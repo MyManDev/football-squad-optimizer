@@ -1,9 +1,9 @@
 {
   "contract_version": "fixtures_v1",
-  "generated_at_utc": "2026-10-30T08:03:58Z",
+  "generated_at_utc": "2026-11-04T06:29:19Z",
   "payload": {
-    "captured_at_utc": "2026-10-30T07:00:58.818398Z",
-    "current_gameweek": 9,
+    "captured_at_utc": "2026-11-04T02:00:46.600538Z",
+    "current_gameweek": 10,
     "gameweeks": [
       {
         "deadline_utc": "2026-08-21T17:30:00Z",
@@ -1422,15 +1422,15 @@
               "short_name": "MUN",
               "team_id": 16
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 0,
+            "finished": true,
             "fixture_id": 84,
             "home": {
               "name": "Chelsea",
               "short_name": "CHE",
               "team_id": 6
             },
-            "home_score": null,
+            "home_score": 2,
             "kickoff_utc": "2026-10-31T12:30:00Z"
           },
           {
@@ -1439,15 +1439,15 @@
               "short_name": "LEE",
               "team_id": 13
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 0,
+            "finished": true,
             "fixture_id": 82,
             "home": {
               "name": "Bournemouth",
               "short_name": "BOU",
               "team_id": 3
             },
-            "home_score": null,
+            "home_score": 2,
             "kickoff_utc": "2026-10-31T15:00:00Z"
           },
           {
@@ -1456,15 +1456,15 @@
               "short_name": "NFO",
               "team_id": 18
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 0,
+            "finished": true,
             "fixture_id": 83,
             "home": {
               "name": "Brentford",
               "short_name": "BRE",
               "team_id": 4
             },
-            "home_score": null,
+            "home_score": 2,
             "kickoff_utc": "2026-10-31T15:00:00Z"
           },
           {
@@ -1473,15 +1473,15 @@
               "short_name": "SUN",
               "team_id": 20
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 1,
+            "finished": true,
             "fixture_id": 85,
             "home": {
               "name": "Coventry City",
               "short_name": "COV",
               "team_id": 7
             },
-            "home_score": null,
+            "home_score": 3,
             "kickoff_utc": "2026-10-31T15:00:00Z"
           },
           {
@@ -1490,15 +1490,15 @@
               "short_name": "IPS",
               "team_id": 12
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 2,
+            "finished": true,
             "fixture_id": 86,
             "home": {
               "name": "Hull City",
               "short_name": "HUL",
               "team_id": 11
             },
-            "home_score": null,
+            "home_score": 2,
             "kickoff_utc": "2026-10-31T15:00:00Z"
           },
           {
@@ -1507,15 +1507,15 @@
               "short_name": "BHA",
               "team_id": 5
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 1,
+            "finished": true,
             "fixture_id": 88,
             "home": {
               "name": "Man City",
               "short_name": "MCI",
               "team_id": 15
             },
-            "home_score": null,
+            "home_score": 0,
             "kickoff_utc": "2026-10-31T15:00:00Z"
           },
           {
@@ -1524,15 +1524,15 @@
               "short_name": "CRY",
               "team_id": 8
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 0,
+            "finished": true,
             "fixture_id": 90,
             "home": {
               "name": "Spurs",
               "short_name": "TOT",
               "team_id": 19
             },
-            "home_score": null,
+            "home_score": 2,
             "kickoff_utc": "2026-10-31T17:30:00Z"
           },
           {
@@ -1541,15 +1541,15 @@
               "short_name": "FUL",
               "team_id": 10
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 1,
+            "finished": true,
             "fixture_id": 81,
             "home": {
               "name": "Aston Villa",
               "short_name": "AVL",
               "team_id": 2
             },
-            "home_score": null,
+            "home_score": 1,
             "kickoff_utc": "2026-10-31T20:00:00Z"
           },
           {
@@ -1558,15 +1558,15 @@
               "short_name": "ARS",
               "team_id": 1
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 1,
+            "finished": true,
             "fixture_id": 87,
             "home": {
               "name": "Liverpool",
               "short_name": "LIV",
               "team_id": 14
             },
-            "home_score": null,
+            "home_score": 0,
             "kickoff_utc": "2026-11-01T16:30:00Z"
           },
           {
@@ -1575,15 +1575,15 @@
               "short_name": "EVE",
               "team_id": 9
             },
-            "away_score": null,
-            "finished": false,
+            "away_score": 1,
+            "finished": true,
             "fixture_id": 89,
             "home": {
               "name": "Newcastle",
               "short_name": "NEW",
               "team_id": 17
             },
-            "home_score": null,
+            "home_score": 0,
             "kickoff_utc": "2026-11-02T20:00:00Z"
           }
         ],
@@ -6695,7 +6695,7 @@
       }
     ],
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+    "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
     "unscheduled_count": 0
   }
 }

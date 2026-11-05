@@ -67,6 +67,18 @@
   font-size: var(--step-2);
   font-weight: 600;
   cursor: pointer;
+  transition:
+    background-color var(--motion-ui-fast),
+    opacity var(--motion-ui-fast);
+}
+
+.form button:hover:not(:disabled) {
+  background: var(--color-board);
+  color: var(--color-board-text);
+}
+
+.form[aria-busy="true"] button {
+  opacity: 0.7;
 }
 
 .form :disabled {

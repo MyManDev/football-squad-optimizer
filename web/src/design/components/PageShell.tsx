@@ -32,41 +32,11 @@ import {
 } from "../shell/nav";
 import { FIXTURE_SHEET_ID, ShellContext, type ShellContextValue } from "../shell/ShellContext";
 import { readSidebarCollapsed, writeSidebarCollapsed } from "../shell/sidebarPreference";
-import { crossfade } from "../viewTransition";
+import { usePageViewport } from "../shell/usePageViewport";
+import { arriveWithoutSnapshot, crossfade } from "../viewTransition";
 import { MatchScene } from "./MatchScene";
 import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
-
-/** A link to an id inside the page (the squad's '#kadro') scrolls there once it has rendered. */
-function useScrollToHash(hash: string, key: string) {
-  useEffect(() => {
-    let id: string;
-    try {
-      id = decodeURIComponent(hash.slice(1));
-    } catch {
-      return;
-    }
-    if (!id) return;
-    const reveal = () => {
-      const target = document.getElementById(id);
-      target?.scrollIntoView?.({ block: "start" });
-      return target !== null;
-    };
-    if (reveal()) return;
-    // The page may still be reading its documents; wait a little for the target to appear.
-    let timer = 0;
-    const observer = new MutationObserver(() => {
-      if (reveal()) stop();
-    });
-    const stop = () => {
-      observer.disconnect();
-      window.clearTimeout(timer);
-    };
-    timer = window.setTimeout(stop, 5000);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return stop;
-  }, [hash, key]);
-}
 
 /**
  * Direction D's app shell, around every page.
@@ -170,12 +140,55 @@ export function PageShell({
   // identity icon opened it; closing returns it to the opener, unless a step taken in the
   // drawer (Değiştir) has already put focus on the page.
   const mainRef = useRef<HTMLElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const markerRef = useRef<HTMLSpanElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
   const whoChangeRef = useRef<HTMLButtonElement>(null);
   const whoRailRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const wasOverlay = useRef(false);
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const marker = markerRef.current;
+    if (!nav || !marker) return;
+    const place = () => {
+      const selected = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      marker.hidden = !selected;
+      if (!selected) return;
+      marker.style.height = `${selected.offsetHeight}px`;
+      marker.style.transform = `translateY(${selected.offsetTop}px)`;
+    };
+    place();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(place);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [location.pathname, location.search, location.hash, identity, mode]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const controls = [
+        ...(panelRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]',
+        ) ?? []),
+      ].filter((node) => node.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus({ preventScroll: true });
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus({ preventScroll: true });
+      }
+    };
+    document.addEventListener("keydown", trap);
+    return () => document.removeEventListener("keydown", trap);
+  }, [drawerOpen]);
   // The rail's identity icon opened the drawer. The icon itself is gone while the drawer
   // is open, so focus returns to the one drawn again when it closes.
   const openedFromWho = useRef(false);
@@ -184,7 +197,9 @@ export function PageShell({
       returnFocus.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
       if (drawerOpen)
-        ((openedFromWho.current ? whoChangeRef.current : null) ?? toggleRef.current)?.focus();
+        ((openedFromWho.current ? whoChangeRef.current : null) ?? toggleRef.current)?.focus({
+          preventScroll: true,
+        });
     } else if (!overlay && wasOverlay.current) {
       const opener = openedFromWho.current ? whoRailRef.current : returnFocus.current;
       returnFocus.current = null;
@@ -193,8 +208,9 @@ export function PageShell({
       const onPage = active instanceof Node && (mainRef.current?.contains(active) ?? false);
       if (onPage) {
         // Focus is already on the page; it stays there.
-      } else if (opener?.isConnected) opener.focus();
-      else (layout === "phone" ? menuRef.current : toggleRef.current)?.focus();
+      } else if (opener?.isConnected) opener.focus({ preventScroll: true });
+      else
+        (layout === "phone" ? menuRef.current : toggleRef.current)?.focus({ preventScroll: true });
     }
     wasOverlay.current = overlay;
   }, [overlay, drawerOpen, layout]);
@@ -204,7 +220,7 @@ export function PageShell({
   useEffect(() => {
     if (!focusAfterExpand.current || collapsed) return;
     focusAfterExpand.current = false;
-    (whoChangeRef.current ?? toggleRef.current)?.focus();
+    (whoChangeRef.current ?? toggleRef.current)?.focus({ preventScroll: true });
   }, [collapsed]);
 
   const setDesktopCollapsed = (next: boolean) => {
@@ -213,7 +229,10 @@ export function PageShell({
   };
   const onToggle = () => {
     if (layout === "desktop") setDesktopCollapsed(!collapsed);
-    else setDrawerOpen(!drawerOpen);
+    else {
+      if (!drawerOpen) toggleRef.current?.focus({ preventScroll: true });
+      setDrawerOpen(!drawerOpen);
+    }
   };
   const openWho = () => {
     if (layout === "desktop") {
@@ -234,6 +253,7 @@ export function PageShell({
   // latest. The drawer closes inside the update and fades out with the page it stood over.
   // A link to the page already open, or a click for a new tab, is left to the link.
   const navigate = useNavigate();
+  useLayoutEffect(() => arriveWithoutSnapshot(mainRef.current), [location.pathname]);
   const landed = useRef<(() => void) | null>(null);
   useEffect(() => {
     landed.current?.();
@@ -283,7 +303,8 @@ export function PageShell({
     stopWatching.current?.();
     const main = mainRef.current;
     if (!main) return;
-    const options = { preventScroll: hash.current !== "" };
+    const options = { preventScroll: true };
+    if (!hash.current) window.scrollTo({ top: 0, behavior: "instant" });
     main.focus(options);
     const toHeading = () => {
       const heading = main.querySelector<HTMLElement>("h1");
@@ -325,7 +346,7 @@ export function PageShell({
     [sheetOpen, registerSheet, focusPage],
   );
 
-  useScrollToHash(location.hash, location.key);
+  usePageViewport(focusPage);
 
   const toggleLabel =
     layout === "desktop"
@@ -388,7 +409,10 @@ export function PageShell({
               aria-controls="sidebar"
               aria-expanded={drawerOpen}
               aria-haspopup="dialog"
-              onClick={() => setDrawerOpen(true)}
+              onClick={(event) => {
+                event.currentTarget.focus({ preventScroll: true });
+                setDrawerOpen(true);
+              }}
             >
               <MenuIcon />
             </button>
@@ -403,7 +427,10 @@ export function PageShell({
                 aria-controls={FIXTURE_SHEET_ID}
                 aria-expanded={sheetOpen}
                 aria-haspopup="dialog"
-                onClick={() => setSheetOpen(true)}
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
+                  setSheetOpen(true);
+                }}
               >
                 {fixturesFace}
               </button>
@@ -426,6 +453,7 @@ export function PageShell({
           inert={sheetOpen}
         >
           <div
+            ref={panelRef}
             className={styles.panel}
             role={drawerOpen ? "dialog" : undefined}
             aria-modal={drawerOpen ? true : undefined}
@@ -488,7 +516,8 @@ export function PageShell({
                   </p>
                 </div>
               ) : null}
-              <nav aria-label={copy.primary} className={styles.nav}>
+              <nav ref={navRef} aria-label={copy.primary} className={styles.nav}>
+                <span ref={markerRef} className={styles.navMarker} aria-hidden="true" />
                 {items.map((item) => (
                   <Link
                     key={item.key}
@@ -515,9 +544,12 @@ export function PageShell({
         <main id="main" ref={mainRef} tabIndex={-1} className={styles.main} inert={overlay}>
           {children}
         </main>
-        {overlay ? (
-          <div className={styles.scrim} aria-hidden="true" onClick={closeOverlays} />
-        ) : null}
+        <div
+          className={styles.scrim}
+          data-open={overlay || undefined}
+          aria-hidden="true"
+          onClick={closeOverlays}
+        />
       </div>
     </ShellContext.Provider>
   );

@@ -541,7 +541,7 @@ describe("the app shell on a phone", () => {
     await user.click(screen.getByRole("link", { name: TR.league }));
     expect(location()).toBe(MEMBERS);
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(container.querySelector(".scrim")).toBeNull();
+    expect(container.querySelector(".scrim")).not.toHaveAttribute("data-open");
   });
 
   it("links the phone bar's 'Fikstür' to the list, or opens the page's sheet when it has one", async () => {

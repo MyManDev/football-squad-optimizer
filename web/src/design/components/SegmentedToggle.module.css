@@ -20,6 +20,9 @@
   font-weight: 500;
   line-height: 16px;
   cursor: pointer;
+  transition:
+    background-color var(--motion-ui-fast),
+    color var(--motion-ui-fast);
 }
 
 .toggle button svg {

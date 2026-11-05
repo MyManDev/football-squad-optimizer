@@ -1,29 +1,808 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-10-30T07:00:58.818398Z",
+  "generated_at_utc": "2026-11-04T02:00:46.600538Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 6654210,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+    "as_of_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
     "weeks": [
       {
-        "gameweek": 9,
+        "gameweek": 10,
         "status": "unsettled",
         "reason": "not_settled",
-        "deadline_utc": "2026-10-31T11:00:00Z",
-        "advice_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
-        "advice_captured_at_utc": "2026-10-30T07:00:58.818398Z",
-        "advice_generated_at_utc": "2026-10-30T08:03:14Z",
-        "advice_sha256": "15f6e82d12c9c404637c7550322b873c4d3e772b01ccac64de7e07100a701ffd",
+        "deadline_utc": "2026-11-06T18:30:00Z",
+        "advice_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+        "advice_captured_at_utc": "2026-11-04T02:00:46.600538Z",
+        "advice_generated_at_utc": "2026-11-04T06:28:27Z",
+        "advice_sha256": "4d9e880cd31c41f0acbd5c9300f14344d21da7203ddf134c7b671a0d22723423",
         "outcome_snapshot_id": null,
         "outcome_captured_at_utc": null,
-        "expected_own_points": 52.107079345813894,
+        "expected_own_points": 56.88156970938806,
         "suggested": null,
         "actual": null,
         "actual_reason": null,
         "net_difference": null,
         "players": [],
+        "recorded_plans": [
+          {
+            "published_path": "advice/6654210/saf-puan/1.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Teddy Sharman-Lowe"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-8548384.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "John Egan",
+                "player_in": "Abdoul Ouattara"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-8548384.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Teddy Sharman-Lowe"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-5.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Teddy Sharman-Lowe"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-10.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Teddy Sharman-Lowe"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-20.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Teddy Sharman-Lowe"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-30.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Maxim De Cuyper",
+                "player_in": "Jan Paul van Hecke"
+              }
+            ],
+            "expected_points_cost": 0.288365005240216,
+            "expected_points_cost_ceiling": 0.288365005240216,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-40.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Maxim De Cuyper",
+                "player_in": "Jan Paul van Hecke"
+              }
+            ],
+            "expected_points_cost": 0.288365005240216,
+            "expected_points_cost_ceiling": 0.288365005240216,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-50.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Maxim De Cuyper",
+                "player_in": "Jan Paul van Hecke"
+              }
+            ],
+            "expected_points_cost": 0.288365005240216,
+            "expected_points_cost_ceiling": 0.288365005240216,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-8548384/top100-5.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "John Egan",
+                "player_in": "Abdoul Ouattara"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-8548384/top100-10.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "John Egan",
+                "player_in": "Abdoul Ouattara"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-8548384/top100-20.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "John Egan",
+                "player_in": "Abdoul Ouattara"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-8548384/top100-30.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "John Egan",
+                "player_in": "Abdoul Ouattara"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-8548384/top100-40.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "John Egan",
+                "player_in": "Abdoul Ouattara"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-8548384/top100-50.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "John Egan",
+                "player_in": "Abdoul Ouattara"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-8548384/top100-5.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Teddy Sharman-Lowe"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-8548384/top100-10.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Teddy Sharman-Lowe"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-8548384/top100-20.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Teddy Sharman-Lowe"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-8548384/top100-30.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Maxim De Cuyper",
+                "player_in": "Jan Paul van Hecke"
+              }
+            ],
+            "expected_points_cost": 0.2883650052402089,
+            "expected_points_cost_ceiling": 0.2883650052402089,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-8548384/top100-40.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Maxim De Cuyper",
+                "player_in": "Jan Paul van Hecke"
+              }
+            ],
+            "expected_points_cost": 0.2883650052402089,
+            "expected_points_cost_ceiling": 0.2883650052402089,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-8548384/top100-50.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 8548384,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Maxim De Cuyper",
+                "player_in": "Jan Paul van Hecke"
+              }
+            ],
+            "expected_points_cost": 0.2883650052402089,
+            "expected_points_cost_ceiling": 0.2883650052402089,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/chip-freehit.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "freehit",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Pascal Groß",
+                "player_in": "Declan Rice"
+              },
+              {
+                "player_out": "John Egan",
+                "player_in": "Luke O'Nien"
+              },
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Antonín Kinský"
+              },
+              {
+                "player_out": "Jay Dasilva",
+                "player_in": "Issa Diop"
+              },
+              {
+                "player_out": "Marcus Tavernier",
+                "player_in": "Bryan Mbeumo"
+              },
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Bart Verbruggen"
+              },
+              {
+                "player_out": "Cole Palmer",
+                "player_in": "Yasin Ayari"
+              },
+              {
+                "player_out": "Francisco Evanilson de Lima Barbosa",
+                "player_in": "Alexander Isak"
+              },
+              {
+                "player_out": "Maxim De Cuyper",
+                "player_in": "Luka Vušković"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/chip-bboost.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "bboost",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ellery Balcombe",
+                "player_in": "Teddy Sharman-Lowe"
+              }
+            ],
+            "expected_points_cost": 0.0
+          }
+        ]
+      },
+      {
+        "gameweek": 9,
+        "status": "available",
+        "reason": null,
+        "deadline_utc": "2026-10-31T11:00:00Z",
+        "advice_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+        "advice_captured_at_utc": "2026-10-30T07:00:58.818398Z",
+        "advice_generated_at_utc": "2026-10-30T08:03:14Z",
+        "advice_sha256": "15f6e82d12c9c404637c7550322b873c4d3e772b01ccac64de7e07100a701ffd",
+        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
+        "expected_own_points": 52.107079345813894,
+        "suggested": {
+          "gross_points": 46.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 46.0,
+          "captain_bonus_points": 2.0,
+          "autosub_points": 0.0,
+          "chip": null
+        },
+        "actual": {
+          "gross_points": 74.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 74.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+            "captain": {
+              "player_id": 223094,
+              "name": "Haaland",
+              "points": 2.0,
+              "multiplier": 2,
+              "counted_points": 4.0
+            },
+            "transfers": [
+              {
+                "player_out": "Dubravka",
+                "player_in": {
+                  "player_id": 235448,
+                  "name": "Balcombe",
+                  "points": 0.0,
+                  "multiplier": 0,
+                  "counted_points": 0.0
+                }
+              },
+              {
+                "player_out": "Maitland-Niles",
+                "player_in": {
+                  "player_id": 226597,
+                  "name": "Gabriel",
+                  "points": 6.0,
+                  "multiplier": 1,
+                  "counted_points": 6.0
+                }
+              },
+              {
+                "player_out": "Botman",
+                "player_in": {
+                  "player_id": 465730,
+                  "name": "De Cuyper",
+                  "points": 9.0,
+                  "multiplier": 1,
+                  "counted_points": 9.0
+                }
+              },
+              {
+                "player_out": "Mitchell",
+                "player_in": {
+                  "player_id": 199798,
+                  "name": "Konsa",
+                  "points": 10.0,
+                  "multiplier": 1,
+                  "counted_points": 10.0
+                }
+              },
+              {
+                "player_out": "Ajer",
+                "player_in": {
+                  "player_id": 173878,
+                  "name": "Dasilva",
+                  "points": 2.0,
+                  "multiplier": 0,
+                  "counted_points": 0.0
+                }
+              },
+              {
+                "player_out": "Greaves",
+                "player_in": {
+                  "player_id": 108416,
+                  "name": "Egan",
+                  "points": 1.0,
+                  "multiplier": 0,
+                  "counted_points": 0.0
+                }
+              },
+              {
+                "player_out": "B.Fernandes",
+                "player_in": {
+                  "player_id": 244851,
+                  "name": "Palmer",
+                  "points": 8.0,
+                  "multiplier": 1,
+                  "counted_points": 8.0
+                }
+              },
+              {
+                "player_out": "Mbeumo",
+                "player_in": {
+                  "player_id": 201658,
+                  "name": "Tavernier",
+                  "points": 3.0,
+                  "multiplier": 1,
+                  "counted_points": 3.0
+                }
+              },
+              {
+                "player_out": "M.Sangaré",
+                "player_in": {
+                  "player_id": 243413,
+                  "name": "Slater",
+                  "points": 2.0,
+                  "multiplier": 0,
+                  "counted_points": 0.0
+                }
+              },
+              {
+                "player_out": "João Pedro",
+                "player_in": {
+                  "player_id": 517052,
+                  "name": "N.Jackson",
+                  "points": 9.0,
+                  "multiplier": 1,
+                  "counted_points": 9.0
+                }
+              },
+              {
+                "player_out": "Kusi-Asare",
+                "player_in": {
+                  "player_id": 444102,
+                  "name": "Evanilson",
+                  "points": 9.0,
+                  "multiplier": 1,
+                  "counted_points": 9.0
+                }
+              }
+            ]
+          }
+        },
+        "actual_reason": null,
+        "net_difference": -28.0,
+        "players": [
+          {
+            "player_id": 154561,
+            "name": "David Raya Martín",
+            "position": "GK",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.806267242511375,
+            "realized_points": 5.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 5.0,
+            "forecast_error": 1.193732757488625
+          },
+          {
+            "player_id": 191866,
+            "name": "Kristoffer Ajer",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.883823065730928,
+            "realized_points": 8.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 8.0,
+            "forecast_error": 5.116176934269072
+          },
+          {
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.3701078294195805,
+            "realized_points": 3.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 3.0,
+            "forecast_error": 0.6298921705804195
+          },
+          {
+            "player_id": 220237,
+            "name": "Sven Botman",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.260564717674938,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -2.260564717674938
+          },
+          {
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": true,
+            "expected_points": 4.578163641507459,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -2.5781636415074587
+          },
+          {
+            "player_id": 244850,
+            "name": "Morgan Rogers",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.448732989223336,
+            "realized_points": 9.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 9.0,
+            "forecast_error": 4.551267010776664
+          },
+          {
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.204415455048864,
+            "realized_points": 1.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 1.0,
+            "forecast_error": -3.2044154550488644
+          },
+          {
+            "player_id": 60307,
+            "name": "Pascal Groß",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.823770606998293,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -1.823770606998293
+          },
+          {
+            "player_id": 513545,
+            "name": "Mamadou Sangaré",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.5002747319812415,
+            "realized_points": 3.0,
+            "minutes": 61,
+            "multiplier": 1,
+            "counted_points": 3.0,
+            "forecast_error": 0.4997252680187585
+          },
+          {
+            "player_id": 223094,
+            "name": "Erling Haaland",
+            "position": "FWD",
+            "role": "starter",
+            "captain": true,
+            "vice_captain": false,
+            "expected_points": 8.453362463981913,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 2,
+            "counted_points": 4.0,
+            "forecast_error": -6.453362463981913
+          },
+          {
+            "player_id": 502500,
+            "name": "Igor Thiago Nascimento Rodrigues",
+            "position": "FWD",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.324234137754055,
+            "realized_points": 9.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 9.0,
+            "forecast_error": 4.675765862245945
+          },
+          {
+            "player_id": 67089,
+            "name": "Martin Dubravka",
+            "position": "GK",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.10027015579447286,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -0.10027015579447286
+          },
+          {
+            "player_id": 154043,
+            "name": "Ainsley Maitland-Niles",
+            "position": "DEF",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 1.5307202964700548,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -1.5307202964700548
+          },
+          {
+            "player_id": 449429,
+            "name": "Jacob Greaves",
+            "position": "DEF",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.40814877568357155,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -0.40814877568357155
+          },
+          {
+            "player_id": 631786,
+            "name": "Jonah Kusi-Asare",
+            "position": "FWD",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.09962495391226733,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -0.09962495391226733
+          }
+        ],
         "recorded_plans": [
           {
             "published_path": "advice/6654210/saf-puan/1.json",
@@ -647,8 +1426,8 @@
         "advice_captured_at_utc": "2026-10-23T11:16:47.162538Z",
         "advice_generated_at_utc": "2026-10-23T12:40:33Z",
         "advice_sha256": "c3c36ae6947346ed5254aca7ec47364718a5417d9b7708f936ec18a999ce5947",
-        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
-        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
+        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
         "expected_own_points": 53.82521910180709,
         "suggested": {
           "gross_points": 33.0,
@@ -1514,8 +2293,8 @@
         "advice_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "advice_generated_at_utc": "2026-10-16T07:13:49Z",
         "advice_sha256": "ab4ac386945c4697e27818a531424f25485a58bddbb1f48f1cb8c70e69a7f2df",
-        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
-        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
+        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
         "expected_own_points": 56.7161534182527,
         "suggested": {
           "gross_points": 59.0,
@@ -2515,8 +3294,8 @@
         "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
         "advice_generated_at_utc": "2026-10-10T06:07:04Z",
         "advice_sha256": "3bef9dd6ef7b70d92f886b335b7844236cad3d8f8dacdc6a9b14cf4fe62990cf",
-        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
-        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
+        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
         "expected_own_points": 56.090116225065955,
         "suggested": {
           "gross_points": 59.0,
@@ -3506,8 +4285,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "134cc434c0388a0115b945bcfdd200b406af728491708d1a5473cc1123750c8f",
-        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
-        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
+        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
         "expected_own_points": 56.736976855319185,
         "suggested": {
           "gross_points": 67.0,
@@ -3768,8 +4547,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "a084c31250ec69270b50f69f59829efb4f2a75fc43672c51536334bb821e8e61",
-        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
-        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
+        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
         "expected_own_points": 57.31589811723791,
         "suggested": {
           "gross_points": 83.0,

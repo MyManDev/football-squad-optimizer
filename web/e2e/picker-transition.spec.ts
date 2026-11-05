@@ -1,6 +1,7 @@
 import { expect, test, type Browser } from "@playwright/test";
 
 import { MESSAGES } from "../src/i18n/messages";
+import { atRest } from "./atRest";
 import { installLeagueMocks } from "./leagueMocks";
 
 // The step from "Sen kimsin?" to the page (#1131) in a real browser: with motion the page
@@ -42,7 +43,7 @@ async function confirmIn(
     });
   }
   await expect(page.getByRole("group", { name: copy.legend })).toHaveCount(0);
-  await page.evaluate(() => Promise.all(document.getAnimations().map((motion) => motion.finished)));
+  await atRest(page);
   const state = {
     url: page.url(),
     heading: await page.getByRole("heading", { level: 1 }).first().textContent(),

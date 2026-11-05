@@ -11,6 +11,18 @@ import styles from "./WhatIfPanel.module.css";
 
 const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
 
+// Player names keep their spelling on screen; searches accept either keyboard's letters.
+const searchKey = (value: string) =>
+  value
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/ı/g, "i")
+    .replace(/ø/g, "o")
+    .replace(/ł/g, "l")
+    .trim()
+    .replace(/\s+/g, " ");
+
 function isPosition(code: string): code is (typeof POSITIONS)[number] {
   return (POSITIONS as readonly string[]).includes(code);
 }
@@ -37,11 +49,14 @@ export function WhatIfPanel({
   const copy = messages.leagueMembers;
   const addId = useId();
   const positionId = useId();
+  const searchId = useId();
   const whatIf = useWhatIf(squad, advised, dependencies);
   const { phase, document, account, advisedAccount, points } = whatIf;
   // The player chosen in the list; only the add button adds, so moving through the list
   // with the keyboard changes nothing.
   const [pick, setPick] = useState("");
+  // The name the add list is filtered by, or "" for every player.
+  const [query, setQuery] = useState("");
   // The position the add list shows, or "" for every position.
   const [only, setOnly] = useState<"" | (typeof POSITIONS)[number]>("");
   // Where focus goes after a removal unmounts the row that held it: the next row's remove
@@ -116,12 +131,17 @@ export function WhatIfPanel({
       : null;
   const changed =
     whatIf.squad.length !== advised.length || whatIf.squad.some((id) => !advisedSet.has(id));
-  const offered = POSITIONS.filter((code) => only === "" || code === only).map((code) => ({
-    code,
-    players: document.players
-      .filter((player) => player.position === code && !chosen.has(player.id))
-      .sort((a, b) => b.expected_points - a.expected_points || a.id - b.id),
-  }));
+  const needle = searchKey(query);
+  const matches = (player: DevicePlanPlayer) =>
+    needle === "" || searchKey(`${player.short_name} ${player.name}`).includes(needle);
+  const offered = POSITIONS.filter((code) => only === "" || code === only)
+    .map((code) => ({
+      code,
+      players: document.players
+        .filter((player) => player.position === code && !chosen.has(player.id) && matches(player))
+        .sort((a, b) => b.expected_points - a.expected_points || a.id - b.id),
+    }))
+    .filter((group) => needle === "" || group.players.length > 0);
 
   const removeFrom = (player: DevicePlanPlayer, group: DevicePlanPlayer[]) => {
     const at = group.indexOf(player);
@@ -230,6 +250,18 @@ export function WhatIfPanel({
       })}
 
       <div className={styles.add}>
+        <div className={styles.field}>
+          <label htmlFor={searchId}>{copy.whatIfSearch}</label>
+          <input
+            id={searchId}
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPick("");
+            }}
+          />
+        </div>
         <div className={styles.field}>
           <label htmlFor={positionId}>{copy.whatIfPosition}</label>
           <select

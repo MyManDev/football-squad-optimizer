@@ -15,6 +15,7 @@ from squadopt.application.football_participation import (
     participation_summary,
 )
 from squadopt.application.manager_words import (
+    AMBIGUOUS_CITED_DOCUMENT,
     SOURCE_CHECK_CITED_DOCUMENTS_HELD,
     ManagerWord,
     ManagerWords,
@@ -177,6 +178,21 @@ def test_optional_companion_refusal_preserves_football_and_reports_label(reason)
                 "publication_verified": False,
             },
             "publication_unverified",
+        ),
+        (
+            {
+                "words": None,
+                "club": None,
+                "source_url": None,
+                "fetched_at_utc": None,
+                "source_sha256": None,
+                "span_start": None,
+                "span_end": None,
+                "scope_verified": False,
+                "publication_verified": False,
+                "document_binding_reason": AMBIGUOUS_CITED_DOCUMENT,
+            },
+            AMBIGUOUS_CITED_DOCUMENT,
         ),
         ({"disposition": "stated_minutes_limited"}, "categorical_statement_has_no_probability"),
     ],

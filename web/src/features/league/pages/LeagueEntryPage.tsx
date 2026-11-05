@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { useLanguage } from "../../../i18n/context";
+import { crossfade } from "../../../design/viewTransition";
 import {
   entryAddress,
   FIND_YOURSELF,
@@ -89,10 +90,12 @@ export function LeagueEntryPage({
   const [entry, setEntry] = useState("");
   const [entryInvalid, setEntryInvalid] = useState(false);
   const active = useRef(true);
+  const arrived = useRef<(() => void) | null>(null);
   useEffect(() => {
     active.current = true;
     return () => {
       active.current = false;
+      arrived.current?.();
     };
   }, []);
 
@@ -110,28 +113,36 @@ export function LeagueEntryPage({
       const result = await lookupPublishedLeague(leagueId);
       if (!active.current) return;
       if (result.status === "connected") {
-        const here = inPlace ? legacyLeagueAddress(location.pathname, leagueId) : null;
-        if (here !== null) {
-          // An address from before the number, rewritten with it: the member step is asked
-          // there, and its state puts focus on the picker as on the other path. The
-          // gate at the new address chooses the league it names, as it does for any league
-          // reached by its address. Choosing it here first would let the gate rewrite the
-          // old address on its own before this navigation lands, without the step state.
-          navigate(`${here}${location.search}${location.hash}`, {
-            replace: true,
-            state: PICK_HERE,
-          });
-          return;
-        }
-        chooseLeague(leagueId);
-        navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
+        const arrival = new Promise<void>((resolve) => {
+          arrived.current = resolve;
+        });
+        crossfade(
+          () => {
+            const here = inPlace ? legacyLeagueAddress(location.pathname, leagueId) : null;
+            if (here !== null) {
+              // An address from before the number, rewritten with it: the member step is asked
+              // there, and its state puts focus on the picker as on the other path. The
+              // gate at the new address chooses the league it names, as it does for any league
+              // reached by its address. Choosing it here first would let the gate rewrite the
+              // old address on its own before this navigation lands, without the step state.
+              navigate(`${here}${location.search}${location.hash}`, {
+                replace: true,
+                state: PICK_HERE,
+              });
+              return;
+            }
+            chooseLeague(leagueId);
+            navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
+          },
+          () => arrival,
+        );
       } else if (onRetry !== undefined && leagueIdInAddress(location.pathname) === leagueId) {
         // The league this address names, asked for again: the gate reads it once more.
         setState(unopened === null ? "idle" : REFUSAL_STATE[unopened.refusal]);
         onRetry();
       } else {
         // Not published: its own address, where the gate reads it from the forwarder.
-        navigate(leagueAddress(leagueId), { replace: inPlace });
+        crossfade(() => navigate(leagueAddress(leagueId), { replace: inPlace }));
       }
     } catch (error) {
       if (active.current) setState(error instanceof LeagueDataMissing ? "missing" : "failed");
@@ -145,7 +156,7 @@ export function LeagueEntryPage({
       setEntryInvalid(true);
       return;
     }
-    navigate(entryAddress(entryId));
+    crossfade(() => navigate(entryAddress(entryId)));
   }
 
   const status =
@@ -165,81 +176,83 @@ export function LeagueEntryPage({
   return (
     <div className={styles.page} data-no-match-scene="">
       <h1 className={styles.title}>{copy.title}</h1>
-        <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
-          <label htmlFor="league-id">{copy.label}</label>
-          <p id="league-entry-hint" className={styles.hint}>
-            {copy.hint}
-          </p>
-          <input
-            id="league-id"
-            name="leagueId"
-            inputMode="numeric"
-            autoComplete="off"
-            value={value}
-            onChange={(event) => {
-              setValue(event.target.value);
-              setState("idle");
-            }}
-            disabled={state === "loading"}
-            aria-invalid={state === "invalid"}
-            aria-describedby="league-entry-hint league-entry-status"
-          />
-          {/* Where the number is found, folded right under the field that asks for it, so a
+      <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
+        <label htmlFor="league-id">{copy.label}</label>
+        <p id="league-entry-hint" className={styles.hint}>
+          {copy.hint}
+        </p>
+        <input
+          id="league-id"
+          name="leagueId"
+          inputMode="numeric"
+          enterKeyHint="go"
+          autoComplete="off"
+          value={value}
+          onChange={(event) => {
+            setValue(event.target.value);
+            setState("idle");
+          }}
+          disabled={state === "loading"}
+          aria-invalid={state === "invalid"}
+          aria-describedby="league-entry-hint league-entry-status"
+        />
+        {/* Where the number is found, folded right under the field that asks for it, so a
               visitor who does not know it looks no further than the field. */}
-          <FplIdHelp />
-          <button type="submit" disabled={state === "loading"}>
-            {copy.submit}
+        <FplIdHelp />
+        <button type="submit" disabled={state === "loading"}>
+          {copy.submit}
+        </button>
+        <p id="league-entry-status" className={styles.status} role="status">
+          {status}
+        </p>
+        {/* A forwarder that could not answer: the same league again, or a listed one. */}
+        {state === "cannotOpen" && onRetry !== undefined ? (
+          <button type="button" className={styles.secondary} onClick={onRetry}>
+            {copy.retry}
           </button>
-          <p id="league-entry-status" className={styles.status} role="status">
-            {status}
-          </p>
-          {/* A forwarder that could not answer: the same league again, or a listed one. */}
-          {state === "cannotOpen" && onRetry !== undefined ? (
-            <button type="button" className={styles.secondary} onClick={onRetry}>
-              {copy.retry}
-            </button>
-          ) : null}
-          {state === "cannotOpen" && others.length > 0 ? (
-            <nav aria-labelledby="league-entry-listed" className={styles.listed}>
-              <h2 id="league-entry-listed" className={styles.listedTitle}>
-                {copy.listedLeagues}
-              </h2>
-              <ul>
-                {others.map((league) => (
-                  <li key={league.leagueId}>
-                    <Link to={leagueAddress(league.leagueId)}>{league.leagueName}</Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ) : null}
-        </form>
-        {/* One team on its own, by its number. A page that needs a league asks for one only. */}
-          <form onSubmit={submitEntry} className={`${styles.form} ${styles.entryForm}`}>
-            <label htmlFor="entry-id">{copy.entryLabel}</label>
-            <p id="entry-id-hint" className={styles.hint}>
-              {copy.entryHint}
-            </p>
-            <input
-              id="entry-id"
-              name="entryId"
-              inputMode="numeric"
-              autoComplete="off"
-              value={entry}
-              onChange={(event) => {
-                setEntry(event.target.value);
-                setEntryInvalid(false);
-              }}
-              aria-invalid={entryInvalid}
-              aria-describedby="entry-id-hint entry-id-status"
-            />
-            <button type="submit" className={styles.secondary}>
-              {copy.entrySubmit}
-            </button>
-            <p id="entry-id-status" aria-live="polite">
-              {entryInvalid ? copy.entryInvalid : ""}
-            </p>
-          </form>
+        ) : null}
+        {state === "cannotOpen" && others.length > 0 ? (
+          <nav aria-labelledby="league-entry-listed" className={styles.listed}>
+            <h2 id="league-entry-listed" className={styles.listedTitle}>
+              {copy.listedLeagues}
+            </h2>
+            <ul>
+              {others.map((league) => (
+                <li key={league.leagueId}>
+                  <Link to={leagueAddress(league.leagueId)}>{league.leagueName}</Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ) : null}
+      </form>
+      {/* One team on its own, by its number. A page that needs a league asks for one only. */}
+      <form onSubmit={submitEntry} className={`${styles.form} ${styles.entryForm}`}>
+        <label htmlFor="entry-id">{copy.entryLabel}</label>
+        <p id="entry-id-hint" className={styles.hint}>
+          {copy.entryHint}
+        </p>
+        <input
+          id="entry-id"
+          name="entryId"
+          inputMode="numeric"
+          enterKeyHint="go"
+          autoComplete="off"
+          value={entry}
+          onChange={(event) => {
+            setEntry(event.target.value);
+            setEntryInvalid(false);
+          }}
+          aria-invalid={entryInvalid}
+          aria-describedby="entry-id-hint entry-id-status"
+        />
+        <button type="submit" className={styles.secondary}>
+          {copy.entrySubmit}
+        </button>
+        <p id="entry-id-status" aria-live="polite">
+          {entryInvalid ? copy.entryInvalid : ""}
+        </p>
+      </form>
     </div>
   );
 }

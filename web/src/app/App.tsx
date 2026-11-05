@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
+import { PageLoading } from "../design/components/PageLoading";
 import { OpeningMark } from "../design/shell/OpeningMark";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
@@ -72,7 +73,7 @@ function LocalizedApp({ basename }: { basename: string }) {
         {/* The shell reads the visitor's league and member through the identity module. */}
         <IdentifiedShell>
           <RouteErrorBoundary>
-            <Suspense fallback={<EmptyState title={messages.common.loading} />}>
+            <Suspense fallback={<PageLoading label={messages.common.loading} />}>
               <Routes>
                 <Route path="/" element={<LeagueEntryPage />} />
                 {/* Every league address names its league; the old shape without the

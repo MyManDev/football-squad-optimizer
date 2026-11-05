@@ -176,10 +176,13 @@ Reuse is unchanged, and it is still asked for with `--previous-news-capture`. Th
 observation is not part of what makes a question the same question. An earlier answer is
 reused as it was given, with its own model revision and the source's own publication times,
 when everything else is the same: provider, model, prompt, endpoint, output format and token
-limit, the season, gameweek and deadline, the roster, and the selected documents with their
-bytes and `Last-Modified`. The observation can still change which documents are selected (a
-newly eligible article, one that has aged out of the seven days), and a different selection
-is a different question. What a later run adds to a reused answer is when it read the pages.
+limit, the season, gameweek and deadline, the roster, the versions of the document selection
+and publication metadata rules, and the selected documents with their bytes and
+`Last-Modified`. The model is shown each document's publication metadata, so a change to
+how it is read must move that version. The observation can still change which documents are
+selected (a newly eligible article, one that has aged out of the seven days), and a
+different selection is a different question. What a later run adds to a reused answer is
+when it read the pages.
 
 Moving the observation changes which documents are eligible in the narrow case above. It is
 not new editorial content, it does not make any statement more reliable, and it is no

@@ -1,22 +1,22 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-30T08:03:14Z",
+  "generated_at_utc": "2026-11-04T06:28:27Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 9,
+    "gameweek": 10,
     "entry_id": 313686,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+    "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
     "moves": [
       {
-        "move_id": "gw09-1",
+        "move_id": "gw10-1",
         "player_out": {
           "player_id": 141746,
           "name": "Bruno Borges Fernandes",
-          "short_name": "Fernandes",
+          "short_name": "B.Fernandes",
           "position": "MID",
           "team": "Man Utd"
         },
@@ -27,25 +27,25 @@
           "position": "MID",
           "team": "Man Utd"
         },
-        "expected_points_delta": -0.37374818645859875,
+        "expected_points_delta": -0.46986990896134273,
         "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": -0.37374818645859875,
-    "expected_points_cost": 2.9514203377219133,
+    "expected_gain_vs_hold": -0.46986990896134273,
+    "expected_points_cost": 1.979735693658995,
     "rival_label": null,
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 52.20569783261734,
+    "expected_own_points": 54.214807515545466,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.453362463981913
+      "expected_points": 7.950379595632534
     },
     "vice_captain": {
       "player_id": 244851,
@@ -53,7 +53,7 @@
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 5.005073584741382
+      "expected_points": 4.798651443301852
     },
     "starting_xi": [
       {
@@ -62,23 +62,23 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 3.021871909660416
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.487225706209676
+        "expected_points": 3.406491380255187
       },
       {
         "player_id": 199798,
         "name": "Ezri Konsa Ngoyo",
-        "short_name": "Ngoyo",
+        "short_name": "Konsa",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.2530503753922586
+        "expected_points": 3.7558255348348126
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "De Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.6846304929766673
       },
       {
         "player_id": 466075,
@@ -86,7 +86,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 2.2733504759159526
+        "expected_points": 3.305822177063959
       },
       {
         "player_id": 244851,
@@ -94,15 +94,7 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.005073584741382
-      },
-      {
-        "player_id": 244850,
-        "name": "Morgan Rogers",
-        "short_name": "Rogers",
-        "position": "MID",
-        "team": "Chelsea",
-        "expected_points": 4.448732989223336
+        "expected_points": 4.798651443301852
       },
       {
         "player_id": 446008,
@@ -110,7 +102,15 @@
         "short_name": "Mbeumo",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 4.204415455048864
+        "expected_points": 4.397598069519702
+      },
+      {
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.290942097915604
       },
       {
         "player_id": 60307,
@@ -118,15 +118,15 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.823770606998293
+        "expected_points": 3.6725165602654712
       },
       {
-        "player_id": 577725,
-        "name": "Josh King",
-        "short_name": "King",
+        "player_id": 614071,
+        "name": "Johan Manzambi",
+        "short_name": "Manzambi",
         "position": "MID",
-        "team": "Fulham",
-        "expected_points": 2.7710888403999125
+        "team": "Aston Villa",
+        "expected_points": 3.5225605046847055
       },
       {
         "player_id": 223094,
@@ -134,7 +134,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.453362463981913
+        "expected_points": 7.950379595632534
       },
       {
         "player_id": 586309,
@@ -142,7 +142,7 @@
         "short_name": "Barry",
         "position": "FWD",
         "team": "Everton",
-        "expected_points": 3.0103929610634266
+        "expected_points": 3.4790100634624403
       }
     ],
     "bench": [
@@ -152,7 +152,7 @@
         "short_name": "Palmer",
         "position": "GK",
         "team": "Ipswich Town",
-        "expected_points": 0.08206076680465356
+        "expected_points": 0.10027015579447228
       },
       {
         "player_id": 108416,
@@ -160,15 +160,7 @@
         "short_name": "Egan",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 2.504226906337987
-      },
-      {
-        "player_id": 551210,
-        "name": "Jorrel Hato",
-        "short_name": "Hato",
-        "position": "DEF",
-        "team": "Chelsea",
-        "expected_points": 1.427022316494937
+        "expected_points": 2.0177201522122137
       },
       {
         "player_id": 631786,
@@ -176,13 +168,21 @@
         "short_name": "Kusi-Asare",
         "position": "FWD",
         "team": "Fulham",
-        "expected_points": 0.09962495391226733
+        "expected_points": 0.11895417311970644
+      },
+      {
+        "player_id": 551210,
+        "name": "Jorrel Hato",
+        "short_name": "Hato",
+        "position": "DEF",
+        "team": "Chelsea",
+        "expected_points": 0.0
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
-        "gameweek": 9,
+        "gameweek": 10,
         "transfers_in": [
           {
             "player_id": 446008,
@@ -196,7 +196,7 @@
           {
             "player_id": 141746,
             "name": "Bruno Borges Fernandes",
-            "short_name": "Fernandes",
+            "short_name": "B.Fernandes",
             "position": "MID",
             "team": "Man Utd"
           }
@@ -205,95 +205,43 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 52.20569783261734
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
-            "player_id": 226597,
-            "name": "Gabriel dos Santos Magalh\u00e3es",
-            "short_name": "Magalh\u00e3es",
-            "position": "DEF",
-            "team": "Arsenal"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 466075,
-            "name": "Riccardo Calafiori",
-            "short_name": "Calafiori",
-            "position": "DEF",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 54.629316974242585
+        "expected_points": 54.214807515545466
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 154561,
-            "name": "David Raya Mart\u00edn",
-            "short_name": "Mart\u00edn",
-            "position": "GK",
+            "player_id": 226597,
+            "name": "Gabriel dos Santos Magalh\u00e3es",
+            "short_name": "Gabriel",
+            "position": "DEF",
             "team": "Arsenal"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 112520,
-            "name": "Alex Palmer",
-            "short_name": "Palmer",
-            "position": "GK",
-            "team": "Ipswich Town"
+            "player_id": 551210,
+            "name": "Jorrel Hato",
+            "short_name": "Hato",
+            "position": "DEF",
+            "team": "Chelsea"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.41371230709354
+        "expected_points": 55.90341905519664
       },
       {
         "gameweek": 12,
         "transfers_in": [
           {
-            "player_id": 201658,
-            "name": "Marcus Tavernier",
-            "short_name": "Tavernier",
-            "position": "MID",
-            "team": "Bournemouth"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
-            "position": "MID",
-            "team": "Fulham"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.601203441862175
-      },
-      {
-        "gameweek": 13,
-        "transfers_in": [
-          {
-            "player_id": 177815,
-            "name": "Dominic Calvert-Lewin",
-            "short_name": "Calvert-Lewin",
+            "player_id": 517052,
+            "name": "Nicolas Jackson",
+            "short_name": "N.Jackson",
             "position": "FWD",
-            "team": "Leeds"
+            "team": "Aston Villa"
           }
         ],
         "transfers_out": [
@@ -309,7 +257,59 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.01271774292606
+        "expected_points": 56.71971354733593
+      },
+      {
+        "gameweek": 13,
+        "transfers_in": [
+          {
+            "player_id": 216616,
+            "name": "Dara O'Shea",
+            "short_name": "O'Shea",
+            "position": "DEF",
+            "team": "Ipswich Town"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 466075,
+            "name": "Riccardo Calafiori",
+            "short_name": "Calafiori",
+            "position": "DEF",
+            "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.71971354733593
+      },
+      {
+        "gameweek": 14,
+        "transfers_in": [
+          {
+            "player_id": 154561,
+            "name": "David Raya Mart\u00edn",
+            "short_name": "Raya",
+            "position": "GK",
+            "team": "Arsenal"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 489639,
+            "name": "Bart Verbruggen",
+            "short_name": "Verbruggen",
+            "position": "GK",
+            "team": "Brighton"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 57.196131801940915
       }
     ],
     "stated_limits": [
@@ -325,16 +325,17 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 2.464999999999975,
+    "expected_points_cost_ceiling": 1.979735693658995,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0,
     "top100": {
       "weight": 20,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261030T070023Z-59306b9ebd52",
-      "picks_snapshot_id": "fpl-elite-picks-20261030T070040Z-b114c859f532",
-      "table_sha256": "dd0d5e4175ca161a4307f295e955ec1491019b97067267bcace1fc40a063e195",
-      "picks_gameweek": 8
+      "cohort_snapshot_id": "fpl-top100-20261104T020027Z-beb6e318e07c",
+      "picks_snapshot_id": "fpl-elite-picks-20261104T020036Z-d078b34cdec4",
+      "table_sha256": "5a678111ed1cc336cb0367fb63fc6dc18167267c36a3502d959575bb88c68c2e",
+      "picks_gameweek": 9
     }
   }
 }

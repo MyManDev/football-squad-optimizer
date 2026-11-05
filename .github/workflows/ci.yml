@@ -187,7 +187,7 @@ jobs:
         run: npm run build
 
       - name: Device spec on Chromium, WebKit and Firefox
-        timeout-minutes: 8
+        timeout-minutes: 12
         shell: bash
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/device-engines.json
