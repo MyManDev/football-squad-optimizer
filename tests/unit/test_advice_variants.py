@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from tests.unit.test_league_views import _Provider
+from tests.unit.test_league_views import _Provider, _WorldPaths
 from tests.unit.test_member_windows import ENTRY, LEAGUE, SEASON
 from tests.unit.test_member_windows import _window_world as _base_world
 
@@ -378,7 +378,9 @@ def test_a_one_week_rival_strategy_under_a_setting_that_favours_nobody_is_the_st
     _publishable(favoured)
 
 
-def _publish(world: dict[str, Any], out: Path, *, counts: Top100Counts | None) -> Any:
+def _publish(
+    world: dict[str, Any], out: Path, *, counts: Top100Counts | None, scenario_modes: bool = False
+) -> Any:
     return build_league_views(
         world["provider"],
         (
@@ -391,6 +393,7 @@ def _publish(world: dict[str, Any], out: Path, *, counts: Top100Counts | None) -
         league_id=LEAGUE,
         league_name="Test League",
         out_dir=out,
+        mode_paths=_WorldPaths(world["projection"], 2) if scenario_modes else None,
         now=datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC),
         standings={
             ENTRY: MemberStanding(ENTRY, "A", "a", rank=2, last_rank=2),
@@ -477,6 +480,57 @@ def test_the_batch_publishes_the_wider_menu_against_the_default_rival_and_names_
     assert not list((tmp_path / "menu" / "advice").rglob("top100-*.json"))
     assert f"advice/{ENTRY}/ortak-koru/3/vs-{RIVAL}/top100-50.json" in again.removed
     assert (tmp_path / "menu" / f"advice/{ENTRY}/ortak-koru/3/vs-{RIVAL}.json").is_file()
+
+
+def test_a_later_publish_removes_one_week_rival_files_no_index_names(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    out = tmp_path / "site"
+    _publish(world, out, counts=None)
+    member = out / f"advice/{ENTRY}"
+    strategies = ("ortak-koru", "fark-yarat")
+    current = [member / f"{strategy}/1/vs-{RIVAL}.json" for strategy in strategies]
+    assert all(path.is_file() for path in current)
+    # Last week's files: one-week plans against a rival the standings no longer pair with
+    # this member, and the plain copy of a strategy the menu no longer offers.
+    gone = 9_999_999
+    stale = [member / f"{strategy}/1/vs-{gone}.json" for strategy in strategies]
+    for source, target in zip(current, stale, strict=True):
+        target.write_bytes(source.read_bytes())
+    dropped = member / "dropped-strategy/1.json"
+    dropped.parent.mkdir(parents=True)
+    dropped.write_bytes(current[0].read_bytes())
+
+    longer = member / f"ortak-koru/3/vs-{gone}.json"
+    longer.parent.mkdir(parents=True, exist_ok=True)
+    longer.write_bytes(current[0].read_bytes())
+    stale.append(longer)
+
+    again = _publish(world, out, counts=None)
+
+    assert not any(path.exists() for path in (*stale, dropped))
+    assert not dropped.parent.exists()
+    assert {path.relative_to(out).as_posix() for path in (*stale, dropped)} == set(again.removed)
+    assert all(path.is_file() for path in current)
+    assert all((member / f"{strategy}/1.json").is_file() for strategy in strategies)
+    assert (member / "saf-puan/1.json").is_file()
+    index = _read(member / "index.json")
+    assert all(f"vs-{gone}" not in row["path"] for row in index["computed"])
+
+
+def test_republishing_scenario_modes_reports_no_kept_file_as_removed(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    _publish(world, tmp_path, counts=None, scenario_modes=True)
+    modes = [
+        tmp_path / f"advice/{entry}/{mode}/1.json"
+        for entry in (ENTRY, RIVAL)
+        for mode in ("garantici", "agresif", "asiri-agresif")
+    ]
+    assert all(path.is_file() for path in modes)
+    again = _publish(world, tmp_path, counts=None, scenario_modes=True)
+    assert again.removed == ()
+    assert all(path.is_file() for path in modes)
 
 
 def test_a_variant_that_fails_is_recorded_at_its_address(
