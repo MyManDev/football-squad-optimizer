@@ -421,6 +421,7 @@ def test_the_host_hook_hands_root_one_request_naming_files_and_reports_its_resul
         "top100_manifest": TOP100.name,
         "news": NEWS,
         "rotation_manifest": ROTATION.name,
+        "handoff_retained": RETAINED.name,
     }
     assert said == [
         f"backend: asked root to move to site-2026-27-gw10-fix1 from capture {CAPTURE}",
@@ -501,3 +502,17 @@ def test_the_backend_choice_picks_the_hook_and_is_its_operator_by_default() -> N
         "move_backend": chain.move_backend_on_this_host,
         "bundle_in_package": True,
     }
+
+
+def test_the_host_hook_refuses_a_run_with_only_the_gameweeks_handoff_alias(tmp_path: Path) -> None:
+    release = chain.release_inputs(_repository(tmp_path), FRIDAY)
+    hook, spool, _ = _host_hook(tmp_path, {"code": 0, "lines": []})
+    alias = tmp_path / "repo" / "data" / "handoffs" / "2026-27-gw10.json"
+    bare = chain.ReleaseInputs(**{**_fields(release), "handoff": alias})
+    said: list[str] = []
+    assert hook("site-2026-27-gw10-fix1", bare, said.append) == 2
+    assert said == [
+        f"backend: refused: run {FRIDAY} records no a handoff retained by its capture; the "
+        "backend was not moved"
+    ]
+    assert not spool.exists()

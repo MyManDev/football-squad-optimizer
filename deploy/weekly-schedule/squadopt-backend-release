@@ -66,6 +66,8 @@ NEWS = re.compile(r"club-news-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}")
 SNAPSHOT = re.compile(r"(fpl-[a-z0-9]+(-[a-z0-9]+)*|club-news)-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}")
 INSTANT = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
 FILE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.json")
+#: A handoff the run retained by capture: its SHA-256 and .json.
+RETAINED = re.compile(r"[0-9a-f]{64}\.json")
 RELEASE_NAME = re.compile(r"[a-z0-9][a-z0-9._-]{2,80}")
 
 
@@ -86,10 +88,20 @@ class Request:
     top100_manifest: str
     news: str
     rotation_manifest: str
+    handoff_retained: str
+
+    @property
+    def retained_handoff(self) -> Path:
+        """The handoff the run retained for its capture, not the gameweek's alias: the alias
+        names whichever run of the week wrote last, which can be a later one."""
+
+        return WEEKLY / "data" / "handoffs" / "by-capture" / self.capture / self.handoff_retained
 
     @property
     def handoff(self) -> Path:
-        return WEEKLY / "data" / "handoffs" / f"{self.season}-gw{self.gameweek:02d}.json"
+        """Root's copy of the retained handoff, under the name pack takes."""
+
+        return STATE / "handoffs" / self.run_id / f"{self.season}-gw{self.gameweek:02d}.json"
 
 
 def _text(
@@ -123,6 +135,7 @@ def parse_request(raw: bytes) -> Request:
         top100_manifest=_text(document, "top100_manifest", FILE_NAME),
         news=_text(document, "news", NEWS, empty=True),
         rotation_manifest=_text(document, "rotation_manifest", FILE_NAME, empty=True),
+        handoff_retained=_text(document, "handoff_retained", RETAINED),
     )
     if bool(request.news) != bool(request.rotation_manifest):
         raise Refused("the request names club news without its rotation table, or the reverse")
@@ -213,6 +226,16 @@ def check_captures(manifest: Path, snapshots: Path) -> None:
             raise Refused(f"the capture {name} is not a plain directory under {snapshots}")
 
 
+def copy_handoff(request: Request) -> None:
+    """Copy the run's retained handoff to the name pack takes, refusing anything but a file."""
+
+    source = request.retained_handoff
+    if source.is_symlink() or not source.is_file():
+        raise Refused(f"the retained handoff {request.handoff_retained} is not a plain file")
+    request.handoff.parent.mkdir(parents=True, exist_ok=True)
+    request.handoff.write_bytes(source.read_bytes())
+
+
 def tool_source(tag: str) -> bytes | None:
     """The release tool as the tag holds it, from root's own clone; None when it holds none."""
 
@@ -287,6 +310,7 @@ def move(request: Request, run: Run, now: datetime, say: Callable[[str], None]) 
             request.news,
         ]
     check_captures(WEEKLY / "artifacts" / "phase_b" / request.top100_manifest, snapshots)
+    copy_handoff(request)
     INCOMING.mkdir(parents=True, exist_ok=True)
     packed = run(pack)
     if packed.code != 0:

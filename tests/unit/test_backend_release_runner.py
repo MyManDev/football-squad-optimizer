@@ -77,10 +77,16 @@ def command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     (base / "releases").mkdir(parents=True)
     monkeypatch.setattr(module, "tool_source", lambda tag: b"# the tool at " + tag.encode())
     _top100(module, [CAPTURE, PICKS])
+    retained = module.WEEKLY / "data" / "handoffs" / "by-capture" / CAPTURE / HANDOFF
+    retained.parent.mkdir(parents=True)
+    retained.write_text(json.dumps({"source_snapshot_id": CAPTURE}), encoding="utf-8")
+    alias = module.WEEKLY / "data" / "handoffs" / "2026-27-gw11.json"
+    alias.write_text('{"source_snapshot_id": "a later run of the week"}', encoding="utf-8")
     return module
 
 
 PICKS = "fpl-elite-picks-20261113T015500Z-b114c859f532"
+HANDOFF = "e" * 64 + ".json"
 
 
 def _top100(module: ModuleType, names: list[str]) -> None:
@@ -104,6 +110,7 @@ def _request(**changes: object) -> dict[str, object]:
         "top100_manifest": TOP100,
         "news": "",
         "rotation_manifest": "",
+        "handoff_retained": HANDOFF,
     }
     return {**document, **changes}
 
@@ -131,12 +138,18 @@ def _steps(host: _Host) -> list[str]:
 def test_a_request_takes_exactly_its_shape(command: ModuleType) -> None:
     parsed = command.parse_request(json.dumps(_request()).encode())
     assert (parsed.run_id, parsed.tag, parsed.gameweek, parsed.news) == (RUN_ID, TAG, 11, "")
-    assert parsed.handoff == command.WEEKLY / "data" / "handoffs" / "2026-27-gw11.json"
+    assert parsed.retained_handoff == (
+        command.WEEKLY / "data" / "handoffs" / "by-capture" / CAPTURE / HANDOFF
+    )
+    assert parsed.handoff == command.STATE / "handoffs" / RUN_ID / "2026-27-gw11.json"
     refused = [
         _request(tag="site-2026-27-gw11-fix1; rm -rf /"),
         _request(top100_manifest="../../etc/passwd.json"),
         _request(top100_manifest="phase_b/" + TOP100),
         _request(capture="fpl-live-latest"),
+        _request(handoff_retained=""),
+        _request(handoff_retained="2026-27-gw11.json"),
+        _request(handoff_retained="../" + HANDOFF),
         _request(gameweek=True),
         _request(gameweek=39),
         _request(deadline_utc="soon"),
@@ -211,12 +224,15 @@ def test_the_five_steps_run_in_order_from_the_tag_and_the_checkouts_files(
         "--capture": CAPTURE,
         "--tag": TAG,
         "--snapshot-root": str(weekly / "data" / "snapshots"),
-        "--handoff": str(weekly / "data" / "handoffs" / "2026-27-gw11.json"),
+        "--handoff": str(command.STATE / "handoffs" / RUN_ID / "2026-27-gw11.json"),
         "--top100-manifest": str(weekly / "artifacts" / "phase_b" / TOP100),
         "--out": str(command.INCOMING),
         "--rotation-manifest": str(weekly / "artifacts" / "rotation" / ROTATION),
         "--news-capture": NEWS,
     }
+    # pack reads the run's own retained handoff, never the alias a later run rewrote.
+    copied = (command.STATE / "handoffs" / RUN_ID / "2026-27-gw11.json").read_text(encoding="utf-8")
+    assert CAPTURE in copied
     assert stage[3:] == ["--tarball", PACKED["tarball"], "--sha256", PACKED["tarball_sha256"]]
     name = str(PACKED["name"])
     assert prepare[3:] == ["--release", name]
@@ -395,3 +411,13 @@ def test_pack_is_refused_a_named_capture_that_is_not_on_disk(command: ModuleType
     manifest.write_text(json.dumps({"source_snapshot_ids": [CAPTURE, missing]}), encoding="utf-8")
     with pytest.raises(command.Refused, match="not a plain directory"):
         command.check_captures(manifest, command.WEEKLY / "data" / "snapshots")
+
+
+def test_pack_is_refused_a_retained_handoff_that_is_not_on_disk(command: ModuleType) -> None:
+    host = _Host(command)
+    request = command.parse_request(
+        json.dumps(_request(handoff_retained="f" * 64 + ".json")).encode()
+    )
+    with pytest.raises(command.Refused, match="retained handoff"):
+        command.move(request, host.run, EARLY, lambda text: None)
+    assert _steps(host) == ["git -C"]

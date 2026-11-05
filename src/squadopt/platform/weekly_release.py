@@ -290,7 +290,8 @@ def backend_request(tag: str, release: ReleaseInputs) -> dict[str, object]:
     """The request `squadopt-backend-release` takes: the release and the files it packs.
 
     Files are named, never given as paths: root looks each one up in its one directory of the
-    weekly checkout. A run whose journal does not record them is refused here.
+    weekly checkout. A run whose journal does not record them, or records no handoff retained by
+    its capture, is refused here.
     """
 
     missing = [
@@ -299,6 +300,10 @@ def backend_request(tag: str, release: ReleaseInputs) -> dict[str, object]:
             ("the capture's deadline", release.deadline_utc),
             ("the Top 100 manifest", release.top100_manifest),
             ("the rotation manifest", release.rotation_manifest if release.news else "-"),
+            (
+                "a handoff retained by its capture",
+                "-" if RETAINED.search(str(release.handoff)) else "",
+            ),
         )
         if not value
     ]
@@ -314,6 +319,9 @@ def backend_request(tag: str, release: ReleaseInputs) -> dict[str, object]:
         "top100_manifest": release.top100_manifest,
         "news": release.news,
         "rotation_manifest": release.rotation_manifest,
+        # The copy retained for this capture, not the gameweek's alias, which a later run of the
+        # same week rewrites (found on 2026-11-05, when the alias held the next morning's).
+        "handoff_retained": release.handoff.name,
     }
 
 
