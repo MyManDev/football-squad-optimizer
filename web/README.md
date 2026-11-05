@@ -5,6 +5,13 @@ static data tree the publication writes under `public/data/`, and, when an advic
 backend is configured, requests advice from it. A member's one-week plan is solved on the
 member's own device, in a Web Worker running HiGHS, from the published device-plan table.
 
+The entry page accepts a classic league number or an FPL team number. Unlisted leagues use
+`/league/<id>` and standalone teams use `/entry/<id>`; both read trimmed FPL data through the
+same-origin forwarder. Classic standings support up to 20 pages (1,000 members). Published
+leagues retain their static-data fallback. After the planning deadline, member pages read the
+current week's score on opening and manual refresh, using the official autosub and captain
+rule. Live scores are display-only and are never written to records or the ledger.
+
 ## Zones and rings
 
 To the Python system the website is one deliverable of the outer ring, R5

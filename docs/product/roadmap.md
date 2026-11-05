@@ -7,13 +7,22 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 
 ## Current position
 
+The 5 November 2026 frontend delivery (#1281) opens classic leagues and individual FPL teams
+by number. The browser builds one-week plans from the published capture table and the FPL
+forwarder; published leagues retain their static fallback. Member pages read live scores
+after the deadline, with official autosubs, captain replacement and transfer hits. See the
+[web guide](../../web/README.md) for the routes and scope. Release acceptance is tracked in
+#983, #980 and #1008; future-week score and request-count observations remain open.
+
+### September 2026 snapshot
+
 Read from `develop` at `0f49ba8d` and from the published tree on 25 September 2026; the
 twelve commits after it on `develop` up to `630f73ca` (#811 to #820, #822 and #827) were read
 on 26 September 2026 for anything they change here, and the manager's word lines were checked
 that day against every version of the published member indexes. Each line names the code or
 the record it can be checked against, and `tests/architecture/test_roadmap_current_position.py`
 checks several of them against those records. The phase sections below keep their goals;
-this section is what exists today.
+the following snapshot records what existed at that time.
 
 ### What a member gets
 
