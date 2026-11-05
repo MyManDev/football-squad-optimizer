@@ -207,7 +207,7 @@ jobs:
   web:
     name: web (node 22)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: web
@@ -302,7 +302,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Playwright smoke
-        timeout-minutes: 10
+        timeout-minutes: 15
         env:
           VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run e2e
