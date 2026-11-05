@@ -134,6 +134,19 @@ the head declares none of them. Nested article content cannot supply them, and s
 metadata cannot override a head declaration. Ordinary canonical aliases still require
 the head declaration.
 
+"Head" means the page's parsed head element. The publication metadata reader takes the
+first `<head>` start tag, with only `<html>` open, that comes before any body content and
+before `</html>`. It ignores any other, such as a `<head>` inside an `<svg>`. The head ends
+at `</head>`, at `<body>`, or at the first element placed directly in it that cannot be in a
+head, as HTML ends a head whose end tag the page omits. A nested or later `<html>` tag opens
+nothing. A canonical, alternate or Open Graph declaration after the head's end is body
+content.
+
+The publication metadata reader closes the elements whose end tags HTML lets a page omit,
+such as `<p>`, `<li>`, `<option>` and table rows and cells, so a run of them is not nesting.
+A page with more than 256 elements open at once is refused as `publication_markup_too_deep`
+and gets no publication date. The limit keeps the search behind each end tag short.
+
 The artifact reader validates these fields' shape. The manager-word consumer independently
 resolves the citation, recomputes source publication and scope, and checks the decision
 calendar before granting a role constraint. Numeric participation/minute consumers apply
