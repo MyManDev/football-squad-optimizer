@@ -782,6 +782,7 @@ def build_backend(
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
     specs = FileAdviceJobSpecStore(config.spec_root)
+    liveness = WorkerLiveness(config.worker_root, queue)
     gate = probe if probe is not None else StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
         config,
@@ -809,6 +810,9 @@ def build_backend(
         # Accepting work the store cannot hold is a promise the deployment cannot keep:
         # the job write would fail, or succeed onto storage nobody will read again.
         store_ready=gate.passed,
+        # The job view's place in line and worker counts come from the look /ready holds.
+        job_look=liveness.look,
+        job_progress=queue.progress,
     )
     return AdviceBackend(
         config=config,
@@ -821,7 +825,7 @@ def build_backend(
         probe=gate,
         metrics=metrics,
         log=component_log,
-        liveness=WorkerLiveness(config.worker_root, queue),
+        liveness=liveness,
     )
 
 

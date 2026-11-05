@@ -59,6 +59,8 @@ from squadopt.platform.api_contract import (
     validate_idempotency_key,
 )
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.queue_contracts import JobProgress
+from squadopt.platform.worker_heartbeat import LivenessLook
 
 _DEFAULT_IDEMPOTENCY_PREFIX: Final = "auto"
 
@@ -207,6 +209,8 @@ class AdviceSubmitService:
         store_ready: Callable[[], bool] | None = None,
         max_open_jobs_per_client: int = 4,
         deadline_for: Callable[[AdviceRequestContext], str] | None = None,
+        job_look: Callable[[], LivenessLook] | None = None,
+        job_progress: Callable[[AdviceJob], JobProgress | None] | None = None,
     ) -> None:
         if max_open_jobs_per_client < 1:
             raise ValueError("max_open_jobs_per_client must be at least 1.")
@@ -217,6 +221,8 @@ class AdviceSubmitService:
         self._store_ready = store_ready
         self._max_open_jobs_per_client = max_open_jobs_per_client
         self._deadline_for = deadline_for
+        self._job_look = job_look
+        self._job_progress = job_progress
         # Only the admission callback accesses this map, under the queue transaction.
         # Addresses never enter queue/spec documents; process restart forgets ownership.
         self._client_jobs: dict[str, str] = {}
@@ -238,11 +244,34 @@ class AdviceSubmitService:
         The stored record carries the client's idempotency key and the worker's
         failure text; neither belongs on a public endpoint, so the view names the
         fields it serves instead of serving the record.
+
+        Three fields say how the wait is going, and each is ``null`` when it does not apply
+        or cannot be read; the rest of the view never depends on them:
+
+        - ``queue_position``: while the job is queued, how many queued jobs will be claimed
+          before it (0 when it is next).
+        - ``progress``: while it runs, ``{done, total}``, the documents its attempt has
+          solved out of those it has to. ``null`` until the attempt has recorded its first
+          count.
+        - ``workers``: ``{busy, total}``, the workers alive now and how many hold a job.
+
+        ``queue_position`` and ``workers`` come from the look ``/ready`` holds for five
+        seconds, so they can be that much older than ``status``.
         """
 
         record = self._queue.load(job_id)
         if record is None:
             return None
+        look = self._job_look() if self._job_look is not None else None
+        progress = None
+        if self._job_progress is not None and record.status == "running":
+            try:
+                progress = self._job_progress(record)
+            except (OSError, ValueError):
+                # A lock that stayed busy or a record that went as it was read: no count
+                # this time, and the poll still answers.
+                progress = None
+        workers = look.workers if look is not None else None
         return {
             "contract_version": "advice_job_view_v1",
             "job_id": record.job_id,
@@ -251,6 +280,9 @@ class AdviceSubmitService:
             "updated_at_utc": record.updated_at_utc,
             "attempt": record.attempt,
             "error_code": record.error.code if record.error is not None else None,
+            "queue_position": look.queue_position(record) if look is not None else None,
+            "progress": progress.as_view() if progress is not None else None,
+            "workers": workers.as_view() if workers is not None else None,
         }
 
     def submit(

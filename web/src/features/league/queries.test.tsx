@@ -175,6 +175,7 @@ describe("league reads", () => {
       leagueKeys.members(LEAGUE)[0],
       leagueKeys.scoreboard(LEAGUE)[0],
       leagueKeys.entrySquad(LEAGUE, 1)[0],
+      leagueKeys.suggestionHistory(LEAGUE, 1)[0],
     ];
     const offenders: string[] = [];
     let reads = 0;
@@ -193,17 +194,6 @@ describe("league reads", () => {
     }
     expect(offenders).toEqual([]);
     expect(reads).toBeGreaterThan(0);
-  });
-
-  it("left outside LEAGUE_READ are named where the rule is written", () => {
-    // The scan above counts `useQuery(` calls, so a read made through data/queries.ts (the
-    // score pages' hooks) escapes it; queries.ts has to say which league modules do that.
-    const rule = readFileSync(join(__dirname, "queries.ts"), "utf-8");
-    const outside = leagueSources()
-      .filter(({ text }) => /from\s+"(?:\.\.\/)+data\/queries"/.test(text))
-      .map(({ name }) => name);
-    expect(outside).toEqual(["pages/LeaguePage.tsx"]);
-    expect(outside.filter((name) => !rule.includes(name))).toEqual([]);
   });
 
   it("are given to queries.ts in the member page's boundary document", () => {

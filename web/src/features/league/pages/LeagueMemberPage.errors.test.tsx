@@ -14,6 +14,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { points } from "../../../lib/format";
 import { COMPUTE_COPY } from "../advice/computeCopy";
+import devicePlan from "../../../fixtures/device-plan/instances.json";
 import { EXAMPLE_LEAGUE, stubTree, withLeague } from "../../../testSupport/league";
 import { memberAddress, membersAddress } from "../../../lib/leagueAddresses";
 import * as data from "../data";
@@ -53,6 +54,8 @@ const PROOF_CAVEATS: Record<Language, readonly RegExp[]> = {
     /Review the shown lineup and transfers before deciding/,
   ],
 };
+// The dash an unknown previous rank's cell draws and is named by.
+const NO_PREVIOUS_RANK = "\u2014";
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -137,7 +140,7 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     "rejected-context",
     "rejected-unreadable",
     "different-selection",
-  ] as const)("keeps the unreachable-service notice honest for %s", (kind) => {
+  ] as const)("leaves no unreachable-service notice for %s without a device", (kind) => {
     const props: LeagueMemberViewProps = {
       squad: mockEntrySquadEnvelopes[ENTRY]!,
       advice: structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1)),
@@ -180,22 +183,79 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
         </MemoryRouter>
       </LanguageProvider>,
     );
-    const computeCopy = COMPUTE_COPY[language];
-    const expected =
-      kind === "published"
-        ? computeCopy.serviceUnreachablePublished
-        : kind === "not-listed" || kind === "declared-unavailable"
-          ? computeCopy.serviceUnreachableAbsent
-          : computeCopy.serviceUnreachable;
-    expect(screen.getByText(expected)).toBeInTheDocument();
-    for (const other of [
-      computeCopy.serviceUnreachablePublished,
-      computeCopy.serviceUnreachableAbsent,
-      computeCopy.serviceUnreachable,
-    ]) {
-      if (other !== expected) expect(screen.queryByText(other)).not.toBeInTheDocument();
-    }
+    // The panel stands in every state; a service that is down is mentioned only where the
+    // member's device can compute instead, and the example squad has no device plan.
+    expect(screen.getByRole("button", { name: copy.computeButton })).toBeInTheDocument();
+    expect(
+      screen.queryByText(COMPUTE_COPY[language].serviceUnreachableDevice),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
+
+  it.each([
+    ["published", false],
+    ["not-listed", true],
+    ["declared-unavailable", true],
+    ["index-missing", false],
+    ["index-error", false],
+    ["invalid-index", false],
+    ["loading", false],
+    ["published-missing", false],
+    ["unavailable", false],
+    ["rejected-context", false],
+    ["rejected-unreadable", false],
+  ] as const)(
+    "offers the device with the service down only where nothing is published: %s",
+    (kind, offered) => {
+      const base = mockEntrySquadEnvelopes[ENTRY]!;
+      const props: LeagueMemberViewProps = {
+        squad: {
+          ...base,
+          payload: {
+            ...base.payload,
+            device_plan: devicePlan.members[2]!.entry as never,
+          },
+        },
+        advice: structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1)),
+        index: structuredClone(mockEntryAdviceIndex(ENTRY).payload),
+        members: mockLeagueMembersEnvelope.payload.members,
+        computeService: "unreachable",
+      };
+      if (kind === "index-missing") {
+        props.index = null;
+        props.adviceIssue = kind;
+      }
+      if (kind === "index-error") props.adviceIssue = kind;
+      if (kind === "invalid-index") props.index!.gameweek += 1;
+      if (kind === "not-listed") props.index!.windows = { "saf-puan": [3] };
+      if (kind === "loading") props.adviceLoading = true;
+      if (kind === "published-missing" || kind === "unavailable") {
+        props.advice = null;
+        props.adviceIssue = kind;
+      }
+      if (kind === "rejected-context")
+        props.advice!.payload.source_snapshot_id = "different-capture";
+      if (kind === "rejected-unreadable")
+        props.advice!.payload.moves = null as unknown as EntryAdvice["moves"];
+      if (kind === "declared-unavailable")
+        props.index!.unavailable.push({
+          strategy: "saf-puan",
+          window: 1,
+          rival_entry_id: null,
+          reason: "not-computed",
+        });
+      render(
+        <LanguageProvider initialLanguage={language}>
+          <MemoryRouter initialEntries={[memberAddress(LEAGUE, ENTRY, "?mode=saf-puan&window=1")]}>
+            {withLeague(<LeagueMemberView {...props} />)}
+          </MemoryRouter>
+        </LanguageProvider>,
+      );
+      const note = screen.queryByRole("note");
+      if (offered) expect(note).toHaveTextContent(COMPUTE_COPY[language].serviceUnreachableDevice);
+      else expect(note).toBeNull();
+    },
+  );
 
   it.each(["plan", "control", "both", "neither"] as const)(
     "shows no proof caveat when %s proof is unfinished",
@@ -228,7 +288,9 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
         </LanguageProvider>
       </QueryClientProvider>,
     );
-    expect(await screen.findByText(copy.invalidEntry)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: copy.invalidEntry }),
+    ).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/SquadOpt da oynuyor|SquadOpt is playing too/);
     expect(
       screen.queryByRole("list", { name: MESSAGES[language].squad.pitchLabel }),
@@ -244,7 +306,10 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     );
     open(language, true);
     expect(
-      await screen.findByText(kind === "missing" ? copy.notAvailable : copy.membersUnreadable),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: kind === "missing" ? copy.notAvailable : copy.membersUnreadable,
+      }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(kind === "missing" ? copy.membersUnreadable : copy.notAvailable),
@@ -410,7 +475,7 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     }
   });
 
-  it("does not invent an applied overlap bound or alternative hit points", () => {
+  it("keeps the plan of a document with no applied bound and unknown alternative hit points", () => {
     const advice = structuredClone(mockEntryAdviceEnvelope(ENTRY, "ortak-koru", 1));
     advice.payload.plan_kind = "within_free_transfers";
     advice.payload.transfer_cap = 1;
@@ -424,10 +489,10 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
       expected_points_cost_ceiling: 2,
     };
     showAdvice(language, advice);
+    expect(screen.queryByText(copy.adviceUnreadable)).not.toBeInTheDocument();
     expect(
-      screen.getByText(copy.planWithinFreeUnknown(1, 8), { exact: false }),
+      screen.getByRole("heading", { level: 2, name: copy.squadAfterTitle }),
     ).toBeInTheDocument();
-    expect(screen.getByText(copy.hitPointsNotPublished, { exact: false })).toBeInTheDocument();
   });
 
   it("does not equate incomplete source data with a withheld plan", () => {
@@ -440,35 +505,15 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     expect(screen.queryByText(/Advice is withheld|öneri gösterilmiyor/)).not.toBeInTheDocument();
   });
 
-  it("preserves a zero overlap bound, measured hit points and plan cost", () => {
+  it("preserves a measured zero plan cost", () => {
     const advice = structuredClone(mockEntryAdviceEnvelope(ENTRY, "ortak-koru", 1));
     advice.payload.solver_status = "OPTIMAL";
     advice.payload.control_solver_status = "OPTIMAL";
-    advice.payload.plan_kind = "within_free_transfers";
-    advice.payload.transfer_cap = 1;
-    advice.payload.overlap_target = 8;
-    advice.payload.overlap_applied = 0;
     advice.payload.expected_points_cost = 0;
     advice.payload.expected_points_cost_ceiling = 0;
-    advice.payload.alternative_plan = {
-      kind: "with_hits",
-      overlap_applied: 8,
-      transfer_hit_points: 0,
-      expected_points_cost: 2,
-      expected_points_cost_ceiling: 2,
-    };
     showAdvice(language, advice);
     const locale = language === "tr" ? "tr-TR" : "en-GB";
-    expect(screen.getByText(copy.planWithinFree(1, 8, 0), { exact: false })).toBeInTheDocument();
-    expect(
-      screen.getByText(copy.alternativeWithHits(8, points(0, 0, locale), points(2, 1, locale)), {
-        exact: false,
-      }),
-    ).toBeInTheDocument();
     expect(screen.getByText(copy.planCost(points(0, 1, locale)))).toBeInTheDocument();
-    expect(
-      screen.queryByText(copy.hitPointsNotPublished, { exact: false }),
-    ).not.toBeInTheDocument();
   });
 
   it("does not invent a zero-transfer plan from an empty record", () => {
@@ -479,7 +524,9 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     advice.payload.bench = null;
     advice.payload.solver_status = null;
     showAdvice(language, advice);
-    expect(screen.getByText(copy.noPlanInRecord)).toBeInTheDocument();
+    // The record is read, not refused, and it holds no eleven: the pitch keeps the held squad.
+    expect(screen.queryByText(copy.adviceUnreadable)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: copy.memberSquad })).toBeInTheDocument();
     expect(screen.queryByText(copy.noMove)).not.toBeInTheDocument();
   });
 
@@ -493,7 +540,6 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
       expect(
         screen.getByText(copy.publicationStates["declared-unavailable"].title),
       ).toBeInTheDocument();
-      expect(screen.getByText(copy.publicationReasonUnknown)).toBeInTheDocument();
       expect(page.container.textContent).not.toContain(reason);
     },
   );
@@ -536,11 +582,11 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
         </LanguageProvider>,
       );
       const row = screen.getByRole("link", { name: member.manager_name! }).closest("tr")!;
-      // Movement is the second column, after the rank; its words are its name.
+      // Movement is the second column, after the rank; its words, or its dash, are its name.
       const movementCell = within(row).getAllByRole("cell")[1]!;
       expect(movementCell).toHaveAccessibleName(
         expected === "unknown"
-          ? copy.noPreviousRank
+          ? NO_PREVIOUS_RANK
           : expected === "same"
             ? copy.movementLabel("same", 0)
             : expected === "new"
@@ -552,8 +598,11 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
 });
 
 describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language) => {
+  // Lets every read the page started answer, the index that states the reason among them.
+  const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
   it.each(["missing", "unreadable"] as const)(
-    "keeps the backend reason only for a %s squad",
+    "keeps the backend reason out of a %s squad's state",
     async (kind) => {
       const reason = "Free Hit in GW3: pre-Free Hit GW2 picks document is missing. <b>capture</b>";
       const index = mockEntryAdviceIndex(ENTRY);
@@ -580,14 +629,15 @@ describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language)
           ],
         ),
       ).toBeInTheDocument();
-      if (kind === "missing") expect(await screen.findAllByText(reason)).toHaveLength(1);
-      else expect(screen.queryByText(reason)).not.toBeInTheDocument();
+      expect(reads.entryAdviceIndex).toHaveBeenCalled();
+      await settle();
+      expect(screen.queryByText(reason)).not.toBeInTheDocument();
       expect(screen.queryByText("capture", { selector: "b" })).not.toBeInTheDocument();
       expect(reads.entryAdvice).not.toHaveBeenCalled();
     },
   );
 
-  it("names a plan that did not solve in the reader's language, never as its code", async () => {
+  it("never names a plan that did not solve as its code", async () => {
     const copy = MESSAGES[language].leagueMembers;
     const index = mockEntryAdviceIndex(ENTRY);
     reads.entryAdviceIndex.mockResolvedValue({
@@ -604,8 +654,8 @@ describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language)
     reads.entrySquad.mockRejectedValue(new data.LeagueDataMissing(`entries/${ENTRY}.json`));
     open(language);
     expect(await screen.findByText(copy.entryNotAvailable)).toBeInTheDocument();
-    const sentence = copy.publicationReasons.not_solved_for_member;
-    expect(await screen.findAllByText(sentence)).toHaveLength(1);
+    expect(reads.entryAdviceIndex).toHaveBeenCalled();
+    await settle();
     expect(screen.queryByText("not_solved_for_member")).not.toBeInTheDocument();
   });
 });

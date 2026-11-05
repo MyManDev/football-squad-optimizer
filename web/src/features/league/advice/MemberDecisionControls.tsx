@@ -1,12 +1,12 @@
 /**
  * The member's own decision controls: strategy, rival, window.
  *
- * The strategies are the catalogue's computable ones — the producer publishes a file per
- * (strategy, rival) and an index that says which exist — so every option here names
- * something that was actually solved from this member's squad, or says plainly that it
- * was not. The rival list is the league's other members; the standings neighbour the
+ * The strategies are the catalogue's computable ones: the producer publishes a file per
+ * (strategy, rival) and an index that says which exist, so every option here names
+ * something that was actually solved from this member's squad, and one that was not is
+ * shown disabled. The rival list is the league's other members; the standings neighbour the
  * producer chose is the default and is labelled as such. Where it named no default, no
- * rival is shown as chosen — the request would name none, and a control that displayed
+ * rival is shown as chosen: the request would name none, and a control that displayed
  * one would demand a choice the member appeared to have made. Windows are enabled only
  * where the index lists them (pure points at three and five weeks when this publish
  * solved them); a rival strategy stays at one week, and a window nobody computed is
@@ -24,8 +24,8 @@
  * The chip row is the member's own declaration, "play this chip this gameweek": one radio
  * per chip the producer solved on the plain one-week plan, and "none". A chip combines with
  * nothing, so while one is chosen the manager's word and the Top 100 settings above 0 are
- * off, and while either of those is on the chips are; every note says which, and "none"
- * (like 0 and the unchecked word) is always one click away.
+ * off, and while either of those is on the chips are; the note says what to change, and
+ * "none" (like 0 and the unchecked word) is always one click away.
  *
  * With a compute service answering (`capabilities`), an option the publish did not solve
  * is still offered wherever the service computes it: any window the service lists, any
@@ -36,16 +36,17 @@
  * Selection lives in the URL (`mode`, `rival`, `window`, `llm`, `top100`, `chip`), the same
  * parameters the templates set and the compute panel reads, so the whole state stays shareable.
  *
- * Plan and Top 100 controls are visible together on the member page. Secondary chip
- * and news controls can be folded within the same settings section. Each part renders
- * once and shares the URL selection; changing layout never resets the user's choices.
+ * The member page shows the plan (strategy, rival, window) with its presets at the top, so
+ * the choice is made in one place, and the Top 100 influence just under it; the model, the
+ * manager's word and the chips wait folded under the advanced settings of the same section
+ * (#1248). Each part renders once and shares the URL selection; changing layout never resets
+ * the user's choices.
  */
 
+import type { ReactNode } from "react";
 import { useSearchParams } from "react-router";
 
-import { Badge } from "../../../design/components/Badge";
 import { useLanguage } from "../../../i18n/context";
-import { signedPoints } from "../../../lib/format";
 import { WINDOWS } from "../../../lib/decisionVocabulary";
 import {
   isMemberStrategy,
@@ -54,25 +55,22 @@ import {
   type EntryView,
 } from "../types";
 import { CHIP_NAMES } from "../chipShape";
-import { DisclosureIcon } from "../components/memberIcons";
 import type { AdviceCapabilities } from "./adviceCapabilities";
 import {
   type DeviceComputable,
   EVIDENCE_PARAMETER,
-  linkKeepsDeviceChoices,
   resolvePublishedAdvice,
 } from "./adviceSelection";
 import { AUTOMATIC_CHIP_OFFERED, CHIP_PARAMETER } from "./chipChoice";
 import { CHIP_COPY, chipReason, chipsUnavailable } from "./chipCopy";
-import { COMPUTE_COPY } from "./computeCopy";
-import { EVIDENCE_COPY, evidenceUnavailable } from "./evidenceCopy";
+import { EVIDENCE_COPY } from "./evidenceCopy";
 import { TOP100_PARAMETER, TOP100_WEIGHTS } from "./top100";
-import { TOP100_COPY, top100Unavailable } from "./top100Copy";
+import { TOP100_COPY } from "./top100Copy";
 import styles from "./MemberDecisionControls.module.css";
 import { RivalEntryInput } from "./RivalEntryInput";
 
 /** Which part of the controls to render; all of them, in turn, when none is named. */
-export type DecisionControlsPart = "plan" | "notes" | "top100" | "advanced";
+export type DecisionControlsPart = "plan" | "model" | "top100" | "advanced";
 
 export function MemberDecisionControls({
   entryId,
@@ -81,6 +79,7 @@ export function MemberDecisionControls({
   capabilities = null,
   onDevice,
   part,
+  presets,
 }: {
   entryId: number;
   members: EntryView[];
@@ -89,8 +88,10 @@ export function MemberDecisionControls({
   /** What the member's device computes from this publish's inputs, beside the service. */
   onDevice?: DeviceComputable;
   part?: DecisionControlsPart;
+  /** The page's one-tap selections, a row of their own under the plan's heading. */
+  presets?: ReactNode;
 }) {
-  const { language, locale, messages } = useLanguage();
+  const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const [searchParams, setSearchParams] = useSearchParams();
   const resolve = (params: URLSearchParams) =>
@@ -107,7 +108,6 @@ export function MemberDecisionControls({
   const selection = resolve(searchParams);
   // What the service adds to the published menu; nothing at all on a static build.
   const computable = selection.computable;
-  const computeCopy = COMPUTE_COPY[language];
   const { strategy, window: windowSize, rivalEntryId: chosenRival } = selection.request;
   const candidates = members.filter(
     (member) => member.member_kind === "human" && member.entry_id !== entryId,
@@ -217,8 +217,6 @@ export function MemberDecisionControls({
   // The service applies it to the same plan, from the capture's own club news.
   const evidenceComputable = computable?.word === true;
   const evidenceCopy = EVIDENCE_COPY[language];
-  // Only a read of registered club pages is real; anything else is example data.
-  const evidenceIsReal = selection.evidence.sourceKind === "club_news_capture";
   // The producer's declared rule marks one of the three from the member's points gap
   // and the weeks left. It is a label on an option the member may ignore, never a
   // preselection: the checked strategy is still whatever the URL says.
@@ -236,19 +234,6 @@ export function MemberDecisionControls({
     windowSize === 1 &&
     (onDevice.top100Weights.length ?? 0) > 1;
   const top100Computable = top100Service || top100Device;
-  // A weight the device solves and this publish has no plan for gets its own note, but only
-  // where a click on it stands: the link asks for no word, football model or preferences,
-  // and the resolver keeps the weight. Otherwise the note says what is in force.
-  const deviceKeeps = (weight: number) => {
-    const next = new URLSearchParams(searchParams);
-    next.set(TOP100_PARAMETER, String(weight));
-    return linkKeepsDeviceChoices(next) && resolve(next).top100.weight === weight;
-  };
-  const top100DeviceUnpublished =
-    top100Device &&
-    onDevice!.top100Weights.some(
-      (weight) => weight !== 0 && !top100.weights.includes(weight) && deviceKeeps(weight),
-    );
   const weightSelectable = (weight: number) =>
     (top100Applies && top100.weights.some((offered) => offered === weight)) ||
     (top100Service && computable!.top100Weights.some((offered) => offered === weight)) ||
@@ -275,41 +260,26 @@ export function MemberDecisionControls({
   const chipBlockedNote = chipStrategy ? strategyCopy.blocked : chipCopy.blockedBySwitches;
   const chipNote =
     chipStrategy && !chipBlocked
-      ? strategyCopy.note
+      ? null
       : !chipsAvailable
         ? chipsUnavailable(chipCopy, chip.reason)
         : !chipApplies
           ? chipCopy.onlyBaseline
           : chipBlocked
             ? chipBlockedNote
-            : chip.chip !== null
-              ? chipCopy.chosen(copy.chipNames[chip.chip] ?? chip.chip)
-              : chip.notOffered
-                ? chipCopy.notOffered
-                : chipCopy.plain;
-  // Why a chip the member cannot choose is off: already played, its window not open, a
-  // Free Hit last gameweek, or no plan solved. Said per chip, in the producer's codes.
-  const chipReasons = CHIP_NAMES.filter(
-    (name) => !chipOptions.includes(name) && (chipsAvailable || chip.reasons[name] !== undefined),
-  ).map((name) =>
-    chipCopy.chipReasonLine(copy.chipNames[name] ?? name, chipReason(chipCopy, chip.reasons[name])),
-  );
-  const top100Note =
-    chipChosen && !chipStrategy
-      ? chipCopy.switchesOff
-      : top100Service && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
-        ? computeCopy.top100Computable
-        : top100DeviceUnpublished
-          ? computeCopy.top100Computable
-          : !top100.available
-            ? top100Unavailable(top100Copy, top100.reason)
-            : !top100Applies
-              ? top100Copy.notForSelection
-              : top100.notOffered
-                ? top100Copy.notOffered
-                : top100.weights.length < TOP100_WEIGHTS.length
-                  ? top100Copy.notSolved
-                  : top100Copy.published;
+            : null;
+  // Why the game keeps a chip off: already played, its window not open, or a Free Hit last
+  // gameweek. Said per chip, in the producer's codes.
+  const chipReasons = CHIP_NAMES.flatMap((name) => {
+    const reason = chipOptions.includes(name) ? null : chipReason(chipCopy, chip.reasons[name]);
+    return reason === null ? [] : [chipCopy.chipReasonLine(copy.chipNames[name] ?? name, reason)];
+  });
+  // The word's note: what to change to switch it on, where something can be changed.
+  const evidenceNote = chipChosen
+    ? chipSwitchesOff
+    : selection.evidence.available && !evidenceApplies
+      ? evidenceCopy.onlyBaseline
+      : null;
 
   // The model is offered only where the service computes the football model, or where the
   // link already asks for it (so the choice can be seen and undone).
@@ -324,8 +294,8 @@ export function MemberDecisionControls({
         "asiri-agresif": messages.decision.modes.extreme,
       }[strategy];
   // The plan in force, as D-Bu-Hafta writes it beside the heading: the strategy and the
-  // window. The model is the radio group just under it, and the decision's own heading row
-  // names all three.
+  // window. The model is chosen under the advanced settings, and the decision's own heading
+  // row names all three.
   const now = [strategyName, messages.decision.week(windowSize)].filter(Boolean).join(" · ");
 
   const plan = (
@@ -339,6 +309,7 @@ export function MemberDecisionControls({
           {copy.viewPlan}
         </a>
       </div>
+      {presets ? <div className={styles.presets}>{presets}</div> : null}
       <fieldset className={styles.field}>
         <legend>{copy.strategyLegend}</legend>
         <div className={styles.rows}>
@@ -399,26 +370,13 @@ export function MemberDecisionControls({
                   <option key={rivalId} value={rivalId} disabled={!rivalSelectable(rivalId)}>
                     {nameOf(rivalId)}
                     {rivalId === defaultRival ? ` ${copy.rivalDefaultSuffix}` : ""}
-                    {rivalSelectable(rivalId)
-                      ? ""
-                      : onDevice?.captainMissingRivals?.includes(rivalId)
-                        ? ` (${copy.rivalCaptainMissing})`
-                        : ` ${copy.rivalUnavailableSuffix}`}
                   </option>
                 ))}
               </select>
             </label>
           )}
-          {rivalIds.length > 0 && chosenRival === null ? (
-            <p className={styles.line}>{copy.rivalNoDefault}</p>
-          ) : null}
           {rivalIds.length > 0 && rivalsUnread ? (
             <p className={styles.line}>{copy.rivalsUnreadable}</p>
-          ) : null}
-          {typeof chosenRival === "number" &&
-          !rivalSelectable(chosenRival) &&
-          onDevice?.captainMissingRivals?.includes(chosenRival) ? (
-            <p className={styles.line}>{copy.rivalCaptainMissing}</p>
           ) : null}
           {onDevice ? (
             <RivalEntryInput
@@ -449,73 +407,32 @@ export function MemberDecisionControls({
           ))}
         </div>
       </fieldset>
-
-      {showModel ? (
-        <fieldset className={styles.field}>
-          <legend>{copy.modelLegend}</legend>
-          <div className={styles.rows}>
-            {(["current", "football"] as const).map((model) => (
-              <label className={styles.row} key={model}>
-                <input
-                  type="radio"
-                  className={styles.radio}
-                  name="prediction-model"
-                  value={model}
-                  checked={chosenModel === model}
-                  disabled={model === "football" && !capabilities?.models?.includes("football")}
-                  onChange={() => update({ model: model === "current" ? null : model })}
-                />
-                <span className={styles.rowName}>{copy.modelNames[model]}</span>
-                {model === "football" ? (
-                  <span className={styles.tag}>{copy.experimentalTag}</span>
-                ) : null}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
     </div>
   );
 
-  const notes = (
-    <details className={styles.notes}>
-      <summary>
-        <DisclosureIcon className={styles.notesIcon} />
-        {copy.optionNotes}
-      </summary>
-      <div className={styles.notesBody}>
-        <p>
-          {copy.strategyIntro} <Badge tone="accent">{messages.decision.shareable}</Badge>
-        </p>
-        <dl className={styles.descriptions}>
-          {strategies.map((slug) => (
-            <div key={slug}>
-              <dt>{copy.strategies[slug].name}</dt>
-              <dd>{copy.strategies[slug].description}</dd>
-            </div>
-          ))}
-        </dl>
-        {suggested ? (
-          <p>
-            {copy.rulePickNote(
-              nameOf(suggested.rival_entry_id),
-              signedPoints(suggested.points_ahead_of_rival, 1, locale),
-              suggested.gameweeks_remaining,
-            )}
-          </p>
-        ) : null}
-        {needsRival ? (
-          <>
-            {windows.length > 1 ? <p>{top100Copy.rivalWindows}</p> : null}
-            {(computable?.rivals.length ?? 0) > 0 ? <p>{computeCopy.rivalComputable}</p> : null}
-          </>
-        ) : null}
-        {selection.request.model === "football" ? <p>{copy.modelWindowNote}</p> : null}
-        {showModel ? <p>{copy.modelNote}</p> : null}
-        {computable && computable.strategies.length > 0 ? <p>{computeCopy.controlsNote}</p> : null}
+  // The model is changed rarely, so the page folds it with the advanced settings instead of
+  // beside the strategy and the window.
+  const modelControls = showModel ? (
+    <fieldset className={styles.fieldset}>
+      <legend>{copy.modelLegend}</legend>
+      <div className={styles.rows}>
+        {(["current", "football"] as const).map((model) => (
+          <label className={styles.row} key={model}>
+            <input
+              type="radio"
+              className={styles.radio}
+              name="prediction-model"
+              value={model}
+              checked={chosenModel === model}
+              disabled={model === "football" && !capabilities?.models?.includes("football")}
+              onChange={() => update({ model: model === "current" ? null : model })}
+            />
+            <span className={styles.rowName}>{copy.modelNames[model]}</span>
+          </label>
+        ))}
       </div>
-    </details>
-  );
+    </fieldset>
+  ) : null;
 
   const top100Controls = (
     <fieldset className={styles.fieldset}>
@@ -542,18 +459,8 @@ export function MemberDecisionControls({
           </label>
         ))}
       </div>
-      <p className={styles.note}>{top100Note}</p>
-      {/* The arithmetic of the weight is for the member who wants it. It waits closed so the
-          card reads as a choice of settings and not as a paragraph to get through first. */}
-      {top100Applies || top100Computable ? (
-        <details className={styles.notes}>
-          <summary>
-            <DisclosureIcon className={styles.notesIcon} />
-            {top100Copy.helpTitle}
-          </summary>
-          <p className={styles.note}>{top100Copy.help}</p>
-        </details>
-      ) : null}
+      {chipChosen && !chipStrategy ? <p className={styles.note}>{chipCopy.switchesOff}</p> : null}
+      {top100Applies || top100Computable ? <p className={styles.note}>{top100Copy.help}</p> : null}
     </fieldset>
   );
 
@@ -572,23 +479,8 @@ export function MemberDecisionControls({
             }
           />
           <span>{evidenceCopy.switchLabel}</span>
-          {selection.evidence.available && !evidenceIsReal ? (
-            <Badge tone="warn">{copy.exampleData}</Badge>
-          ) : null}
         </label>
-        <p className={styles.note}>
-          {chipChosen
-            ? chipSwitchesOff
-            : !selection.evidence.available && evidenceComputable
-              ? computeCopy.wordComputable
-              : !selection.evidence.available
-                ? evidenceUnavailable(evidenceCopy, selection.evidence.reason)
-                : !evidenceApplies
-                  ? evidenceCopy.onlyBaseline
-                  : evidenceIsReal
-                    ? evidenceCopy.sourceCapture
-                    : evidenceCopy.sourceExample}
-        </p>
+        {evidenceNote !== null ? <p className={styles.note}>{evidenceNote}</p> : null}
       </fieldset>
 
       <fieldset className={styles.fieldset}>
@@ -639,22 +531,21 @@ export function MemberDecisionControls({
             </label>
           ))}
         </div>
-        <p className={styles.note}>{chipNote}</p>
+        {chipNote !== null ? <p className={styles.note}>{chipNote}</p> : null}
         {chipReasons.length > 0 ? <p className={styles.note}>{chipReasons.join(" ")}</p> : null}
-        {chipApplies && !chipStrategy ? <p className={styles.note}>{chipCopy.help}</p> : null}
       </fieldset>
     </div>
   );
 
   if (part === "plan") return plan;
-  if (part === "notes") return notes;
+  if (part === "model") return modelControls;
   if (part === "top100") return top100Controls;
   if (part === "advanced") return advanced;
   return (
     <>
       {plan}
+      {modelControls}
       {top100Controls}
-      {notes}
       {advanced}
     </>
   );

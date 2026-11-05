@@ -141,8 +141,8 @@ def _allowed(name: str, request: SettledPublicationRequest) -> bool:
         return False
     if name.startswith(f"data/{request.season}/"):
         return True
-    # series-horizon is derived from the SAME history rows. Its consumer requires
-    # the same member-week key set, so histories and this companion travel together.
+    # series-horizon is derived from the SAME history rows and names the same
+    # member-week key set, so histories and this companion travel together.
     tree = _tree_name(request)
     if name in (
         f"{tree}/members.json",

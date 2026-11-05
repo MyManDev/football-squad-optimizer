@@ -119,9 +119,9 @@ it("requires consent, preserves untrusted text as text and reports pending rathe
   expect(screen.getByRole("button", { name: "Onaya gönder" })).toBeDisabled();
   await user.click(screen.getByRole("checkbox"));
   await user.click(screen.getByRole("button", { name: "Onaya gönder" }));
-  expect(await screen.findByText(/Yorumun kaydedildi/)).toHaveTextContent(
-    "Henüz herkese açık değil",
-  );
+  expect(
+    await screen.findByText("Yorumun kaydedildi; yönetici onayı bekliyor."),
+  ).toBeInTheDocument();
   const posts = mock.mock.calls.filter(([, init]) => init?.method === "POST");
   expect(posts).toHaveLength(1);
   expect(JSON.parse(posts[0]![1]!.body as string)).toMatchObject({

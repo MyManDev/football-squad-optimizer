@@ -1,7 +1,7 @@
 /**
  * Hesapla reaches the card: a member whose published advice is missing keeps the compute
- * control; a computed answer lands in the advice card with its origin; a failure leaves the
- * published plan standing; a changed selection never wears an earlier selection's answer.
+ * control; a computed answer lands in the advice card; a failure leaves the published plan
+ * standing; a changed selection never wears an earlier selection's answer.
  */
 
 import { act, cleanup, render, screen } from "@testing-library/react";
@@ -15,6 +15,7 @@ import {
   mockLeagueMembersEnvelope,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import type { ComputeService } from "../advice/AdviceRequestPanel";
 import type {
   AdviceClient,
   AdviceJobStatus,
@@ -115,6 +116,7 @@ function renderView({
   initialEntry = `/league/352490/members/${ENTRY}`,
   language = "tr",
   index = mockEntryAdviceIndex(ENTRY).payload,
+  computeService,
 }: {
   advice: LeagueViewEnvelope<EntryAdvice> | null;
   adviceIssue?: AdviceIssue;
@@ -122,6 +124,7 @@ function renderView({
   initialEntry?: string;
   language?: "tr" | "en";
   index?: EntryAdviceIndex | null;
+  computeService?: ComputeService;
 }) {
   const content = (squad: LeagueViewEnvelope<EntrySquad>) => (
     <LanguageProvider initialLanguage={language}>
@@ -135,6 +138,7 @@ function renderView({
             members={MEMBERS}
             index={index}
             client={client}
+            computeService={computeService}
           />,
         )}
       </MemoryRouter>
@@ -175,7 +179,7 @@ describe("league member advice flow", () => {
     await compute();
     expect(screen.getByText("Kuyrukta")).toBeInTheDocument();
     expect(await screen.findByText("Computed Striker", {}, { timeout: 4000 })).toBeInTheDocument();
-    expect(screen.getByText("Hesap sonucu")).toBeInTheDocument();
+    expect(screen.getByText("Plan hazır")).toBeInTheDocument();
     expect(calls.map((call) => call.method)).toEqual(["POST", "GET", "GET"]);
     expect(calls[0]?.body).toEqual({ strategy: "saf-puan", window: 1, rival_entry_id: null });
     expect(calls[1]?.url).toBe("https://api.example/api/v1/advice-jobs/job-entry");
@@ -186,6 +190,7 @@ describe("league member advice flow", () => {
       advice: null,
       adviceIssue: "not-computed",
       client: new FakeClient(async () => ({ kind: "unavailable" })),
+      computeService: "ready",
     });
 
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeInTheDocument();
@@ -193,7 +198,21 @@ describe("league member advice flow", () => {
     expect(screen.getByText("Plandaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
   });
 
-  it("shows the computed moves in the advice card with their origin", async () => {
+  it.each(["not-computed", "published-missing", "unavailable"] as const)(
+    "sends nobody to Hesapla on a build with no service when the advice is %s",
+    (adviceIssue) => {
+      renderView({
+        advice: null,
+        adviceIssue,
+        client: new FakeClient(async () => ({ kind: "unavailable" })),
+      });
+
+      expect(screen.getByRole("button", { name: "Hesapla" })).toBeInTheDocument();
+      expect(screen.queryByText("Plandaki Hesapla ile isteyebilirsin.")).toBeNull();
+    },
+  );
+
+  it("shows the computed moves in the advice card", async () => {
     renderView({
       advice: null,
       adviceIssue: "not-computed",
@@ -207,10 +226,9 @@ describe("league member advice flow", () => {
     await compute();
 
     expect(await screen.findByText("Computed Striker")).toBeInTheDocument();
-    expect(screen.getByText("Hesap sonucu")).toBeInTheDocument();
     expect(screen.getByText("Plan hazır")).toBeInTheDocument();
+    expect(screen.getByText("Hesap: plan hazır")).toBeInTheDocument();
     expect(screen.queryByText("Şimdi hesaplandı")).toBeNull();
-    expect(screen.getByText(/Veri çekimi fpl-live-computed/)).toBeInTheDocument();
     expect(screen.queryByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeNull();
   });
 
@@ -230,7 +248,7 @@ describe("league member advice flow", () => {
     expect(
       screen.getByText(published.payload.moves.length === 0 ? /plan transfer önermiyor/ : /Çıkan/),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Hesap sonucu")).toBeNull();
+    expect(screen.queryByText("Plan hazır")).toBeNull();
   });
 
   it("does not carry a computed answer over to a changed selection", async () => {
@@ -251,7 +269,6 @@ describe("league member advice flow", () => {
     });
 
     expect(screen.queryByText("Computed Striker")).toBeNull();
-    expect(screen.queryByText("Hesap sonucu")).toBeNull();
     expect(screen.queryByText("Plan hazır")).toBeNull();
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
   });
@@ -272,7 +289,7 @@ describe("league member advice flow", () => {
         }),
       });
       expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
-      expect(screen.getByText("Bu seçim bu yayında listelenmiyor.")).toBeInTheDocument();
+      expect(screen.getByText("Bu seçim için plan yok.")).toBeInTheDocument();
       await compute();
       expect(requests).toEqual([]);
     },
@@ -303,6 +320,7 @@ describe("league member advice flow", () => {
         requests.push(request);
         return { kind: "unavailable" };
       }),
+      computeService: "ready",
     });
 
     expect(screen.getByRole("radio", { name: new RegExp(`${window} hafta`) })).toBeChecked();
@@ -371,9 +389,9 @@ describe("league member advice flow", () => {
     expect(requests[0]).toMatchObject({ strategy: "ortak-koru", window: 1, rivalEntryId: rival });
   });
 
-  it("explains unsupported selections in English without promising a calculation", () => {
+  it("turns Compute off for an unsupported selection in English, promising no calculation", () => {
     // A rival strategy with nobody to play it against: the publish named no standings
-    // neighbour, so the control offers no rival as chosen and the button says why.
+    // neighbour, so the control offers no rival as chosen and the button is off.
     const base = mockEntryAdviceIndex(ENTRY).payload;
     renderView({
       advice: null,
@@ -386,34 +404,46 @@ describe("league member advice flow", () => {
       screen.getByRole("combobox", { name: "The member you are playing against" }),
     ).toHaveValue("");
     expect(screen.getByRole("button", { name: "Compute" })).toBeDisabled();
-    expect(
-      screen.getByText(/Compute supports pure points at one, three or five weeks/),
-    ).toBeInTheDocument();
     expect(screen.queryByText(/not computed over a longer window/)).toBeNull();
     expect(screen.queryByText("You can ask for it with Compute above.")).toBeNull();
+    expect(screen.queryByText("You can ask for it with Compute in the plan.")).toBeNull();
   });
 
-  it.each(["static", "static-fallback"] as const)(
-    "labels a %s answer as a published plan",
-    async (source) => {
-      renderView({
-        advice: null,
-        client: new FakeClient(async () => ({
-          kind: "advice",
-          envelope: computedEnvelope(),
-          source,
-        })),
-      });
+  it("marks a press that lands on the published plan as ready, in the panel and the echo", async () => {
+    renderView({
+      advice: null,
+      client: new FakeClient(async () => ({
+        kind: "advice",
+        envelope: computedEnvelope(),
+        source: "static",
+      })),
+    });
 
-      await compute();
+    await compute();
 
-      expect(screen.getByText("Computed Striker")).toBeInTheDocument();
-      expect(screen.getByText("Yayınlanmış plan")).toBeInTheDocument();
-      expect(screen.queryByText("Hesap sonucu")).toBeNull();
-      expect(screen.queryByText("Plan hazır")).toBeNull();
-      expect(screen.queryByText("Şimdi hesaplandı")).toBeNull();
-    },
-  );
+    expect(screen.getByText("Computed Striker")).toBeInTheDocument();
+    expect(screen.getByText("Plan hazır")).toBeInTheDocument();
+    expect(screen.getByText("Hesap: plan hazır")).toBeInTheDocument();
+    expect(screen.queryByText("Şimdi hesaplandı")).toBeNull();
+  });
+
+  it("says the service could not be reached, with no ready mark, when it falls back", async () => {
+    renderView({
+      advice: null,
+      client: new FakeClient(async () => ({
+        kind: "advice",
+        envelope: computedEnvelope(),
+        source: "static-fallback",
+      })),
+    });
+
+    await compute();
+
+    expect(screen.getByText("Computed Striker")).toBeInTheDocument();
+    expect(screen.getByText("Hesaplama servisine ulaşılamadı.")).toBeInTheDocument();
+    expect(screen.queryByText("Plan hazır")).toBeNull();
+    expect(screen.queryByText("Hesap: plan hazır")).toBeNull();
+  });
 
   it("uses squad context and removes a stale rival from the pure-points request", async () => {
     const requests: AdviceRequest[] = [];

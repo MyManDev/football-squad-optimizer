@@ -9,19 +9,18 @@ the member's points nor the registry order is used to reconstruct a previous ran
   arrow and the places, and names them in words (“up 2 places” / “2 sıra yükseldi”).
 - Equal positive ranks: `same` and `0`, shown as “=” and named “unchanged” / “yerinde
   kaldı”.
-- Missing, null or zero previous rank: `unknown` and `null`, shown as a dash and named
-  “Previous rank unavailable” / “Önceki sıra bilinmiyor”. Zero is not a position and does
-  not prove that the member just joined. A missing current rank also prevents movement.
+- Missing, null or zero previous rank: `unknown` and `null`, shown as a dash, which a screen
+  reader hears as it is. Zero is not a position and does not prove that the member just
+  joined. A missing current rank also prevents movement.
 - Negative, boolean, fractional or text previous ranks fail parsing instead of being
   coerced into a plausible movement. Both standings parsers use the same rule.
 
-Movement is the table's second column, after the rank. The words are each cell's
-accessible name, so a screen reader hears them rather than the glyphs.
+Movement is the table's second column, after the rank. The words are the accessible name
+of each cell with an arrow or “=”, so a screen reader hears them rather than the glyphs.
 
 The movement compares the game's current and previous weekly standings in the capture.
 The adjacent scores come from the last completed and checked gameweek's member history.
-The page states this distinction in Turkish and English; its upcoming advice gameweek
-does not relabel the standings or their points.
+The page's upcoming advice gameweek does not relabel the standings or their points.
 
 ## Captured source check for #533
 

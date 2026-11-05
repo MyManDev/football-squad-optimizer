@@ -24,11 +24,6 @@
   border-color: currentColor;
 }
 
-.warn {
-  color: var(--color-warn);
-  border-color: currentColor;
-}
-
 .bad {
   color: var(--color-bad);
   border-color: currentColor;
@@ -37,11 +32,4 @@
 .accent {
   color: var(--color-accent);
   border-color: currentColor;
-}
-
-/* Lime is a fill, never a text colour, and always carries ink. */
-.lime {
-  border-color: var(--color-lime);
-  background: var(--color-lime);
-  color: var(--color-text);
 }

@@ -344,7 +344,6 @@ jobs:
               workflow_id: "ci.yml",
               head_sha: commitSha,
               event: "push",
-              status: "success",
               per_page: 100,
             });
             const candidates = runs
@@ -353,6 +352,7 @@ jobs:
                   run.head_sha === commitSha &&
                   run.head_branch === "main" &&
                   run.event === "push" &&
+                  run.status === "completed" &&
                   run.conclusion === "success" &&
                   run.path.endsWith("/ci.yml"),
               )

@@ -15,7 +15,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** The shape the producer wrote from the 2026-09-07 GW4 capture, with the numbers rounded. */
+/** The document the producer wrote from the 2026-09-07 GW4 capture, as typed, numbers rounded. */
 const scoreboard: LeagueViewEnvelope<Scoreboard> = {
   contract_version: "provisional_league_ui_v1",
   generated_at_utc: "2026-09-07T13:20:00Z",
@@ -27,8 +27,6 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
     captured_at_utc: "2026-09-07T13:14:14Z",
     cohort_snapshot_id: "fpl-top100-20260907T131112Z-1b1419176245",
     cohort_picks_snapshot_id: "fpl-elite-picks-20260907T131133Z-6517b37b5afe",
-    registered_members: 15,
-    histories_held: 15,
     gameweeks: [
       {
         gameweek: 1,
@@ -42,7 +40,6 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
           xi: 26,
           hits: 0,
           projected: 56.1,
-          mode: "live",
           scoring_basis: "named_eleven_no_autosubs",
           vice_captain_named: false,
         },
@@ -63,7 +60,6 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
           xi: null,
           hits: 4,
           projected: 60.2,
-          mode: "replay",
           scoring_basis: "named_eleven_no_autosubs",
           vice_captain_named: false,
         },
@@ -84,8 +80,6 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
           gameweek: 3,
           basis: "net",
           mean_score: 68.75,
-          hit_points: 4,
-          picks_snapshot_id: "fpl-elite-picks-20260907T131133Z-6517b37b5afe",
           cohort_size: 100,
           final: true,
         },
@@ -110,61 +104,29 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
     cumulative: {
       through_gameweek: 3,
       gameweeks: [1, 2, 3],
-      ours_net: 26,
-      ours_gameweeks: [1],
-      ours_basis: "official_autosub_captain_v2",
-      ours_excluded_gameweeks: [],
       members_mean_total_points: 199.2,
-      members_gameweeks: [1, 2, 3],
       members_counted: 15,
       average_entry_score: 182,
     },
   },
 };
 
-/**
- * The pipeline's own English words, as whole words. The snapshot id is provenance and is
- * taken out before this is applied (its `fpl-live-` prefix would match on its own).
- */
+/** The pipeline's own English words, as whole words. */
 const PIPELINE_WORDS = /\b(capture|ledger|live|replay|bench|snapshot|GW)\b/i;
 
-/** The same capture with every note switched on: a gross Top-100, a provisional week, a comparison. */
-function everyNote(): LeagueViewEnvelope<Scoreboard> {
+/** The same capture with its most qualified figure: a gross, unfinal Top-100 in an unchecked week. */
+function qualified(): LeagueViewEnvelope<Scoreboard> {
   const value = structuredClone(scoreboard);
   const top100 = value.payload.gameweeks[2].top100!;
   top100.basis = "gross";
-  top100.hit_points = null;
-  top100.picks_snapshot_id = null;
+  top100.final = false;
   value.payload.gameweeks[2].data_checked = false;
-  value.payload.gameweeks[0].comparisons = [
-    {
-      kind: "system",
-      net: 26,
-      scoring_basis: "named_eleven_no_autosubs",
-      source_snapshot_id: value.payload.source_snapshot_id,
-      diagnostics: {
-        zero_minute_starters: 0,
-        minutes_shortfall: -12,
-        captain_shortfall: 2.5,
-        autosub_recovery: 3,
-      },
-    },
-  ];
   return value;
 }
 
-/** The mode badge in each "ours" cell of a scoreboard table, as the reader sees it. */
-function badgesIn(table: HTMLElement): string[] {
-  return [...table.querySelectorAll("tbody td:first-of-type > span")].map(
-    (badge) => badge.textContent ?? "",
-  );
-}
-
-/** The first column header of each table on screen: the scoreboard's, then the comparisons'. */
-function weekHeaders(): string[] {
-  return screen
-    .getAllByRole("table")
-    .map((table) => within(table).getAllByRole("columnheader")[0]!.textContent ?? "");
+/** Each cell's text, the row's own header first. */
+function cellsOf(row: Element): (string | null)[] {
+  return [...row.querySelectorAll("th, td")].map((cell) => cell.textContent);
 }
 
 function renderCard(envelope: LeagueViewEnvelope<Scoreboard>, language: Language = "en") {
@@ -185,66 +147,6 @@ function renderSection(language: Language = "en") {
 }
 
 describe("scoreboard card", () => {
-  it("shows four measured errors on a settled week and dashes on an unsettled one", () => {
-    const value = structuredClone(scoreboard);
-    value.payload.gameweeks[0].ours!.diagnostics = {
-      zero_minute_starters: 0,
-      minutes_shortfall: -12,
-      captain_shortfall: 2.5,
-      autosub_recovery: 3,
-    };
-    value.payload.gameweeks[1].ours!.diagnostics = value.payload.gameweeks[0].ours!.diagnostics;
-    const { container } = renderCard(value);
-    const rows = container.querySelectorAll("tbody tr");
-    expect([...rows[0].querySelectorAll("td")].slice(-4).map((cell) => cell.textContent)).toEqual([
-      "0",
-      "−12.0",
-      "+2.5",
-      "3.0",
-    ]);
-    for (const cell of [...rows[1].querySelectorAll("td")].slice(-4))
-      expect(cell).toHaveTextContent(/^—$/);
-  });
-  it.each(["en", "tr"] as const)(
-    "explains all nine value columns even without comparisons or diagnostics in %s",
-    (language) => {
-      const { container } = renderCard(scoreboard, language);
-      const copy = MESSAGES[language];
-      expect(screen.getByText(copy.scoreboardComparisons.missing)).toBeVisible();
-      expect(screen.queryByRole("heading", { name: copy.scoreboardComparisons.title })).toBeNull();
-      const table = screen.getByRole("table", { name: copy.leagueScoreboard.caption });
-      expect(table.querySelectorAll("thead th")).toHaveLength(10);
-      for (const label of ["zero", "minutes", "captain", "autosub"] as const)
-        expect(table.querySelector("caption")?.textContent?.toLocaleLowerCase()).toContain(
-          copy.scoreboardComparisons[label].toLocaleLowerCase(),
-        );
-      for (const row of container.querySelectorAll("tbody tr, tfoot tr"))
-        for (const cell of [...row.querySelectorAll("td")].slice(-4))
-          expect(cell).toHaveTextContent(/^—$/);
-    },
-  );
-  it.each(["en", "tr"] as const)(
-    "shows the producer's single-basis total beside differently scored weeks in %s",
-    (language) => {
-      const value = structuredClone(scoreboard);
-      value.payload.gameweeks[1].ours!.net = 30;
-      value.payload.gameweeks[1].ours!.scoring_basis = "official_autosub_captain_v2";
-      value.payload.cumulative.ours_net = 30;
-      value.payload.cumulative.ours_gameweeks = [2];
-      value.payload.cumulative.ours_basis = "official_autosub_captain_v2";
-      value.payload.cumulative.ours_excluded_gameweeks = [
-        { gameweek: 1, scoring_basis: "named_eleven_no_autosubs" },
-      ];
-      const { container } = renderCard(value, language);
-      const copy = MESSAGES[language];
-      const rows = container.querySelectorAll("tbody tr");
-      expect(rows[0]).toHaveTextContent(copy.scoreboardComparisons.legacy);
-      expect(rows[1]).toHaveTextContent(copy.scoreboardComparisons.official);
-      const totalCell = container.querySelector("tfoot td")!;
-      expect(totalCell.firstChild?.textContent).toBe("30");
-      expect(totalCell).toHaveTextContent(copy.leagueScoreboard.oursCovers("2"));
-    },
-  );
   it.each(["tr", "en"] as const)("shows one row per finished gameweek in %s", (language) => {
     const copy = MESSAGES[language].leagueScoreboard;
     const { container } = renderCard(scoreboard, language);
@@ -252,212 +154,70 @@ describe("scoreboard card", () => {
     expect(screen.getByRole("heading", { name: copy.title })).toBeInTheDocument();
     // Three finished weeks in the body, one cumulative row in the foot, one header row.
     expect(screen.getAllByRole("row")).toHaveLength(5);
-    expect(screen.getByRole("columnheader", { name: copy.ours })).toBeInTheDocument();
     expect(screen.getByRole("rowheader", { name: copy.cumulative(3) })).toBeInTheDocument();
-    expect(screen.getByText(copy.paperLedger)).toBeInTheDocument();
     expect(container.textContent).not.toMatch(AS_A_CHANCE);
   });
 
-  it.each([
-    ["en", "live", "replay"],
-    ["tr", "canlı", "sonradan kayıt"],
-  ] as const)(
-    "labels our row with the mode it was decided in and withholds an unsettled net in %s",
-    (language, live, replay) => {
-      const copy = MESSAGES[language].leagueScoreboard;
-      expect(copy.modes).toEqual({ live, replay });
-      renderCard(scoreboard, language);
-      const rows = screen.getAllByRole("row");
-      const gw1 = rows[1].querySelectorAll("td");
-      expect(gw1[0].textContent).toContain("26");
-      expect(gw1[0].textContent).toContain(live);
-      const gw2 = rows[2].querySelectorAll("td");
-      expect(gw2[0].textContent).toContain("—");
-      expect(gw2[0].textContent).toContain(replay);
-      expect(gw2[0].textContent).toContain(copy.notSettled);
-      // No ledger entry at all: a dash, no badge.
-      const gw3 = rows[3].querySelectorAll("td");
-      expect(gw3[0].textContent).toBe("—");
-    },
-  );
-
-  it("speaks Turkish to a Turkish reader and keeps only the snapshot id as provenance", () => {
-    const { container } = renderCard(everyNote(), "tr");
-    const copy = MESSAGES.tr.leagueScoreboard;
-    // The notes a card with finished weeks carries are on screen: the gross Top-100 and
-    // provisional notes, which need their weeks, and the mode note. The empty-table line is
-    // not: it shows only when no week has finished, so the empty-card test below reads it.
-    for (const note of [copy.grossNote, copy.provisionalNote, copy.modeNote])
-      expect(screen.getByText(note)).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: MESSAGES.tr.scoreboardComparisons.title }),
-    ).toBeInTheDocument();
-    const shown = scoreboard.payload.source_snapshot_id.slice(0, 24);
-    expect(container.textContent).toContain(`veri çekimi ${shown}…`);
-    // The badges themselves, one per row with a ledger entry, in the reader's words.
-    const table = screen.getByRole("table", { name: copy.caption });
-    expect(badgesIn(table)).toEqual(["canlı", "sonradan kayıt"]);
-    // The comparison table heads its week column as the scoreboard table does.
-    expect(weekHeaders()).toEqual(["OH", "OH"]);
-    // The snapshot id stays as it is; every other text node, the hidden caption included,
-    // is Turkish. Read node by node: textContent glues a badge or a header cell to the next
-    // element's text ("liveAdı", "GWKarar") and a whole-word check cannot see it there.
-    expect(textByNode(container).replaceAll(shown, "")).not.toMatch(PIPELINE_WORDS);
-  });
-
   it.each(["en", "tr"] as const)(
-    "heads the comparison table's week column as the scoreboard table does in %s",
+    "heads the table with the week and its four figures in %s",
     (language) => {
-      renderCard(everyNote(), language);
-      const [scoreboardWeek, comparisonsWeek] = weekHeaders();
-      expect(comparisonsWeek).toBe(scoreboardWeek);
-      expect(scoreboardWeek).toBe(language === "en" ? "GW" : "OH");
+      const copy = MESSAGES[language].leagueScoreboard;
+      renderCard(scoreboard, language);
+      const table = screen.getByRole("table", { name: copy.caption });
+      expect(
+        within(table)
+          .getAllByRole("columnheader")
+          .map((header) => header.textContent),
+      ).toEqual([copy.gameweek, copy.members, copy.top100, copy.average, copy.highest]);
     },
   );
-
-  it("keeps the English card's pipeline words as they were", () => {
-    const { container } = renderCard(everyNote(), "en");
-    const copy = MESSAGES.en.leagueScoreboard;
-    const shown = scoreboard.payload.source_snapshot_id.slice(0, 24);
-    expect(container.textContent).toContain(`capture ${shown}…`);
-    expect(badgesIn(screen.getByRole("table", { name: copy.caption }))).toEqual(["live", "replay"]);
-    expect(screen.getByText(copy.modeNote)).toBeInTheDocument();
-    expect(copy.modeNote.startsWith("live: decided before the deadline, from a capture")).toBe(
-      true,
-    );
-    expect(container.querySelector("caption")?.textContent).toContain("our paper ledger");
-    expect(copy.noGameweek).toBe("No gameweek has finished in this capture yet.");
-  });
 
   it("shows the members' mean net, the Top-100 mean for its own week, the average and the highest", () => {
     renderCard(scoreboard);
     const rows = screen.getAllByRole("row");
-    const gw3 = rows[3].querySelectorAll("td");
-    expect(gw3[1].textContent).toContain("58.7");
-    expect(gw3[1].textContent).toContain("15 members");
-    expect(gw3[2].textContent).toContain("68.8");
-    expect(gw3[2].textContent).not.toContain("not final");
-    expect(gw3[3].textContent).toBe("51");
-    expect(gw3[4].textContent).toBe("119");
+    expect(cellsOf(rows[3])).toEqual(["3", "58.7", "68.8", "51", "119"]);
     // The Top-100 capture describes one week; the others carry a dash, not a copy.
-    expect(rows[1].querySelectorAll("td")[2].textContent).toBe("—");
+    expect(cellsOf(rows[1])).toEqual(["1", "54.3", "—", "50", "131"]);
   });
 
-  it("marks a Top-100 mean read before the week was checked as not final", () => {
-    const unchecked = structuredClone(scoreboard);
-    unchecked.payload.gameweeks[2].top100!.final = false;
-    renderCard(unchecked);
-    expect(screen.getByText(/not final/)).toBeInTheDocument();
+  it("shows a qualified figure on its own", () => {
+    renderCard(qualified());
+    expect(cellsOf(screen.getAllByRole("row")[3])).toEqual(["3", "58.7", "68.8", "51", "119"]);
   });
 
-  it.each(["tr", "en"] as const)("names the basis the Top-100 mean is on in %s", (language) => {
-    const copy = MESSAGES[language].leagueScoreboard;
-    // Net: the cohort's own picks capture covered all hundred, so the column is on the
-    // same basis as the members' and ours, and nothing warns the reader off it.
-    const net = renderCard(scoreboard, language);
-    expect(net.container.textContent).toContain(copy.top100Net);
-    expect(net.container.textContent).not.toContain(copy.grossNote);
-    cleanup();
-
-    // Gross: the standings' own weekly total, before hits. It says so in the cell, the
-    // card says why it does not compare, and the cell is ruled off from the net columns.
-    const gross = structuredClone(scoreboard);
-    const week = gross.payload.gameweeks[2].top100!;
-    week.basis = "gross";
-    week.mean_score = 68.79;
-    week.hit_points = null;
-    week.picks_snapshot_id = null;
-    const rendered = renderCard(gross, language);
-    expect(rendered.container.textContent).toContain(copy.top100Gross);
-    expect(screen.getByText(copy.grossNote)).toBeInTheDocument();
-    const cell = screen.getAllByRole("row")[3].querySelectorAll("td")[2];
-    expect(cell.className).toMatch(/gross/);
-  });
-
-  it.each(["tr", "en"] as const)(
-    "marks a finished week that is not data-checked as provisional in %s",
-    (language) => {
-      const copy = MESSAGES[language].leagueScoreboard;
-      // Every week checked: nothing to warn about.
-      expect(renderCard(scoreboard, language).container.textContent).not.toContain(
-        copy.provisionalNote,
-      );
-      cleanup();
-
-      // Finished but not data-checked: bonus lands fixture by fixture, so the row moves.
-      const provisional = structuredClone(scoreboard);
-      provisional.payload.gameweeks[2].data_checked = false;
-      renderCard(provisional, language);
-      expect(screen.getAllByRole("row")[3].textContent).toContain(copy.provisional);
-      expect(screen.getByText(copy.provisionalNote)).toBeInTheDocument();
-    },
-  );
-
-  it.each(["tr", "en"] as const)(
-    "says our figure is the named eleven, without autosubs or a vice-captain, in %s",
-    (language) => {
-      const copy = MESSAGES[language].leagueScoreboard;
-      const { container } = renderCard(scoreboard, language);
-      // The payload marks the basis; the copy states it, and states that it reads low.
-      expect(scoreboard.payload.gameweeks[0].ours!.scoring_basis).toBe("named_eleven_no_autosubs");
-      expect(scoreboard.payload.gameweeks[0].ours!.vice_captain_named).toBe(false);
-      expect(screen.getByText(copy.paperLedger)).toBeInTheDocument();
-      expect(container.textContent).toContain(copy.ours);
-    },
-  );
-
-  it("names the weeks the cumulative figures cover", () => {
+  it("totals the members and the FPL average in the cumulative row", () => {
     renderCard(scoreboard);
     const foot = screen.getByRole("rowheader", { name: /cumulative through GW3/ }).closest("tr")!;
-    const cells = foot.querySelectorAll("td");
-    expect(cells[0].textContent).toContain("26");
-    expect(cells[0].textContent).toContain("GW 1 only");
-    expect(cells[1].textContent).toContain("199.2");
-    expect(cells[1].textContent).toContain("mean total of 15");
-    // Same weeks as the rest of the row here, so the members' cell says nothing extra.
-    expect(cells[1].textContent).not.toContain("covers GW");
-    expect(cells[3].textContent).toBe("182");
+    expect(cellsOf(foot).slice(1)).toEqual(["199.2", "—", "182", "—"]);
   });
 
-  it("says which weeks the members' cumulative covers when they are not the row's", () => {
-    // A postponed fixture leaves GW2 unfinished while GW3 finishes. `ours_net` and the
-    // field average are summed over the finished weeks; the members' figure is FPL's own
-    // running total, which advances for GW2 as well. Under one "cumulative through GW3"
-    // label those are not comparable unless the wider one says so.
-    const gap = structuredClone(scoreboard);
-    gap.payload.gameweeks = gap.payload.gameweeks.map((week) =>
-      week.gameweek === 2 ? { ...week, finished: false } : week,
+  it("speaks Turkish to a Turkish reader, the hidden caption included", () => {
+    const { container } = renderCard(qualified(), "tr");
+    // Read node by node: textContent glues a header cell to the next element's text
+    // and a whole-word check cannot see it there.
+    expect(textByNode(container)).not.toMatch(PIPELINE_WORDS);
+  });
+
+  it("leaves the pipeline's words out of the English card too", () => {
+    const { container } = renderCard(qualified(), "en");
+    // GW is the game's own word for a week, and the English table heads its column with it.
+    expect(textByNode(container).replace(/\bGW\d*\b/g, "")).not.toMatch(PIPELINE_WORDS);
+    expect(container.textContent).not.toContain(scoreboard.payload.source_snapshot_id.slice(0, 24));
+  });
+
+  it("names the table and words its empty states in the reader's terms", () => {
+    const { tr, en } = MESSAGES;
+    expect(tr.leagueScoreboard.caption).toBe(
+      "Biten her oyun haftası için: lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması, en yüksek puan",
     );
-    gap.payload.cumulative = {
-      ...gap.payload.cumulative,
-      gameweeks: [1, 3],
-      members_gameweeks: [1, 2, 3],
-    };
-    renderCard(gap);
-    const foot = screen.getByRole("rowheader", { name: /cumulative through GW3/ }).closest("tr")!;
-    const cells = foot.querySelectorAll("td");
-    expect(cells[1].textContent).toContain("covers GW 1, 2, 3");
+    expect(en.leagueScoreboard.caption).toBe(
+      "Per finished gameweek: the league members' mean net, the Top-100 mean, the FPL average, the highest score",
+    );
+    expect(tr.leagueScoreboard.noGameweek).toBe("Henüz biten oyun haftası yok.");
+    expect(en.leagueScoreboard.noGameweek).toBe("No gameweek has finished yet.");
+    expect(tr.leagueScoreboard.notPublished).toBe("Skor tablosu henüz yayımlanmadı.");
+    expect(en.leagueScoreboard.notPublished).toBe("The scoreboard is not published yet.");
   });
-
-  it.each<[Language]>([["en"], ["tr"]])(
-    "explains both of the reasons a row is stamped replay (%s)",
-    (language) => {
-      // `decide` stamps replay when the run named a capture rather than took one, and
-      // again when the decision was recorded past the deadline. A note giving only the
-      // second is false about a row decided before its deadline from a reused capture.
-      renderCard(scoreboard, language);
-      const copy = MESSAGES[language].leagueScoreboard;
-      const note = copy.modeNote;
-      expect(screen.getByText(note)).toBeInTheDocument();
-      expect(note).toContain(language === "en" ? "capture" : "veri çekimi");
-      // The note names each mode by the word its badge carries.
-      expect(note.startsWith(`${copy.modes.live}: `)).toBe(true);
-      expect(note.split(`${copy.modes.replay}: `)).toHaveLength(2);
-      expect(note.split(`${copy.modes.replay}: `)[1]).toContain(
-        language === "en" ? " or " : " ya da ",
-      );
-    },
-  );
 
   it.each(["en", "tr"] as const)(
     "says when no gameweek has finished instead of drawing an empty table, in %s",
@@ -470,44 +230,15 @@ describe("scoreboard card", () => {
       empty.payload.cumulative = {
         through_gameweek: null,
         gameweeks: [],
-        ours_net: null,
-        ours_gameweeks: [],
-        ours_basis: null,
-        ours_excluded_gameweeks: [],
         members_mean_total_points: null,
-        members_gameweeks: [],
         members_counted: 0,
         average_entry_score: null,
       };
       const { container } = renderCard(empty, language);
       expect(screen.getByText(MESSAGES[language].leagueScoreboard.noGameweek)).toBeInTheDocument();
       expect(screen.queryByRole("table")).not.toBeInTheDocument();
-      if (language === "tr") {
-        // The empty card, its line included, is Turkish; only the snapshot id stays as it is.
-        const shown = scoreboard.payload.source_snapshot_id.slice(0, 24);
-        expect(textByNode(container).replaceAll(shown, "")).not.toMatch(PIPELINE_WORDS);
-      }
-    },
-  );
-
-  it.each(["tr", "en"] as const)(
-    "does not call a settled week unsettled when it is left out for its basis, in %s",
-    (language) => {
-      // The total is null because gameweek 1 was scored under another rule and is not
-      // summed with the series, not because nothing has settled. Its row is right there in
-      // the table showing 26, so "no settled week" would contradict what the reader sees.
-      const other = structuredClone(scoreboard);
-      other.payload.cumulative = {
-        ...other.payload.cumulative,
-        ours_net: null,
-        ours_gameweeks: [],
-        ours_basis: null,
-        ours_excluded_gameweeks: [{ gameweek: 1, scoring_basis: "named_eleven_no_autosubs" }],
-      };
-      renderCard(other, language);
-      const copy = MESSAGES[language].leagueScoreboard;
-      expect(screen.getByText(copy.oursOtherBasis("1"))).toBeInTheDocument();
-      expect(screen.queryByText(copy.oursNone)).not.toBeInTheDocument();
+      // The empty card, its line included, is Turkish to a Turkish reader.
+      if (language === "tr") expect(textByNode(container)).not.toMatch(PIPELINE_WORDS);
     },
   );
 });
@@ -544,14 +275,15 @@ describe("scoreboard section", () => {
     expect(await screen.findByText(MESSAGES.en.leagueScoreboard.notAvailable)).toBeInTheDocument();
   });
 
-  it("renders the published document", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(scoreboard), { status: 200 })),
-    );
+  it("renders the published document, the only one it reads", async () => {
+    const reads = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(scoreboard), { status: 200 }));
+    vi.stubGlobal("fetch", reads);
     renderSection();
     expect(
       await screen.findByRole("rowheader", { name: /cumulative through GW3/ }),
     ).toBeInTheDocument();
+    expect(reads).toHaveBeenCalledTimes(1);
   });
 });

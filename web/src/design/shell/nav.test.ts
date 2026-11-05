@@ -10,7 +10,7 @@ const OWN = `${MEMBERS}/35249001`;
 beforeEach(() => vi.stubEnv("VITE_ADVICE_API_ORIGIN", "https://squadopt-api.example"));
 afterEach(() => vi.unstubAllEnvs());
 
-const at = (pathname: string, search = "", hash = ""): Place => ({ pathname, search, hash });
+const at = (pathname: string, search = ""): Place => ({ pathname, search });
 
 const CHOSEN: ShellIdentity = { leagueId: LEAGUE, member: null };
 const CLAIMED: ShellIdentity = {
@@ -61,7 +61,7 @@ describe("the sidebar's navigation with a league and nobody claimed", () => {
       active: false,
     });
     expect(items.map((item) => item.key)).toEqual(["findLeague", "fixtures", "contribute"]);
-    for (const key of ["thisWeek", "squad", "league"]) {
+    for (const key of ["thisWeek", "league"]) {
       expect(items.some((item) => item.key === key)).toBe(false);
     }
   });
@@ -76,36 +76,58 @@ describe("the sidebar's navigation with a league and nobody claimed", () => {
 });
 
 describe("the sidebar's navigation with the member claimed", () => {
-  it("opens the claimed member's page as 'Bu hafta', its squad as 'Kadro', and the league", () => {
+  it("opens the claimed member's page as 'Bu hafta', the league, the tools and the history", () => {
     expect(hrefs(at("/fixtures"), CLAIMED)).toEqual([
       ["thisWeek", OWN, false],
-      ["squad", `${OWN}#kadro`, false],
       ["league", MEMBERS, false],
+      ["currentSquad", `${OWN}/current-squad`, false],
+      ["whatIf", `${OWN}/what-if`, false],
+      ["duel", `${OWN}/duel`, false],
+      ["chips", `${OWN}/chips`, false],
+      ["squadCard", `${OWN}/card`, false],
+      ["history", `${OWN}/history`, false],
       ["fixtures", "/fixtures", true],
       ["contribute", "/contribute", false],
     ]);
     expect(navItems(at("/"), CLAIMED).some((item) => item.key === "findLeague")).toBe(false);
   });
 
-  it("marks 'Bu hafta' on the own page and 'Kadro' at its squad", () => {
+  it("marks 'Bu hafta' on the own page, wherever on it the visitor reads", () => {
     const active = (place: Place) =>
       navItems(place, CLAIMED)
         .filter((item) => item.active)
         .map((item) => item.key);
     expect(active(at(OWN))).toEqual(["thisWeek"]);
-    expect(active(at(OWN, "?mode=fark-yarat", "#kadro"))).toEqual(["squad"]);
+    expect(active(at(OWN, "?mode=fark-yarat"))).toEqual(["thisWeek"]);
     expect(active(at(`${OWN}/`))).toEqual(["thisWeek"]);
+    expect(active(at(`${OWN}/history`))).toEqual(["history"]);
   });
 
-  it("keeps 'Bu hafta' and 'Kadro' on the visitor's own page while they read a rival's", () => {
+  it("keeps 'Bu hafta' on the visitor's own page while they read a rival's", () => {
     const items = navItems(at(`${MEMBERS}/35249002`, "?mode=agresif"), CLAIMED);
     expect(items.find((item) => item.key === "thisWeek")).toEqual({
       key: "thisWeek",
       to: OWN,
       active: false,
     });
-    expect(items.find((item) => item.key === "squad")?.to).toBe(`${OWN}#kadro`);
     expect(items.some((item) => item.active)).toBe(false);
+  });
+
+  it("marks a tool on its own page only, and keeps the plan in its link", () => {
+    const plan = "?mode=fark-yarat&window=3";
+    const items = navItems(at(`${OWN}/duel`, plan), CLAIMED, {
+      leagueId: LEAGUE,
+      entryId: "35249001",
+      search: plan,
+    });
+    expect(items.filter((item) => item.active).map((item) => item.key)).toEqual(["duel"]);
+    expect(items.find((item) => item.key === "whatIf")?.to).toBe(`${OWN}/what-if${plan}`);
+    expect(memberAt(at(`${OWN}/what-if`, plan))).toEqual({
+      leagueId: LEAGUE,
+      entryId: "35249001",
+      search: plan,
+    });
+    expect(memberAt(at(`${OWN}/nothing-here`))).toBeNull();
   });
 
   it("marks 'Lig' on the member list only", () => {
@@ -119,7 +141,7 @@ describe("the sidebar's navigation with the member claimed", () => {
     const plan = "?mode=ortak-koru&window=3";
     const own = { leagueId: LEAGUE, entryId: "35249001", search: plan };
     expect(navItems(at("/fixtures"), CLAIMED, own)[0]!.to).toBe(`${OWN}${plan}`);
-    expect(navItems(at("/fixtures"), CLAIMED, own)[1]!.to).toBe(`${OWN}${plan}#kadro`);
+    expect(navItems(at("/fixtures"), CLAIMED, own)[2]!.to).toBe(`${OWN}/current-squad${plan}`);
     const rival = { leagueId: LEAGUE, entryId: "35249002", search: plan };
     expect(navItems(at("/fixtures"), CLAIMED, rival)[0]!.to).toBe(OWN);
     const elsewhere = { leagueId: 7, entryId: "35249001", search: plan };
@@ -148,6 +170,6 @@ describe("the member an address is about", () => {
     expect(navItems(at("/contribute/"), NO_IDENTITY).find((item) => item.active)?.key).toBe(
       "contribute",
     );
-    expect(navItems(at("/status"), NO_IDENTITY).some((item) => item.active)).toBe(false);
+    expect(navItems(at(`/league/${LEAGUE}`), NO_IDENTITY).some((item) => item.active)).toBe(false);
   });
 });

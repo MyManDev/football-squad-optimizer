@@ -7,10 +7,6 @@
   font-family: var(--font-display);
   margin: var(--space-2) 0;
 }
-.muted {
-  color: var(--color-text-muted);
-  max-width: var(--measure);
-}
 .selector {
   display: flex;
   align-items: center;
@@ -34,7 +30,6 @@
   font-variant-numeric: tabular-nums;
 }
 .players {
-  min-width: 620px;
   font-size: var(--step--1);
 }
 .scores th,
@@ -63,18 +58,13 @@
 }
 .facts dd {
   margin: 0.4rem 0 0;
-  overflow-wrap: anywhere;
-}
-.facts div {
-  min-width: 0;
-  max-width: 100%;
 }
 .position {
   display: block;
   font-weight: normal;
   color: var(--color-text-muted);
 }
-.evidence summary {
+.plan summary {
   cursor: pointer;
   padding: var(--space-2) 0;
 }

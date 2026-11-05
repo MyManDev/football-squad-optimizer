@@ -1,0 +1,36 @@
+# One tick of the weekly schedule's deadline gate (#1243), started by weekly-schedule.timer.
+# A definition, not applied by committing it: provision.sh installs it on the Contabo Ubuntu
+# 24.04 host, and deploy/weekly-schedule/README.md says what the host needs and in which order
+# to enable it. The layout is provision.sh's: user squadopt, home /srv/squadopt, the checkout
+# at /srv/squadopt/weekly.
+#
+# A tick decides; at most once a UTC morning and once a gameweek it starts a weekly run, which
+# ends at its site pull request. That can take hours, so the tick has no start timeout, and
+# while it runs the timer starts no second one. The gate runs without --release: D1 on #1243
+# releases a run only after its preview and a yes, by
+# `python -m squadopt.platform.weekly_release --run-id <id>`.
+[Unit]
+Description=SquadOpt weekly schedule: one tick of the deadline gate
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=squadopt
+Group=squadopt
+WorkingDirectory=/srv/squadopt/weekly
+# Private, outside Git: SQUADOPT_CLUB_NEWS_SETTINGS and the model key variable the settings
+# name. Never put a secret in this file.
+EnvironmentFile=/etc/squadopt/weekly-schedule.env
+Environment=PYTHONPATH=/srv/squadopt/weekly/src:/srv/squadopt/weekly
+Environment=PYTHONUNBUFFERED=1
+# One solver worker per core. A Cloud VPS 4 has 4; provision.sh writes the host's own count
+# into the drop-in workers.conf, which overrides this line.
+Environment=WEEKLY_WORKERS=4
+ExecStart=/srv/squadopt/weekly/.venv/bin/python -m squadopt.platform.weekly_schedule --workspace /srv/squadopt/weekly --workers ${WEEKLY_WORKERS}
+TimeoutStartSec=infinity
+# The gate reads its run's peak memory from this unit's cgroup (memory.peak), and a worker the
+# kernel kills for memory fails the run, which the gate reports on #1093, instead of stopping
+# the whole tick before its end line.
+MemoryAccounting=yes
+OOMPolicy=continue

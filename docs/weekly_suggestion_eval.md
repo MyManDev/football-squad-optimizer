@@ -19,8 +19,8 @@ members. Entry/capture baseline recording for additional leagues remains work in
   deadline is too late. The stamp cannot precede the capture.
 - The record's `generated_at_utc` is its build's clock, not a publication time. Records
   written from this change on take it after every member is solved, just before the
-  files are written; older records carry the build's start. The page labels it as the
-  advice's build time.
+  files are written; older records carry the build's start. It stays in the document, and
+  the page does not show it.
 - The measurement readers (`scripts/measure_live_price_honesty.py`,
   `scripts/measure_top100_effect.py`) hold no published tree and still take the latest
   record by its stamp. No member-facing document is built that way.
@@ -61,37 +61,31 @@ gross points minus its recorded transfer charge. A missing charge is unknown, ne
 zero. A known suggested result can still be displayed when the member's actual result
 is absent; the comparison then stays unknown.
 
-The signed difference is **suggested net minus actual net**. Player rows show recorded
-expected points, actual unmultiplied points, their difference, minutes, recorded role,
-captain/vice with the applied multiplier beside the captain label. Separate multiplier
-and counted-points columns are omitted. Headings and labels use title case in both
-languages; explanatory sentences retain normal capitalization. The recorded aggregate
-expectation is XI plus captain, before transfer costs and extra chip points; the UI
-explicitly distinguishes this from a net forecast. No accuracy percentage is inferred.
+The signed difference is **suggested net minus actual net**. Player rows show the role,
+captain/vice with the applied multiplier beside the captain label, and actual unmultiplied
+points. The document also records expected points, their difference from the actual points,
+minutes, multiplier and counted points; the page does not show them. Headings and labels use
+title case in both languages; explanatory sentences retain normal capitalization. The recorded
+aggregate expectation is XI plus captain, before transfer costs and extra chip points; it stays
+in the document and is not shown. No accuracy percentage is inferred.
 
 ## Publication and UI
 
 The optional `weeks[].recorded_plans` lists one-week decisions with no rival or the
 publication's default rival. Windows and other rivals remain in the archive.
 Default-rival aliases are omitted only when their digests match the explicit rival row.
-The list is
-collapsed by default on the member history page. It includes strategy, window,
-rival id, moves and captain, plus chip and any explicitly recorded Top 100,
-manager's-word and expected-points cost fields. Player names come from that record;
-an unresolved player retains their recorded id. No switched plan is solved or scored
-against results here. The existing baseline comparison and horizon are unchanged.
+The list includes strategy, window, rival id, moves and captain, plus chip and any explicitly
+recorded Top 100, manager's-word and expected-points cost fields. The member history page
+shows only the plain pure-points row (no rival, setting or chip), with its captain and moves,
+collapsed by default. Player names come from that record; an unresolved player retains their
+recorded id. No switched plan is solved or scored against results here. The existing baseline
+comparison and horizon are unchanged.
 
 Histories and archives written before the settings were recorded have no such field.
 Missing settings or prices are not reconstructed, labelled off or shown as zero.
 Each optional row comes from the exact capture already selected for that week, under
 the same pre-deadline publication rule, reusing the verified selected record.
-Plain pure-points and chip rows have no displayed price. A mode priced by the scenario
-menu (garantici, agresif, asiri-agresif) shows its recorded cost, which never carries a
-ceiling. Any other priced row shows its recorded cost only when the record carries a
-ceiling equal to it, the only shape a price measured against a proven pure-points plan
-produces. A priced row with no ceiling, or with a ceiling that differs from its cost
-(written before that rule), shows no price. A negative value is never shown.
-The published path identifies a row but is not displayed.
+No price is displayed. The published path identifies a row but is not displayed.
 
 The additive schema is `docs/contracts/weekly_suggestion_history_v1.schema.json`.
 Regenerate it from the repository root with:
@@ -110,9 +104,9 @@ new private advice records. Normal weekly publication supplies the same configur
 record root. This adds no API, solver job, model, scheduler or infrastructure service.
 
 The member page links to `/league/members/{entry_id}/history`. The Turkish/English
-page provides a recorded-week selector, score comparison, player details and expandable
-source timestamps/digests. Missing files, unfinished results and unreadable records
-have distinct states. Its loader never falls back to example data.
+page provides a recorded-week selector, score comparison and player details. Missing
+files, unfinished results and unreadable records have distinct states. Its loader never
+falls back to example data.
 
 The default view is now an overview ordered by gameweek, with suggested net points,
 the member's actual net points, weekly difference and cumulative difference. The
@@ -131,8 +125,8 @@ and GW14 is unfinished. This fixture is used only by tests and a clearly labelle
 separate local mock preview. It is not imported by the production UI.
 
 `generated_at_utc` in this derived contract denotes the input capture cutoff for
-outcomes, shown as the result-data date. The advice's build time remains separate and
-can be later than its input capture.
+outcomes. It stays in the document, and the page does not show it. The advice's build time
+remains separate and can be later than its input capture.
 
 ## Personal season report
 

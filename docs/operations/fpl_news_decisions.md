@@ -8,8 +8,8 @@ calibrated probability of starting. Zero and an unknown value remain different.
 An empty news field with a retained date is reported as cleared text; this is not
 proof that the player has recovered.
 
-The page shows the capture time separately from the news date. It only reflects
-the capture used by that decision. Server readiness does not establish freshness,
+The page shows the news date; the capture time stays in the published document. Both
+reflect only the capture used by that decision. Server readiness does not establish freshness,
 and this feature adds neither a polling service nor a new data scheduler.
 
 ## Coach evidence
