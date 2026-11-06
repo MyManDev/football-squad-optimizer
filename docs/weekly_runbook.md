@@ -76,7 +76,11 @@ capture, and refuses otherwise (the site would serve two captures). It writes th
 `legacy_advice_records`. Its member histories read the baseline records under
 `--baseline-record-root` (by default `member_baselines` beside `--advice-record-root`, where
 the weekly run writes them), so a week only that store holds stays in a second league's
-history; it writes no baseline record itself.
+history; it writes no baseline record itself. Before solving it makes the preflight's native
+window check and refuses unless the child loads `highspy` 1.15.1; `--cp-sat-windows` binds no
+native solver instead, so every window search runs on CP-SAT alone. After the build it prints
+one `windows` line per member and window length with the counts the receipt's `window_solvers`
+carries, and each fallback reason with its count below it.
 
 `--decide` is deliberately absent from that line. It is the members' loop that runs every
 week; our own squad is a separate decision with a precondition that is not currently met
@@ -91,6 +95,44 @@ Run the installed package from the clean checkout you mean to publish from (or p
 Start after the previous gameweek's picks are public and inside the lead-time window below — "before the deadline" is a floor, not the policy.
 `--dry-run` prints the plan and runs nothing. Without `--decide` the ledger is not
 touched and the loop is the members' loop alone.
+
+**The native window solver.** The three- and five-week searches run on native HiGHS in a
+separate interpreter, with CP-SAT as the fallback. The preflight starts that interpreter
+once and refuses the week, before any capture, unless it loads `highspy` 1.15.1; its
+receipt says `native_window_solver: highspy 1.15.1`. To check the weekly venv by hand
+before a run, `python -c "import highspy; print(highspy.Highs().version())"` must print
+`1.15.1`; otherwise `python -m pip install highspy==1.15.1` (the package pins it, so a
+fresh `pip install -e .` installs it too). After the league stage, its receipt's
+`leagues.<id>.window_solvers` gives, per member and window length, how many searches
+native HiGHS answered, how many fell back to CP-SAT, the HiGHS version the child
+reported and each fallback reason with its count; the run log carries the same rows as
+`tick.week.league.window_solver` events. A fallback publishes what CP-SAT alone would
+have published. The same reason on every member's windows points at the environment
+rather than a member. An accepted native answer can publish another plan than CP-SAT
+alone, even at the same value: a five-week window CP-SAT leaves FEASIBLE can now be proved
+(4 of 7 changed value in the #1147 record), its status, gap and the prices measured
+against it change with it, and a window whose CP-SAT tie-break does not finish can
+publish another plan of equal value, because the tie-break now starts from the HiGHS
+solution with almost its whole budget (`docs/architecture/publication_services.md`).
+
+**What the native solver changed on a capture.** The first weekly rehearsal on the commit
+that brings the native solver, and any later week where the owner asks, rebuilds the same
+league from the same capture with CP-SAT alone into a scratch directory and compares the
+two trees:
+
+```bash
+python -m scripts.build_league_site --league 352490 --snapshot-id <capture> --out <scratch> --no-advice-record --cp-sat-windows --workers N --in-season-projection <handoff>
+git diff --no-index --stat <preview>/data/leagues/352490 <scratch>/data/leagues/352490
+```
+
+Add `--rotation-evidence`, `--club-news-source` and `--top100-evidence` when the run's
+league stage read them (its journal lists each input). `scoreboard.json` comes from a later
+stage and is missing from the scratch tree. Every other file listed is a document the two
+backends answered differently, and the rehearsal record lists each of them. The one-week
+documents (`saf-puan/1.json`, `<strategy>/1.json`, `<strategy>/1/vs-<rival>.json`) never
+reach the native solver, so a difference there means the two builds read different inputs:
+fix the command before reading the window differences. The comparison solves the whole menu
+again, so it takes about as long as the league stage.
 
 The preview now defaults to `data/runtime/weekly/<run-id>/preview`, rather than tracked
 `web/public`. `--out` still selects another destination. A source-controlled destination can
