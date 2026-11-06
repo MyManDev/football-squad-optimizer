@@ -455,6 +455,8 @@ describe.each(["tr", "en"] as const)("a team through the forwarder in %s", (lang
     });
     expect(await screen.findByText(COMPUTE_COPY[language].deadlinePassedTitle)).toBeInTheDocument();
     await waitFor(() => expect(document.querySelector("[data-member-live-score]")).not.toBeNull());
+    expect(document.querySelectorAll('#kadro [data-points-kind="actual"]')).toHaveLength(15);
+    expect(document.querySelectorAll('#kadro [data-points-kind="expected"]')).toHaveLength(0);
     expect(create).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: copy.decisionTitle })).toBeVisible();
     expect(screen.getByRole("heading", { name: copy.memberSquad })).toBeVisible();
@@ -509,6 +511,7 @@ describe.each(["tr", "en"] as const)("a team through the forwarder in %s", (lang
       });
       expect(await screen.findByRole("heading", { name: copy.memberSquad })).toBeVisible();
       expect(document.querySelectorAll("#kadro [data-player-motion]")).toHaveLength(15);
+      expect(document.querySelectorAll("#kadro [data-player-points]")).toHaveLength(0);
       expect(document.querySelector(`#kadro [data-player-motion="${incoming.id}"]`)).not.toBeNull();
       expect(document.querySelector(`#kadro [data-player-motion="${FIFTEEN[0]}"]`)).toBeNull();
       const deviceButton = screen.getByRole("button", { name: copy.deviceButton });

@@ -16,8 +16,9 @@ import { gameweekDeadline, passedDeadline, useMinuteClock } from "../advice/dead
 import { useDevicePlan, type DevicePlanDependencies } from "../device/useDevicePlan";
 import { forwarder } from "../forwarder/client";
 import type { FplStandingRow } from "../forwarder/documents";
-import { MemberLiveWeek } from "../live/MemberLiveWeek";
-import type { MemberLiveDependencies } from "../live/useMemberLiveScore";
+import { MemberLiveWeekView } from "../live/MemberLiveWeek";
+import { useMemberLiveScore, type MemberLiveDependencies } from "../live/useMemberLiveScore";
+import { squadWithPlayedWeek } from "../live/memberLineup";
 import { AdviceDecision, PlanLineup } from "../pages/MemberAdviceCard";
 import { MemberPageSkeleton } from "../pages/MemberPageSkeleton";
 import { MemberSquad } from "../pages/MemberSquad";
@@ -239,6 +240,7 @@ export function ForwardedMemberView({
   const now = useMinuteClock(dependencies.clock);
   const closed =
     passedDeadline(gameweekDeadline(fixtures, view.season, view.gameweek), now) !== null;
+  const liveWeek = useMemberLiveScore(view, fixtures, dependencies.live, closed);
   const request = useMemo<AdviceRequest>(
     () => ({
       publicEntry: true,
@@ -272,7 +274,9 @@ export function ForwardedMemberView({
         : null;
   const plan = closed ? null : (shown?.envelope.payload ?? null);
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
-  const displayedSquad = closed && currentSquad !== null ? currentSquad : view;
+  const displayedSquad = closed
+    ? squadWithPlayedWeek(currentSquad ?? view, liveWeek.shown?.lineup ?? null)
+    : view;
   const onPitch = squadOnPitch(plan, displayedSquad);
   const manager = view.entry.manager_name;
   const title = view.entry.team_name ?? messages.forwarded.teamTitle(view.entry.entry_id);
@@ -291,9 +295,7 @@ export function ForwardedMemberView({
               {COMPUTE_COPY[language].deadlinePassedTitle}
             </h2>
           </section>
-          {fixtures !== null ? (
-            <MemberLiveWeek squad={view} fixtures={fixtures} dependencies={dependencies.live} />
-          ) : null}
+          {fixtures !== null ? <MemberLiveWeekView squad={view} live={liveWeek} /> : null}
         </>
       ) : null}
       <section
@@ -337,6 +339,7 @@ export function ForwardedMemberView({
         </div>
         <div className={page.squadArea}>
           <MemberSquad
+            pointsKind={closed ? "actual" : "expected"}
             onPitch={onPitch}
             plan={plan}
             codes={codes}

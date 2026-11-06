@@ -8,6 +8,8 @@ import type { ModelChange } from "../advice/modelSwitch";
 import { ClubShirt } from "./ClubShirt";
 import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
+import { playerPoints, type PitchPointsKind } from "./playerPoints";
+export type { PitchPointsKind } from "./playerPoints";
 
 /**
  * One player as the pitch draws them: a name plate on the grass, white or in club colours,
@@ -22,6 +24,7 @@ export interface PitchPlayer {
   team: string;
   /** Expected points; null where the document states none, which is never drawn as 0. */
   expectedPoints: number | null;
+  eventPoints?: number | null;
   captain: boolean;
   vice: boolean;
   /** Arrives with this plan's transfers. */
@@ -54,6 +57,7 @@ function Plate({
   changed,
   news,
   onSelectPlayer,
+  pointsKind = "expected",
 }: {
   player: PitchPlayer;
   codes: ClubCodes;
@@ -61,11 +65,13 @@ function Plate({
   changed: boolean;
   news?: CoachAbsence;
   onSelectPlayer?: (id: number) => void;
+  pointsKind?: PitchPointsKind;
 }) {
   const { language, locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
   const keeper = player.position === "GK";
   const shortName = player.shortName.trim() || player.name;
+  const points = playerPoints(player, pointsKind);
   // The shirt is drawn three ways and the stylesheet shows the one the pitch has room for:
   // large above the plate where an upright pitch is tall enough for it, otherwise small in
   // the plate where the club swatch stood, before the name across and before the code
@@ -109,12 +115,17 @@ function Plate({
         />
         <span className={styles.codeText}>{code ?? player.team}</span>
       </span>
-      {news || (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
-        <span className={styles.xp}>
-          {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+      {news || (points !== null && Number.isFinite(points)) ? (
+        <span className={styles.xp} data-points-kind={pointsKind} data-player-points={points}>
+          {points !== null && Number.isFinite(points) ? (
             <>
-              {figure(player.expectedPoints, locale)}
-              <span className="visually-hidden"> {messages.leagueMembers.pointsUnitSpoken}</span>
+              {pointsKind === "actual" ? points.toLocaleString(locale) : figure(points, locale)}
+              <span className="visually-hidden">
+                {" "}
+                {pointsKind === "actual"
+                  ? messages.leagueMembers.pointsLabel
+                  : messages.leagueMembers.pointsUnitSpoken}
+              </span>
             </>
           ) : null}
           {news ? <CoachNewsMark news={news} name={player.name} /> : null}
@@ -163,6 +174,7 @@ export function MemberPitch({
   modelChange = null,
   news,
   onSelectPlayer,
+  pointsKind = "expected",
 }: {
   players: PitchPlayer[];
   codes: ClubCodes;
@@ -174,6 +186,7 @@ export function MemberPitch({
   modelChange?: PlateChange;
   news?: ReadonlyMap<number, CoachAbsence>;
   onSelectPlayer?: (id: number) => void;
+  pointsKind?: PitchPointsKind;
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -239,6 +252,7 @@ export function MemberPitch({
                   >
                     <div data-player-motion={player.playerId}>
                       <Plate
+                        pointsKind={pointsKind}
                         player={player}
                         codes={codes}
                         news={news?.get(player.playerId)}
@@ -265,6 +279,7 @@ export interface BenchPlayer {
   position: string;
   team: string;
   expectedPoints: number | null;
+  eventPoints?: number | null;
   /** The published order, or null where none is published (shown as a hyphen, last). */
   order: number | null;
 }
@@ -280,12 +295,14 @@ export function MemberBench({
   modelChange = null,
   news,
   onSelectPlayer,
+  pointsKind = "expected",
 }: {
   players: BenchPlayer[];
   codes: ClubCodes;
   modelChange?: PlateChange;
   news?: ReadonlyMap<number, CoachAbsence>;
   onSelectPlayer?: (id: number) => void;
+  pointsKind?: PitchPointsKind;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -302,6 +319,7 @@ export function MemberBench({
             const code = clubCode(player.team, codes);
             const shortName = player.shortName.trim() || player.name;
             const changed = modelChange?.changed.has(player.playerId) ?? false;
+            const points = playerPoints(player, pointsKind);
             return (
               <li
                 key={player.playerId}
@@ -334,15 +352,22 @@ export function MemberBench({
                     </span>
                   ) : null}
                 </span>
-                {news?.has(player.playerId) ||
-                (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
-                  <span className={styles.benchXp}>
-                    {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+                {news?.has(player.playerId) || (points !== null && Number.isFinite(points)) ? (
+                  <span
+                    className={styles.benchXp}
+                    data-points-kind={pointsKind}
+                    data-player-points={points}
+                  >
+                    {points !== null && Number.isFinite(points) ? (
                       <>
-                        {figure(player.expectedPoints, locale)}
+                        {pointsKind === "actual"
+                          ? points.toLocaleString(locale)
+                          : figure(points, locale)}
                         <span className="visually-hidden">
                           {" "}
-                          {messages.leagueMembers.pointsUnitSpoken}
+                          {pointsKind === "actual"
+                            ? messages.leagueMembers.pointsLabel
+                            : messages.leagueMembers.pointsUnitSpoken}
                         </span>
                       </>
                     ) : null}

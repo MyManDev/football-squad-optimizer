@@ -33,6 +33,7 @@ import {
 import type { FplEntryBundle, FplStandingRow } from "../forwarder/documents";
 import { bundleEntryState } from "../forwarder/entryState";
 import type { BundleTableRefusal } from "../forwarder/identity";
+import { memberLineup } from "../live/memberLineup";
 import type {
   EntryChipAvailability,
   EntrySquad,
@@ -110,31 +111,8 @@ export function currentMemberSquad(
     table.source_snapshot_id !== squad.source_snapshot_id
   )
     return null;
-  const players = new Map(table.players.map((player) => [player.element_id, player]));
-  if (current.pick_order.some((element) => !players.has(element))) return null;
-  const fifteen = current.pick_order.map((element, index): EntrySquadPlayer => {
-    const player = players.get(element)!;
-    return {
-      player_id: player.id,
-      name: player.name,
-      short_name: player.short_name,
-      team: player.team,
-      position: position(player.position),
-      price_tenths: player.buy_tenths,
-      expected_points: player.expected_points,
-      event_points: null,
-      is_captain: element === current.captain,
-      is_vice_captain: element === current.vice,
-      role: index < 11 ? "starter" : "bench",
-      bench_order: index < 11 ? null : index - 10,
-    };
-  });
-  return {
-    ...squad,
-    starting_xi: fifteen.slice(0, 11),
-    bench: fifteen.slice(11),
-    active_chip: current.active_chip,
-  };
+  const lineup = memberLineup(current, table);
+  return lineup === null ? null : { ...squad, ...lineup };
 }
 
 /** The season's chip windows the table's rules state, or null where one cannot be read. */

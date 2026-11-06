@@ -31,6 +31,20 @@ describe("the member's live week from the forwarder and the capture's table", ()
       expect(result.live.score.bonus_confirmed).toBe(name === "finished");
       expect(result.live.names.get(7)).toBe("Player 7");
       expect(result.live.names.size).toBe(15);
+      const { live, member, table } = inputs(name);
+      const picked = [...result.live.lineup.starting_xi, ...result.live.lineup.bench];
+      expect(picked.map((player) => player.player_id)).toEqual(
+        member.pick_order.map((id) => table.players.find((player) => player.element_id === id)!.id),
+      );
+      expect(picked.map((player) => player.event_points)).toEqual(
+        member.pick_order.map(
+          (id) => live.elements.find((player) => player.element_id === id)!.points,
+        ),
+      );
+      // The captain's plate states his raw score; the team score applies the multiplier.
+      expect(picked.find((player) => player.is_captain)?.event_points).toBe(
+        live.elements.find((player) => player.element_id === member.captain)!.points,
+      );
     },
   );
 
