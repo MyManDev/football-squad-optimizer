@@ -7,6 +7,8 @@
 
 import type { FixturesPayload } from "../../fixtures/types";
 import { scoreMemberWeek, type LiveWeekScore } from "../../liveScore/officialScoring";
+import { playerActivities, type PlayerActivity } from "../../liveScore/playerActivity";
+import type { LiveActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek, Position, WeekLive } from "../../liveScore/weekLive";
 import { forecastSource } from "../device/chipForecast/member";
 import { DEVICE_PLAN_TABLE_CONTRACT_VERSION, type DevicePlanDocument } from "../device/types";
@@ -37,6 +39,7 @@ export interface MemberLiveScore {
   score: Extract<LiveWeekScore, { refused: false }>;
   /** The fifteen's names by element id, as the table states them. */
   names: ReadonlyMap<number, string>;
+  activity: PlayerActivity[] | null;
 }
 
 export type MemberLiveResult =
@@ -47,11 +50,13 @@ export function memberLiveScore({
   member,
   table,
   fixtures,
+  activity = null,
 }: {
   live: WeekLive;
   member: MemberWeek;
   table: DevicePlanDocument;
   fixtures: FixturesPayload;
+  activity?: LiveActivity | null;
 }): MemberLiveResult {
   if (member.gameweek !== live.gameweek) return { ok: false, reason: "other_week" };
   if (table.season !== live.season || fixtures.season !== live.season) {
@@ -89,5 +94,13 @@ export function memberLiveScore({
     member,
   );
   if (score.refused) return { ok: false, reason: "score_refused", detail: score.reason };
-  return { ok: true, live: { gameweek: live.gameweek, score, names } };
+  return {
+    ok: true,
+    live: {
+      gameweek: live.gameweek,
+      score,
+      names,
+      activity: activity === null ? null : playerActivities(activity, member.pick_order),
+    },
+  };
 }
