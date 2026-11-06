@@ -48,10 +48,17 @@ done
 for path in "${PATHS[@]}"; do
   [ -d "$path" ] && [ ! -L "$path" ] || fail "$path is not a directory"
 done
+paths=("${PATHS[@]}")
+# The independent baseline store appears with the multi-league rollout (#1206).
+baselines="$WEEKLY/data/member_baselines"
+if [ -e "$baselines" ] || [ -L "$baselines" ]; then
+  [ -d "$baselines" ] && [ ! -L "$baselines" ] || fail "$baselines is not a directory"
+  paths+=("$baselines")
+fi
 ping /start
 restic cat config >/dev/null 2>&1 || fail "the repository is not initialised (README, Backups and alerts)"
 
-summary="$(restic backup --quiet --json --tag nightly --host squadopt-host "${PATHS[@]}" | tail -1)" ||
+summary="$(restic backup --quiet --json --tag nightly --host squadopt-host "${paths[@]}" | tail -1)" ||
   fail "restic backup exited non-zero"
 snapshot="$(printf '%s' "$summary" | python3 -c 'import json, sys; print(json.load(sys.stdin)["snapshot_id"])' 2>/dev/null)" ||
   fail "restic backup reported no snapshot"

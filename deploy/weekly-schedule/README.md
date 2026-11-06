@@ -304,6 +304,7 @@ FPL serves only the present, so a lost capture cannot be taken again.
   weekly run and the backend cannot rebuild to a restic repository in Cloudflare R2. That covers
   `data/snapshots`, `data/handoffs`, `data/ledger`, `data/advice_records`, `data/entries`,
   `data/runtime`, `data/logs`, `artifacts/`, and the backend's `releases/` and `store/`.
+  Once the multi-league baseline store exists, `data/member_baselines` is included too.
   Keep the runtime journals, started markers and release logs with their captures: they prevent
   a restored host from starting a run or publishing a release twice.
   - restic encrypts each backup, adds only what changed and checksums every block. It keeps

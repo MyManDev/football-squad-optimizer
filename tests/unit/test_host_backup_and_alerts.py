@@ -16,6 +16,7 @@ import importlib.machinery
 import importlib.util
 import json
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -285,6 +286,7 @@ def test_the_backup_covers_every_store_the_issue_names_and_keeps_a_stamp() -> No
         "data/handoffs",
         "data/ledger",
         "data/advice_records",
+        "data/member_baselines",
         "data/entries",
         "data/runtime",
         "data/logs",
@@ -298,6 +300,78 @@ def test_the_backup_covers_every_store_the_issue_names_and_keeps_a_stamp() -> No
     assert "ping /fail" in text and 'ping ""' in text
     assert "/var/lib/squadopt/backup/last-success" in text
     assert "/var/lib/squadopt/backup/last-success" in _text(WATCH)
+
+
+@needs_bash
+@pytest.mark.parametrize("baseline", ["absent", "present", "symlink"])
+def test_backup_includes_a_landed_baseline_store_and_refuses_a_link(
+    tmp_path: Path, baseline: str
+) -> None:
+    weekly, backend = tmp_path / "weekly", tmp_path / "backend"
+    for relative in (
+        "data/snapshots",
+        "data/handoffs",
+        "data/ledger",
+        "data/advice_records",
+        "data/entries",
+        "data/runtime",
+        "data/logs",
+        "artifacts",
+    ):
+        (weekly / relative).mkdir(parents=True)
+    for relative in ("releases", "store"):
+        (backend / relative).mkdir(parents=True)
+    store = weekly / "data/member_baselines"
+    if baseline == "present":
+        store.mkdir()
+    elif baseline == "symlink":
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        store.symlink_to(outside, target_is_directory=True)
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    scripts = {
+        "id": "#!/bin/sh\nprintf '0\\n'\n",
+        "python3": f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n',
+        "restic": (
+            "#!/usr/bin/env python3\nimport json, os, sys\n"
+            "with open(os.environ['BACKUP_CALLS'], 'a') as out:\n"
+            "    out.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+            "if sys.argv[1] == 'backup': print(json.dumps({'snapshot_id': 'synthetic'}))\n"
+        ),
+    }
+    for name, source in scripts.items():
+        path = binaries / name
+        path.write_text(source, encoding="utf-8")
+        path.chmod(0o755)
+    password = tmp_path / "synthetic-password"
+    password.write_text("test only", encoding="utf-8")
+    calls = tmp_path / "calls.jsonl"
+    environment = {
+        "PATH": f"{binaries}:/usr/bin:/bin",
+        "SQUADOPT_WEEKLY": str(weekly),
+        "SQUADOPT_BACKEND_BASE": str(backend),
+        "SQUADOPT_BACKUP_STAMP": str(tmp_path / "stamp"),
+        "SQUADOPT_ALERT": "/bin/true",
+        "RESTIC_PASSWORD_FILE": str(password),
+        "RESTIC_REPOSITORY": "synthetic",
+        "AWS_ACCESS_KEY_ID": "synthetic",
+        "AWS_SECRET_ACCESS_KEY": "synthetic",
+        "BACKUP_CALLS": str(calls),
+    }
+    result = subprocess.run(
+        [BASH or "bash", str(BACKUP)], env=environment, capture_output=True, text=True, timeout=15
+    )
+    if baseline == "symlink":
+        assert result.returncode == 1
+        assert not calls.exists()
+        assert not (tmp_path / "stamp").exists()
+    else:
+        assert result.returncode == 0, result.stderr
+        commands = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+        backup = next(arguments for arguments in commands if arguments[0] == "backup")
+        assert (str(store) in backup) is (baseline == "present")
+        assert (tmp_path / "stamp").is_file()
 
 
 @needs_bash
