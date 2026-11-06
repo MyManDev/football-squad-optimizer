@@ -91,6 +91,7 @@ def test_preflight_comes_before_the_first_step_that_changes_the_host() -> None:
         "release_layout",
         "tunnel_unit",
         "receive_command",
+        "follow_releases",
         "backups_and_alerts",
         "steps_left",
     ]

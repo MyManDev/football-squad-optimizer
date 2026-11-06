@@ -10,9 +10,10 @@
 # which keeps its layout under ~/squadopt of the user it reaches over SSH, here root. This
 # script installs Docker and cloudflared from their own apt repositories, makes that layout
 # (the checkout, a store owned by the containers' user, the environment file and an empty
-# override), installs the tunnel's unit and the squadopt-receive command. It starts no backend
-# and writes no secret: a release's activate starts the backend, and a person makes the
-# tunnel's credential (README, "The advice backend").
+# override), installs the tunnel's unit, the squadopt-receive command and
+# squadopt-backend-release with its two units, which move the backend after each release from
+# GW11 (#1243, 6605005485). It starts no backend and writes no secret: a release's activate
+# starts the backend, and a person makes the tunnel's credential (README, "The advice backend").
 set -euo pipefail
 
 readonly BASE=/root/squadopt
@@ -25,6 +26,13 @@ readonly ORIGINS=https://squadopt.mymandev.com,https://squadopt.pages.dev
 readonly TUNNEL_CONFIG=/etc/cloudflared/config.yml
 readonly TUNNEL_UNIT=cloudflared-squadopt.service
 readonly RECEIVE=/usr/local/sbin/squadopt-receive
+readonly FOLLOW=/usr/local/sbin/squadopt-backend-release
+readonly FOLLOW_UNIT=squadopt-backend-release
+readonly SERVICE_USER="${SQUADOPT_SERVICE_USER:-squadopt}"
+# The release chain writes its requests here as the service user; root writes its results
+# where that user can read them and change nothing.
+readonly SPOOL=/srv/squadopt/spool/backend
+readonly STATE=/var/lib/squadopt/backend
 # The backup and the alerts (#1294): three commands, their units and two private settings files.
 readonly WATCH_COMMANDS=(squadopt-alert squadopt-backup squadopt-watch)
 readonly WATCH_UNITS=(squadopt-backup.service squadopt-backup.timer squadopt-watch.service squadopt-watch.timer)
@@ -54,8 +62,8 @@ write_if_changed() {
 preflight() {
   [ "$(id -u)" -eq 0 ] || refuse "run as root: bash backend.sh"
   local file
-  for file in squadopt-receive "$TUNNEL_UNIT" cloudflared.example.yml "${WATCH_COMMANDS[@]}" \
-    "${WATCH_UNITS[@]}"; do
+  for file in squadopt-receive "$TUNNEL_UNIT" cloudflared.example.yml "$FOLLOW_UNIT" \
+    "$FOLLOW_UNIT.path" "$FOLLOW_UNIT.service" "${WATCH_COMMANDS[@]}" "${WATCH_UNITS[@]}"; do
     [ -f "$SOURCE/$file" ] || refuse "no $SOURCE/$file: run provision.sh first"
   done
 }
@@ -149,6 +157,27 @@ receive_command() {
   ls -l "$RECEIVE"
 }
 
+follow_releases() {
+  say "$FOLLOW_UNIT, the backend following each release on this host"
+  write_if_changed "$FOLLOW" 0755 <"$SOURCE/$FOLLOW_UNIT" || true
+  local group unit changed=no
+  group="$(id -gn "$SERVICE_USER")"
+  install -d -m 0700 -o "$SERVICE_USER" -g "$group" "$(dirname "$SPOOL")" "$SPOOL"
+  install -d -m 0755 "$(dirname "$STATE")" "$STATE"
+  for unit in "$FOLLOW_UNIT.path" "$FOLLOW_UNIT.service"; do
+    if write_if_changed "/etc/systemd/system/$unit" 0644 <"$SOURCE/$unit"; then
+      changed=yes
+    fi
+  done
+  if [ "$changed" = yes ]; then
+    systemctl daemon-reload
+  fi
+  # The path unit only watches the spool; the service runs when a release leaves a request.
+  systemctl enable --now "$FOLLOW_UNIT.path" >/dev/null
+  systemctl is-active "$FOLLOW_UNIT.path"
+  ls -l "$FOLLOW"
+}
+
 backups_and_alerts() {
   say "The backup to R2 and the alerts through ntfy (#1294)"
   apt-get install -y -q restic
@@ -194,6 +223,8 @@ steps_left() {
    SQUADOPT_VM_HOST=root@<this host>, then prepare, candidate and activate.
 3. FORWARDED_ALLOW_IPS in $BASE/.env, once the api's peer is verified.
 4. The cutover: cloudflared tunnel route dns --overwrite-dns <name> squadopt-api.mymandev.com
+5. From GW11, release.conf in weekly-schedule.service.d (README, "Release a run"): each run then
+   releases itself, and $FOLLOW_UNIT moves the backend after it.
 STEPS
 }
 
@@ -205,6 +236,7 @@ main() {
   release_layout
   tunnel_unit
   receive_command
+  follow_releases
   backups_and_alerts
   steps_left
 }

@@ -922,9 +922,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--release",
         action="store_true",
         help=(
-            "release a run that exits 0 in the same tick, with no person; off, as D1 on #1243 "
-            "keeps it: a run is released after its preview and a yes, by weekly_release"
+            "release a run that exits 0 in the same tick, with no person; on from GW11 "
+            "(#1243, 6605005485), before that a run was released after its preview and a yes"
         ),
+    )
+    parser.add_argument(
+        "--backend",
+        choices=weekly_release.BACKENDS,
+        default="operator",
+        help="with --release, who moves the backend once the site is live (weekly_release)",
     )
     parser.add_argument("--dry-run", action="store_true", help="print the decision, write nothing")
     return parser
@@ -936,17 +942,19 @@ def main(
     runner: Runner = run_logged,
     acquire: Acquire = club_news_acquire.main,
     read_bootstrap: Callable[[], bytes] = fpl_bootstrap,
-    release: Release = weekly_release.release_run,
+    release: Release | None = None,
     notify: Notify = comment_on_slot_issue,
     clock: Clock = time.monotonic,
     peaks: Peaks = memory_peaks,
 ) -> int:
     """Decide this tick and start its run, and release the run only with ``--release``.
 
-    `runner`, `acquire`, `read_bootstrap`, `release`, `notify`, `clock` and `peaks` are seams.
+    `runner`, `acquire`, `read_bootstrap`, `release`, `notify`, `clock` and `peaks` are seams;
+    `release` is the chain with the backend hook ``--backend`` names unless a test passes one.
     """
 
     arguments = build_parser().parse_args(argv)
+    chain = release if release is not None else weekly_release.releaser(arguments.backend)
     workspace = arguments.workspace.resolve()
     now: datetime = arguments.now or datetime.now(UTC)
     state = workspace / SCHEDULE_STATE
@@ -1002,7 +1010,10 @@ def main(
         )
         print(f"would run: {sys.executable} {' '.join(preview)}")
         if arguments.release:
-            print(f"would release {identity} once it exits 0, with {weekly_release.__name__}")
+            print(
+                f"would release {identity} once it exits 0, with {weekly_release.__name__}, the "
+                f"backend moved by its {arguments.backend}"
+            )
         return 0
     settings = arguments.club_news_settings or os.environ.get(SETTINGS_VARIABLE)
     return start_run(
@@ -1016,7 +1027,7 @@ def main(
         runner=runner,
         acquire=acquire,
         notify=notify,
-        release=release if arguments.release else None,
+        release=chain if arguments.release else None,
         run_hours=arguments.run_hours,
         clock=clock,
         peaks=peaks,
