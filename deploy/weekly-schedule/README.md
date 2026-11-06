@@ -211,6 +211,25 @@ copies. A release is packed on the PC from the stores there.
 
 ### Set it up
 
+Public teams can use the existing API/worker queue with
+`SQUADOPT_BACKEND_PUBLIC_ENTRIES=1` in the backend's private Compose environment.
+`SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT` defaults to 32 open jobs. Apply the tested release
+to both API and worker before enabling the flag; rollback disables the flag or restores
+the previous release.
+
+`GET /api/v1/public/leagues/{league}/entries/{entry}/advice` only reads an existing result.
+`POST` fetches and pins that one team's FPL bundle, then joins or creates a durable job.
+League 0 denotes a standalone `/entry/{entry}` page; regular league endpoints still require
+a positive league id. Only the plain one-week plan is accepted. Country leagues are never
+added to the weekly capture configuration. The browser starts neither server nor device
+computation until the visitor chooses it; queued work can resume after a reload.
+
+Inputs live under `store/public-entries`, keyed by capture and entry, and their fingerprint
+is part of the advice cache identity. The first valid input for a capture is immutable;
+a newer capture gets fresh inputs. API and worker share this store and the normal rate
+limits, deadline guard, per-client job limit, job progress and cache. Fetches use only the
+deployed FPL forwarder, reject redirects, and are bounded to 15 seconds and 2 MiB.
+
 1. As root: `bash /srv/squadopt/weekly/deploy/weekly-schedule/backend.sh`. It is the same
    script for a first setup and for a check that changes nothing.
 2. **The tunnel, by a person, once.** The two commands make the account's certificate and

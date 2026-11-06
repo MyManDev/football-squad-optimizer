@@ -27,6 +27,8 @@ import type { ChipSelection } from "./chipChoice";
 import { preferencesKey, type DecisionPreferences } from "./decisionPreferences";
 
 export interface AdviceRequest {
+  /** Fetch and pin this public team's inputs only when computation is requested. */
+  publicEntry?: boolean;
   preferences?: DecisionPreferences;
   leagueId: number;
   entryId: number;
@@ -290,7 +292,7 @@ export class HttpAdviceClient implements AdviceClient {
     const word = request.managersWord === true ? "&managers_word=true" : "";
     const chip = request.chip == null ? "" : `&chip=${encodeURIComponent(request.chip)}`;
     return (
-      `${this.origin}/api/v1/leagues/${request.leagueId}/entries/${request.entryId}/advice` +
+      `${this.origin}/api/v1/${request.publicEntry ? "public/" : ""}leagues/${request.leagueId}/entries/${request.entryId}/advice` +
       `?strategy=${encodeURIComponent(request.strategy)}&window=${request.window}${rival}` +
       weight +
       word +

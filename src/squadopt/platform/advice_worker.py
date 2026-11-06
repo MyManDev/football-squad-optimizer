@@ -50,6 +50,7 @@ import time
 import traceback
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
+from dataclasses import replace
 from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
@@ -99,6 +100,7 @@ from squadopt.platform.backend_runtime import (
 )
 from squadopt.platform.capture_context import AdviceCaptureContext
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.public_entry_inputs import PUBLIC_ENTRY_SWITCH, PublicEntryInputs
 from squadopt.platform.queue_contracts import (
     DEFAULT_ARCHIVE_AFTER_SECONDS,
     ProgressRecorder,
@@ -303,6 +305,7 @@ def build_advice_compute(
     cache: AdviceCacheRepository | None = None,
     job_log_fields: dict[str, object] | None = None,
     progress: ProgressRecorder | None = None,
+    public_inputs: PublicEntryInputs | None = None,
 ) -> Callable[[AdviceJob], bytes]:
     """Return the callback that turns one claimed job into the bytes it will be served as.
 
@@ -338,9 +341,11 @@ def build_advice_compute(
             configuration_fingerprint=spec.context.configuration_fingerprint,
             rival_entry_id=address.rival_entry_id,
             strategy_uses_rival=uses_rival[address.strategy],
-            switches={MODEL_SWITCH: spec.switches[MODEL_SWITCH]}
-            if MODEL_SWITCH in spec.switches
-            else {},
+            switches={
+                name: identity
+                for name, identity in spec.switches.items()
+                if name in {MODEL_SWITCH, PUBLIC_ENTRY_SWITCH}
+            },
         )
         held = cache.get(key)
         if held is None:
@@ -393,9 +398,37 @@ def build_advice_compute(
                 f"{spec.context.capture_snapshot_id}) is no longer the one this backend "
                 "answers from; ask again to be answered from the current one.",
             )
+        menu_spec = spec
+        if PUBLIC_ENTRY_SWITCH in spec.switches:
+            fingerprint = spec.switch(PUBLIC_ENTRY_SWITCH).get("fingerprint")
+            if (
+                public_inputs is None
+                or set(spec.switches) != {PUBLIC_ENTRY_SWITCH}
+                or spec.strategy != "saf-puan"
+                or spec.window != 1
+                or spec.rival_entry_id is not None
+                or not isinstance(fingerprint, str)
+            ):
+                raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unsupported public team request.")
+            identity = contexts.identity()
+            if identity is None or identity.context != spec.context:
+                raise AdviceComputeRefused(
+                    "CONTEXT_UNAVAILABLE", "The capture changed before computation."
+                )
+            try:
+                provider = public_inputs.provider(
+                    spec.context, spec.entry_id, fingerprint, identity.snapshot.payloads
+                )
+            except (ValueError, OSError) as error:
+                raise AdviceComputeRefused(
+                    "PUBLIC_ENTRY_INPUTS_UNAVAILABLE",
+                    "The requested team's inputs are unavailable.",
+                ) from error
+            capture = replace(capture, provider=provider)
+            menu_spec = replace(spec, switches={})
         if capture.switches.official_injuries is not None:
             require_official_injury_source()
-        request = _menu_request(spec, capture)
+        request = _menu_request(menu_spec, capture)
         football = capture.switches.football if MODEL_SWITCH in spec.switches else None
         projection = football.projection if football is not None else capture.projection
         horizon_builder = (
@@ -933,6 +966,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 cache=running.cache,
                 job_log_fields=job_log_fields,
                 progress=running.queue.record_progress,
+                public_inputs=running.public_inputs,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.

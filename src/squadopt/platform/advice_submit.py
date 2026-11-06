@@ -50,8 +50,10 @@ from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
 from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
+    AdviceInputsNotPreparedError,
     AdviceReadStore,
     AdviceRequestContext,
+    ResolvedAdviceRequest,
 )
 from squadopt.platform.api_contract import (
     ApiCommandRequest,
@@ -211,9 +213,13 @@ class AdviceSubmitService:
         deadline_for: Callable[[AdviceRequestContext], str] | None = None,
         job_look: Callable[[], LivenessLook] | None = None,
         job_progress: Callable[[AdviceJob], JobProgress | None] | None = None,
+        prepare_inputs: Callable[[AdviceRequestContext, int], None] | None = None,
+        max_open_jobs: int | None = None,
     ) -> None:
         if max_open_jobs_per_client < 1:
             raise ValueError("max_open_jobs_per_client must be at least 1.")
+        if max_open_jobs is not None and max_open_jobs < 1:
+            raise ValueError("max_open_jobs must be at least 1.")
         self._reader = reader
         self._queue = queue
         self._limiter = rate_limiter
@@ -223,6 +229,8 @@ class AdviceSubmitService:
         self._deadline_for = deadline_for
         self._job_look = job_look
         self._job_progress = job_progress
+        self._prepare_inputs = prepare_inputs
+        self._max_open_jobs = max_open_jobs
         # Only the admission callback accesses this map, under the queue transaction.
         # Addresses never enter queue/spec documents; process restart forgets ownership.
         self._client_jobs: dict[str, str] = {}
@@ -332,25 +340,50 @@ class AdviceSubmitService:
                 raise MalformedIdempotencyKeyError(
                     "The Idempotency-Key header is not a valid key."
                 ) from error
-        resolved = self._reader.resolve(
-            league_id=league_id,
-            entry_id=entry_id,
-            strategy=strategy,
-            window=window,
-            rival_entry_id=rival_entry_id,
-            top100_weight=top100_weight,
-            managers_word=managers_word,
-            chip=chip,
-            model=model,
-            preferences=preferences,
-        )
+
+        def resolve() -> ResolvedAdviceRequest:
+            return self._reader.resolve(
+                league_id=league_id,
+                entry_id=entry_id,
+                strategy=strategy,
+                window=window,
+                rival_entry_id=rival_entry_id,
+                top100_weight=top100_weight,
+                managers_word=managers_word,
+                chip=chip,
+                model=model,
+                preferences=preferences,
+            )
+
+        limiter = self._limiter
+        charged = False
+        try:
+            resolved = resolve()
+        except AdviceInputsNotPreparedError as missing:
+            if self._prepare_inputs is None:
+                raise
+            if self._deadline_for is not None and datetime.fromisoformat(
+                at_utc
+            ) >= datetime.fromisoformat(self._deadline_for(missing.context)):
+                raise DeadlinePassedError("This gameweek's deadline has passed.") from missing
+            if (
+                self._max_open_jobs is not None
+                and sum(not job.is_terminal for job in self._queue.jobs()) >= self._max_open_jobs
+            ):
+                raise OpenJobLimitedError(
+                    "The computation queue is full; try again shortly."
+                ) from missing
+            if limiter is not None and not limiter.allow(f"ip:{client_bucket}"):
+                raise self._rate_limited() from missing
+            charged = True
+            self._prepare_inputs(missing.context, entry_id)
+            resolved = resolve()
         cache_key, context = resolved.key, resolved.context
         cached = self._reader.cached(cache_key)
         if cached is not None:
             return SubmitOutcome(kind="hit", payload=cached)
-        limiter = self._limiter
         entry_bucket = f"entry:{context.capture_snapshot_id}:{entry_id}"
-        if limiter is not None and not limiter.allow(f"ip:{client_bucket}"):
+        if not charged and limiter is not None and not limiter.allow(f"ip:{client_bucket}"):
             raise self._rate_limited()
 
         command = ApiCommandRequest(
@@ -380,6 +413,13 @@ class AdviceSubmitService:
         # One lock per process holds the read through the write; resolving, the cache read
         # and the rate limit stay outside it. Separate api processes are not serialized.
         with self._admission:
+            # Read before entering the queue transaction: jobs() takes that same lock.
+            # Admission is serialized in this API process; duplicate jobs never call admit.
+            open_jobs = (
+                sum(not job.is_terminal for job in self._queue.jobs())
+                if self._max_open_jobs is not None
+                else 0
+            )
             history = self._queue.history(idempotency_key=idempotency_key, cache_key=cache_key)
             if idempotency_key is not None:
                 # Idempotency history survives terminal state: a key reused for a
@@ -424,6 +464,8 @@ class AdviceSubmitService:
 
             @contextmanager
             def admit() -> Iterator[None]:
+                if self._max_open_jobs is not None and open_jobs >= self._max_open_jobs:
+                    raise OpenJobLimitedError("The computation queue is full; try again shortly.")
                 self._client_jobs = {
                     identifier: owner
                     for identifier, owner in self._client_jobs.items()

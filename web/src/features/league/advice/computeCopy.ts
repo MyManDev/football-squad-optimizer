@@ -18,6 +18,7 @@ import type { WaitingPhase } from "./useAdviceJob";
  * gives the member nothing to do; the code itself and the service's own text are never shown.
  */
 export interface ComputeCopy {
+  serverButton: string;
   /** How these words write a number. */
   locale: string;
   notPrecomputed: string;
@@ -38,6 +39,7 @@ export interface ComputeCopy {
 }
 
 const en: ComputeCopy = {
+  serverButton: "Compute on server",
   locale: "en-GB",
   notPrecomputed: "You can compute it now.",
   notComputable: "Change the selection to use Compute.",
@@ -94,6 +96,7 @@ const en: ComputeCopy = {
 };
 
 const tr: ComputeCopy = {
+  serverButton: "Sunucuda hesapla",
   locale: "tr-TR",
   notPrecomputed: "Şimdi hesaplatabilirsin.",
   notComputable: "Hesapla için seçimi değiştir.",

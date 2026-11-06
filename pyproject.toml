@@ -604,6 +604,8 @@ exhaustive_ignores = [
     "official_injury_capture",
     "projection_retention",
     "publication_workers",
+    "public_entry_advice",
+    "public_entry_inputs",
     "queries",
     "queue_contracts",
     "runlog",

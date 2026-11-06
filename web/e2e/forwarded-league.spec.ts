@@ -133,6 +133,7 @@ async function typeLeague(page: Page, league: number) {
 
 /** The device's plan on the page: the real worker solved it, and its moves are named. */
 async function expectDevicePlan(page: Page) {
+  await page.locator("[data-device-compute]").click();
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
   const names = new Map(TABLE.players.map((player) => [player.id, player.name]));
   for (const move of member.reference.moves) {
