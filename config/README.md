@@ -23,10 +23,10 @@ The weekly journal reports preparation, projection, member and publication timin
 each league. League 352490 keeps its full menu during the transition.
 
 `legacy_advice_records`, `true` on at most one line, marks the league that keeps the legacy
-advice records: the first league the site published, today league 352490. On every recorded
-run its publications still write `member_advice_record_v2` under `data/advice_records`, and its
-member histories read those records first; every other league reads only the
-league-independent baseline records under `data/member_baselines`. The settled publisher
+advice records: the first league the site published, today league 352490. A recorded full-menu
+publication writes `member_advice_record_v2` under `data/advice_records`; a device menu only
+reads the retained archive. Its member histories read those records first; every other league
+reads only the league-independent baseline records under `data/member_baselines`. The settled publisher
 (`scripts.build_settled_site`) is limited to this league. No module under `src/squadopt` names
 the league's number: the code reads it from this file, relative to the working directory
 (`legacy_record_league` in `squadopt.application.weekly_suggestion_eval`), so the weekly run and

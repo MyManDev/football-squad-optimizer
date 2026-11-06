@@ -873,10 +873,18 @@ class WeeklyOperations:
         gameweek: int | None = None
         baselines = None
         baseline_seconds = 0.0
-        if record:
+        # Device menus are a promise not to compute a member's plan until requested.
+        # Recording cannot turn them back into a weekly solve batch. A full menu can
+        # still share its existing control with a device league containing that entry.
+        full_leagues = tuple(
+            league
+            for league in self.request.league_ids
+            if league not in self.request.device_league_ids
+        )
+        if record and full_leagues:
             baseline_started = time.perf_counter()
             baselines = prepare_tracked_baselines(
-                tuple(self._league_request(league, False) for league in self.request.league_ids),
+                tuple(self._league_request(league, False) for league in full_leagues),
                 read_capture=self._capture_for_publication,
             )
             baseline_seconds = round(time.perf_counter() - baseline_started, 6)

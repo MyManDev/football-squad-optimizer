@@ -1,4 +1,4 @@
-"""Tracked entries are solved once before either league emits its member pages."""
+"""Full-menu controls are shared; a device publication starts no member solve."""
 
 import functools
 import json
@@ -33,7 +33,7 @@ def test_shared_member_has_one_server_solve_and_one_record(tmp_path, monkeypatch
         record_advice=True,
     )
     if device:
-        operation.request = replace(operation.request, device_league_ids=TWO, workers=8)
+        operation.request = replace(operation.request, device_league_ids=(7,), workers=8)
     operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
     operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
     original = league_publication.solve_member_control
@@ -64,8 +64,6 @@ def test_shared_member_has_one_server_solve_and_one_record(tmp_path, monkeypatch
     assert "league_id" not in record and "told" not in record
     assert record["advice"][0]["scoring_complete"] is True
     assert all(row["advice_recorded"] for row in result.value["leagues"].values())
-    if device:
-        assert not list(operation.paths.records.rglob("advice.json"))
     manifest = json.loads((records[0].parent / "manifest.json").read_bytes())
     assert manifest["contract_version"] == MEMBER_BASELINE_RECORD_CONTRACT_VERSION
     stamps = []
@@ -83,6 +81,40 @@ def test_shared_member_has_one_server_solve_and_one_record(tmp_path, monkeypatch
     # the stamp is what history reads against the deadline.
     assert record["generated_at_utc"] == stamps[0]
     assert records[0] in result.output_paths
+
+
+@pytest.mark.parametrize("record", [False, True])
+def test_device_publication_never_solves_a_baseline_even_when_recording(
+    tmp_path, monkeypatch, record
+):
+    operation = world(
+        tmp_path,
+        league_ids=TWO,
+        pages={352490: (101,), 7: (101,)},
+        seeded_from=TWO,
+        record_advice=record,
+    )
+    operation.request = replace(operation.request, device_league_ids=TWO, workers=8)
+    operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
+    operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
+
+    def no_member_solve(*args, **kwargs):
+        pytest.fail("A device-only publication started an unrequested member solve")
+
+    monkeypatch.setattr(league_publication, "solve_member_control", no_member_solve)
+    monkeypatch.setattr(league_views, "solve_member_control", no_member_solve)
+    result = operation._league()
+    assert result.value["baselines"]["entries"] == 0
+    assert result.value["advice_recorded"] is False
+    assert not list(operation.paths.baselines.rglob("advice.json"))
+    assert not list(operation.paths.records.rglob("advice.json"))
+    for league in TWO:
+        tree = operation.paths.out / "data/leagues" / str(league)
+        assert (tree / "entries/101.json").is_file()
+        index = json.loads((tree / "advice/101/index.json").read_bytes())["payload"]
+        assert index["menu"] == "device"
+        assert list((tree / "advice/101").rglob("*.json")) == [tree / "advice/101/index.json"]
+        assert result.value["leagues"][str(league)]["advice_recorded"] is False
 
 
 def test_mixed_capture_batch_is_refused_before_solving(tmp_path, monkeypatch):
