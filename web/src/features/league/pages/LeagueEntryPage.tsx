@@ -185,6 +185,11 @@ export function LeagueEntryPage({
           {copy.entryMode}
         </button>
       </div>
+      {mode === "league" && !inPlace && unopened === null ? (
+        <nav className={styles.featured} aria-label={copy.listedLeagues}>
+          <Link to={leagueAddress(239)}>Turkey</Link>
+        </nav>
+      ) : null}
       {mode === "league" ? (
         <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
           <label htmlFor="league-id">{copy.label}</label>

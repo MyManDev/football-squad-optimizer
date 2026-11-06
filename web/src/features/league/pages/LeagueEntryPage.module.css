@@ -108,6 +108,27 @@
   background: var(--color-surface);
 }
 
+.featured {
+  display: flex;
+  justify-content: center;
+}
+.featured a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+.featured a:hover {
+  background: var(--color-board);
+  color: var(--color-board-text);
+}
+
 .modeSwitch button {
   min-height: 44px;
   border: 0;

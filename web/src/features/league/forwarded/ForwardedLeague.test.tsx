@@ -7,7 +7,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -81,7 +81,12 @@ const forwarderReads = (fetcher: ReturnType<typeof site>) =>
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="location">{location.pathname}</span>;
+  return (
+    <span data-testid="location">
+      {location.pathname}
+      {location.search}
+    </span>
+  );
 }
 
 function ForwardedMember() {
@@ -216,11 +221,15 @@ describe.each(["tr", "en"] as const)("the league gate with the forwarder in %s",
   it("reads the next page on request, and stops after the last", async () => {
     const fetcher = site((page) => marked(page === 1 ? FIRST : LAST));
     open(language, `/league/${FORWARDED}`);
-    const more = await screen.findByRole("button", { name: words.more });
+    const more = await screen.findByRole("button", { name: words.nextPage });
     await userEvent.setup().click(more);
     expect(await screen.findByRole("link", { name: LAST.results[0]!.entry_name })).toBeVisible();
-    expect(screen.getAllByRole("row")).toHaveLength(1 + FIRST.results.length + LAST.results.length);
-    expect(screen.queryByRole("button", { name: words.more })).toBeNull();
+    expect(screen.getAllByRole("row")).toHaveLength(1 + LAST.results.length);
+    expect(screen.getByRole("button", { name: words.nextPage })).toBeDisabled();
+    expect(screen.getByTestId("location")).toHaveTextContent(`?page=2`);
+    await userEvent.setup().click(screen.getByRole("button", { name: words.previousPage }));
+    expect(await screen.findByRole("link", { name: FIRST.results[0]!.entry_name })).toBeVisible();
+    expect(screen.getAllByRole("row")).toHaveLength(1 + FIRST.results.length);
     expect(forwarderReads(fetcher)).toEqual([
       `/api/v1/fpl/standings/${FORWARDED}?page=1`,
       `/api/v1/fpl/standings/${FORWARDED}?page=2`,
@@ -238,10 +247,11 @@ describe.each(["tr", "en"] as const)("the league gate with the forwarder in %s",
     );
     open(language, `/league/${FORWARDED}`);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: words.more }));
+    await user.click(await screen.findByRole("button", { name: words.nextPage }));
     expect(await screen.findByText(words.moreFailed)).toBeInTheDocument();
-    // The rows already read stay.
-    expect(screen.getByRole("link", { name: FIRST.results[0]!.entry_name })).toBeVisible();
+    // A failed page never presents the previous page's rows as its own.
+    expect(screen.queryByRole("link", { name: FIRST.results[0]!.entry_name })).toBeNull();
+    expect(screen.getByRole("button", { name: words.previousPage })).toBeEnabled();
     fail = false;
     await user.click(screen.getByRole("button", { name: words.retry }));
     expect(await screen.findByRole("link", { name: LAST.results[0]!.entry_name })).toBeVisible();
@@ -249,48 +259,69 @@ describe.each(["tr", "en"] as const)("the league gate with the forwarder in %s",
   });
 });
 
-describe("the forwarded table as the visitor scrolls", () => {
-  // Twenty pages read in turn: given the time a loaded runner needs for them.
-  it(
-    "reads the next page when the end of the table comes into view, up to page 20",
-    { timeout: 20_000 },
-    async () => {
-      const seen: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
-      vi.stubGlobal(
-        "IntersectionObserver",
-        class {
-          constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
-            seen.push(callback);
-          }
-          observe() {}
-          disconnect() {}
-        },
-      );
-      // Every page says another follows: the table still stops at the forwarder's last page.
-      const fetcher = site((page) =>
-        marked({
-          ...FIRST,
-          page,
-          has_next: true,
-          results: FIRST.results.map((row) => ({
-            ...row,
-            entry: row.entry + 100 * page,
-            entry_name: `${row.entry_name} p${page}`,
-          })),
-        }),
-      );
-      open("en", `/league/${FORWARDED}`);
-      // Found by text: a role query over a growing table is what made this slow.
-      await screen.findByText(`${FIRST.results[0]!.entry_name} p1`);
-      for (let page = 2; page <= MAX_STANDINGS_PAGE; page += 1) {
-        await act(async () => seen.at(-1)!([{ isIntersecting: true }]));
-        await screen.findByText(`${FIRST.results[0]!.entry_name} p${page}`);
-      }
-      expect(forwarderReads(fetcher)).toHaveLength(MAX_STANDINGS_PAGE);
-      expect(screen.queryByRole("button", { name: MESSAGES.en.forwarded.more })).toBeNull();
-      expect(screen.getAllByRole("row")).toHaveLength(
-        1 + MAX_STANDINGS_PAGE * FIRST.results.length,
-      );
-    },
-  );
+describe("large forwarded leagues", () => {
+  function page(number: number): FplLeagueStandings {
+    return {
+      ...FIRST,
+      page: number,
+      has_next: number < 406,
+      results: FIRST.results.map((row) => ({
+        ...row,
+        entry: row.entry + number * 100,
+        entry_name: `${row.entry_name} p${number}`,
+        rank: (number - 1) * 50 + row.rank,
+      })),
+    };
+  }
+
+  it("jumps beyond the old cap without reading intervening pages or accumulating rows", async () => {
+    const fetcher = site((number) => marked(page(number)));
+    open("en", `/league/${FORWARDED}?page=406`);
+    expect(
+      await screen.findByRole("link", { name: page(406).results[0]!.entry_name }),
+    ).toBeVisible();
+    expect(forwarderReads(fetcher)).toEqual([
+      `/api/v1/fpl/standings/${FORWARDED}?page=1`,
+      `/api/v1/fpl/standings/${FORWARDED}?page=406`,
+    ]);
+    expect(screen.getAllByRole("row")).toHaveLength(1 + FIRST.results.length);
+    expect(screen.getByRole("button", { name: MESSAGES.en.forwarded.nextPage })).toBeDisabled();
+    const user = userEvent.setup();
+    const field = screen.getByRole("textbox", { name: MESSAGES.en.forwarded.page });
+    await user.clear(field);
+    await user.type(field, "21");
+    await user.click(screen.getByRole("button", { name: MESSAGES.en.forwarded.go }));
+    expect(
+      await screen.findByRole("link", { name: page(21).results[0]!.entry_name }),
+    ).toBeVisible();
+    expect(screen.queryByRole("link", { name: page(406).results[0]!.entry_name })).toBeNull();
+    expect(forwarderReads(fetcher)).toHaveLength(3);
+    expect(screen.getByTestId("location")).toHaveTextContent("?page=21");
+  });
+
+  it("does not request an out-of-range page submitted by the visitor", async () => {
+    const fetcher = site((number) => marked(page(number)));
+    open("en", `/league/${FORWARDED}`);
+    const field = await screen.findByRole("textbox", { name: MESSAGES.en.forwarded.page });
+    const user = userEvent.setup();
+    await user.clear(field);
+    await user.type(field, String(MAX_STANDINGS_PAGE + 1));
+    await user.click(screen.getByRole("button", { name: MESSAGES.en.forwarded.go }));
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(forwarderReads(fetcher)).toHaveLength(1);
+  });
+
+  it("normalizes an invalid URL page and retains the forwarder's upper bound", async () => {
+    const fetcher = site((number) => marked({ ...page(number), has_next: true }));
+    open("en", `/league/${FORWARDED}?page=${MAX_STANDINGS_PAGE}`);
+    expect(
+      await screen.findByRole("link", { name: page(MAX_STANDINGS_PAGE).results[0]!.entry_name }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: MESSAGES.en.forwarded.nextPage })).toBeDisabled();
+    expect(forwarderReads(fetcher)).toHaveLength(2);
+    cleanup();
+    open("en", `/league/${FORWARDED}?page=-1`);
+    expect(await screen.findByRole("link", { name: page(1).results[0]!.entry_name })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: MESSAGES.en.forwarded.page })).toHaveValue("1");
+  });
 });
