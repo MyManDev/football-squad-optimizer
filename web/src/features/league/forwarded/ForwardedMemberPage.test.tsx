@@ -456,6 +456,72 @@ describe.each(["tr", "en"] as const)("a team through the forwarder in %s", (lang
     expect(await screen.findByText(COMPUTE_COPY[language].deadlinePassedTitle)).toBeInTheDocument();
     await waitFor(() => expect(document.querySelector("[data-member-live-score]")).not.toBeNull());
     expect(create).not.toHaveBeenCalled();
-    expect(screen.queryByRole("heading", { name: copy.decisionTitle })).toBeNull();
+    expect(screen.getByRole("heading", { name: copy.decisionTitle })).toBeVisible();
+    expect(screen.getByRole("heading", { name: copy.memberSquad })).toBeVisible();
+    expect(screen.getByRole("button", { name: copy.deviceButton })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: COMPUTE_COPY[language].serverButton }),
+    ).toBeDisabled();
   });
+
+  it.each([`/entry/${ENTRY}`, `/league/314/members/${ENTRY}`])(
+    "keeps the current squad and disabled controls at %s when live points are unavailable",
+    async (address) => {
+      const incoming = TABLE.players.find(
+        (player) => player.position === "GK" && !FIFTEEN.includes(player.id),
+      )!;
+      site({
+        bundle: () =>
+          marked({
+            ...BUNDLE,
+            current_week: {
+              ...exampleMember(ENTRY, TABLE.gameweek),
+              pick_order: [incoming.id, ...FIFTEEN.slice(1)],
+              captain: 139,
+              vice: 132,
+            },
+          }),
+        calendar: envelope(
+          exampleCalendar({
+            season: TABLE.season,
+            gameweek: TABLE.gameweek,
+            deadline: "2020-01-01T00:00:00Z",
+          }),
+          "fixtures_v1",
+        ),
+      });
+      const create = vi.fn(() => new CannedSolver());
+      const server: AdviceClient = {
+        requestAdvice: vi.fn(),
+        readJob: vi.fn(),
+        readAdvice: vi.fn(),
+        readPublished: vi.fn(),
+      };
+      open(language, address, {
+        server,
+        device: { createSolver: create },
+        live: {
+          forwarder: {
+            entryBundle: async () => ({ ok: false, reason: "upstream_unavailable" }) as const,
+            liveWeek: vi.fn(),
+          },
+        },
+      });
+      expect(await screen.findByRole("heading", { name: copy.memberSquad })).toBeVisible();
+      expect(document.querySelectorAll("#kadro [data-player-motion]")).toHaveLength(15);
+      expect(document.querySelector(`#kadro [data-player-motion="${incoming.id}"]`)).not.toBeNull();
+      expect(document.querySelector(`#kadro [data-player-motion="${FIFTEEN[0]}"]`)).toBeNull();
+      const deviceButton = screen.getByRole("button", { name: copy.deviceButton });
+      const serverButton = screen.getByRole("button", {
+        name: COMPUTE_COPY[language].serverButton,
+      });
+      expect(deviceButton).toBeDisabled();
+      expect(serverButton).toBeDisabled();
+      await userEvent.setup().click(deviceButton);
+      await userEvent.setup().click(serverButton);
+      expect(create).not.toHaveBeenCalled();
+      expect(server.requestAdvice).not.toHaveBeenCalled();
+      expect(document.querySelector("[data-member-live-score]")).toBeNull();
+    },
+  );
 });

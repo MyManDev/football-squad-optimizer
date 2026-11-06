@@ -91,6 +91,52 @@ function position(value: string): EntrySquadPlayer["position"] {
     : "UNK";
 }
 
+/** The played week's actual picks, for display only; planning still uses the held basis. */
+export function currentMemberSquad(
+  squad: EntrySquad,
+  bundle: FplEntryBundle,
+  table: DevicePlanDocument,
+): EntrySquad | null {
+  const current = bundle.current_week;
+  if (
+    current === null ||
+    bundle.entry_id !== squad.entry.entry_id ||
+    bundle.entry.id !== squad.entry.entry_id ||
+    bundle.gameweek !== squad.gameweek ||
+    current.entry_id !== squad.entry.entry_id ||
+    current.gameweek !== squad.gameweek ||
+    table.season !== squad.season ||
+    table.gameweek !== squad.gameweek ||
+    table.source_snapshot_id !== squad.source_snapshot_id
+  )
+    return null;
+  const players = new Map(table.players.map((player) => [player.element_id, player]));
+  if (current.pick_order.some((element) => !players.has(element))) return null;
+  const fifteen = current.pick_order.map((element, index): EntrySquadPlayer => {
+    const player = players.get(element)!;
+    return {
+      player_id: player.id,
+      name: player.name,
+      short_name: player.short_name,
+      team: player.team,
+      position: position(player.position),
+      price_tenths: player.buy_tenths,
+      expected_points: player.expected_points,
+      event_points: null,
+      is_captain: element === current.captain,
+      is_vice_captain: element === current.vice,
+      role: index < 11 ? "starter" : "bench",
+      bench_order: index < 11 ? null : index - 10,
+    };
+  });
+  return {
+    ...squad,
+    starting_xi: fifteen.slice(0, 11),
+    bench: fifteen.slice(11),
+    active_chip: current.active_chip,
+  };
+}
+
 /** The season's chip windows the table's rules state, or null where one cannot be read. */
 function chipWindows(rules: DevicePlanDocument["rules"]): ChipWindow[] | null {
   if (!Array.isArray(rules.chips)) return null;

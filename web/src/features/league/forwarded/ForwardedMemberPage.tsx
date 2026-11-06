@@ -27,7 +27,7 @@ import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { useLeague } from "../useLeague";
 import { useForwardedLeague } from "./ForwardedLeagueContext";
 import { ForwardedTreeProvider } from "./ForwardedTreeProvider";
-import { forwardedMemberSquad } from "./memberSquad";
+import { currentMemberSquad, forwardedMemberSquad } from "./memberSquad";
 import {
   newestDeviceTable,
   standingsPage,
@@ -76,8 +76,8 @@ function MemberHeading({ title, manager = null }: { title: string; manager?: str
  * the newest the directory names; the team's bundle is asked for that table's gameweek, and
  * the identity rule binds the two (`forwardedMemberSquad`). Bound, the page shows the
  * device's one-week plan, the chip timing card where its inputs hold, and once the deadline
- * has passed the live score instead. Not bound, it says the plan cannot be computed for
- * this team this week, and shows nothing else.
+ * has passed the current squad, locked controls and live score. Not bound, it says the plan
+ * cannot be computed for this team this week, and shows nothing else.
  */
 export function ForwardedMemberPage({
   dependencies = {},
@@ -134,6 +134,13 @@ export function ForwardedMemberPage({
           })
         : null,
     [read, tableEnvelope, entryId, calendar, league?.leagueId, standing],
+  );
+  const currentSquad = useMemo(
+    () =>
+      built?.ok && read?.ok && tableEnvelope !== null
+        ? currentMemberSquad(built.squad.payload, read.document, tableEnvelope.payload)
+        : null,
+    [built, read, tableEnvelope],
   );
 
   if (tool !== undefined) return <EmptyState title={messages.shell.notFound} />;
@@ -196,6 +203,7 @@ export function ForwardedMemberPage({
     >
       <ForwardedMemberView
         squad={built.squad}
+        currentSquad={currentSquad}
         fixtures={calendar}
         dependencies={{ ...dependencies, live }}
       />
@@ -205,15 +213,17 @@ export function ForwardedMemberPage({
 
 /**
  * A bound team's week: before its deadline, a requested server or device plan, the squad
- * it fields and the chip timing card; once the deadline has passed, the notice and the live
- * score. The plan is the plain one-week plan: nothing else is offered for a forwarded team.
+ * it fields and the chip timing card; once the deadline has passed, the squad remains with
+ * locked controls and the live score. The plan is the plain one-week plan.
  */
 export function ForwardedMemberView({
   squad,
+  currentSquad = null,
   fixtures,
   dependencies = {},
 }: {
   squad: LeagueViewEnvelope<EntrySquad>;
+  currentSquad?: EntrySquad | null;
   fixtures: FixturesPayload | null;
   dependencies?: ForwardedMemberDependencies;
 }) {
@@ -260,9 +270,10 @@ export function ForwardedMemberView({
       : computed
         ? { envelope: computed, origin: "computed" }
         : null;
-  const plan = shown?.envelope.payload ?? null;
+  const plan = closed ? null : (shown?.envelope.payload ?? null);
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
-  const onPitch = squadOnPitch(plan, view);
+  const displayedSquad = closed && currentSquad !== null ? currentSquad : view;
+  const onPitch = squadOnPitch(plan, displayedSquad);
   const manager = view.entry.manager_name;
   const title = view.entry.team_name ?? messages.forwarded.teamTitle(view.entry.entry_id);
 
@@ -284,60 +295,64 @@ export function ForwardedMemberView({
             <MemberLiveWeek squad={view} fixtures={fixtures} dependencies={dependencies.live} />
           ) : null}
         </>
-      ) : (
-        <section
-          aria-labelledby="entry-advice-title"
-          className={page.adviceSection}
-          data-device-state={state.phase}
-        >
-          <div className={page.decision} data-mark="decision">
-            <div className={page.headingRow}>
-              <div className={page.headingText}>
-                <h2 className={page.decisionTitle} id="entry-advice-title">
-                  {copy.decisionTitle}
-                </h2>
-              </div>
+      ) : null}
+      <section
+        aria-labelledby="entry-advice-title"
+        className={page.adviceSection}
+        data-device-state={state.phase}
+      >
+        <div className={page.decision} data-mark="decision">
+          <div className={page.headingRow}>
+            <div className={page.headingText}>
+              <h2 className={page.decisionTitle} id="entry-advice-title">
+                {copy.decisionTitle}
+              </h2>
             </div>
-            {shown ? <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} /> : null}
-            <AdviceRequestPanel
-              request={request}
-              job={{
-                ...job,
-                compute: (asked) => {
-                  device.reset();
-                  job.compute(asked);
-                },
-              }}
-              device={{
-                ...device,
-                run: () => {
-                  job.reset();
-                  device.run();
-                },
-              }}
-              service="ready"
-              computable={serverConfigured}
-              serverLabel={COMPUTE_COPY[language].serverButton}
-              compact
-            />
           </div>
-          <div className={page.squadArea}>
-            <MemberSquad
-              onPitch={onPitch}
-              plan={plan}
-              codes={codes}
-              held={view}
-              fixtures={fixtures}
-              list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
-            />
-          </div>
+          {!closed && shown ? (
+            <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
+          ) : null}
+          <AdviceRequestPanel
+            disabled={closed}
+            request={request}
+            job={{
+              ...job,
+              compute: (asked) => {
+                device.reset();
+                job.compute(asked);
+              },
+            }}
+            device={{
+              ...device,
+              run: () => {
+                job.reset();
+                device.run();
+              },
+            }}
+            service="ready"
+            computable={serverConfigured}
+            serverLabel={COMPUTE_COPY[language].serverButton}
+            compact
+          />
+        </div>
+        <div className={page.squadArea}>
+          <MemberSquad
+            onPitch={onPitch}
+            plan={plan}
+            codes={codes}
+            held={displayedSquad}
+            fixtures={fixtures}
+            list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
+          />
+        </div>
+        {!closed ? (
           <ChipTimingCard
             squad={view}
             timing={state.phase === "done" ? state.chipTiming : null}
             fixtures={fixtures}
           />
-        </section>
-      )}
+        ) : null}
+      </section>
     </div>
   );
 }
