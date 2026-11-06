@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
@@ -85,6 +86,7 @@ async function forwarder(
   page: Page,
   bundle: (route: Route) => Promise<void>,
   weeks: LiveExample[],
+  events?: { goals: number; assists: number }[],
 ) {
   const asked = { bundle: [] as string[], live: [] as string[] };
   await page.route("**/api/v1/fpl/**", async (route) => {
@@ -94,11 +96,39 @@ async function forwarder(
       return bundle(route);
     }
     if (pathname === `/api/v1/fpl/live/${gameweek}`) {
-      asked.live.push(pathname);
+      asked.live.push(`${pathname}${search}`);
       const name = weeks[Math.min(asked.live.length, weeks.length) - 1]!;
+      const week = forwardedLive(name, gameweek);
+      const counts = events?.[Math.min(asked.live.length, events.length) - 1];
+      const fixture = week.fixtures.find((row) => !row.finished);
+      const scorer = week.elements.find((row) => row.minutes > 0)!;
+      const activity =
+        counts && fixture
+          ? {
+              in_play_fixtures: [fixture.id],
+              appearances: week.elements.map((row) => ({
+                element_id: row.element_id,
+                fixture_id: fixture.id,
+                minutes: row.minutes,
+                goals: row.element_id === scorer.element_id ? counts.goals : 0,
+                assists: row.element_id === scorer.element_id ? counts.assists : 0,
+              })),
+            }
+          : null;
+      week.source_time = new Date(
+        Date.parse(week.source_time) + asked.live.length * 60_000,
+      ).toISOString();
       return route.fulfill({
         headers: MARKED,
-        body: JSON.stringify(forwardedLive(name, gameweek)),
+        body: JSON.stringify(
+          search === "?view=activity"
+            ? {
+                contract_version: "week_activity_v1",
+                week,
+                activity,
+              }
+            : week,
+        ),
       });
     }
     return route.fulfill({ status: 404, headers: MARKED, body: '{"error":"not_found"}' });
@@ -133,7 +163,7 @@ for (const language of ["tr", "en"] as const) {
       ),
     ).toBe(true);
     expect(asked.bundle).toEqual([`/api/v1/fpl/entry/${ENTRY}/bundle?gw=${gameweek}`]);
-    expect(asked.live).toEqual([`/api/v1/fpl/live/${gameweek}`]);
+    expect(asked.live).toEqual([`/api/v1/fpl/live/${gameweek}?view=activity`]);
 
     // Refresh reads the live points again, and nothing else.
     await card.getByRole("button", { name: language === "tr" ? "Yenile" : "Refresh" }).click();
@@ -141,6 +171,71 @@ for (const language of ["tr", "en"] as const) {
     expect(asked.live).toHaveLength(2);
     expect(asked.bundle).toHaveLength(1);
   });
+}
+
+for (const width of [375, 1280]) {
+  for (const reduce of [false, true]) {
+    test(`realized events at ${width}px with reduced motion ${reduce}`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ reducedMotion: reduce ? "reduce" : "no-preference" });
+      await closedWeek(page);
+      await forwarder(
+        page,
+        answersBundle,
+        ["in_progress"],
+        [
+          { goals: 0, assists: 0 },
+          { goals: 1, assists: 0 },
+          { goals: 1, assists: 0 },
+          { goals: 1, assists: 1 },
+        ],
+      );
+      await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
+      await page.goto(`/league/352490/members/${ENTRY}`);
+      await expect(page.locator("[data-opening-mark]")).toHaveCount(0, { timeout: 10_000 });
+      const card = page.locator("[data-member-live-score]");
+      await expect(card.getByRole("img", { name: "Maç sürüyor" }).first()).toBeVisible();
+      await card.evaluate((node) => {
+        node.setAttribute("data-test-animations", "0");
+        node.addEventListener("animationstart", (event) => {
+          if ((event as AnimationEvent).animationName.includes("live-event")) {
+            node.setAttribute(
+              "data-test-animations",
+              String(Number(node.getAttribute("data-test-animations")) + 1),
+            );
+          }
+        });
+      });
+      const refresh = card.getByRole("button", { name: "Yenile" });
+      await refresh.click();
+      await expect(card.getByLabel("Gol: 1", { exact: true })).toBeVisible();
+      await expect(card).toHaveAttribute("data-test-animations", reduce ? "0" : "1");
+      await refresh.click();
+      await expect(refresh).toBeEnabled();
+      await expect(card).toHaveAttribute("data-test-animations", reduce ? "0" : "1");
+      await refresh.click();
+      await expect(card.getByLabel("Asist: 1", { exact: true })).toBeVisible();
+      await expect(card).toHaveAttribute("data-test-animations", reduce ? "0" : "2");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      await card.evaluate((node) =>
+        Promise.all(
+          node
+            .getAnimations({ subtree: true })
+            .map((animation) => animation.finished.catch(() => undefined)),
+        ),
+      );
+      expect(
+        (await new AxeBuilder({ page }).include("[data-member-live-score]").analyze()).violations,
+      ).toEqual([]);
+      await card.screenshot({
+        path: testInfo.outputPath(`live-activity-${width}-${reduce ? "reduced" : "motion"}.png`),
+      });
+    });
+  }
 }
 
 for (const [name, answer] of [

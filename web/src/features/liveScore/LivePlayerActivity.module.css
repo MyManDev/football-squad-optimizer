@@ -1,0 +1,56 @@
+.players {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0 0 1rem;
+  list-style: none;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  font-size: var(--step--1);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.playing {
+  flex: none;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.event {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .player[data-live-highlight] {
+    animation: live-event var(--live-event-duration) var(--motion-ease) 1 both;
+  }
+}
+
+@keyframes live-event {
+  0% {
+    background: color-mix(in srgb, var(--color-accent) 24%, var(--color-surface));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+  100% {
+    background: var(--color-surface);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}

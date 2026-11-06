@@ -6,6 +6,7 @@
  * `fpl_entry_bundle_v1.md` and `week_live_v1.md`.
  */
 
+import { weekActivity, type WeekActivity } from "../../liveScore/weekActivity";
 import {
   memberWeek,
   weekLive,
@@ -257,6 +258,14 @@ export function readLiveWeek(value: unknown, gameweek: number): WeekLive | null 
     const document = weekLive(value);
     need(document.gameweek === gameweek && document.members === undefined);
     need(document.elements.every((row) => row.position === undefined && row.club === undefined));
+    return document;
+  });
+}
+
+export function readLiveActivity(value: unknown, gameweek: number): WeekActivity | null {
+  return readOrNull(() => {
+    const document = weekActivity(value);
+    need(readLiveWeek(document.week, gameweek) !== null);
     return document;
   });
 }

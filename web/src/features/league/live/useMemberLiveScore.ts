@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FixturesPayload } from "../../fixtures/types";
+import type { LiveActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek, WeekLive } from "../../liveScore/weekLive";
 import type { DevicePlanDocument } from "../device/types";
 import { forwarder as siteForwarder, type ForwarderClient } from "../forwarder/client";
@@ -18,7 +19,7 @@ import { memberLiveScore, type MemberLiveScore } from "./memberLiveScore";
 
 export interface MemberLiveDependencies {
   /** The forwarder's bundle and live reads; the site's own client unless a test injects one. */
-  forwarder?: Pick<ForwarderClient, "entryBundle" | "liveWeek">;
+  forwarder?: Pick<ForwarderClient, "entryBundle" | "liveWeek" | "liveActivity">;
   /** Reads the capture's table; the tree's own read unless a test injects one. */
   loadTable?: (signal: AbortSignal) => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
 }
@@ -39,9 +40,38 @@ interface Held {
 }
 
 /** The week to show from one live document, or null where it cannot be scored. */
-function scored(live: WeekLive, held: Held, fixtures: FixturesPayload): MemberLiveScore | null {
+interface LiveReading {
+  week: WeekLive;
+  activity: LiveActivity | null;
+}
+
+async function readLive(
+  forwarder: NonNullable<MemberLiveDependencies["forwarder"]>,
+  gameweek: number,
+  signal: AbortSignal,
+): Promise<LiveReading | null> {
+  if (forwarder.liveActivity) {
+    const result = await forwarder.liveActivity(gameweek, { signal });
+    if (result.ok) return { week: result.document.week, activity: result.document.activity };
+    if (result.reason !== "not_found" && result.reason !== "not_forwarder") return null;
+    if (signal.aborted) return null;
+  }
+  const result = await forwarder.liveWeek(gameweek, { signal });
+  return result.ok ? { week: result.document, activity: null } : null;
+}
+
+function scored(
+  reading: LiveReading,
+  held: Held,
+  fixtures: FixturesPayload,
+): MemberLiveScore | null {
   try {
-    const result = memberLiveScore({ live, ...held, fixtures });
+    const result = memberLiveScore({
+      live: reading.week,
+      activity: reading.activity,
+      ...held,
+      fixtures,
+    });
     return result.ok ? result.live : null;
   } catch {
     return null;
@@ -101,15 +131,15 @@ export function useMemberLiveScore(
       if (read.signal.aborted || !bundle.ok || bundle.document.current_week === null) return;
       const member = bundle.document.current_week;
       const [live, table] = await Promise.all([
-        forwarder.liveWeek(member.gameweek, { signal: read.signal }),
+        readLive(forwarder, member.gameweek, read.signal),
         loadTable(read.signal).then(
           (envelope) => envelope.payload,
           () => null,
         ),
       ]);
-      if (read.signal.aborted || !live.ok || table === null) return;
+      if (read.signal.aborted || live === null || table === null) return;
       held.current = { identity, member, table };
-      const shown = scored(live.document, held.current, sources.current.fixtures);
+      const shown = scored(live, held.current, sources.current.fixtures);
       if (shown !== null) setState({ identity, shown, refreshing: false });
     };
     // The client answers every failure as a refusal; anything else also shows nothing.
@@ -124,16 +154,19 @@ export function useMemberLiveScore(
     const read = new AbortController();
     reading.current = read;
     setState((current) => ({ ...current, refreshing: true }));
-    void sources.current.forwarder
-      .liveWeek(inputs.member.gameweek, { signal: read.signal })
+    void readLive(sources.current.forwarder, inputs.member.gameweek, read.signal)
       .catch(() => null)
       .then((live) => {
         if (read.signal.aborted) return;
         // A refresh the source does not answer leaves no card, as the first read does.
-        setState({
-          identity,
-          shown: live?.ok ? scored(live.document, inputs, sources.current.fixtures) : null,
-          refreshing: false,
+        const shown = live === null ? null : scored(live, inputs, sources.current.fixtures);
+        setState((current) => {
+          const older =
+            current.identity === identity &&
+            current.shown !== null &&
+            shown !== null &&
+            Date.parse(shown.score.source_time) < Date.parse(current.shown.score.source_time);
+          return { identity, shown: older ? current.shown : shown, refreshing: false };
         });
       });
   }, [identity]);
