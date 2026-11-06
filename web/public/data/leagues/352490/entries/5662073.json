@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-04T06:28:27Z",
+  "generated_at_utc": "2026-11-06T14:58:16Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -56,7 +56,7 @@
         "position": "DEF",
         "team": "Arsenal",
         "price_tenths": 48,
-        "expected_points": 3.7558255348348126,
+        "expected_points": 2.8168691511261095,
         "event_points": null,
         "is_captain": false,
         "is_vice_captain": false,
@@ -312,7 +312,7 @@
     "purchase_prices_known": true,
     "squad_sell_value_tenths": 976,
     "spendable_budget_tenths": 1004,
-    "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+    "source_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
     "squadopt_comparison": null,
     "data_quality": "complete",
     "missing_fields": [],
