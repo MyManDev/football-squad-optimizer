@@ -31,9 +31,9 @@ function shouldOpen(): boolean {
  * green on the right, then turn a quarter clockwise into the SquadOpt mark (red over green)
  * beside SquadOpt. The maker's signature sits in the lower right as the cover fades.
  *
- * It is decoration only: hidden from assistive technology, inert, and transparent to the
- * pointer, so the page under it can be used from the first frame. Under the reduced-motion
- * preference it never shows.
+ * A click dismisses the cover without activating the obscured page. Keyboard input removes
+ * it too; Tab continues into the page. It is hidden from assistive technology and never
+ * shows under the reduced-motion preference.
  */
 export function OpeningMark() {
   const [open, setOpen] = useState(shouldOpen);
@@ -48,13 +48,30 @@ export function OpeningMark() {
     const timer = window.setTimeout(() => setOpen(false), OPENING_LEAVE_MS);
     return () => window.clearTimeout(timer);
   }, []);
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.key === "Shift") return;
+      setOpen(false);
+      if (event.key !== "Tab") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
+    document.addEventListener("keydown", dismiss, true);
+    return () => document.removeEventListener("keydown", dismiss, true);
+  }, [open]);
   if (!open) return null;
   return (
     <div
       className={styles.cover}
       aria-hidden="true"
-      inert
       data-opening-mark=""
+      onPointerDown={(event) => event.preventDefault()}
+      onClick={(event) => {
+        event.stopPropagation();
+        setOpen(false);
+      }}
       onAnimationEnd={(event) => {
         if (event.target === event.currentTarget) setOpen(false);
       }}

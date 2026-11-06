@@ -17,7 +17,7 @@
   justify-content: center;
   gap: var(--space-6);
   background: var(--color-bg);
-  pointer-events: none;
+  pointer-events: auto;
   animation: cover-off var(--opening-length) var(--motion-ease) both;
 }
 
