@@ -80,14 +80,45 @@ labels those additions “İstek üzerine” / “On request”. The original we
 advice archives and research horizon remain unchanged. Missing requested files are normal
 for deployments that have not produced them yet; malformed evidence is not silently hidden.
 
+## Preparing a snapshot from the running backend
+
+```sh
+python -m squadopt.platform.requested_history_snapshot \
+  --store /path/to/backend/store --output-root /path/to/private/requested-history
+```
+
+This freezes live job metadata and the archived-job inventory under the queue's existing
+lock. It then releases the lock before reading archived records or copying immutable
+specifications and answers. A completion after that transaction is excluded even if its
+second-resolution timestamp equals another completion's timestamp. The metadata transaction
+refuses when its one-second work budget is exceeded. It never stops a service, recovers a
+queue, quarantines a cache entry or calculates a plan.
+
+Each successful copy is a verified `private_backup_v1` of an isolated staging subset. The
+backup's `writers_stopped` declaration applies to that finished staging subset, not to the
+running backend. Only completed plain one-week requests enter it; job idempotency keys are
+removed. This is history evidence, not a complete queue restore. A failed copy keeps the
+previous `latest.json` receipt; the receipt advances atomically after every output byte is
+verified. Previous snapshots are kept so an in-progress run can resume against its original
+input. Snapshot files and receipts stay private and must not be committed or served.
+
+The command prints only the receipt path and manifest digest. `--group-readable` shares the
+copy with the process's primary group (directories 0750, files 0640); run it with the weekly
+service's group when that service must consume a root-owned backend's history. The default
+creates new output roots and snapshots private to their owner. Source and output directories
+must be disjoint.
+
 ## Weekly integration
 
 The installed weekly command accepts `--requested-history-store /path/to/offline/store`.
 The scheduled command can inherit the same path through `SQUADOPT_REQUESTED_HISTORY_STORE`
 in its private environment file; an explicit command-line path takes precedence. This must
-name a consistent, immutable offline snapshot, never the backend's running store or a
-directory another process refreshes in place. Keep the snapshot at the same path for resumes.
-The command consumes a supplied snapshot; it does not create one or stop backend writers.
+name a consistent, immutable offline snapshot, or the snapshot command's private `latest.json`
+receipt. It must never name the backend's running store or a directory another process
+refreshes in place. For a receipt, the weekly command checks the manifest digest and every
+file before starting, then pins that exact backup in its journal. A resume verifies the pinned
+backup even if `latest.json` has since advanced. For a directory, keep it at the same path for
+resumes. The weekly command consumes the supplied source and does not stop backend writers.
 
 When configured, the league stage refreshes requested history after the normal member
 publication, for each listed league. Only members with requests or retained requested weeks
@@ -101,5 +132,6 @@ bundle alongside existing history. The scoreboard stage records the final identi
 all league writes. The single-entry builder above produces an inspection artifact; use the
 weekly integration when preparing a complete release tree, so the final identity covers it.
 
-Without the option, existing requested files are retained unchanged. Provisioning a
-consistent snapshot and enabling the setting on the host remain rollout prerequisites.
+Without the option, existing requested files are retained unchanged. Running the snapshot
+command under the host's service permissions, wiring its pre-run invocation and enabling
+the setting remain rollout prerequisites; no snapshot producer is installed by importing it.

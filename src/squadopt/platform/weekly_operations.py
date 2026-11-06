@@ -76,6 +76,7 @@ from squadopt.live import handoff_path_for, load_entry, read_projection_handoff,
 from squadopt.platform import benchmark_capture, cohort_capture, elite_capture
 from squadopt.platform.fpl_capture import capture
 from squadopt.platform.publication_workers import league_mapper
+from squadopt.platform.requested_history_snapshot import read_history_snapshot
 from squadopt.platform.requested_suggestion_history import publish_requested_histories
 from squadopt.platform.runlog import RunLog, configure_run_logging
 from squadopt.platform.storage._queue_lock import QueueFileLock
@@ -261,6 +262,7 @@ class WeeklyOperations:
         self.rule_snapshot = request.snapshot_id or latest_live_snapshot(paths.snapshots)
         self.ledger_inputs = sorted((paths.ledger / request.season).glob("gw*"))
         self.record_inputs = recorded_capture_directories(paths.records, request.season)
+        prior: dict[str, Any] = {}
         if resume:
             prior = read_run_request(paths.journal, run_id)
             # Derived reads belong to the original preflight, even after this run captures
@@ -268,6 +270,21 @@ class WeeklyOperations:
             self.rule_snapshot = prior["rule_snapshot"]
             self.ledger_inputs = [Path(value) for value in prior["ledger_inputs"]]
             self.record_inputs = [Path(value) for value in prior["record_inputs"]]
+        history_source = self.requested_history_store
+        history_receipt: dict[str, Any] | None = None
+        if history_source is not None and (
+            history_source.is_file() or history_source.suffix == ".json"
+        ):
+            # A later snapshot may advance latest.json while this run works. A resume
+            # verifies the original immutable backup, never follows the new pointer.
+            pinned = (
+                prior.get("requested_history_receipt")
+                if prior.get("requested_history_source") == str(history_source)
+                else None
+            )
+            selected_history = read_history_snapshot(history_source, pinned=pinned)
+            self.requested_history_store = selected_history.store
+            history_receipt = selected_history.receipt
         decision_directory = paths.ledger / request.season / f"gw{request.gameweek:02d}"
         if benchmark_freeze and not request.decide and decision_directory not in self.ledger_inputs:
             raise WeekError(
@@ -297,6 +314,9 @@ class WeeklyOperations:
             }
         if self.requested_history_store is not None:
             declaration["requested_history_store"] = str(self.requested_history_store)
+        if history_receipt is not None:
+            declaration["requested_history_source"] = str(history_source)
+            declaration["requested_history_receipt"] = history_receipt
         self.run = WeeklyRun(paths.journal, run_id, declaration, self.stages, resume=resume)
 
     @property
@@ -1340,7 +1360,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--requested-history-store",
         type=Path,
         default=os.environ.get("SQUADOPT_REQUESTED_HISTORY_STORE"),
-        help="immutable offline backend-store snapshot; also SQUADOPT_REQUESTED_HISTORY_STORE",
+        help="immutable offline store or verified snapshot receipt; "
+        "also SQUADOPT_REQUESTED_HISTORY_STORE",
     )
     parser.add_argument("--cohort-snapshot")
     parser.add_argument("--elite-snapshot")

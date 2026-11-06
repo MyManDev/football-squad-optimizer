@@ -104,7 +104,10 @@ def world(
 TWO = (352490, 7)
 
 
-def test_weekly_requested_history_is_generated_for_two_leagues_and_journalled(tmp_path):
+@pytest.mark.parametrize("use_receipt", [False, True])
+def test_weekly_requested_history_is_generated_for_two_leagues_and_journalled(
+    tmp_path, use_receipt
+):
     from tests.unit import test_advice_worker as roster
     from tests.unit.test_requested_suggestion_history import _store
 
@@ -112,6 +115,7 @@ def test_weekly_requested_history_is_generated_for_two_leagues_and_journalled(tm
     from squadopt.data.sources.fpl_live import POSITION_CODES
     from squadopt.platform.advice_job_spec import AdviceJobSpec
     from squadopt.platform.advice_read import AdviceRequestContext
+    from squadopt.platform.requested_history_snapshot import snapshot_requested_history
 
     template = world(tmp_path, league_ids=TWO, pages={352490: (101,), 7: (101,)}, seeded_from=TWO)
     current = read_snapshot(template.paths.snapshots, template.request.snapshot_id)
@@ -166,6 +170,9 @@ def test_weekly_requested_history_is_generated_for_two_leagues_and_journalled(tm
     }
     store = tmp_path / "offline-store"
     _store(store, spec, payload, captured="2026-08-27T08:00:00Z", completed="2026-08-27T08:01:00Z")
+    history_source = store
+    if use_receipt:
+        history_source = snapshot_requested_history(store, tmp_path / "history-copies").source
     request = replace(template.request, device_league_ids=TWO)
     operation = weekly.WeeklyOperations(
         request,
@@ -173,13 +180,14 @@ def test_weekly_requested_history_is_generated_for_two_leagues_and_journalled(tm
         run_id="requested",
         repository_commit="b" * 40,
         handoff=template.supplied_handoff,
-        requested_history_store=store,
+        requested_history_store=history_source,
     )
     receipt = operation.execute()
     document = json.loads(receipt.read_bytes())
     assert document["status"] == "completed"
     league = next(row for row in document["stages"] if row["name"] == "league")
-    assert str(store) in [row["path"] for row in league["inputs"]]
+    selected_store = operation.requested_history_store
+    assert str(selected_store) in [row["path"] for row in league["inputs"]]
     outputs = []
     for league_id in TWO:
         tree = operation.paths.out / "data" / "leagues" / str(league_id)
@@ -191,18 +199,22 @@ def test_weekly_requested_history_is_generated_for_two_leagues_and_journalled(tm
         assert "history/requested/101.json" in check_tree_identity(tree)["files"]
         assert league["value"]["leagues"][str(league_id)]["requested_history_entries"] == [101]
         outputs.append((path, path.read_bytes()))
+    if use_receipt:
+        newer = snapshot_requested_history(store, tmp_path / "history-copies")
+        assert newer.store != selected_store
     replay = weekly.WeeklyOperations(
         request,
         operation.paths,
         run_id="requested",
         repository_commit="b" * 40,
         handoff=template.supplied_handoff,
-        requested_history_store=store,
+        requested_history_store=history_source,
         resume=True,
     )
+    assert replay.requested_history_store == selected_store
     replay.execute()
     assert all(path.read_bytes() == raw for path, raw in outputs)
-    cache = next((store / "cache").rglob("*.json"))
+    cache = next((selected_store / "cache").rglob("*.json"))
     cache.write_bytes(cache.read_bytes() + b"\n")
     with pytest.raises(WeeklyJournalError, match="changed"):
         replay.execute()
