@@ -65,7 +65,7 @@ describe("which requests are answered", () => {
     assert.deepEqual(route(`/api/v1/fpl/standings/7?page=${MAX_STANDINGS_PAGE}`), {
       kind: "standings",
       league: 7,
-      page: 20,
+      page: MAX_STANDINGS_PAGE,
     });
     assert.deepEqual(route("/api/v1/fpl/entry/123456/bundle?gw=10"), {
       kind: "bundle",
@@ -99,9 +99,9 @@ describe("which requests are answered", () => {
     }
   });
 
-  it("refuses a page above 20, a gameweek above 38 and a query that is not exactly the route's", () => {
+  it("refuses a page above 1000, a gameweek above 38 and a query that is not exactly the route's", () => {
     for (const path of [
-      "/api/v1/fpl/standings/314?page=21",
+      "/api/v1/fpl/standings/314?page=1001",
       "/api/v1/fpl/standings/314?page=0",
       "/api/v1/fpl/standings/314",
       "/api/v1/fpl/standings/314?page=1&page=2",

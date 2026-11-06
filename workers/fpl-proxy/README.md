@@ -10,7 +10,7 @@ The decision, its cache rules and its terms note are
 
 | Route | Answers |
 | --- | --- |
-| `GET /api/v1/fpl/standings/{league}?page={1..20}` | [`fpl_league_standings_v1`](../../docs/contracts/fpl_league_standings_v1.md) |
+| `GET /api/v1/fpl/standings/{league}?page={1..1000}` | [`fpl_league_standings_v1`](../../docs/contracts/fpl_league_standings_v1.md) |
 | `GET /api/v1/fpl/entry/{entry}/bundle?gw={table gameweek}` | [`fpl_entry_bundle_v1`](../../docs/contracts/fpl_entry_bundle_v1.md) |
 | `GET /api/v1/fpl/live/{gameweek}` | [`week_live_v1`](../../docs/contracts/week_live_v1.md), without member blocks |
 | `GET /api/v1/fpl/live/{gameweek}?view=activity`            | [`week_activity_v1`](../../docs/contracts/week_activity_v1.md), the same score with optional realized player events |

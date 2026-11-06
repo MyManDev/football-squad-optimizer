@@ -184,6 +184,7 @@ export function LeagueEntryPage({
         <button type="button" aria-pressed={mode === "entry"} onClick={() => setMode("entry")}>
           {copy.entryMode}
         </button>
+        {!inPlace && unopened === null ? <Link to={leagueAddress(239)}>Turkey</Link> : null}
       </div>
       {mode === "league" ? (
         <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>

@@ -26,7 +26,7 @@ export function ForwardedLeagueGate({
 }) {
   const { messages } = useLanguage();
   const standings = useForwardedStandings(leagueId);
-  const first = standings.data?.pages[0];
+  const first = standings.data;
   const name = first?.league.name ?? null;
   const league = useMemo<ForwardedLeague>(() => ({ leagueId, leagueName: name }), [leagueId, name]);
   if (first !== undefined) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
@@ -27,7 +27,7 @@ import { ForwardedTreeProvider } from "./ForwardedTreeProvider";
 import { forwardedMemberSquad } from "./memberSquad";
 import {
   newestDeviceTable,
-  standingRows,
+  standingsPage,
   useCaptureTable,
   useDirectory,
   useEntryBundle,
@@ -47,6 +47,8 @@ export interface ForwardedMemberDependencies {
 function MemberHeading({ title, manager = null }: { title: string; manager?: string | null }) {
   const { messages } = useLanguage();
   const league = useForwardedLeague();
+  const location = useLocation();
+  const page = standingsPage(location.state?.leaguePage);
   return (
     <header className={styles.heading}>
       <h1 className={styles.title}>{title}</h1>
@@ -55,7 +57,9 @@ function MemberHeading({ title, manager = null }: { title: string; manager?: str
         <p className={styles.back}>
           {league.leagueName ?? messages.forwarded.leagueTitle(league.leagueId)}
           {" · "}
-          <Link to={leagueAddress(league.leagueId)}>{messages.forwarded.backToLeague}</Link>
+          <Link to={`${leagueAddress(league.leagueId)}${page > 1 ? `?page=${page}` : ""}`}>
+            {messages.forwarded.backToLeague}
+          </Link>
         </p>
       ) : null}
     </header>
@@ -79,6 +83,7 @@ export function ForwardedMemberPage({
   const { messages } = useLanguage();
   const words = messages.forwarded;
   const { entryId: entryParam, tool } = useParams();
+  const location = useLocation();
   const league = useForwardedLeague();
   const entryId = /^\d+$/.test(entryParam ?? "") ? Number(entryParam) : 0;
   const valid = Number.isSafeInteger(entryId) && entryId > 0;
@@ -88,9 +93,12 @@ export function ForwardedMemberPage({
   const gameweek = table.data?.payload.gameweek ?? null;
   const bundle = useEntryBundle(entryId, valid ? gameweek : null);
   const fixtures = useFixtures();
-  const standings = useForwardedStandings(league?.leagueId ?? null);
+  const standings = useForwardedStandings(
+    league?.leagueId ?? null,
+    standingsPage(location.state?.leaguePage),
+  );
   const standing: FplStandingRow | null =
-    standingRows(standings.data?.pages).find((row) => row.entry === entryId) ?? null;
+    standings.data?.results.find((row) => row.entry === entryId) ?? null;
   const read = bundle.data;
   // Once the deadline has passed, the live card asks for the same bundle; the one read here
   // answers it, so the forwarder is asked once.
