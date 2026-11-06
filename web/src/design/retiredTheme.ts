@@ -1,7 +1,8 @@
 /**
- * The site once had a dark theme and stored the viewer's choice under this key. It has
- * one palette now, so a value left by an older visit means nothing: it is removed on load,
- * so no code later mistakes it for a live preference.
+ * The site once had a different dark theme and stored the viewer's choice under this key.
+ * That choice was never made between today's palettes, so a value left by an older visit
+ * means nothing: it is removed on load, so no code later mistakes it for a live preference.
+ * Today's choice has its own key (colourScheme.ts).
  */
 export const RETIRED_THEME_KEY = "squadopt.theme";
 

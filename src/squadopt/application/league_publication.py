@@ -26,6 +26,7 @@ from squadopt.application.league_views import (
 )
 from squadopt.application.manager_words import ManagerWords, load_manager_words
 from squadopt.application.mode_selection import build_mode_paths
+from squadopt.application.player_names import game_names, with_game_short_names
 from squadopt.application.publication_history import explicit_archive_seasons
 from squadopt.application.top100_weight import (
     Top100Counts,
@@ -309,8 +310,16 @@ def publish_league(
     )
 
 
-def load_publication_manager_words(request: LeaguePublicationRequest) -> ManagerWords | None:
-    """The manager's word for this publication, or ``None`` when it names no evidence."""
+def load_publication_manager_words(
+    request: LeaguePublicationRequest,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> ManagerWords | None:
+    """The manager's word for this publication, or ``None`` when it names no evidence.
+
+    ``read_capture`` is the publication's capture reader, so a weekly run's leagues read the
+    club-news and roster captures once between them rather than once per league.
+    """
 
     if request.rotation_evidence is None and request.club_news_source is None:
         return None
@@ -323,6 +332,7 @@ def load_publication_manager_words(request: LeaguePublicationRequest) -> Manager
         request.rotation_evidence,
         club_news_source=request.club_news_source,
         snapshot_root=request.snapshot_root,
+        read_capture=read_capture,
     )
 
 
@@ -698,7 +708,7 @@ def publish_prepared_league(
     # or writes the league's path, so its histories carry over.
     legacy = settle_legacy_tree(site_data, (request.league_id,))
     out_dir = league_tree_dir(site_data, request.league_id)
-    manager_words = load_publication_manager_words(request)
+    manager_words = load_publication_manager_words(request, read_capture=read_capture)
     if manager_words is not None and (manager_words.season, manager_words.gameweek) != (
         season,
         int(inputs.deadline.gameweek),
@@ -712,12 +722,17 @@ def publish_prepared_league(
     # The capture's own table, shared by every league of the run and written once: checked
     # against any table already on disk before a member is solved, written after the tree,
     # which keeps its own copy for pages from before the per-capture table.
-    table_payload = device_plan_capture_table(
-        inputs,
-        projection,
-        read_season_rules(snapshot, season=season),
-        bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
-        top100=top100_counts,
+    # Every page names a player as the game does, and the device table beside them too.
+    short_names = game_names(snapshot.payloads[BOOTSTRAP_PAYLOAD], inputs.players)
+    table_payload = with_game_short_names(
+        device_plan_capture_table(
+            inputs,
+            projection,
+            read_season_rules(snapshot, season=season),
+            bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
+            top100=top100_counts,
+        ),
+        short_names,
     )
     check_device_plan_table(
         site_data, request.snapshot_id, table_payload, remedy=BUILDER_TABLE_REMEDY
@@ -756,6 +771,7 @@ def publish_prepared_league(
         top100_unavailable_reason=top100_reason,
         chip_forecast_source=forecast_source(snapshot),
         device_only=request.menu == "device",
+        short_names=short_names,
     )
     if on_stage is not None:
         on_stage("members")

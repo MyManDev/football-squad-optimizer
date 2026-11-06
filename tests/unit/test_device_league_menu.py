@@ -87,6 +87,14 @@ def test_device_members_need_no_solver_and_remove_old_advice(world, tmp_path, co
     if count > 1:
         assert index["default_rival_entry_id"] == 102
         assert index["suggested_strategy"]["rival_entry_id"] == 102
+    # The page throws "The published device menu is invalid." for a device index with no
+    # windows (publicationShape.ts), so the checker must not pass that tree either.
+    published = (out / "advice/101/index.json").read_bytes()
+    unwindowed = json.loads(published)
+    del unwindowed["payload"]["windows"]
+    (out / "advice/101/index.json").write_text(json.dumps(unwindowed))
+    assert check_variants(read) == ["101: index the page refuses (device menu)"]
+    (out / "advice/101/index.json").write_bytes(published)
     wrong = read("entries/101.json")
     wrong["payload"]["source_snapshot_id"] = "another-capture"
     (out / "entries/101.json").write_text(json.dumps(wrong))

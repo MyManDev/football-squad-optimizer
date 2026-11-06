@@ -93,12 +93,12 @@ export function cardData(view: EntryAdvice, squad: EntrySquad): SquadCardData | 
  */
 export const CARD_COLOURS = {
   "--color-board": "#10261a",
-  "--color-board-muted": "#cfe3d3",
+  "--color-board-muted": "#ebe4d3",
   "--color-pitch": "#3f8f58",
   "--color-pitch-2": "#48995f",
   "--color-chip": "#ffffff",
   "--color-chip-text": "#10261a",
-  "--color-lime": "#c6ff3d",
+  "--color-mark": "#c6ff3d",
   "--color-out-panel": "#c62828",
   "--color-in-panel": "#1e7b45",
 } as const;
@@ -109,7 +109,7 @@ const PITCH = CARD_COLOURS["--color-pitch"];
 const PITCH_STRIPE = CARD_COLOURS["--color-pitch-2"];
 const CHIP = CARD_COLOURS["--color-chip"];
 const CHIP_TEXT = CARD_COLOURS["--color-chip-text"];
-const ACCENT = CARD_COLOURS["--color-lime"];
+const ACCENT = CARD_COLOURS["--color-mark"];
 const OUT = CARD_COLOURS["--color-out-panel"];
 const IN = CARD_COLOURS["--color-in-panel"];
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";

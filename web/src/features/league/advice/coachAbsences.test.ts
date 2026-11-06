@@ -34,6 +34,7 @@ describe("source-verified manager absences on players", () => {
     { published_at_utc: "2026-08-22T05:00:00Z" },
     { published_at_utc: "yesterday" },
     { fetched_at_utc: "2026-08-23T00:00:00Z" },
+    { fetched_at_utc: "yesterday" },
   ])("does not turn incomplete or different evidence into an absence: %j", (change) => {
     const { squad, document, item } = coachNewsFixture();
     Object.assign(item, change);
@@ -69,6 +70,23 @@ describe("source-verified manager absences on players", () => {
   it("refuses an older publication even for the same FPL snapshot", () => {
     const { squad, document } = coachNewsFixture();
     document.generated_at_utc = "2026-08-22T03:00:00Z";
+    expect(coachAbsences(document, squad).size).toBe(0);
+  });
+
+  it.each(["2026-08-22T04:00:00", "2026-08-22", "today"])(
+    "refuses a shared generation time that is not a full instant: %s",
+    (generated) => {
+      const { squad, document } = coachNewsFixture();
+      document.generated_at_utc = generated;
+      squad.generated_at_utc = generated;
+      expect(coachAbsences(document, squad).size).toBe(0);
+    },
+  );
+
+  it("refuses a squad without a capture even when the document has none either", () => {
+    const { squad, document } = coachNewsFixture();
+    squad.payload.source_snapshot_id = null;
+    document.payload.source_snapshot_id = null;
     expect(coachAbsences(document, squad).size).toBe(0);
   });
 

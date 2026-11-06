@@ -1,6 +1,7 @@
 import { expect, test, type Browser } from "@playwright/test";
 
 import { MESSAGES } from "../src/i18n/messages";
+import { atRest } from "./atRest";
 import { installLeagueMocks } from "./leagueMocks";
 
 // The step from "Sen kimsin?" to the page (#1131) in a real browser: with motion the page
@@ -31,8 +32,7 @@ async function confirmIn(
   await page.goto("/league/352490/members");
   const copy = MESSAGES.tr.memberPicker;
   const group = page.getByRole("group", { name: copy.legend });
-  await group.getByRole("radio", { name: /Seda Kaya/ }).check();
-  const confirm = page.getByRole("button", { name: copy.confirm });
+  const confirm = group.getByRole("button", { name: /Seda Kaya/ });
   if (presses === 1) {
     await confirm.click();
   } else {
@@ -43,7 +43,7 @@ async function confirmIn(
     });
   }
   await expect(page.getByRole("group", { name: copy.legend })).toHaveCount(0);
-  await page.evaluate(() => Promise.all(document.getAnimations().map((motion) => motion.finished)));
+  await atRest(page);
   const state = {
     url: page.url(),
     heading: await page.getByRole("heading", { level: 1 }).first().textContent(),
@@ -69,7 +69,7 @@ test("the step to the page crossfades with motion and lands the same without it"
   expect(still.errors).toEqual([]);
 });
 
-test("a second Onayla in the same frame starts no second transition", async ({ browser }) => {
+test("a second click in the same frame starts no second transition", async ({ browser }) => {
   const once = await confirmIn(browser, "no-preference");
   const twice = await confirmIn(browser, "no-preference", 2);
   expect(twice.transitions).toBe(1);

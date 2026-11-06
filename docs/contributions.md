@@ -76,10 +76,11 @@ their existing policy. No new analytics are added.
 
 ## Fixtures and release acceptance
 
-The fixtures page shows the first gameweek with an open deadline or an unfinished future
-kickoff, and its numbered successor from the published calendar, above every earlier week.
-Closing the FPL deadline does not hide remaining weekend fixtures. The list includes the
-capture date; this is not a real-time scores service. The sidebar links it on every screen
+The fixtures page opens on a matrix of every club over five gameweeks, starting at the
+first with an open deadline or an unfinished future kickoff, and the window rolls on as
+weeks pass. Its other view is one club's matches still to come, to the end of the season.
+No earlier week is listed, and the page prints no capture date and no score. Closing the
+FPL deadline does not hide remaining weekend fixtures. The sidebar links it on every screen
 (a 264px column from 1180px, a 72px icon rail from 600px, a drawer below that), and phones
 also have a 'Fikstür' button in the sticky phone bar: it links to this page, except on a
 member page, where it opens that member's own fixture sheet. The shell carries no

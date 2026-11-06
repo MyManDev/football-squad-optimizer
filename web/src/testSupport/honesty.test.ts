@@ -149,7 +149,7 @@ describe("the shared caveat guard", () => {
     "Bu hafta için başka bir üyenin kadrosu yayınlanmamış.",
     "Not yet: the recorded measurement calls for 60 more settled weeks.",
     // A device run that found no plan says so; that is a state, not a claim about a figure.
-    "This device did not prove a plan for this selection.",
+    "This device found no plan for this selection.",
   ])("accepts the plain state %s", (copy) => {
     expect(copy).not.toMatch(AS_A_CAVEAT);
   });

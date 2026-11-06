@@ -61,7 +61,8 @@ test.describe("a first visit", () => {
       const address = `/league/123456/members/${member.entry_id}?mode=saf-puan`;
       await page.goto(address);
       await expect(page.getByLabel(entry.label)).toHaveValue("123456");
-      await expect(page.getByRole("status")).toHaveText(entry.unsupported(123456));
+      // The league is not listed, so the gate asks the forwarder, which no spec here runs.
+      await expect(page.getByRole("status")).toHaveText(entry.cannotOpen(123456));
       await expect(page).toHaveURL(address);
       expect(await page.evaluate(() => localStorage.getItem("squadopt.league"))).toBe(
         String(LEAGUE),
@@ -183,7 +184,7 @@ test.describe("a return visit", () => {
       await expect(page.getByRole("heading", { level: 1, name: picker.title })).toBeVisible();
       await expect(page).toHaveURL(numbered);
       await expect(page.getByRole("heading", { name: entry.title })).toHaveCount(0);
-      // Onayla keeps the address, its plan included.
+      // Choosing a name keeps the address, its plan included.
       await pickMember(page, exampleMember(member.entry_id!), language);
       await expect(page.getByRole("heading", { level: 1, name: member.team_name! })).toBeVisible();
       await expect(page).toHaveURL(numbered);

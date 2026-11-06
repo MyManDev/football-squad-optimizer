@@ -11,12 +11,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdviceIndex } from "../types";
 import type { AdviceCapabilities } from "./adviceCapabilities";
 import { chipPath } from "./chipChoice";
 import { CHIP_COPY } from "./chipCopy";
-import { COMPUTE_COPY } from "./computeCopy";
 import { MemberDecisionControls } from "./MemberDecisionControls";
 import { TOP100_WEIGHTS } from "./top100";
 
@@ -85,12 +83,10 @@ function enabledValues(name: string): string[] {
 
 describe("the controls without capabilities", () => {
   it("keep a rival strategy at one week, and the unsolved switches off", () => {
-    const { container } = renderControls("mode=ortak-koru", null);
+    renderControls("mode=ortak-koru", null);
     expect(enabledValues("window")).toEqual(["1"]);
     expect(enabledValues("top100")).toEqual([]);
     expect(inputs("llm")[0]!.disabled).toBe(true);
-    expect(container).not.toHaveTextContent(COMPUTE_COPY.tr.controlsNote);
-    expect(container).not.toHaveTextContent(COMPUTE_COPY.tr.rivalComputable);
   });
 });
 
@@ -98,21 +94,17 @@ describe("the controls with the service's capabilities", () => {
   it.each([3, 5])(
     "retains the %s-week window and Top100 weight when switching models",
     (window) => {
-      const { container } = renderControls(`mode=saf-puan&window=${window}&top100=20`, {
+      renderControls(`mode=saf-puan&window=${window}&top100=20`, {
         ...WHOLE_MENU,
         models: ["current", "football"],
       });
-      const modelWindowNote = "Her haftanın tahmini o haftanın fikstürlerinden hesaplanır";
-      expect(container).not.toHaveTextContent(modelWindowNote);
       fireEvent.click(inputs("prediction-model").find((input) => input.value === "football")!);
-      expect(container).toHaveTextContent(modelWindowNote);
       expect(query().get("model")).toBe("football");
       expect(query().get("window")).toBe(String(window));
       expect(query().get("top100")).toBe("20");
       expect(enabledValues("window")).toEqual(["1", "3", "5"]);
       expect(enabledValues("top100")).toEqual(TOP100_WEIGHTS.map(String));
       fireEvent.click(inputs("prediction-model").find((input) => input.value === "current")!);
-      expect(container).not.toHaveTextContent(modelWindowNote);
       expect(query().get("model")).not.toBe("football");
       expect(query().get("top100")).toBe("20");
     },
@@ -138,7 +130,6 @@ describe("the controls with the service's capabilities", () => {
       });
       expect(inputs("chip").map((input) => input.value)).not.toContain("auto");
       expect(container).not.toHaveTextContent(/Otomatik strateji|Automatic strategy/);
-      expect(container).toHaveTextContent(MESSAGES.tr.leagueMembers.chipStrategy.note);
       expect(enabledValues("chip")).toEqual(["", "3xc"]);
       expect(inputs("chip").find((input) => input.value === "")).toBeChecked();
       fireEvent.click(inputs("chip").find((input) => input.value === "3xc")!);
@@ -148,7 +139,7 @@ describe("the controls with the service's capabilities", () => {
     },
   );
   it.each(["mode=saf-puan&window=3", "mode=ortak-koru&window=1"])(
-    "explains why service-only chips are disabled for %s",
+    "says what to change where service-only chips are disabled for %s",
     (search) => {
       const { container } = renderControls(search, {
         ...WHOLE_MENU,
@@ -158,15 +149,12 @@ describe("the controls with the service's capabilities", () => {
       expect(inputs("chip").find((input) => input.value === "bboost")).toBeDisabled();
     },
   );
-  it("open a rival strategy's longer windows and every setting, and say how", () => {
-    const { container } = renderControls("mode=ortak-koru", WHOLE_MENU);
+  it("open a rival strategy's longer windows and every setting", () => {
+    renderControls("mode=ortak-koru", WHOLE_MENU);
     expect(enabledValues("window")).toEqual(["1", "3", "5"]);
     expect(enabledValues("top100")).toEqual(TOP100_WEIGHTS.map(String));
     // The word stays a one-week pure-points switch, whoever computes it.
     expect(inputs("llm")[0]!.disabled).toBe(true);
-    expect(container).toHaveTextContent(COMPUTE_COPY.tr.controlsNote);
-    expect(container).toHaveTextContent(COMPUTE_COPY.tr.rivalComputable);
-    expect(container).toHaveTextContent(COMPUTE_COPY.tr.top100Computable);
 
     fireEvent.click(inputs("window")[1]!);
     expect(query().get("window")).toBe("3");
@@ -195,10 +183,9 @@ describe("the controls with the service's capabilities", () => {
   });
 
   it("switch the manager's word on where only the service has it", () => {
-    const { container } = renderControls("", WHOLE_MENU);
+    renderControls("", WHOLE_MENU);
     const word = inputs("llm")[0]!;
     expect(word.disabled).toBe(false);
-    expect(container).toHaveTextContent(COMPUTE_COPY.tr.wordComputable);
     fireEvent.click(word);
     expect(query().get("llm")).toBe("on");
     expect(inputs("llm")[0]!.checked).toBe(true);

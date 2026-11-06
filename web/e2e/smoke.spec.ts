@@ -1,92 +1,59 @@
 import { expect, test } from "@playwright/test";
 
-import indexFixture from "../public/data/index.json" with { type: "json" };
 import { claimMember, shippedClaim } from "./identity";
 
-// The league and system pages stand behind the league number and "Sen kimsin?"; the
-// visitor in this group has taken both, as the published league's first member.
+// The league pages stand behind the league number and "Sen kimsin?"; the visitor in this
+// group has taken both, as the published league's first member.
 test.describe("a visitor who has said who they are", () => {
   test.beforeEach(async ({ page }) => {
     await claimMember(page, shippedClaim());
   });
 
-  test("the legacy squad remains reachable by its direct gameweek URL", async ({ page }) => {
-    await page.goto("/gw/2026-27/1");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(/Oyun haftası/);
-    await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
-    await expect(page.getByText(/Bu sayılar neyi söylemiyor/)).toBeVisible();
-  });
-
-  test("suggested moves states the published week honestly", async ({ page }) => {
-    await page.goto("/moves");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Önerilen Hamleler");
-    // The page reads the week the shipped index names, which moves with every publish: the
-    // opening week says there is nothing to transfer, a later week lists who goes and comes.
-    const opening = page.getByText(/Açılış kadrosu \u2014 yapılacak transfer yok/);
-    if (Number(indexFixture.payload.latest.gameweek) === 1) {
-      await expect(opening).toBeVisible();
-    } else {
-      await expect(opening).toHaveCount(0);
-      await expect(
-        page.getByRole("heading", { level: 2, name: "Bu öneri neye dayanıyor" }),
-      ).toBeVisible();
-    }
-    await expect(page.getByText("canlı kontrol")).toBeVisible();
-
-    await page.getByRole("radio", { name: "3 hafta" }).click();
-
-    await expect(page).toHaveURL(/window=3/);
-    await expect(page.getByText("araştırma gölgesi")).toBeVisible();
-    await expect(page.getByText(/H3 gölge kanıt için ayrılmıştır/)).toBeVisible();
-  });
-
-  test("rivals shows the projections and says why there is no rival yet", async ({ page }) => {
-    await page.goto("/rivals");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rakip Analizi");
-    await expect(page.getByRole("table", { name: /Projeksiyon havuzu, FWD/ })).toBeVisible();
-    await expect(page.getByText(/Bu karara karşı puanlanmış bir rakip yok/)).toBeVisible();
-  });
-
-  test("league shows the season and the cumulative chart", async ({ page }) => {
+  test("league shows its title and the weekly scoreboard", async ({ page }) => {
     await page.goto("/league/352490");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Analizi");
     // This test runs against whatever is currently published, so every assertion in it has to
-    // hold for any week of the season rather than for the week it was written in. Whether the
-    // chart is drawn or replaced by the line explaining that one week is a point and not a
-    // line depends on how many weeks have scored, so neither is asserted: the previous version
-    // pinned the season's opening state and broke the moment gameweek one settled.
-    //
-    // The verdict is asserted through the phrase that survives every season state, and it is
-    // Turkish because the payload now carries a stable code the page translates.
-    await expect(page.getByText(/oyun ortalamasına karşı/)).toBeVisible();
-    await expect(page.getByText(/Bu kadronun ne kadarı şablon/)).toBeVisible();
-    // Named rather than taken by role alone, for the same reason the comment above gives. A
-    // bare `getByRole("table")` assumed the page had exactly one, which was true only while
-    // the scoreboard had nothing to publish; a week with a scoreboard renders a second table
-    // and the locator fails on strict mode rather than on anything being wrong. The season
-    // ledger is the table that is there in every season state, so that is the one asserted.
-    await expect(page.getByRole("table", { name: /sezon ledger/i })).toBeVisible();
+    // hold for any week of the season rather than for the week it was written in. The table
+    // stands once a week has finished, and the card's own line stands before that.
+    await expect(page.getByRole("heading", { name: "Haftalık skor tablosu" })).toBeVisible();
+    await expect(
+      page
+        .getByRole("table", { name: /Biten her oyun haftası için/ })
+        .or(page.getByText("Henüz biten oyun haftası yok.", { exact: true })),
+    ).toBeVisible();
   });
 
-  test("status is reachable by its address and not from the sidebar", async ({ page }) => {
-    await page.goto("/");
-    await expect(
-      page.locator("#sidebar").getByRole("link", { name: "Operasyon Durumu" }),
-    ).toHaveCount(0);
-    await page.goto("/status");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Durum");
-  });
+  for (const address of [
+    "/gw/2026-27/1",
+    "/moves",
+    "/status",
+    "/admin",
+    "/rivals",
+    "/rivals/2026-27/1",
+  ]) {
+    test(`${address} falls to the not found state`, async ({ page }) => {
+      await page.goto(address);
+      await expect(page.getByRole("main").getByRole("status")).toHaveText("Burada bir sayfa yok.");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Burada bir sayfa yok.");
+    });
+  }
 
   test("language selection switches the full frame and persists across routes", async ({
     page,
   }) => {
     const member = shippedClaim();
-    await page.goto("/moves?mode=garantici&window=3");
+    // CI builds with the production API origin; no spec may reach it (e2e/leagueMocks.ts).
+    await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
+    // The plan settings stand while the published week is open, so the clock stands before
+    // every deadline of the season.
+    await page.clock.setFixedTime(new Date("2026-08-01T00:00:00Z"));
+    await page.goto(`/league/${member.leagueId}/members/${member.entryId}?mode=saf-puan&window=3`);
     await page.getByRole("button", { name: /EN.*English/ }).click();
 
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Suggested Moves");
+    // The page's title is the member's team, so the words that change stand under it.
+    await expect(page.getByRole("heading", { level: 2, name: "Plan settings" })).toBeVisible();
     await expect(page.getByRole("radio", { name: /3 weeks/ })).toBeChecked();
-    await expect(page).toHaveURL(/mode=garantici&window=3/);
+    await expect(page).toHaveURL(/mode=saf-puan&window=3/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
     // 'League' is the member list, titled with the league's name; 'This week' is the
@@ -102,7 +69,6 @@ test.describe("a visitor who has said who they are", () => {
       "href",
       `/league/${member.leagueId}/members/${member.entryId}`,
     );
-    await expect(page.getByRole("link", { name: "Suggested Moves" })).toHaveCount(0);
   });
 });
 

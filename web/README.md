@@ -1,10 +1,16 @@
 # SquadOpt member website
 
 React + TypeScript + Vite front end for the published league-member views. It reads the
-static `ui_view_v1` data tree that `python -m scripts.build_site` (a thin CLI over
-`squadopt.application.site_publication`) writes under `public/`, and, when an advice
+static data tree the publication writes under `public/data/`, and, when an advice
 backend is configured, requests advice from it. A member's one-week plan is solved on the
 member's own device, in a Web Worker running HiGHS, from the published device-plan table.
+
+The entry page accepts a classic league number or an FPL team number. Unlisted leagues use
+`/league/<id>` and standalone teams use `/entry/<id>`; both read trimmed FPL data through the
+same-origin forwarder. Classic standings support up to 20 pages (1,000 members). Published
+leagues retain their static-data fallback. After the planning deadline, member pages read the
+current week's score on opening and manual refresh, using the official autosub and captain
+rule. Live scores are display-only and are never written to records or the ledger.
 
 ## Zones and rings
 
@@ -12,11 +18,11 @@ To the Python system the website is one deliverable of the outer ring, R5
 ([architecture overview](../ARCHITECTURE.md#2-rings)). Inside it, `src/` is divided into zones,
 and dependencies point from the outer zones to the inner ones, the same rule the rings follow.
 
-| Zone                                                | Holds                                                                                                                         | Role                                                                  |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `src/design/`, `src/lib/`, `src/i18n/`, `src/data/` | Design tokens and shared components, pure helpers and shared vocabulary, messages, the data client and generated schema types | Inner zones: vocabulary, presentation primitives and the HTTP adapter |
-| `src/features/<feature>/`                           | One feature each: league and member pages, the device solver, fixtures, status and the others                                 | Features: one use case each, with its views                           |
-| `src/app/`, `src/main.tsx`                          | The routes and the entry point                                                                                                | Composition: wires the features into routes                           |
+| Zone                                                | Holds                                                                                                                             | Role                                                                  |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `src/design/`, `src/lib/`, `src/i18n/`, `src/data/` | Design tokens and shared components, pure helpers and shared vocabulary, messages, the request helpers and generated schema types | Inner zones: vocabulary, presentation primitives and the HTTP adapter |
+| `src/features/<feature>/`                           | One feature each: league and member pages, the device solver, fixtures and the others                                             | Features: one use case each, with its views                           |
+| `src/app/`, `src/main.tsx`                          | The routes and the entry point                                                                                                    | Composition: wires the features into routes                           |
 
 Two tests read the source with the TypeScript compiler and hold these rules at zero:
 `src/architecture.test.ts` keeps the inner zones free of any import from `features/` or
@@ -59,6 +65,7 @@ order, after `npm ci` and a Python `.[api,dev]` install for the last step:
 | Typecheck                                     | `npm run typecheck`                                                    |
 | Unit tests                                    | `npx vitest run`                                                       |
 | FPL probe worker tests                        | the `node --test` run below, from the repository root                  |
+| FPL forwarder worker tests                    | the second `node --test` run below, from the repository root           |
 | Build                                         | `npm run build`                                                        |
 | Deployment assets                             | `npm run check:deployment`                                             |
 | Bundle budget                                 | `npm run size`                                                         |
@@ -69,6 +76,12 @@ The FPL probe row runs the Worker's own suites ([FPL forwarder probe](../docs/fp
 
 ```sh
 node --test workers/fpl-probe/test/probe.test.mjs workers/fpl-probe/test/deploy-steps.test.mjs
+```
+
+The FPL forwarder row runs its own suites ([ADR 0012](../docs/architecture/decisions/0012-fpl-forwarder.md)):
+
+```sh
+node --test workers/fpl-proxy/test/proxy.test.mjs workers/fpl-proxy/test/worker.test.mjs workers/fpl-proxy/test/deploy-steps.test.mjs
 ```
 
 The last row runs, with `SQUADOPT_PUBLICATION_CONTRACT=1` and `SQUADOPT_BROWSER_SMOKE=1` set:
@@ -83,12 +96,12 @@ Run the same list locally before opening a PR; the browser half is described bel
 
 The browser specs live in `e2e/`. Four configurations select from them:
 
-| Configuration                  | Runs                                                                                                                                                                     | When                                                                                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `playwright.config.ts`         | Every spec except `advice-backend.spec.ts` and `live-smoke.spec.ts`, against the production build served by `npm run preview`                                            | `npm run e2e`, in CI and locally                                                                                                                 |
-| `playwright.backend.config.ts` | `advice-backend.spec.ts`, against a real local API and worker                                                                                                            | Only through `tests/integration/test_advice_browser.py`, which supplies its context ([below](#browser-check-with-the-real-advice-backend))       |
-| `playwright.live.config.ts`    | `live-smoke.spec.ts`, read-only, against a deployed site named by `LIVE_BASE_URL`                                                                                        | By hand after a release; it refuses to run in CI ([deployment runbook](../docs/deployment_runbook.md#post-deployment-smoke))                     |
-| `playwright.engines.config.ts` | `device-plan.spec.ts` on Chromium, WebKit and Firefox, against the same build and server as `playwright.config.ts`; each test prints its device timings as one JSON line | `npm run e2e:engines`; the separate `device engines (Playwright)` CI job uses the matching official container and retains results for seven days |
+| Configuration                  | Runs                                                                                                                                                                     | When                                                                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `playwright.config.ts`         | Every spec except `advice-backend.spec.ts` and `live-smoke.spec.ts`, against the production build served by `npm run preview`                                            | `npm run e2e`, in CI and locally                                                                                                                                                                                 |
+| `playwright.backend.config.ts` | `advice-backend.spec.ts`, against a real local API and worker                                                                                                            | Only through `tests/integration/test_advice_browser.py`, which supplies its context ([below](#browser-check-with-the-real-advice-backend))                                                                       |
+| `playwright.live.config.ts`    | `live-smoke.spec.ts`, read-only, against a deployed site named by `LIVE_BASE_URL`                                                                                        | By hand after a release; it refuses to run in CI ([deployment runbook](../docs/deployment_runbook.md#post-deployment-smoke))                                                                                     |
+| `playwright.engines.config.ts` | `device-plan.spec.ts` on Chromium, WebKit and Firefox, against the same build and server as `playwright.config.ts`; each test prints its device timings as one JSON line | `npm run e2e:engines`, locally after `npx playwright install chromium webkit firefox`; the separate `device engines (Playwright)` CI job uses the matching official container and retains results for seven days |
 
 ## Deployment checks
 

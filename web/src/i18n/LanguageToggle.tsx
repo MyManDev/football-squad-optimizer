@@ -1,5 +1,5 @@
 import { useLanguage } from "./context";
-import styles from "./LanguageToggle.module.css";
+import styles from "../design/components/SegmentedToggle.module.css";
 
 /** `vertical` stacks TR over EN, for the sidebar's 72 px icon rail. */
 export function LanguageToggle({ vertical = false }: { vertical?: boolean }) {

@@ -30,7 +30,7 @@ const LANGUAGES: readonly Language[] = ["en", "tr"];
 
 // No entry is exempt. Two denials once were (a "never a chance of winning" note on /moves and
 // a "rather than a probability nobody measured" clause on /rivals); a denial still puts the
-// word on the page, so the note is gone and the clause was rewritten without it.
+// word on the page, so both are gone.
 
 /**
  * Stands in for any argument a message function takes. It answers 1 to every primitive
@@ -84,14 +84,12 @@ const PRODUCTION = (readdirSync(SRC, { recursive: true }) as string[])
 describe("every string in both message catalogues", () => {
   it("was actually walked, both languages, strings and called functions alike", () => {
     expect(catalogue.size).toBeGreaterThan(1000);
-    expect(catalogue.get("en.squad.squadCost")).toBe("Squad Cost");
-    expect(catalogue.get("tr.squad.squadCost")).toBe("Kadro Maliyeti");
+    expect(catalogue.get("en.squad.captainLabel")).toBe("captain");
+    expect(catalogue.get("tr.squad.captainLabel")).toBe("kaptan");
     // A function-valued entry, called, not skipped.
-    expect(catalogue.get("en.squad.projectedPlayerPoints")).toBe("xP 1");
+    expect(catalogue.get("en.common.gameweekShort")).toBe("GW1");
     expect(catalogue.get("tr.chipCopy.title")).toBe("Çip seçimi");
-    expect(catalogue.get("en.chipCopy.chosen")).toBe(
-      "1 is played this gameweek because you chose it.",
-    );
+    expect(catalogue.get("en.chipCopy.gain")).toBe("~1 expected points this gameweek.");
     for (const path of catalogue.keys()) {
       const twin = path.startsWith("en.") ? `tr.${path.slice(3)}` : `en.${path.slice(3)}`;
       expect(catalogue.has(twin)).toBe(true);
@@ -115,7 +113,6 @@ describe("every string in both message catalogues", () => {
 
   it("words the former denials without the thing they denied, or drops them", () => {
     for (const language of LANGUAGES) {
-      expect(catalogue.get(`${language}.rivals.noRivalAfterStatus`)).not.toMatch(AS_A_CHANCE);
       expect(catalogue.has(`${language}.decision.diagnosticTitle`)).toBe(false);
     }
   });
@@ -149,7 +146,7 @@ describe("every string in both message catalogues", () => {
 
   it("never writes the Top 100 setting as a share, a winner or a gain", () => {
     const top100 = [...catalogue].filter(([path]) => path.includes(".top100Copy."));
-    expect(top100.length).toBeGreaterThan(40);
+    expect(top100.length).toBeGreaterThan(30);
     const offenders = top100
       .filter(([, text]) =>
         /per\s?cent|\bbest\b|optimal|likely|uplift|boost|recommended|\/\s*100|önerilen|en iyi|artış|getiri/i.test(
@@ -162,7 +159,7 @@ describe("every string in both message catalogues", () => {
 
   it("never words a chosen chip's gain as a recommendation or names a week to play it", () => {
     const chip = [...catalogue].filter(([path]) => path.includes(".chipCopy."));
-    expect(chip.length).toBeGreaterThan(50);
+    expect(chip.length).toBeGreaterThan(20);
     const offenders = chip
       .filter(([, text]) =>
         /recommend|\bbest\b|optimal|likely|should play|right week|öner|en iyi|en uygun|oynamalısın/i.test(
@@ -179,9 +176,6 @@ describe("every string in both message catalogues", () => {
       expect(catalogue.has(`${language}.decision.modes.aheadFive`)).toBe(false);
       expect(catalogue.has(`${language}.squad.lowerTail`)).toBe(false);
       expect(catalogue.has(`${language}.squad.lowerTailUnavailable`)).toBe(false);
-      // The price vocabulary that survives is a cost in points.
-      expect(catalogue.has(`${language}.decision.modes.cost`)).toBe(true);
-      expect(catalogue.has(`${language}.decision.modes.points`)).toBe(true);
     }
   });
 });
@@ -246,8 +240,10 @@ describe("every string a production component writes inline", () => {
   it("was actually read: literals, template text and JSX text, in both languages", () => {
     expect(INLINE.length).toBeGreaterThan(1000);
     const texts = new Set(INLINE.map(({ text }) => text));
-    expect(texts.has("İki modelin karşılaştırması")).toBe(true);
-    expect(texts.has("Aynı kadro, bütçe,")).toBe(true);
+    // A literal in each language, the head of a template, and JSX text.
+    expect(texts.has("Katkıda bulun")).toBe(true);
+    expect(texts.has("Contribute")).toBe(true);
+    expect(texts.has("Your gameweek")).toBe(true);
     expect(texts.has("SquadOpt")).toBe(true);
   });
 

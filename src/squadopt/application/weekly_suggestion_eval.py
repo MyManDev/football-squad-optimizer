@@ -66,10 +66,9 @@ from squadopt.live.recommendation import infer_season
 CONTRACT_VERSION = "weekly_suggestion_history_v1"
 SUPPORTED_LEAGUE_ID = 352490
 
-# The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. The reader
-# rejects the whole document when any one of these disagrees with the scoreboard it is shown
-# beside, and reports no reason for the rejection, so each constant is the contract's own
-# spelling rather than a description of it.
+# The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. A reader has
+# to reject the whole document when any one of these disagrees with the scoreboard, so each
+# constant is the contract's own spelling rather than a description of it.
 MEMBER_WEEK_HORIZON_CONTRACT_VERSION: Final = "member_week_horizon_v1"
 SERIES_HORIZON_FILE: Final = "series-horizon.json"
 # The contract fixes these two. They are promises about what produced the numbers, so the
@@ -79,7 +78,7 @@ CONTRACT_SCORING_BASIS: Final = ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2.value
 CONTRACT_POPULATION: Final = "recorded_member_suggestions_vs_actual"
 _MEASUREMENT_ARTIFACT = re.compile(r"docs/[a-z0-9_-]+\.json")
 # A recorded advice digest is a lowercase sha256 hexdigest. Checking it here rather than
-# trusting it keeps a malformed key out of a set the reader compares for exact equality.
+# trusting it keeps a malformed key out of a set a reader has to compare for exact equality.
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 
@@ -223,6 +222,60 @@ def published_advice_captures(league_dir: Path) -> dict[tuple[int, int], str]:
     return carried
 
 
+class _AnotherLeaguesWeek(Exception):
+    """The member-week is another league's: not this league's week.
+
+    Either every record in it belongs to another league, or it holds no record and this
+    league records none (:func:`_records_advice`). Not a :class:`DataError`, so
+    :func:`_evaluate_week` cannot report it as an unavailable week; the walk that asked for
+    it leaves the week out. The public :func:`select_record` and :func:`evaluate_week` never
+    raise it.
+    """
+
+
+def _records_advice(league_id: int) -> bool:
+    """Whether publications of ``league_id`` write member advice records.
+
+    The rule ``league_publication.records_advice_for`` applies, which this module cannot
+    import. Only a league that records advice can leave one of its own member-week
+    directories without a record, from a write that never landed. For any other league
+    such a directory was left by the league that does record.
+    """
+    return league_id == SUPPORTED_LEAGUE_ID
+
+
+def _check_record_identity(
+    record: Mapping[str, Any], *, season: str, gameweek: int, entry_id: int, league_id: int
+) -> None:
+    if (
+        record.get("contract_version") != MEMBER_ADVICE_RECORD_CONTRACT_VERSION
+        or record.get("season") != season
+        or _identifier(record.get("gameweek")) != gameweek
+        or _identifier(record.get("entry_id")) != entry_id
+        or _identifier(record.get("league_id")) != league_id
+        or record.get("player_id_space") != "fpl_element_code"
+    ):
+        raise SuggestionEvaluationError("Record identity does not match the requested member.")
+
+
+def _another_leagues_record(
+    record: Mapping[str, Any], *, season: str, gameweek: int, entry_id: int, league_id: int
+) -> bool:
+    """Whether ``record`` is a sound record of this member-week for a league not ``league_id``.
+
+    Only a record sound in every other identity belongs to the league it names. One naming no
+    league, or wrong in any other identity, belongs to no other league and stays refused.
+    """
+    try:
+        named = _identifier(record.get("league_id"))
+        _check_record_identity(
+            record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=named
+        )
+    except SuggestionEvaluationError:
+        return False
+    return named != league_id
+
+
 def select_record(
     root: Path,
     *,
@@ -249,20 +302,57 @@ def select_record(
 
     An unreadable candidate is refused instead of silently falling back to an older one.
     """
+    return _select_record(
+        root,
+        season=season,
+        gameweek=gameweek,
+        entry_id=entry_id,
+        deadline_utc=deadline_utc,
+        published=published,
+        league_id=league_id,
+        other_leagues_absent=False,
+    )
+
+
+def _select_record(
+    root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+    published: PublishedCaptures | None,
+    league_id: int,
+    other_leagues_absent: bool,
+) -> dict[str, Any] | None:
+    """:func:`select_record`, and for the history walk the weeks that are another league's.
+
+    A record's path names no league, so a member of two leagues has one directory per week
+    for both. With ``other_leagues_absent`` a sound record of another league is absent
+    rather than refused, and a week whose records are all another league's raises
+    :class:`_AnotherLeaguesWeek`, as does a week holding no record for a league that records
+    none. Without it, another league's record is refused as before. Only
+    :func:`review_member_weeks` sets it, and it is the one caller that catches the signal.
+    """
     _identifier(league_id)
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
     candidates: list[tuple[datetime, str, dict[str, Any]]] = []
-    for capture in recorded_captures(root, season, gameweek, entry_id):
+    captures = recorded_captures(root, season, gameweek, entry_id)
+    if other_leagues_absent and not captures and not _records_advice(league_id):
+        # A directory a record never landed in, left by the league that records advice.
+        # That league shows it without advice; for this league it is no week at all.
+        raise _AnotherLeaguesWeek
+    others = 0
+    for capture in captures:
         record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
-        if (
-            record.get("contract_version") != MEMBER_ADVICE_RECORD_CONTRACT_VERSION
-            or record.get("season") != season
-            or _identifier(record.get("gameweek")) != gameweek
-            or _identifier(record.get("entry_id")) != entry_id
-            or _identifier(record.get("league_id")) != league_id
-            or record.get("player_id_space") != "fpl_element_code"
+        if other_leagues_absent and _another_leagues_record(
+            record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=league_id
         ):
-            raise SuggestionEvaluationError("Record identity does not match the requested member.")
+            others += 1
+            continue
+        _check_record_identity(
+            record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=league_id
+        )
         stamp = record.get("generated_at_utc")
         if not isinstance(stamp, str):
             raise SuggestionEvaluationError("Recorded publication time is missing.")
@@ -277,6 +367,8 @@ def select_record(
                     continue
                 raise
             candidates.append((stamped, capture.snapshot_id, record))
+    if captures and others == len(captures):
+        raise _AnotherLeaguesWeek
     if not candidates:
         return None
     if published is not None:
@@ -465,9 +557,37 @@ def evaluate_week(
     published: PublishedCaptures | None = None,
     league_id: int = SUPPORTED_LEAGUE_ID,
 ) -> WeekReview:
+    return _evaluate_week(
+        root,
+        season=season,
+        gameweek=gameweek,
+        entry_id=entry_id,
+        deadline_utc=deadline_utc,
+        captures=captures,
+        selected_records=selected_records,
+        published=published,
+        league_id=league_id,
+        other_leagues_absent=False,
+    )
+
+
+def _evaluate_week(
+    root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+    captures: Sequence[CapturedSnapshot],
+    selected_records: dict[tuple[int, int], dict[str, Any]] | None,
+    published: PublishedCaptures | None,
+    league_id: int,
+    other_leagues_absent: bool,
+) -> WeekReview:
+    """:func:`evaluate_week`; ``other_leagues_absent`` as :func:`_select_record` takes it."""
     base: dict[str, Any] = {"gameweek": gameweek, "deadline_utc": deadline_utc}
     try:
-        record = select_record(
+        record = _select_record(
             root,
             league_id=league_id,
             season=season,
@@ -475,6 +595,7 @@ def evaluate_week(
             entry_id=entry_id,
             deadline_utc=deadline_utc,
             published=published,
+            other_leagues_absent=other_leagues_absent,
         )
         if record is None:
             return WeekReview(**base, status="unavailable", reason="no_pre_deadline_record")
@@ -596,12 +717,17 @@ def review_member_weeks(
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+    other_league_weeks: set[tuple[int, int]] | None = None,
 ) -> dict[int, tuple[WeekReview, ...]]:
     """Review every recorded week of every member, newest gameweek first, from evidence only.
 
     This is the body the publisher serializes, so the document and any later reading of the
     same weeks are the same reviews rather than two walks that could drift apart.
     ``published`` is passed to :func:`select_record` for every week.
+
+    A week whose records all belong to another league is not one of this league's weeks and
+    is left out, as is a week holding no record when this league records none.
+    ``other_league_weeks``, when given, receives each such ``(entry_id, week)``.
     """
     _identifier(league_id)
     if not re.fullmatch(r"\d{4}-\d{2}", season):
@@ -633,20 +759,25 @@ def review_member_weeks(
             week = int(directory.name[2:])
             if week not in deadlines:
                 weeks.append(WeekReview(week, "unavailable", "missing_deadline"))
-            else:
-                weeks.append(
-                    evaluate_week(
-                        record_root,
-                        league_id=league_id,
-                        season=season,
-                        gameweek=week,
-                        entry_id=entry_id,
-                        deadline_utc=deadlines[week],
-                        captures=captures,
-                        selected_records=selected_records,
-                        published=published,
-                    )
+                continue
+            try:
+                reviewed = _evaluate_week(
+                    record_root,
+                    league_id=league_id,
+                    season=season,
+                    gameweek=week,
+                    entry_id=entry_id,
+                    deadline_utc=deadlines[week],
+                    captures=captures,
+                    selected_records=selected_records,
+                    published=published,
+                    other_leagues_absent=True,
                 )
+            except _AnotherLeaguesWeek:
+                if other_league_weeks is not None:
+                    other_league_weeks.add((entry_id, week))
+                continue
+            weeks.append(reviewed)
         reviews[entry_id] = tuple(weeks)
     return reviews
 
@@ -666,8 +797,8 @@ def settled_member_week_comparisons(
     contribute nothing. An unknown actual score is not a difference of zero.
 
     The same filter decides what is measured and what is named, so the published key set and
-    the measured rows are one list rather than two that could drift. The reader applies the
-    matching filter to the histories it loaded; a week either enters both sides or neither.
+    the measured rows are one list rather than two that could drift. A reader has to apply
+    the matching filter to the histories it loads; a week enters both sides or neither.
     """
     comparisons = []
     for entry_id, weeks in reviews.items():
@@ -716,14 +847,13 @@ def series_horizon_document(
 
     None is the whole answer to a refusal. The reading refuses below two settled weeks,
     below any within-week replication and on a record with no variation, and it carries no
-    correlation to publish in those states. The page already renders "not yet" for an absent
-    document, so the true statement is the absent document; a document built from a
-    substituted correlation would be a claim, and zero, the only substitution available, is
-    the most optimistic one there is.
+    correlation to publish in those states. The true statement is the absent document; a
+    document built from a substituted correlation would be a claim, and zero, the only
+    substitution available, is the most optimistic one there is.
 
     ``required_week_clusters`` is floored at the instrument's own two-week minimum. A
     clustered reading does not exist below two settled weeks, so an arithmetic target of one
-    is not a count anyone could measure at, and the reader refuses anything under two. The
+    is not a count anyone could measure at, and the contract refuses anything under two. The
     floor applies to the published target only; the estimator's arithmetic is unchanged.
     """
     if scoring_basis != CONTRACT_SCORING_BASIS or population != CONTRACT_POPULATION:
@@ -746,14 +876,13 @@ def series_horizon_document(
         "league_id": league_id,
         "scoring_basis": scoring_basis,
         "population": population,
-        # The committed record the target effect and the two error rates come from. The
-        # reader validates the path and never fetches it, so the producer is what stands
-        # behind it being a real, indexed measurement.
+        # The committed record the target effect and the two error rates come from. Nothing
+        # after this fetches the path, so the producer is what stands behind it being a real,
+        # indexed measurement.
         "measurement_artifact": measurement_artifact,
         # Published although nothing renders it: it is the entire distance between this
         # target and the one an independence assumption would have produced, and it cannot be
-        # recovered later from a record that has since grown. Dropping it also pins the page
-        # at "unknown" with no visible cause, because the reader rejects the whole document.
+        # recovered later from a record that has since grown.
         "within_week_correlation": reading.within_week_correlation,
         "required_week_clusters": max(MINIMUM_WEEKS_FOR_CORRELATION, horizon.total_weeks),
         "member_week_keys": list(reading.member_week_keys),
@@ -773,9 +902,9 @@ def publish_series_horizon(
 ) -> Path | None:
     """Write the horizon handoff, or remove a stale one and publish nothing.
 
-    A previous week's document names a key set this publication no longer measures, which the
-    reader would reject anyway; removing it keeps a target that nothing supports from sitting
-    on disk beside the histories that replaced it.
+    A previous week's document names a key set this publication no longer measures; removing
+    it keeps a target that nothing supports from sitting on disk beside the histories that
+    replaced it.
     """
     path = out_dir / SERIES_HORIZON_FILE
     document = series_horizon_document(
@@ -913,16 +1042,16 @@ def publish_suggestion_histories(
     """Publish member-safe derived documents from existing verified, bounded captures.
 
     Two documents come out of one walk: each member's history, and the horizon those same
-    member-weeks can support. They are published together because the reader compares the
-    horizon's key set against the keys it builds from these very histories, and two separate
-    walks could return two sets that no reader could reconcile. A record that supports no
-    horizon publishes histories and no horizon file.
+    member-weeks can support. They are published together because the horizon's key set names
+    these very histories, and two separate walks could return two sets that no reader could
+    reconcile. A record that supports no horizon publishes histories and no horizon file.
 
     ``published`` is what the tree these documents join says each member was shown
     (:func:`published_advice_captures`), and it is required: a history shows a week as what
     the member was told only when its record is the capture that tree names.
     """
     selected_records: dict[tuple[int, int], dict[str, Any]] = {}
+    other_league_weeks: set[tuple[int, int]] = set()
     reviews = review_member_weeks(
         record_root=record_root,
         snapshot_root=snapshot_root,
@@ -933,6 +1062,7 @@ def publish_suggestion_histories(
         selected_records=selected_records,
         published=published,
         read_capture=read_capture,
+        other_league_weeks=other_league_weeks,
     )
     # Validate the whole replacement before writing the first member. An incomplete
     # record store must not turn a previously published week into a week that vanished.
@@ -946,7 +1076,15 @@ def publish_suggestion_histories(
         if old.get("entry_id") != entry_id or old.get("league_id") != league_id:
             raise SuggestionEvaluationError(f"History identity does not match {previous}.")
         old_weeks = {_identifier(row["gameweek"]) for row in old["weeks"]}
-        dropped = sorted(old_weeks - {week.gameweek for week in reviews[entry_id]})
+        # A history written before the walk left out other leagues' weeks shows each of them
+        # without advice. Withdrawing such a row loses no record; a row naming advice stays.
+        withdrawn = {
+            row["gameweek"]
+            for row in old["weeks"]
+            if row.get("advice_snapshot_id") is None
+            and (entry_id, row["gameweek"]) in other_league_weeks
+        }
+        dropped = sorted(old_weeks - withdrawn - {week.gameweek for week in reviews[entry_id]})
         if dropped:
             raise SuggestionEvaluationError(
                 f"Entry {entry_id} history would drop gameweeks {dropped}; restore the records."

@@ -282,7 +282,7 @@ describe("the mark's stylesheet", () => {
     )?.[1] ?? "";
 
   it("is a static ring in the accent with an ink edge, on the pitch and the bench alike", () => {
-    expect(rule).toMatch(/outline: 2px solid var\(--color-lime\)/);
+    expect(rule).toMatch(/outline: 2px solid var\(--color-mark\)/);
     expect(rule).toMatch(/0 0 0 1px var\(--color-text\),\s*0 0 0 4px var\(--color-text\)/);
     expect(rule).not.toMatch(/transition|animation/);
   });
@@ -292,7 +292,7 @@ describe("the mark's stylesheet", () => {
     const token = (name: string) => tokens.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6});`))![1]!;
     const ink = token("--color-text");
     // The accent meets only the ink edge; the ink edge meets the grass or the surface.
-    expect(contrast(token("--color-lime"), ink)).toBeGreaterThanOrEqual(3);
+    expect(contrast(token("--color-mark"), ink)).toBeGreaterThanOrEqual(3);
     for (const ground of ["--color-pitch", "--color-pitch-2", "--color-surface", "--color-bg"])
       expect(contrast(ink, token(ground))).toBeGreaterThanOrEqual(3);
   });

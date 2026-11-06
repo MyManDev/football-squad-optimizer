@@ -1,13 +1,16 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
+import { MESSAGES } from "../src/i18n/messages";
+import { atRest } from "./atRest";
 import { NO_LEAGUE } from "./leagueState";
 
 // This is the first visit: no league remembered.
 test.use({ storageState: NO_LEAGUE });
 
 for (const language of ["tr", "en"] as const) {
-  test(`a number the site does not publish is refused after the directory alone in ${language}`, async ({
+  test(`a number the site does not publish goes to its own address, read from the forwarder, in ${language}`, async ({
     page,
   }) => {
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
@@ -39,23 +42,24 @@ for (const language of ["tr", "en"] as const) {
     });
     await field.fill("123");
     await submit.click();
+    // Not published: its own address, where the gate asks the forwarder, which this preview
+    // does not run, so the league cannot be opened now.
+    await expect(page).toHaveURL("/league/123");
     await expect(page.getByRole("status")).toHaveText(
       language === "tr"
-        ? "Bu site 123 numaralı ligi yayımlamıyor."
-        : "This site does not publish league 123.",
+        ? "123 numaralı lig şu anda açılamıyor."
+        : "League 123 cannot be opened right now.",
     );
-    await expect(page).toHaveURL("/");
-    // Only the directory was read (the absent list, then the legacy tree's record); no
-    // document of league 123 was asked for.
+    // The directory (the absent list, then the legacy tree's record), read by the form and
+    // again by the gate, then page 1 of league 123's standings; no published document of it.
     const directory = ["/data/leagues.json", "/data/league/members.json"];
-    expect(requests).toEqual(directory);
+    const opened = [...directory, ...directory, "/api/v1/fpl/standings/123"];
+    expect(requests).toEqual(opened);
     await field.fill("352490");
     response = "missing";
     await submit.click();
     await expect(page.getByRole("status")).toHaveText(
-      language === "tr"
-        ? "Yayımlanmış lig belgesi şu anda mevcut değil. Daha sonra yeniden dene."
-        : "The published league document is unavailable. Try again later.",
+      language === "tr" ? "Daha sonra yeniden dene." : "Try again later.",
     );
     response = "failed";
     await submit.click();
@@ -64,6 +68,104 @@ for (const language of ["tr", "en"] as const) {
         ? "Yayımlanan lig verisi okunamadı. Yeniden dene."
         : "The published league data could not be read. Try again.",
     );
-    expect(requests).toEqual([...directory, ...directory, ...directory]);
+    expect(requests).toEqual([...opened, ...directory, ...directory]);
   });
 }
+
+for (const language of ["tr", "en"] as const) {
+  test(`where the league ID is found opens under the field on a 390 px phone in ${language}`, async ({
+    page,
+  }) => {
+    const entry = MESSAGES[language].leagueEntry;
+    const copy = MESSAGES[language].fplIdHelp;
+    await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    const field = page.getByLabel(entry.label);
+    const submit = page.getByRole("button", { name: entry.submit, exact: true });
+    const summary = page.locator("summary", { hasText: copy.title });
+    const help = page.locator("details", { has: summary });
+    // The form's last edge, its button, is on the first screen whether the help is shut or
+    // open: the help never sends the field and its action below the fold.
+    const onFirstScreen = async () => {
+      const box = (await submit.boundingBox())!;
+      return box.y + box.height <= 844;
+    };
+    await expect(help).not.toHaveAttribute("open");
+    await expect(field).toBeVisible();
+    expect(await onFirstScreen()).toBe(true);
+    expect((await summary.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+
+    // The summary is the next stop after the field, and opens with the keyboard.
+    await field.focus();
+    await page.keyboard.press("Tab");
+    await expect(summary).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(help).toHaveAttribute("open", "");
+    await expect(help.getByText(copy.league)).toBeVisible();
+    await expect(help.locator("code")).toHaveText(
+      "fantasy.premierleague.com/leagues/123456/standings/c",
+    );
+    const site = help.getByRole("link", {
+      name: `fantasy.premierleague.com (${copy.newTab})`,
+      exact: true,
+    });
+    await expect(site).toHaveAttribute("href", "https://fantasy.premierleague.com/");
+    await expect(site).toHaveAttribute("target", "_blank");
+    await expect(site).toHaveAttribute("rel", "noopener noreferrer");
+    expect((await site.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await atRest(page);
+    expect(await onFirstScreen()).toBe(true);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(
+      results.violations
+        .filter((violation) => ["critical", "serious"].includes(violation.impact ?? ""))
+        .map((violation) => violation.id),
+    ).toEqual([]);
+
+    await page.keyboard.press("Enter");
+    await expect(help).not.toHaveAttribute("open");
+  });
+}
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+  { width: 320, height: 568 },
+]) {
+  test(`the form stands alone in the middle of a ${viewport.width} x ${viewport.height} screen`, async ({
+    page,
+  }) => {
+    const entry = MESSAGES.tr.leagueEntry;
+    await page.addInitScript(() => sessionStorage.setItem("squadopt.openingShown", "1"));
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    const title = page.getByRole("heading", { level: 1, name: entry.title });
+    const submit = page.getByRole("button", { name: entry.submit, exact: true });
+    await expect(submit).toBeVisible();
+    await expect(page.locator("[data-match-scene]")).toBeHidden();
+
+    const heading = (await title.boundingBox())!;
+    const action = (await submit.boundingBox())!;
+    const column = (await page.locator("#main").boundingBox())!;
+    expect(Math.abs(heading.x + heading.width / 2 - (column.x + column.width / 2))).toBeLessThan(2);
+    const middle = (heading.y + action.y + action.height) / 2;
+    expect(Math.abs(middle - viewport.height / 2)).toBeLessThan(viewport.height * 0.08);
+    expect(action.y + action.height).toBeLessThanOrEqual(viewport.height);
+
+    const size = await title.evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
+    expect(size).toBeGreaterThanOrEqual(48);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+  });
+}
+
+test("the match scene stands behind the next page", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("[data-match-scene]")).toBeHidden();
+  await page.goto("/fixtures");
+  await expect(page.locator("[data-match-scene]")).toBeVisible();
+});

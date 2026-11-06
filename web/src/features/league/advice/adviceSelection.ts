@@ -357,7 +357,7 @@ function top100For(
   const weights = top100Weights(index, entryId, word, target);
   const weight = weights.includes(asked) ? asked : 0;
   // "Not offered" is about the menu itself; a weight solved without the word but not with
-  // it is offered, and the controls say which settings the switches leave off.
+  // it is offered.
   const offered = top100Weights(index, entryId, false, target);
   return {
     ...base,
@@ -397,8 +397,16 @@ export function resolvePublishedAdvice(
     (context &&
       (capabilities.season !== context.season || capabilities.gameweek !== context.gameweek))
   ) {
+    // A rejected index stays rejected beside the model or preferences, so the page still
+    // says it cannot be read and offers the retry.
     return !preferences.valid || preferences.value || searchParams.get("model") === "football"
-      ? { ...published, status: "not-listed", path: null, windows: [], strategies: [] }
+      ? {
+          ...published,
+          status: published.status === "index-error" ? "index-error" : "not-listed",
+          path: null,
+          windows: [],
+          strategies: [],
+        }
       : published;
   }
   const result = withComputable(published, searchParams, entryId, members, index, capabilities);
@@ -411,7 +419,7 @@ export function resolvePublishedAdvice(
       !(preferences.value?.save_chips && searchParams.has("chip"));
     return {
       ...result,
-      status: "not-listed",
+      status: result.status === "index-error" ? "index-error" : "not-listed",
       path: null,
       computable: result.computable && {
         ...result.computable,
@@ -435,10 +443,7 @@ function withDeviceChoices(
     !isMemberStrategy(published.request.strategy) ||
     !device.strategies.includes(published.request.strategy) ||
     !device.windows.includes(1) ||
-    searchParams.get("model") === "football" ||
-    searchParams.get(EVIDENCE_PARAMETER) === "on" ||
-    !preferencesFromUrl(searchParams).valid ||
-    preferencesFromUrl(searchParams).value
+    !linkKeepsDeviceChoices(searchParams)
   )
     return published;
 
@@ -456,11 +461,28 @@ function withDeviceChoices(
   if (weight === published.top100.weight && chip === published.chip.chip) return published;
   return {
     ...published,
-    status: "not-listed",
+    // A rejected index stays rejected, so the page still says it cannot be read and offers
+    // the retry. The device needs no index, so the choice is kept: the controls, which are
+    // given no index then, show the same choice the device is asked for.
+    status: published.status === "index-error" ? "index-error" : "not-listed",
     path: null,
     top100: { ...published.top100, weight, notOffered: false },
     chip: { ...published.chip, chip, notOffered: chip === null && published.chip.notOffered },
   };
+}
+
+/**
+ * Whether a link leaves room for the device's own choices: it asks for no manager's word,
+ * no football model and no decision preferences, none of which the device solves.
+ */
+function linkKeepsDeviceChoices(searchParams: URLSearchParams): boolean {
+  const preferences = preferencesFromUrl(searchParams);
+  return (
+    searchParams.get("model") !== "football" &&
+    searchParams.get(EVIDENCE_PARAMETER) !== "on" &&
+    preferences.valid &&
+    !preferences.value
+  );
 }
 
 function notComputable(strategies: MemberStrategy[] = []): ComputableAdvice {
@@ -796,10 +818,10 @@ function resolveFromIndex(
   if (!result.windows.includes(window)) return result;
   if (strategy === "saf-puan") {
     // The word is solved for the one-week pure-points plan only; asked for anywhere
-    // else, the switch stays off and the controls say why.
+    // else, the switch stays off and the controls name that plan.
     const switched = evidenceAsked && evidencePath !== null && window === 1;
     // The Top 100 menu is the same plan at another setting. A setting whose file this
-    // selection cannot read shows the plan at 0, and the controls say so.
+    // selection cannot read shows the plan at 0.
     const { path: weightedPath, ...published100 } = top100For(
       result.top100,
       index,
@@ -824,7 +846,7 @@ function resolveFromIndex(
     }
     // A chosen chip is the plain one-week plan with that chip forced, and combines with
     // nothing: with the word on or a setting above 0 the chip is left out and the
-    // controls say so.
+    // controls say what to change.
     const chip =
       window === 1 &&
       !switched &&

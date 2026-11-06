@@ -31,6 +31,7 @@ from squadopt.platform.advice_submit import (
     client_address_bucket,
 )
 from squadopt.platform.jobs_contract import AdviceJob, JobError
+from squadopt.platform.worker_heartbeat import WorkerHeartbeat, WorkerLiveness
 
 LEAGUE_ID = 352490
 CONTEXT = AdviceRequestContext(
@@ -1082,6 +1083,149 @@ def test_the_public_job_view_carries_no_private_fields(tmp_path: Path) -> None:
     assert "ertug" not in json.dumps(view)  # no raw worker text, no host paths
 
 
+#: What the page has read from the job view since before the three optional fields
+#: (``adviceClient.ts``, ``readJob``), and the keys the view served then.
+_OLD_CLIENT_READS = ("job_id", "status", "error_code")
+_OLD_VIEW = (
+    "contract_version",
+    "job_id",
+    "status",
+    "created_at_utc",
+    "updated_at_utc",
+    "attempt",
+    "error_code",
+)
+
+
+def test_the_job_view_says_where_a_job_stands_while_it_waits_and_runs(tmp_path: Path) -> None:
+    """Each field in the state it belongs to, from a look held for five seconds."""
+
+    now = datetime(2026, 8, 27, 12, 0, tzinfo=UTC)
+    clock = [0.0]
+    store = FileJobQueue(tmp_path / "jobs")  # the api's own handle on the same store
+    liveness = WorkerLiveness(
+        tmp_path / "workers", store, clock=lambda: now, monotonic=lambda: clock[0]
+    )
+    client, cache, queue = _world(tmp_path, job_look=liveness.look, job_progress=store.progress)
+    first = client.post(ADVICE_URL, json=BODY).json()["job_id"]
+    later = AdviceJob(
+        job_id="advice-later-1",
+        status="queued",
+        request_fingerprint="1" * 64,
+        cache_key="2" * 64,
+        created_at_utc="2026-08-27T12:00:30Z",
+        updated_at_utc="2026-08-27T12:00:30Z",
+    )
+    queue.submit(later)
+
+    def view(job_id: str) -> dict[str, Any]:
+        response = client.get(f"/api/v1/advice-jobs/{job_id}")
+        assert response.status_code == 200, response.text
+        served = response.json()
+        assert set(served) == {*_OLD_VIEW, "queue_position", "progress", "workers"}
+        return served
+
+    # Queued: a place in line, no count, and no worker has ever beaten.
+    assert [view(job)["queue_position"] for job in (first, later.job_id)] == [0, 1]
+    assert view(first)["progress"] is None
+    assert view(first)["workers"] == {"busy": 0, "total": 0}
+
+    for host in ("a1", "b2"):
+        WorkerHeartbeat(tmp_path / "workers", pid=7, host=host, clock=lambda: now).beat()
+    running = queue.claim(at_utc="2026-08-27T12:01:00Z")
+    assert running is not None and running.job_id == first
+    # Within five seconds the look is the one already taken; the status is read fresh.
+    assert view(later.job_id)["queue_position"] == 1
+    assert view(first)["workers"] == {"busy": 0, "total": 0}
+    assert (view(first)["status"], view(first)["queue_position"]) == ("running", None)
+
+    clock[0] = 5.0
+    assert view(later.job_id)["queue_position"] == 0
+    assert view(first)["workers"] == {"busy": 0, "total": 2}
+    assert view(first)["progress"] is None  # running, before the attempt says how many
+    queue.record_progress(running, done=0, total=3)
+    assert view(first)["progress"] == {"done": 0, "total": 3}
+    queue.record_progress(running, done=1, total=3)
+    assert view(first)["progress"] == {"done": 1, "total": 3}
+    assert view(later.job_id)["progress"] is None
+
+    queue.complete(
+        running, cache=cache, payload=_valid_advice_document(), at_utc="2026-08-27T12:02:00Z"
+    )
+    failing = queue.claim(at_utc="2026-08-27T12:03:00Z")
+    assert failing is not None and failing.job_id == later.job_id
+    queue.store(
+        failing.transition(
+            "failed",
+            at_utc="2026-08-27T12:03:30Z",
+            error=JobError(code="ADVICE_FAILED", message="boom"),
+        )
+    )
+    clock[0] = 10.0
+    for job_id, status in ((first, "completed"), (later.job_id, "failed")):
+        finished = view(job_id)
+        assert finished["status"] == status
+        assert (finished["queue_position"], finished["progress"]) == (None, None)
+        assert finished["workers"] == {"busy": 0, "total": 2}
+
+
+def test_an_older_client_reads_the_job_view_as_it_did(tmp_path: Path) -> None:
+    """The fields are added beside the old ones; what the page reads does not move."""
+
+    now = datetime(2026, 8, 27, 12, 0, tzinfo=UTC)
+    (tmp_path / "with").mkdir()
+    store = FileJobQueue(tmp_path / "with" / "jobs")
+    liveness = WorkerLiveness(tmp_path / "with" / "workers", store, clock=lambda: now)
+    WorkerHeartbeat(tmp_path / "with" / "workers", pid=7, host="a1", clock=lambda: now).beat()
+    services: list[AdviceSubmitService] = []
+    old_client, _old_cache, old_queue = _world(tmp_path / "without", submit_services=services)
+    new_client, _new_cache, new_queue = _world(
+        tmp_path / "with",
+        submit_services=services,
+        job_look=liveness.look,
+        job_progress=store.progress,
+    )
+    pairs = []
+    for client in (old_client, new_client):
+        pairs.append(client.post(ADVICE_URL, json=BODY).json()["job_id"])
+    assert pairs[0] == pairs[1]
+    job_id = pairs[0]
+
+    def both() -> tuple[dict[str, Any], dict[str, Any]]:
+        old = old_client.get(f"/api/v1/advice-jobs/{job_id}").json()
+        new = new_client.get(f"/api/v1/advice-jobs/{job_id}").json()
+        return old, new
+
+    for step in ("queued", "running", "failed"):
+        old, new = both()
+        assert {key: new[key] for key in _OLD_VIEW} == {key: old[key] for key in _OLD_VIEW}
+        assert [new[key] for key in _OLD_CLIENT_READS] == [old[key] for key in _OLD_CLIENT_READS]
+        assert new["status"] == step
+        # A service that has no look serves the fields as null, never a guess.
+        assert (old["queue_position"], old["progress"], old["workers"]) == (None, None, None)
+        assert new["workers"] == {"busy": 0, "total": 1}
+        if step == "queued":
+            assert new["queue_position"] == 0
+            for queue in (old_queue, new_queue):
+                assert queue.claim(at_utc="2026-08-27T12:01:00Z") is not None
+        elif step == "running":
+            new_queue.record_progress(new_queue.jobs()[0], done=0, total=1)
+            assert new_client.get(f"/api/v1/advice-jobs/{job_id}").json()["progress"] == {
+                "done": 0,
+                "total": 1,
+            }
+            for queue in (old_queue, new_queue):
+                running = queue.jobs()[0]
+                queue.store(
+                    running.transition(
+                        "failed",
+                        at_utc="2026-08-27T12:02:00Z",
+                        error=JobError(code="ADVICE_FAILED", message="boom"),
+                    )
+                )
+    assert len(services) == 2
+
+
 @pytest.mark.parametrize(
     "body",
     [
@@ -1362,3 +1506,33 @@ def test_one_key_sent_for_two_requests_at_once_is_still_a_conflict(
     replay = client.post(ADVICE_URL, json=body, headers=key)
     assert replay.status_code == 202
     assert replay.json()["job_id"] == accepted.json()["job_id"]
+
+
+_VIEW_EXAMPLES = (
+    Path(__file__).resolve().parents[2] / "docs" / "contracts" / "advice_job_view_v1.examples.json"
+)
+
+
+def test_the_job_view_contract_examples_carry_the_served_fields_by_their_rules() -> None:
+    """The contract's examples name the keys the view serves, each where it belongs."""
+
+    examples = json.loads(_VIEW_EXAMPLES.read_text(encoding="utf-8"))
+    assert set(examples) == {"queued", "running", "completed", "failed"}
+    for status, example in examples.items():
+        assert set(example) == {*_OLD_VIEW, "queue_position", "progress", "workers"}
+        assert example["contract_version"] == "advice_job_view_v1"
+        assert example["status"] == status
+        assert isinstance(example["attempt"], int) and example["attempt"] >= 1
+        position = example["queue_position"]
+        assert (position is not None) == (status == "queued")
+        assert position is None or (isinstance(position, int) and position >= 0)
+        progress = example["progress"]
+        assert progress is None or status == "running"
+        if progress is not None:
+            assert set(progress) == {"done", "total"}
+            assert 0 <= progress["done"] <= progress["total"] and progress["total"] >= 1
+        workers = example["workers"]
+        if workers is not None:
+            assert set(workers) == {"busy", "total"}
+            assert 0 <= workers["busy"] <= workers["total"]
+        assert (example["error_code"] is not None) == (status == "failed")

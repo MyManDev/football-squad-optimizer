@@ -27,7 +27,7 @@ import hashlib
 import json
 import logging
 import re
-from collections.abc import Hashable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Integral
 from pathlib import Path
@@ -115,6 +115,14 @@ WORDS_WITHHELD_FIGURE: Final = "withheld_figure"
 the source's own words, but the rule about what a member page may show applies to every
 sentence on it, whoever wrote the sentence. The page says the words were withheld and why,
 and links the source."""
+AMBIGUOUS_CITED_DOCUMENT: Final = "ambiguous_cited_document"
+"""More than one held document answers a row's citation, so the word names none of them.
+
+A row cites bytes by digest and not a page by address, so one article held under two
+addresses (``/x`` and ``/x?ref=home``) answers the same digest twice. When the row's
+publication digest and the player's club still leave more than one, the reader cannot tell
+which one the claim was coded from, and the word is refused under this reason rather than
+resolved to whichever document was held first."""
 SOURCE_FIXTURE_FILE: Final = "fixture_file"
 SOURCE_CLUB_NEWS_CAPTURE: Final = "club_news_capture"
 
@@ -157,6 +165,8 @@ class ManagerWord:
     publication_source: str | None = None
     publication_source_sha256: str | None = None
     fixture_binding_reason: str | None = None
+    document_binding_reason: str | None = None
+    """``AMBIGUOUS_CITED_DOCUMENT`` when the citation answers more than one held document."""
 
     def __post_init__(self) -> None:
         if self.fixture_binding_reason not in (None, "ambiguous_current_week_fixture"):
@@ -169,6 +179,16 @@ class ManagerWord:
             object.__setattr__(self, "words_status", WORDS_UNRESOLVED)
         if self.words is not None and self.words_status != WORDS_SHOWN:
             raise ManagerWordsError("Words are either shown or withheld, never both.")
+        if self.document_binding_reason not in (None, AMBIGUOUS_CITED_DOCUMENT):
+            raise ManagerWordsError("Unknown document binding reason.")
+        if self.document_binding_reason is not None and (
+            self.words_status != WORDS_UNRESOLVED
+            or self.club is not None
+            or self.source_url is not None
+            or self.fetched_at_utc is not None
+            or self.fixture_binding_reason is not None
+        ):
+            raise ManagerWordsError("An ambiguous citation names no document and no words.")
         provenance = (self.source_sha256, self.span_start, self.span_end)
         if any(value is not None for value in provenance) and (
             self.words_status == WORDS_UNRESOLVED
@@ -285,14 +305,31 @@ def _text(value: object) -> str | None:
 
 
 def _resolve(
-    documents: Sequence[RawDocument], digest: str | None, start: object, end: object
-) -> tuple[RawDocument | None, str | None, bool]:
-    """The document whose bytes hash to the citation, the cited span, and whether it stands alone.
+    documents: Sequence[RawDocument],
+    digest: str | None,
+    start: object,
+    end: object,
+    *,
+    club: str | None = None,
+    publication_digest: str | None = None,
+) -> tuple[RawDocument | None, str | None, bool, str | None]:
+    """The document the citation names, the cited span, whether it stands alone, and why
+    no document is named when more than one answers.
 
     The claim parser hashed the bytes it indexed; whether those were the readable text
     or the raw content is settled by which one hashes to the digest, so both are tried
     and the span is cut from the one that matched. A digest no held document produces
     resolves to nothing rather than to different words presented as the source's own.
+
+    A digest names bytes, not an address, so one article held under two addresses answers
+    it twice, and the first one held is not the cited one by any rule. Every held document
+    that answers is gathered, and kept only when its raw content hashes to the row's
+    publication digest (``publication_digest``, when the row has one) and it is the
+    player's club's (``club``, when the decision capture names it). One kept is the cited
+    document. None kept resolves to nothing, as an unheld digest does. More than one is
+    refused as ``AMBIGUOUS_CITED_DOCUMENT``, the fourth value, so the answer never depends
+    on the order the documents were held in. Documents that agree on everything the word is
+    read from are one answer, not two.
 
     The third value says whether the span is a whole sentence of the text it was cut from
     (:func:`_is_whole_sentence`). The scope rule reads the quote alone, so it cannot see
@@ -300,23 +337,51 @@ def _resolve(
     """
 
     if digest is None:
-        return None, None, False
+        return None, None, False, None
+    answers: dict[tuple[object, ...], tuple[RawDocument, bytes]] = {}
     for document in documents:
-        for candidate in (document.readable, document.content):
-            if hashlib.sha256(candidate).hexdigest() != digest:
-                continue
-            try:
-                first, last = int(str(start)), int(str(end))
-            except (TypeError, ValueError):
-                return document, None, False
-            if not 0 <= first < last <= len(candidate):
-                return document, None, False
-            try:
-                words = candidate[first:last].decode("utf-8").strip()
-            except UnicodeDecodeError:
-                return document, None, False
-            return document, words or None, _is_whole_sentence(candidate, first, last)
-    return None, None, False
+        candidate = next(
+            (
+                text
+                for text in (document.readable, document.content)
+                if hashlib.sha256(text).hexdigest() == digest
+            ),
+            None,
+        )
+        if (
+            candidate is None
+            or (
+                publication_digest is not None
+                and hashlib.sha256(document.content).hexdigest() != publication_digest
+            )
+            or (club is not None and document.club != club)
+        ):
+            continue
+        read_from = (
+            document.club,
+            document.final_url,
+            document.fetched_at_utc,
+            document.content_type,
+            document.content,
+            document.readable,
+        )
+        answers.setdefault(read_from, (document, candidate))
+    if len(answers) > 1:
+        return None, None, False, AMBIGUOUS_CITED_DOCUMENT
+    if not answers:
+        return None, None, False, None
+    ((document, candidate),) = answers.values()
+    try:
+        first, last = int(str(start)), int(str(end))
+    except (TypeError, ValueError):
+        return document, None, False, None
+    if not 0 <= first < last <= len(candidate):
+        return document, None, False, None
+    try:
+        words = candidate[first:last].decode("utf-8").strip()
+    except UnicodeDecodeError:
+        return document, None, False, None
+    return document, words or None, _is_whole_sentence(candidate, first, last), None
 
 
 #: What may stand between a sentence boundary and the quote: space, and a quotation mark
@@ -454,7 +519,12 @@ def _require_the_coded_documents(
 
 
 def _coding_attested(
-    table: pd.DataFrame, source_kind: str, source_label: str, snapshot_root: Path | None
+    table: pd.DataFrame,
+    source_kind: str,
+    source_label: str,
+    snapshot_root: Path | None,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> bool:
     """Check the bound responses before retaining any capture-backed attestation."""
     news_id = table.attrs.get("club_news_snapshot_id")
@@ -468,7 +538,9 @@ def _coding_attested(
     ):
         return False
     try:
-        snapshot = _club_news_snapshot(snapshot_root / news_id, snapshot_root)
+        snapshot = _club_news_snapshot(
+            snapshot_root / news_id, snapshot_root, read_capture=read_capture
+        )
         if snapshot.metadata.captured_at_utc != table.attrs.get("club_news_captured_at_utc"):
             return False
         responses = read_captured_responses(snapshot)
@@ -512,8 +584,13 @@ def manager_words_from_artifact(
     source_kind: str,
     source_label: str,
     snapshot_root: Path | None = None,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> ManagerWords:
-    """Read a verified evidence artifact into the statements the rule can act on."""
+    """Read a verified evidence artifact into the statements the rule can act on.
+
+    ``read_capture`` reads the club-news and roster captures; ``None`` reads them from disk.
+    A weekly run passes its own reader so its leagues share one read of each capture.
+    """
 
     table = read_rotation_evidence_artifact(Path(table_path), Path(manifest_path))
     seasons = {str(value) for value in table["season"].tolist()}
@@ -525,24 +602,30 @@ def manager_words_from_artifact(
         )
     clubs = _covered(table, table_path)
     source_check = _require_the_coded_documents(table, table_path, documents, source_label)
-    coding_attested = _coding_attested(table, source_kind, source_label, snapshot_root)
-    target_basis = _decision_fixture_basis(table, snapshot_root)
+    coding_attested = _coding_attested(
+        table, source_kind, source_label, snapshot_root, read_capture=read_capture
+    )
+    target_basis = _decision_fixture_basis(table, snapshot_root, read_capture=read_capture)
     words: list[ManagerWord] = []
     for row in table.to_dict(orient="records"):
         disposition = _text(row.get("rotation_disposition"))
         if disposition is None:
             continue
-        document, cited, whole_sentence = _resolve(
+        player = (
+            target_basis[1].get(int(str(row["player_id"]))) if target_basis is not None else None
+        )
+        publication_source = _text(row.get("rotation_claim_publication_source"))
+        publication_digest = _text(row.get("rotation_claim_publication_source_sha256"))
+        document, cited, whole_sentence, document_binding_reason = _resolve(
             documents,
             _text(row.get("rotation_claim_source_sha256")),
             row.get("rotation_claim_span_start"),
             row.get("rotation_claim_span_end"),
+            club=player[0] if player else None,
+            publication_digest=publication_digest,
         )
         resolved = cited is not None
         scope = _text(row.get("rotation_claim_fixture_scope")) or "unspecified"
-        player = (
-            target_basis[1].get(int(str(row["player_id"]))) if target_basis is not None else None
-        )
         checked_scope = (
             verified_fixture_scope(
                 cited.encode(), disposition, player_name=player[2] if player else None
@@ -562,8 +645,6 @@ def manager_words_from_artifact(
             scope_verified = target_basis is not None and _targets_decision(
                 row, document, target_basis
             )
-        publication_source = _text(row.get("rotation_claim_publication_source"))
-        publication_digest = _text(row.get("rotation_claim_publication_source_sha256"))
         metadata = (
             publication_metadata(document.content, document.content_type, document.final_url)
             if document is not None and resolved
@@ -619,6 +700,7 @@ def manager_words_from_artifact(
                 publication_source=publication_source,
                 publication_source_sha256=publication_digest,
                 fixture_binding_reason=fixture_binding_reason,
+                document_binding_reason=document_binding_reason,
             )
         )
     return ManagerWords(
@@ -633,11 +715,16 @@ def manager_words_from_artifact(
     )
 
 
-def _club_news_snapshot(source: Path, snapshot_root: Path | None) -> CapturedSnapshot:
+def _club_news_snapshot(
+    source: Path,
+    snapshot_root: Path | None,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> CapturedSnapshot:
     root = Path(snapshot_root) if snapshot_root is not None else source.parent
     if source.resolve() != (root / source.name).resolve():
         raise ManagerWordsError("Configured club-news capture is outside its snapshot root.")
-    snapshot = read_snapshot(root, source.name)
+    snapshot = (read_capture or read_snapshot)(root, source.name)
     if snapshot.metadata.source != CLUB_NEWS_SOURCE:
         raise ManagerWordsError("Configured capture is not a club-news capture.")
     return snapshot
@@ -654,7 +741,10 @@ def club_news_capture_id(source: Path, *, snapshot_root: Path | None = None) -> 
 
 
 def documents_from_source(
-    source: Path, *, snapshot_root: Path | None = None
+    source: Path,
+    *,
+    snapshot_root: Path | None = None,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> tuple[tuple[RawDocument, ...], str, str]:
     """The captured documents behind an evidence table, with what kind of source they are.
 
@@ -670,7 +760,7 @@ def documents_from_source(
         synthetic = json.loads(path.read_text(encoding="utf-8")).get("synthetic") is True
         return documents, SOURCE_SYNTHETIC_FIXTURE if synthetic else SOURCE_FIXTURE_FILE, path.name
     if path.is_dir():
-        snapshot = _club_news_snapshot(path, snapshot_root)
+        snapshot = _club_news_snapshot(path, snapshot_root, read_capture=read_capture)
         return (
             read_captured_documents(snapshot),
             SOURCE_CLUB_NEWS_CAPTURE,
@@ -680,15 +770,25 @@ def documents_from_source(
 
 
 def load_manager_words(
-    table_path: Path, *, club_news_source: Path, snapshot_root: Path | None = None
+    table_path: Path,
+    *,
+    club_news_source: Path,
+    snapshot_root: Path | None = None,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> ManagerWords:
-    """The evidence table beside its manifest, joined to the documents it was coded from."""
+    """The evidence table beside its manifest, joined to the documents it was coded from.
+
+    ``read_capture`` reads every capture this needs (the club-news capture and the roster
+    capture the manifest names); ``None`` reads each from disk on every call.
+    """
 
     table = Path(table_path)
     manifest = table.with_suffix(".manifest.json")
     if not Path(addressable(manifest)).is_file():
         raise ManagerWordsError(f"No manifest beside {table.name}: expected {manifest.name}.")
-    documents, kind, label = documents_from_source(club_news_source, snapshot_root=snapshot_root)
+    documents, kind, label = documents_from_source(
+        club_news_source, snapshot_root=snapshot_root, read_capture=read_capture
+    )
     return manager_words_from_artifact(
         table,
         manifest,
@@ -698,18 +798,23 @@ def load_manager_words(
         snapshot_root=(snapshot_root or club_news_source.parent)
         if club_news_source.is_dir()
         else snapshot_root,
+        read_capture=read_capture,
     )
 
 
 def _decision_fixture_basis(
     table: pd.DataFrame,
     snapshot_root: Path | None,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> tuple[pd.DataFrame, dict[int, tuple[str, int, str]], str] | None:
     """Read only the exact immutable decision named by the checked manifest."""
     if snapshot_root is None or "rotation_claim_scope_verified" not in table:
         return None
     try:
-        snapshot = read_snapshot(snapshot_root, str(table.attrs["roster_snapshot_id"]))
+        snapshot = (read_capture or read_snapshot)(
+            snapshot_root, str(table.attrs["roster_snapshot_id"])
+        )
         captured = snapshot.metadata.captured_at_utc
         if set(table.captured_at_utc.astype(str)) != {captured}:
             return None
@@ -769,6 +874,7 @@ def _targets_decision(
 
 
 __all__ = [
+    "AMBIGUOUS_CITED_DOCUMENT",
     "MANAGERS_WORD_FILE",
     "MANAGERS_WORD_RULE_VERSION",
     "NOT_CAPTAIN_DISPOSITIONS",

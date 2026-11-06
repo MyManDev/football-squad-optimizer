@@ -33,6 +33,7 @@ describe.each(["tr", "en"] as const)("member live score in %s", (language) => {
     expect(
       screen.getByText(language === "tr" ? "Bonus bekleniyor" : "Bonus pending"),
     ).toBeInTheDocument();
+    expect(screen.getByText(language === "tr" ? "Güncellendi" : "Updated")).toBeInTheDocument();
     expect(container.querySelector("time")).toHaveAttribute("datetime", score.source_time);
     expect(container.textContent).not.toMatch(AS_A_CHANCE);
     expect(container.textContent).not.toMatch(AS_A_CAVEAT);
@@ -81,13 +82,15 @@ it("does not replace a missing player name with an invented label", () => {
   ).toBeEmptyDOMElement();
 });
 
-it("keeps a real zero and a negative score visible", () => {
+it("keeps a real zero and a negative score visible in the net stat", () => {
   const score = result();
   if (score.refused) throw new Error(score.reason);
+  // The transfer hit stat also shows "0" here, so read the value next to the net label only.
+  const net = () => screen.getByText("Net puan", { exact: true }).nextElementSibling;
   const { rerender } = render(
     <MemberLiveScoreCard gameweek={8} score={{ ...score, net: 0 }} names={names} />,
   );
-  expect(screen.getAllByText("0", { exact: true }).length).toBeGreaterThan(0);
+  expect(net()).toHaveTextContent(/^0$/);
   rerender(<MemberLiveScoreCard gameweek={8} score={{ ...score, net: -4 }} names={names} />);
-  expect(screen.getByText("-4", { exact: true })).toBeInTheDocument();
+  expect(net()).toHaveTextContent(/^-4$/);
 });

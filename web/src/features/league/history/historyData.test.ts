@@ -10,18 +10,15 @@ afterEach(() => vi.unstubAllGlobals());
 const document = () => structuredClone(fixture) as SuggestionHistory;
 
 describe("recorded weekly history", () => {
-  it("accepts optional archived plans and preserves absent settings and prices", () => {
+  it("accepts optional archived plans and preserves absent settings", () => {
     const value = document();
     Object.assign(value.payload.weeks[0], { recorded_plans: structuredClone(rows) });
     const plans = checkedHistory(value, 101).payload.weeks[0].recorded_plans!;
     expect(plans).toEqual(rows);
     expect(plans[0].top100_weight).toBeUndefined();
     expect(plans[0].managers_word).toBeUndefined();
-    expect(plans[0].expected_points_cost).toBe(0);
   });
   it.each([
-    { expected_points_cost: null },
-    { expected_points_cost: Infinity },
     { managers_word: false },
     { moves: [{ player_out: 12, player_in: null }] },
     { published_path: "advice/202/saf-puan/1.json" },

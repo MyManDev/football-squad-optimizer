@@ -8,7 +8,7 @@ import { NO_LEAGUE, rememberedLeague } from "./leagueState";
 
 /**
  * "Ligini bul", then "Sen kimsin?": nothing of a league opens before both steps, the
- * picker shows names only, Onayla opens the page asked for or the visitor's own page, and
+ * picker shows names only, a click on a name opens the page asked for or the visitor's own page, and
  * the sidebar's Değiştir is the one way to be someone else.
  */
 
@@ -45,15 +45,17 @@ test.describe("the sidebar before and after the two steps", () => {
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.leagueEntry.title);
       expect(await sidebarLinks(page)).toEqual(["/", "/fixtures", ...CONTRIBUTE]);
       const sidebar = page.locator("#sidebar");
-      for (const name of [TR.shell.thisWeek, TR.shell.squad, TR.shell.league]) {
+      for (const name of [TR.shell.thisWeek, TR.shell.league]) {
         await expect(sidebar.getByRole("link", { name, exact: true })).toHaveCount(0);
       }
       await expect(sidebar.getByRole("button", { name: TR.shell.changeMember })).toHaveCount(0);
       const buttons = sidebar.getByRole("button");
-      await expect(buttons).toHaveCount(3);
+      await expect(buttons).toHaveCount(5);
       await expect(buttons.nth(0)).toHaveAccessibleName(TR.shell.collapseSidebar);
       await expect(buttons.nth(1)).toHaveAccessibleName(/^TR/);
       await expect(buttons.nth(2)).toHaveAccessibleName(/^EN/);
+      await expect(buttons.nth(3)).toHaveAccessibleName(TR.colourScheme.light);
+      await expect(buttons.nth(4)).toHaveAccessibleName(TR.colourScheme.dark);
     });
   });
 
@@ -72,7 +74,7 @@ test.describe("the sidebar before and after the two steps", () => {
       });
       if (path === MEMBERS) await expect(find).toHaveAttribute("aria-current", "page");
       else await expect(find).not.toHaveAttribute("aria-current");
-      for (const name of [TR.shell.squad, TR.shell.league]) {
+      for (const name of [TR.shell.thisWeek, TR.shell.league]) {
         await expect(page.locator("#sidebar").getByRole("link", { name, exact: true })).toHaveCount(
           0,
         );
@@ -92,8 +94,13 @@ test.describe("the sidebar before and after the two steps", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(await sidebarLinks(page)).toEqual([
       own(EXAMPLE_CLAIM.entryId),
-      `${own(EXAMPLE_CLAIM.entryId)}#kadro`,
       MEMBERS,
+      `${own(EXAMPLE_CLAIM.entryId)}/current-squad`,
+      `${own(EXAMPLE_CLAIM.entryId)}/what-if`,
+      `${own(EXAMPLE_CLAIM.entryId)}/duel`,
+      `${own(EXAMPLE_CLAIM.entryId)}/chips`,
+      `${own(EXAMPLE_CLAIM.entryId)}/card`,
+      `${own(EXAMPLE_CLAIM.entryId)}/history`,
       "/fixtures",
       ...CONTRIBUTE,
     ]);
@@ -127,7 +134,7 @@ test.describe("before the visitor says who they are", () => {
       await expect(page).toHaveURL(shown);
       await expect(page.locator("main table")).toHaveCount(0);
       await expect(page.locator('[data-mark="decision"]')).toHaveCount(0);
-      const options = page.locator("[data-member-picker] label");
+      const options = page.locator("[data-member-picker] li button");
       await expect(options).toHaveCount(humans.length);
       const texts = await options.allTextContents();
       expect(new Set(texts)).toEqual(
@@ -175,30 +182,22 @@ test.describe("before the visitor says who they are", () => {
     await page.goto(MEMBERS);
     const group = page.getByRole("group", { name: TR.memberPicker.legend });
     await expect(group).toBeVisible();
-    const radios = group.getByRole("radio");
-    await expect(radios).toHaveCount(humans.length);
-    await expect(group.getByRole("radio", { name: /SquadOpt/ })).toHaveCount(0);
-    const names = (await page.locator("[data-member-picker] label").allTextContents()).map(
-      (text) => text.split(", ")[0]!,
-    );
+    const buttons = group.getByRole("button");
+    await expect(buttons).toHaveCount(humans.length);
+    await expect(group.getByRole("button", { name: /SquadOpt/ })).toHaveCount(0);
+    const names = (await buttons.allTextContents()).map((text) => text.split(", ")[0]!);
     const named = names.filter((name) => name !== TR.leagueMembers.unknownMember);
     expect(named).toEqual(
       [...named].sort(new Intl.Collator("tr", { sensitivity: "base" }).compare),
     );
     expect(names.at(-1)).toBe(TR.leagueMembers.unknownMember);
 
-    const confirm = page.getByRole("button", { name: TR.memberPicker.confirm, exact: true });
-    await expect(confirm).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^(Onayla|Confirm)$/ })).toHaveCount(0);
     await pickerHeading(page).focus();
     await page.keyboard.press("Tab");
-    await expect(radios.nth(0)).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-    await expect(radios.nth(1)).toBeFocused();
-    await page.keyboard.press("Space");
-    await expect(radios.nth(1)).toBeChecked();
-    await expect(confirm).toBeEnabled();
+    await expect(buttons.nth(0)).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(confirm).toBeFocused();
+    await expect(buttons.nth(1)).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator("#league-member-list")).toBeVisible();
     await expect(page).toHaveURL(MEMBERS);
@@ -377,8 +376,7 @@ test.describe("Değiştir", () => {
       await expect(pickerHeading(page)).toBeFocused();
 
       for (const control of [
-        ...(await page.locator("[data-member-picker] label").all()),
-        page.getByRole("button", { name: TR.memberPicker.confirm, exact: true }),
+        ...(await page.locator("[data-member-picker] li button").all()),
         page.getByRole("link", { name: TR.memberPicker.otherLeague }),
       ]) {
         const box = (await control.boundingBox())!;
@@ -461,11 +459,7 @@ test("with reduced motion the picker and the drawer do not move", async ({ page 
         const style = getComputedStyle(element);
         return { animation: style.animationDuration, transition: style.transitionDuration };
       });
-  for (const selector of [
-    "[data-member-picker]",
-    "[data-member-picker] label",
-    "[data-member-picker] button[type=submit]",
-  ]) {
+  for (const selector of ["[data-member-picker]", "[data-member-picker] li button"]) {
     expect(await durations(selector), selector).toEqual({ animation: "0s", transition: "0s" });
   }
   await page.getByRole("banner").getByRole("button", { name: TR.shell.openMenu }).click();
@@ -476,24 +470,24 @@ test("with reduced motion the picker and the drawer do not move", async ({ page 
   expect(drawer).toBe(true);
 });
 
-test.describe("the system's own pages behind the same two steps", () => {
+test.describe("the addresses that name no league behind the same two steps", () => {
   test.describe("with no league entered", () => {
     test.use({ storageState: NO_LEAGUE });
 
-    test("the moves page asks for the number, then who you are, in place", async ({ page }) => {
+    test("the league page asks for the number, then who you are, in place", async ({ page }) => {
       await installLeagueMocks(page, { claim: null });
       await page.route("**/data/league/members.json", (route) =>
         route.fulfill({ json: { ...mockLeagueMembersEnvelope, source_kind: "live" } }),
       );
-      await page.goto("/moves");
+      await page.goto("/league");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.leagueEntry.title);
       await page.getByLabel(TR.leagueEntry.label).fill(String(LEAGUE));
       await page.getByRole("button", { name: TR.leagueEntry.submit, exact: true }).click();
-      await expect(page).toHaveURL("/moves");
+      await expect(page).toHaveURL(`/league/${LEAGUE}`);
       await expect(pickerHeading(page)).toBeFocused();
       await pickMember(page, exampleMember(35249002));
-      await expect(page).toHaveURL("/moves");
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.moves.title);
+      await expect(page).toHaveURL(`/league/${LEAGUE}`);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.league.title);
     });
 
     for (const [address, numbered] of [
@@ -516,22 +510,5 @@ test.describe("the system's own pages behind the same two steps", () => {
         await expect(pickerHeading(page)).toBeFocused();
       });
     }
-  });
-
-  test("the rivals page and the gameweek page ask who you are before reading anything", async ({
-    page,
-  }) => {
-    await installLeagueMocks(page, { claim: null });
-    const reads: string[] = [];
-    page.on("request", (request) => {
-      const path = new URL(request.url()).pathname;
-      if (/^\/data\/\d{4}-\d{2}\//.test(path)) reads.push(path);
-    });
-    for (const address of ["/rivals", "/gw/2026-27/1"]) {
-      await page.goto(address);
-      await expect(pickerHeading(page)).toBeVisible();
-      await expect(page).toHaveURL(address);
-    }
-    expect(reads).toEqual([]);
   });
 });

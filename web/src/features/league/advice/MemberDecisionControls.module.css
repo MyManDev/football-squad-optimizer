@@ -34,6 +34,11 @@
   text-wrap: pretty;
 }
 
+/* The presets row under the heading, as wide as the plan it sets. */
+.presets {
+  min-width: 0;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -155,6 +160,13 @@
   font-size: var(--step--1);
 }
 
+@media (max-width: 599.98px) {
+  .rivalField select,
+  .rivalField input {
+    font-size: 16px;
+  }
+}
+
 /* The window: three real radios drawn as one segmented control. */
 .segments {
   display: grid;
@@ -192,8 +204,8 @@
 }
 
 .segment:has(input:checked) {
-  background: var(--color-text);
-  color: #ffffff;
+  background: var(--color-board);
+  color: var(--color-board-text);
   font-weight: 600;
 }
 
@@ -213,72 +225,11 @@
 }
 
 .segment:has(input:checked:focus-visible) {
-  outline-color: var(--color-lime);
-}
-
-/* Under Hesapla in the sidebar, a step apart from the button's own lines. */
-.notes {
-  margin-top: var(--space-2);
-}
-
-.notes > summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 44px;
-  list-style: none;
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.notes > summary::-webkit-details-marker {
-  display: none;
-}
-
-.notesIcon {
-  flex: none;
-  transition: transform var(--motion-ui-fast) var(--motion-ease);
-}
-
-.notes[open] .notesIcon {
-  transform: rotate(90deg);
-}
-
-.notesBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-1) 0 var(--space-2);
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-}
-
-.notesBody p {
-  margin: 0;
-}
-
-.descriptions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-}
-
-.descriptions dt {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
-.descriptions dd {
-  margin: 0;
+  outline-color: var(--color-mark);
 }
 
 @media (max-width: 1179.98px) {
-  .row,
-  .notes > summary {
+  .row {
     min-height: 44px;
   }
 
@@ -357,7 +308,8 @@
     gap: var(--space-4);
   }
 
-  .planHead {
+  .planHead,
+  .presets {
     grid-column: 1 / -1;
   }
 }

@@ -2,15 +2,15 @@ import userEvent from "@testing-library/user-event";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MemoryRouter, useLocation } from "react-router";
+import { Link, MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LanguageProvider } from "../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../i18n/messages";
+import { MOTION_MS, REDUCED_MOTION_QUERY } from "../motion";
 import { DESKTOP_QUERY, PHONE_QUERY, type ShellLayout } from "../shell/layout";
 import { NO_IDENTITY, type ShellIdentity } from "../shell/nav";
-import { FIXTURE_SHEET_ID, useShell, useShellSlot } from "../shell/ShellContext";
-import { ShellPortal } from "../shell/ShellPortal";
+import { FIXTURE_SHEET_ID, useShell } from "../shell/ShellContext";
 import { SIDEBAR_STORAGE_KEY } from "../shell/sidebarPreference";
 import { PageShell } from "./PageShell";
 
@@ -153,16 +153,11 @@ describe("the app shell on a desktop", () => {
         "aria-current",
         "page",
       );
-      for (const name of [copy.league, copy.squad, copy.thisWeek]) {
+      for (const name of [copy.league, copy.thisWeek]) {
         expect(screen.queryByRole("link", { name })).toBeNull();
       }
       expect(screen.queryByRole("button", { name: copy.changeMember })).toBeNull();
-      // The operations, analysis and admin surfaces are reachable by address only.
-      expect(
-        document.querySelector(
-          'a[href="/status"], a[href="/league"], a[href="/admin"], a[href^="/gw/"]',
-        ),
-      ).toBeNull();
+      expect(document.querySelector('a[href="/league"]')).toBeNull();
     },
   );
 
@@ -171,7 +166,7 @@ describe("the app shell on a desktop", () => {
     const find = screen.getByRole("link", { name: TR.findLeague });
     expect(find).toHaveAttribute("href", MEMBERS);
     expect(find).not.toHaveAttribute("aria-current");
-    for (const name of [TR.league, TR.squad, TR.thisWeek]) {
+    for (const name of [TR.league, TR.thisWeek]) {
       expect(screen.queryByRole("link", { name })).toBeNull();
     }
     expect(screen.queryByRole("button", { name: TR.changeMember })).toBeNull();
@@ -179,23 +174,18 @@ describe("the app shell on a desktop", () => {
     expect(location()).toBe(MEMBERS);
   });
 
-  it("opens the claimed member as 'Bu hafta' and 'Kadro', and the league as 'Lig'", async () => {
+  it("opens the claimed member as 'Bu hafta', and the league as 'Lig'", () => {
     const path = `${OWN}?mode=fark-yarat&window=3`;
-    const { user } = renderShell({ path, identity: CLAIMED });
+    renderShell({ path, identity: CLAIMED });
 
     const thisWeek = screen.getByRole("link", { name: TR.thisWeek });
-    const squad = screen.getByRole("link", { name: TR.squad });
     expect(thisWeek).toHaveAttribute("href", path);
     expect(thisWeek).toHaveAttribute("aria-current", "page");
-    expect(squad).toHaveAttribute("href", `${path}#kadro`);
-    expect(squad).not.toHaveAttribute("aria-current");
+    // 'Bu hafta' is the squad's page too; the sidebar has no second link to it.
+    expect(screen.queryByRole("link", { name: "Kadro" })).toBeNull();
+    expect(document.querySelector('aside a[href*="#kadro"]')).toBeNull();
     expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
     expect(screen.queryByRole("link", { name: TR.findLeague })).toBeNull();
-
-    await user.click(squad);
-    expect(location()).toBe(`${path}#kadro`);
-    expect(screen.getByRole("link", { name: TR.squad })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: TR.thisWeek })).not.toHaveAttribute("aria-current");
   });
 
   it("keeps the plan of the own page in reach for the rest of the visit, in memory only", async () => {
@@ -206,7 +196,10 @@ describe("the app shell on a desktop", () => {
     expect(location()).toBe("/fixtures");
     expect(screen.getByRole("link", { name: TR.fixtures })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute("href", path);
-    expect(screen.getByRole("link", { name: TR.squad })).toHaveAttribute("href", `${path}#kadro`);
+    expect(screen.getByRole("link", { name: TR.whatIf })).toHaveAttribute(
+      "href",
+      `${OWN}/what-if?mode=ortak-koru`,
+    );
     expect(window.localStorage.getItem("squadopt.viewer")).toBeNull();
     expect(Object.keys(window.localStorage)).not.toContain("squadopt.member");
   });
@@ -216,7 +209,6 @@ describe("the app shell on a desktop", () => {
     const thisWeek = screen.getByRole("link", { name: TR.thisWeek });
     expect(thisWeek).toHaveAttribute("href", OWN);
     expect(thisWeek).not.toHaveAttribute("aria-current");
-    expect(screen.getByRole("link", { name: TR.squad })).toHaveAttribute("href", `${OWN}#kadro`);
   });
 
   it("collapses to the icon rail and remembers that in this browser", async () => {
@@ -247,8 +239,13 @@ describe("the app shell on a desktop", () => {
     const second = renderShell({ identity: CLAIMED });
     expect(navLinks().map((link) => link.textContent)).toEqual([
       TR.thisWeek,
-      TR.squad,
       TR.league,
+      TR.currentSquad,
+      TR.whatIf,
+      TR.duel,
+      TR.chips,
+      TR.squadCard,
+      TR.history,
       TR.fixtures,
       TR.contribute,
     ]);
@@ -273,6 +270,8 @@ describe("the app shell on a desktop", () => {
       ...navLinks(),
       screen.getByRole("button", { name: /^TR/ }),
       screen.getByRole("button", { name: /^EN/ }),
+      screen.getByRole("button", { name: "Gündüz" }),
+      screen.getByRole("button", { name: "Gece" }),
       screen.getByRole("button", { name: "page action" }),
     ];
     for (const element of expected) {
@@ -307,9 +306,72 @@ describe("the app shell on a desktop", () => {
       const { hash } = useLocation();
       return hash ? <section id="kadro">squad</section> : null;
     }
-    const { user } = renderShell({ path: OWN, identity: CLAIMED, page: <Late /> });
-    await user.click(screen.getByRole("link", { name: TR.squad }));
+    const page = (
+      <>
+        <Link to="#kadro">kadro</Link>
+        <Late />
+      </>
+    );
+    const { user } = renderShell({ path: OWN, identity: CLAIMED, page });
+    await user.click(screen.getByRole("link", { name: "kadro" }));
     expect(scrolled).toContain("kadro");
+  });
+});
+
+// A move between pages from the navigation is one crossfade (#1131); jsdom has no View
+// Transitions, so a browser that has them is stood in for, keeping each update it runs.
+describe("moving between pages from the navigation", () => {
+  let started: Array<Promise<void> | void> = [];
+  let startedAt = 0;
+  beforeEach(() => {
+    started = [];
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      writable: true,
+      value: vi.fn((update: () => Promise<void> | void) => {
+        startedAt = performance.now();
+        started.push(update());
+        return {};
+      }),
+    });
+  });
+  afterEach(() => {
+    delete (document as { startViewTransition?: unknown }).startViewTransition;
+  });
+
+  it("crossfades into the page a link names once its address has landed", async () => {
+    const { user } = renderShell({ path: OWN, identity: CLAIMED });
+    await user.click(screen.getByRole("link", { name: TR.league }));
+    expect(document.startViewTransition).toHaveBeenCalledOnce();
+    let settledAt = Number.POSITIVE_INFINITY;
+    await act(async () => {
+      await started[0];
+      settledAt = performance.now();
+    });
+    expect(location()).toBe(MEMBERS);
+    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("aria-current", "page");
+    // The address landing ends the wait, not the data time that caps it.
+    expect(settledAt - startedAt).toBeLessThan(MOTION_MS.data);
+
+    // The page already open changes nothing, so its link starts no transition.
+    await user.click(screen.getByRole("link", { name: TR.league }));
+    expect(document.startViewTransition).toHaveBeenCalledOnce();
+  });
+
+  it("moves at once under reduced motion", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query === REDUCED_MOTION_QUERY,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
+    });
+    const { user } = renderShell({ path: OWN, identity: CLAIMED });
+    await user.click(screen.getByRole("link", { name: TR.fixtures }));
+    expect(document.startViewTransition).not.toHaveBeenCalled();
+    expect(location()).toBe("/fixtures");
   });
 });
 
@@ -432,67 +494,6 @@ describe("focusing the page after a step in front of it", () => {
   });
 });
 
-function Slots({ planFirst = true }: { planFirst?: boolean }) {
-  const plan = useShellSlot("plan");
-  return (
-    <>
-      <ShellPortal slot="plan">
-        <fieldset>
-          <legend>Strateji</legend>
-          <label>
-            <input type="radio" name="strategy" value="a" defaultChecked={!planFirst} />A
-          </label>
-          <label>
-            <input type="radio" name="strategy" value="b" defaultChecked={planFirst} />B
-          </label>
-        </fieldset>
-      </ShellPortal>
-      <p>main content</p>
-      <output data-testid="plan-slot">{plan ? plan.tagName : "none"}</output>
-    </>
-  );
-}
-
-describe("the shell's plan slot", () => {
-  it("renders a page's PLAN part once, inside the sidebar after the navigation", () => {
-    const { container } = renderShell({ path: OWN, identity: CLAIMED, page: <Slots /> });
-
-    expect(within(sidebar()).getByRole("group", { name: "Strateji" })).toBeInTheDocument();
-    expect(within(screen.getByRole("main")).getByText("main content")).toBeInTheDocument();
-    expect(container.querySelectorAll('input[name="strategy"]')).toHaveLength(2);
-    expect(screen.getByTestId("plan-slot")).toHaveTextContent("DIV");
-    const order = [...sidebar().querySelectorAll("nav, fieldset")].map((node) => node.tagName);
-    expect(order).toEqual(["NAV", "FIELDSET"]);
-  });
-
-  it("renders it inline where the page stands when there is no shell", () => {
-    const { container } = render(
-      <MemoryRouter>
-        <Slots />
-      </MemoryRouter>,
-    );
-    expect(container.querySelectorAll('input[name="strategy"]')).toHaveLength(2);
-    expect(screen.getByTestId("plan-slot")).toHaveTextContent("none");
-    expect(screen.queryByRole("complementary")).toBeNull();
-  });
-
-  it("offers the rail's plan button only while a page fills the plan, and opens the plan", async () => {
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, "collapsed");
-    const empty = renderShell();
-    expect(screen.queryByRole("button", { name: TR.changePlan })).toBeNull();
-    empty.unmount();
-
-    const { user } = renderShell({ path: OWN, identity: CLAIMED, page: <Slots /> });
-    const plan = await screen.findByRole("button", { name: TR.changePlan });
-    expect(plan).toHaveAttribute("aria-controls", "sidebar");
-    expect(plan).toHaveAttribute("aria-expanded", "false");
-    await user.click(plan);
-    expect(sidebar()).toHaveAttribute("data-mode", "open");
-    expect(screen.getByRole("radio", { name: "B" })).toHaveFocus();
-    expect(screen.queryByRole("button", { name: TR.changePlan })).toBeNull();
-  });
-});
-
 describe("the app shell on a phone", () => {
   it("opens the sidebar from the phone bar as a modal drawer and closes it with Escape", async () => {
     stubLayout("phone");
@@ -522,34 +523,6 @@ describe("the app shell on a phone", () => {
     expect(document.documentElement.style.overflow).toBe("");
   });
 
-  it("leaves the drawer open when a control inside it already answered Escape", async () => {
-    stubLayout("phone");
-    // A control that closes something of its own on Escape and says so.
-    function Answering() {
-      return (
-        <ShellPortal slot="plan">
-          <input
-            aria-label="answers escape"
-            onKeyDown={(event) => {
-              if (event.key === "Escape") event.preventDefault();
-            }}
-          />
-        </ShellPortal>
-      );
-    }
-    const { user } = renderShell({ path: `${MEMBERS}/7`, page: <Answering /> });
-    await user.click(screen.getByRole("button", { name: TR.openMenu }));
-    await user.click(screen.getByRole("textbox", { name: "answers escape" }));
-    await user.keyboard("{Escape}");
-    expect(screen.getByRole("dialog", { name: TR.menu })).toBeInTheDocument();
-    // Escape anywhere else still closes it.
-    await user.click(screen.getByRole("button", { name: TR.closeMenu }));
-    expect(screen.queryByRole("dialog")).toBeNull();
-    await user.click(screen.getByRole("button", { name: TR.openMenu }));
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).toBeNull();
-  });
-
   it("closes the drawer from the scrim, the close button and a navigation", async () => {
     stubLayout("phone");
     const { user, container } = renderShell({ identity: CLAIMED });
@@ -568,7 +541,7 @@ describe("the app shell on a phone", () => {
     await user.click(screen.getByRole("link", { name: TR.league }));
     expect(location()).toBe(MEMBERS);
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(container.querySelector(".scrim")).toBeNull();
+    expect(container.querySelector(".scrim")).not.toHaveAttribute("data-open");
   });
 
   it("links the phone bar's 'Fikstür' to the list, or opens the page's sheet when it has one", async () => {

@@ -1,0 +1,17 @@
+# The tunnel from Cloudflare to the advice api on this host's loopback. backend.sh installs it
+# and starts it once /etc/cloudflared/config.yml exists; the credentials file that config names
+# is made by a person (README, "The tunnel") and read only by cloudflared.
+[Unit]
+Description=cloudflared: the tunnel to the advice api on 127.0.0.1:8000
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

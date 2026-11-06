@@ -77,7 +77,11 @@ function envelope(payload: DevicePlanDocument): LeagueViewEnvelope<DevicePlanDoc
   };
 }
 
-function show(dependencies: Partial<WhatIfDependencies> = {}, squad: EntrySquad = SQUAD) {
+function show(
+  dependencies: Partial<WhatIfDependencies> = {},
+  squad: EntrySquad = SQUAD,
+  advised: readonly number[] = ADVISED,
+) {
   const worker = new InProcessSolver();
   const loadDocument = vi.fn(async () => envelope(document));
   const view = render(
@@ -85,7 +89,7 @@ function show(dependencies: Partial<WhatIfDependencies> = {}, squad: EntrySquad 
       {withLeague(
         <WhatIfPanel
           squad={squad}
-          advised={ADVISED}
+          advised={advised}
           dependencies={{ loadDocument, createSolver: () => worker, ...dependencies }}
         />,
       )}
@@ -241,30 +245,28 @@ describe("on the device", () => {
 
 describe("what the mode says before it can start", () => {
   it.each([
-    [
-      "an unpublished table",
-      () => Promise.reject(new LeagueDataMissing("device-plan.json")),
-      COPY.whatIfUnpublished,
-    ],
-    ["an unreadable table", () => Promise.reject(new Error("broken")), COPY.whatIfFailed],
+    ["an unpublished table", () => Promise.reject(new LeagueDataMissing("device-plan.json"))],
+    ["an unreadable table", () => Promise.reject(new Error("broken"))],
     [
       "a table of another capture",
       async () => envelope({ ...document, source_snapshot_id: "another" }),
-      COPY.whatIfOtherCapture,
     ],
     [
       "a table without one of the advised players",
       async () =>
         envelope({ ...document, players: document.players.filter((player) => player.id !== 160) }),
-      COPY.whatIfOtherCapture,
     ],
-  ])("says so for %s", async (_, loadDocument, said) => {
-    show({ loadDocument });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
-    });
-    expect(await screen.findByText(said)).toBeInTheDocument();
-  });
+  ])(
+    "says the list could not be read for %s, and offers the start again",
+    async (_, loadDocument) => {
+      show({ loadDocument });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
+      });
+      expect(await screen.findByText(COPY.whatIfFailed)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: COPY.whatIfRetry })).toBeInTheDocument();
+    },
+  );
 });
 
 describe("again after a failure", () => {
@@ -330,6 +332,159 @@ describe("again after a failure", () => {
   });
 });
 
+describe("choosing the replacement", () => {
+  it("narrows the add list to the removed player's position, and widens it on request", async () => {
+    await started();
+    const list = () => screen.getByLabelText(COPY.whatIfAdd);
+    const groups = () =>
+      [...list().querySelectorAll("optgroup")].map((group) => group.getAttribute("label"));
+    const positions = MESSAGES.tr.positions;
+    expect(groups()).toEqual([positions.GK, positions.DEF, positions.MID, positions.FWD]);
+
+    const forwards = screen
+      .getAllByRole("list")
+      .find((group) => group.getAttribute("aria-label") === positions.FWD)!;
+    fireEvent.click(within(forwards).getAllByRole("button")[0]!);
+    await settled();
+    expect(screen.getByLabelText(COPY.whatIfPosition)).toHaveValue("FWD");
+    expect(groups()).toEqual([positions.FWD]);
+
+    fireEvent.change(screen.getByLabelText(COPY.whatIfPosition), { target: { value: "" } });
+    expect(groups()).toHaveLength(4);
+    fireEvent.change(screen.getByLabelText(COPY.whatIfPosition), { target: { value: "GK" } });
+    expect(groups()).toEqual([positions.GK]);
+
+    fireEvent.click(screen.getByRole("button", { name: COPY.whatIfReset }));
+    await settled();
+    expect(screen.getByLabelText(COPY.whatIfPosition)).toHaveValue("");
+    expect(groups()).toHaveLength(4);
+  });
+});
+
+describe("searching by name", () => {
+  it.each([
+    ["Alexander Isak", "Isak", "isak"],
+    ["Alexander Isak", "Isak", "İSAK"],
+    ["Alex Iwobi", "Iwobi", "ıwobı"],
+    ["İlkay Gündoğan", "Gündoğan", "ilkay gundogan"],
+    ["João Pedro", "João Pedro", "  JOAO   PEDRO "],
+    ["Martin Ødegaard", "Ødegaard", "odegaard"],
+    ["Çağlar Söyüncü", "Söyüncü", "caglar soyuncu"],
+  ])("finds %s with the spelling %s searched as %s", async (name, short_name, query) => {
+    const target = document.players.find((player) => !ADVISED.includes(player.id))!;
+    show({
+      loadDocument: async () =>
+        envelope({
+          ...document,
+          players: document.players.map((p) =>
+            p.id === target.id ? { ...p, name, short_name } : p,
+          ),
+        }),
+    });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart })));
+    fireEvent.change(await screen.findByLabelText(COPY.whatIfSearch), { target: { value: query } });
+    const options = [...screen.getByLabelText(COPY.whatIfAdd).querySelectorAll("option")];
+    expect(options.filter((o) => o.value).map((o) => o.value)).toEqual([String(target.id)]);
+    expect(options.find((o) => o.value)?.textContent).toContain(short_name);
+    add(target.id);
+    expect(screen.getByRole("button", { name: COPY.whatIfRemoveLabel(short_name) })).toBeVisible();
+  });
+
+  it("narrows the add list to players whose name matches, and restores it when cleared", async () => {
+    await started();
+    const list = () => screen.getByLabelText(COPY.whatIfAdd);
+    const options = () =>
+      [...list().querySelectorAll("option")].filter((option) => option.value !== "");
+    const before = options().length;
+
+    const advisedSet = new Set(ADVISED);
+    const target = document.players.find((player) => !advisedSet.has(player.id))!;
+    const shown = target.short_name || target.name;
+    const matches = (player: (typeof document.players)[number]) =>
+      `${player.short_name} ${player.name}`
+        .toLocaleLowerCase("tr")
+        .includes(shown.toLocaleLowerCase("tr"));
+
+    fireEvent.change(screen.getByLabelText(COPY.whatIfSearch), { target: { value: shown } });
+    const after = options();
+    expect(after.length).toBe(
+      document.players.filter((player) => !advisedSet.has(player.id) && matches(player)).length,
+    );
+    expect(after.length).toBeLessThan(before);
+    expect(after.map((option) => option.value)).toContain(String(target.id));
+
+    fireEvent.change(screen.getByLabelText(COPY.whatIfSearch), { target: { value: "" } });
+    expect(options().length).toBe(before);
+  });
+
+  it("adds the found player only on the add button", async () => {
+    await started();
+    const advisedSet = new Set(ADVISED);
+    const target = document.players.find((player) => !advisedSet.has(player.id))!;
+    const shown = target.short_name || target.name;
+
+    fireEvent.change(screen.getByLabelText(COPY.whatIfSearch), { target: { value: shown } });
+    expect(figure(COPY.whatIfTransfers)).toBe("1");
+    fireEvent.change(screen.getByLabelText(COPY.whatIfAdd), {
+      target: { value: String(target.id) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: COPY.whatIfAddButton }));
+    await settled();
+    expect(
+      screen.getByRole("button", {
+        name: COPY.whatIfRemoveLabel(target.short_name || target.name),
+      }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("returning to a tried squad", () => {
+  it("discards saved player ids that are no longer in the table", async () => {
+    const first = await started();
+    first.unmount();
+    const slot = Object.keys(sessionStorage).find((key) => key.startsWith("squadopt.what-if."))!;
+    const saved = JSON.parse(sessionStorage.getItem(slot)!);
+    sessionStorage.setItem(slot, JSON.stringify({ ...saved, players: [Number.MAX_SAFE_INTEGER] }));
+    show();
+    await waitFor(() => expect(figure(COPY.whatIfPoints)).toContain("74,39"));
+    expect(screen.getAllByRole("button", { name: /^Kadrodan çıkar/ })).toHaveLength(15);
+    expect(screen.getByRole("button", { name: COPY.whatIfReset })).toBeDisabled();
+  });
+
+  it("restores the edits after the panel leaves and recalculates their points", async () => {
+    const first = await started();
+    remove("160");
+    add(152);
+    await settled();
+    first.unmount();
+    const restored = show();
+    await waitFor(() => expect(figure(COPY.whatIfPoints)).toContain("66,38"));
+    expect(screen.getByRole("button", { name: COPY.whatIfRemoveLabel("152") })).toBeVisible();
+    expect(screen.queryByRole("button", { name: COPY.whatIfRemoveLabel("160") })).toBeNull();
+    expect(restored.loadDocument).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: COPY.whatIfReset }));
+    await settled();
+    restored.unmount();
+    show();
+    await waitFor(() => expect(figure(COPY.whatIfPoints)).toContain("74,39"));
+    expect(screen.getByRole("button", { name: COPY.whatIfReset })).toBeDisabled();
+  });
+
+  it.each([
+    ["member", { ...SQUAD, entry: { ...SQUAD.entry, entry_id: 999 } }, ADVISED],
+    ["capture", { ...SQUAD, source_snapshot_id: "new-capture" }, ADVISED],
+    ["advice", SQUAD, ADVISED.map((id) => (id === 160 ? 152 : id))],
+    ["account", { ...SQUAD, device_plan: { ...SQUAD.device_plan!, bank_tenths: 999 } }, ADVISED],
+  ])("does not restore a draft for a different %s", async (_, squad, advised) => {
+    const first = await started();
+    remove("160");
+    first.unmount();
+    const next = show({}, squad as EntrySquad, advised);
+    expect(screen.getByRole("button", { name: COPY.whatIfStart })).toBeVisible();
+    expect(next.loadDocument).not.toHaveBeenCalled();
+  });
+});
+
 describe("with the keyboard and a screen reader", () => {
   it("adds nothing while the member moves through the list; only the add button adds", async () => {
     await started();
@@ -385,6 +540,13 @@ describe("the panel's stylesheet", () => {
     );
     for (const selector of [".action", ".remove"])
       expect(css).toMatch(new RegExp(`\\${selector} \\{[^}]*min-height: 44px`));
+  });
+
+  it("draws what names its own colour in the mark's ink on a changed row", () => {
+    expect(css).toMatch(
+      /\.player\[data-changed\] \.meta,\s+\.player\[data-changed\] \.remove \{\s+border-color: var\(--color-mark-text\);\s+color: var\(--color-mark-text\);/,
+    );
+    expect(css).toMatch(/\.player\[data-changed\] \{\s+--color-focus: var\(--color-mark-text\);/);
   });
 });
 

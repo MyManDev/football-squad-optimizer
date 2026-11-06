@@ -22,8 +22,7 @@ raises before the site is built. That call site belongs to the application owner
 not changed here.
 
 The document uses the separate, closed `live_score_v1` contract. `ui_view_v1` is
-unchanged. The site includes both schemas. Older publications without `live.json`
-keep rendering decisions and settled results; the provisional card says unavailable.
+unchanged. The site includes both schemas. Older publications have no `live.json`.
 
 The application reads bootstrap, fixtures and the requested week's live payload
 from that one capture. It checks payload checksums, source, season, matching frozen
@@ -39,16 +38,9 @@ replacement and is not labelled the official FPL total. Fixture progress and
 not settle a decision. No provisional value enters an outcome, league comparison,
 season total, or measurement artifact.
 
-Every displayed value is labelled as the last recorded provisional score, with its
-capture ID, full date/time/timezone and publication time. A capture more than 60
-minutes old additionally gets an old-capture label. This is a presentation threshold,
-not a promised upstream refresh cadence. The page uses the existing query lifecycle
-(mount/reconnect with a 60-second stale time; window-focus refresh is disabled by
-the app), with no polling service. A
-document regenerated from an old capture remains old. A settled decision hides the
-card; a later site build replaces its live document with `unavailable/settled`.
+No page reads this document since the /gw page was removed; it stays published.
 
 Validation covers chip/hit arithmetic, identity and missing-source refusals, the
-separate schema, byte-for-byte ledger preservation through site generation,
-replacing an old available document, and the existing settled page. Synthetic
-previews are labelled explicitly and do not publish real season scores.
+separate schema, byte-for-byte ledger preservation through site generation, and
+replacing an old available document. Synthetic previews are labelled explicitly and
+do not publish real season scores.

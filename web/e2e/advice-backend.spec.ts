@@ -83,12 +83,20 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   const findLeague = page.getByRole("button", { name: "Ligi bul", exact: true });
   await leagueField.fill("123");
   await findLeague.click();
-  await expect(page.getByRole("status")).toHaveText("Bu site 123 numaralı ligi yayımlamıyor.");
-  // Only the directory was read (the absent list, then the legacy tree's record); nothing
-  // of league 123, and nothing of the backend, was asked for.
-  expect(leagueRequests).toEqual([
+  // Not published: its own address, where the gate asks the FPL forwarder (not the advice
+  // backend), which this preview does not run.
+  await expect(page).toHaveURL("/league/123");
+  await expect(page.getByRole("status")).toHaveText("123 numaralı lig şu anda açılamıyor.");
+  // The directory (the absent list, then the legacy tree's record), read by the form and
+  // again by the gate, then page 1 of league 123's standings; nothing of the backend.
+  const directory = [
     `${context.webOrigin}/data/leagues.json`,
     `${context.webOrigin}/data/league/members.json`,
+  ];
+  expect(leagueRequests).toEqual([
+    ...directory,
+    ...directory,
+    `${context.webOrigin}/api/v1/fpl/standings/123?page=1`,
   ]);
   await leagueField.fill(String(context.leagueId));
   await findLeague.click();
@@ -123,7 +131,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await expect(page.locator("#sidebar").getByRole("button", { name: "Değiştir" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
-  await expect(page.getByText("Listelenen öneri dosyası bulunamadı.")).toBeVisible();
+  await expect(page.getByText("Bu öneri bulunamadı.")).toBeVisible();
   const compute = page.getByRole("button", { name: "Hesapla", exact: true });
   const accepted = page.waitForResponse(
     (response) => response.url().startsWith(route) && response.request().method() === "POST",
@@ -163,11 +171,11 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   const job = await page.request.get(`${context.apiOrigin}/api/v1/advice-jobs/${jobId}`);
   expect(await job.json()).toMatchObject({ job_id: jobId, status: "completed" });
   await expect(page.getByText("Plan hazır", { exact: true })).toBeVisible();
-  await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
   await atRest(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await expect(page.getByText(context.snapshotId, { exact: false })).toBeVisible();
   const advice = page.locator('[aria-labelledby="entry-advice-title"]');
+  // The section also holds the member's own squad; a plan's armband is drawn only in here.
+  const decision = advice.locator('[data-mark="decision"]');
   expect(["OPTIMAL", "FEASIBLE"]).toContain(answer.payload.solver_status);
   for (const move of answer.payload.moves) {
     if (move.player_in) await expect(advice).toContainText(move.player_in.name);
@@ -188,7 +196,8 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   const cached = await hit;
   expect(cached.status()).toBe(200);
   expect(await cached.json()).toEqual(answer);
-  await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+  await expect(page.getByText("Plan hazır", { exact: true })).toBeVisible();
+  await expect(decision).toContainText(answer.payload.captain!.short_name);
   expect(postsAfterReload).toEqual([]);
   const postedCache = page.waitForResponse(
     (response) => response.url().startsWith(route) && response.request().method() === "POST",
@@ -242,7 +251,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
       source_snapshot_id: context.snapshotId,
       window: 1,
     });
-    await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+    await expect(page.getByText("Plan hazır", { exact: true })).toBeVisible();
     await expect(advice).toBeVisible();
     for (const move of selectedAnswer.payload.moves) {
       if (move.player_in) await expect(advice).toContainText(move.player_in.name);
@@ -295,17 +304,27 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await page.goto(`/league/352490/members/${context.entryId}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
-  await expect(page.getByText(COMPUTE_COPY.tr.serviceUnreachablePublished)).toBeVisible();
-  await expect(page.getByText(COMPUTE_COPY.tr.serviceUnreachable)).toHaveCount(0);
-  await expect(page.getByText(COMPUTE_COPY.tr.serviceUnreachableAbsent)).toHaveCount(0);
   await expect(advice).toBeVisible();
   await expect(advice).toContainText(baseline.payload.captain.name);
-  await expect(page.getByText("Hesap sonucu", { exact: true })).toHaveCount(0);
+  await expect(decision).toContainText(baseline.payload.captain.short_name);
+  await expect(page.getByText("Plan hazır", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Hesapla", exact: true }).click();
   await expect(
     page.getByText(MESSAGES.tr.leagueMembers.computeStaticFallback, { exact: false }),
   ).toBeVisible();
+  // A down service with nothing published says the same sentence; only there does the
+  // decision's heading add that the computation could not be done.
+  await expect(
+    page.getByText(
+      MESSAGES.tr.leagueMembers.computeEcho(
+        MESSAGES.tr.leagueMembers.computeEchoStates.unavailable,
+      ),
+    ),
+  ).toHaveCount(0);
   await expect(advice).toContainText(baseline.payload.captain.name);
-  await expect(page.getByText("Hesap sonucu", { exact: true })).toHaveCount(0);
+  await expect(decision).toContainText(baseline.payload.captain.short_name);
+  await expect(page.getByText("Plan hazır", { exact: true })).toHaveCount(0);
+  // The published plan answers, so nothing sends the member to this device instead.
+  await expect(page.getByText(COMPUTE_COPY.tr.serviceUnreachableDevice)).toHaveCount(0);
 });

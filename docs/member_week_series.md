@@ -1,45 +1,34 @@
 # The accumulating member record
 
-Issue #530 adds a read-only surface on `/league`. It consumes the already published
-`data/leagues/<league id>/history/<entry>.json` through the same validator as each member's history.
-Only available suggestion/actual pairs from the scoreboard's season and capture enter;
-the scoreboard must also mark the week finished and checked. Missing member files and
-incomplete pairs do not create zero observations. The card reports missing histories.
+No page reads this record since the `/league` card was removed, so a stale horizon file
+changes nothing a member sees. The weekly run still measures it, and
+`data/leagues/<league id>/series-horizon.json` stays published under the publication identity
+(`docs/contracts/league_publication_identity_v1.md`). Each member's own weeks are on their
+history page, read from `data/leagues/<league id>/history/<entry>.json`.
 
-The observation is a member-week, grouped by gameweek. The page shows both counts, each
-weekly mean and each underlying pair, with links to the member's recorded history. Its
-overall mean weights member-weeks equally and is explicitly descriptive. It does not
-claim that members followed the advice or that the suggestion caused the difference.
-The system paper ledger never enters this series. Its legacy GW1 basis remains visible
-on its own scoreboard row; the producer totals only weeks on the series basis, and the
-page displays that total with the producer's coverage explanation.
-GW1 is not rescored or rewritten by this change. It remains a separate scoring series;
+Only settled suggestion/actual pairs enter. Unsettled and refused weeks, and settled weeks
+whose actual score is unknown, do not create zero observations.
+
+The observation is a member-week, grouped by gameweek. The record does not claim that
+members followed the advice or that the suggestion caused the difference.
+The system paper ledger never enters this series. Its legacy GW1 basis stays on its own row
+of `scoreboard.json`, and the producer totals only weeks on the series basis.
+GW1 is not rescored or rewritten. It remains a separate scoring series;
 missing frozen inputs are never reconstructed by assumption to make it comparable.
 
 Both member scores use the existing history v1 scoring contract: official substitutions
-and captain fallback, chip handling, and transfer costs deducted on both sides. Every
-displayed pair identifies this scoring basis and the population of members who have both
-a recorded suggestion and an actual score. Unsettled error cells show an em dash (—), while a
-measured zero remains a zero.
+and captain fallback, chip handling, and transfer costs deducted on both sides. The document
+names this scoring basis and the population of members who have both a recorded suggestion
+and an actual score.
 
-## Optional measurement handoff
+## Measurement handoff
 
-The research owner has not yet supplied the within-week dependence measurement. Until
-then the card says that the number of further weeks is not known. The UI does not estimate
-that measurement, assume an effect size, or infer a week target from the member count.
-The measurement producer is owned separately in `evaluation/live_series.py`. The page
-consumes its published result; the optional shape below is the current consumer seam
-to align with that producer when it lands, not an implementation of the measurement.
+`evaluation/live_series.py` estimates the within-week dependence, and
+`application/weekly_suggestion_eval.py` writes `series-horizon.json` beside the scoreboard, or
+removes an earlier one when the record supports no horizon. The standalone
+[member week horizon v1 contract](contracts/member_week_horizon_v1.md) and its
+[JSON schema](contracts/member_week_horizon_v1.schema.json) define the required fields,
+producer responsibilities and the reason within-week correlation is mandatory.
 
-When that measurement exists, publish `data/leagues/<league id>/series-horizon.json` beside the
-scoreboard. The standalone [member week horizon v1 contract](contracts/member_week_horizon_v1.md)
-and its [JSON schema](contracts/member_week_horizon_v1.schema.json) define the required
-fields, producer responsibilities and the reason within-week correlation is mandatory.
-
-The consumer requires at least two settled week groups and an exact match of record keys,
-including their captured provenance. A stale, malformed, missing or differently scoped
-handoff leaves the horizon unknown. A matching handoff displays
-`max(0, required_week_clusters - observed_week_clusters)`. Reaching that count does not
-declare an improvement. New settled records require a refreshed measurement handoff.
-
-No measurement artifact or made-up horizon is committed by this surface change.
+Reaching the target count does not declare an improvement. New settled records require a
+refreshed document.

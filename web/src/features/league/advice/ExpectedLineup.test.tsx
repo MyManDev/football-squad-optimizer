@@ -23,7 +23,7 @@ const expectation: AdviceLineupExpectation = {
 };
 
 it.each(["tr", "en"] as const)(
-  "explains automatic substitutes and vice recovery in %s",
+  "states the net figure alone, without how it was worked out, in %s",
   (language) => {
     const view = {
       ...mockEntryAdviceEnvelope(101, "saf-puan", 3).payload,
@@ -36,20 +36,21 @@ it.each(["tr", "en"] as const)(
       </LanguageProvider>,
     );
     const region = screen.getByTestId("lineup-expectation");
+    expect(screen.getByRole("heading")).toHaveTextContent(
+      language === "tr" ? /^Beklenen puan$/ : /^Expected points$/,
+    );
     expect(region).toHaveTextContent(
       language === "tr"
-        ? "Yedeklere sabit bir puan payı eklenmez"
-        : "No fixed share of bench points is added",
+        ? /Ceza sonrası beklenen puan: 42,\d/
+        : /Expected points after hits: 42\.\d/,
     );
-    expect(region).toHaveTextContent(
+    expect(region).not.toHaveTextContent(
+      language === "tr" ? "Yedeklere sabit bir puan payı eklenmez" : "No fixed share of bench",
+    );
+    expect(region).not.toHaveTextContent(
       language === "tr" ? "yardımcısının ek puanı" : "Vice-captain bonus",
     );
-    expect(region).not.toHaveTextContent(
-      language === "tr" ? "birbirinden bağımsız" : "treated as independent",
-    );
-    expect(region).not.toHaveTextContent(
-      language === "tr" ? "Oynama varsayımları" : "Playing assumptions",
-    );
+    expect(region).not.toHaveTextContent(language === "tr" ? "Transfer cezası" : "Transfer hits");
     expect(region).not.toHaveTextContent("independent_player_week_appearances");
   },
 );
