@@ -1,0 +1,9 @@
+# One pass of the host's checks (#1294): /usr/local/sbin/squadopt-watch names them.
+[Unit]
+Description=SquadOpt: check the host and alert a person
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/squadopt/alert.env
+ExecStart=/usr/local/sbin/squadopt-watch
+TimeoutStartSec=2min

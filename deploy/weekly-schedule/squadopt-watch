@@ -1,0 +1,323 @@
+#!/usr/bin/env python3
+"""Every five minutes, as root: check the host and tell a person through ntfy when it breaks.
+
+backend.sh installs this as /usr/local/sbin/squadopt-watch; squadopt-watch.timer starts it. The
+checks, each named by the key its alert carries:
+
+- ``backend``: the advice api's ``/ready`` has not answered 200 for 5 minutes;
+- ``disk``: the root file system is more than 80 % full;
+- ``backup``: the newest successful backup is older than 36 hours, or none has succeeded;
+- ``run``: the newest weekly run, by the gate's measurements, ended with a non-zero exit;
+- ``timer``: the gate's timer has not been active for 3 hours;
+- ``capture``: a gameweek's deadline is 3 hours away and no capture was taken since the deadline
+  before it. That is the one failure nothing can repair later.
+
+A check alerts when it turns bad, again once a day while it stays bad, and once when it is good
+again. Its state is kept in /var/lib/squadopt/watch/state.json. Each pass ends with a ping to
+healthchecks.io, so a host that cannot send anything is noticed from outside. The topic and the
+ping address come from /etc/squadopt/alert.env (README, "Backups and alerts"); this command prints
+neither. #1294 asked for it.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+WEEKLY = Path(os.environ.get("SQUADOPT_WEEKLY", "/srv/squadopt/weekly"))
+STATE = Path(os.environ.get("SQUADOPT_WATCH_STATE", "/var/lib/squadopt/watch/state.json"))
+BACKUP_STAMP = Path(
+    os.environ.get("SQUADOPT_BACKUP_STAMP", "/var/lib/squadopt/backup/last-success")
+)
+READY_URL = "http://127.0.0.1:8000/ready"
+MEASUREMENTS = WEEKLY / "data" / "logs" / "weekly" / "measurements.jsonl"
+BOOTSTRAP = WEEKLY / "data" / "runtime" / "weekly-schedule" / "bootstrap.json"
+SNAPSHOTS = WEEKLY / "data" / "snapshots"
+
+BACKEND_GRACE = timedelta(minutes=5)
+DISK_LIMIT = 0.80
+BACKUP_LIMIT = timedelta(hours=36)
+TIMER_GRACE = timedelta(hours=3)
+CAPTURE_LEAD = timedelta(hours=3)
+REPEAT = timedelta(hours=24)
+
+
+@dataclass(frozen=True, slots=True)
+class Reading:
+    """One check's answer this pass: bad or not, and what an alert says."""
+
+    key: str
+    bad: bool
+    text: str
+    #: For a check that is bad only once it has stayed bad this long.
+    grace: timedelta = timedelta(0)
+    #: An alert is repeated for the same identity once a day, and a new identity alerts at once.
+    identity: str = ""
+
+
+def _instant(text: str) -> datetime:
+    return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(UTC)
+
+
+def _utc(moment: datetime) -> str:
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def read_backend(fetch: Callable[[str], int]) -> Reading:
+    try:
+        status = fetch(READY_URL)
+    except OSError as error:
+        status, detail = 0, f"no answer ({error.__class__.__name__})"
+    else:
+        detail = f"answered {status}"
+    return Reading(
+        "backend",
+        status != 200,
+        f"The advice backend's /ready {detail} for 5 minutes or more. Read docker ps and "
+        "docker logs squadopt-api-1 on the host.",
+        grace=BACKEND_GRACE,
+    )
+
+
+def read_disk(usage: Callable[[str], Any]) -> Reading:
+    total, used, _free = usage("/")
+    share = used / total
+    return Reading(
+        "disk",
+        share > DISK_LIMIT,
+        f"The host's disk is {share:.0%} full. The backend's releases and images are pruned "
+        "after each move; read du -sh /root/squadopt/* /srv/squadopt/weekly/data/*.",
+    )
+
+
+def read_backup(stamp: Path, now: datetime) -> Reading:
+    try:
+        done = _instant(stamp.read_text(encoding="utf-8").split()[0])
+    except (OSError, IndexError, ValueError):
+        return Reading(
+            "backup", True, "No backup has succeeded yet. Read journalctl -u squadopt-backup."
+        )
+    age = now - done
+    hours = age.total_seconds() / 3600
+    return Reading(
+        "backup",
+        age > BACKUP_LIMIT,
+        f"The newest backup is {hours:.0f} hours old (from {_utc(done)}). "
+        "Read journalctl -u squadopt-backup on the host.",
+    )
+
+
+def read_run(lines: Iterable[str]) -> Reading:
+    last: Mapping[str, Any] | None = None
+    for line in lines:
+        if line.strip():
+            try:
+                last = json.loads(line)
+            except ValueError:
+                continue
+    if last is None:
+        return Reading("run", False, "No weekly run has been measured yet.")
+    run_id, code = str(last.get("run_id", "")), last.get("exit_code")
+    stage = str(last.get("stage") or "")
+    return Reading(
+        "run",
+        code != 0,
+        f"Weekly run {run_id} ended with exit {code}"
+        + (f" at stage {stage}" if stage else "")
+        + f". Read data/logs/weekly/{run_id}.log on the host; the alarm on #1093 says the same.",
+        identity=run_id,
+    )
+
+
+def read_timer(active: bool) -> Reading:
+    return Reading(
+        "timer",
+        not active,
+        "The weekly schedule's timer has been off for 3 hours or more, so no run can start. "
+        "systemctl start weekly-schedule.timer, once nothing is being released by hand.",
+        grace=TIMER_GRACE,
+    )
+
+
+def next_deadlines(
+    bootstrap: Mapping[str, Any], now: datetime
+) -> tuple[datetime | None, datetime | None]:
+    """The deadline before `now` and the next one after it, from FPL's bootstrap."""
+
+    deadlines = sorted(
+        _instant(str(event["deadline_time"]))
+        for event in bootstrap.get("events", [])
+        if event.get("deadline_time")
+    )
+    before = [moment for moment in deadlines if moment <= now]
+    after = [moment for moment in deadlines if moment > now]
+    return (before[-1] if before else None, after[0] if after else None)
+
+
+def newest_capture(snapshots: Path) -> datetime | None:
+    newest: datetime | None = None
+    for metadata in snapshots.glob("fpl-live-*/metadata.json"):
+        try:
+            moment = _instant(
+                str(json.loads(metadata.read_text(encoding="utf-8"))["captured_at_utc"])
+            )
+        except (OSError, ValueError, KeyError):
+            continue
+        if newest is None or moment > newest:
+            newest = moment
+    return newest
+
+
+def read_capture(bootstrap: Mapping[str, Any], newest: datetime | None, now: datetime) -> Reading:
+    previous, upcoming = next_deadlines(bootstrap, now)
+    if upcoming is None or now < upcoming - CAPTURE_LEAD:
+        return Reading("capture", False, "The next deadline is more than 3 hours away.")
+    missing = newest is None or (previous is not None and newest <= previous)
+    return Reading(
+        "capture",
+        missing,
+        f"The deadline {_utc(upcoming)} is less than 3 hours away and no capture was taken since "
+        f"the deadline before it. It cannot be taken again after the deadline: read journalctl -u "
+        "weekly-schedule on the host now.",
+        identity=_utc(upcoming),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Alert:
+    key: str
+    priority: str
+    title: str
+    text: str
+
+
+def decide(readings: Iterable[Reading], state: dict[str, Any], now: datetime) -> list[Alert]:
+    """The alerts this pass sends, with `state` updated in place for the next pass."""
+
+    alerts: list[Alert] = []
+    for reading in readings:
+        entry = state.setdefault(reading.key, {})
+        if not reading.bad:
+            if entry.get("alerted_at"):
+                alerts.append(
+                    Alert(
+                        reading.key,
+                        "default",
+                        f"SquadOpt {reading.key}: resolved",
+                        f"The {reading.key} check is good again.",
+                    )
+                )
+            state[reading.key] = {}
+            continue
+        since = _instant(entry["bad_since"]) if entry.get("bad_since") else now
+        entry["bad_since"] = _utc(since)
+        if now - since < reading.grace:
+            continue
+        last = _instant(entry["alerted_at"]) if entry.get("alerted_at") else None
+        fresh = entry.get("identity", "") != reading.identity
+        if last is None or fresh or now - last >= REPEAT:
+            alerts.append(Alert(reading.key, "high", f"SquadOpt {reading.key}", reading.text))
+            entry.update(alerted_at=_utc(now), identity=reading.identity)
+    return alerts
+
+
+def fetch_status(url: str) -> int:
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:  # loopback only
+            return int(response.status)
+    except urllib.error.HTTPError as error:
+        return int(error.code)
+
+
+def timer_active() -> bool:
+    shown = subprocess.run(
+        ["systemctl", "is-active", "weekly-schedule.timer"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return shown.stdout.strip() == "active"
+
+
+def send(alert: Alert) -> bool:
+    topic = os.environ.get("NTFY_TOPIC", "")
+    if not topic:
+        print(f"no NTFY_TOPIC: {alert.title}: {alert.text}", file=sys.stderr)
+        return False
+    request = urllib.request.Request(
+        f"{os.environ.get('NTFY_URL', 'https://ntfy.sh').rstrip('/')}/{topic}",
+        data=alert.text.encode("utf-8"),
+        headers={"Title": alert.title, "Priority": alert.priority, "Tags": "squadopt"},
+        method="POST",
+    )
+    token = os.environ.get("NTFY_TOKEN", "")
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(request, timeout=20):  # the configured ntfy server
+            return True
+    except (urllib.error.URLError, OSError) as error:
+        print(
+            f"the alert was not sent ({error.__class__.__name__}): {alert.title}", file=sys.stderr
+        )
+        return False
+
+
+def ping(url: str) -> None:
+    if url:
+        try:
+            with urllib.request.urlopen(url, timeout=10):  # the configured check
+                pass
+        except (urllib.error.URLError, OSError):
+            print("the healthchecks ping failed", file=sys.stderr)
+
+
+def readings(now: datetime) -> list[Reading]:
+    try:
+        bootstrap = json.loads(BOOTSTRAP.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        bootstrap = {}
+    try:
+        lines = MEASUREMENTS.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        lines = []
+    return [
+        read_backend(fetch_status),
+        read_disk(shutil.disk_usage),
+        read_backup(BACKUP_STAMP, now),
+        read_run(lines),
+        read_timer(timer_active()),
+        read_capture(bootstrap, newest_capture(SNAPSHOTS), now),
+    ]
+
+
+def main(now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> int:
+    moment = now()
+    try:
+        state = json.loads(STATE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        state = {}
+    alerts = decide(readings(moment), state, moment)
+    for alert in alerts:
+        print(f"alert: {alert.title}: {alert.text}")
+        send(alert)
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    partial = STATE.with_suffix(".partial")
+    partial.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(partial, STATE)
+    ping(os.environ.get("HC_WATCH_URL", ""))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
