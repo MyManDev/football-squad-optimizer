@@ -135,6 +135,8 @@ def history_schema() -> dict[str, Any]:
         },
     }
     required_week = list(week)
+    week["advice_source"] = {"const": "requested_server"}
+    week["request_cache_key"] = {"type": "string", "pattern": "^[a-f0-9]{64}$"}
     week["recorded_plans"] = {
         "type": "array",
         "items": {
@@ -159,7 +161,15 @@ def history_schema() -> dict[str, Any]:
         "as_of_snapshot_id": text,
         "weeks": {
             "type": "array",
-            "items": {"type": "object", "properties": week, "required": required_week},
+            "items": {
+                "type": "object",
+                "properties": week,
+                "required": required_week,
+                "dependentRequired": {
+                    "advice_source": ["request_cache_key"],
+                    "request_cache_key": ["advice_source"],
+                },
+            },
         },
     }
     return {

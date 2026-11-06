@@ -276,3 +276,61 @@ def test_real_public_worker_answer_survives_archive_with_no_second_fetch_or_solv
     assert record["request"]["switches"]["public_entry"]["fingerprint"]
     assert len(json.loads(record["response_json"])["payload"]["starting_xi"]) == 11
     fetch.assert_called_once()
+
+    # The same archived answer reaches the product history through real captured
+    # outcome joins; no second optimizer or public-team fetch is involved.
+    from scripts.build_requested_history import build_requested_history
+
+    from squadopt.data.snapshots import write_snapshot
+
+    decision = backend.contexts.identity().snapshot
+    payloads = dict(decision.payloads)
+    bootstrap = json.loads(payloads["bootstrap-static.json"])
+    event = next(event for event in bootstrap["events"] if event["id"] == context.gameweek)
+    event.update(finished=True, data_checked=True)
+    settled_at = (
+        (_instant(event["deadline_time"]) + timedelta(days=3)).isoformat().replace("+00:00", "Z")
+    )
+    payloads["bootstrap-static.json"] = json.dumps(bootstrap).encode()
+    payloads[f"event-gw{context.gameweek:02d}-live.json"] = json.dumps(
+        {
+            "elements": [
+                {"id": player["id"], "stats": {"total_points": 2, "minutes": 90, "starts": 1}}
+                for player in bootstrap["elements"]
+            ]
+        }
+    ).encode()
+    payloads[f"entry-{ENTRY}-history.json"] = json.dumps(
+        {
+            "current": [
+                {
+                    "event": context.gameweek,
+                    "points": 30,
+                    "total_points": 30,
+                    "event_transfers_cost": 4,
+                }
+            ]
+        }
+    ).encode()
+    settled = write_snapshot(
+        backend.config.snapshot_root,
+        source="fpl-live",
+        captured_at_utc=settled_at,
+        payloads=payloads,
+    )
+    path = build_requested_history(
+        store_snapshot=backend.config.store_root,
+        snapshot_root=backend.config.snapshot_root,
+        as_of_snapshot_id=settled.snapshot_id,
+        league_id=239,
+        entry_id=ENTRY,
+        gameweeks=[context.gameweek],
+        out_dir=backend.config.site_data_root / "leagues" / "239",
+    )
+    (row,) = json.loads(path.read_bytes())["payload"]["weeks"]
+    assert row["status"] == "available"
+    assert row["suggested"]["gross_points"] == 24
+    assert row["actual"]["net_points"] == 26
+    assert row["advice_source"] == "requested_server"
+    assert row["request_cache_key"] == job.cache_key
+    fetch.assert_called_once()

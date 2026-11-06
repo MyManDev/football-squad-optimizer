@@ -49,10 +49,37 @@ and requests from different league pages. Nothing overwrites `member_advice_reco
 `member_baseline_record_v1`. A successful result establishes that the backend made an answer
 available; it does not prove that somebody viewed or followed it.
 
-## Remaining integration
+## Site history
 
-This export does not populate the site's settled history or calculate realized scores.
-That consumer still needs an explicit choice among requested answers, the recorded player
-mapping and settled-outcome join. It must retain the completion clock and request identity
-instead of treating the export as a weekly page publication. No host installation or
-scheduled export is part of this change.
+`scripts.build_requested_history` joins these answers to retained decision and outcome
+captures and writes `history/requested/{entry_id}.json` under a selected league tree:
+
+```sh
+python -m scripts.build_requested_history \
+  --store-snapshot /path/to/restored/store --snapshot-root /path/to/snapshots \
+  --as-of-snapshot fpl-live-CAPTURE_ID --league-id 239 --entry-id 2199732 \
+  --gameweek 10 --out-dir /path/to/preview/data/leagues/239
+```
+
+Repeat `--gameweek` to refresh several weeks. The actual captured FPL deadline must agree
+between the decision and outcome calendars. The latest completed eligible answer is used;
+equally recent answers that disagree are refused. The cached player codes and positions
+are checked against the decision roster. Scoring shares the existing official autosub,
+captain fallback, chip and transfer-hit rules, with no optimizer call. An unfinished or
+unchecked event stays unsettled, and missing actual member points stay unknown.
+
+The derived document uses `weekly_suggestion_history_v1` with the additive per-week fields
+`advice_source: requested_server` and `request_cache_key`. It retains completion time in
+`advice_generated_at_utc`. Previous requested weeks are preserved; newer outcomes can update
+their scores, but an older capture or an incomplete store cannot erase them. Each output
+file is replaced atomically only after validation.
+
+The history page reads the requested file beside its existing weekly file. It adds requested
+weeks that have no original published week, retaining the original row on overlap, and
+labels those additions “İstek üzerine” / “On request”. The original weekly files, immutable
+advice archives and research horizon remain unchanged. Missing requested files are normal
+for deployments that have not produced them yet; malformed evidence is not silently hidden.
+
+Production automation still needs to supply a consistent backend-store snapshot and run
+this builder after the normal history publication. No host installation or scheduled export
+has been performed under the current weekly-run merge/release hold.

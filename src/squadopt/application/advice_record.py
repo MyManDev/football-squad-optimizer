@@ -391,22 +391,23 @@ def _moves(payload: Mapping[str, object]) -> list[dict[str, object]]:
 
 
 def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
-    """One published document, reduced to what scoring it needs plus its two digests.
+    """One published document, reduced to scoring facts plus publication evidence."""
+    return {
+        **_scoring_document(
+            advice.payload,
+            strategy=advice.strategy,
+            window=int(advice.window),
+            rival_entry_id=advice.rival_entry_id,
+        ),
+        "published_path": advice.relative_path,
+        "published_sha256": _sha256(advice.raw),
+    }
 
-    Player names, positions and prices are not repeated per document: they are the same
-    for every document in the record and live once in ``players``. What is per-document is
-    the decision — who starts, in what order, who wears the armband, which chip, what
-    moved and what the week's hit cost.
 
-    Two digests, because they answer different questions. ``published_sha256`` is of the
-    exact bytes at that address, envelope and generation timestamp included, so the record
-    can prove which file it describes. ``advice_sha256`` is of the payload alone,
-    canonically encoded, so a second publish that changed only *when* it ran can be told
-    apart from one that changed *what it said* — the distinction
-    :func:`record_member_advice` makes to tell a replay from a disagreement.
-    """
-
-    payload = advice.payload
+def _scoring_document(
+    payload: Mapping[str, object], *, strategy: str, window: int, rival_entry_id: int | None
+) -> dict[str, object]:
+    """Scoring facts and a payload digest, independent of any publication address."""
     starting_xi = _lineup_ids(payload, "starting_xi")
     bench = _lineup_ids(payload, "bench")
     captain = _player_id(payload, "captain")
@@ -446,14 +447,10 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
             if planning
             else {}
         ),
-        # Which document this is. Several are published per member — the pure-points
-        # baseline, each rival strategy against each rival, each solved window — and only
-        # one of them is what the member's page points at, so every one carries its own
-        # address rather than being identified by position in a list.
-        "strategy": advice.strategy,
-        "window": int(advice.window),
-        "rival_entry_id": advice.rival_entry_id,
-        "published_path": advice.relative_path,
+        # Identify the decision independently of its position in a record.
+        "strategy": strategy,
+        "window": window,
+        "rival_entry_id": rival_entry_id,
         # The decision itself, in the published order: the eleven in pitch order and the
         # bench with the goalkeeper first, which is the order the game's autosubs walk.
         "starting_xi": starting_xi,
@@ -482,7 +479,6 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
         # published without a lineup (the selector chose a transfer decision, not a week),
         # and the record says so rather than presenting an empty eleven as a decision.
         "scoring_complete": bool(starting_xi and bench and captain is not None),
-        "published_sha256": _sha256(advice.raw),
         "advice_sha256": _sha256(encoded),
     }
 

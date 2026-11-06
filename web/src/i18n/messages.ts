@@ -2,6 +2,7 @@ export type Language = "tr" | "en";
 
 const en = {
   suggestionHistory: {
+    requested: "On request",
     recordedPlans: "Suggested move",
     noRecordedMoves: "No moves",
     title: "Weekly suggestion history",
@@ -582,6 +583,7 @@ type MessageSchema<T> = {
 
 const tr: MessageSchema<typeof en> = {
   suggestionHistory: {
+    requested: "İstek üzerine",
     recordedPlans: "Önerilen hamle",
     noRecordedMoves: "Hamle yok",
     title: "Haftalık öneri geçmişi",

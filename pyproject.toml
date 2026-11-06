@@ -608,6 +608,7 @@ exhaustive_ignores = [
     "publication_workers",
     "queries",
     "queue_contracts",
+    "requested_suggestion_history",
     "runlog",
     "runtime",
     "store_probe",

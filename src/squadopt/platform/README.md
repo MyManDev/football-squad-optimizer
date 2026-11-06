@@ -57,6 +57,7 @@ inputs it seals.
 | `football_minute_basis.py` | Dispatches composite companions with captured roster, deadline and calendar bindings, while retaining legacy fixture-basis reading (`src/squadopt/platform/football_minute_basis.py:88`). |
 | `football_publication.py` | Validates and publishes capture-bound football documents without fitting a model. |
 | `history_documents.py` | The public shape of recorded weekly history (`weekly_suggestion_history_v1`), without computing a score. |
+| `requested_suggestion_history.py` | Validates completed request evidence against retained captures and delegates to the settled-history scorer; never starts a plan solve. |
 
 ## Advice API services
 

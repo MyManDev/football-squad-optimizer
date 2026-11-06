@@ -123,7 +123,11 @@ describe("recorded weekly history", () => {
     async (status) => {
       vi.stubGlobal(
         "fetch",
-        vi.fn().mockResolvedValue(new Response("<!doctype html><html></html>", { status })),
+        vi
+          .fn()
+          .mockImplementation(() =>
+            Promise.resolve(new Response("<!doctype html><html></html>", { status })),
+          ),
       );
       await expect(loadSuggestionHistory(exampleTree, 101)).rejects.toBeInstanceOf(
         LeagueDataMissing,
@@ -132,27 +136,122 @@ describe("recorded weekly history", () => {
   );
 
   it("fails broken JSON as unreadable, and reads valid published data without a fixture fallback", async () => {
-    const fetch = vi
+    const published = vi
       .fn()
       .mockResolvedValueOnce(new Response("{broken"))
       .mockResolvedValueOnce(new Response(JSON.stringify(fixture)));
+    const fetch = vi.fn((url: string) =>
+      url.includes("/requested/")
+        ? Promise.resolve(new Response("", { status: 404 }))
+        : published(),
+    );
     vi.stubGlobal("fetch", fetch);
     await expect(loadSuggestionHistory(exampleTree, 101)).rejects.toBeInstanceOf(LeagueDataError);
     await expect(loadSuggestionHistory(exampleTree, 101)).resolves.toEqual(fixture);
-    expect(fetch).toHaveBeenLastCalledWith(
+    expect(fetch).toHaveBeenCalledWith(
       "/data/league/history/101.json",
       expect.objectContaining({ cache: "no-cache" }),
     );
   });
 
   it("reads a league published under the directory at its own path", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture)));
+    const fetch = vi.fn((url: string) =>
+      Promise.resolve(
+        url.includes("/requested/")
+          ? new Response("", { status: 404 })
+          : new Response(JSON.stringify(fixture)),
+      ),
+    );
     vi.stubGlobal("fetch", fetch);
     const tree = createLeagueTree({ ...EXAMPLE_LEAGUE, path: "leagues/352490" });
     await expect(loadSuggestionHistory(tree, 101)).resolves.toEqual(fixture);
-    expect(fetch).toHaveBeenLastCalledWith(
+    expect(fetch).toHaveBeenCalledWith(
       "/data/leagues/352490/history/101.json",
       expect.objectContaining({ cache: "no-cache" }),
     );
+  });
+});
+
+describe("requested history beside weekly publications", () => {
+  const requested = (week = 5) => {
+    const value = document();
+    value.payload.weeks = [value.payload.weeks[0]];
+    Object.assign(value.payload.weeks[0], {
+      gameweek: week,
+      advice_source: "requested_server",
+      request_cache_key: "a".repeat(64),
+    });
+    return value;
+  };
+  const tree = (published: unknown, computed: unknown) => ({
+    league: EXAMPLE_LEAGUE,
+    raw: vi.fn(async (path: string) => {
+      const value = path.includes("/requested/") ? computed : published;
+      if (value instanceof Error) throw value;
+      return value;
+    }),
+  });
+
+  it("shows requested history when the entry never had a weekly publication", async () => {
+    const value = requested();
+    await expect(
+      loadSuggestionHistory(tree(new LeagueDataMissing("legacy"), value), 101),
+    ).resolves.toEqual(value);
+  });
+
+  it("adds new weeks and preserves every overlapping published week", async () => {
+    const published = document();
+    const computed = requested();
+    computed.payload.weeks.push(requested(4).payload.weeks[0]);
+    const loaded = await loadSuggestionHistory(tree(published, computed), 101);
+    expect(loaded.payload.weeks.map((week) => week.gameweek)).toEqual([5, 4]);
+    expect(loaded.payload.weeks.find((week) => week.gameweek === 4)).toEqual(
+      published.payload.weeks[0],
+    );
+    expect(published).toEqual(document());
+  });
+
+  it("does not conceal malformed legacy evidence behind a requested result", async () => {
+    await expect(
+      loadSuggestionHistory(tree(new LeagueDataError("broken"), requested()), 101),
+    ).rejects.toBeInstanceOf(LeagueDataError);
+  });
+
+  it("does not claim a weekly document as a requested answer", async () => {
+    await expect(loadSuggestionHistory(tree(document(), document()), 101)).rejects.toBeInstanceOf(
+      LeagueDataError,
+    );
+  });
+
+  it("does not mix seasons", async () => {
+    const value = requested();
+    value.payload.season = "2025-26";
+    await expect(loadSuggestionHistory(tree(document(), value), 101)).rejects.toBeInstanceOf(
+      LeagueDataError,
+    );
+  });
+
+  it.each([
+    {},
+    { advice_source: "requested_server" },
+    { request_cache_key: "a".repeat(64) },
+    { advice_source: "device", request_cache_key: "a".repeat(64) },
+    { advice_source: "requested_server", request_cache_key: "bad" },
+  ])("requires complete requested provenance: %o", async (fields) => {
+    const value = document();
+    Object.assign(value.payload.weeks[0], fields);
+    await expect(
+      loadSuggestionHistory(tree(new LeagueDataMissing("legacy"), value), 101),
+    ).rejects.toBeInstanceOf(LeagueDataError);
+  });
+
+  it("forwards cancellation to both file reads", async () => {
+    const input = tree(document(), new LeagueDataMissing("requested"));
+    const options = { signal: new AbortController().signal };
+    await loadSuggestionHistory(input, 101, options);
+    expect(input.raw.mock.calls).toEqual([
+      ["history/101.json", options],
+      ["history/requested/101.json", options],
+    ]);
   });
 });
