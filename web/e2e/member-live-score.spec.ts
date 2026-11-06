@@ -164,10 +164,24 @@ for (const language of ["tr", "en"] as const) {
     ).toBe(true);
     expect(asked.bundle).toEqual([`/api/v1/fpl/entry/${ENTRY}/bundle?gw=${gameweek}`]);
     expect(asked.live).toEqual([`/api/v1/fpl/live/${gameweek}?view=activity`]);
+    const assertPlayerPoints = async (name: LiveExample) => {
+      const table = exampleTable({ season, gameweek, capture: capture! });
+      const week = forwardedLive(name, gameweek);
+      await expect(page.locator('#kadro [data-points-kind="actual"]')).toHaveCount(15);
+      for (const id of exampleMember(ENTRY, gameweek).pick_order) {
+        const player = table.players.find((row) => row.element_id === id)!;
+        const points = week.elements.find((row) => row.element_id === id)!.points;
+        await expect(
+          page.locator(`#kadro [data-player-motion="${player.id}"] [data-player-points]`),
+        ).toHaveAttribute("data-player-points", String(points));
+      }
+    };
+    await assertPlayerPoints("in_progress");
 
     // Refresh reads the live points again, and nothing else.
     await card.getByRole("button", { name: language === "tr" ? "Yenile" : "Refresh" }).click();
     await expect(card).toContainText(language === "tr" ? "Bonus eklendi" : "Bonus added");
+    await assertPlayerPoints("finished");
     expect(asked.live).toHaveLength(2);
     expect(asked.bundle).toHaveLength(1);
   });

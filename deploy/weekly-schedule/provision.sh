@@ -181,7 +181,8 @@ venv() {
     apt-get install -y -q build-essential python3.13-dev
     as_user "${install[@]}"
   fi
-  as_user "$python" -c 'import squadopt.platform.weekly_schedule, squadopt.platform.weekly_release'
+  as_user "$python" -c \
+    'import squadopt.platform.weekly_operations, squadopt.platform.weekly_schedule, squadopt.platform.weekly_release'
 }
 
 swap() {

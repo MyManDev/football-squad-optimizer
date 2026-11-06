@@ -63,8 +63,9 @@ async function readLive(
 function scored(
   reading: LiveReading,
   held: Held,
-  fixtures: FixturesPayload,
+  fixtures: FixturesPayload | null,
 ): MemberLiveScore | null {
+  if (fixtures === null) return null;
   try {
     const result = memberLiveScore({
       live: reading.week,
@@ -85,10 +86,12 @@ function scored(
  */
 export function useMemberLiveScore(
   squad: EntrySquad,
-  fixtures: FixturesPayload,
+  fixtures: FixturesPayload | null,
   dependencies: MemberLiveDependencies = {},
+  enabled = true,
 ): MemberLive {
   const { tree } = useLeague();
+  const ready = enabled && fixtures !== null;
   const capture = squad.source_snapshot_id ?? null;
   const identity = JSON.stringify([squad.entry.entry_id, squad.season, squad.gameweek, capture]);
   // The reads and the calendar as this render has them, for reads that start later.
@@ -123,6 +126,7 @@ export function useMemberLiveScore(
   useEffect(() => {
     reading.current?.abort();
     held.current = null;
+    if (!ready) return;
     const read = new AbortController();
     reading.current = read;
     const { forwarder, loadTable } = sources.current;
@@ -145,7 +149,7 @@ export function useMemberLiveScore(
     // The client answers every failure as a refusal; anything else also shows nothing.
     first().catch(() => undefined);
     return () => read.abort();
-  }, [entryId, gameweek, capture, identity]);
+  }, [entryId, gameweek, capture, identity, ready]);
 
   const refresh = useCallback(() => {
     const inputs = held.current;
@@ -174,7 +178,7 @@ export function useMemberLiveScore(
   useEffect(() => () => reading.current?.abort(), []);
 
   return {
-    shown: state.identity === identity ? state.shown : null,
+    shown: ready && state.identity === identity ? state.shown : null,
     refreshing: state.identity === identity && state.refreshing,
     refresh,
   };

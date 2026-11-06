@@ -10,13 +10,15 @@ import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { TOP100_COPY } from "../advice/top100Copy";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { CoachNews } from "./CoachNews";
-import type { BenchPlayer, PitchPlayer } from "./MemberPitch";
+import type { BenchPlayer, PitchPlayer, PitchPointsKind } from "./MemberPitch";
+import { playerPoints } from "./playerPoints";
 import styles from "./PlayerDetails.module.css";
 
 const COPY = {
   tr: {
     close: "Kapat",
     points: "Beklenen puan",
+    actualPoints: "Hafta puanı",
     minutes: "Beklenen dakika",
     fixtures: "Bu haftanın maçları",
     home: "Ev",
@@ -27,6 +29,7 @@ const COPY = {
   en: {
     close: "Close",
     points: "Expected points",
+    actualPoints: "Gameweek points",
     minutes: "Expected minutes",
     fixtures: "This week's fixtures",
     home: "Home",
@@ -45,6 +48,7 @@ export function PlayerDetails({
   codes,
   news,
   onClose,
+  pointsKind = "expected",
 }: {
   player: PitchPlayer | BenchPlayer;
   plan: EntryAdvice | null;
@@ -53,9 +57,11 @@ export function PlayerDetails({
   codes: ClubCodes;
   news: ReadonlyMap<number, CoachAbsence>;
   onClose: () => void;
+  pointsKind?: PitchPointsKind;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = COPY[language];
+  const points = playerPoints(player, pointsKind);
   const titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const [closing, setClosing] = useState(false);
@@ -169,10 +175,12 @@ export function PlayerDetails({
           {copy.close}
         </button>
       </header>
-      {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+      {points !== null && Number.isFinite(points) ? (
         <dl className={styles.points}>
-          <dt>{copy.points}</dt>
-          <dd>{figure(player.expectedPoints, locale)}</dd>
+          <dt>{pointsKind === "actual" ? copy.actualPoints : copy.points}</dt>
+          <dd>
+            {pointsKind === "actual" ? points.toLocaleString(locale) : figure(points, locale)}
+          </dd>
         </dl>
       ) : null}
       {reason ? (

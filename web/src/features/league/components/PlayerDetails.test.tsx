@@ -132,6 +132,46 @@ function open() {
   return trigger;
 }
 
+it.each([0, -2, 12, null])(
+  "shows actual week points %s without falling back to the forecast",
+  (points) => {
+    const squad = {
+      ...held,
+      starting_xi: held.starting_xi.map((row) => ({
+        ...row,
+        event_points: points,
+        expected_points: 7.25,
+      })),
+      bench: held.bench.map((row) => ({ ...row, event_points: points, expected_points: 7.25 })),
+    };
+    const { container } = render(
+      <LanguageProvider initialLanguage="tr">
+        <MemberSquad
+          onPitch={squadOnPitch(null, squad)}
+          plan={null}
+          held={squad}
+          codes={new Map()}
+          list={null}
+          pointsKind="actual"
+        />
+      </LanguageProvider>,
+    );
+    const numbers = container.querySelectorAll("#kadro [data-player-points]");
+    expect(numbers).toHaveLength(points === null ? 0 : 15);
+    for (const number of numbers)
+      expect(number).toHaveAttribute("data-player-points", String(points));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `${squad.starting_xi[0]!.name}: Oyuncu ayrıntıları`,
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).queryByText("Beklenen puan")).toBeNull();
+    expect(within(dialog).queryByText("Hafta puanı") !== null).toBe(points !== null);
+    if (points !== null) expect(dialog.querySelector("dd")).toHaveTextContent(String(points));
+  },
+);
+
 it("opens the chosen player's published points, fixture and minutes, then restores focus", async () => {
   render(view());
   const trigger = open();

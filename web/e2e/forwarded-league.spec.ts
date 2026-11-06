@@ -6,6 +6,7 @@ import fixture from "../src/fixtures/device-plan/instances.json" with { type: "j
 import { bundleHolding, fixtureCaptureTable, STANDINGS_EXAMPLES } from "../src/fixtures/forwarder";
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
+import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
 import { installLeagueMocks } from "./leagueMocks";
 
 /**
@@ -49,7 +50,7 @@ const MARKED = { "x-squadopt-fpl": "1", "content-type": "application/json; chars
  * The published example league in a directory whose line names the capture's table, a
  * calendar with both weeks open, and the forwarder up or down. Returns what it was asked.
  */
-async function serveSite(page: Page, forwarder: "up" | "down") {
+async function serveSite(page: Page, forwarder: "up" | "down", closed = false) {
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
   await installLeagueMocks(page);
   await page.route("**/data/leagues.json", (route) =>
@@ -93,7 +94,7 @@ async function serveSite(page: Page, forwarder: "up" | "down") {
           unscheduled_count: 0,
           gameweeks: [PUBLISHED.gameweek, TABLE.gameweek].map((gameweek) => ({
             gameweek,
-            deadline_utc: "2999-01-01T00:00:00Z",
+            deadline_utc: closed ? "2020-01-01T00:00:00Z" : "2999-01-01T00:00:00Z",
             fixtures: [],
           })),
         },
@@ -117,11 +118,52 @@ async function serveSite(page: Page, forwarder: "up" | "down") {
       return answer(404, { error: "head_to_head_league", league: HEAD_TO_HEAD });
     }
     if (pathname === `/api/v1/fpl/entry/${ENTRY}/bundle` && search === `?gw=${TABLE.gameweek}`) {
-      return answer(200, BUNDLE);
+      return answer(
+        200,
+        closed
+          ? {
+              ...BUNDLE,
+              current_week: {
+                entry_id: ENTRY,
+                gameweek: TABLE.gameweek,
+                pick_order: FIFTEEN,
+                captain: 132,
+                vice: 139,
+                active_chip: null,
+                transfer_cost: 0,
+              },
+            }
+          : BUNDLE,
+      );
     }
     return answer(404, { error: "not_found" });
   });
   return asked;
+}
+
+for (const width of [375, 1280]) {
+  test(`a closed public team keeps its squad and locked calculation panel at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const writes: string[] = [];
+    page.on("request", (request) => {
+      if (!["GET", "HEAD", "OPTIONS"].includes(request.method())) writes.push(request.url());
+    });
+    await serveSite(page, "up", true);
+    await typeLeague(page, LEAGUE);
+    await page.getByRole("link", { name: FIRST.results[0]!.entry_name }).click();
+    await expect(page.getByTestId("deadline-passed")).toBeVisible();
+    await expect(page.getByRole("heading", { name: copy.leagueMembers.memberSquad })).toBeVisible();
+    await expect(page.locator("#kadro [data-player-motion]")).toHaveCount(15);
+    await expect(page.getByRole("button", { name: COMPUTE_COPY.tr.serverButton })).toBeDisabled();
+    await expect(page.locator("[data-device-compute]")).toBeDisabled();
+    await expect(page.locator("[data-member-live-score]")).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    expect(writes).toEqual([]);
+  });
 }
 
 /** Types a league number on the entry page and asks for it. */

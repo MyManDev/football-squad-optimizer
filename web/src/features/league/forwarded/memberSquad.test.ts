@@ -14,7 +14,7 @@ import type { DevicePlanDocument, DevicePlanPlayer } from "../device/types";
 import { sellPriceTenths } from "../entryState/prices";
 import type { FplEntryBundle } from "../forwarder/documents";
 import type { LeagueViewEnvelope } from "../types";
-import { forwardedMemberSquad } from "./memberSquad";
+import { currentMemberSquad, forwardedMemberSquad } from "./memberSquad";
 
 const CAPTURE = "fpl-live-20261016T060000Z-0123456789ab";
 
@@ -88,6 +88,66 @@ describe("a forwarded member's document from the parity fixture", () => {
     value: bank + worth,
     captain: 132,
     vice: 139,
+  });
+
+  it("draws the current picks without replacing the planner's held squad or inputs", () => {
+    const built = forwardedMemberSquad({
+      bundle,
+      table: envelope(table),
+      entryId: member.entry_id,
+      fixtures: null,
+      leagueId: 314,
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) throw new Error("fixture must bind");
+    const original = structuredClone(built.squad.payload);
+    const current = {
+      ...bundle,
+      current_week: {
+        entry_id: member.entry_id,
+        gameweek: table.gameweek,
+        pick_order: [105, ...fifteen.slice(1, 11), 101, ...fifteen.slice(12)],
+        captain: 139,
+        vice: 132,
+        active_chip: "freehit" as const,
+        transfer_cost: 0,
+      },
+    };
+    const shown = currentMemberSquad(built.squad.payload, current, table)!;
+    expect(shown.starting_xi[0]!.player_id).toBe(105);
+    expect(shown.bench[0]!.player_id).toBe(101);
+    expect(shown.starting_xi.find((player) => player.is_captain)?.player_id).toBe(139);
+    expect(shown.starting_xi.find((player) => player.is_vice_captain)?.player_id).toBe(132);
+    expect(shown.active_chip).toBe("freehit");
+    expect(built.squad.payload).toEqual(original);
+    expect(currentMemberSquad(original, { ...current, current_week: null }, table)).toBeNull();
+    expect(
+      currentMemberSquad(
+        original,
+        { ...current, current_week: { ...current.current_week, entry_id: member.entry_id + 1 } },
+        table,
+      ),
+    ).toBeNull();
+    expect(
+      currentMemberSquad(
+        original,
+        { ...current, current_week: { ...current.current_week, gameweek: table.gameweek + 1 } },
+        table,
+      ),
+    ).toBeNull();
+    expect(
+      currentMemberSquad(
+        original,
+        {
+          ...current,
+          current_week: { ...current.current_week, pick_order: [999999, ...fifteen.slice(1)] },
+        },
+        table,
+      ),
+    ).toBeNull();
+    expect(
+      currentMemberSquad(original, current, { ...table, source_snapshot_id: "another-capture" }),
+    ).toBeNull();
   });
 
   it("binds the bundle to the table and builds the block the run publishes", () => {

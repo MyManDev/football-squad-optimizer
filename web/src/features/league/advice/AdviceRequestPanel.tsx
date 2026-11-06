@@ -143,6 +143,7 @@ export function AdviceRequestPanel({
   device,
   compact = false,
   serverLabel,
+  disabled = false,
 }: {
   request: AdviceRequest;
   job: AdviceJob;
@@ -150,6 +151,8 @@ export function AdviceRequestPanel({
   device?: DevicePlan;
   compact?: boolean;
   serverLabel?: string;
+  /** Keep the controls visible when the page's gameweek is closed. */
+  disabled?: boolean;
   selectionAvailable?: boolean;
   service?: ComputeService;
   /** With a ready service: whether it can answer this exact selection now. */
@@ -213,6 +216,7 @@ export function AdviceRequestPanel({
           type="button"
           className={styles.compute}
           disabled={
+            disabled ||
             !supported ||
             state.phase === "requesting" ||
             state.phase === "waiting" ||
@@ -220,7 +224,7 @@ export function AdviceRequestPanel({
             device?.state.phase === "solving"
           }
           onClick={() => {
-            if (supported) compute(request);
+            if (!disabled && supported) compute(request);
           }}
         >
           {serverLabel ?? copy.computeButton}
@@ -234,20 +238,25 @@ export function AdviceRequestPanel({
             data-device-compute
             // The page behind the run's cover is inert, so its state line changes unheard: the
             // button says how the run ended as it takes focus back.
-            aria-describedby={device.state.phase === "idle" ? undefined : deviceStateId}
+            aria-describedby={disabled || device.state.phase === "idle" ? undefined : deviceStateId}
             disabled={
+              disabled ||
               device.state.phase === "loading" ||
               device.state.phase === "solving" ||
               state.phase === "requesting" ||
               state.phase === "waiting"
             }
-            onClick={device.run}
+            onClick={() => {
+              if (!disabled) device.run();
+            }}
           >
             {copy.deviceButton}
           </button>
         ) : null}
-        {device?.available ? <DeviceState id={deviceStateId} state={device.state} /> : null}
-        {device?.available ? (
+        {device?.available && !disabled ? (
+          <DeviceState id={deviceStateId} state={device.state} />
+        ) : null}
+        {device?.available && !disabled ? (
           <DeviceProgressPanel state={device.state} returnFocus={deviceButton} />
         ) : null}
 
@@ -275,7 +284,7 @@ export function AdviceRequestPanel({
         ) : null}
       </div>
 
-      {!compact && (state.phase === "waiting" || note !== null) ? (
+      {!disabled && !compact && (state.phase === "waiting" || note !== null) ? (
         <div className={styles.notes}>
           {state.phase === "waiting" ? (
             <p className={styles.note}>{computeCopy.leaveOpen}</p>

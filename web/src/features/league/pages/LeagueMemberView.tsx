@@ -19,7 +19,9 @@ import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { isDevicePlanEntry } from "../device/types";
 import { advisedFifteen } from "../device/whatIf";
 import { WhatIfPanel } from "../device/WhatIfPanel";
-import { MemberLiveWeek } from "../live/MemberLiveWeek";
+import { MemberLiveWeekView } from "../live/MemberLiveWeek";
+import { useMemberLiveScore } from "../live/useMemberLiveScore";
+import { squadWithPlayedWeek } from "../live/memberLineup";
 import { whatIfBasis } from "../device/whatIfDraft";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
@@ -179,6 +181,13 @@ function LeagueMemberContent({
   // Past its deadline the week is closed: nothing is computed for it and none of its plans
   // can be applied, so the page leaves out what only changes or recomputes the plan.
   const closed = deadlinePassed !== null;
+  const liveWeek = useMemberLiveScore(
+    view,
+    fixtures,
+    liveDependencies,
+    closed && view.league_id === leagueId && (!tool || tool === "current-squad"),
+  );
+  const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
   // The same holds for a selection the member's device solves, until a run ends without a
@@ -224,7 +233,7 @@ function LeagueMemberContent({
   // the page without the card.
   const lastWeek = lastWeekResult(view, scoreboard, history);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
-  const onPitch = squadOnPitch(plan, view);
+  const onPitch = squadOnPitch(closed ? null : plan, displayedSquad);
   // The week can still be changed only while the calendar states a deadline that is ahead:
   // an unknown deadline is not an open week, so nothing is offered to apply then.
   const weekOpen =
@@ -252,7 +261,7 @@ function LeagueMemberContent({
       pending={fixturesPending}
       season={view.season}
       gameweek={view.gameweek}
-      moves={plan?.moves ?? []}
+      moves={closed ? [] : (plan?.moves ?? [])}
       eleven={onPitch.eleven}
       codes={codes}
     />
@@ -261,13 +270,16 @@ function LeagueMemberContent({
     <div className={styles.squadArea}>
       <div className={styles.squadGrid}>
         <MemberSquad
+          pointsKind={closed ? "actual" : "expected"}
           onPitch={onPitch}
-          plan={plan}
+          plan={closed ? null : plan}
           codes={codes}
           news={news}
-          held={view}
+          held={displayedSquad}
           fixtures={fixtures}
-          list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
+          list={
+            !closed && plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null
+          }
         />
         {railPlacement === "flow" ? rail : null}
       </div>
@@ -385,7 +397,14 @@ function LeagueMemberContent({
   const tools: Record<MemberTool, { title: string; body: ReactNode | null }> = {
     "current-squad": {
       title: copy.memberSquad,
-      body: view.starting_xi.length > 0 ? <HeldSquad squad={view} codes={codes} /> : null,
+      body:
+        displayedSquad.starting_xi.length > 0 ? (
+          <HeldSquad
+            squad={displayedSquad}
+            codes={codes}
+            pointsKind={closed ? "actual" : "expected"}
+          />
+        ) : null,
     },
     "what-if": {
       title: copy.whatIfTitle,
@@ -477,7 +496,7 @@ function LeagueMemberContent({
             closed week leaves the plan's settings out, so the card adds nothing to the open
             week's page. It needs the calendar for each club's id. */}
         {deadlinePassed !== null && fixtures !== null && view.league_id === leagueId ? (
-          <MemberLiveWeek squad={view} fixtures={fixtures} dependencies={liveDependencies} />
+          <MemberLiveWeekView squad={view} live={liveWeek} />
         ) : null}
 
         {/* What the member's last finished week came to, before what this week decides. */}
