@@ -141,11 +141,15 @@ export function AdviceRequestPanel({
   pending = false,
   dockClassName,
   device,
+  compact = false,
+  serverLabel,
 }: {
   request: AdviceRequest;
   job: AdviceJob;
   /** A solve on the member's own device, offered where the publisher wrote its inputs. */
   device?: DevicePlan;
+  compact?: boolean;
+  serverLabel?: string;
   selectionAvailable?: boolean;
   service?: ComputeService;
   /** With a ready service: whether it can answer this exact selection now. */
@@ -208,12 +212,18 @@ export function AdviceRequestPanel({
         <button
           type="button"
           className={styles.compute}
-          disabled={!supported || state.phase === "requesting" || state.phase === "waiting"}
+          disabled={
+            !supported ||
+            state.phase === "requesting" ||
+            state.phase === "waiting" ||
+            device?.state.phase === "loading" ||
+            device?.state.phase === "solving"
+          }
           onClick={() => {
             if (supported) compute(request);
           }}
         >
-          {copy.computeButton}
+          {serverLabel ?? copy.computeButton}
         </button>
 
         {device?.available ? (
@@ -265,7 +275,7 @@ export function AdviceRequestPanel({
         ) : null}
       </div>
 
-      {state.phase === "waiting" || note !== null ? (
+      {!compact && (state.phase === "waiting" || note !== null) ? (
         <div className={styles.notes}>
           {state.phase === "waiting" ? (
             <p className={styles.note}>{computeCopy.leaveOpen}</p>

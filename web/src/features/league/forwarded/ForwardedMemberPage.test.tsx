@@ -16,6 +16,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import deviceInstances from "../../../fixtures/device-plan/instances.json";
+import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import {
   bundleHolding,
   exampleBundle,
@@ -31,6 +32,7 @@ import { MESSAGES, type Language } from "../../../i18n/messages";
 import { jsonResponse, stubFetchByUrl } from "../../../testSupport/fetchByUrl";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import { COMPUTE_COPY } from "../advice/computeCopy";
+import type { AdviceClient, AdviceRequestResult } from "../advice/adviceClient";
 import type { DevicePlanReply, DevicePlanRequest } from "../device/deviceSolver.worker";
 import type { DeviceSolver } from "../device/useDevicePlan";
 import type { FplEntryBundle } from "../forwarder/documents";
@@ -39,6 +41,7 @@ import { ForwardedMemberPage, type ForwardedMemberDependencies } from "./Forward
 
 afterEach(() => {
   cleanup();
+  sessionStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -216,11 +219,87 @@ describe.each(["tr", "en"] as const)("a team through the forwarder in %s", (lang
   const copy = MESSAGES[language].leagueMembers;
   const words = MESSAGES[language].forwarded;
 
-  it("opens /entry/<id> on its own with the device's plan, from the newest table", async () => {
+  it("queues only after a server click and renders its completed plan", async () => {
+    site();
+    const solver = new CannedSolver();
+    const answer = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    Object.assign(answer.payload, {
+      league_id: 314,
+      season: TABLE.season,
+      gameweek: TABLE.gameweek,
+      source_snapshot_id: CAPTURE,
+    });
+    const requestAdvice = vi.fn<AdviceClient["requestAdvice"]>().mockResolvedValue({
+      kind: "job",
+      jobId: "public-one",
+      status: "queued",
+    });
+    const server: AdviceClient = {
+      requestAdvice,
+      readJob: vi.fn().mockResolvedValue({ jobId: "public-one", status: "completed" }),
+      readAdvice: vi
+        .fn()
+        .mockResolvedValue({ kind: "advice", envelope: answer, source: "api-cache" }),
+      readPublished: vi.fn().mockResolvedValue({ kind: "not-computed" }),
+    };
+    open(language, `/league/314/members/${ENTRY}`, {
+      server,
+      device: { createSolver: () => solver },
+    });
+    const button = await screen.findByRole("button", { name: COMPUTE_COPY[language].serverButton });
+    expect(requestAdvice).not.toHaveBeenCalled();
+    expect(solver.asked).toHaveLength(0);
+    await userEvent.setup().click(button);
+    expect(await screen.findByText(copy.computeQueued)).toBeVisible();
+    expect(screen.getByRole("button", { name: copy.deviceButton })).toBeDisabled();
+    expect(screen.queryByText(COMPUTE_COPY[language].leaveOpen)).toBeNull();
+    expect(await screen.findByText(copy.computeDone, {}, { timeout: 5000 })).toBeVisible();
+    expect(requestAdvice).toHaveBeenCalledTimes(1);
+    expect(requestAdvice.mock.calls[0]![0]).toMatchObject({
+      publicEntry: true,
+      leagueId: 314,
+      entryId: ENTRY,
+    });
+    expect(solver.asked).toHaveLength(0);
+    expect(server.readPublished).not.toHaveBeenCalled();
+  });
+
+  it("refuses a server result from another capture", async () => {
+    site();
+    const answer = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    Object.assign(answer.payload, {
+      league_id: 0,
+      season: TABLE.season,
+      gameweek: TABLE.gameweek,
+      source_snapshot_id: OLDER,
+    });
+    const server: AdviceClient = {
+      requestAdvice: async (): Promise<AdviceRequestResult> => ({
+        kind: "advice",
+        envelope: answer,
+        source: "api-cache",
+      }),
+      readJob: vi.fn(),
+      readAdvice: vi.fn(),
+      readPublished: vi.fn(),
+    };
+    open(language, `/entry/${ENTRY}`, { server });
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: COMPUTE_COPY[language].serverButton }));
+    expect(
+      await screen.findByText(COMPUTE_COPY[language].failures.ANSWER_OTHER_CAPTURE),
+    ).toBeVisible();
+    expect(screen.queryByText(copy.computeDone)).toBeNull();
+  });
+
+  it("opens without computing and runs on the device only when asked", async () => {
     const fetcher = site();
     const solver = new CannedSolver();
     open(language, `/entry/${ENTRY}`, { device: { createSolver: () => solver } });
     expect(await screen.findByRole("heading", { name: "Synthetic XI", level: 1 })).toBeVisible();
+    expect(solver.asked).toHaveLength(0);
+    await userEvent.setup().click(screen.getByRole("button", { name: copy.deviceButton }));
     await waitFor(() =>
       expect(document.querySelector('[data-device-state="done"]')).not.toBeNull(),
     );
@@ -268,6 +347,7 @@ describe.each(["tr", "en"] as const)("a team through the forwarder in %s", (lang
       "href",
       "/league/314",
     );
+    await userEvent.setup().click(screen.getByRole("button", { name: copy.deviceButton }));
     await waitFor(() =>
       expect(document.querySelector('[data-device-state="done"]')).not.toBeNull(),
     );
@@ -309,6 +389,7 @@ describe.each(["tr", "en"] as const)("a team through the forwarder in %s", (lang
     expect(await screen.findByText(words.teamUnavailable)).toBeInTheDocument();
     down = false;
     await userEvent.setup().click(screen.getByRole("button", { name: words.retry }));
+    await userEvent.setup().click(await screen.findByRole("button", { name: copy.deviceButton }));
     await waitFor(() =>
       expect(document.querySelector('[data-device-state="done"]')).not.toBeNull(),
     );

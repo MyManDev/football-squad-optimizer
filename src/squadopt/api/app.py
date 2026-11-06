@@ -192,6 +192,8 @@ def create_app(
     view_store: PublishedViewStore | None = None,
     advice_store: AdviceReadStore | None = None,
     advice_submit: AdviceSubmitService | None = None,
+    public_advice_store: AdviceReadStore | None = None,
+    public_advice_submit: AdviceSubmitService | None = None,
     allowed_origins: tuple[str, ...] = (),
     metrics: AdviceMetrics | None = None,
     queue_depth: Callable[[], int] | None = None,
@@ -463,11 +465,15 @@ def create_app(
         )
 
     @application.get(
+        "/api/v1/public/leagues/{league_id}/entries/{entry_id}/advice", response_class=Response
+    )
+    @application.get(
         "/api/v1/leagues/{league_id}/entries/{entry_id}/advice",
         response_class=Response,
     )
     def read_advice(
-        league_id: Annotated[int, ApiPath(ge=1)],
+        request: Request,
+        league_id: Annotated[int, ApiPath(ge=0)],
         entry_id: Annotated[int, ApiPath(ge=1)],
         strategy: Annotated[str, Query(pattern=_STRATEGY_PATTERN)],
         window: Annotated[int, Query()],
@@ -478,7 +484,12 @@ def create_app(
         model: Annotated[str, Query()] = "current",
         preferences: Annotated[str | None, Query(max_length=1500)] = None,
     ) -> Response:
-        if advice_store is None:
+        if league_id == 0 and not request.url.path.startswith("/api/v1/public/"):
+            return _contract_error(422, "VALIDATION_FAILED", "A league id must be positive.")
+        reader = (
+            public_advice_store if request.url.path.startswith("/api/v1/public/") else advice_store
+        )
+        if reader is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         try:
             selection = parse_advice_selection(
@@ -496,7 +507,7 @@ def create_app(
         except ValueError as error:
             return _contract_error(422, "VALIDATION_FAILED", str(error))
         try:
-            payload = advice_store.read_advice(
+            payload = reader.read_advice(
                 league_id=league_id,
                 entry_id=entry_id,
                 strategy=selection.strategy,
@@ -527,15 +538,25 @@ def create_app(
         )
 
     @application.post(
+        "/api/v1/public/leagues/{league_id}/entries/{entry_id}/advice", response_class=Response
+    )
+    @application.post(
         "/api/v1/leagues/{league_id}/entries/{entry_id}/advice",
         response_class=Response,
     )
     async def request_advice(
         request: Request,
-        league_id: Annotated[int, ApiPath(ge=1)],
+        league_id: Annotated[int, ApiPath(ge=0)],
         entry_id: Annotated[int, ApiPath(ge=1)],
     ) -> Response:
-        if advice_submit is None:
+        if league_id == 0 and not request.url.path.startswith("/api/v1/public/"):
+            return _contract_error(422, "VALIDATION_FAILED", "A league id must be positive.")
+        submitter = (
+            public_advice_submit
+            if request.url.path.startswith("/api/v1/public/")
+            else advice_submit
+        )
+        if submitter is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         # A cross-site form can send text/plain without a CORS preflight; only a JSON body
         # is read, so such a request files no job. Media types ignore case and parameters.
@@ -571,7 +592,7 @@ def create_app(
         # async route it ran on the event loop and held every other request, /health
         # included, until it returned; the plain-def routes already run in the thread pool.
         outcome = await run_in_threadpool(
-            advice_submit.submit,
+            submitter.submit,
             league_id=league_id,
             entry_id=entry_id,
             strategy=selection.strategy,

@@ -241,8 +241,9 @@ class ApiCommandRequest:
             raise BackendApiContractError("dry_run must be boolean.")
         for name in ("league_id", "entry_id", "rival_entry_id"):
             value = getattr(self, name)
+            minimum = 0 if name == "league_id" else 1
             if value is not None and (
-                isinstance(value, bool) or not isinstance(value, int) or value < 1
+                isinstance(value, bool) or not isinstance(value, int) or value < minimum
             ):
                 raise BackendApiContractError(f"{name} must be a positive integer.")
         object.__setattr__(
@@ -781,7 +782,7 @@ def backend_api_schema() -> dict[str, Any]:
             "season": season,
             "operation": {"type": "string", "const": "league.advise"},
             "gameweek": {"type": "integer", "minimum": 1},
-            "league_id": {"type": "integer", "minimum": 1},
+            "league_id": {"type": "integer", "minimum": 0},
             "entry_id": {"type": "integer", "minimum": 1},
             "strategy": {"type": "string", "pattern": _NAME_PATTERN.pattern},
             "window": {"type": "integer", "enum": list(windows)},
