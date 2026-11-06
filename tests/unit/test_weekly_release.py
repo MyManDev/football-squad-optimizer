@@ -6,7 +6,9 @@ passed to `ship.sh`, the bundle seal only on a club-news run, and one release pe
 outside command passes through the chain's one runner, and these tests put a recorder in its
 place, so nothing here reads GitHub, runs a release script or touches a backend. On the backend
 host the PC's `vm_push.sh` does not apply: the chain never calls it, and its backend hook by
-default writes one line and runs no command.
+default writes one line and runs no command. The host's hook writes one request for root's
+`squadopt-backend-release` and waits for its result; these tests play root's part by writing
+that result, and the chain then seals nothing, since the release package carried the club news.
 
 The journal each test releases is written by `WeeklyRun` itself, with the stages and values a
 completed publishing run records, so the chain reads it as it reads a real one.
@@ -37,6 +39,9 @@ COMMIT = "0123456789abcdef0123456789abcdef01234567"
 PR = "https://github.com/MyManDev/football-squad-optimizer/pull/1250"
 TABLE = Path("artifacts/rotation/rotation_evidence_v4_2026-27_gw10_aa_decision_bb.csv")
 RETAINED = Path("data/handoffs/by-capture") / CAPTURE / ("e" * 64 + ".json")
+DEADLINE = "2026-11-06T18:30:00Z"
+TOP100 = Path("artifacts/phase_b/player_evidence_v1_2026-27_gw10_top100_cc.manifest.json")
+ROTATION = Path("artifacts/rotation/rotation_evidence_v4_2026-27_gw10_aa_decision_bb.manifest.json")
 TAGS = (
     "1\trefs/tags/site-2026-27-gw09-settled",
     "2\trefs/tags/site-2026-27-gw10-decision",
@@ -87,8 +92,18 @@ def _repository(
     paths = {"snapshots": str(repo / "data/snapshots"), "out": str(preview)}
     alias = _output(repo / "data/handoffs/2026-27-gw10.json")
     values = {
-        "capture": ({"snapshot_id": CAPTURE}, [_output(repo / "data/snapshots" / CAPTURE / "a")]),
-        "rotation": ({"table": str(repo / TABLE)}, [_output(repo / TABLE, "player_id\n")]),
+        "top100_evidence": (
+            {"table": str(repo / TOP100.with_suffix(".csv")), "manifest": str(repo / TOP100)},
+            [_output(repo / TOP100)],
+        ),
+        "capture": (
+            {"snapshot_id": CAPTURE, "deadline_utc": DEADLINE},
+            [_output(repo / "data/snapshots" / CAPTURE / "a")],
+        ),
+        "rotation": (
+            {"table": str(repo / TABLE), "manifest": str(repo / ROTATION)},
+            [_output(repo / TABLE, "player_id\n"), _output(repo / ROTATION)],
+        ),
         "handoff": ({"path": str(alias)}, [alias, _output(repo / RETAINED)]),
         "publish": (
             {"status": "pr_open", "publication_commit": COMMIT, "pr_url": PR},
@@ -225,7 +240,7 @@ def test_pending_or_unreported_checks_are_waited_for_and_a_pass_is_awaited_no_lo
 
 
 def test_a_failed_backend_move_stops_the_chain_after_the_site_is_live(tmp_path: Path) -> None:
-    def failing_move(tag: str, say: chain.Say) -> int:
+    def failing_move(tag: str, release: chain.ReleaseInputs, say: chain.Say) -> int:
         say(f"backend: tried {tag}")
         return 5
 
@@ -247,8 +262,9 @@ def test_the_default_backend_hook_says_so_and_runs_no_command(
     for name in ("run", "Popen", "call", "check_call", "check_output"):
         monkeypatch.setattr(subprocess, name, forbidden)
     monkeypatch.setattr("os.system", forbidden)
+    release = chain.release_inputs(_repository(tmp_path / "read"), FRIDAY)
     said: list[str] = []
-    assert chain.leave_backend_to_its_operator("site-2026-27-gw10-fix1", said.append) == 0
+    assert chain.leave_backend_to_its_operator("site-2026-27-gw10-fix1", release, said.append) == 0
     assert said == [
         "backend: left to its operator to move to site-2026-27-gw10-fix1; nothing was started "
         "or stopped"
@@ -366,4 +382,137 @@ def test_the_release_is_a_command_of_its_own_that_takes_one_run_id(
         chain.main(["--workspace", str(repo)], release=release)
     assert missing.value.code == 2
     assert "the following arguments are required: --run-id" in capsys.readouterr().err
-    assert inspect.signature(chain.main).parameters["release"].default is chain.release_run
+    assert inspect.signature(chain.main).parameters["release"].default is None
+
+
+def _host_hook(
+    tmp_path: Path, answer: dict[str, object] | None
+) -> tuple[functools.partial[int], Path, Path]:
+    """The host's hook on scratch directories, root's part played by the first pause."""
+
+    spool, state = tmp_path / "spool", tmp_path / "state"
+
+    def root_answers(seconds: float) -> None:
+        if answer is not None and (spool / f"{FRIDAY}.json").is_file():
+            state.mkdir(parents=True, exist_ok=True)
+            (state / f"{FRIDAY}.result.json").write_text(json.dumps(answer), encoding="utf-8")
+
+    hook = functools.partial(
+        chain.move_backend_on_this_host, spool=spool, state=state, pause=root_answers, minutes=1
+    )
+    return hook, spool, state
+
+
+def test_the_host_hook_hands_root_one_request_naming_files_and_reports_its_result(
+    tmp_path: Path,
+) -> None:
+    release = chain.release_inputs(_repository(tmp_path), FRIDAY)
+    lines = ["backend: packed gw10-fix1-0123456789ab-x", "backend: live: the backend serves it"]
+    hook, spool, _ = _host_hook(tmp_path, {"code": 0, "lines": lines})
+    said: list[str] = []
+    assert hook("site-2026-27-gw10-fix1", release, said.append) == 0
+    assert json.loads((spool / f"{FRIDAY}.json").read_text(encoding="utf-8")) == {
+        "run_id": FRIDAY,
+        "tag": "site-2026-27-gw10-fix1",
+        "season": "2026-27",
+        "gameweek": 10,
+        "capture": CAPTURE,
+        "deadline_utc": DEADLINE,
+        "top100_manifest": TOP100.name,
+        "news": NEWS,
+        "rotation_manifest": ROTATION.name,
+        "handoff_retained": RETAINED.name,
+    }
+    assert said == [
+        f"backend: asked root to move to site-2026-27-gw10-fix1 from capture {CAPTURE}",
+        *lines,
+    ]
+    assert [path.name for path in spool.iterdir()] == [f"{FRIDAY}.json"]
+
+
+def test_the_host_hook_passes_on_roots_failure_and_stops_when_no_result_comes(
+    tmp_path: Path,
+) -> None:
+    release = chain.release_inputs(_repository(tmp_path), FRIDAY)
+    failed, _, _ = _host_hook(tmp_path / "a", {"code": 3, "lines": ["backend: stopped: x"]})
+    said: list[str] = []
+    assert failed("site-2026-27-gw10-fix1", release, said.append) == 3
+    assert said[-1] == "backend: stopped: x"
+    silent, _, state = _host_hook(tmp_path / "b", None)
+    said.clear()
+    assert silent("site-2026-27-gw10-fix1", release, said.append) == 124
+    assert said[-1] == f"backend: no result within 1 min; read {state / FRIDAY}.log"
+
+
+def test_the_host_hook_refuses_a_run_it_cannot_pack_or_moved_before(tmp_path: Path) -> None:
+    release = chain.release_inputs(_repository(tmp_path), FRIDAY)
+    hook, spool, state = _host_hook(tmp_path, {"code": 0, "lines": []})
+    said: list[str] = []
+    bare = chain.ReleaseInputs(**{**_fields(release), "top100_manifest": "", "deadline_utc": ""})
+    assert hook("site-2026-27-gw10-fix1", bare, said.append) == 2
+    assert said == [
+        f"backend: refused: run {FRIDAY} records no the capture's deadline, the Top 100 "
+        "manifest; the backend was not moved"
+    ]
+    state.mkdir(parents=True)
+    (state / f"{FRIDAY}.result.json").write_text("{}", encoding="utf-8")
+    said.clear()
+    assert hook("site-2026-27-gw10-fix1", release, said.append) == 2
+    assert said[0].startswith("backend: refused: ") and said[0].endswith("was moved before")
+    assert not spool.exists()
+
+
+def _fields(release: chain.ReleaseInputs) -> dict[str, object]:
+    return {name: getattr(release, name) for name in chain.ReleaseInputs.__slots__}
+
+
+def test_on_the_host_the_chain_seals_nothing_after_the_backend_moved(tmp_path: Path) -> None:
+    repo = _repository(tmp_path, forecast=False)
+    host = _Host()
+    moved: list[str] = []
+
+    def move(tag: str, release: chain.ReleaseInputs, say: chain.Say) -> int:
+        moved.append(f"{tag} {release.capture}")
+        return 0
+
+    code = chain.release_run(
+        repo,
+        FRIDAY,
+        runner=host.runner,
+        move_backend=move,
+        pause=lambda seconds: None,
+        wait_minutes=2,
+        summary="Publish the week.",
+        bundle_in_package=True,
+    )
+    steps = (repo / chain.WEEKLY_LOGS / f"{FRIDAY}.release.log").read_text(encoding="utf-8")
+    assert (code, moved) == (0, [f"site-2026-27-gw10-fix1 {CAPTURE}"])
+    assert host.calls[-1].startswith("sh scripts/release/ship.sh")
+    assert steps.splitlines()[-1].endswith(
+        f"bundle: the backend's release package carries club news {NEWS}"
+    )
+
+
+def test_the_backend_choice_picks_the_hook_and_is_its_operator_by_default() -> None:
+    assert chain.build_parser().parse_args(["--run-id", FRIDAY]).backend == "operator"
+    assert chain.releaser("operator") is chain.release_run
+    host = chain.releaser("host")
+    assert isinstance(host, functools.partial) and host.func is chain.release_run
+    assert host.keywords == {
+        "move_backend": chain.move_backend_on_this_host,
+        "bundle_in_package": True,
+    }
+
+
+def test_the_host_hook_refuses_a_run_with_only_the_gameweeks_handoff_alias(tmp_path: Path) -> None:
+    release = chain.release_inputs(_repository(tmp_path), FRIDAY)
+    hook, spool, _ = _host_hook(tmp_path, {"code": 0, "lines": []})
+    alias = tmp_path / "repo" / "data" / "handoffs" / "2026-27-gw10.json"
+    bare = chain.ReleaseInputs(**{**_fields(release), "handoff": alias})
+    said: list[str] = []
+    assert hook("site-2026-27-gw10-fix1", bare, said.append) == 2
+    assert said == [
+        f"backend: refused: run {FRIDAY} records no a handoff retained by its capture; the "
+        "backend was not moved"
+    ]
+    assert not spool.exists()

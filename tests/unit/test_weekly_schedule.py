@@ -567,8 +567,12 @@ def test_the_gate_releases_only_with_the_switch_and_only_a_run_that_exited_0(
 
 def test_the_switch_passes_the_ported_chain_and_is_off_by_default() -> None:
     seam = inspect.signature(gate.main).parameters["release"]
-    assert seam.default is weekly_release.release_run
-    assert gate.build_parser().parse_args([]).release is False
+    assert seam.default is None
+    parsed = gate.build_parser().parse_args([])
+    assert (parsed.release, parsed.backend) == (False, "operator")
+    assert weekly_release.releaser(parsed.backend) is weekly_release.release_run
+    hooked = weekly_release.releaser(gate.build_parser().parse_args(["--backend", "host"]).backend)
+    assert hooked.keywords["move_backend"] is weekly_release.move_backend_on_this_host
 
 
 def test_a_dry_run_names_the_release_only_with_the_switch(
@@ -583,7 +587,7 @@ def test_a_dry_run_names_the_release_only_with_the_switch(
     assert (switched[:3], len(plain), host.released) == (plain, 3, [])
     assert switched[3:] == [
         "would release 2026-27-gw09-friday-20261031T0705Z once it exits 0, with "
-        "squadopt.platform.weekly_release"
+        "squadopt.platform.weekly_release, the backend moved by its operator"
     ]
     assert not (tmp_path / "data").exists()
 
@@ -605,10 +609,14 @@ def test_the_host_units_tick_the_gate_by_its_module_on_a_workspace() -> None:
         assert arguments[1:3] == ["-m", "squadopt.platform.weekly_schedule"], command
         workspace = arguments[arguments.index("--workspace") + 1]
         assert arguments[0] == f"{workspace}/.venv/bin/python"
-        # D1 on #1243: no tick releases; a run is released by hand after its preview.
+        # The unit alone releases nothing; release.conf's variable is the switch (#1243,
+        # 6605005485), and the dry run's command leaves the variable out.
         assert ("--release" in arguments, "--dry-run" in arguments) == (False, dry), command
+        assert ("$WEEKLY_RELEASE" in arguments) == (not dry), command
         # One solver worker per core, from the unit or provision.sh's workers.conf.
         assert " --workers ${WEEKLY_WORKERS}" in command
+        # The host's measured times (#1243, 2026-11-04), the same for a dry run as a real one.
+        assert " --final-lead-hours 8 --run-hours 7" in command
         workspaces.add(workspace)
     (workspace,) = workspaces
     # The drop-in clears the unit's command before it gives its own.
@@ -619,15 +627,23 @@ def test_the_host_units_tick_the_gate_by_its_module_on_a_workspace() -> None:
     assert [key for key, _ in service].count("EnvironmentFile") == 1
     # The club-news settings and any key come from the private file, never from the unit.
     assert all(
-        value.split("=", 1)[0] in {"PYTHONPATH", "PYTHONUNBUFFERED", "WEEKLY_WORKERS"}
+        value.split("=", 1)[0]
+        in {"PYTHONPATH", "PYTHONUNBUFFERED", "WEEKLY_WORKERS", "WEEKLY_RELEASE"}
         for value in environment
     )
-    assert "WEEKLY_WORKERS=4" in environment
+    assert {"WEEKLY_WORKERS=4", "WEEKLY_RELEASE="} <= set(environment)
     # The gate reads the unit's memory peak, and a worker killed for memory fails the run
     # rather than stopping the tick before its end line.
     assert {("MemoryAccounting", "yes"), ("OOMPolicy", "continue")} <= set(service)
     assert {("OnCalendar", "*:0/15"), ("Persistent", "true")} <= set(timer)
     assert ("Unit", "weekly-schedule.service") in timer
+
+
+def test_the_release_drop_in_switches_the_release_and_the_hosts_backend_on() -> None:
+    release = _directives(HOST_FILES / "release.conf")
+    assert release == [("Environment", '"WEEKLY_RELEASE=--release --backend host"')]
+    arguments = gate.build_parser().parse_args(["--release", "--backend", "host"])
+    assert (arguments.release, arguments.backend) == (True, "host")
 
 
 FINAL_RUN = "2026-27-gw09-friday-20261031T0705Z"
