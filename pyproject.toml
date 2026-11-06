@@ -14,6 +14,7 @@ dependencies = [
     "numpy>=2.0.2,<3",
     "ortools>=9.15.6755,<9.16",
     "highspy==1.15.1",
+    "jsonschema>=4.23,<5",
     "pandas>=2.2.3,<3.1",
     "scikit-learn>=1.6,<2",
     # Already present transitively through scikit-learn, and now imported directly by the
@@ -30,7 +31,6 @@ research-bo = ["botorch==0.18.1"]
 capacity = ["psutil==7.2.2"]
 api = [
     "fastapi>=0.141,<1",
-    "jsonschema>=4.23,<5",
     "uvicorn>=0.52,<1",
 ]
 dev = [
@@ -38,12 +38,11 @@ dev = [
     # gate that cannot see the library it is checking is not checking it. Without this the
     # SDK would resolve to `Any` in CI and the strictest check in the repository would be
     # blind at the one call site where a wrong parameter costs a real request. Same reason
-    # fastapi and jsonschema appear twice below and above.
+    # fastapi appears twice below and above.
     "anthropic>=1.4,<2",
     "fastapi>=0.141,<1",
     "httpx2>=2.12,<3",
     "import-linter>=2.0,<3",
-    "jsonschema>=4.23,<5",
     "mypy>=1.14,<3",
     "pandas-stubs>=2.2.3,<3.1",
     "pytest>=8.3,<10",
