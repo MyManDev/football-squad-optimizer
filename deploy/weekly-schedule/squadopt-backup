@@ -21,6 +21,8 @@ readonly PATHS=(
   "$WEEKLY/data/ledger"
   "$WEEKLY/data/advice_records"
   "$WEEKLY/data/entries"
+  "$WEEKLY/data/runtime"
+  "$WEEKLY/data/logs"
   "$WEEKLY/artifacts"
   "$BACKEND/releases"
   "$BACKEND/store"

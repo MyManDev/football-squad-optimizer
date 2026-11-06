@@ -22,6 +22,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -85,6 +86,79 @@ def test_the_backend_alerts_only_after_five_minutes_without_ready(watch: ModuleT
     assert len(watch.decide([reading], state, NOW + timedelta(minutes=5))) == 1
     assert not watch.read_backend(lambda url: 200).bad
     assert watch.read_backend(lambda url: 503).bad
+
+
+def test_failed_notifications_retry_without_repeating_successful_checks(
+    watch: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(watch, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(
+        watch,
+        "readings",
+        lambda now: [watch.Reading("disk", True, "full"), watch.Reading("backup", True, "late")],
+    )
+    attempts: list[str] = []
+    pings: list[str] = []
+
+    def send(alert: Any) -> bool:
+        key = alert.key
+        attempts.append(key)
+        return key != "disk" or attempts.count("disk") > 1
+
+    monkeypatch.setattr(watch, "send", send)
+    monkeypatch.setattr(watch, "ping", pings.append)
+    monkeypatch.setenv("HC_WATCH_URL", "https://health.invalid/watch")
+    assert watch.main(lambda: NOW) == 1
+    assert attempts == ["disk", "backup"]
+    assert pings == []
+    assert watch.main(lambda: NOW + timedelta(minutes=5)) == 0
+    assert attempts == ["disk", "backup", "disk"]
+    assert pings == ["https://health.invalid/watch"]
+    assert watch.main(lambda: NOW + timedelta(minutes=10)) == 0
+    assert attempts == ["disk", "backup", "disk"]
+
+
+def test_a_failed_recovery_notice_is_retried_until_delivered(
+    watch: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(watch, "STATE", tmp_path / "state.json")
+    bad = True
+    monkeypatch.setattr(watch, "readings", lambda now: [watch.Reading("disk", bad, "full")])
+    attempts: list[str] = []
+
+    def send(alert: Any) -> bool:
+        title = alert.title
+        attempts.append(title)
+        return title != "SquadOpt disk: resolved" or attempts.count(title) > 1
+
+    monkeypatch.setattr(watch, "send", send)
+    monkeypatch.setattr(watch, "ping", lambda url: None)
+    assert watch.main(lambda: NOW) == 0
+    bad = False
+    assert watch.main(lambda: NOW + timedelta(minutes=5)) == 1
+    assert watch.main(lambda: NOW + timedelta(minutes=10)) == 0
+    assert watch.main(lambda: NOW + timedelta(minutes=15)) == 0
+    assert attempts == ["SquadOpt disk", "SquadOpt disk: resolved", "SquadOpt disk: resolved"]
+
+
+def test_notification_failure_does_not_restart_the_backend_grace_period(
+    watch: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(watch, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(watch, "readings", lambda now: [watch.read_backend(lambda url: 503)])
+    attempts: list[str] = []
+
+    def send(alert: Any) -> bool:
+        attempts.append(alert.key)
+        return len(attempts) > 1
+
+    monkeypatch.setattr(watch, "send", send)
+    monkeypatch.setattr(watch, "ping", lambda url: None)
+    assert watch.main(lambda: NOW) == 0
+    assert attempts == []
+    assert watch.main(lambda: NOW + timedelta(minutes=5)) == 1
+    assert watch.main(lambda: NOW + timedelta(minutes=6)) == 0
+    assert attempts == ["backend", "backend"]
 
 
 def test_a_new_failed_run_alerts_at_once_and_the_same_one_only_daily(watch: ModuleType) -> None:
@@ -155,6 +229,30 @@ def test_the_timer_and_the_disk_use_their_limits(watch: ModuleType) -> None:
     assert watch.read_disk(lambda path: (100, 81, 19)).bad is True
 
 
+@pytest.mark.parametrize(
+    "bootstrap",
+    [
+        {},
+        {"events": []},
+        {"events": None},
+        {"events": [{}]},
+        {"events": [{"deadline_time": "bad"}]},
+    ],
+)
+def test_unavailable_deadlines_do_not_report_capture_health(
+    watch: ModuleType, bootstrap: dict[str, Any]
+) -> None:
+    reading = watch.read_capture(bootstrap, NOW, NOW)
+    assert reading.bad
+    assert reading.identity == "deadline_source_unavailable"
+    assert "cannot be checked" in reading.text
+
+
+def test_a_finished_season_is_distinct_from_unavailable_deadlines(watch: ModuleType) -> None:
+    bootstrap = {"events": [{"deadline_time": "2026-11-06T18:30:00Z"}]}
+    assert not watch.read_capture(bootstrap, None, NOW).bad
+
+
 def test_the_watch_reads_every_check_the_issue_lists(watch: ModuleType) -> None:
     keys = {
         "backend": "/ready",
@@ -188,6 +286,8 @@ def test_the_backup_covers_every_store_the_issue_names_and_keeps_a_stamp() -> No
         "data/ledger",
         "data/advice_records",
         "data/entries",
+        "data/runtime",
+        "data/logs",
         "artifacts",
         "/releases",
         "/store",

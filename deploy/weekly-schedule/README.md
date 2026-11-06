@@ -303,13 +303,19 @@ FPL serves only the present, so a lost capture cannot be taken again.
 - **The backup** (`squadopt-backup`, nightly at 23:30Z, when no run writes) sends what the
   weekly run and the backend cannot rebuild to a restic repository in Cloudflare R2. That covers
   `data/snapshots`, `data/handoffs`, `data/ledger`, `data/advice_records`, `data/entries`,
-  `artifacts/`, and the backend's `releases/` and `store/`.
+  `data/runtime`, `data/logs`, `artifacts/`, and the backend's `releases/` and `store/`.
+  Keep the runtime journals, started markers and release logs with their captures: they prevent
+  a restored host from starting a run or publishing a release twice.
   - restic encrypts each backup, adds only what changed and checksums every block. It keeps
     14 daily, 8 weekly and 12 monthly snapshots, checks the repository's structure each night
     and reads a fifth of the data back on Sundays.
   - A success writes `/var/lib/squadopt/backup/last-success`. A failure sends an alert.
 - **The watch** (`squadopt-watch`, every five minutes) sends an ntfy alert when a check turns
   bad, again once a day while it stays bad, and once when it is good again:
+
+  A failed delivery is retried on the next pass, including a recovery notice. Only a successful
+  delivery starts the daily repeat interval. A pass with a failed delivery exits non-zero and
+  sends no success ping to healthchecks.io.
 
   | Alert | What it means, and what to do |
   | --- | --- |
@@ -318,7 +324,7 @@ FPL serves only the present, so a lost capture cannot be taken again.
   | `backup` | No backup in 36 hours, or none yet. Read `journalctl -u squadopt-backup`. |
   | `run` | The newest weekly run ended with a non-zero exit; the alarm on #1093 names its stage. Read its log. |
   | `timer` | `weekly-schedule.timer` has been off for 3 hours, so no run can start. Start it once no release by hand is running. |
-  | `capture` | A deadline is 3 hours away and nothing was captured since the deadline before. Act now: it cannot be taken after the deadline. |
+  | `capture` | A deadline is 3 hours away and nothing was captured since the deadline before, or the cached deadlines cannot be read. Check the gate's journal and bootstrap cache now: a missing capture cannot be taken after the deadline. |
 
 - **From outside**, healthchecks.io expects a ping from every watch pass and every backup, and
   alerts through the same ntfy topic when one is late. That is how a host that cannot send

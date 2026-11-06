@@ -29,6 +29,7 @@ import sys
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -154,11 +155,10 @@ def next_deadlines(
 ) -> tuple[datetime | None, datetime | None]:
     """The deadline before `now` and the next one after it, from FPL's bootstrap."""
 
-    deadlines = sorted(
-        _instant(str(event["deadline_time"]))
-        for event in bootstrap.get("events", [])
-        if event.get("deadline_time")
-    )
+    events = bootstrap.get("events")
+    if not isinstance(events, list) or not events:
+        raise ValueError("No cached deadlines")
+    deadlines = sorted(_instant(str(event["deadline_time"])) for event in events)
     before = [moment for moment in deadlines if moment <= now]
     after = [moment for moment in deadlines if moment > now]
     return (before[-1] if before else None, after[0] if after else None)
@@ -179,7 +179,16 @@ def newest_capture(snapshots: Path) -> datetime | None:
 
 
 def read_capture(bootstrap: Mapping[str, Any], newest: datetime | None, now: datetime) -> Reading:
-    previous, upcoming = next_deadlines(bootstrap, now)
+    try:
+        previous, upcoming = next_deadlines(bootstrap, now)
+    except (KeyError, TypeError, ValueError):
+        return Reading(
+            "capture",
+            True,
+            "The cached FPL deadlines are unavailable, so capture freshness cannot be checked. "
+            "Read journalctl -u weekly-schedule and data/runtime/weekly-schedule/bootstrap.json.",
+            identity="deadline_source_unavailable",
+        )
     if upcoming is None or now < upcoming - CAPTURE_LEAD:
         return Reading("capture", False, "The next deadline is more than 3 hours away.")
     missing = newest is None or (previous is not None and newest <= previous)
@@ -287,6 +296,8 @@ def readings(now: datetime) -> list[Reading]:
         bootstrap = json.loads(BOOTSTRAP.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         bootstrap = {}
+    if not isinstance(bootstrap, dict):
+        bootstrap = {}
     try:
         lines = MEASUREMENTS.read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -307,16 +318,25 @@ def main(now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> int:
         state = json.loads(STATE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         state = {}
+    previous = deepcopy(state)
     alerts = decide(readings(moment), state, moment)
+    delivery_failed = False
     for alert in alerts:
         print(f"alert: {alert.title}: {alert.text}")
-        send(alert)
+        if not send(alert):
+            delivery_failed = True
+            proposed = state[alert.key]
+            retained = previous.get(alert.key, {})
+            if "bad_since" in proposed:
+                retained["bad_since"] = proposed["bad_since"]
+            state[alert.key] = retained
     STATE.parent.mkdir(parents=True, exist_ok=True)
     partial = STATE.with_suffix(".partial")
     partial.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(partial, STATE)
-    ping(os.environ.get("HC_WATCH_URL", ""))
-    return 0
+    if not delivery_failed:
+        ping(os.environ.get("HC_WATCH_URL", ""))
+    return 1 if delivery_failed else 0
 
 
 if __name__ == "__main__":
