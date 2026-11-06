@@ -1,0 +1,16 @@
+# Moves the advice backend to a released week: one request from the spool, the five steps of
+# scripts/release/vm_football_release.py on this host, then the prune
+# (/usr/local/sbin/squadopt-backend-release says how). Started by squadopt-backend-release.path,
+# never by the timer. Root, because the backend lives under /root/squadopt and runs under
+# Docker; the weekly service user has neither.
+[Unit]
+Description=SquadOpt: move the advice backend to a released week
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/squadopt-backend-release
+# prepare builds an image and candidate runs an advice job; the chain waits up to 50 minutes.
+TimeoutStartSec=50min

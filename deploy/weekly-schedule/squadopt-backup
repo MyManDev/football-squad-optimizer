@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Nightly, as root: back up what the weekly run and the backend cannot rebuild to the restic
+# repository in Cloudflare R2 (#1294). backend.sh installs it as /usr/local/sbin/squadopt-backup,
+# and squadopt-backup.timer starts it at 23:30Z, when no weekly run is writing.
+#
+# restic encrypts each backup, adds only what changed since the last one and checksums every
+# block. After the backup it forgets old snapshots (14 daily, 8 weekly, 12 monthly kept), checks
+# the repository's structure, and on Sundays reads a fifth of the data back. The repository, its
+# R2 key and the password file come from /etc/squadopt/backup.env, which a person writes; this
+# script prints none of them. A success leaves its time in /var/lib/squadopt/backup/last-success
+# for squadopt-watch and pings healthchecks.io; a failure pings its failure and sends an alert.
+set -uo pipefail
+
+readonly WEEKLY="${SQUADOPT_WEEKLY:-/srv/squadopt/weekly}"
+readonly BACKEND="${SQUADOPT_BACKEND_BASE:-/root/squadopt}"
+readonly STAMP="${SQUADOPT_BACKUP_STAMP:-/var/lib/squadopt/backup/last-success}"
+readonly ALERT="${SQUADOPT_ALERT:-/usr/local/sbin/squadopt-alert}"
+readonly REQUESTED_HISTORY="${SQUADOPT_REQUESTED_HISTORY_ROOT:-/var/lib/squadopt/requested-history}"
+readonly PATHS=(
+  "$WEEKLY/data/snapshots"
+  "$WEEKLY/data/handoffs"
+  "$WEEKLY/data/ledger"
+  "$WEEKLY/data/advice_records"
+  "$WEEKLY/data/entries"
+  "$WEEKLY/data/runtime"
+  "$WEEKLY/data/logs"
+  "$WEEKLY/artifacts"
+  "$BACKEND/releases"
+  "$BACKEND/store"
+)
+
+ping() {
+  if [ -n "${HC_BACKUP_URL:-}" ]; then
+    curl -fsS -m 10 --retry 3 "$HC_BACKUP_URL$1" >/dev/null 2>&1 || true
+  fi
+}
+fail() {
+  echo "Backup failed: $*" >&2
+  ping /fail
+  "$ALERT" high "SquadOpt backup failed" "$* Read journalctl -u squadopt-backup on the host." || true
+  exit 1
+}
+
+[ "$(id -u)" -eq 0 ] || fail "run as root, as the unit does"
+for variable in RESTIC_REPOSITORY RESTIC_PASSWORD_FILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+  [ -n "${!variable:-}" ] || fail "$variable is not set in /etc/squadopt/backup.env"
+done
+[ -r "$RESTIC_PASSWORD_FILE" ] || fail "the password file is not readable"
+for path in "${PATHS[@]}"; do
+  [ -d "$path" ] && [ ! -L "$path" ] || fail "$path is not a directory"
+done
+paths=("${PATHS[@]}")
+# The independent baseline store appears with the multi-league rollout (#1206).
+baselines="$WEEKLY/data/member_baselines"
+if [ -e "$baselines" ] || [ -L "$baselines" ]; then
+  [ -d "$baselines" ] && [ ! -L "$baselines" ] || fail "$baselines is not a directory"
+  paths+=("$baselines")
+fi
+if [ -e "$REQUESTED_HISTORY" ] || [ -L "$REQUESTED_HISTORY" ]; then
+  [ -d "$REQUESTED_HISTORY" ] && [ ! -L "$REQUESTED_HISTORY" ] || fail "requested history is not a directory"
+  [ -f "$REQUESTED_HISTORY/.snapshot.lock" ] && [ ! -L "$REQUESTED_HISTORY/.snapshot.lock" ] ||
+    fail "requested history has no regular snapshot lock"
+  # The producer uses flock on this permanent file too. Hold it until restic has
+  # captured both the pointer and the immutable copies that resumed runs reference.
+  exec {history_lock}<> "$REQUESTED_HISTORY/.snapshot.lock" || fail "requested history lock could not be opened"
+  flock -w 60 "$history_lock" || fail "requested history snapshot is still busy"
+  paths+=("$REQUESTED_HISTORY")
+fi
+ping /start
+restic cat config >/dev/null 2>&1 || fail "the repository is not initialised (README, Backups and alerts)"
+
+summary="$(restic backup --quiet --json --tag nightly --host squadopt-host "${paths[@]}" | tail -1)" ||
+  fail "restic backup exited non-zero"
+snapshot="$(printf '%s' "$summary" | python3 -c 'import json, sys; print(json.load(sys.stdin)["snapshot_id"])' 2>/dev/null)" ||
+  fail "restic backup reported no snapshot"
+if [ -n "${history_lock:-}" ]; then
+  flock -u "$history_lock"
+  exec {history_lock}>&-
+fi
+restic forget --quiet --tag nightly --host squadopt-host \
+  --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune >/dev/null || fail "restic forget exited non-zero"
+restic check --quiet >/dev/null || fail "restic check found a problem"
+if [ "$(date -u +%u)" = 7 ]; then
+  restic check --quiet --read-data-subset=20% >/dev/null || fail "restic check could not read back a fifth of the data"
+fi
+
+install -d -m 0755 "$(dirname "$STAMP")"
+printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$snapshot" >"$STAMP.partial"
+mv "$STAMP.partial" "$STAMP"
+ping ""
+echo "Backed up: snapshot $snapshot"

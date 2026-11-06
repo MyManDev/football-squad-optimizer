@@ -4,7 +4,10 @@ import { join } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-import { heldChips } from "../src/features/league/device/chipForecast/member";
+import { heldChips, memberChipForecast } from "../src/features/league/device/chipForecast/member";
+import type { ChipName } from "../src/features/league/device/chipForecast/rule";
+import type { DevicePlanDocument } from "../src/features/league/device/types";
+import type { FixturesPayload } from "../src/features/fixtures/types";
 import type { EntrySquad } from "../src/features/league/types";
 import { MESSAGES } from "../src/i18n/messages";
 import { PUBLIC_ROOT, shippedTrees } from "../src/testSupport/shippedTrees";
@@ -21,13 +24,12 @@ import { claimMember, shippedClaim, type SeededClaim } from "./identity";
 const COPY = MESSAGES.tr.leagueMembers;
 
 /**
- * By default the shipped tree is walked for two members: 6879786, whose published reading
- * plays chips this week, and the first member whose reading only holds. Every member is
+ * By default the shipped tree is walked for two members with chips: a published play/hold
+ * pair when present, otherwise two members with inputs for device computation. Every member is
  * walked, and the device time of each run printed for all of them, with
  * CHIP_TIMING_ALL_MEMBERS=1.
  */
 const ALL_MEMBERS = process.env.CHIP_TIMING_ALL_MEMBERS === "1";
-const PLAYS_NOW = 6879786;
 const read = <T>(path: string): T => JSON.parse(readFileSync(path, "utf-8")) as T;
 
 interface Published {
@@ -44,12 +46,14 @@ function shippedMembers() {
     const squad = read<{ payload: EntrySquad }>(join(tree.root, "entries", name)).payload;
     if (!squad.device_plan) return [];
     const index = join(tree.root, "advice", match[1]!, "index.json");
-    const published = existsSync(index)
-      ? (read<{ payload: { chip_forecast?: Published } }>(index).payload.chip_forecast ?? null)
+    const payload = existsSync(index)
+      ? read<{ payload: { menu?: string; chip_forecast?: Published } }>(index).payload
       : null;
+    const published = payload?.chip_forecast ?? null;
+    if (payload?.menu !== "device") expect(published).not.toBeNull();
     // The chips the device solves beside the plain plan: n of the 1 + n solves.
     const held = heldChips(squad.chips, squad.gameweek)?.length ?? 0;
-    return [{ entryId: Number(match[1]), published, held }];
+    return [{ entryId: Number(match[1]), published, held, squad }];
   });
   return { tree, members };
 }
@@ -60,12 +64,20 @@ function playsNow(published: Published | null): boolean {
 }
 
 /** The members the shipped walk covers: every one, or the two the default names. */
-function walked<T extends { entryId: number; published: Published | null }>(members: T[]): T[] {
+function walked<T extends { entryId: number; published: Published | null; held: number }>(
+  members: T[],
+): T[] {
   if (ALL_MEMBERS) return members;
-  const playing = members.find((member) => member.entryId === PLAYS_NOW);
-  const holding = members.find(
-    (member) => shownChips(member.published).length > 0 && !playsNow(member.published),
-  );
+  const playing =
+    members.find((member) => playsNow(member.published)) ??
+    members.find((member) => member.held > 0);
+  const holding =
+    members.find(
+      (member) =>
+        member !== playing &&
+        shownChips(member.published).length > 0 &&
+        !playsNow(member.published),
+    ) ?? members.find((member) => member !== playing && member.held > 0);
   return [playing, holding].filter((member): member is T => member !== undefined);
 }
 
@@ -75,6 +87,25 @@ function shownChips(published: Published | null): string[] {
   return (published.forecast?.chips ?? [])
     .filter((chip) => chip.verdict === "play_now" || chip.verdict === "hold")
     .map((chip) => chip.name);
+}
+
+type Gains = Partial<Record<ChipName, number | null>>;
+
+function reading(
+  root: string,
+  member: { published: Published | null; squad: EntrySquad; held: number },
+  gains: Gains | null,
+): Published {
+  if (member.published !== null) return member.published;
+  if (member.held > 0) expect(gains).not.toBeNull();
+  const table = read<{ payload: DevicePlanDocument }>(join(root, "device-plan.json")).payload;
+  const fixtures = read<{ payload: FixturesPayload }>(
+    join(PUBLIC_ROOT, "data", "fixtures.json"),
+  ).payload;
+  const forecast = memberChipForecast({ table, squad: member.squad, fixtures, gains: gains ?? {} });
+  expect(forecast.status).toBe("available");
+  expect(forecast.source_snapshot_id).toBe(member.squad.source_snapshot_id);
+  return forecast;
 }
 
 /** A moment the shipped gameweek is still open: a day before its deadline. */
@@ -94,7 +125,7 @@ async function openPage(page: Page, claim: SeededClaim, gameweek: number): Promi
   // and each press. The fixed clock stands in for the page's User Timing, so the page's
   // measures cannot be read; an event's own time stamp is not the clock's.
   await page.addInitScript(() => {
-    const replies: { kind: string; seconds: number | null; at: number }[] = [];
+    const replies: { kind: string; seconds: number | null; at: number; gains: Gains | null }[] = [];
     const presses: number[] = [];
     Object.assign(window, { deviceReplies: replies, devicePresses: presses });
     document.addEventListener("click", (event) => presses.push(event.timeStamp), true);
@@ -107,9 +138,15 @@ async function openPage(page: Page, claim: SeededClaim, gameweek: number): Promi
             kind: string;
             seconds?: number;
             answer?: { seconds?: number };
+            gains?: Gains | null;
           };
           const seconds = data.answer?.seconds ?? data.seconds ?? null;
-          replies.push({ kind: data.kind, seconds, at: event.timeStamp });
+          replies.push({
+            kind: data.kind,
+            seconds,
+            at: event.timeStamp,
+            gains: data.gains ?? null,
+          });
         });
       }
     };
@@ -119,6 +156,7 @@ async function openPage(page: Page, claim: SeededClaim, gameweek: number): Promi
 /** One device run: its plain plan, then its gains, each from the press and by the worker. */
 interface Run {
   requested: string[];
+  gains: Gains | null;
   /** The worker's solving time for the plain plan, and for the whole run. */
   planSeconds: number;
   gainsSeconds: number | null;
@@ -158,7 +196,7 @@ async function solve(page: Page, address: string): Promise<Run> {
     requested,
     ...(await page.evaluate(() => {
       const { deviceReplies: replies, devicePresses: presses } = window as unknown as {
-        deviceReplies: { kind: string; seconds: number | null; at: number }[];
+        deviceReplies: { kind: string; seconds: number | null; at: number; gains: Gains | null }[];
         devicePresses: number[];
       };
       const press = presses.at(-1)!;
@@ -166,6 +204,7 @@ async function solve(page: Page, address: string): Promise<Run> {
       const gains = replies.find((reply) => reply.kind === "gains") ?? null;
       const round = (seconds: number) => Math.round(seconds * 1000) / 1000;
       return {
+        gains: gains?.gains ?? null,
         planSeconds: round(plan.seconds!),
         gainsSeconds: gains?.seconds == null ? null : round(gains.seconds),
         planArrival: round((plan.at - press) / 1000),
@@ -193,15 +232,17 @@ test("shipped members' chip timing is read on the device, beside the chip contro
     .gameweek;
   expect(members.length).toBe(ALL_MEMBERS ? shipped.length : 2);
   await openPage(page, claim, gameweek);
-  const timings: ({ entry: number; chips: number } & Omit<Run, "requested">)[] = [];
+  const timings: ({ entry: number; chips: number } & Omit<Run, "requested" | "gains">)[] = [];
   let scanned = false;
-  for (const { entryId, published, held } of members) {
-    const { requested, ...run } = await solve(
+  for (const member of members) {
+    const { entryId, held } = member;
+    const { requested, gains, ...run } = await solve(
       page,
       `/league/${claim.leagueId}/members/${entryId}?mode=saf-puan&window=1`,
     );
     const origin = new URL(page.url()).origin;
     expect(requested.filter((url) => new URL(url).origin !== origin)).toEqual([]);
+    const published = reading(tree.root, member, gains);
     const expected = shownChips(published);
     const tool = await openChipSettings(page);
     const card = tool.locator("[data-chip-timing]");
@@ -230,6 +271,7 @@ test("shipped members' chip timing is read on the device, beside the chip contro
     }
     timings.push({ entry: entryId, chips: held, ...run });
   }
+  expect(scanned, "at least one computed chip card is drawn and checked").toBe(true);
   const summary = (values: (number | null)[]) => {
     const sorted = values.filter((value) => value !== null).sort((a, b) => a - b);
     const middle = sorted.length / 2;
@@ -273,11 +315,12 @@ test("a league tree with no advice index shows the card from the device alone", 
       members: { member_kind: string; entry_id: number; manager_name: string; team_name: string }[];
     };
   }>(join(tree.root, "members.json")).payload;
-  // The member with the most chips the published reading names, so the card has rows.
+  // Prefer a published reading, or a device member holding chips when no plan was precomputed.
   const chosen = [...members].sort(
-    (a, b) => shownChips(b.published).length - shownChips(a.published).length,
+    (a, b) =>
+      (shownChips(b.published).length || b.held) - (shownChips(a.published).length || a.held),
   )[0]!;
-  expect(shownChips(chosen.published).length).toBeGreaterThan(0);
+  expect(chosen.held).toBeGreaterThan(0);
   const person = roster.members.find((member) => member.entry_id === chosen.entryId)!;
   await openPage(
     page,
@@ -334,7 +377,7 @@ test("a league tree with no advice index shows the card from the device alone", 
     });
   });
 
-  const { requested } = await solve(
+  const { requested, gains } = await solve(
     page,
     `/league/${FIXTURE_LEAGUE}/members/${chosen.entryId}?mode=saf-puan&window=1`,
   );
@@ -347,7 +390,9 @@ test("a league tree with no advice index shows the card from the device alone", 
   const tool = await openChipSettings(page);
   const card = tool.locator("[data-chip-timing]");
   await expect(card.getByRole("heading", { name: "Çip zamanı" })).toBeVisible();
-  await expect(card.locator("[data-chip]")).toHaveCount(shownChips(chosen.published).length);
+  const expected = shownChips(reading(tree.root, chosen, gains));
+  expect(expected.length).toBeGreaterThan(0);
+  await expect(card.locator("[data-chip]")).toHaveCount(expected.length);
   await atRest(page);
   const results = await new AxeBuilder({ page }).include("[data-chip-timing]").analyze();
   expect(results.violations).toEqual([]);

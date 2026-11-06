@@ -50,6 +50,7 @@ import time
 import traceback
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
+from dataclasses import replace
 from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
@@ -69,6 +70,11 @@ from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
+from squadopt.planning.native_highs import (
+    NativeWindowOutcome,
+    native_window_executor,
+    native_window_outcomes,
+)
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecError, AdviceJobSpecStore
@@ -99,6 +105,8 @@ from squadopt.platform.backend_runtime import (
 )
 from squadopt.platform.capture_context import AdviceCaptureContext
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.native_windows import execute_native_window, summarize_native_windows
+from squadopt.platform.public_entry_inputs import PUBLIC_ENTRY_SWITCH, PublicEntryInputs
 from squadopt.platform.queue_contracts import (
     DEFAULT_ARCHIVE_AFTER_SECONDS,
     ProgressRecorder,
@@ -303,6 +311,7 @@ def build_advice_compute(
     cache: AdviceCacheRepository | None = None,
     job_log_fields: dict[str, object] | None = None,
     progress: ProgressRecorder | None = None,
+    public_inputs: PublicEntryInputs | None = None,
 ) -> Callable[[AdviceJob], bytes]:
     """Return the callback that turns one claimed job into the bytes it will be served as.
 
@@ -338,9 +347,11 @@ def build_advice_compute(
             configuration_fingerprint=spec.context.configuration_fingerprint,
             rival_entry_id=address.rival_entry_id,
             strategy_uses_rival=uses_rival[address.strategy],
-            switches={MODEL_SWITCH: spec.switches[MODEL_SWITCH]}
-            if MODEL_SWITCH in spec.switches
-            else {},
+            switches={
+                name: identity
+                for name, identity in spec.switches.items()
+                if name in {MODEL_SWITCH, PUBLIC_ENTRY_SWITCH}
+            },
         )
         held = cache.get(key)
         if held is None:
@@ -393,9 +404,37 @@ def build_advice_compute(
                 f"{spec.context.capture_snapshot_id}) is no longer the one this backend "
                 "answers from; ask again to be answered from the current one.",
             )
+        menu_spec = spec
+        if PUBLIC_ENTRY_SWITCH in spec.switches:
+            fingerprint = spec.switch(PUBLIC_ENTRY_SWITCH).get("fingerprint")
+            if (
+                public_inputs is None
+                or set(spec.switches) != {PUBLIC_ENTRY_SWITCH}
+                or spec.strategy != "saf-puan"
+                or spec.window != 1
+                or spec.rival_entry_id is not None
+                or not isinstance(fingerprint, str)
+            ):
+                raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unsupported public team request.")
+            identity = contexts.identity()
+            if identity is None or identity.context != spec.context:
+                raise AdviceComputeRefused(
+                    "CONTEXT_UNAVAILABLE", "The capture changed before computation."
+                )
+            try:
+                provider = public_inputs.provider(
+                    spec.context, spec.entry_id, fingerprint, identity.snapshot.payloads
+                )
+            except (ValueError, OSError) as error:
+                raise AdviceComputeRefused(
+                    "PUBLIC_ENTRY_INPUTS_UNAVAILABLE",
+                    "The requested team's inputs are unavailable.",
+                ) from error
+            capture = replace(capture, provider=provider)
+            menu_spec = replace(spec, switches={})
         if capture.switches.official_injuries is not None:
             require_official_injury_source()
-        request = _menu_request(spec, capture)
+        request = _menu_request(menu_spec, capture)
         football = capture.switches.football if MODEL_SWITCH in spec.switches else None
         projection = football.projection if football is not None else capture.projection
         horizon_builder = (
@@ -423,20 +462,25 @@ def build_advice_compute(
                 progress,
             )
         )
+        native_windows: list[NativeWindowOutcome] = []
         try:
-            advice = advise_menu_entry(
-                request,
-                provider=capture.provider,
-                inputs=capture.inputs,
-                projection=projection,
-                rules=capture.rules,
-                horizon_builder=horizon_builder,
-                top100_counts=capture.top100_counts,
-                manager_words=capture.manager_words,
-                chip_forecast_source=capture.chip_forecast_source if football is None else None,
-                prerequisite=prerequisite,
-                on_document=None if count is None else count.solved,
-            )
+            with (
+                native_window_executor(execute_native_window),
+                native_window_outcomes() as native_windows,
+            ):
+                advice = advise_menu_entry(
+                    request,
+                    provider=capture.provider,
+                    inputs=capture.inputs,
+                    projection=projection,
+                    rules=capture.rules,
+                    horizon_builder=horizon_builder,
+                    top100_counts=capture.top100_counts,
+                    manager_words=capture.manager_words,
+                    chip_forecast_source=capture.chip_forecast_source if football is None else None,
+                    prerequisite=prerequisite,
+                    on_document=None if count is None else count.solved,
+                )
         except ChipUnavailable as error:
             raise AdviceComputeRefused(error.code, str(error)) from error
         except ManagersWordNotSolved as error:
@@ -453,6 +497,11 @@ def build_advice_compute(
                 "PLAN_NOT_FOUND",
                 "No plan was found for this selection from this capture.",
             ) from error
+        finally:
+            # Which backend answered each window search, and why any fell back: on the
+            # job's terminal log event, whatever the outcome. The answer never carries it.
+            if job_log_fields is not None and native_windows:
+                job_log_fields["window_solvers"] = summarize_native_windows(native_windows)
         if football is not None:
             advice["decision_information"] = capture.switches.decision_information(
                 capture.inputs.snapshot_id
@@ -933,6 +982,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 cache=running.cache,
                 job_log_fields=job_log_fields,
                 progress=running.queue.record_progress,
+                public_inputs=running.public_inputs,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.

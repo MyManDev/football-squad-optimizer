@@ -9,7 +9,9 @@ The FPL forwarder ([ADR 0012](../architecture/decisions/0012-fpl-forwarder.md)) 
 league, read from FPL's `leagues-classic/{league}/standings/?page_standings={page}` on the
 visitor's request and trimmed to the fields below. It is never FPL's own JSON. Since #983 step 4
 the site reads it for a league its directory does not list (`web/src/features/league/forwarded/`):
-page 1 when the league's address is opened, and each next page as the visitor scrolls.
+page 1 when the league's address is opened, then only the page the visitor requests. The
+page number is kept in the address; a jump does not fetch intervening pages and the table
+renders at most one FPL page at a time.
 
 ## Fields
 
@@ -19,8 +21,8 @@ page 1 when the league's address is opened, and each next page as the visitor sc
 | `league.id` | The league asked for. FPL's answer must declare it, or the answer is not read. |
 | `league.name` | The league's name as FPL states it, or `null` when it states none. |
 | `league.scoring` | Exactly `classic`: the route reads classic standings only, and a head-to-head league is refused. |
-| `page` | The page asked for, 1 to 20. FPL's answer must be that page. |
-| `has_next` | FPL's `has_next`: whether a further page exists. On page 20 it says the league has more than the device reads. |
+| `page` | The page asked for, 1 to 1000. FPL's answer must be that page. |
+| `has_next` | FPL's `has_next`: whether a further page exists. |
 | `last_updated_data` | FPL's `last_updated_data` as text, or `null` when absent or blank. Pages of one league read together should share it, as the capture's reader requires. |
 | `source_time` | When the forwarder read the page (UTC, ISO 8601, ending in `Z`). A last good copy keeps its original time. |
 | `results` | The page's rows in FPL's order. |
@@ -42,7 +44,7 @@ Each row keeps eight of FPL's fields, under FPL's names, so a port of the Python
 
 Every refusal is JSON with `x-squadopt-fpl: 1`, never this document:
 
-- a page above 20, a league id that is not a positive integer, or a query other than `page`:
+- a page above 1000, a league id that is not a positive integer, or a query other than `page`:
   404 `not_found`, with FPL asked nothing;
 - FPL has no classic page 1 for the id and its head-to-head table declares the league: 404
   `head_to_head_league`, naming the league;

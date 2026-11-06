@@ -2,6 +2,7 @@ export type Language = "tr" | "en";
 
 const en = {
   suggestionHistory: {
+    requested: "On request",
     recordedPlans: "Suggested move",
     noRecordedMoves: "No moves",
     title: "Weekly suggestion history",
@@ -161,6 +162,11 @@ const en = {
     leagueTitle: (leagueId: number) => `League ${leagueId}`,
     loading: "Reading the league…",
     more: "Show more",
+    pagination: "League pages",
+    page: "Page",
+    go: "Go",
+    previousPage: "Previous page",
+    nextPage: "Next page",
     moreFailed: "The next page of the table could not be read.",
     teamTitle: (entryId: number) => `Team ${entryId}`,
     teamNotFound: (entryId: number) => `There is no FPL team with ID ${entryId}.`,
@@ -577,6 +583,7 @@ type MessageSchema<T> = {
 
 const tr: MessageSchema<typeof en> = {
   suggestionHistory: {
+    requested: "İstek üzerine",
     recordedPlans: "Önerilen hamle",
     noRecordedMoves: "Hamle yok",
     title: "Haftalık öneri geçmişi",
@@ -725,6 +732,11 @@ const tr: MessageSchema<typeof en> = {
     leagueTitle: (leagueId) => `${leagueId} numaralı lig`,
     loading: "Lig okunuyor…",
     more: "Daha fazla göster",
+    pagination: "Lig sayfaları",
+    page: "Sayfa",
+    go: "Git",
+    previousPage: "Önceki sayfa",
+    nextPage: "Sonraki sayfa",
     moreFailed: "Tablonun sonraki sayfası okunamadı.",
     teamTitle: (entryId) => `${entryId} numaralı takım`,
     teamNotFound: (entryId) => `${entryId} numaralı bir FPL takımı bulunamadı.`,

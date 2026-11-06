@@ -4,7 +4,7 @@
  * bundle for that table's gameweek. Each spreads the league feature's read policy.
  */
 
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { loadDevicePlanTable } from "../data";
 import { loadLeagueDirectory, type DevicePlanTableRef, type LeagueDirectory } from "../directory";
@@ -14,16 +14,12 @@ import {
   type ForwarderReason,
   type StandingsReason,
 } from "../forwarder/client";
-import {
-  MAX_STANDINGS_PAGE,
-  type FplLeagueStandings,
-  type FplStandingRow,
-} from "../forwarder/documents";
+import { MAX_STANDINGS_PAGE, type FplLeagueStandings } from "../forwarder/documents";
 import { LEAGUE_READ, leagueKeys } from "../queries";
 
 /** The forwarded reads' cache keys, each naming its league, entry or table. */
 export const forwardedKeys = {
-  standings: (leagueId: number) => ["fpl-standings", leagueId] as const,
+  standings: (leagueId: number, page = 1) => ["fpl-standings", leagueId, page] as const,
   table: (table: DevicePlanTableRef | null) =>
     ["device-capture-table", table?.path ?? null, table?.sha256 ?? null] as const,
   bundle: (entryId: number, gameweek: number | null) =>
@@ -61,39 +57,32 @@ export function refusalOf(error: unknown): ForwarderReason {
 }
 
 /**
- * A classic league's standings as the visitor scrolls: page 1 first, then each next page
- * while FPL says there is one, up to the forwarder's twentieth. The league gate reads page 1
- * through this same read, so the table under it starts from the page the gate opened.
- * `leagueId` null reads nothing.
+ * One requested page. The gate and table share page 1; browsing never downloads the
+ * intervening pages or every member of a large league. `leagueId` null reads nothing.
  */
-export function useForwardedStandings(leagueId: number | null) {
-  return useInfiniteQuery({
-    queryKey: forwardedKeys.standings(leagueId ?? 0),
-    queryFn: async ({ pageParam, signal }): Promise<FplLeagueStandings> => {
-      const read = await standings(leagueId!, pageParam, { signal });
+export function useForwardedStandings(leagueId: number | null, page = 1) {
+  return useQuery({
+    queryKey: forwardedKeys.standings(leagueId ?? 0, page),
+    queryFn: async ({ signal }): Promise<FplLeagueStandings> => {
+      const read = await standings(leagueId!, page, { signal });
       if (!read.ok) throw new ForwarderRefused(read.reason);
       return read.document;
     },
-    initialPageParam: 1,
-    getNextPageParam: (last: FplLeagueStandings) =>
-      last.has_next && last.page < MAX_STANDINGS_PAGE ? last.page + 1 : undefined,
     enabled: leagueId !== null,
     ...LEAGUE_READ,
   });
 }
 
-/** The rows of the pages read so far, each entry once, in FPL's order. */
-export function standingRows(pages: readonly FplLeagueStandings[] | undefined): FplStandingRow[] {
-  const seen = new Set<number>();
-  const rows: FplStandingRow[] = [];
-  for (const page of pages ?? []) {
-    for (const row of page.results) {
-      if (seen.has(row.entry)) continue;
-      seen.add(row.entry);
-      rows.push(row);
-    }
-  }
-  return rows;
+/** A URL/history page is bounded before it can become a forwarder request. */
+export function standingsPage(value: unknown): number {
+  if (typeof value !== "string" && typeof value !== "number") return 1;
+  const page = Number(value);
+  return /^\d+$/.test(String(value)) &&
+    Number.isSafeInteger(page) &&
+    page >= 1 &&
+    page <= MAX_STANDINGS_PAGE
+    ? page
+    : 1;
 }
 
 /**

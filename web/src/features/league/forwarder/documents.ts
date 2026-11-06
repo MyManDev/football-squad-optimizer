@@ -6,6 +6,7 @@
  * `fpl_entry_bundle_v1.md` and `week_live_v1.md`.
  */
 
+import { weekActivity, type WeekActivity } from "../../liveScore/weekActivity";
 import {
   memberWeek,
   weekLive,
@@ -18,8 +19,8 @@ export const STANDINGS_CONTRACT = "fpl_league_standings_v1";
 export const BUNDLE_CONTRACT = "fpl_entry_bundle_v1";
 export const LIVE_CONTRACT = "week_live_v1";
 
-/** The forwarder reads classic leagues of up to 20 pages. */
-export const MAX_STANDINGS_PAGE = 20;
+/** Each request reads one page; country leagues can be browsed beyond the first thousand members. */
+export const MAX_STANDINGS_PAGE = 1000;
 export const LAST_GAMEWEEK = 38;
 
 export interface FplStandingRow {
@@ -257,6 +258,14 @@ export function readLiveWeek(value: unknown, gameweek: number): WeekLive | null 
     const document = weekLive(value);
     need(document.gameweek === gameweek && document.members === undefined);
     need(document.elements.every((row) => row.position === undefined && row.club === undefined));
+    return document;
+  });
+}
+
+export function readLiveActivity(value: unknown, gameweek: number): WeekActivity | null {
+  return readOrNull(() => {
+    const document = weekActivity(value);
+    need(readLiveWeek(document.week, gameweek) !== null);
     return document;
   });
 }

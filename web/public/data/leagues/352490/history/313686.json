@@ -1,435 +1,29 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-11-04T02:00:46.600538Z",
+  "generated_at_utc": "2026-11-06T08:31:54.156133Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 313686,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+    "as_of_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
     "weeks": [
       {
         "gameweek": 10,
-        "status": "unsettled",
-        "reason": "not_settled",
+        "status": "unavailable",
+        "reason": "not_published",
         "deadline_utc": "2026-11-06T18:30:00Z",
-        "advice_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
-        "advice_captured_at_utc": "2026-11-04T02:00:46.600538Z",
-        "advice_generated_at_utc": "2026-11-04T06:28:27Z",
-        "advice_sha256": "1117e9e2cacfd8cebefddde3f13c41c6d4e1bb4586433bb039be13ac8b862038",
+        "advice_snapshot_id": null,
+        "advice_captured_at_utc": null,
+        "advice_generated_at_utc": null,
+        "advice_sha256": null,
         "outcome_snapshot_id": null,
         "outcome_captured_at_utc": null,
-        "expected_own_points": 55.582915438725436,
+        "expected_own_points": null,
         "suggested": null,
         "actual": null,
         "actual_reason": null,
         "net_difference": null,
-        "players": [],
-        "recorded_plans": [
-          {
-            "published_path": "advice/313686/saf-puan/1.json",
-            "strategy": "saf-puan",
-            "window": 1,
-            "rival_entry_id": null,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Johan Manzambi",
-                "player_in": "Declan Rice"
-              }
-            ],
-            "expected_points_cost": 0.0
-          },
-          {
-            "published_path": "advice/313686/ortak-koru/1/vs-2199732.json",
-            "strategy": "ortak-koru",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Jorrel Hato",
-                "player_in": "Kristoffer Ajer"
-              }
-            ],
-            "expected_points_cost": 0.8982380142186273,
-            "expected_points_cost_ceiling": 0.8982380142186273
-          },
-          {
-            "published_path": "advice/313686/fark-yarat/1/vs-2199732.json",
-            "strategy": "fark-yarat",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Johan Manzambi",
-                "player_in": "Declan Rice"
-              }
-            ],
-            "expected_points_cost": 0.0,
-            "expected_points_cost_ceiling": 0.0
-          },
-          {
-            "published_path": "advice/313686/saf-puan/1/top100-5.json",
-            "strategy": "saf-puan",
-            "window": 1,
-            "rival_entry_id": null,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 5
-          },
-          {
-            "published_path": "advice/313686/saf-puan/1/top100-10.json",
-            "strategy": "saf-puan",
-            "window": 1,
-            "rival_entry_id": null,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 10
-          },
-          {
-            "published_path": "advice/313686/saf-puan/1/top100-20.json",
-            "strategy": "saf-puan",
-            "window": 1,
-            "rival_entry_id": null,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 20
-          },
-          {
-            "published_path": "advice/313686/saf-puan/1/top100-30.json",
-            "strategy": "saf-puan",
-            "window": 1,
-            "rival_entry_id": null,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 30
-          },
-          {
-            "published_path": "advice/313686/saf-puan/1/top100-40.json",
-            "strategy": "saf-puan",
-            "window": 1,
-            "rival_entry_id": null,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 40
-          },
-          {
-            "published_path": "advice/313686/saf-puan/1/top100-50.json",
-            "strategy": "saf-puan",
-            "window": 1,
-            "rival_entry_id": null,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 50
-          },
-          {
-            "published_path": "advice/313686/ortak-koru/1/vs-2199732/top100-5.json",
-            "strategy": "ortak-koru",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Jorrel Hato",
-                "player_in": "Kristoffer Ajer"
-              }
-            ],
-            "expected_points_cost": 0.8982380142186273,
-            "expected_points_cost_ceiling": 0.8982380142186273,
-            "top100_weight": 5
-          },
-          {
-            "published_path": "advice/313686/ortak-koru/1/vs-2199732/top100-10.json",
-            "strategy": "ortak-koru",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Johan Manzambi",
-                "player_in": "Marcus Tavernier"
-              }
-            ],
-            "expected_points_cost": 0.7153305835364847,
-            "expected_points_cost_ceiling": 0.7153305835364847,
-            "top100_weight": 10
-          },
-          {
-            "published_path": "advice/313686/ortak-koru/1/vs-2199732/top100-20.json",
-            "strategy": "ortak-koru",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Johan Manzambi",
-                "player_in": "Marcus Tavernier"
-              }
-            ],
-            "expected_points_cost": 0.7153305835364847,
-            "expected_points_cost_ceiling": 0.7153305835364847,
-            "top100_weight": 20
-          },
-          {
-            "published_path": "advice/313686/ortak-koru/1/vs-2199732/top100-30.json",
-            "strategy": "ortak-koru",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Johan Manzambi",
-                "player_in": "Marcus Tavernier"
-              }
-            ],
-            "expected_points_cost": 0.7153305835364847,
-            "expected_points_cost_ceiling": 0.7153305835364847,
-            "top100_weight": 30
-          },
-          {
-            "published_path": "advice/313686/ortak-koru/1/vs-2199732/top100-40.json",
-            "strategy": "ortak-koru",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Johan Manzambi",
-                "player_in": "Marcus Tavernier"
-              }
-            ],
-            "expected_points_cost": 0.7153305835364847,
-            "expected_points_cost_ceiling": 0.7153305835364847,
-            "top100_weight": 40
-          },
-          {
-            "published_path": "advice/313686/ortak-koru/1/vs-2199732/top100-50.json",
-            "strategy": "ortak-koru",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Johan Manzambi",
-                "player_in": "Marcus Tavernier"
-              }
-            ],
-            "expected_points_cost": 0.7153305835364847,
-            "expected_points_cost_ceiling": 0.7153305835364847,
-            "top100_weight": 50
-          },
-          {
-            "published_path": "advice/313686/fark-yarat/1/vs-2199732/top100-5.json",
-            "strategy": "fark-yarat",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 5
-          },
-          {
-            "published_path": "advice/313686/fark-yarat/1/vs-2199732/top100-10.json",
-            "strategy": "fark-yarat",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 10
-          },
-          {
-            "published_path": "advice/313686/fark-yarat/1/vs-2199732/top100-20.json",
-            "strategy": "fark-yarat",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 20
-          },
-          {
-            "published_path": "advice/313686/fark-yarat/1/vs-2199732/top100-30.json",
-            "strategy": "fark-yarat",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 30
-          },
-          {
-            "published_path": "advice/313686/fark-yarat/1/vs-2199732/top100-40.json",
-            "strategy": "fark-yarat",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 40
-          },
-          {
-            "published_path": "advice/313686/fark-yarat/1/vs-2199732/top100-50.json",
-            "strategy": "fark-yarat",
-            "window": 1,
-            "rival_entry_id": 2199732,
-            "chip": null,
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0819435220793352,
-            "expected_points_cost_ceiling": 0.0819435220793352,
-            "top100_weight": 50
-          },
-          {
-            "published_path": "advice/313686/saf-puan/1/chip-freehit.json",
-            "strategy": "saf-puan",
-            "window": 1,
-            "rival_entry_id": null,
-            "chip": "freehit",
-            "captain": "Erling Haaland",
-            "moves": [
-              {
-                "player_out": "Pascal Groß",
-                "player_in": "Declan Rice"
-              },
-              {
-                "player_out": "John Egan",
-                "player_in": "Issa Diop"
-              },
-              {
-                "player_out": "Alex Palmer",
-                "player_in": "Teddy Sharman-Lowe"
-              },
-              {
-                "player_out": "Bruno Borges Fernandes",
-                "player_in": "Regan Slater"
-              },
-              {
-                "player_out": "Morgan Rogers",
-                "player_in": "Bryan Mbeumo"
-              },
-              {
-                "player_out": "Riccardo Calafiori",
-                "player_in": "Gabriel dos Santos Magalhães"
-              },
-              {
-                "player_out": "Jorrel Hato",
-                "player_in": "Abdoul Ouattara"
-              },
-              {
-                "player_out": "Thierno Barry",
-                "player_in": "Alexander Isak"
-              },
-              {
-                "player_out": "Johan Manzambi",
-                "player_in": "Yasin Ayari"
-              },
-              {
-                "player_out": "Jonah Kusi-Asare",
-                "player_in": "Nicolas Jackson"
-              }
-            ],
-            "expected_points_cost": 0.0
-          }
-        ]
+        "players": []
       },
       {
         "gameweek": 9,
@@ -440,8 +34,8 @@
         "advice_captured_at_utc": "2026-10-30T07:00:58.818398Z",
         "advice_generated_at_utc": "2026-10-30T08:03:14Z",
         "advice_sha256": "63f96e3762999d107f0068f6fca4f09a6b5aecc1caf527d12c83bb3afafb5729",
-        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
-        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
+        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
+        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
         "expected_own_points": 54.12607410852291,
         "suggested": {
           "gross_points": 74.0,
@@ -456,7 +50,7 @@
           "transfer_hit_points": 0.0,
           "net_points": 72.0,
           "details": {
-            "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+            "source_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
             "captain": {
               "player_id": 223094,
               "name": "Haaland",
@@ -1237,8 +831,8 @@
         "advice_captured_at_utc": "2026-10-23T11:16:47.162538Z",
         "advice_generated_at_utc": "2026-10-23T12:40:33Z",
         "advice_sha256": "d9f8ca2fb72f201402d35d9d754f5f74ae2617715ade3b5e884d7b54bc78bcd5",
-        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
-        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
+        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
+        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
         "expected_own_points": 55.48752911085304,
         "suggested": {
           "gross_points": 42.0,
@@ -2034,8 +1628,8 @@
         "advice_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "advice_generated_at_utc": "2026-10-16T07:13:49Z",
         "advice_sha256": "1336355dafab090824fccf16289949c33056eb25f8367aa7d46cb6d6b85018e8",
-        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
-        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
+        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
+        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
         "expected_own_points": 58.20318064017789,
         "suggested": {
           "gross_points": 65.0,
@@ -2842,8 +2436,8 @@
         "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
         "advice_generated_at_utc": "2026-10-10T06:07:04Z",
         "advice_sha256": "a368830cc908c219e06c99024afe4eb69f8e080be6028b566f2e94295103dd6d",
-        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
-        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
+        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
+        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
         "expected_own_points": 56.43947555743522,
         "suggested": {
           "gross_points": 73.0,
@@ -3650,8 +3244,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "db115e09936e8f00c16f3a8bb3ae1e9d5bcc132732373f55024e5377b3b0bb51",
-        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
-        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
+        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
+        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
         "expected_own_points": 57.538282006301074,
         "suggested": {
           "gross_points": 59.0,
@@ -3922,8 +3516,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "aeecb330247e9d8a775021410ea53a3e5a5f94fb148cf792443a5220f8c75809",
-        "outcome_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
-        "outcome_captured_at_utc": "2026-11-04T02:00:46.600538Z",
+        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
+        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
         "expected_own_points": 55.570688627208106,
         "suggested": {
           "gross_points": 69.0,

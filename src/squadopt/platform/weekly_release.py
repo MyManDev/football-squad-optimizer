@@ -6,7 +6,9 @@ D1 on #1243 (6559389043, 2026-11-01): a scheduled run opens its site pull reques
 person, and its release runs only after İbo has seen that run's preview and said yes. So the
 release is a command of its own, run by hand for one completed run by its id. The gate's
 ``--release``, which would call `release_run` in the same tick once the weekly command exited
-0, stays off; switching it on is a new decision, recorded on #1243 first. The chain is
+0, stays off; switching it on is a new decision, recorded on #1243 first. It was recorded on
+2026-11-03 (6605005485): from GW11 the gate runs with ``--release``, and the backend follows
+every release on its host. The chain is
 ``scripts/weekly_release.ps1`` (#1249) in Python, so a Linux host releases too: what
 ``weekly_run.ps1`` prints for a person, in order, stopping at the first step that fails:
 
@@ -24,9 +26,16 @@ release is a command of its own, run by hand for one completed run by its id. Th
 
 The PC's step 6 was ``vm_push.sh``: it streams the PC's captures to the VM and restarts the
 backend's containers there. On the backend host the run wrote its data on that host already,
-so that step does not apply and the chain never calls it. No agent or automation
-starts, restarts or stops the backend, so the default hook writes one line and runs nothing:
-the backend's operator moves it to the release.
+so that step does not apply and the chain never calls it. Two hooks move the backend instead:
+
+- `leave_backend_to_its_operator`, the default, writes one line and runs nothing: the
+  backend's operator moves it to the release;
+- `move_backend_on_this_host`, which ``--backend host`` chooses on the schedule's host, hands
+  the release to root there. It writes one request into the spool, where
+  ``squadopt-backend-release`` (``deploy/weekly-schedule``) takes it and runs the five steps
+  of ``scripts/release/vm_football_release.py`` from this run's own data, then waits for its
+  result. That package carries the run's club news and rotation table, so step 7 seals
+  nothing on that host.
 
 Each step writes one line to ``data/logs/weekly/<run id>.release.log`` and prints it; the
 commands' output goes to ``<run id>.release-commands.log``. The release log is the run's
@@ -40,6 +49,7 @@ person reconciles from the two logs.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import re
@@ -54,6 +64,8 @@ from pathlib import Path
 from typing import Final
 
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
+from squadopt.data.atomic import write_document_once
+from squadopt.data.errors import AtomicWriteError
 from squadopt.platform.weekly_journal import WeeklyJournalError, held_run
 from squadopt.platform.weekly_publish import WEEKLY_RUNS
 
@@ -77,6 +89,15 @@ PULL_REQUEST: Final = re.compile(r"^PR: (https://github\.com/\S+)", re.MULTILINE
 RETAINED: Final = re.compile(r"[\\/]by-capture[\\/]")
 #: The two documents of the forecast a seal reads, beside each other under `<root>/football`.
 FORECAST: Final = (".json", ".components.json")
+#: The two ways the backend follows a release (module docstring, step 6).
+BACKENDS: Final = ("operator", "host")
+#: Where the chain leaves a request for root's ``squadopt-backend-release``, and where that
+#: command leaves its result (``deploy/weekly-schedule/README.md``, "The advice backend").
+BACKEND_SPOOL: Final = Path("/srv/squadopt/spool/backend")
+BACKEND_STATE: Final = Path("/var/lib/squadopt/backend")
+#: How long the chain waits for the backend's move: prepare builds an image and candidate
+#: runs an advice job; the root unit stops the command at 50 minutes.
+BACKEND_MINUTES: Final = 55
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,9 +112,9 @@ class Completed:
 Runner = Callable[[Sequence[str], Path, Path], Completed]
 #: Writes one line to the release log.
 Say = Callable[[str], None]
-#: Moves the backend to the release tag once the site is live, saying what it did; 0, or the
-#: code that stops the chain.
-MoveBackend = Callable[[str, Say], int]
+#: Moves the backend to the release tag once the site is live, from what the run left, saying
+#: what it did; 0, or the code that stops the chain.
+MoveBackend = Callable[[str, "ReleaseInputs", Say], int]
 #: Waits a number of seconds between two reads of GitHub.
 Pause = Callable[[float], None]
 
@@ -106,6 +127,7 @@ class ReleaseRefused(ValueError):
 class ReleaseInputs:
     """What a completed run left for its release: its journal, its log and its preview."""
 
+    run_id: str
     kind: str
     season: str
     gameweek: int
@@ -118,6 +140,11 @@ class ReleaseInputs:
     snapshots: Path
     handoff: Path
     rotation: str
+    #: The capture's deadline, and the file names of the manifests a backend package reads;
+    #: empty when the run's journal does not record them.
+    deadline_utc: str = ""
+    top100_manifest: str = ""
+    rotation_manifest: str = ""
 
     @property
     def number(self) -> str:
@@ -154,6 +181,8 @@ def release_inputs(workspace: Path, run_id: str) -> ReleaseInputs:
         news = str(request.get("rotation_capture") or "")
         commit = str(stages["publish"]["value"].get("publication_commit") or "")
         capture = str(stages["capture"]["value"]["snapshot_id"])
+        deadline = str(stages["capture"]["value"].get("deadline_utc") or "")
+        top100 = str(stages.get("top100_evidence", {}).get("value", {}).get("manifest") or "")
         retained = [
             str(output["path"])
             for output in stages["handoff"]["outputs"]
@@ -161,6 +190,7 @@ def release_inputs(workspace: Path, run_id: str) -> ReleaseInputs:
         ]
         handoff = Path(retained[0] if retained else str(stages["handoff"]["value"]["path"]))
         rotation = str(stages["rotation"]["value"]["table"]) if news else ""
+        rotation_manifest = str(stages["rotation"]["value"].get("manifest") or "") if news else ""
         preview, snapshots = Path(str(paths["out"])) / "data", Path(str(paths["snapshots"]))
     except (KeyError, TypeError, ValueError) as error:
         raise ReleaseRefused(
@@ -181,6 +211,7 @@ def release_inputs(workspace: Path, run_id: str) -> ReleaseInputs:
     if not pull_request:
         raise ReleaseRefused("The run's log names no site pull request.")
     return ReleaseInputs(
+        run_id=run_id,
         kind=kind[1],
         season=season,
         gameweek=gameweek,
@@ -193,6 +224,9 @@ def release_inputs(workspace: Path, run_id: str) -> ReleaseInputs:
         snapshots=snapshots,
         handoff=handoff,
         rotation=rotation,
+        deadline_utc=deadline,
+        top100_manifest=Path(top100).name if top100 else "",
+        rotation_manifest=Path(rotation_manifest).name if rotation_manifest else "",
     )
 
 
@@ -239,7 +273,7 @@ def bundle_root(workspace: Path) -> Path:
     return root if root.is_absolute() else workspace / root
 
 
-def leave_backend_to_its_operator(tag: str, say: Say) -> int:
+def leave_backend_to_its_operator(tag: str, release: ReleaseInputs, say: Say) -> int:
     """The default backend move: one line in the release log, and no command at all.
 
     The team rule is that no agent or automation starts, restarts or stops the backend. So
@@ -250,6 +284,96 @@ def leave_backend_to_its_operator(tag: str, say: Say) -> int:
 
     say(f"backend: left to its operator to move to {tag}; nothing was started or stopped")
     return 0
+
+
+def backend_request(tag: str, release: ReleaseInputs) -> dict[str, object]:
+    """The request `squadopt-backend-release` takes: the release and the files it packs.
+
+    Files are named, never given as paths: root looks each one up in its one directory of the
+    weekly checkout. A run whose journal does not record them, or records no handoff retained by
+    its capture, is refused here.
+    """
+
+    missing = [
+        name
+        for name, value in (
+            ("the capture's deadline", release.deadline_utc),
+            ("the Top 100 manifest", release.top100_manifest),
+            ("the rotation manifest", release.rotation_manifest if release.news else "-"),
+            (
+                "a handoff retained by its capture",
+                "-" if RETAINED.search(str(release.handoff)) else "",
+            ),
+        )
+        if not value
+    ]
+    if missing:
+        raise ReleaseRefused(f"run {release.run_id} records no {', '.join(missing)}")
+    return {
+        "run_id": release.run_id,
+        "tag": tag,
+        "season": release.season,
+        "gameweek": release.gameweek,
+        "capture": release.capture,
+        "deadline_utc": release.deadline_utc,
+        "top100_manifest": release.top100_manifest,
+        "news": release.news,
+        "rotation_manifest": release.rotation_manifest,
+        # The copy retained for this capture, not the gameweek's alias, which a later run of the
+        # same week rewrites (found on 2026-11-05, when the alias held the next morning's).
+        "handoff_retained": release.handoff.name,
+    }
+
+
+def move_backend_on_this_host(
+    tag: str,
+    release: ReleaseInputs,
+    say: Say,
+    *,
+    spool: Path = BACKEND_SPOOL,
+    state: Path = BACKEND_STATE,
+    pause: Pause = time.sleep,
+    minutes: int = BACKEND_MINUTES,
+) -> int:
+    """Hand the release to root's ``squadopt-backend-release`` on this host and wait for it.
+
+    The request is written once, through a temporary the path unit ignores; a different
+    request already waiting for the run is refused. The result's lines go into the release
+    log; its code is the hook's, and 124 when no result came within `minutes`.
+    """
+
+    try:
+        request = backend_request(tag, release)
+    except ReleaseRefused as error:
+        say(f"backend: refused: {error}; the backend was not moved")
+        return 2
+    result = state / f"{release.run_id}.result.json"
+    if result.exists():
+        say(f"backend: refused: {result} exists, so this run was moved before")
+        return 2
+    spool.mkdir(parents=True, exist_ok=True)
+    try:
+        write_document_once(request, spool / f"{release.run_id}.json")
+    except AtomicWriteError as error:
+        say(f"backend: refused: another request for this run waits in {spool} ({error})")
+        return 2
+    say(f"backend: asked root to move to {tag} from capture {release.capture}")
+    for _ in range(minutes * 4):
+        if result.is_file():
+            break
+        pause(15)
+    else:
+        say(f"backend: no result within {minutes} min; read {state / release.run_id}.log")
+        return 124
+    try:
+        document = json.loads(result.read_text(encoding="utf-8"))
+        code, lines = int(document["code"]), [str(line) for line in document["lines"]]
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        say(f"backend: the result {result} is unreadable ({error!r})")
+        return 1
+    for line in lines:
+        say(line)
+    return code
 
 
 def posix_shell() -> str:
@@ -332,12 +456,14 @@ def release_run(
     pause: Pause = time.sleep,
     wait_minutes: int = WAIT_MINUTES,
     summary: str = SUMMARY,
+    bundle_in_package: bool = False,
 ) -> int:
     """Release the completed run `run_id`: every step in order, the first that fails stops it.
 
     `runner` is the one door to every outside command and `move_backend` the backend's move,
     both seams; the exit code is 0 when every step completed, 2 for a refusal before the
-    enqueue and 1 for a stop after it.
+    enqueue and 1 for a stop after it. With `bundle_in_package`, the backend's release package
+    carried the run's club news, so the seal is not attempted.
     """
 
     if not RUN_ID.fullmatch(run_id):
@@ -426,7 +552,7 @@ def release_run(
         )
         return 1
     say(f"live: {tag}")
-    moved = move_backend(tag, say)
+    moved = move_backend(tag, release, say)
     if moved != 0:
         say(
             f"stopped: the backend move exited {moved}; the site is live, the backend is not "
@@ -435,6 +561,9 @@ def release_run(
         return 1
     if not release.news:
         say("bundle: none, the run read no club-news capture")
+        return 0
+    if bundle_in_package:
+        say(f"bundle: the backend's release package carries club news {release.news}")
         return 0
     return seal_bundle(workspace, release, run, say)
 
@@ -490,19 +619,37 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="the completed run to release, as the gate's start line on #1093 names it",
     )
+    parser.add_argument(
+        "--backend",
+        choices=BACKENDS,
+        default="operator",
+        help="who moves the backend once the site is live: its operator, or root on this host",
+    )
     return parser
 
 
+def releaser(backend: str) -> Callable[[Path, str], int]:
+    """`release_run` with the backend hook `backend` names: ``operator`` or ``host``."""
+
+    if backend == "host":
+        return functools.partial(
+            release_run, move_backend=move_backend_on_this_host, bundle_in_package=True
+        )
+    return release_run
+
+
 def main(
-    argv: list[str] | None = None, *, release: Callable[[Path, str], int] = release_run
+    argv: list[str] | None = None, *, release: Callable[[Path, str], int] | None = None
 ) -> int:
     """Release one completed run by its id, after its preview and a yes (D1 on #1243).
 
-    `release` is the seam: the chain's own `release_run` unless a test passes another.
+    `release` is the seam: the chain's own `release_run`, with the hook ``--backend`` names,
+    unless a test passes another.
     """
 
     arguments = build_parser().parse_args(argv)
-    return release(arguments.workspace.resolve(), arguments.run_id)
+    chosen = release if release is not None else releaser(arguments.backend)
+    return chosen(arguments.workspace.resolve(), arguments.run_id)
 
 
 if __name__ == "__main__":

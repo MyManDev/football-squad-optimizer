@@ -84,6 +84,88 @@ const expected = (name: LiveExample) => {
 
 const net = () => screen.getByText("Net puan", { exact: true }).nextElementSibling;
 
+it("reads and refreshes realized activity through the real opt-in client without extra live requests", async () => {
+  const live = forwardedLive("in_progress", WEEK);
+  const fixture = live.fixtures.find((row) => !row.finished)!;
+  const scorer = live.elements.find(
+    (row) => MEMBER.pick_order.includes(row.element_id) && row.minutes > 0,
+  )!;
+  let goals = 0;
+  let minute = 0;
+  const transport = vi.fn(async (input: string) => {
+    const document = input.includes("/bundle")
+      ? BUNDLE
+      : {
+          contract_version: "week_activity_v1",
+          week: {
+            ...live,
+            source_time: new Date(Date.parse(live.source_time) + minute * 60_000).toISOString(),
+          },
+          activity: {
+            in_play_fixtures: [fixture.id],
+            appearances: live.elements.map((row) => ({
+              element_id: row.element_id,
+              fixture_id: fixture.id,
+              minutes: row.minutes,
+              goals: row.element_id === scorer.element_id ? goals : 0,
+              assists: 0,
+            })),
+          },
+        };
+    if (!input.includes("/bundle")) expect(input).toContain("?view=activity");
+    return Response.json(document, { headers: { "x-squadopt-fpl": "1" } });
+  });
+  const { container } = show({
+    forwarder: createForwarderClient({ fetch: transport }),
+    loadTable: tableLoader(),
+  });
+  await screen.findByText("Bonus bekleniyor");
+  expect(screen.getAllByRole("img", { name: "Maç sürüyor" }).length).toBeGreaterThan(0);
+  expect(transport).toHaveBeenCalledTimes(2);
+  goals = 1;
+  minute = 1;
+  fireEvent.click(screen.getByRole("button", { name: "Yenile" }));
+  await screen.findByLabelText("Gol: 1");
+  const highlighted = container.querySelector("[data-live-highlight]");
+  expect(highlighted).toHaveAttribute("data-live-player", String(scorer.element_id));
+  minute = 2;
+  fireEvent.click(screen.getByRole("button", { name: "Yenile" }));
+  await waitFor(() => expect(transport).toHaveBeenCalledTimes(4));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Yenile" })).toBeEnabled());
+  expect(container.querySelector("[data-live-highlight]")).toBe(highlighted);
+});
+
+it("uses the original score route when an older Worker has no activity view", async () => {
+  const forwarder = {
+    ...forwarderAnswering(okBundle(), okLive("in_progress")),
+    liveActivity: vi.fn(async () => ({ ok: false, reason: "not_found" }) as const),
+  };
+  show({ forwarder, loadTable: tableLoader() });
+  await screen.findByText("Bonus bekleniyor");
+  expect(forwarder.liveActivity).toHaveBeenCalledTimes(1);
+  expect(forwarder.liveWeek).toHaveBeenCalledTimes(1);
+});
+
+it("does not replace a newer visible score with an older last-good refresh", async () => {
+  const current = okLive("in_progress");
+  const older = structuredClone(current);
+  older.document.source_time = new Date(
+    Date.parse(current.document.source_time) - 60_000,
+  ).toISOString();
+  older.document.elements.forEach((row) => {
+    row.points = 0;
+  });
+  const forwarder = forwarderAnswering(okBundle(), current, older);
+  const { container } = show({ forwarder, loadTable: tableLoader() });
+  await screen.findByText("Bonus bekleniyor");
+  const heldNet = net()?.textContent;
+  fireEvent.click(screen.getByRole("button", { name: "Yenile" }));
+  await waitFor(() => expect(forwarder.liveWeek).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Yenile" })).toBeEnabled());
+  expect(net()).toHaveTextContent(heldNet!);
+  expect(container.querySelector("time")).toHaveAttribute("datetime", current.document.source_time);
+});
+
 describe.each(["tr", "en"] as const)("the member's live week in %s", (language) => {
   it("shows a week in progress, read once on open", async () => {
     const forwarder = forwarderAnswering(okBundle(), okLive("in_progress"));

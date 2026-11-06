@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Send one alert to a person's phone through ntfy (#1294): squadopt-alert <priority> <title> <text>.
+# backend.sh installs it as /usr/local/sbin/squadopt-alert; squadopt-backup calls it when a backup
+# fails. The topic (and a token, for a protected topic) come from /etc/squadopt/alert.env, which
+# the units name as an EnvironmentFile and a person writes (README, "Backups and alerts"). It
+# prints neither, and a send that fails is reported on stderr, never retried in a loop.
+set -euo pipefail
+
+priority="${1:?usage: squadopt-alert <min|low|default|high|urgent> <title> <text>}"
+title="${2:?usage: squadopt-alert <priority> <title> <text>}"
+text="${3:?usage: squadopt-alert <priority> <title> <text>}"
+case "$priority" in
+  min | low | default | high | urgent) ;;
+  *)
+    echo "Refused: priority $priority is not one ntfy takes" >&2
+    exit 2
+    ;;
+esac
+if [ -z "${NTFY_TOPIC:-}" ] && [ -r /etc/squadopt/alert.env ]; then
+  set -a
+  # shellcheck disable=SC1091  # written on the host by a person
+  . /etc/squadopt/alert.env
+  set +a
+fi
+[ -n "${NTFY_TOPIC:-}" ] || {
+  echo "Refused: no NTFY_TOPIC (README, Backups and alerts)" >&2
+  exit 2
+}
+headers=(-H "Title: $title" -H "Priority: $priority" -H "Tags: squadopt")
+if [ -n "${NTFY_TOKEN:-}" ]; then
+  headers+=(-H "Authorization: Bearer $NTFY_TOKEN")
+fi
+if ! curl -fsS -m 20 --retry 2 "${headers[@]}" --data-binary "$text" \
+  "${NTFY_URL:-https://ntfy.sh}/$NTFY_TOPIC" >/dev/null; then
+  echo "squadopt-alert: the send failed: $title" >&2
+  exit 1
+fi

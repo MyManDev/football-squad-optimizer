@@ -18,6 +18,11 @@ readonly BACKEND=/root/squadopt
 readonly TUNNEL_CONFIG=/etc/cloudflared/config.yml
 readonly TUNNEL_UNIT=cloudflared-squadopt.service
 readonly RECEIVE=/usr/local/sbin/squadopt-receive
+readonly FOLLOW=/usr/local/sbin/squadopt-backend-release
+readonly FOLLOW_UNIT=squadopt-backend-release
+readonly SPOOL=/srv/squadopt/spool/backend
+readonly STATE=/var/lib/squadopt/backend
+readonly BACKUP_STAMP=/var/lib/squadopt/backup/last-success
 readonly STORES=(
   data/snapshots data/entries data/ledger data/handoffs data/advice_records data/raw/vaastav-fpl
   artifacts/phase_b artifacts/rotation artifacts/football
@@ -151,6 +156,12 @@ if [ -e "$DROP_INS/dry-run.conf" ]; then
 else
   ok "no dry-run drop-in: ticks start real runs"
 fi
+# From GW11 (#1243, 6605005485) a run releases itself; before, it waits for a release by hand.
+if [ -e "$DROP_INS/release.conf" ]; then
+  ok "release drop-in installed: a run that exits 0 releases itself, and the backend follows"
+else
+  note "no release drop-in: a run waits at its site pull request for a release by hand"
+fi
 # The last WEEKLY_WORKERS wins: the unit's, then workers.conf's.
 workers="$(systemctl show weekly-schedule.service -p Environment --value | tr ' ' '\n' |
   sed -n 's/^WEEKLY_WORKERS=//p' | tail -1)"
@@ -196,6 +207,42 @@ else
   absent "$TUNNEL_UNIT active with $TUNNEL_CONFIG"
 fi
 if [ -x "$RECEIVE" ]; then ok "$RECEIVE"; else absent "$RECEIVE (bash backend.sh)"; fi
+if [ -x "$FOLLOW" ] && systemctl is-active --quiet "$FOLLOW_UNIT.path"; then
+  ok "$FOLLOW, its path unit watching $SPOOL"
+else
+  absent "$FOLLOW with $FOLLOW_UNIT.path active (bash backend.sh)"
+fi
+if [ "$(stat -c '%a %U' "$SPOOL" 2>/dev/null)" = "700 $SERVICE_USER" ] &&
+  [ "$(stat -c '%a %U' "$STATE" 2>/dev/null)" = "755 root" ]; then
+  ok "the spool is $SERVICE_USER's and the results root's"
+else
+  absent "$SPOOL (700, $SERVICE_USER) and $STATE (755, root)"
+fi
+waiting="$(find "$SPOOL" -maxdepth 1 -name '*.json' 2>/dev/null | wc -l)"
+if [ "$waiting" -eq 0 ]; then
+  ok "no release waits for the backend"
+else
+  note "$waiting request(s) wait in $SPOOL: read journalctl -u $FOLLOW_UNIT.service"
+fi
+
+section "Backups and alerts (#1294)"
+for file in /etc/squadopt/alert.env /etc/squadopt/backup.env /etc/squadopt/restic-password; do
+  if [ -f "$file" ] && [ "$(stat -c '%a %U' "$file")" = "600 root" ]; then
+    ok "$file (mode 600, root)"
+  else
+    absent "$file with mode 600, owner root"
+  fi
+done
+for timer in squadopt-watch.timer squadopt-backup.timer; do
+  if systemctl is-active --quiet "$timer" 2>/dev/null; then ok "$timer active"; else absent "$timer active"; fi
+done
+if [ -s "$BACKUP_STAMP" ]; then
+  done_at="$(cut -d' ' -f1 "$BACKUP_STAMP")"
+  age=$(( ($(date +%s) - $(date -d "$done_at" +%s)) / 3600 ))
+  if [ "$age" -le 36 ]; then ok "the newest backup is $age h old"; else note "the newest backup is $age h old"; fi
+else
+  absent "a successful backup ($BACKUP_STAMP)"
+fi
 
 section "Access"
 if ufw status 2>/dev/null | grep -q '^Status: active'; then

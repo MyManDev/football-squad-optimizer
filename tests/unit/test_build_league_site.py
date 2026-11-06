@@ -175,3 +175,142 @@ def test_a_refused_advice_record_names_the_escape_a_deadline_needs(
     assert "published_sha256 moved" in printed
     assert "--no-advice-record" in printed
     assert "scripts.run_week" in printed
+
+
+def _by_hand_build(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *extra: str
+) -> tuple[Any, list[dict[str, Any]]]:
+    """``build_league_site.main`` up to the solve, with the capture and the build faked.
+
+    Returns the module and the list each ``league_mapper`` call appends its keyword
+    arguments to; the mapper hands back a build whose one member had two three-week
+    searches, one answered by native HiGHS and one fallen back.
+    """
+
+    import sys
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    import scripts.build_league_site as build_league_site
+
+    from squadopt.planning.native_highs import (
+        CP_SAT_BACKEND,
+        NATIVE_BACKEND,
+        NativeWindowOutcome,
+    )
+
+    prepared = SimpleNamespace(
+        request=SimpleNamespace(snapshot_id="named-capture"),
+        registrations=(101,),
+        standings=(101,),
+        season="2026-27",
+        inputs=SimpleNamespace(deadline=SimpleNamespace(gameweek=8)),
+        scored_gameweek=None,
+        scored_members=0,
+    )
+    member = SimpleNamespace(
+        entry_id=101,
+        rendered=True,
+        reason="",
+        native_windows=(
+            NativeWindowOutcome(3, NATIVE_BACKEND, "1.15.1", ""),
+            NativeWindowOutcome(3, CP_SAT_BACKEND, "1.15.1", "The native solve did not prove"),
+        ),
+    )
+    built = SimpleNamespace(
+        report=SimpleNamespace(rendered_count=1, members=(member,), removed=(), files=()),
+        top100_note="",
+        purchase_prices_note="",
+        legacy_tree=None,
+    )
+    mapped: list[dict[str, Any]] = []
+
+    @contextmanager
+    def mapper(request: Any, workers: int, **keywords: Any) -> Any:
+        mapped.append(keywords)
+        yield map
+
+    monkeypatch.setattr(build_league_site, "resolve_live_snapshot_id", lambda *_: "named-capture")
+    monkeypatch.setattr(build_league_site, "prepare_league_publication", lambda _: prepared)
+    monkeypatch.setattr(build_league_site, "leagues_beside", lambda *_: ())
+    monkeypatch.setattr(build_league_site, "league_mapper", mapper)
+    monkeypatch.setattr(build_league_site, "publish_prepared_league", lambda *_, **__: built)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_league_site",
+            "--league",
+            "352490",
+            "--snapshot-root",
+            str(tmp_path),
+            "--out",
+            str(tmp_path / "out"),
+            "--no-advice-record",
+            *extra,
+        ],
+    )
+    return build_league_site, mapped
+
+
+def test_a_by_hand_build_refuses_a_native_child_without_the_pinned_highs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Every window would otherwise fall back to CP-SAT in silence and publish plans the
+    weekly run does not publish from the same capture."""
+
+    build_league_site, mapped = _by_hand_build(monkeypatch, tmp_path)
+    monkeypatch.setattr(build_league_site, "native_window_version", lambda: "1.14.0")
+
+    assert build_league_site.main() == 1
+
+    printed = capsys.readouterr().err
+    assert "loads HiGHS 1.14.0" in printed
+    assert "highspy==1.15.1" in printed
+    assert "--cp-sat-windows" in printed
+    assert mapped == [], "nothing may be solved after the refusal"
+
+    def missing() -> str:
+        raise RuntimeError("No module named 'highspy'")
+
+    monkeypatch.setattr(build_league_site, "native_window_version", missing)
+    assert build_league_site.main() == 1
+    assert "cannot start in this environment: No module named 'highspy'" in (
+        capsys.readouterr().err
+    )
+    assert mapped == []
+
+
+def test_a_by_hand_build_prints_which_backend_answered_each_window(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    build_league_site, mapped = _by_hand_build(monkeypatch, tmp_path)
+    monkeypatch.setattr(build_league_site, "native_window_version", lambda: "1.15.1")
+
+    assert build_league_site.main() == 0
+
+    assert mapped == [{"native_windows": True}]
+    printed = capsys.readouterr().out
+    assert "window solver: native HiGHS 1.15.1" in printed
+    assert (
+        "  windows       101  3 weeks: 2 searches, 1 native HiGHS 1.15.1, 1 CP-SAT fallback"
+    ) in printed
+    assert "fallback x1: The native solve did not prove" in printed
+
+
+def test_a_cp_sat_only_build_binds_no_native_solver_and_starts_no_child(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The rehearsal's comparison build: the same capture with every window on CP-SAT."""
+
+    build_league_site, mapped = _by_hand_build(monkeypatch, tmp_path, "--cp-sat-windows")
+
+    def probe() -> str:
+        raise AssertionError("a CP-SAT-only build must not start the native child")
+
+    monkeypatch.setattr(build_league_site, "native_window_version", probe)
+
+    assert build_league_site.main() == 0
+
+    assert mapped == [{"native_windows": False}]
+    assert "window solver: CP-SAT alone for every search" in capsys.readouterr().out

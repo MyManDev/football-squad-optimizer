@@ -34,7 +34,8 @@ from squadopt.application.live_price_honesty import (
     pairs_for_record,
     reading,
 )
-from squadopt.application.weekly_suggestion_eval import SUPPORTED_LEAGUE_ID, review_member_weeks
+from squadopt.application.weekly_suggestion_eval import legacy_record_league, review_member_weeks
+from squadopt.contracts.league_list import LEAGUE_LIST_FILE
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import live_event_outcomes, live_payload
@@ -72,13 +73,17 @@ def measure(data_root: Path, season: str, through_gameweek: int | None) -> dict[
             if directory.is_dir()
         }
     )
+    # The records under data/advice_records are the legacy league's.
+    league_id = legacy_record_league(REPOSITORY_ROOT / LEAGUE_LIST_FILE)
+    if league_id is None:
+        raise SystemExit("config/leagues.json marks no league that keeps legacy advice records.")
     selected: dict[tuple[int, int], dict[str, Any]] = {}
     reviews = review_member_weeks(
         record_root=record_root,
         snapshot_root=snapshot_root,
         as_of_snapshot=anchor,
         season=season,
-        league_id=SUPPORTED_LEAGUE_ID,
+        league_id=league_id,
         entry_ids=entries,
         selected_records=selected,
     )

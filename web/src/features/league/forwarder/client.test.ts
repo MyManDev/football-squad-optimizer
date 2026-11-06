@@ -212,7 +212,7 @@ describe("the forwarder's refusals", () => {
 
   it.each([
     ["a league id that is not a positive integer", (c: Client) => c.standings(0, 1)],
-    ["a page past 20", (c: Client) => c.standings(314, 21)],
+    ["a page past 1000", (c: Client) => c.standings(314, 1001)],
     ["a fractional page", (c: Client) => c.standings(314, 1.5)],
     ["a table gameweek before 2", (c: Client) => c.entryBundle(101, 1)],
     ["a table gameweek past 38", (c: Client) => c.entryBundle(101, 39)],

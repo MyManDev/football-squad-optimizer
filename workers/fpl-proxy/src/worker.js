@@ -36,6 +36,7 @@ import {
   freeHitWeek,
   historyPart,
   lastGoodTtl,
+  liveActivityDocument,
   liveDocument,
   liveTtl,
   liveWeekAllowed,
@@ -359,7 +360,7 @@ export function createWorker(options = {}) {
     return { document, seconds: bundleTtl({ settled, nowMs: now(), nextDeadlineMs }) };
   }
 
-  async function live({ gameweek }) {
+  async function live({ gameweek, view }) {
     const plan = await schedule();
     const { latestStarted, nextDeadlineMs } = weekState(plan, now());
     if (!liveWeekAllowed(gameweek, latestStarted)) {
@@ -373,7 +374,7 @@ export function createWorker(options = {}) {
       part(upstreamPaths.live(gameweek)),
       part(upstreamPaths.fixtures(gameweek)),
     ]);
-    const document = liveDocument({
+    const document = (view === "activity" ? liveActivityDocument : liveDocument)({
       live: liveRaw,
       fixtures: fixturesRaw,
       season: plan.season,
@@ -381,7 +382,7 @@ export function createWorker(options = {}) {
       sourceTime: iso(now()),
     });
     const seconds = liveTtl({
-      finished: weekFinished(document.fixtures),
+      finished: weekFinished(view === "activity" ? document.week.fixtures : document.fixtures),
       nowMs: now(),
       nextDeadlineMs,
     });

@@ -46,9 +46,10 @@ leading zero or a decimal point. The query must be exactly what the route names,
 
 | Route | Answers | Upstream reads |
 | --- | --- | --- |
-| `/api/v1/fpl/standings/{league}?page={1..20}` | [`fpl_league_standings_v1`](../../contracts/fpl_league_standings_v1.md): one page of a classic league | `leagues-classic/{league}/standings/?page_standings={page}`; on a 404 for page 1, `leagues-h2h/{league}/standings/` once, to name a head-to-head league in the refusal, as the capture does |
+| `/api/v1/fpl/standings/{league}?page={1..1000}` | [`fpl_league_standings_v1`](../../contracts/fpl_league_standings_v1.md): one page of a classic league | `leagues-classic/{league}/standings/?page_standings={page}`; on a 404 for page 1, `leagues-h2h/{league}/standings/` once, to name a head-to-head league in the refusal, as the capture does |
 | `/api/v1/fpl/entry/{entry}/bundle?gw={table gameweek}` | [`fpl_entry_bundle_v1`](../../contracts/fpl_entry_bundle_v1.md): what the device's entry readers take, and the member's current week | `entry/{entry}/`, `entry/{entry}/history/`, `entry/{entry}/transfers/`, the picks of the held week and of each week the Free Hit walk-back passes, the gameweek 1 picks when the history starts there, the current week's picks, and `fixtures/?event={current week}` |
 | `/api/v1/fpl/live/{gameweek}` | [`week_live_v1`](../../contracts/week_live_v1.md) without member blocks, for the current week or an earlier one | `event/{gameweek}/live/` and `fixtures/?event={gameweek}` |
+| `/api/v1/fpl/live/{gameweek}?view=activity`            | [`week_activity_v1`](../../contracts/week_activity_v1.md), the unchanged score with optional fixture-specific minutes, goals and assists | The same two live-week inputs; no additional upstream route                                                                                                                                                                                                           |
 
 Every other path answers a JSON 404; another method on one of the three paths answers a JSON
 405. A bundle's table gameweek runs from 2 to the week after the latest started one, so its held
@@ -183,3 +184,10 @@ If one week's request count approaches 10 percent of the Free plan's daily allow
 starts refusing the forwarder's requests in a way the last good copy cannot cover; if permission
 to redistribute is obtained or refused; or if the device needs a field the contracts do not
 carry, which is a new contract version, not an edit.
+
+## 2026-11-06: country leagues
+
+The owner requested Turkey (league 239) live this week. The forwarded standings limit is
+now 1,000 pages, covering its 20,300 members. A request still fetches exactly one page,
+and the browser renders only that page. Page jumps never fetch intervening pages.
+This does not enroll country leagues in the weekly capture or baseline scheduler.

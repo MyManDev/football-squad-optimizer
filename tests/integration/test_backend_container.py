@@ -453,6 +453,78 @@ def test_production_factory_refuses_a_closed_gameweek(deployment: dict[str, Any]
     assert refused["error"]["code"] == "DEADLINE_PASSED"
 
 
+def _requested_snapshot(state: dict[str, Any]) -> dict[str, Any]:
+    """Copy a live answer, then verify it as a different UID in the weekly reader group."""
+    output = f"{MOUNT}/history"
+    mount = f"{state['volume']}:{MOUNT}"
+    _docker(
+        "run",
+        "--rm",
+        "--user",
+        "0:0",
+        "--volume",
+        mount,
+        IMAGE,
+        "sh",
+        "-c",
+        f"mkdir -p {output} && chown {RUNTIME_UID}:1000 {output} && chmod 750 {output}",
+    )
+    _docker(
+        "run",
+        "--rm",
+        "--user",
+        f"{RUNTIME_UID}:1000",
+        "--volume",
+        mount,
+        "--read-only",
+        "--network=none",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "--memory=1g",
+        "--cpus=0.5",
+        "--pids-limit=64",
+        "--env",
+        "OPENBLAS_NUM_THREADS=1",
+        "--env",
+        "OMP_NUM_THREADS=1",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,size=64m",
+        IMAGE,
+        "python",
+        "-m",
+        "squadopt.platform.requested_history_snapshot",
+        "--store",
+        STORE_ROOT,
+        "--output-root",
+        output,
+        "--group-readable",
+        "--reuse-unchanged",
+        "--max-snapshot-bytes",
+        str(512 * 1024**2),
+    )
+    result = json.loads(
+        _docker(
+            "run",
+            "--rm",
+            "--user",
+            "10002:1000",
+            "--volume",
+            f"{mount}:ro",
+            "--network=none",
+            IMAGE,
+            "python",
+            "-c",
+            "import json; from pathlib import Path; "
+            "from squadopt.platform.requested_history_snapshot import read_history_snapshot; "
+            f"snapshot=read_history_snapshot(Path('{output}/latest.json')); "
+            "jobs=[json.loads(p.read_bytes()) for p in (snapshot.store/'jobs').glob('*.json')]; "
+            "print(json.dumps({'receipt':snapshot.receipt,'jobs':jobs}))",
+        )
+    )
+    assert isinstance(result, dict)
+    return result
+
+
 def test_two_containers_from_one_image_answer_through_the_shared_volume(
     deployment: dict[str, Any],
 ) -> None:
@@ -512,6 +584,13 @@ def test_two_containers_from_one_image_answer_through_the_shared_volume(
     cached_status, cached = _post(origin, deployment)
     assert cached_status == 200, (cached_status, cached)
     assert cached == served
+
+    # History shares the queue lock with the running worker and is readable without
+    # the backend UID or root. An unchanged second tick retains the same receipt.
+    snapshot = _requested_snapshot(deployment)
+    assert [job["job_id"] for job in snapshot["jobs"]] == [job_id]
+    assert snapshot["jobs"][0].get("idempotency_key") is None
+    assert _requested_snapshot(deployment) == snapshot
 
     # The worker container reports what it did. An empty log here is a deployment nobody can
     # diagnose, which is what this used to be.

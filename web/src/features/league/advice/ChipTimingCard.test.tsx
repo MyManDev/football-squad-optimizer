@@ -235,6 +235,7 @@ function shippedMembers() {
     table: DevicePlanDocument;
     gains: Partial<Record<ChipName, number | null>>;
     rows: number;
+    device: boolean;
   }[] = [];
   for (const { root } of shippedTrees()) {
     if (!existsSync(join(root, "advice"))) continue;
@@ -260,7 +261,12 @@ function shippedMembers() {
       const shown = (published?.forecast?.chips ?? []).filter(
         (chip) => chip.verdict === "play_now" || chip.verdict === "hold",
       ).length;
-      found.push({ entryId: Number(match[1]), squad, table, gains, rows: shown });
+      const device = index.menu === "device";
+      if (device) {
+        expect(index.chip_forecast == null).toBe(true);
+        expect(gains).toEqual({});
+      }
+      found.push({ entryId: Number(match[1]), squad, table, gains, rows: shown, device });
     }
   }
   return { fixtures, members: found };
@@ -291,7 +297,8 @@ describe("the chip timing card on the shipped trees", () => {
         if (member.rows > 0) drawn += 1;
         cleanup();
       }
-      expect(drawn).toBeGreaterThan(0);
+      if (members.some((member) => !member.device)) expect(drawn).toBeGreaterThan(0);
+      else expect(drawn).toBe(0);
     });
   }
 });

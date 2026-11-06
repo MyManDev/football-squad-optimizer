@@ -52,6 +52,7 @@ it.
 
 | File | Contract | Producer or subject | Tests |
 | --- | --- | --- | --- |
+| [member_baseline_record_v1.md](member_baseline_record_v1.md) | One independent server baseline per entry and capture, shared by tracked leagues | `src/squadopt/application/advice_record.py`, `src/squadopt/application/league_publication.py` | `tests/unit/test_tracked_baselines.py`, `tests/unit/test_advice_record.py` |
 | `league_member_movement_v1.schema.json` | A member's captured rank movement in the league views | `src/squadopt/application/league_views.py` | `tests/unit/test_league_views.py` |
 | `member_week_horizon_v1.md`, `member_week_horizon_v1.schema.json` | The optional `series-horizon.json` beside a league's scoreboard; published, no page reads it | `src/squadopt/application/weekly_suggestion_eval.py` | `tests/unit/test_member_week_horizon_contract.py`, `tests/unit/test_weekly_suggestion_eval.py` |
 | `scoreboard_comparisons_v1.md`, `scoreboard_comparisons_v1.schema.json` | The `comparisons` extension of each scoreboard gameweek | `src/squadopt/application/scoreboard.py` | `tests/unit/test_build_scoreboard.py`, `tests/unit/test_scoreboard_basis.py` |
@@ -61,6 +62,7 @@ it.
 | [`fpl_entry_bundle_v1.md`](fpl_entry_bundle_v1.md), `fpl_entry_bundle_v1.schema.json`, `fpl_entry_bundle_v1.examples.json` | One entry's documents for the device, and its current week, as the FPL forwarder serves them (#980) | `workers/fpl-proxy/src/worker.js` and `proxy.js`, which its node tests hold to the examples | `workers/fpl-proxy/test/worker.test.mjs`, `tests/unit/test_fpl_forwarder_contracts.py` |
 | `league_device_plan_v1.md` | What a member's own browser needs to solve the one-week plan | `src/squadopt/application/device_plan.py`; solved by `web/src/features/league/device/`; `scripts/add_device_plan_inputs.py` and `scripts/export_device_plan_fixture.py` | `tests/unit/test_device_plan.py`, `tests/unit/test_device_plan_fixture.py`, `tests/unit/test_add_device_plan_inputs.py` |
 | `league_publication_identity_v1.md` | The record that binds a league's members and retained history as one publication | `src/squadopt/contracts/league_publication_identity.py` | `tests/unit/test_league_publication_identity.py` |
+| [`requested_advice_export_v1.md`](requested_advice_export_v1.md) | Completed pre-deadline server answers and their separate weekly product history | `scripts/export_requested_history.py`, `scripts/build_requested_history.py`; `src/squadopt/platform/requested_suggestion_history.py` | `tests/unit/test_requested_history_export.py`, `tests/unit/test_requested_suggestion_history.py` |
 | `football_point_accounting_v1.md` | Raw football point accounting for explicitly supplied moments (#1070) | `src/squadopt/contracts/football_point_accounting.py` | `tests/unit/test_football_point_accounting.py`, `tests/unit/test_football_point_accounting_native.py` |
 
 ## Word lists

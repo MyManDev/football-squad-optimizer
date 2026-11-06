@@ -7,7 +7,8 @@ member's own device, in a Web Worker running HiGHS, from the published device-pl
 
 The entry page accepts a classic league number or an FPL team number. Unlisted leagues use
 `/league/<id>` and standalone teams use `/entry/<id>`; both read trimmed FPL data through the
-same-origin forwarder. Classic standings support up to 20 pages (1,000 members). Published
+same-origin forwarder. Classic standings support up to 1,000 pages, including Turkey, and
+render one requested page at a time. Published
 leagues retain their static-data fallback. After the planning deadline, member pages read the
 current week's score on opening and manual refresh, using the official autosub and captain
 rule. Live scores are display-only and are never written to records or the ledger.
@@ -81,7 +82,7 @@ node --test workers/fpl-probe/test/probe.test.mjs workers/fpl-probe/test/deploy-
 The FPL forwarder row runs its own suites ([ADR 0012](../docs/architecture/decisions/0012-fpl-forwarder.md)):
 
 ```sh
-node --test workers/fpl-proxy/test/proxy.test.mjs workers/fpl-proxy/test/worker.test.mjs workers/fpl-proxy/test/deploy-steps.test.mjs
+node --test workers/fpl-proxy/test/proxy.test.mjs workers/fpl-proxy/test/activity.test.mjs workers/fpl-proxy/test/worker.test.mjs workers/fpl-proxy/test/deploy-steps.test.mjs
 ```
 
 The last row runs, with `SQUADOPT_PUBLICATION_CONTRACT=1` and `SQUADOPT_BROWSER_SMOKE=1` set:

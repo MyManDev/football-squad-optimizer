@@ -20,6 +20,18 @@ under ``--advice-record-root``, one per member, gameweek and capture; without it
 that has been published can never afterwards be reviewed. A week is published more than
 once — mid-week, then again with fresh availability before the deadline — and each of those
 captures records its own, so the advice that stood at the deadline is on disk too.
+Only the league ``config/leagues.json`` marks with ``legacy_advice_records`` writes that
+record. Every league's member histories also read the league-independent baseline records
+under ``--baseline-record-root`` (by default ``member_baselines`` beside the advice record
+root, where the weekly run writes them); a by-hand build reads them and writes none.
+
+The three- and five-week searches run on native HiGHS in a separate interpreter, as the
+weekly run's do. Before anything is solved the build asks that interpreter which HiGHS it
+loads and refuses without the pinned one; after the build it prints, per member and window
+length, how many searches native HiGHS answered and why any fell back to CP-SAT.
+``--cp-sat-windows`` binds no native solver at all, so every search runs on CP-SAT alone:
+the comparison build a rehearsal diffs against, and a way to build where the child cannot
+run.
 
 Nothing personal is committed. The registry, the captures and the advice records stay
 local (``.gitignore`` excludes ``data/entries/``, ``data/snapshots/`` and
@@ -54,6 +66,8 @@ from squadopt.application.league_publication import (
 )
 from squadopt.contracts.league_tree import league_tree_dir
 from squadopt.data.errors import DataError
+from squadopt.planning.native_highs import NATIVE_VERSION, NativeWindowOutcome
+from squadopt.platform.native_windows import native_window_version, summarize_native_windows
 from squadopt.platform.publication_workers import (
     _render_in_worker as _render_in_worker,
 )
@@ -97,6 +111,48 @@ def _mode_note(summary: ModePathsSummary) -> None:
         f"mode paths: {summary.scenario_count} scenarios for gameweek "
         f"{summary.gameweek} from {summary.source_id}"
     )
+
+
+def _native_window_refusal() -> str | None:
+    """Why the isolated child cannot answer the windows with the pinned HiGHS, if it cannot.
+
+    The same probe the weekly preflight makes. Without it a broken or different highspy
+    would turn every window into a CP-SAT fallback, which publishes, but not the plans the
+    weekly run publishes from the same capture.
+    """
+
+    remedy = (
+        f"Install the pin into this environment (python -m pip install "
+        f"highspy=={NATIVE_VERSION}) and run again, or pass --cp-sat-windows to solve every "
+        "window on CP-SAT alone."
+    )
+    try:
+        version = native_window_version()
+    except (OSError, RuntimeError, ValueError) as error:
+        return f"The native window solver cannot start in this environment: {error} {remedy}"
+    if version != NATIVE_VERSION:
+        return (
+            f"The native window solver loads HiGHS {version}; this commit pins "
+            f"{NATIVE_VERSION}. {remedy}"
+        )
+    return None
+
+
+def _window_solver_lines(entry_id: int, outcomes: tuple[NativeWindowOutcome, ...]) -> list[str]:
+    """The receipt's ``window_solvers`` rows for one member, one line per window length."""
+
+    lines: list[str] = []
+    for row in summarize_native_windows(outcomes):
+        versions, reasons = row["native_versions"], row["fallback_reasons"]
+        assert isinstance(versions, list) and isinstance(reasons, dict)
+        reported = f" {', '.join(str(version) for version in versions)}" if versions else ""
+        lines.append(
+            f"  windows       {entry_id}  {row['weeks']} weeks: {row['solves']} searches, "
+            f"{row['native']} native HiGHS{reported}, {row['fallback']} CP-SAT fallback"
+        )
+        for reason, count in reasons.items():
+            lines.append(f"                fallback x{count}: {reason}")
+    return lines
 
 
 def main() -> int:
@@ -151,6 +207,13 @@ def main() -> int:
         "week",
     )
     parser.add_argument(
+        "--baseline-record-root",
+        type=Path,
+        help="where the weekly run wrote the league-independent member baseline records, "
+        "which every league's member histories read; read only, never written here "
+        "(default: member_baselines beside --advice-record-root)",
+    )
+    parser.add_argument(
         "--no-advice-record",
         action="store_true",
         help="publish without recording what was published; a week built this way can "
@@ -177,19 +240,37 @@ def main() -> int:
         "their own pure-points plan. Refused, with the reason in the index, when the "
         "handoff already carries the uplift or the export fails the handoff's own gate",
     )
+    parser.add_argument(
+        "--cp-sat-windows",
+        action="store_true",
+        help="solve every three- and five-week search on CP-SAT alone, with no native "
+        "HiGHS child: the comparison build a rehearsal diffs against, or a build where the "
+        "child cannot run",
+    )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     arguments = parser.parse_args()
     if arguments.workers < 1:
         parser.error("--workers must be at least 1")
 
-    # The advice record names one league; another league is published without one.
-    recorded = not arguments.no_advice_record and records_advice_for(arguments.league)
-    if not arguments.no_advice_record and not recorded:
-        print(
-            f"League {arguments.league} is published without an advice record: the record "
-            "names one league until it carries the league."
-        )
+    # The weekly run's rule (WeeklyPaths.baselines): the baseline store sits beside the
+    # advice record root.
+    baseline_root = (
+        Path(arguments.baseline_record_root)
+        if arguments.baseline_record_root is not None
+        else Path(arguments.advice_record_root).parent / "member_baselines"
+    )
     try:
+        # Only the league the league list marks keeps the legacy advice record.
+        recorded = not arguments.no_advice_record and records_advice_for(arguments.league)
+        if not arguments.no_advice_record and not recorded:
+            print(
+                f"League {arguments.league} writes no legacy advice record: only the league "
+                "config/leagues.json marks with legacy_advice_records keeps one."
+            )
+        print(
+            f"Member histories read the baseline records under {baseline_root}; a by-hand "
+            "build writes none (the weekly run's --record-advice or --publish does)."
+        )
         snapshot_root = Path(arguments.snapshot_root)
         snapshot_id = resolve_live_snapshot_id(snapshot_root, arguments.snapshot_id)
         request = LeaguePublicationRequest(
@@ -204,6 +285,7 @@ def main() -> int:
             mode_residuals=arguments.mode_residuals,
             record_root=Path(arguments.advice_record_root) if recorded else None,
             history_record_root=Path(arguments.advice_record_root),
+            baseline_record_root=baseline_root,
             rival_menu=not arguments.no_rival_menu,
             rotation_evidence=arguments.rotation_evidence,
             club_news_source=arguments.club_news_source,
@@ -219,11 +301,26 @@ def main() -> int:
         if arguments.dry_run:
             print("Dry run: nothing written.")
             return 0
+        if arguments.cp_sat_windows:
+            print("window solver: CP-SAT alone for every search (--cp-sat-windows)")
+        else:
+            refusal = _native_window_refusal()
+            if refusal is not None:
+                print(f"build_league_site refused:\n  {refusal}", file=sys.stderr)
+                return 1
+            print(
+                f"window solver: native HiGHS {NATIVE_VERSION} for three- and five-week "
+                "searches, CP-SAT where one falls back"
+            )
         # A by-hand build of one league keeps the other leagues the site lists when their
         # trees are there and were rendered from the same capture; another capture is
         # refused, before anything is solved.
         beside = leagues_beside(request.out_dir / "data", request.league_id, snapshot_id)
-        with league_mapper(replace(request, season=prepared.season), arguments.workers) as mapper:
+        with league_mapper(
+            replace(request, season=prepared.season),
+            arguments.workers,
+            native_windows=not arguments.cp_sat_windows,
+        ) as mapper:
             result = publish_prepared_league(
                 prepared, mapper=mapper, on_mode_paths=_mode_note, beside=beside
             )
@@ -239,6 +336,10 @@ def main() -> int:
                 # Printing it is the only place an operator learns that a published name
                 # is not byte-for-byte what the capture held.
                 print(f"  note          {member.entry_id}  {member.reason}")
+            # Which backend answered this member's window searches, and why any fell back:
+            # the rows the weekly receipt carries under ``window_solvers``.
+            for line in _window_solver_lines(member.entry_id, member.native_windows):
+                print(line)
         # A member this run did not render must not keep the last publish's document: the
         # tree is checked out of origin/develop and committed as a union, so leaving it
         # would serve a finished gameweek's advice under this week's league.

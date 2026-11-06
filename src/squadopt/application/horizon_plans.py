@@ -47,6 +47,7 @@ _RUNTIME_DIAGNOSTICS: Final = frozenset(
         "deterministic_time_used",
         "tiebreak_deterministic_time",
         "tiebreak_deterministic_time_limit",
+        "native_verification_deterministic_time",
     }
 )
 

@@ -133,7 +133,8 @@ async function typeLeague(page: Page, league: number) {
 
 /** The device's plan on the page: the real worker solved it, and its moves are named. */
 async function expectDevicePlan(page: Page) {
-  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+  await page.locator("[data-device-compute]").click();
+  await expect(page.locator("section[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
   const names = new Map(TABLE.players.map((player) => [player.id, player.name]));
   for (const move of member.reference.moves) {
     await expect(page.getByText(names.get(move.in!)!).first()).toBeVisible();
@@ -147,9 +148,9 @@ test("a typed unlisted league opens from the forwarder, and a member opens with 
   await typeLeague(page, LEAGUE);
   await expect(page).toHaveURL(`/league/${LEAGUE}`);
   await expect(page.getByRole("heading", { level: 1, name: FIRST.league.name! })).toBeVisible();
-  // The end of the table is in view, so the next page is read as well; there is no third.
+  await page.getByRole("button", { name: copy.forwarded.nextPage }).click();
   await expect(page.getByRole("link", { name: LAST.results[0]!.entry_name })).toBeVisible();
-  await expect(page.getByRole("button", { name: copy.forwarded.more })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: copy.forwarded.nextPage })).toBeDisabled();
   expect(asked).toEqual([
     `/api/v1/fpl/standings/${LEAGUE}?page=1`,
     `/api/v1/fpl/standings/${LEAGUE}?page=2`,
@@ -159,6 +160,7 @@ test("a typed unlisted league opens from the forwarder, and a member opens with 
     String(PUBLISHED.league_id),
   );
 
+  await page.getByRole("button", { name: copy.forwarded.previousPage }).click();
   await page.getByRole("link", { name: FIRST.results[0]!.entry_name }).click();
   await expect(page).toHaveURL(`/league/${LEAGUE}/members/${ENTRY}`);
   await expect(
@@ -224,3 +226,55 @@ test("a phone opens a team by ID and keeps the plan and navigation usable", asyn
   await expect(page).toHaveURL("/fixtures");
   await expect(page.getByRole("button", { name: copy.shell.openMenu, exact: true })).toBeVisible();
 });
+
+for (const width of [375, 1280]) {
+  test(`Turkey reaches a distant page and returns to it from a device plan at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await serveSite(page, "up");
+    const pages: number[] = [];
+    await page.route("**/api/v1/fpl/standings/239?*", (route) => {
+      const number = Number(new URL(route.request().url()).searchParams.get("page"));
+      pages.push(number);
+      return route.fulfill({
+        headers: MARKED,
+        body: JSON.stringify({
+          ...FIRST,
+          league: { ...FIRST.league, id: 239, name: "Turkey" },
+          page: number,
+          has_next: number < 406,
+          results: number === 1 ? FIRST.results : [{ ...FIRST.results[0], rank: 20300 }],
+        }),
+      });
+    });
+    await page.goto("/");
+    await page.getByRole("link", { name: "Turkey", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Turkey" })).toBeVisible();
+    const field = page.getByRole("textbox", { name: copy.forwarded.page, exact: true });
+    await field.fill("406");
+    await page.getByRole("button", { name: copy.forwarded.go, exact: true }).click();
+    await expect(page).toHaveURL("/league/239?page=406");
+    await expect(page.getByRole("cell", { name: "20300", exact: true })).toBeVisible();
+    await expect(page.getByRole("row")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: copy.forwarded.nextPage })).toBeDisabled();
+    expect(pages).toEqual([1, 406]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    const controls = page
+      .getByRole("form", { name: copy.forwarded.pagination })
+      .locator("button, input");
+    for (const control of await controls.all()) {
+      const box = await control.boundingBox();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+    }
+    await page.getByRole("link", { name: FIRST.results[0]!.entry_name }).click();
+    await expectDevicePlan(page);
+    await page.getByRole("link", { name: copy.forwarded.backToLeague }).click();
+    await expect(page).toHaveURL("/league/239?page=406");
+    await expect(page.getByRole("cell", { name: "20300", exact: true })).toBeVisible();
+    expect(pages).toEqual([1, 406]);
+  });
+}

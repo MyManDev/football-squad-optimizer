@@ -26,9 +26,10 @@ export const CACHE_HEADER = "x-squadopt-fpl-cache";
 export const STANDINGS_CONTRACT = "fpl_league_standings_v1";
 export const BUNDLE_CONTRACT = "fpl_entry_bundle_v1";
 export const LIVE_CONTRACT = "week_live_v1";
+export const ACTIVITY_CONTRACT = "week_activity_v1";
 
-/** A classic league page beyond this is refused: the device reads leagues of up to 1,000. */
-export const MAX_STANDINGS_PAGE = 20;
+/** A bounded page range for on-demand classic and country league standings. */
+export const MAX_STANDINGS_PAGE = 1000;
 export const LAST_GAMEWEEK = 38;
 
 /** The chips week_live_v1's member block names; any other chip leaves that block out. */
@@ -65,7 +66,7 @@ export const CACHE_PREFIX = "/api/v1/fpl/.cache/v1/";
 export const SCHEDULE_CACHE_KEY = `${SITE_ORIGIN}${CACHE_PREFIX}schedule`;
 
 const ID_TEXT = /^[1-9][0-9]{0,14}$/;
-const SMALL_TEXT = /^[1-9][0-9]?$/;
+const SMALL_TEXT = /^[1-9][0-9]{0,3}$/;
 const SEASON_TEXT = /^[0-9]{4}-[0-9]{2}$/;
 
 const STANDINGS_PATH = /^\/api\/v1\/fpl\/standings\/([^/]+)$/;
@@ -106,7 +107,7 @@ function onlyParameters(searchParams, names) {
  * query exactly as written, gives { kind, ... }. Any other method on those paths gives a 405
  * refusal; every other path, id or query gives a 404 refusal. Only the URL is read.
  *
- * - /api/v1/fpl/standings/{league}?page={1..20} gives { kind: "standings", league, page }
+ * - /api/v1/fpl/standings/{league}?page={1..1000} gives { kind: "standings", league, page }
  * - /api/v1/fpl/entry/{entry}/bundle?gw={1..38} gives { kind: "bundle", entry, gameweek }
  * - /api/v1/fpl/live/{1..38} gives { kind: "live", gameweek }
  */
@@ -121,7 +122,10 @@ export function routeFor(method, url) {
   if (method !== "GET") {
     return {
       status: 405,
-      body: { error: "method_not_allowed", detail: "the forwarder answers GET only" },
+      body: {
+        error: "method_not_allowed",
+        detail: "the forwarder answers GET only",
+      },
     };
   }
   if (standings !== null) {
@@ -146,7 +150,12 @@ export function routeFor(method, url) {
   }
   const gameweek = smallNumber(live[1], LAST_GAMEWEEK);
   if (gameweek === null) return notFound(`a gameweek is a whole number from 1 to ${LAST_GAMEWEEK}`);
-  if (!onlyParameters(searchParams, [])) return notFound("a live week takes no query parameters");
+  if (onlyParameters(searchParams, ["view"]) && searchParams.get("view") === "activity") {
+    return { kind: "live", gameweek, view: "activity" };
+  }
+  if (!onlyParameters(searchParams, [])) {
+    return notFound("a live week takes only the optional view=activity query");
+  }
   return { kind: "live", gameweek };
 }
 
@@ -155,8 +164,9 @@ export function cacheKeys(route) {
   let tail;
   if (route.kind === "standings") tail = `standings/${route.league}/${route.page}`;
   else if (route.kind === "bundle") tail = `bundle/${route.entry}/${route.gameweek}`;
-  else if (route.kind === "live") tail = `live/${route.gameweek}`;
-  else throw new TypeError(`no cache keys for a route of kind ${String(route.kind)}`);
+  else if (route.kind === "live") {
+    tail = `live/${route.gameweek}${route.view === "activity" ? "/activity" : ""}`;
+  } else throw new TypeError(`no cache keys for a route of kind ${String(route.kind)}`);
   return {
     fresh: `${SITE_ORIGIN}${CACHE_PREFIX}fresh/${tail}`,
     lastGood: `${SITE_ORIGIN}${CACHE_PREFIX}last-good/${tail}`,
@@ -407,7 +417,10 @@ export function historyPart(raw) {
   });
   const chips = array(document.chips, "history.chips").map((value) => {
     const row = object(value, "chip");
-    return { name: text(row.name, "chip.name"), event: week(row.event, "chip.event") };
+    return {
+      name: text(row.name, "chip.name"),
+      event: week(row.event, "chip.event"),
+    };
   });
   return { current, chips };
 }
@@ -609,4 +622,66 @@ export function liveDocument({ live, fixtures, season, gameweek, sourceTime }) {
     fixtures: fixturesPart(fixtures, gameweek),
     elements,
   };
+}
+
+/** The opt-in activity view uses the same two upstream documents and its own cache key. */
+export function liveActivityDocument(inputs) {
+  const week = liveDocument(inputs);
+  let activity = null;
+  try {
+    activity = activityFrom(inputs.live, inputs.fixtures, week);
+  } catch (error) {
+    if (!(error instanceof UnreadableError)) throw error;
+    // Missing event detail must never remove an otherwise valid score or invent activity.
+  }
+  return { contract_version: ACTIVITY_CONTRACT, week, activity };
+}
+
+function activityFrom(live, fixtures, week) {
+  const fixtureIds = new Set(week.fixtures.map((fixture) => fixture.id));
+  const inPlay = array(fixtures, "fixtures")
+    .filter((fixture) => fixture.event === week.gameweek)
+    .filter((fixture) => {
+      if (fixture.started !== null) flag(fixture.started, "fixture.started");
+      return fixture.started === true && fixture.finished === false;
+    })
+    .map((fixture) => fixture.id)
+    .sort((a, b) => a - b);
+  const appearances = [];
+  for (const row of live.elements) {
+    const seen = new Set();
+    const totals = { minutes: 0, goals_scored: 0, assists: 0 };
+    for (const value of array(row.explain, "element.explain")) {
+      const explain = object(value, "explain");
+      const fixtureId = integer(explain.fixture, "explain.fixture", 1);
+      if (!fixtureIds.has(fixtureId) || seen.has(fixtureId)) {
+        throw new UnreadableError("explain has an unknown or repeated fixture");
+      }
+      seen.add(fixtureId);
+      const counts = { minutes: 0, goals_scored: 0, assists: 0 };
+      const found = new Set();
+      for (const value of array(explain.stats, "explain.stats")) {
+        const stat = object(value, "explain stat");
+        if (!Object.hasOwn(counts, stat.identifier)) continue;
+        if (found.has(stat.identifier)) throw new UnreadableError("repeated event identifier");
+        found.add(stat.identifier);
+        counts[stat.identifier] = integer(stat.value, `explain.${stat.identifier}`, 0);
+      }
+      for (const key of Object.keys(totals)) totals[key] += counts[key];
+      appearances.push({
+        element_id: row.id,
+        fixture_id: fixtureId,
+        minutes: counts.minutes,
+        goals: counts.goals_scored,
+        assists: counts.assists,
+      });
+    }
+    for (const key of Object.keys(totals)) {
+      if (totals[key] !== integer(row.stats[key], `stats.${key}`, 0)) {
+        throw new UnreadableError(`explain does not match stats.${key}`);
+      }
+    }
+  }
+  appearances.sort((a, b) => a.element_id - b.element_id || a.fixture_id - b.fixture_id);
+  return { in_play_fixtures: inPlay, appearances };
 }
