@@ -22,6 +22,7 @@ test("published league and member journey works without submitting a solve", asy
   const origin = new URL(process.env.LIVE_BASE_URL!).origin;
   const errors: string[] = [];
   const consoleErrors: { text: string; url: string }[] = [];
+  const optionalDocuments = new Set(OPTIONAL_DOCUMENTS);
   const absentDocuments = new Set<string>();
   // The FPL forwarder's own 404s and 503s, marked as its answers: a page reads each as no
   // document and shows nothing for it (#983 step 3, #1008), so they are not failures.
@@ -30,14 +31,30 @@ test("published league and member journey works without submitting a solve", asy
   const adviceMisses: Response[] = [];
   const failures: string[] = [];
   const writes: string[] = [];
+  const staticPlanReads: string[] = [];
   let capabilitiesUrl: string | undefined;
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (
+      url.origin === origin &&
+      /^\/data\/(?:leagues\/\d+|league)\/advice\/\d+\/[^/]+\/\d+\.json$/.test(url.pathname)
+    )
+      staticPlanReads.push(request.url());
+  });
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
     if (message.type() === "error")
       consoleErrors.push({ text: message.text(), url: message.location().url });
   });
   page.on("requestfailed", (request) => {
-    if (new URL(request.url()).origin === origin) failures.push(request.url());
+    const url = new URL(request.url());
+    // Leaving a member cancels its polling and device-input prefetch. Other failures stay red.
+    const cancelledRead =
+      request.method() === "GET" &&
+      request.failure()?.errorText === "net::ERR_ABORTED" &&
+      (/^\/api\/v1\/fpl\/live\/\d+$/.test(url.pathname) ||
+        /^\/data\/device\/[^/]+\/device-plan\.json$/.test(url.pathname));
+    if (url.origin === origin && !cancelledRead) failures.push(request.url());
   });
   page.on("response", (response) => {
     if (
@@ -53,7 +70,7 @@ test("published league and member journey works without submitting a solve", asy
       capabilitiesUrl = response.url();
     if (new URL(response.url()).origin === origin && response.status() >= 400) {
       const { pathname } = new URL(response.url());
-      if (response.status() === 404 && OPTIONAL_DOCUMENTS.has(pathname)) {
+      if (response.status() === 404 && optionalDocuments.has(pathname)) {
         absentDocuments.add(response.url());
         console.log(`optional document absent: ${response.url()}`);
       } else if (
@@ -102,6 +119,8 @@ test("published league and member journey works without submitting a solve", asy
   const member = members.payload.members.find((entry) => entry.member_kind === "human");
   expect(member, "a published human member is required").toBeDefined();
   const entryId = member!.entry_id;
+  // A week published before requested-history export has no such document yet.
+  optionalDocuments.add(`/data/${tree}/history/requested/${entryId}.json`);
   // The league's number is in its own members record.
   const league = members.payload.league_id;
   const squadResponse = await page.request.get(`/data/${tree}/entries/${entryId}.json`);
@@ -113,7 +132,11 @@ test("published league and member journey works without submitting a solve", asy
   const index = (await indexResponse.json()) as LeagueViewEnvelope<EntryAdviceIndex>;
   expect(index.payload.entry_id).toBe(entryId);
   const deviceMenu = index.payload.menu === "device";
-  const published = await page.request.get(`/data/${tree}/advice/${entryId}/saf-puan/1.json`);
+  // Pages can retain deleted URLs at older edges. Probe this publication's cache key;
+  // the browser journey below must also prove a device menu never reads those old plans.
+  const published = await page.request.get(
+    `/data/${tree}/advice/${entryId}/saf-puan/1.json?v=${encodeURIComponent(index.generated_at_utc)}`,
+  );
   expect(published.status()).toBe(deviceMenu ? 404 : 200);
   const advice = deviceMenu ? null : ((await published.json()) as LeagueViewEnvelope<EntryAdvice>);
   if (advice) {
@@ -247,6 +270,8 @@ test("published league and member journey works without submitting a solve", asy
     ).toBeVisible();
   }
   expect(writes, "no mutating API request is allowed").toEqual([]);
+  if (deviceMenu)
+    expect(staticPlanReads, "a device menu must not read old published plans").toEqual([]);
   // The model comparison also performs a cache-only GET. Admit only this member's
   // exact baseline settings and a typed NOT_COMPUTED response from the discovered API.
   for (const response of adviceMisses) {
