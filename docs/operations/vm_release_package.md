@@ -3,10 +3,10 @@
 Since GW7 the VM's two Compose services do not read `~/squadopt/{site,snapshots,handoffs,
 artifacts}`. `~/squadopt/.env` and `~/squadopt/compose.artifacts.yaml` point both services at
 one immutable release directory, `~/squadopt/releases/<name>/payload/`, which holds the four
-data roots and the club-news source of one capture. `scripts/vm_push.sh` predates that layout:
-it rebuilds the image and restarts on the previous release's mounts, so the backend keeps
-serving last week's capture while the command reports success. Use
-`scripts/release/vm_football_release.py` instead.
+data roots and the club-news source of one capture. `scripts/vm_push.sh` supports only the
+older ordinary-folder layout. Its preflight refuses a retained package before any transfer,
+so copying unused folders cannot leave last week's capture served after an apparent success.
+Use `scripts/release/vm_football_release.py` for release packages.
 
 ## The five steps
 

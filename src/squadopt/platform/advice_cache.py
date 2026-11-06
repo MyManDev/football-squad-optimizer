@@ -104,7 +104,8 @@ def advice_cache_key(
         ("entry_id", entry_id),
         ("window", window),
     ):
-        if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+        minimum = 0 if label == "league_id" else 1  # Standalone public teams have no league.
+        if isinstance(number, bool) or not isinstance(number, int) or number < minimum:
             raise AdviceCacheError(f"{label} must be a positive integer.")
     if rival_entry_id is not None and (
         isinstance(rival_entry_id, bool)

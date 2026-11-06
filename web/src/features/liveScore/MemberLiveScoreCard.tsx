@@ -2,6 +2,8 @@ import { Card } from "../../design/components/Card";
 import { Stat, StatRow } from "../../design/components/Stat";
 import { useLanguage } from "../../i18n/context";
 import type { LiveWeekScore } from "./officialScoring";
+import { LivePlayerActivity } from "./LivePlayerActivity";
+import type { PlayerActivity } from "./playerActivity";
 import styles from "./MemberLiveScoreCard.module.css";
 
 const COPY = {
@@ -46,6 +48,7 @@ export function MemberLiveScoreCard({
   names,
   onRefresh,
   refreshing = false,
+  activity = null,
 }: {
   gameweek: number;
   score: LiveWeekScore | null;
@@ -53,6 +56,7 @@ export function MemberLiveScoreCard({
   names: ReadonlyMap<number, string>;
   onRefresh?: () => void;
   refreshing?: boolean;
+  activity?: PlayerActivity[] | null;
 }) {
   const { language, locale } = useLanguage();
   const copy = COPY[language];
@@ -95,6 +99,12 @@ export function MemberLiveScoreCard({
           />
         </StatRow>
         <p className={styles.bonus}>{score.bonus_confirmed ? copy.bonusDone : copy.bonusPending}</p>
+        <LivePlayerActivity
+          identity={String(gameweek)}
+          sourceTime={score.source_time}
+          players={activity}
+          names={names}
+        />
         <dl className={styles.details}>
           <div>
             <dt>{copy.captain}</dt>

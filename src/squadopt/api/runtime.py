@@ -105,6 +105,8 @@ def app_for_backend(
         data_root=backend.config.site_data_root,
         advice_store=backend.reader,
         advice_submit=backend.submit,
+        public_advice_store=backend.public_reader,
+        public_advice_submit=backend.public_submit,
         allowed_origins=backend.config.allowed_origins,
         metrics=backend.metrics,
         queue_depth=backend.queue_depth,

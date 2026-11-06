@@ -102,6 +102,41 @@ SQUADOPT_BACKEND_ARTIFACT_ROOT=<path to artifacts/>
 SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json>
 ```
 
+### VM data root selection
+
+The VM sync helpers support only the ordinary layout:
+`~/squadopt/{site,snapshots,handoffs,artifacts}`, each bound read-only at `/mnt/<name>` in
+both services, with `SQUADOPT_BACKEND_SITE_DATA_ROOT`, `SQUADOPT_BACKEND_SNAPSHOT_ROOT`,
+`SQUADOPT_BACKEND_HANDOFF_ROOT` and `SQUADOPT_BACKEND_ARTIFACT_ROOT` naming those mounts.
+Before any remote write, `vm_push.sh` runs the read-only preflight
+`scripts/release/check_vm_layout.py` on the VM over SSH. It checks both services' resolved
+Compose configuration and running mounts, and it resolves Compose from `~/squadopt/repo`
+with the same `--env-file` and `-f` arguments as the restart in `vm_sync.sh`, so it reads
+the bind sources that restart would mount.
+`vm_push.sh` then copies the preflight to `~/vm_check_layout.py`, where `vm_sync.sh` runs
+it before changing the checkout and again after it, against the target release's Compose
+file; without that file `vm_sync.sh` stops before the checkout. A separately retained
+package, a symlinked data root, a missing, repeated or writable data bind, or a runtime
+root that names another path refuses the ordinary sync. The preflight prints no
+environment values and changes no files or running services.
+
+A refusal leaves what is served unchanged: no site data is copied, no image is built,
+`~/squadopt/.env` is not edited and no service is restarted. A refusal from the check
+after the checkout leaves `~/squadopt/repo` at the new tag while both services still run
+the previous image and mounts.
+
+#### Activating a separately prepared package
+
+Use the [release-package procedure](operations/vm_release_package.md). Its
+`scripts/release/vm_football_release.py` command packs and verifies the inputs, proves the
+candidate on a separate Compose project, and keeps a rollback before activation. The
+[weekly host guide](../deploy/weekly-schedule/README.md#the-advice-backend) describes where
+that package is served.
+
+Do not redirect the legacy sync folders to a retained package to bypass this preflight.
+Its refusal protects the currently selected release. Inspect the current selection with
+the package tool's `status` command before choosing a new package or a rollback.
+
 ### Persistent native Windows artifact selection
 
 The native launcher can retain a separately prepared immutable artifact root across

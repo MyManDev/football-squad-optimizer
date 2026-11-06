@@ -75,8 +75,15 @@ export function openCalendar() {
  */
 export async function installLeagueMocks(
   page: Page,
-  { claim = EXAMPLE_CLAIM }: { claim?: SeededClaim | null } = {},
+  {
+    claim = EXAMPLE_CLAIM,
+    opening = false,
+  }: { claim?: SeededClaim | null; opening?: boolean } = {},
 ) {
+  // Ordinary feature scenarios start after the once-per-tab cover. Opening checks opt in.
+  if (!opening) {
+    await page.addInitScript(() => sessionStorage.setItem("squadopt.openingShown", "1"));
+  }
   if (claim !== null) await claimMember(page, claim);
   // Registered first, so every route below wins over it: a document the example league
   // does not carry (the scoreboard, the histories, the device inputs) is the

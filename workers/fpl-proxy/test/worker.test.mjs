@@ -93,7 +93,7 @@ describe("every answer", () => {
       "/api/v1/fpl/live/9",
       "/api/v1/fpl/nothing-here",
       "/api/v1/fpl/standings/abc?page=1",
-      "/api/v1/fpl/standings/314?page=21",
+      "/api/v1/fpl/standings/314?page=1001",
       "/api/v1/fpl/live/12",
     ];
     for (const path of paths) {
@@ -108,7 +108,7 @@ describe("every answer", () => {
     assert.equal(body.error, "method_not_allowed");
   });
 
-  it("refuses a path outside the allowlist, a non-numeric id and page 21 without asking anyone", async () => {
+  it("refuses a path outside the allowlist, a non-numeric id and page 1001 without asking anyone", async () => {
     const { get, upstream } = harness({});
     for (const path of [
       "/api/v1/fpl/bootstrap-static/",
@@ -116,7 +116,7 @@ describe("every answer", () => {
       "/api/v1/fpl/standings/abc?page=1",
       "/api/v1/fpl/entry/0/bundle?gw=10",
       "/api/v1/fpl/entry/-3/bundle?gw=10",
-      "/api/v1/fpl/standings/314?page=21",
+      "/api/v1/fpl/standings/314?page=1001",
       "/api/v1/fpl/live/0",
     ]) {
       const { response, body } = await get(path);
@@ -136,6 +136,20 @@ describe("every answer", () => {
 });
 
 describe("standings", () => {
+  it("reads and caches Turkey page 406 without fetching any intervening page", async () => {
+    const url = fpl(upstreamPaths.classicStandings(239, 406));
+    const { get, upstream } = harness({ [url]: standingsPage({ league: 239, page: 406, rows: 50 }) });
+    const first = await get("/api/v1/fpl/standings/239?page=406");
+    assert.equal(first.response.status, 200);
+    assert.equal(first.body.page, 406);
+    assert.equal(first.body.results.length, 50);
+    assert.deepEqual(problems(await contractFile("fpl_league_standings_v1.schema.json"), first.body), []);
+    const again = await get("/api/v1/fpl/standings/239?page=406");
+    assert.equal(again.response.headers.get(CACHE_HEADER), "hit");
+    assert.deepEqual(again.body, first.body);
+    assert.deepEqual(upstream.calls.map((call) => call.url), [url]);
+  });
+
   it("answers fpl_league_standings_v1 exactly as the committed examples show", async () => {
     const examples = await contractFile("fpl_league_standings_v1.examples.json");
     const schema = await contractFile("fpl_league_standings_v1.schema.json");
@@ -353,6 +367,56 @@ describe("the entry bundle", () => {
 });
 
 describe("the live week", () => {
+  it("isolates opt-in activity and legacy cache copies, including last-good fallback", async () => {
+    const world = liveWorld({ fixtures: [[91, 1, 2, false]] });
+    world[fpl(upstreamPaths.fixtures(9))][0].started = true;
+    for (const row of world[fpl(upstreamPaths.live(9))].elements) {
+      row.stats.goals_scored = row.id === 1 ? 1 : 0;
+      row.stats.assists = 0;
+      row.explain = [
+        {
+          fixture: 91,
+          stats: [
+            { identifier: "minutes", value: row.stats.minutes },
+            { identifier: "goals_scored", value: row.stats.goals_scored },
+          ],
+        },
+      ];
+    }
+    const { get, upstream, clock, cache } = harness(world);
+    const legacy = await get("/api/v1/fpl/live/9");
+    const activity = await get("/api/v1/fpl/live/9?view=activity");
+    assert.equal(activity.response.status, 200);
+    assert.equal(activity.body.contract_version, "week_activity_v1");
+    assert.deepEqual(activity.body.week, legacy.body);
+    assert.deepEqual(activity.body.activity.in_play_fixtures, [91]);
+    assert.equal(activity.body.activity.appearances[0].goals, 1);
+    assert.deepEqual(
+      problems(await contractFile("week_activity_v1.schema.json"), activity.body),
+      [],
+    );
+    const keys = cacheKeys({ kind: "live", gameweek: 9, view: "activity" });
+    assert.equal(cache.stored.get(keys.fresh).maxAge, 60);
+    assert.equal(fplCalls(upstream.calls).length, 4);
+    await get("/api/v1/fpl/live/9?view=activity");
+    assert.equal(fplCalls(upstream.calls).length, 4);
+    clock.advance(61_000);
+    upstream.answers[fpl(upstreamPaths.live(9))] = status(503);
+    const held = await get("/api/v1/fpl/live/9?view=activity");
+    assert.equal(held.response.headers.get(CACHE_HEADER), "last-good");
+    assert.deepEqual(held.body, activity.body);
+    assert.equal((await get("/api/v1/fpl/live/9")).body.contract_version, "week_live_v1");
+  });
+
+  it("keeps scoring available when the upstream lacks activity and refuses a future view", async () => {
+    const { get } = harness(liveWorld());
+    const { response, body } = await get("/api/v1/fpl/live/9?view=activity");
+    assert.equal(response.status, 200);
+    assert.equal(body.activity, null);
+    assert.equal(body.week.contract_version, "week_live_v1");
+    assert.equal((await get("/api/v1/fpl/live/10?view=activity")).response.status, 404);
+  });
+
   it("answers week_live_v1 in the trimmed source A form of the committed examples", async () => {
     const schema = await contractFile("week_live_v1.schema.json");
     const examples = await contractFile("week_live_v1.examples.json");

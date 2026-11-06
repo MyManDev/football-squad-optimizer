@@ -154,7 +154,8 @@ class AdviseEntryRequest:
             raise EntryError("season must be non-empty text.")
         for name in ("gameweek", "league_id", "entry_id"):
             value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            minimum = 0 if name == "league_id" else 1  # 0 is a standalone public team.
+            if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
                 raise EntryError(f"{name} must be a positive integer.")
         if not isinstance(self.strategy, str) or not self.strategy.strip():
             raise EntryError("strategy must be non-empty text.")

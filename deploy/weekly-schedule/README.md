@@ -211,6 +211,25 @@ copies. A release is packed on the PC from the stores there.
 
 ### Set it up
 
+Public teams can use the existing API/worker queue with
+`SQUADOPT_BACKEND_PUBLIC_ENTRIES=1` in the backend's private Compose environment.
+`SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT` defaults to 32 open jobs. Apply the tested release
+to both API and worker before enabling the flag; rollback disables the flag or restores
+the previous release.
+
+`GET /api/v1/public/leagues/{league}/entries/{entry}/advice` only reads an existing result.
+`POST` fetches and pins that one team's FPL bundle, then joins or creates a durable job.
+League 0 denotes a standalone `/entry/{entry}` page; regular league endpoints still require
+a positive league id. Only the plain one-week plan is accepted. Country leagues are never
+added to the weekly capture configuration. The browser starts neither server nor device
+computation until the visitor chooses it; queued work can resume after a reload.
+
+Inputs live under `store/public-entries`, keyed by capture and entry, and their fingerprint
+is part of the advice cache identity. The first valid input for a capture is immutable;
+a newer capture gets fresh inputs. API and worker share this store and the normal rate
+limits, deadline guard, per-client job limit, job progress and cache. Fetches use only the
+deployed FPL forwarder, reject redirects, and are bounded to 15 seconds and 2 MiB.
+
 1. As root: `bash /srv/squadopt/weekly/deploy/weekly-schedule/backend.sh`. It is the same
    script for a first setup and for a check that changes nothing.
 2. **The tunnel, by a person, once.** The two commands make the account's certificate and
@@ -294,6 +313,90 @@ the final run does not fit its 4 h lead (its line says `"late": true`: it ended 
 1.75 h, GW8's release, before the deadline) or memory runs out (swap in use, or a worker
 killed). After the move, run `provision.sh` again: it sets `WEEKLY_WORKERS` to the new count
 of cores.
+
+## Backups and alerts
+
+#1294 asked for both before the host held captures of its own; since 2026-11-04 it does, and
+FPL serves only the present, so a lost capture cannot be taken again.
+
+- **The backup** (`squadopt-backup`, nightly at 23:30Z, when no run writes) sends what the
+  weekly run and the backend cannot rebuild to a restic repository in Cloudflare R2. That covers
+  `data/snapshots`, `data/handoffs`, `data/ledger`, `data/advice_records`, `data/entries`,
+  `data/runtime`, `data/logs`, `artifacts/`, and the backend's `releases/` and `store/`.
+  Once the multi-league baseline store exists, `data/member_baselines` is included too.
+  Keep the runtime journals, started markers and release logs with their captures: they prevent
+  a restored host from starting a run or publishing a release twice.
+  - restic encrypts each backup, adds only what changed and checksums every block. It keeps
+    14 daily, 8 weekly and 12 monthly snapshots, checks the repository's structure each night
+    and reads a fifth of the data back on Sundays.
+  - A success writes `/var/lib/squadopt/backup/last-success`. A failure sends an alert.
+- **The watch** (`squadopt-watch`, every five minutes) sends an ntfy alert when a check turns
+  bad, again once a day while it stays bad, and once when it is good again:
+
+  A failed delivery is retried on the next pass, including a recovery notice. Only a successful
+  delivery starts the daily repeat interval. A pass with a failed delivery exits non-zero and
+  sends no success ping to healthchecks.io.
+
+  | Alert | What it means, and what to do |
+  | --- | --- |
+  | `backend` | `/ready` has not answered 200 for 5 minutes. Read `docker ps` and `docker logs squadopt-api-1`. |
+  | `disk` | The root file system is over 80 % full. Read `du -sh /root/squadopt/* /srv/squadopt/weekly/data/*`. |
+  | `backup` | No backup in 36 hours, or none yet. Read `journalctl -u squadopt-backup`. |
+  | `run` | The newest weekly run ended with a non-zero exit; the alarm on #1093 names its stage. Read its log. |
+  | `timer` | `weekly-schedule.timer` has been off for 3 hours, so no run can start. Start it once no release by hand is running. |
+  | `capture` | A deadline is 3 hours away and nothing was captured since the deadline before, or the cached deadlines cannot be read. Check the gate's journal and bootstrap cache now: a missing capture cannot be taken after the deadline. |
+
+- **From outside**, healthchecks.io expects a ping from every watch pass and every backup, and
+  alerts through the same ntfy topic when one is late. That is how a host that cannot send
+  anything at all is noticed.
+
+### Set them up, once, by a person
+
+The values are secrets: write them on the host yourself, never in chat, an issue or a commit.
+
+1. **ntfy.** Install the ntfy app on both phones. Choose a long, random topic name, subscribe
+   to it on `ntfy.sh` in both apps, and share it only in private.
+2. **healthchecks.io.** In a free account, add two checks:
+   - "squadopt-watch", period 5 minutes, grace 10 minutes;
+   - "squadopt-backup", period 1 day, grace 12 hours.
+
+   Add the ntfy integration with the same topic, and copy each check's ping address.
+3. **R2.** In Cloudflare, create the bucket `squadopt-backup`, then an R2 API token with
+   *Object Read & Write* on that bucket only. Keep its access key id, its secret access key and
+   the account's S3 endpoint (`https://<account id>.r2.cloudflarestorage.com`).
+4. **On the host, as root:**
+
+   ```sh
+   install -m 0600 /srv/squadopt/weekly/deploy/weekly-schedule/alert.example.env /etc/squadopt/alert.env
+   install -m 0600 /srv/squadopt/weekly/deploy/weekly-schedule/backup.example.env /etc/squadopt/backup.env
+   nano /etc/squadopt/alert.env /etc/squadopt/backup.env      # fill in every <...>
+   (umask 077; openssl rand -base64 33 > /etc/squadopt/restic-password)
+   ```
+
+   Keep a copy of the restic password in a password manager: without it the backup cannot be
+   read.
+5. **Initialise the repository and start the timers:**
+
+   ```sh
+   set -a; . /etc/squadopt/backup.env; set +a; restic init
+   bash /srv/squadopt/weekly/deploy/weekly-schedule/backend.sh
+   systemctl start squadopt-backup.service     # the first backup, now
+   squadopt-alert default "SquadOpt test" "The alert reaches this phone."
+   ```
+
+### Restore
+
+Into an empty directory, never over the live data:
+
+```sh
+set -a; . /etc/squadopt/backup.env; set +a
+restic snapshots --tag nightly
+restic restore latest --tag nightly --target /srv/restore
+restic check --read-data
+```
+
+Then compare checksums with the live stores (for example `sha256sum` over a capture's files),
+and copy back only what was lost, as the squadopt user. `restic find <name>` finds one file.
 
 ## Stop it
 

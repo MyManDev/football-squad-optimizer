@@ -603,6 +603,8 @@ exhaustive_ignores = [
     "manifest",
     "official_injury_capture",
     "projection_retention",
+    "public_entry_advice",
+    "public_entry_inputs",
     "publication_workers",
     "queries",
     "queue_contracts",

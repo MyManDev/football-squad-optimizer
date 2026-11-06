@@ -93,7 +93,7 @@ def test_the_bundle_member_week_is_week_live_v1s():
     "damage",
     [
         lambda item: item.update(contract_version="fpl_league_standings_v2"),
-        lambda item: item.update(page=21),
+        lambda item: item.update(page=1001),
         lambda item: item.update(page=0),
         lambda item: item.update(source_time="2026-10-19"),
         lambda item: item.update(raw_response="private"),
@@ -111,6 +111,13 @@ def test_standings_schema_refuses_malformed_or_unrequested_values(damage):
     damage(example)
     with pytest.raises(ValidationError):
         _validator(STANDINGS).validate(example)
+
+
+@pytest.mark.parametrize("page", [21, 406, 1000])
+def test_country_league_pages_match_the_schema(page):
+    example = copy.deepcopy(STANDINGS_EXAMPLES["first_page"])
+    example["page"] = page
+    _validator(STANDINGS).validate(example)
 
 
 @pytest.mark.parametrize(

@@ -280,6 +280,14 @@ export function useAdviceJob(
             }
             if (!alive()) return;
             if (outcome.kind === "advice") {
+              if (
+                request.publicEntry &&
+                expectedSnapshotId != null &&
+                outcome.envelope.payload.source_snapshot_id !== expectedSnapshotId
+              ) {
+                fail(undefined, ANSWER_OTHER_CAPTURE);
+                return;
+              }
               setState({
                 phase: "done",
                 request,
@@ -376,6 +384,14 @@ export function useAdviceJob(
               }
               if (!alive()) return;
               if (read.kind === "advice") {
+                if (
+                  request.publicEntry &&
+                  expectedSnapshotId != null &&
+                  read.envelope.payload.source_snapshot_id !== expectedSnapshotId
+                ) {
+                  fail(undefined, ANSWER_OTHER_CAPTURE);
+                  return;
+                }
                 setState({ phase: "done", request, envelope: read.envelope, source: read.source });
               } else {
                 fail(undefined, ANSWER_UNREADABLE); // completed but unreadable: say so
@@ -429,7 +445,7 @@ export function useAdviceJob(
           if (readAfterMissingJob && generation.current === run) readCached(request);
         });
     },
-    [client, allowPublishedBaseline, readCached, setState],
+    [client, allowPublishedBaseline, expectedSnapshotId, readCached, setState],
   );
 
   const compute = useCallback(

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
@@ -7,7 +7,9 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { leagueAddress } from "../../../lib/leagueAddresses";
 import { useFixtures } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
-import type { AdviceRequest } from "../advice/adviceClient";
+import { createAdviceClient, type AdviceClient, type AdviceRequest } from "../advice/adviceClient";
+import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
+import { useAdviceJob, sameAdviceRequest } from "../advice/useAdviceJob";
 import { ChipTimingCard } from "../advice/ChipTimingCard";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { gameweekDeadline, passedDeadline, useMinuteClock } from "../advice/deadline";
@@ -22,12 +24,13 @@ import { MemberSquad } from "../pages/MemberSquad";
 import type { ShownAdvice } from "../pages/memberPageTypes";
 import { hasLineup, squadOnPitch } from "../pages/squadOnPitch";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
+import { useLeague } from "../useLeague";
 import { useForwardedLeague } from "./ForwardedLeagueContext";
 import { ForwardedTreeProvider } from "./ForwardedTreeProvider";
 import { forwardedMemberSquad } from "./memberSquad";
 import {
   newestDeviceTable,
-  standingRows,
+  standingsPage,
   useCaptureTable,
   useDirectory,
   useEntryBundle,
@@ -38,6 +41,7 @@ import styles from "./ForwardedMemberPage.module.css";
 
 /** The page's reads and clock; the site's own unless a test injects them. */
 export interface ForwardedMemberDependencies {
+  server?: AdviceClient;
   device?: DevicePlanDependencies;
   live?: MemberLiveDependencies;
   clock?: () => number;
@@ -47,6 +51,8 @@ export interface ForwardedMemberDependencies {
 function MemberHeading({ title, manager = null }: { title: string; manager?: string | null }) {
   const { messages } = useLanguage();
   const league = useForwardedLeague();
+  const location = useLocation();
+  const page = standingsPage(location.state?.leaguePage);
   return (
     <header className={styles.heading}>
       <h1 className={styles.title}>{title}</h1>
@@ -55,7 +61,9 @@ function MemberHeading({ title, manager = null }: { title: string; manager?: str
         <p className={styles.back}>
           {league.leagueName ?? messages.forwarded.leagueTitle(league.leagueId)}
           {" · "}
-          <Link to={leagueAddress(league.leagueId)}>{messages.forwarded.backToLeague}</Link>
+          <Link to={`${leagueAddress(league.leagueId)}${page > 1 ? `?page=${page}` : ""}`}>
+            {messages.forwarded.backToLeague}
+          </Link>
         </p>
       ) : null}
     </header>
@@ -79,6 +87,7 @@ export function ForwardedMemberPage({
   const { messages } = useLanguage();
   const words = messages.forwarded;
   const { entryId: entryParam, tool } = useParams();
+  const location = useLocation();
   const league = useForwardedLeague();
   const entryId = /^\d+$/.test(entryParam ?? "") ? Number(entryParam) : 0;
   const valid = Number.isSafeInteger(entryId) && entryId > 0;
@@ -88,9 +97,12 @@ export function ForwardedMemberPage({
   const gameweek = table.data?.payload.gameweek ?? null;
   const bundle = useEntryBundle(entryId, valid ? gameweek : null);
   const fixtures = useFixtures();
-  const standings = useForwardedStandings(league?.leagueId ?? null);
+  const standings = useForwardedStandings(
+    league?.leagueId ?? null,
+    standingsPage(location.state?.leaguePage),
+  );
   const standing: FplStandingRow | null =
-    standingRows(standings.data?.pages).find((row) => row.entry === entryId) ?? null;
+    standings.data?.results.find((row) => row.entry === entryId) ?? null;
   const read = bundle.data;
   // Once the deadline has passed, the live card asks for the same bundle; the one read here
   // answers it, so the forwarder is asked once.
@@ -191,27 +203,8 @@ export function ForwardedMemberPage({
   );
 }
 
-/** The device's state as one line beside the decision's heading. */
-function deviceLine(
-  copy: ReturnType<typeof useLanguage>["messages"]["leagueMembers"],
-  state: ReturnType<typeof useDevicePlan>["state"],
-): string {
-  switch (state.phase) {
-    case "idle":
-    case "loading":
-    case "solving":
-      return copy.deviceSolving;
-    case "done":
-      return "";
-    case "refused":
-      return copy.deviceRefused;
-    default:
-      return copy.deviceFailed;
-  }
-}
-
 /**
- * A bound team's week: before its deadline, the plan the device solves on opening, the squad
+ * A bound team's week: before its deadline, a requested server or device plan, the squad
  * it fields and the chip timing card; once the deadline has passed, the notice and the live
  * score. The plan is the plain one-week plan: nothing else is offered for a forwarded team.
  */
@@ -227,11 +220,18 @@ export function ForwardedMemberView({
   const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = squad.payload;
+  const { tree } = useLeague();
+  const client = useMemo(
+    () => dependencies.server ?? createAdviceClient(tree.entryAdvice),
+    [dependencies.server, tree],
+  );
+  const serverConfigured = Boolean(dependencies.server || import.meta.env.VITE_ADVICE_API_ORIGIN);
   const now = useMinuteClock(dependencies.clock);
   const closed =
     passedDeadline(gameweekDeadline(fixtures, view.season, view.gameweek), now) !== null;
   const request = useMemo<AdviceRequest>(
     () => ({
+      publicEntry: true,
       leagueId: view.league_id,
       entryId: view.entry.entry_id,
       strategy: "saf-puan",
@@ -242,17 +242,27 @@ export function ForwardedMemberView({
     [view.league_id, view.entry.entry_id, view.season, view.gameweek],
   );
   const device = useDevicePlan(view, request, dependencies.device, []);
-  const { available, state, run } = device;
-  // Opening the page is the request: the plan is solved once, while the week is open.
+  const { state } = device;
+  const job = useAdviceJob(client, false, view.source_snapshot_id);
+  const { reset, resume } = job;
+  // Only resume work this tab explicitly requested; opening a team never starts a solve.
   useEffect(() => {
-    if (!closed && available && state.phase === "idle") run();
-  }, [closed, available, state.phase, run]);
+    reset();
+    if (!closed && serverConfigured) resume?.(request);
+  }, [closed, serverConfigured, request, reset, resume]);
+  const computed =
+    job.state.phase === "done" && sameAdviceRequest(job.state.request, request)
+      ? job.state.envelope
+      : null;
   const shown: ShownAdvice | null =
-    state.phase === "done" ? { envelope: state.envelope, origin: "computed" } : null;
+    state.phase === "done"
+      ? { envelope: state.envelope, origin: "computed" }
+      : computed
+        ? { envelope: computed, origin: "computed" }
+        : null;
   const plan = shown?.envelope.payload ?? null;
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
   const onPitch = squadOnPitch(plan, view);
-  const ended = state.phase === "failed" || state.phase === "refused";
   const manager = view.entry.manager_name;
   const title = view.entry.team_name ?? messages.forwarded.teamTitle(view.entry.entry_id);
 
@@ -286,18 +296,30 @@ export function ForwardedMemberView({
                 <h2 className={page.decisionTitle} id="entry-advice-title">
                   {copy.decisionTitle}
                 </h2>
-                <p className={page.echo} aria-live="polite">
-                  {available ? deviceLine(copy, state) : copy.deviceFailed}
-                </p>
               </div>
             </div>
-            {shown ? (
-              <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
-            ) : ended ? (
-              <button type="button" className={styles.retry} onClick={run}>
-                {messages.forwarded.retry}
-              </button>
-            ) : null}
+            {shown ? <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} /> : null}
+            <AdviceRequestPanel
+              request={request}
+              job={{
+                ...job,
+                compute: (asked) => {
+                  device.reset();
+                  job.compute(asked);
+                },
+              }}
+              device={{
+                ...device,
+                run: () => {
+                  job.reset();
+                  device.run();
+                },
+              }}
+              service="ready"
+              computable={serverConfigured}
+              serverLabel={COMPUTE_COPY[language].serverButton}
+              compact
+            />
           </div>
           <div className={page.squadArea}>
             <MemberSquad

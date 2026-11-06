@@ -1,0 +1,18 @@
+# The nightly backup to R2 (#1294): /usr/local/sbin/squadopt-backup says what it covers. Its
+# settings, all private, are /etc/squadopt/backup.env; the alert's are /etc/squadopt/alert.env.
+[Unit]
+Description=SquadOpt: back the host's data up to R2
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/squadopt/backup.env
+EnvironmentFile=-/etc/squadopt/alert.env
+ExecStart=/usr/local/sbin/squadopt-backup
+# restic keeps its index cache here; without a home it would read the whole index from R2 each night.
+Environment=RESTIC_CACHE_DIR=/var/cache/squadopt-restic
+CacheDirectory=squadopt-restic
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=2h

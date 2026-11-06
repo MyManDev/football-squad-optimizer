@@ -34,6 +34,13 @@ MEMORY = "peak memory 5.3 GiB and 0 MiB of swap for the whole run, 1.2 GiB in it
 HOST_FILES = Path(__file__).resolve().parents[2] / "deploy" / "weekly-schedule"
 
 
+@pytest.fixture(autouse=True)
+def isolated_club_news_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Synthetic schedule tests must not inherit the operator's private model settings."""
+
+    monkeypatch.delenv(gate.SETTINGS_VARIABLE, raising=False)
+
+
 def _bootstrap(deadlines: dict[int, str], settled: Collection[int] = ()) -> bytes:
     # The bootstrap's shape, with fields the gate does not read beside the ones it does.
     events = [
@@ -782,7 +789,7 @@ def test_a_gate_that_cannot_decide_posts_one_alarm_a_day_without_its_paths(
         assert _main(workspace, now, host) == 2
     assert host.posted == [
         f"Alarm: the weekly schedule gate refused at stage `gate`. At {day}T02:00Z it could not "
-        "decide, so no run could start: web/public/data/fixtures.json names no "
+        f"decide, so no run could start: {gate.FIXTURES} names no "
         "payload.season. This alarm is posted once a UTC day while the refusal lasts. "
         f"{STAYS}"
         for day in ("2026-10-30", "2026-10-31")

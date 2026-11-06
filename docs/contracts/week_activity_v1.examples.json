@@ -1,0 +1,166 @@
+{
+  "in_progress": {
+    "contract_version": "week_activity_v1",
+    "week": {
+      "contract_version": "week_live_v1",
+      "season": "2026-27",
+      "gameweek": 9,
+      "source_time": "2026-10-31T16:00:00Z",
+      "fixtures": [
+        {
+          "id": 91,
+          "home_club": 1,
+          "away_club": 2,
+          "finished": false
+        },
+        {
+          "id": 92,
+          "home_club": 1,
+          "away_club": 3,
+          "finished": true
+        }
+      ],
+      "elements": [
+        {
+          "element_id": 1,
+          "points": 9,
+          "minutes": 130,
+          "card_shown": false
+        },
+        {
+          "element_id": 2,
+          "points": 1,
+          "minutes": 20,
+          "card_shown": false
+        }
+      ]
+    },
+    "activity": {
+      "in_play_fixtures": [91],
+      "appearances": [
+        {
+          "element_id": 1,
+          "fixture_id": 91,
+          "minutes": 40,
+          "goals": 1,
+          "assists": 0
+        },
+        {
+          "element_id": 1,
+          "fixture_id": 92,
+          "minutes": 90,
+          "goals": 0,
+          "assists": 1
+        },
+        {
+          "element_id": 2,
+          "fixture_id": 91,
+          "minutes": 20,
+          "goals": 0,
+          "assists": 0
+        }
+      ]
+    }
+  },
+  "finished": {
+    "contract_version": "week_activity_v1",
+    "week": {
+      "contract_version": "week_live_v1",
+      "season": "2026-27",
+      "gameweek": 9,
+      "source_time": "2026-10-31T18:00:00Z",
+      "fixtures": [
+        {
+          "id": 91,
+          "home_club": 1,
+          "away_club": 2,
+          "finished": true
+        },
+        {
+          "id": 92,
+          "home_club": 1,
+          "away_club": 3,
+          "finished": true
+        }
+      ],
+      "elements": [
+        {
+          "element_id": 1,
+          "points": 9,
+          "minutes": 130,
+          "card_shown": false
+        },
+        {
+          "element_id": 2,
+          "points": 1,
+          "minutes": 20,
+          "card_shown": false
+        }
+      ]
+    },
+    "activity": {
+      "in_play_fixtures": [],
+      "appearances": [
+        {
+          "element_id": 1,
+          "fixture_id": 91,
+          "minutes": 40,
+          "goals": 1,
+          "assists": 0
+        },
+        {
+          "element_id": 1,
+          "fixture_id": 92,
+          "minutes": 90,
+          "goals": 0,
+          "assists": 1
+        },
+        {
+          "element_id": 2,
+          "fixture_id": 91,
+          "minutes": 20,
+          "goals": 0,
+          "assists": 0
+        }
+      ]
+    }
+  },
+  "unavailable": {
+    "contract_version": "week_activity_v1",
+    "week": {
+      "contract_version": "week_live_v1",
+      "season": "2026-27",
+      "gameweek": 9,
+      "source_time": "2026-10-31T16:00:00Z",
+      "fixtures": [
+        {
+          "id": 91,
+          "home_club": 1,
+          "away_club": 2,
+          "finished": false
+        },
+        {
+          "id": 92,
+          "home_club": 1,
+          "away_club": 3,
+          "finished": true
+        }
+      ],
+      "elements": [
+        {
+          "element_id": 1,
+          "points": 9,
+          "minutes": 130,
+          "card_shown": false
+        },
+        {
+          "element_id": 2,
+          "points": 1,
+          "minutes": 20,
+          "card_shown": false
+        }
+      ]
+    },
+    "activity": null
+  }
+}
