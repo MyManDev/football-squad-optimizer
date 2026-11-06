@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# After every release: move the backend VM to the release tag. Run on the PC from Git Bash.
+# Legacy ordinary-folder layout only: move the backend VM to a release tag from Git Bash.
+# Retained packages use scripts/release/vm_football_release.py, not this transfer.
 #   bash scripts/vm_push.sh site-2026-27-gw07-decision
 # First it runs the read-only layout preflight scripts/release/check_vm_layout.py on the VM
 # over SSH. A refusal stops the script there, before any remote write; see "VM data root
