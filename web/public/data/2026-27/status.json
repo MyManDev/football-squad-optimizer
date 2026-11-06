@@ -1,6 +1,6 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-11-04T06:29:19Z",
+  "generated_at_utc": "2026-11-06T14:59:14Z",
   "payload": {
     "actions": [
       {
@@ -19,11 +19,11 @@
         "gameweek": 10,
         "handoff_path": null,
         "kind": "wait",
-        "reason": "gameweek 10 deadline in 60.0 h; capture opens 3 h before it",
+        "reason": "gameweek 10 deadline in 3.5 h; capture opens 3 h before it",
         "reason_code": "before_window",
         "reason_params": {
           "gameweek": 10,
-          "hours_left": 60.0,
+          "hours_left": 3.5,
           "window_hours": 3.0
         },
         "snapshot_id": null
@@ -34,12 +34,12 @@
       4,
       5
     ],
-    "hours_to_deadline": 60.01,
+    "hours_to_deadline": 3.51,
     "is_idle": true,
-    "latest_capture": "fpl-live-20261104T020046Z-eaadfd3e9143",
+    "latest_capture": "fpl-live-20261106T083154Z-8b1a248398c6",
     "next_deadline_utc": "2026-11-06T18:30:00Z",
     "next_gameweek": 10,
-    "now_utc": "2026-11-04T06:29:19Z",
+    "now_utc": "2026-11-06T14:59:14Z",
     "recent_events": [
       {
         "fields": {
@@ -47,8 +47,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T06:29:18.904+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:59:13.290+00:00"
       },
       {
         "fields": {
@@ -56,56 +56,56 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T06:29:18.897+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:59:13.289+00:00"
       },
       {
         "fields": {
-          "elapsed_seconds": 16003.962701,
+          "elapsed_seconds": 66.083167,
           "league_id": 352490,
-          "menu": "full",
+          "menu": "device",
           "stage": "publication"
         },
         "level": "INFO",
         "message": "tick.week.league.substage",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T06:29:14.114+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:59:11.505+00:00"
       },
       {
         "fields": {
-          "elapsed_seconds": 15963.18299,
+          "elapsed_seconds": 13.90997,
           "league_id": 352490,
-          "menu": "full",
+          "menu": "device",
           "stage": "members"
         },
         "level": "INFO",
         "message": "tick.week.league.substage",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T06:28:33.334+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:58:19.332+00:00"
       },
       {
         "fields": {
-          "elapsed_seconds": 7.66359,
+          "elapsed_seconds": 8.954657,
           "league_id": 352490,
-          "menu": "full",
+          "menu": "device",
           "stage": "projection"
         },
         "level": "INFO",
         "message": "tick.week.league.substage",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:02:37.815+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:58:14.377+00:00"
       },
       {
         "fields": {
-          "elapsed_seconds": 0.680253,
+          "elapsed_seconds": 0.802685,
           "league_id": 352490,
-          "menu": "full",
+          "menu": "device",
           "stage": "prepared"
         },
         "level": "INFO",
         "message": "tick.week.league.substage",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:02:30.831+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:58:06.225+00:00"
       },
       {
         "fields": {
@@ -113,8 +113,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:02:28.452+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:58:04.145+00:00"
       },
       {
         "fields": {
@@ -122,8 +122,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:02:26.884+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:58:03.509+00:00"
       },
       {
         "fields": {
@@ -131,8 +131,26 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:01:05.429+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:30.916+00:00"
+      },
+      {
+        "fields": {
+          "stage": "rotation"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.done",
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:30.916+00:00"
+      },
+      {
+        "fields": {
+          "stage": "rotation"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.start",
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:30.597+00:00"
       },
       {
         "fields": {
@@ -140,8 +158,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:01:05.429+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:30.597+00:00"
       },
       {
         "fields": {
@@ -149,8 +167,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:54.278+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:19.552+00:00"
       },
       {
         "fields": {
@@ -158,8 +176,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:54.278+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:19.551+00:00"
       },
       {
         "fields": {
@@ -167,8 +185,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:36.606+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:19.375+00:00"
       },
       {
         "fields": {
@@ -176,8 +194,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:36.606+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:19.374+00:00"
       },
       {
         "fields": {
@@ -185,8 +203,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:36.233+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:19.168+00:00"
       },
       {
         "fields": {
@@ -194,8 +212,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:36.232+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:19.167+00:00"
       },
       {
         "fields": {
@@ -203,8 +221,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:27.297+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:19.102+00:00"
       },
       {
         "fields": {
@@ -212,26 +230,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:27.297+00:00"
-      },
-      {
-        "fields": {
-          "stage": "top100_cohort"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:26.245+00:00"
-      },
-      {
-        "fields": {
-          "stage": "preflight"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw10-tuesday-20261104T0200Z",
-        "ts": "2026-11-04T02:00:26.245+00:00"
+        "run_id": "2026-27-gw10-friday-20261106T145429Z-recovery",
+        "ts": "2026-11-06T14:56:19.102+00:00"
       }
     ],
     "season": "2026-27",

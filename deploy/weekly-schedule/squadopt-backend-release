@@ -1,0 +1,596 @@
+#!/usr/bin/env python3
+"""Move the advice backend on this host to a released week, from the weekly run's own data.
+
+backend.sh installs this as /usr/local/sbin/squadopt-backend-release, with the root units
+squadopt-backend-release.{path,service} beside it. Once a release is live, the release chain
+(`squadopt.platform.weekly_release`, as the service user) writes one request, a small JSON
+document, into the spool; the path unit starts this command as root, which takes the oldest
+request and runs the five steps of scripts/release/vm_football_release.py (#1211) on this
+host:
+
+1. pack, from the weekly checkout's captures, handoff and manifests, with the site data of the
+   release tag;
+2. stage, in place of push: the package is already here;
+3. prepare;
+4. candidate, with its advice job while the deadline is ahead and with --no-jobs after it;
+5. activate, likewise.
+
+Then it prunes the oldest releases and their images, keeping the live one and those just
+before it, and writes its result where the chain waits for it.
+
+What root never does here: run code from the service user's checkout or git inside it (a
+repository's own configuration can run commands, which is what git's "dubious ownership"
+refusal guards against). The tool comes from the release tag in root's own clone, and the
+checkout is read for data files only, through pinned descriptors without following links.
+The tool reads a private root-owned copy. A request names files, never paths; each is looked
+for in its one directory.
+
+Every step's command and output go to the journal and to <state>/<run id>.log. A run is moved
+once: a request for a run that has a result is refused.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+from collections.abc import Callable, Sequence
+from contextlib import suppress
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+WEEKLY = Path(os.environ.get("SQUADOPT_WEEKLY", "/srv/squadopt/weekly"))
+SPOOL = Path(os.environ.get("SQUADOPT_BACKEND_SPOOL", "/srv/squadopt/spool/backend"))
+STATE = Path(os.environ.get("SQUADOPT_BACKEND_STATE", "/var/lib/squadopt/backend"))
+# The tool keeps its layout under the home of the user it runs as: root's here.
+BASE = Path(os.environ.get("SQUADOPT_BACKEND_BASE", str(Path.home() / "squadopt")))
+REPO = BASE / "repo"
+RELEASES = BASE / "releases"
+INCOMING = BASE / "incoming"
+TOOL_PATH = "scripts/release/vm_football_release.py"
+#: Releases kept besides the live one, so activate's rollback and a by-hand one have a target.
+KEEP: int = 2
+#: A candidate's advice job needs this long before the deadline; later it runs with --no-jobs.
+JOB_MARGIN = timedelta(minutes=20)
+REQUEST_BYTES = 64 * 1024
+
+RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,95}")
+TAG = re.compile(r"site-[0-9]{4}-[0-9]{2}-gw[0-9]{2}-(decision|settled|fix[0-9]+)")
+SEASON = re.compile(r"[0-9]{4}-[0-9]{2}")
+CAPTURE = re.compile(r"fpl-live-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}")
+NEWS = re.compile(r"club-news-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}")
+#: Any capture a package copies: the decision capture, the Top 100's and the club news.
+SNAPSHOT = re.compile(r"(fpl-[a-z0-9]+(-[a-z0-9]+)*|club-news)-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}")
+INSTANT = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
+FILE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.json")
+TABLE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.csv")
+#: A handoff the run retained by capture: its SHA-256 and .json.
+RETAINED = re.compile(r"[0-9a-f]{64}\.json")
+RELEASE_NAME = re.compile(r"[a-z0-9][a-z0-9._-]{2,80}")
+
+
+class Refused(ValueError):
+    """A request this command does not act on; nothing on the host changed."""
+
+
+@dataclass(frozen=True, slots=True)
+class Request:
+    """One released week the backend moves to, as the release chain wrote it."""
+
+    run_id: str
+    tag: str
+    season: str
+    gameweek: int
+    capture: str
+    deadline_utc: str
+    top100_manifest: str
+    news: str
+    rotation_manifest: str
+    handoff_retained: str
+
+    @property
+    def retained_handoff(self) -> Path:
+        """The handoff the run retained for its capture, not the gameweek's alias: the alias
+        names whichever run of the week wrote last, which can be a later one."""
+
+        return WEEKLY / "data" / "handoffs" / "by-capture" / self.capture / self.handoff_retained
+
+    @property
+    def handoff_name(self) -> str:
+        """The name pack takes for the private copy of the retained handoff."""
+
+        return f"{self.season}-gw{self.gameweek:02d}.json"
+
+
+def _text(
+    document: dict[str, Any], key: str, pattern: re.Pattern[str], *, empty: bool = False
+) -> str:
+    value = document.get(key, "")
+    if not isinstance(value, str) or not (pattern.fullmatch(value) or (empty and value == "")):
+        raise Refused(f"the request's {key} is not one this command takes: {value!r}")
+    return value
+
+
+def parse_request(raw: bytes) -> Request:
+    """The request in `raw`, every field checked against the one shape it may have."""
+
+    try:
+        document = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError) as error:
+        raise Refused(f"the request is not JSON ({error})") from error
+    if not isinstance(document, dict):
+        raise Refused("the request is not a JSON object")
+    gameweek = document.get("gameweek")
+    if not isinstance(gameweek, int) or isinstance(gameweek, bool) or not 1 <= gameweek <= 38:
+        raise Refused(f"the request's gameweek is not one this command takes: {gameweek!r}")
+    request = Request(
+        run_id=_text(document, "run_id", RUN_ID),
+        tag=_text(document, "tag", TAG),
+        season=_text(document, "season", SEASON),
+        gameweek=gameweek,
+        capture=_text(document, "capture", CAPTURE),
+        deadline_utc=_text(document, "deadline_utc", INSTANT),
+        top100_manifest=_text(document, "top100_manifest", FILE_NAME),
+        news=_text(document, "news", NEWS, empty=True),
+        rotation_manifest=_text(document, "rotation_manifest", FILE_NAME, empty=True),
+        handoff_retained=_text(document, "handoff_retained", RETAINED),
+    )
+    if bool(request.news) != bool(request.rotation_manifest):
+        raise Refused("the request names club news without its rotation table, or the reverse")
+    try:
+        datetime.strptime(request.deadline_utc, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as error:
+        raise Refused("the request's deadline is not a valid UTC instant") from error
+    return request
+
+
+def open_directory(directory: Path) -> int:
+    """Pin an absolute directory without following links in any parent directory."""
+
+    if sys.platform == "win32" or not directory.is_absolute() or ".." in directory.parts:
+        raise Refused("host inputs need an absolute POSIX directory path")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    descriptor = os.open(directory.anchor, flags)
+    try:
+        for part in directory.parts[1:]:
+            child = os.open(part, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+    except OSError as error:
+        os.close(descriptor)
+        raise Refused("the input or one of its parents is not a plain directory") from error
+    return descriptor
+
+
+def take_request(spool: Path) -> bytes | None:
+    """Read and remove the oldest plain request through a pinned spool directory descriptor."""
+
+    directory = open_directory(spool)
+    try:
+        return _take_request(directory)
+    finally:
+        os.close(directory)
+
+
+def _take_request(directory: int) -> bytes | None:
+    entries: list[tuple[float, str]] = []
+    for name in os.listdir(directory):
+        if name.endswith(".json"):
+            try:
+                metadata = os.stat(name, dir_fd=directory, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            entries.append((metadata.st_mtime, name))
+    for _modified, name in sorted(entries):
+        try:
+            descriptor = os.open(
+                name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=directory
+            )
+        except OSError:
+            with suppress(FileNotFoundError):
+                os.unlink(name, dir_fd=directory)
+            continue
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            os.close(descriptor)
+            os.rename(name, name + ".refused", src_dir_fd=directory, dst_dir_fd=directory)
+            continue
+        with os.fdopen(descriptor, "rb") as handle:
+            raw = handle.read(REQUEST_BYTES + 1)
+        with suppress(FileNotFoundError):
+            os.unlink(name, dir_fd=directory)
+        if len(raw) > REQUEST_BYTES:
+            raise Refused(f"{name} is larger than a request is")
+        return raw
+    return None
+
+
+Run = Callable[[Sequence[str]], "Completed"]
+
+
+@dataclass(frozen=True, slots=True)
+class Completed:
+    code: int
+    output: str
+
+
+def run_command(log: Path) -> Run:
+    """Run one command to its end, its line and output appended to `log` and printed."""
+
+    def run(arguments: Sequence[str]) -> Completed:
+        completed = subprocess.run(
+            list(arguments),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        with log.open("a", encoding="utf-8") as handle:
+            handle.write(f"$ {' '.join(arguments)}\n{completed.stdout}")
+        sys.stdout.write(completed.stdout)
+        return Completed(completed.returncode, completed.stdout)
+
+    return run
+
+
+def _json_line(output: str, stage: str) -> dict[str, Any]:
+    """The tool's JSON report of `stage`, the last document in its output."""
+
+    start = output.rfind('{\n  "stage"') if '{\n  "stage"' in output else output.rfind('{"stage"')
+    if start < 0:
+        raise Refused(f"the tool's {stage} printed no report")
+    document = json.loads(output[start:])
+    if not isinstance(document, dict) or document.get("stage") != stage:
+        raise Refused(f"the tool's report is not its {stage!r} report")
+    return document
+
+
+def capture_names(manifest: Path) -> list[str]:
+    """Read capture names from the private copy of the Top 100 manifest."""
+
+    if manifest.is_symlink() or not manifest.is_file():
+        raise Refused(f"the Top 100 manifest {manifest.name} is not a plain file")
+    try:
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+        names = document["source_snapshot_ids"]
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise Refused(f"the Top 100 manifest {manifest.name} is unreadable ({error!r})") from error
+    if not isinstance(names, list) or not names:
+        raise Refused(f"the Top 100 manifest {manifest.name} names no captures")
+    for name in names:
+        if not isinstance(name, str) or not SNAPSHOT.fullmatch(name):
+            raise Refused(f"the Top 100 manifest names a capture this command takes not: {name!r}")
+    return names
+
+
+def check_captures(manifest: Path, snapshots: Path) -> None:
+    """Check the manifest against the private, fully staged capture directories."""
+
+    for name in capture_names(manifest):
+        path = snapshots / name
+        if path.is_symlink() or not path.is_dir():
+            raise Refused(f"the capture {name} is not a plain directory under {snapshots}")
+
+
+def copy_input(source: Path, target: Path, *, tree: bool = False) -> None:
+    """Copy data through pinned, non-following descriptors into a private root directory."""
+
+    parent = open_directory(source.parent)
+    try:
+        _copy_entry(parent, source.name, target, tree=tree)
+    except OSError as error:
+        raise Refused(f"release input {source.name} is not a readable plain input") from error
+    finally:
+        os.close(parent)
+
+
+def _copy_entry(parent: int, name: str, target: Path, *, tree: bool) -> None:
+    descriptor = os.open(
+        name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=parent
+    )
+    try:
+        metadata = os.fstat(descriptor)
+        if tree and stat.S_ISDIR(metadata.st_mode):
+            target.mkdir(parents=True)
+            for child in sorted(os.listdir(descriptor)):
+                entry = os.stat(child, dir_fd=descriptor, follow_symlinks=False)
+                _copy_entry(descriptor, child, target / child, tree=stat.S_ISDIR(entry.st_mode))
+        elif not tree and stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with (
+                os.fdopen(descriptor, "rb", closefd=False) as incoming,
+                target.open("xb") as output,
+            ):
+                shutil.copyfileobj(incoming, output)
+        else:
+            raise Refused(f"release input {name} is not a plain {'directory' if tree else 'file'}")
+    finally:
+        os.close(descriptor)
+
+
+def stage_inputs(request: Request, root: Path) -> None:
+    """Stage only the named data; no service-owned path is passed to the root release tool."""
+
+    def manifest(group: str, name: str) -> Path:
+        source = WEEKLY / "artifacts" / group
+        target = root / "artifacts" / group / name
+        copy_input(source / name, target)
+        try:
+            table = json.loads(target.read_text(encoding="utf-8"))["table_file"]
+        except (ValueError, KeyError, TypeError) as error:
+            raise Refused(f"manifest {name} names no table") from error
+        if not isinstance(table, str) or not TABLE_NAME.fullmatch(table):
+            raise Refused(f"manifest {name} names an unsafe table")
+        copy_input(source / table, target.with_name(table))
+        return target
+
+    top100 = manifest("phase_b", request.top100_manifest)
+    captures = {request.capture, *capture_names(top100)}
+    if request.news:
+        manifest("rotation", request.rotation_manifest)
+        captures.add(request.news)
+    for capture in sorted(captures):
+        copy_input(
+            WEEKLY / "data" / "snapshots" / capture,
+            root / "snapshots" / capture,
+            tree=True,
+        )
+    check_captures(top100, root / "snapshots")
+    try:
+        copy_input(request.retained_handoff, root / "handoffs" / request.handoff_name)
+    except Refused as error:
+        raise Refused(
+            f"the retained handoff {request.handoff_retained} is not a plain file"
+        ) from error
+
+
+def trusted_release_commit(tag: str, run: Run) -> str:
+    """Resolve an annotated release tag only when its commit is on the fetched main history."""
+
+    reference = f"refs/tags/{tag}"
+    kind = run(["git", "-C", str(REPO), "cat-file", "-t", reference])
+    if kind.code != 0 or kind.output.strip() != "tag":
+        raise Refused(f"{tag} is not an annotated release tag")
+    resolved = run(["git", "-C", str(REPO), "rev-parse", "--verify", f"{reference}^{{commit}}"])
+    commit = resolved.output.strip()
+    if resolved.code != 0 or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise Refused(f"{tag} does not resolve to a release commit")
+    approved = run(
+        ["git", "-C", str(REPO), "merge-base", "--is-ancestor", commit, "refs/remotes/origin/main"]
+    )
+    if approved.code != 0:
+        raise Refused(f"{tag} is not on the protected main release history")
+    return commit
+
+
+def tool_source(commit: str) -> bytes | None:
+    """Read the tool by its verified commit, never by a mutable or unreviewed ref."""
+
+    shown = subprocess.run(
+        ["git", "-C", str(REPO), "show", f"{commit}:{TOOL_PATH}"], capture_output=True, check=False
+    )
+    return shown.stdout if shown.returncode == 0 and shown.stdout else None
+
+
+def with_jobs(deadline_utc: str, now: datetime) -> bool:
+    """Whether the candidate and the activation run their advice job (before the deadline)."""
+
+    deadline = datetime.strptime(deadline_utc, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+    return now + JOB_MARGIN < deadline
+
+
+def pack_release(request: Request, python: list[str], run: Run) -> Completed:
+    """Keep a private staging directory alive only until the package has been built."""
+
+    inputs = STATE / "inputs"
+    inputs.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f"{request.run_id}-", dir=inputs) as directory:
+        root = Path(directory)
+        stage_inputs(request, root)
+        pack = [
+            *python,
+            "pack",
+            "--repo",
+            str(REPO),
+            "--season",
+            request.season,
+            "--gameweek",
+            str(request.gameweek),
+            "--capture",
+            request.capture,
+            "--tag",
+            request.tag,
+            "--snapshot-root",
+            str(root / "snapshots"),
+            "--handoff",
+            str(root / "handoffs" / request.handoff_name),
+            "--top100-manifest",
+            str(root / "artifacts" / "phase_b" / request.top100_manifest),
+            "--out",
+            str(INCOMING),
+        ]
+        if request.news:
+            pack += [
+                "--rotation-manifest",
+                str(root / "artifacts" / "rotation" / request.rotation_manifest),
+                "--news-capture",
+                request.news,
+            ]
+        INCOMING.mkdir(parents=True, exist_ok=True)
+        return run(pack)
+
+
+def move(request: Request, run: Run, now: datetime, say: Callable[[str], None]) -> int:
+    """The five steps for `request`; 0 once the backend serves it, else the failing step's code."""
+
+    fetched = run(
+        [
+            "git",
+            "-C",
+            str(REPO),
+            "fetch",
+            "-q",
+            "--no-tags",
+            "origin",
+            "refs/heads/main:refs/remotes/origin/main",
+            f"refs/tags/{request.tag}:refs/tags/{request.tag}",
+        ]
+    )
+    if fetched.code != 0:
+        say(f"stopped: fetching {request.tag} into {REPO} exited {fetched.code}")
+        return fetched.code
+    commit = trusted_release_commit(request.tag, run)
+    source = tool_source(commit)
+    if source is None:
+        say(f"stopped: {request.tag} holds no {TOOL_PATH}")
+        return 1
+    tool = STATE / "tools" / f"{request.tag}.py"
+    tool.parent.mkdir(parents=True, exist_ok=True)
+    tool.write_bytes(source)
+    python = [sys.executable, str(tool)]
+
+    packed = pack_release(request, python, run)
+    if packed.code != 0:
+        say(f"stopped: pack exited {packed.code}; nothing was staged")
+        return packed.code
+    report = _json_line(packed.output, "packed")
+    name = str(report["name"])
+    if not RELEASE_NAME.fullmatch(name):
+        raise Refused(f"pack named an unsafe release {name!r}")
+    say(f"packed {name}: {report['files']} files, football {report['football']}")
+    staged = run(
+        [
+            *python,
+            "stage",
+            "--tarball",
+            str(report["tarball"]),
+            "--sha256",
+            str(report["tarball_sha256"]),
+        ]
+    )
+    shutil.rmtree(INCOMING / name, ignore_errors=True)
+    if staged.code != 0:
+        say(f"stopped: stage exited {staged.code}")
+        return staged.code
+    jobs = [] if with_jobs(request.deadline_utc, now) else ["--no-jobs"]
+    for step in ("prepare", "candidate", "activate"):
+        done = run([*python, step, "--release", name, *(jobs if step != "prepare" else [])])
+        if done.code != 0:
+            say(
+                f"stopped: {step} exited {done.code}; "
+                + (
+                    "the live backend was not touched"
+                    if step != "activate"
+                    else "activate restored the kept configuration"
+                )
+            )
+            return done.code
+        skipped = bool(jobs) and step != "prepare"
+        say(f"{step}: done" + (" (no advice job: the deadline is near or past)" if skipped else ""))
+    say(f"live: the backend serves {name}")
+    prune(name, run, say)
+    return 0
+
+
+def _read(path: Path) -> dict[str, Any]:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return document if isinstance(document, dict) else {}
+
+
+def prune(live: str, run: Run, say: Callable[[str], None]) -> None:
+    """Remove the oldest releases, their images and build checkouts, keeping `live` and the
+    `KEEP` packed just before it. A release whose package names no creation time is kept."""
+
+    releases = [
+        path
+        for path in RELEASES.iterdir()
+        if path.is_dir() and not path.is_symlink() and RELEASE_NAME.fullmatch(path.name)
+    ]
+    created = {
+        path.name: str(_read(path / "package.json").get("created_at", "")) for path in releases
+    }
+    dated = sorted(
+        (path for path in releases if created[path.name]), key=lambda path: created[path.name]
+    )
+    older = [path for path in dated if path.name != live]
+    doomed = older[: max(len(older) - KEEP, 0)]
+    kept_builds = {
+        str(_read(path / "image.json").get("build_dir", ""))
+        for path in releases
+        if path not in doomed
+    }
+    for path in doomed:
+        record = _read(path / "image.json")
+        image, build = str(record.get("image", "")), str(record.get("build_dir", ""))
+        if image:
+            run(["docker", "image", "rm", image])
+        build_path = Path(build)
+        build_root = BASE / "build"
+        if (
+            build
+            and build not in kept_builds
+            and build_path.parent == build_root
+            and not build_path.is_symlink()
+            and build_path.resolve().parent == build_root.resolve()
+        ):
+            shutil.rmtree(build_path, ignore_errors=True)
+        shutil.rmtree(path)
+        say(f"pruned {path.name}" + (f" and image {image}" if image else ""))
+
+
+def main(*, now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> int:
+    """Take one request from the spool and move the backend to it; 0 when there was none."""
+
+    if getattr(os, "geteuid", lambda: -1)() != 0:
+        print("Refused: run as root, as the unit does", file=sys.stderr)
+        return 2
+    STATE.mkdir(parents=True, exist_ok=True)
+    try:
+        raw = take_request(SPOOL)
+        if raw is None:
+            return 0
+        request = parse_request(raw)
+    except Refused as error:
+        print(f"Refused: {error}", file=sys.stderr)
+        return 2
+    result = STATE / f"{request.run_id}.result.json"
+    log = STATE / f"{request.run_id}.log"
+    lines: list[str] = []
+
+    def say(text: str) -> None:
+        line = f"{datetime.now(UTC):%Y-%m-%dT%H:%M:%SZ} backend: {text}"
+        lines.append(f"backend: {text}")
+        with log.open("a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+        print(line)
+
+    if result.exists():
+        print(f"Refused: {request.run_id} was moved before; read {log}", file=sys.stderr)
+        return 2
+    say(f"run {request.run_id}: moving to {request.tag}, capture {request.capture}")
+    try:
+        code = move(request, run_command(log), now(), say)
+    except (Refused, OSError, KeyError, ValueError) as error:
+        say(f"stopped: {error}")
+        code = 1
+    document = {"run_id": request.run_id, "tag": request.tag, "code": code, "lines": lines}
+    staged = result.with_suffix(".partial")
+    staged.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    os.chmod(staged, 0o644)
+    os.replace(staged, result)
+    return 0 if code == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

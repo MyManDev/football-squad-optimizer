@@ -7,7 +7,9 @@
  * gains are the published chip documents' own, as the publisher reads them; one member is
  * also read end to end through the device's own 1 + n solves. A full-menu tree whose
  * index carries no `chip_forecast` fails here: the parity reference is gone, and a guard
- * that skips would ship the device's reading unchecked.
+ * that skips would ship the device's reading unchecked. Explicit device menus instead
+ * publish inputs without a forecast; their worker must produce finite gains and a
+ * reading for the held chips from the same capture.
  */
 
 import {
@@ -40,7 +42,7 @@ const read = <T>(path: string): T => JSON.parse(readFileSync(path, "utf-8")) as 
 interface Member {
   entryId: number;
   squad: EntrySquad;
-  published: Record<string, unknown>;
+  published: Record<string, unknown> | null;
   /** The published chip documents' gains, an unreadable one as unknown. */
   gains: Partial<Record<ChipName, number | null>>;
 }
@@ -61,7 +63,11 @@ function members(root: string): Member[] {
     const indexPath = join(root, "advice", String(entryId), "index.json");
     if (!isDevicePlanEntry(squad.device_plan) || !existsSync(indexPath)) continue;
     const index = read<LeagueViewEnvelope<EntryAdviceIndex>>(indexPath).payload;
-    if (index.chip_forecast === undefined || index.chip_forecast === null) {
+    if (index.menu === "device") {
+      expect(index.computed).toEqual([]);
+      expect(index.chip_forecast == null).toBe(true);
+      expect(index.chips?.available).toBe(false);
+    } else if (index.chip_forecast === undefined || index.chip_forecast === null) {
       throw new Error(`${indexPath} carries no chip_forecast to hold the device to.`);
     }
     const gains: Member["gains"] = {};
@@ -76,7 +82,7 @@ function members(root: string): Member[] {
     found.push({
       entryId,
       squad,
-      published: index.chip_forecast as Record<string, unknown>,
+      published: (index.chip_forecast ?? null) as Record<string, unknown> | null,
       gains,
     });
   }
@@ -155,12 +161,15 @@ const fixtures = (() => {
 })();
 
 const trees = shippedTrees().map(({ path, root }) => ({ path, root, members: members(root) }));
-const fullMenu = trees.filter((tree) => tree.members.length > 0);
+const fullMenu = trees
+  .map((tree) => ({
+    ...tree,
+    members: tree.members.filter((member) => member.published !== null),
+  }))
+  .filter((tree) => tree.members.length > 0);
 
-it("the site publishes at least one full-menu tree to hold the device to", () => {
-  // The day no tree carries a member index, this file has no reference left and is retired
-  // on purpose, not by an empty loop.
-  expect(fullMenu.length).toBeGreaterThan(0);
+it("the site publishes member inputs for the device to compute chip timing", () => {
+  expect(trees.flatMap((tree) => tree.members).length).toBeGreaterThan(0);
 });
 
 it("a full-menu tree whose member index carries no chip_forecast fails, not skips", () => {
@@ -200,11 +209,11 @@ for (const { path, root, members: shipped } of fullMenu) {
  * gain of the tree to its published document, and each solve costs seconds.
  */
 function solvedMember(): { root: string; member: Member } | undefined {
-  const all = fullMenu.flatMap(({ root, members: shipped }) =>
+  const all = trees.flatMap(({ root, members: shipped }) =>
     shipped.map((member) => ({ root, member })),
   );
   const playNow = all.find(({ member }) =>
-    JSON.stringify(member.published.forecast ?? null).includes('"play_now"'),
+    JSON.stringify(member.published?.forecast ?? null).includes('"play_now"'),
   );
   return playNow ?? all[0];
 }
@@ -217,7 +226,7 @@ describe("the device's own chip gains", () => {
     solver = (await load({ wasmBinary: wasm })) as unknown as LpSolver;
   }, 60_000);
 
-  it("give the published reading through the worker's 1 + n request", () => {
+  it("compute the member's chip timing through the worker's 1 + n request", () => {
     const { root, member } = solvedMember()!;
     const { squad, published, gains } = member;
     const table = read<LeagueViewEnvelope<DevicePlanDocument>>(
@@ -234,10 +243,17 @@ describe("the device's own chip gains", () => {
     const solved = answer.chip_gains!;
     expect(Object.keys(solved)).toEqual(chips);
     for (const chip of chips) {
-      if (gains[chip] == null) expect(solved[chip]).toBeNull();
+      if (published === null) expect(Number.isFinite(solved[chip])).toBe(true);
+      else if (gains[chip] == null) expect(solved[chip]).toBeNull();
       else expect(solved[chip]).toBeCloseTo(gains[chip], 6);
     }
     const device = memberChipForecast({ table, squad, fixtures, gains: solved });
-    expectSameReading(device, published, "chip_forecast");
+    if (published !== null) expectSameReading(device, published, "chip_forecast");
+    else {
+      expect(device.status).toBe("available");
+      expect(device.reason).toBeNull();
+      expect(device.source_snapshot_id).toBe(squad.source_snapshot_id);
+      expect(device.forecast?.chips.map((chip) => chip.name)).toEqual(chips);
+    }
   }, 180_000);
 });

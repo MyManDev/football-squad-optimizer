@@ -21,6 +21,7 @@ import pytest
 from squadopt.application import weekly_suggestion_eval as review
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
+    MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
     RECORD_FILE,
     record_member_advice,
 )
@@ -113,6 +114,209 @@ def choose(root: Path) -> dict[str, Any] | None:
     return review.select_record(
         root, season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
     )
+
+
+def test_one_baseline_is_read_by_both_leagues(tmp_path: Path) -> None:
+    record = recorded()
+    del record["league_id"]
+    record["contract_version"] = MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+    record["source"] = "server_one_week_baseline"
+    record_member_advice(tmp_path, record)
+    for league in (352490, 755941):
+        selected = review.select_record(
+            tmp_path,
+            season=SEASON,
+            gameweek=4,
+            entry_id=101,
+            deadline_utc=DEADLINE,
+            published={(101, 4): "capture-a"},
+            league_id=league,
+        )
+        assert selected == record
+        assert (
+            review.score_recorded_advice(record, review._advice(record), points())[0].net_points
+            == 20
+        )
+
+
+def _baseline(**kwargs: Any) -> dict[str, Any]:
+    record = recorded(**kwargs)
+    del record["league_id"]
+    record.update(
+        contract_version=MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
+        source="server_one_week_baseline",
+    )
+    return record
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        pytest.param({"league_id": 352490}, id="league"),
+        pytest.param({"season": "2025-26"}, id="season"),
+        pytest.param({"gameweek": 5}, id="gameweek"),
+        pytest.param({"entry_id": 102}, id="entry"),
+        pytest.param({"player_id_space": "fpl_element_id"}, id="player-id-space"),
+        pytest.param({"source": "published_menu"}, id="source"),
+    ],
+)
+def test_a_baseline_wrong_in_one_identity_is_refused(tmp_path: Path, fault: dict[str, Any]) -> None:
+    """A record that is a sound baseline but for one identity, filed where member 101's
+    gameweek 4 is read, is refused rather than read as that member-week's baseline."""
+    record = {**_baseline(), **fault}
+    # Filed by its own fields, then moved to the requested member-week: the reader, not the
+    # path, has to see the fault.
+    record_member_advice(tmp_path / "filed", record)
+    filed = next((tmp_path / "filed").glob("*/gw*/entry-*/capture-a"))
+    requested = tmp_path / "records" / SEASON / "gw04" / "entry-101" / "capture-a"
+    requested.parent.mkdir(parents=True)
+    filed.rename(requested)
+    with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+        choose(tmp_path / "records")
+
+
+def test_dual_stores_keep_the_original_digest_and_serve_the_second_league(tmp_path):
+    legacy = recorded()
+    baseline = _baseline(digest="b" * 64)
+    record_member_advice(tmp_path / "records", legacy)
+    record_member_advice(tmp_path / "baselines", baseline)
+    for league, expected in [(352490, legacy), (755941, baseline)]:
+        assert (
+            review.select_record(
+                tmp_path / "records",
+                baseline_record_root=tmp_path / "baselines",
+                season=SEASON,
+                gameweek=4,
+                entry_id=101,
+                league_id=league,
+                deadline_utc=DEADLINE,
+                published={(101, 4): "capture-a"},
+            )
+            == expected
+        )
+
+
+@pytest.mark.parametrize("fault", ["source", "generated_at_utc"])
+def test_legacy_record_cannot_hide_a_broken_baseline(tmp_path, fault):
+    baseline = _baseline()
+    baseline[fault] = "wrong" if fault == "source" else "2026-09-01T00:00:00Z"
+    record_member_advice(tmp_path / "records", recorded())
+    record_member_advice(tmp_path / "baselines", baseline)
+    with pytest.raises(review.SuggestionEvaluationError):
+        review.select_record(
+            tmp_path / "records",
+            baseline_record_root=tmp_path / "baselines",
+            season=SEASON,
+            gameweek=4,
+            entry_id=101,
+            deadline_utc=DEADLINE,
+        )
+
+
+def test_late_legacy_publication_cannot_borrow_the_baseline_clock(tmp_path):
+    record_member_advice(tmp_path / "records", recorded(published="2026-09-13T12:00:00Z"))
+    record_member_advice(tmp_path / "baselines", _baseline())
+    assert (
+        review.select_record(
+            tmp_path / "records",
+            baseline_record_root=tmp_path / "baselines",
+            season=SEASON,
+            gameweek=4,
+            entry_id=101,
+            deadline_utc=DEADLINE,
+        )
+        is None
+    )
+
+
+def test_a_second_league_walk_keeps_the_weeks_the_baseline_store_holds(tmp_path: Path) -> None:
+    """Both stores in the history walk: another league's legacy record is absent, the
+    baseline beside it is this league's, and a baseline directory whose record never
+    landed is still a week of every league the member is in."""
+    records, baselines = tmp_path / "records", tmp_path / "baselines"
+    publish_for(records, gameweek=4, entry_id=101)
+    day = DEADLINES[4][:10]
+    record_member_advice(
+        baselines,
+        _baseline(
+            gameweek=4,
+            entry_id=101,
+            captured=f"{day}T06:00:00Z",
+            published=f"{day}T07:00:00Z",
+            name="capture-b",
+            digest="b" * 64,
+        ),
+    )
+    (baselines / SEASON / "gw03" / "entry-101").mkdir(parents=True)
+    anchor = capture_with(
+        tmp_path / "snapshots", events={3: True, 4: True}, actuals={101: {3: 18, 4: 25}}
+    )
+    walk = dict(
+        record_root=records,
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=755941,
+        entry_ids=[101],
+        published={(101, 4): "capture-b"},
+    )
+    weeks = review.review_member_weeks(**walk, baseline_record_root=baselines)[101]
+    assert [(week.gameweek, week.status) for week in weeks] == [
+        (4, "available"),
+        (3, "unavailable"),
+    ]
+    assert (weeks[0].advice_snapshot_id, weeks[0].advice_sha256) == ("capture-b", "b" * 64)
+    assert weeks[1].reason == "no_pre_deadline_record"
+    # Without the baseline store the only record is another league's, so the week is not
+    # this league's at all.
+    assert review.review_member_weeks(**walk)[101] == ()
+
+
+def test_a_baseline_directory_keeps_its_week_beside_another_leagues_record(
+    tmp_path: Path,
+) -> None:
+    """A baseline directory whose record never landed still names a week of every league,
+    even when the legacy archive holds only another league's record for that week."""
+    records, baselines = tmp_path / "records", tmp_path / "baselines"
+    publish_for(records, gameweek=3, entry_id=101)
+    day = DEADLINES[4][:10]
+    record_member_advice(
+        baselines,
+        _baseline(
+            gameweek=4,
+            entry_id=101,
+            captured=f"{day}T06:00:00Z",
+            published=f"{day}T07:00:00Z",
+            name="capture-b",
+            digest="b" * 64,
+        ),
+    )
+    (baselines / SEASON / "gw03" / "entry-101").mkdir(parents=True)
+    anchor = capture_with(
+        tmp_path / "snapshots", events={3: True, 4: True}, actuals={101: {3: 18, 4: 25}}
+    )
+    walk = dict(
+        record_root=records,
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=755941,
+        entry_ids=[101],
+        published={(101, 4): "capture-b"},
+    )
+    found: set[tuple[int, int]] = set()
+    weeks = review.review_member_weeks(
+        **walk, baseline_record_root=baselines, other_league_weeks=found
+    )[101]
+    assert [(week.gameweek, week.status) for week in weeks] == [
+        (4, "available"),
+        (3, "unavailable"),
+    ]
+    assert weeks[1].reason == "no_pre_deadline_record"
+    assert found == set()
+    # Without the baseline store the only record of week 3 is another league's.
+    assert review.review_member_weeks(**walk, other_league_weeks=found)[101] == ()
+    assert found == {(101, 3)}
 
 
 def snapshot(
@@ -664,6 +868,58 @@ def test_a_rerender_keeps_every_week_or_refuses_before_any_history_changes(tmp_p
     assert {path: path.read_bytes() for path in paths} == before
 
 
+def test_baseline_store_keeps_legacy_bytes_then_adds_a_week_without_dropping_either_store(
+    tmp_path: Path,
+) -> None:
+    anchor = settled_two_weeks(tmp_path)
+    paths = published(tmp_path, anchor)
+    before = {path: path.read_bytes() for path in paths}
+    baselines = tmp_path / "baselines"
+    for entry in (101, 202):
+        record_member_advice(
+            baselines,
+            _baseline(entry_id=entry, digest="b" * 64),
+        )
+    arguments = dict(
+        record_root=tmp_path / "records",
+        baseline_record_root=baselines,
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=352490,
+        entry_ids=[101, 202],
+        out_dir=tmp_path / "out",
+        published=shown_everywhere((101, 202), (3, 4)),
+    )
+    review.publish_suggestion_histories(**arguments)
+    assert {path: path.read_bytes() for path in paths} == before
+    for entry in (101, 202):
+        record_member_advice(
+            baselines,
+            _baseline(
+                entry_id=entry,
+                gameweek=5,
+                captured="2026-09-16T06:00:00Z",
+                published="2026-09-16T07:00:00Z",
+            ),
+        )
+    arguments["as_of_snapshot"] = capture_with(
+        tmp_path / "snapshots", events={3: True, 4: True, 5: False}
+    )
+    arguments["published"] = shown_everywhere((101, 202), (3, 4, 5))
+    outputs = review.publish_suggestion_histories(**arguments)
+    after = {path: path.read_bytes() for path in outputs}
+    for entry in (101, 202):
+        history = json.loads((tmp_path / f"out/history/{entry}.json").read_bytes())
+        assert [week["gameweek"] for week in history["payload"]["weeks"]] == [5, 4, 3]
+    # Losing the new store is as serious as losing an old archive week.
+    with pytest.raises(review.SuggestionEvaluationError, match="history would drop"):
+        review.publish_suggestion_histories(
+            **{**arguments, "baseline_record_root": tmp_path / "missing-baselines"}
+        )
+    assert {path: path.read_bytes() for path in outputs} == after
+
+
 def second_league(
     tmp_path: Path, anchor: CapturedSnapshot, entry_ids: Sequence[int]
 ) -> dict[int, list[dict[str, Any]]]:
@@ -813,6 +1069,49 @@ def test_a_member_week_holding_no_record_is_the_recording_leagues_week(
         assert other_league_weeks == set()
     else:
         assert weeks == [] and other_league_weeks == {(101, 3), (101, 4)}
+
+
+def test_the_recording_league_and_the_readers_default_come_from_the_league_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No league id is written into the code: marking another league in the list moves the
+    empty week and the readers' default league with it."""
+    anchor = week_without_a_record(tmp_path)
+    listed = {
+        "contract_version": "league_list_v1",
+        "leagues": [{"league_id": 352490}, {"league_id": 755941, "legacy_advice_records": True}],
+    }
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "leagues.json").write_text(json.dumps(listed), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    walked = {
+        league_id: [
+            (week.gameweek, week.reason)
+            for week in review.review_member_weeks(
+                record_root=tmp_path / "records",
+                snapshot_root=tmp_path / "snapshots",
+                as_of_snapshot=anchor,
+                season=SEASON,
+                league_id=league_id,
+                entry_ids=[101],
+                published=shown_everywhere([101], (3, 4)),
+            )[101]
+        ]
+        for league_id in (352490, 755941)
+    }
+    # League 352490 keeps the week its record names; the week holding none is now 755941's.
+    assert walked == {352490: [(4, None)], 755941: [(3, "no_pre_deadline_record")]}
+    # Unnamed, a reader's league is the marked one, so 352490's record is another league's.
+    with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+        review.select_record(
+            tmp_path / "records", season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
+        )
+    del listed["leagues"][1]["legacy_advice_records"]
+    (tmp_path / "config" / "leagues.json").write_text(json.dumps(listed), encoding="utf-8")
+    with pytest.raises(review.SuggestionEvaluationError, match="name the league"):
+        review.select_record(
+            tmp_path / "records", season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
+        )
 
 
 def test_the_public_readers_still_refuse_another_leagues_record(tmp_path: Path) -> None:

@@ -53,10 +53,13 @@ inputs it seals.
 | `weekly_journal.py` | Durable sequential stage execution: ownership lock, input and output fingerprints, resume. |
 | `weekly_publish.py` | Publishes one gameweek's site view: worktree, copy, commit, push and pull request in one command. |
 | `publication_workers.py` | Process scheduling for the member publication service. |
+| `native_windows.py` | Isolated native HiGHS process port for three/five-week server plans, its version probe for the weekly preflight, and the operator's per-window solver summary; avoids the OR-Tools library collision on Linux. |
 | `football_bundle.py` | Validates existing football inputs and publishes one immutable ready marker last. |
 | `football_minute_basis.py` | Dispatches composite companions with captured roster, deadline and calendar bindings, while retaining legacy fixture-basis reading (`src/squadopt/platform/football_minute_basis.py:88`). |
 | `football_publication.py` | Validates and publishes capture-bound football documents without fitting a model. |
 | `history_documents.py` | The public shape of recorded weekly history (`weekly_suggestion_history_v1`), without computing a score. |
+| `requested_history_snapshot.py` | Takes a short queue metadata snapshot, copies immutable completed answers outside the queue lock and publishes a verified private receipt for the weekly run. |
+| `requested_suggestion_history.py` | Exports completed requests from an offline store, validates their retained captures and publishes scored history through the weekly stage or the two operator commands; never starts a plan solve. |
 
 ## Advice API services
 

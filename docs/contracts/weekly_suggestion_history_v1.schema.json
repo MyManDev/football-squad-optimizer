@@ -29,6 +29,14 @@
         },
         "weeks": {
           "items": {
+            "dependentRequired": {
+              "advice_source": [
+                "request_cache_key"
+              ],
+              "request_cache_key": [
+                "advice_source"
+              ]
+            },
             "properties": {
               "actual": {
                 "anyOf": [
@@ -193,6 +201,9 @@
                   "string",
                   "null"
                 ]
+              },
+              "advice_source": {
+                "const": "requested_server"
               },
               "deadline_utc": {
                 "pattern": "Z$",
@@ -426,6 +437,10 @@
                   "type": "object"
                 },
                 "type": "array"
+              },
+              "request_cache_key": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
               },
               "status": {
                 "enum": [

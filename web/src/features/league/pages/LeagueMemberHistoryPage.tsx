@@ -141,6 +141,9 @@ function HistoryOverview({
                   {week.status === "unsettled" && (
                     <span className={styles.rowStatus}>{copy.unsettled}</span>
                   )}
+                  {week.advice_source === "requested_server" && (
+                    <span className={styles.rowStatus}>{copy.requested}</span>
+                  )}
                 </th>
                 <td>{format(week.status === "available" ? week.suggested?.net_points : null)}</td>
                 <td>{format(week.status === "available" ? week.actual?.net_points : null)}</td>
@@ -175,6 +178,9 @@ function WeekResult({ week }: { week: WeekReview }) {
   return (
     <>
       <Card title={copy.gameweek(week.gameweek)}>
+        {week.advice_source === "requested_server" && (
+          <span className={styles.rowStatus}>{copy.requested}</span>
+        )}
         {week.status !== "available" || !suggested ? (
           <EmptyState title={week.status === "unsettled" ? copy.unsettled : copy.unavailable} />
         ) : (

@@ -201,3 +201,19 @@ Reason: the owner wants the page to serve looking ahead. The results of played w
 a manager reads it for.
 
 Source: the owner's message of 3 November, #1302.
+
+## 2026-11-06: Members request calculations on the server or their device
+
+Decision: publish league 352490 with the device menu from the next new run. The weekly
+publication prepares shared projections and member inputs without solving every member's
+advice. A member explicitly requests a server-queue or device calculation. Turkey and
+other forwarded leagues fetch only the requested team's inputs and do not join the weekly
+registry. Opening a team does not start a solve.
+
+This brings forward the 352490 transition scheduled for GW12 above. Existing immutable
+advice records remain intact; this menu writes no new baseline records. The independent
+baseline/history work remains outside this release. Historical research readings are not
+claimed complete, and their original records are retained.
+
+Source: the owner's 6 November instruction to calculate on demand and deploy now; #1326
+tracks the Turkey/server/device launch and #978 tracks the existing league's transition.

@@ -1,5 +1,10 @@
 import { expect, test, type Response } from "@playwright/test";
-import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
+import type {
+  EntryAdvice,
+  EntryAdviceIndex,
+  EntrySquad,
+  LeagueViewEnvelope,
+} from "../src/features/league/types";
 import { isForwarderRefusal, MARKER_HEADER } from "../src/features/league/forwarder/client";
 import { MESSAGES } from "../src/i18n/messages";
 import { pickMember } from "./identity";
@@ -99,10 +104,22 @@ test("published league and member journey works without submitting a solve", asy
   const entryId = member!.entry_id;
   // The league's number is in its own members record.
   const league = members.payload.league_id;
+  const squadResponse = await page.request.get(`/data/${tree}/entries/${entryId}.json`);
+  expect(squadResponse.status()).toBe(200);
+  const squad = (await squadResponse.json()) as LeagueViewEnvelope<EntrySquad>;
+  expect(squad.payload.source_snapshot_id).toBeTruthy();
+  const indexResponse = await page.request.get(`/data/${tree}/advice/${entryId}/index.json`);
+  expect(indexResponse.status()).toBe(200);
+  const index = (await indexResponse.json()) as LeagueViewEnvelope<EntryAdviceIndex>;
+  expect(index.payload.entry_id).toBe(entryId);
+  const deviceMenu = index.payload.menu === "device";
   const published = await page.request.get(`/data/${tree}/advice/${entryId}/saf-puan/1.json`);
-  expect(published.status()).toBe(200);
-  const advice = (await published.json()) as LeagueViewEnvelope<EntryAdvice>;
-  expect(advice.payload.starting_xi).toHaveLength(11);
+  expect(published.status()).toBe(deviceMenu ? 404 : 200);
+  const advice = deviceMenu ? null : ((await published.json()) as LeagueViewEnvelope<EntryAdvice>);
+  if (advice) {
+    expect(advice.payload.starting_xi).toHaveLength(11);
+    expect(advice.payload.source_snapshot_id).toBe(squad.payload.source_snapshot_id);
+  }
 
   // Each member's own page and history page read this document; the journey opens one member's.
   for (const entry of members.payload.members.filter((row) => row.member_kind === "human")) {
@@ -126,22 +143,24 @@ test("published league and member journey works without submitting a solve", asy
   ).toBeVisible();
   await page.goto(`/league/${league}/members/${entryId}`);
   await expect(page).toHaveURL(new RegExp(`/league/${league}/members/${entryId}$`));
-  const plan = page.locator('[aria-labelledby="entry-advice-title"]');
-  await expect(plan).toBeVisible();
-  for (const player of advice.payload.starting_xi ?? [])
-    await expect(plan).toContainText(player.name);
-  expect(advice.payload.captain).toBeTruthy();
-  await expect(
-    plan
-      .locator("dl > div")
-      .filter({ has: page.getByText(MESSAGES.en.leagueMembers.captainLabel, { exact: true }) }),
-  ).toContainText(advice.payload.captain!.name);
-  expect(Number.isFinite(advice.payload.expected_own_points)).toBe(true);
-  await expect(plan).toContainText(
-    MESSAGES.en.leagueMembers.expectedOwnPoints(
-      figure(advice.payload.expected_own_points!, "en-GB"),
-    ),
-  );
+  if (advice) {
+    const plan = page.locator('[aria-labelledby="entry-advice-title"]');
+    await expect(plan).toBeVisible();
+    for (const player of advice.payload.starting_xi ?? [])
+      await expect(plan).toContainText(player.name);
+    expect(advice.payload.captain).toBeTruthy();
+    await expect(
+      plan
+        .locator("dl > div")
+        .filter({ has: page.getByText(MESSAGES.en.leagueMembers.captainLabel, { exact: true }) }),
+    ).toContainText(advice.payload.captain!.name);
+    expect(Number.isFinite(advice.payload.expected_own_points)).toBe(true);
+    await expect(plan).toContainText(
+      MESSAGES.en.leagueMembers.expectedOwnPoints(
+        figure(advice.payload.expected_own_points!, "en-GB"),
+      ),
+    );
+  }
   // Past the week's deadline the page offers no settings, since nothing is computed for a
   // closed week. It reads the deadline from the published calendar, and so does this check.
   const calendarResponse = await page.request.get("/data/fixtures.json");
@@ -151,12 +170,13 @@ test("published league and member journey works without submitting a solve", asy
       })
     : null;
   const deadline =
-    calendar?.payload.season === advice.payload.season
-      ? calendar.payload.gameweeks.find((week) => week.gameweek === advice.payload.gameweek)
+    calendar?.payload.season === squad.payload.season
+      ? calendar.payload.gameweeks.find((week) => week.gameweek === squad.payload.gameweek)
           ?.deadline_utc
       : undefined;
   const closed = deadline !== undefined && Date.now() >= Date.parse(deadline);
   if (closed) await expect(page.getByTestId("deadline-passed")).toBeVisible();
+  if (deviceMenu && !closed) await expect(page.locator("[data-device-compute]")).toBeEnabled();
   for (const selector of [
     'input[name="strategy"][value="saf-puan"]',
     'input[name="window"][value="1"]',
@@ -197,7 +217,7 @@ test("published league and member journey works without submitting a solve", asy
         entry_id: entryId,
         mode: "saf-puan",
         window: 1,
-        source_snapshot_id: advice.payload.source_snapshot_id,
+        source_snapshot_id: squad.payload.source_snapshot_id,
       });
       console.log(`backend cache hit matches published capture: ${cacheRead}`);
     }
