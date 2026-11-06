@@ -80,6 +80,26 @@ labels those additions “İstek üzerine” / “On request”. The original we
 advice archives and research horizon remain unchanged. Missing requested files are normal
 for deployments that have not produced them yet; malformed evidence is not silently hidden.
 
-Production automation still needs to supply a consistent backend-store snapshot and run
-this builder after the normal history publication. No host installation or scheduled export
-has been performed under the current weekly-run merge/release hold.
+## Weekly integration
+
+The installed weekly command accepts `--requested-history-store /path/to/offline/store`.
+The scheduled command can inherit the same path through `SQUADOPT_REQUESTED_HISTORY_STORE`
+in its private environment file; an explicit command-line path takes precedence. This must
+name a consistent, immutable offline snapshot, never the backend's running store or a
+directory another process refreshes in place. Keep the snapshot at the same path for resumes.
+The command consumes a supplied snapshot; it does not create one or stop backend writers.
+
+When configured, the league stage refreshes requested history after the normal member
+publication, for each listed league. Only members with requests or retained requested weeks
+produce files; no new plan is calculated for this history. The store and retained captures
+are journalled inputs, and generated history files are journalled outputs. Missing evidence,
+incompatible existing history or changed inputs refuse the stage before publication. A
+resume reuses the verified outputs and refuses a changed store.
+
+Requested files join the protected publication identity, the release checks and the ready
+bundle alongside existing history. The scoreboard stage records the final identity after
+all league writes. The single-entry builder above produces an inspection artifact; use the
+weekly integration when preparing a complete release tree, so the final identity covers it.
+
+Without the option, existing requested files are retained unchanged. Provisioning a
+consistent snapshot and enabling the setting on the host remain rollout prerequisites.

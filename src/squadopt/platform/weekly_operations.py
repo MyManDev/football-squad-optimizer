@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import re
 import secrets
 import shutil
@@ -16,6 +17,8 @@ from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+import jsonschema
 
 from squadopt.application.advice_record import load_member_advice_record, record_directory
 from squadopt.application.commands import DecideRequest, decide
@@ -29,7 +32,7 @@ from squadopt.application.league_publication import (
     remove_unlisted_trees,
     settle_legacy_tree,
 )
-from squadopt.application.league_tree_identity import check_tree_identity
+from squadopt.application.league_tree_identity import check_tree_identity, record_tree_identity
 from squadopt.application.player_evidence import PlayerEvidenceRequest, export_player_evidence
 from squadopt.application.projection_handoff import build as build_handoff
 from squadopt.application.rotation_export import RotationExportRequest, export_rotation_evidence
@@ -73,6 +76,7 @@ from squadopt.live import handoff_path_for, load_entry, read_projection_handoff,
 from squadopt.platform import benchmark_capture, cohort_capture, elite_capture
 from squadopt.platform.fpl_capture import capture
 from squadopt.platform.publication_workers import league_mapper
+from squadopt.platform.requested_suggestion_history import publish_requested_histories
 from squadopt.platform.runlog import RunLog, configure_run_logging
 from squadopt.platform.storage._queue_lock import QueueFileLock
 from squadopt.platform.storage.projection_retention import (
@@ -209,6 +213,7 @@ class WeeklyOperations:
         no_advice_record: bool = False,
         benchmark_freeze: bool = False,
         benchmark_picks_freezes: tuple[str, ...] = (),
+        requested_history_store: Path | None = None,
     ) -> None:
         if paths.out == paths.journal / "preview":
             paths = replace(paths, out=paths.journal / run_id / "preview")
@@ -220,6 +225,9 @@ class WeeklyOperations:
         self.supplied_handoff = handoff
         self.record_advice = record_advice
         self.no_advice_record = no_advice_record
+        self.requested_history_store = (
+            requested_history_store.resolve() if requested_history_store is not None else None
+        )
         self.benchmark_freeze = benchmark_freeze
         for identifier in benchmark_picks_freezes:
             _require_capture_name(identifier, "--benchmark-picks-freeze")
@@ -287,6 +295,8 @@ class WeeklyOperations:
                 "freeze": benchmark_freeze,
                 "picks_freezes": list(benchmark_picks_freezes),
             }
+        if self.requested_history_store is not None:
+            declaration["requested_history_store"] = str(self.requested_history_store)
         self.run = WeeklyRun(paths.journal, run_id, declaration, self.stages, resume=resume)
 
     @property
@@ -317,6 +327,10 @@ class WeeklyOperations:
         return self.values.get("top100_picks", {}).get("snapshot_id", self.request.elite_snapshot)
 
     def _preflight(self) -> WeeklyStageResult:
+        if self.requested_history_store is not None and not all(
+            (self.requested_history_store / part).is_dir() for part in ("jobs", "specs", "cache")
+        ):
+            raise WeekError("Requested history needs an offline store with jobs, specs and cache.")
         rules = (
             read_season_rules(
                 read_snapshot(self.paths.snapshots, self.rule_snapshot), season=self.request.season
@@ -915,6 +929,24 @@ class WeeklyOperations:
                 beside.append(result.published)
             gameweek = result.gameweek
             outputs.extend(result.output_paths)
+            requested_outputs: tuple[Path, ...] = ()
+            if self.requested_history_store is not None:
+                tree = (
+                    self.paths.out
+                    / "data"
+                    / (result.published.path if result.published is not None else LEGACY_TREE)
+                )
+                members = json.loads((tree / "members.json").read_bytes())["payload"]["members"]
+                requested_outputs = publish_requested_histories(
+                    store_snapshot=self.requested_history_store,
+                    snapshot_root=self.paths.snapshots,
+                    as_of=self._capture_for_publication(self.paths.snapshots, self._capture_id()),
+                    league_id=league_id,
+                    entry_ids=[m["entry_id"] for m in members if m["member_kind"] == "human"],
+                    out_dir=tree,
+                )
+                outputs.extend(requested_outputs)
+                record_tree_identity(tree, source_snapshot_id=self._capture_id())
             leagues[str(league_id)] = {
                 "menu": request.menu,
                 "timings": timings,
@@ -933,6 +965,7 @@ class WeeklyOperations:
                 # Whose purchase prices were rebuilt from the transfers list, and why not
                 # the rest; empty when the capture held no member's picks.
                 "purchase_prices_note": result.purchase_prices_note,
+                "requested_history_entries": [int(path.stem) for path in requested_outputs],
             }
         # Whether this run recorded advice at all, which the publish stage requires: a run
         # asked to record whose leagues the record does not name recorded nothing, and
@@ -1130,6 +1163,8 @@ class WeeklyOperations:
             self.run.hold(),
         ):
             initial_inputs = [p.registry, *self.ledger_inputs]
+            if self.requested_history_store is not None:
+                initial_inputs.append(self.requested_history_store)
             if self.rule_snapshot:
                 initial_inputs.append(self._snapshot_path(self.rule_snapshot))
             self.values["preflight"] = dict(
@@ -1220,6 +1255,11 @@ class WeeklyOperations:
                 )
             self._seed_preview()
             common = [selected, held_handoff, p.registry, self._published_tree()]
+            requested_inputs = (
+                [self.requested_history_store, p.snapshots]
+                if self.requested_history_store is not None
+                else []
+            )
             top100_inputs = (
                 [Path(self.values["top100_evidence"][key]) for key in ("table", "manifest")]
                 if "top100_evidence" in self.values
@@ -1231,7 +1271,13 @@ class WeeklyOperations:
             self.values["league"] = dict(
                 self._stage(
                     "league",
-                    inputs=[*common, p.archive, *self.record_inputs, *top100_inputs],
+                    inputs=[
+                        *common,
+                        p.archive,
+                        *self.record_inputs,
+                        *top100_inputs,
+                        *requested_inputs,
+                    ],
                     operation=self._league,
                 ).value
             )
@@ -1290,6 +1336,12 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"the leagues the site serves ({LEAGUE_LIST_FILE.as_posix()} in the workspace)",
     )
     parser.add_argument("--snapshot-id")
+    parser.add_argument(
+        "--requested-history-store",
+        type=Path,
+        default=os.environ.get("SQUADOPT_REQUESTED_HISTORY_STORE"),
+        help="immutable offline backend-store snapshot; also SQUADOPT_REQUESTED_HISTORY_STORE",
+    )
     parser.add_argument("--cohort-snapshot")
     parser.add_argument("--elite-snapshot")
     parser.add_argument("--skip-top100", action="store_true")
@@ -1504,6 +1556,11 @@ def main(argv: list[str] | None = None) -> int:
             no_advice_record=args.no_advice_record,
             benchmark_freeze=args.benchmark_freeze,
             benchmark_picks_freezes=tuple(args.benchmark_picks_freeze),
+            requested_history_store=(
+                (root / args.requested_history_store).resolve()
+                if args.requested_history_store is not None
+                else None
+            ),
         )
         completed = operation.execute()
         print(f"Verified weekly run: {completed}")
@@ -1523,6 +1580,7 @@ def main(argv: list[str] | None = None) -> int:
         OSError,
         ValueError,
         KeyError,
+        jsonschema.ValidationError,
     ) as error:
         # A stage's own refusal is stated here, at the run's boundary, rather than escaping
         # as a traceback; the journal already holds which stage stopped and why.

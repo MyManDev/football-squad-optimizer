@@ -15,7 +15,10 @@ from squadopt.platform.advice_job_spec import AdviceJobSpec, FileAdviceJobSpecSt
 from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_read import AdviceRequestContext
 from squadopt.platform.jobs_contract import AdviceJob
-from squadopt.platform.requested_suggestion_history import requested_week
+from squadopt.platform.requested_suggestion_history import (
+    publish_requested_histories,
+    requested_week,
+)
 
 
 def _capture(root, *, captured, finished, checked=True, actual=True):
@@ -275,3 +278,56 @@ def test_archived_job_is_still_published_as_requested_history(world):
     assert queue.archive(now_utc="2026-11-06T00:00:00Z")
     assert queue.jobs() == ()
     assert json.loads(_build(world).read_bytes())["payload"]["weeks"][0]["status"] == "available"
+
+
+def test_batch_refreshes_only_requested_members_in_each_league(world):
+    paths = []
+    for league_id in (239, 352490):
+        paths.extend(
+            publish_requested_histories(
+                store_snapshot=world["store_snapshot"],
+                snapshot_root=world["snapshot_root"],
+                as_of=world["outcome"],
+                league_id=league_id,
+                entry_ids=[101, 102],
+                out_dir=world["out_dir"] / str(league_id),
+            )
+        )
+    assert len(paths) == 2
+    assert all(path.name == "101.json" for path in paths)
+    assert [json.loads(path.read_bytes())["payload"]["league_id"] for path in paths] == [
+        239,
+        352490,
+    ]
+    assert all(
+        json.loads(path.read_bytes())["payload"]["weeks"][0]["net_difference"] == -2
+        for path in paths
+    )
+
+
+def test_batch_cannot_erase_previously_published_request_when_its_jobs_are_missing(world):
+    path = _build(world)
+    before = path.read_bytes()
+    for job in (world["store_snapshot"] / "jobs").glob("*.json"):
+        job.unlink()
+    with pytest.raises(ValueError, match="erase an existing"):
+        publish_requested_histories(
+            store_snapshot=world["store_snapshot"],
+            snapshot_root=world["snapshot_root"],
+            as_of=world["outcome"],
+            league_id=239,
+            entry_ids=[101],
+            out_dir=world["out_dir"],
+        )
+    assert path.read_bytes() == before
+
+
+def test_future_requests_do_not_require_a_future_capture_when_rebuilding_an_older_view(world):
+    assert (
+        requested_week(
+            _export(world),
+            captures=[],
+            as_of=world["decision"],
+        )
+        is None
+    )

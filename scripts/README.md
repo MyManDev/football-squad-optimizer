@@ -48,7 +48,7 @@ column is the author date of the file's last commit when this catalogue was last
 | `build_league_site.py` | shim | `squadopt.application.league_publication`; `docs/weekly_runbook.md` | 2026-10-09 |
 | `build_player_catalog.py` | operational | `data/players.json` under the site directory `--out`, for the contribution form; `docs/contributions.md`, `docs/deployment_runbook.md` | 2026-09-22 |
 | `build_projection_handoff.py` | shim | `squadopt.application.projection_handoff`; `docs/weekly_runbook.md` | 2026-10-02 |
-| `build_requested_history.py` | operational | scores retained requested answers into `history/requested/{entry_id}.json` from an offline store snapshot and captured outcomes; [contract and procedure](../docs/contracts/requested_advice_export_v1.md) | 2026-11-06 |
+| `build_requested_history.py` | shim | `squadopt.platform.requested_suggestion_history`; scores retained requests into `history/requested/{entry_id}.json`; [contract and procedure](../docs/contracts/requested_advice_export_v1.md) | 2026-11-06 |
 | `build_scoreboard.py` | shim | `squadopt.application.scoreboard`; `docs/weekly_runbook.md` | 2026-10-04 |
 | `build_settled_site.py` | operational | a scratch GW5 settled candidate through `squadopt.application.settled_publication`, held to the league tree checks of `check_league_tree.py` before it is written; `docs/deployment_runbook.md`, `docs/weekly_runbook.md` | 2026-09-26 |
 | `build_site.py` | shim | `squadopt.application.site_publication`; `docs/weekly_runbook.md` | 2026-09-19 |
@@ -59,7 +59,7 @@ column is the author date of the file's last commit when this catalogue was last
 | `check_football_prospective_inputs.py` | operational | an outcome-free readiness audit of a named offline capture inventory, printed; writes nothing; pairs the current arm by the rule of `docs/football_prospective_pairing_note.md` through `football_prospective_inputs.py`, without the backend; `docs/football_prospective_input_check.md` | 2026-10-14 |
 | `check_league_tree.py` | operational | the league tree release checks on a site's data directory or its origin URL; writes nothing; `docs/weekly_runbook.md`, `docs/deployment_runbook.md`; imported by `build_settled_site.py` | 2026-10-11 |
 | `export_player_evidence.py` | shim | `squadopt.application.player_evidence`; `docs/weekly_runbook.md` | 2026-09-26 |
-| `export_requested_history.py` | operational | exports completed pre-deadline answers from an offline backend-store snapshot, without solving again; [contract and procedure](../docs/contracts/requested_advice_export_v1.md) | 2026-11-06 |
+| `export_requested_history.py` | shim | `squadopt.platform.requested_suggestion_history`; exports completed pre-deadline answers from an offline store; [contract and procedure](../docs/contracts/requested_advice_export_v1.md) | 2026-11-06 |
 | `export_rotation_evidence.py` | shim | `squadopt.application.rotation_export`; `docs/weekly_runbook.md` | 2026-09-26 |
 | `export_settled_outcomes.py` | shim | `squadopt.application.settled_outcomes` | 2026-09-26 |
 | `fetch_historical_data.py` | operational | `docs/data_pipeline.md`; named by `src/squadopt/data/sources/vaastav.py` and six scripts | 2026-08-14 |
