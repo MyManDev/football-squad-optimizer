@@ -67,7 +67,7 @@ describe("the brand's opening", () => {
     expect(cover()).toBeNull();
   });
 
-  it("consumes the first activation key and releases it after dismissal", () => {
+  it.each(["Enter", " "])("preserves %j on a focused control while dismissing", (key) => {
     const click = vi.fn();
     const { getByRole } = render(
       <>
@@ -76,11 +76,11 @@ describe("the brand's opening", () => {
       </>,
     );
     const button = getByRole("button");
-    expect(fireEvent.keyDown(button, { key: "Enter" })).toBe(false);
+    button.focus();
+    expect(fireEvent.keyDown(button, { key })).toBe(true);
     expect(cover()).toBeNull();
-    expect(click).not.toHaveBeenCalled();
-    fireEvent.keyDown(button, { key: "Enter" });
     expect(click).toHaveBeenCalledOnce();
+    expect(button).toHaveFocus();
   });
 
   it("reveals a focused field without dropping its first typed character", () => {

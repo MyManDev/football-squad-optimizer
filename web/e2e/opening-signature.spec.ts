@@ -52,6 +52,21 @@ for (const { width, touch } of [
       expect(await page.locator(":focus").evaluate((node) => node.tagName)).not.toBe("BODY");
     });
 
+    test("Enter activates an already focused link while dismissing the opening", async ({
+      page,
+    }) => {
+      await freezeOpeningClock(page);
+      await installLeagueMocks(page, { opening: true });
+      await page.goto("/");
+      const opening = page.locator("[data-opening-mark]");
+      await expect(opening).toBeAttached();
+      const fixtures = page.getByRole("link", { name: "Fikstür", exact: true });
+      await fixtures.focus();
+      await page.keyboard.press("Enter");
+      await expect(opening).toHaveCount(0);
+      await expect(page).toHaveURL("/fixtures");
+    });
+
     test("filling a field reveals it and Enter submits the value", async ({ page }) => {
       await freezeOpeningClock(page);
       await installLeagueMocks(page, { opening: true });

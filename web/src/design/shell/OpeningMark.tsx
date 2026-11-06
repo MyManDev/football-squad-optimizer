@@ -32,8 +32,8 @@ function shouldOpen(): boolean {
  * beside SquadOpt. The maker's signature sits in the lower right as the cover fades.
  *
  * A click dismisses the cover without activating the obscured page. Keyboard input removes
- * it too; Tab continues into the page. It is hidden from assistive technology and never
- * shows under the reduced-motion preference.
+ * it too, preserving activation of an already focused control. It is hidden from assistive
+ * technology and never shows under the reduced-motion preference.
  */
 export function OpeningMark() {
   const [open, setOpen] = useState(shouldOpen);
@@ -53,7 +53,7 @@ export function OpeningMark() {
     const dismiss = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey || event.key === "Shift") return;
       setOpen(false);
-      if (["Enter", " ", "Escape"].includes(event.key)) {
+      if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
       }
