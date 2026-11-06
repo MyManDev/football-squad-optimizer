@@ -67,6 +67,8 @@ What the API process serves, and the composition root that wires the backend's p
 | `backend_runtime.py` | The composition root: the one place the backend's parts are wired to each other, for the API and the worker. |
 | `advice_read.py` | The read side of on-demand advice: league state and pure cache lookups. |
 | `advice_submit.py` | The write side: one request becomes a job record, with rate and open-job limits. |
+| `public_entry_inputs.py` | Pins one requested team's public FPL inputs separately from the weekly capture. |
+| `public_entry_advice.py` | Read-only cache addressing for public teams, computed through the shared queue. |
 | `advice_documents.py` | The public read contracts: what the advice route and the league route may serve. |
 | `api_contract.py` | Transport-neutral request and response contracts of the HTTP API (`backend_api_v1`). |
 | `queries.py` | The query seam for published application views. |

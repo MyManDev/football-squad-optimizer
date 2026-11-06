@@ -123,6 +123,14 @@ class AdviceRequestContext:
     configuration_fingerprint: str
 
 
+class AdviceInputsNotPreparedError(AdviceNotComputedError):
+    """A public entry has no pinned inputs yet; only a POST may prepare them."""
+
+    def __init__(self, context: AdviceRequestContext) -> None:
+        super().__init__("This entry has not requested a computation for this capture.")
+        self.context = context
+
+
 class AdviceContextProvider(Protocol):
     """Where the current capture context comes from; ``None`` means not ready."""
 

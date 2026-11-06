@@ -23,7 +23,7 @@ export interface StoredAdviceJob {
 
 /** The question a request asks, as one string: every field that changes the answer. */
 export function adviceRequestKey(request: AdviceRequest): string {
-  const key = [
+  const base = [
     request.leagueId,
     request.entryId,
     request.strategy,
@@ -34,6 +34,7 @@ export function adviceRequestKey(request: AdviceRequest): string {
     request.season ?? "",
     request.gameweek ?? "",
   ].join(":");
+  const key = request.publicEntry ? `${base}:public` : base;
   const modelKey = request.model === "football" ? `${key}:model:football` : key;
   const chipKey = request.chip == null ? modelKey : `${modelKey}:chip:${request.chip}`;
   const preferences = preferencesKey(request.preferences);
