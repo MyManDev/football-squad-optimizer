@@ -62,6 +62,13 @@ removes so a dropped league's member names leave the site, and the device-plan t
 every earlier build under `data/device/`, which the run removes before it writes this
 capture's own.
 
+Completed server requests can also feed each league's history through
+`--requested-history-store <immutable offline store>` (or the scheduled environment's
+`SQUADOPT_REQUESTED_HISTORY_STORE`). The league stage refreshes only requested members,
+without solving another plan, and the journal and publication identity protect the result.
+See the [requested history procedure](contracts/requested_advice_export_v1.md#weekly-integration)
+for snapshot requirements and resume behavior.
+
 By hand, `scripts.build_league_site --league <id>` rebuilds one league from a capture. It
 keeps the other leagues the directory lists only when their trees were rendered from the same
 capture, and refuses otherwise (the site would serve two captures). It writes the legacy

@@ -31,6 +31,7 @@ def release_tree(root: Path, capture: str, older: str) -> Path:
         {**members, "entry": members["members"][0], "source_snapshot_id": capture},
     )
     _write(root, "history/1.json", {"as_of_snapshot_id": older, "weeks": [5]})
+    _write(root, "history/requested/1.json", {"as_of_snapshot_id": older, "weeks": [4]})
     _write(root, "series-horizon.json", {"as_of_snapshot_id": older, "keys": ["1:5"]})
     _write(root, "scoreboard.json", {"source_snapshot_id": older, "points": [10]})
     tree = root / "league"
@@ -40,7 +41,14 @@ def release_tree(root: Path, capture: str, older: str) -> Path:
 
 @pytest.mark.parametrize(
     "substitute",
-    ["members.json", "entries/1.json", "history/1.json", "scoreboard.json", "series-horizon.json"],
+    [
+        "members.json",
+        "entries/1.json",
+        "history/1.json",
+        "history/requested/1.json",
+        "scoreboard.json",
+        "series-horizon.json",
+    ],
 )
 def test_two_publication_tree_is_refused_by_release_command(tmp_path, substitute, capsys):
     first = release_tree(tmp_path / "a", "decision-a", "settled-a")
@@ -57,9 +65,10 @@ def test_two_publication_tree_is_refused_by_release_command(tmp_path, substitute
     assert f"League publication file changed: {substitute}" in capsys.readouterr().out
 
 
-def test_added_or_removed_retained_files_cannot_escape_inventory(tmp_path):
+@pytest.mark.parametrize("path", ["history/2.json", "history/requested/2.json"])
+def test_added_or_removed_retained_files_cannot_escape_inventory(tmp_path, path):
     tree = release_tree(tmp_path, "decision", "settled")
-    _write(tmp_path, "history/2.json", {})
+    _write(tmp_path, path, {})
     with pytest.raises(ValueError, match="inventory changed"):
         check_tree_identity(tree)
 
@@ -82,7 +91,12 @@ def test_record_refuses_two_human_captures_before_writing_identity(tmp_path):
 
 def add_history(case):
     tree = case["site_data_root"] / "league"
-    for name in ("scoreboard.json", "history/101.json", "series-horizon.json"):
+    for name in (
+        "scoreboard.json",
+        "history/101.json",
+        "history/requested/101.json",
+        "series-horizon.json",
+    ):
         dump(tree / name, {"payload": {"as_of_snapshot_id": "previous", "weeks": [5]}})
     record_tree_identity(tree)
     return tree
@@ -91,7 +105,13 @@ def add_history(case):
 def test_sealed_bundle_keeps_the_complete_previous_history_set(case):
     tree = add_history(case)
     result = bundle.seal_football_bundle(**case)
-    for name in ("scoreboard.json", "history/101.json", "series-horizon.json", IDENTITY_FILE):
+    for name in (
+        "scoreboard.json",
+        "history/101.json",
+        "history/requested/101.json",
+        "series-horizon.json",
+        IDENTITY_FILE,
+    ):
         sealed = result.files["site_members"].parent / name
         assert sealed.read_bytes() == (tree / name).read_bytes()
     check_tree_identity(result.files["site_members"].parent)

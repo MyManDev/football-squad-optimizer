@@ -12,6 +12,19 @@ import { mockSuggestionOverview } from "../../../fixtures/weeklySuggestionOvervi
 import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
+it.each<Language>(["tr", "en"])("labels requested weeks concisely in %s", async (language) => {
+  const value = history();
+  Object.assign(value.payload.weeks[0], {
+    advice_source: "requested_server",
+    request_cache_key: "a".repeat(64),
+  });
+  show(value, language);
+  const copy = MESSAGES[language].suggestionHistory;
+  expect(screen.getByText(copy.requested)).toBeInTheDocument();
+  await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+  expect(screen.getByText(copy.requested)).toBeInTheDocument();
+  expect(screen.getByText(`${copy.difference}:`).textContent).toMatch(/−2[,.]0/);
+});
 it.each<Language>(["tr", "en"])(
   "keeps only the plain plan, collapsed and without a price, in %s",
   async (language) => {

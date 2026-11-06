@@ -1,0 +1,206 @@
+#!/usr/bin/python3 -I
+"""Prepare private requested history using the running backend's immutable image.
+
+Installed explicitly as a root-owned command; requested-history.conf invokes it before
+the weekly gate. It changes no backend service and executes no checkout code as root.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import stat
+import subprocess
+import sys
+from pathlib import Path
+from uuid import uuid4
+
+STORE = Path("/root/squadopt/store")
+OUTPUT = Path("/var/lib/squadopt/requested-history")
+CONTAINER_UID = 10001
+SNAPSHOT_BYTES = 512 * 1024**2
+TOTAL_BYTES = 10 * 1024**3
+RESERVE_BYTES = 1024**3
+INSPECT = '{"image":{{json .Image}},"running":{{json .State.Running}},"mounts":{{json .Mounts}}}'
+BINARIES = {name: "/usr/bin/" + name for name in ("docker", "systemctl", "id")}
+ENVIRONMENT = {
+    "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+    "HOME": "/root",
+    "DOCKER_HOST": "unix:///var/run/docker.sock",
+}
+
+
+def command(arguments: list[str]) -> str:
+    result = subprocess.run(
+        [BINARIES[arguments[0]], *arguments[1:]],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=300,
+        env=ENVIRONMENT,
+    )
+    if result.returncode:
+        # Docker output may name private paths. The operator can inspect the named unit.
+        raise ValueError(f"{arguments[0]} exited {result.returncode}; history was not refreshed.")
+    return result.stdout.strip()
+
+
+def image() -> str:
+    images = []
+    for name in ("squadopt-api-1", "squadopt-worker-1"):
+        value = json.loads(command(["docker", "inspect", "--format", INSPECT, name]))
+        if value.get("running") is not True:
+            raise ValueError("Both backend containers must be running.")
+        selected = value.get("image")
+        if not isinstance(selected, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", selected):
+            raise ValueError("The running backend must identify an immutable image.")
+        mounts = [m for m in value["mounts"] if m.get("Destination") == "/mnt/store"]
+        if (
+            len(mounts) != 1
+            or mounts[0].get("Type") != "bind"
+            or mounts[0].get("Source") != str(STORE)
+        ):
+            raise ValueError("The running backend does not mount the expected durable store.")
+        images.append(selected)
+    if images[0] != images[1]:
+        raise ValueError("The backend is between releases; try after the move finishes.")
+    return images[0]
+
+
+def directory(path: Path) -> None:
+    for ancestor in (*reversed(path.parents), path):
+        if not stat.S_ISDIR(ancestor.lstat().st_mode):
+            raise ValueError(f"Expected a real directory: {ancestor}")
+
+
+def prepare_output(group: int) -> None:
+    directory(STORE)
+    for parent in reversed(OUTPUT.parent.parents):
+        directory(parent)
+    if not OUTPUT.parent.exists():
+        OUTPUT.parent.mkdir(mode=0o755)
+        OUTPUT.parent.chmod(0o755)
+    directory(OUTPUT.parent)
+    for parent in (OUTPUT.parent, *OUTPUT.parent.parents):
+        info = parent.stat()
+        if info.st_uid != 0 or info.st_mode & 0o022 or not info.st_mode & 0o001:
+            raise ValueError(
+                "History must sit below root-owned directories without group/world write."
+            )
+    if not OUTPUT.exists():
+        OUTPUT.mkdir(mode=0o750)
+        os.chown(OUTPUT, CONTAINER_UID, group)
+        OUTPUT.chmod(0o750)
+    directory(OUTPUT)
+    info = OUTPUT.stat()
+    if (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) != (CONTAINER_UID, group, 0o750):
+        raise ValueError("History requires owner 10001, the squadopt group and mode 0750.")
+
+
+def capacity() -> None:
+    used = 0
+    for folder, directories, files in os.walk(OUTPUT, followlinks=False):
+        for name in directories:
+            if not stat.S_ISDIR((Path(folder) / name).lstat().st_mode):
+                raise ValueError("History contains a linked directory.")
+        for name in files:
+            info = (Path(folder) / name).lstat()
+            if not stat.S_ISREG(info.st_mode):
+                raise ValueError("History contains a linked or special file.")
+            used += info.st_size
+    room = 2 * SNAPSHOT_BYTES + RESERVE_BYTES
+    if used + room > TOTAL_BYTES or shutil.disk_usage(OUTPUT).free < room:
+        raise ValueError(
+            "History capacity limit reached; retain pinned copies and archive completed runs."
+        )
+
+
+def arguments(selected: str, group: int, name: str) -> list[str]:
+    return [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        name,
+        "--pull=never",
+        "--init",
+        "--read-only",
+        "--network=none",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "--memory=1g",
+        "--cpus=0.5",
+        "--pids-limit=64",
+        "--user",
+        f"{CONTAINER_UID}:{group}",
+        "--env",
+        "OPENBLAS_NUM_THREADS=1",
+        "--env",
+        "OMP_NUM_THREADS=1",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,size=64m",
+        "--mount",
+        f"type=bind,src={STORE},dst=/mnt/store",
+        "--mount",
+        f"type=bind,src={OUTPUT},dst=/mnt/history",
+        selected,
+        "python",
+        "-m",
+        "squadopt.platform.requested_history_snapshot",
+        "--store",
+        "/mnt/store",
+        "--output-root",
+        "/mnt/history",
+        "--group-readable",
+        "--reuse-unchanged",
+        "--max-snapshot-bytes",
+        str(SNAPSHOT_BYTES),
+    ]
+
+
+def require_root() -> None:
+    if os.name != "posix" or os.geteuid() != 0:
+        raise ValueError("Run the installed history command as root on the backend host.")
+
+
+def main() -> int:
+    try:
+        require_root()
+        start = command(
+            ["systemctl", "show", "weekly-schedule.service", "--property=ExecStart", "--value"]
+        )
+        if re.search(r"(?:^|\s)--dry-run(?:\s|;|$)", start):
+            print("Requested history skipped: the weekly gate is a dry run.")
+            return 0
+        group_text = command(["id", "-g", "squadopt"])
+        if not re.fullmatch(r"[1-9][0-9]*", group_text):
+            raise ValueError("The weekly service needs a non-root squadopt group.")
+        group = int(group_text)
+        selected = image()
+        prepare_output(group)
+        capacity()
+        name = "squadopt-history-" + uuid4().hex
+        try:
+            command(arguments(selected, group, name))
+        finally:
+            # A client timeout must not leave its isolated copy container behind.
+            # A completed --rm container is already absent; that exit is harmless.
+            subprocess.run(
+                [BINARIES["docker"], "rm", "--force", name],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=ENVIRONMENT,
+            )
+        print("Requested history ready for the weekly gate.")
+        return 0
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        print(f"Requested history refused: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

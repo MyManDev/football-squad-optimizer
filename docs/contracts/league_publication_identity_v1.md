@@ -19,7 +19,8 @@ names the writer's decision capture when no member could be rendered.
 serialized by Python's `json.dumps` with sorted keys, compact separators, ASCII
 escapes and no NaN (`document_digest` in `squadopt.contracts.league_publication_identity`).
 Paths are restricted to `members.json`, `entries/<positive integer>.json`,
-`history/<positive integer>.json`, `scoreboard.json` and `series-horizon.json`.
+`history/<positive integer>.json`, `history/requested/<positive integer>.json`,
+`scoreboard.json` and `series-horizon.json`.
 Every protected file on disk must be listed, and every listed document must match.
 The remote release check verifies every listed document; the disk check also
 verifies the complete file inventory.

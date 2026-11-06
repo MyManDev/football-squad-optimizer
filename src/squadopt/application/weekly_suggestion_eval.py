@@ -720,6 +720,33 @@ def _evaluate_week(
             else "invalid_record"
         )
         return WeekReview(**base, status="unavailable", reason=reason)
+    return score_selected_week(
+        record,
+        advice,
+        base=base,
+        captures=captures,
+        gameweek=gameweek,
+        entry_id=entry_id,
+        deadline_utc=deadline_utc,
+    )
+
+
+def score_selected_week(
+    record: Mapping[str, Any],
+    advice: Mapping[str, Any],
+    *,
+    base: dict[str, Any],
+    captures: Sequence[CapturedSnapshot],
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+) -> WeekReview:
+    """Score an already selected, validated record without selecting or solving a plan.
+
+    Weekly publication and requested-answer history establish different evidence of
+    availability. They share only this settled scoring step, never their record selection.
+    """
+    base = dict(base)
     try:
         settled = [
             capture

@@ -1,6 +1,6 @@
 import type { LeagueTree } from "../data";
 import type { RequestOptions } from "../../../data/request";
-import { LeagueDataError } from "../dataErrors";
+import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import { isMemberStrategy } from "../types";
 import { isMemberChip } from "../advice/chipChoice";
 import { isTop100Weight } from "../advice/top100";
@@ -78,6 +78,8 @@ export interface WeekReview {
   net_difference: number | null;
   players: PlayerReview[];
   recorded_plans?: RecordedPlan[];
+  advice_source?: "requested_server";
+  request_cache_key?: string;
 }
 
 export interface SuggestionHistory {
@@ -186,6 +188,13 @@ export function checkedHistory(
         !seen.has(row.gameweek),
     );
     seen.add(row.gameweek);
+    if (row.advice_source !== undefined || row.request_cache_key !== undefined) {
+      requireThat(
+        row.advice_source === "requested_server" &&
+          text(row.request_cache_key) &&
+          /^[a-f0-9]{64}$/.test(row.request_cache_key),
+      );
+    }
     requireThat(["available", "unsettled", "unavailable"].includes(String(row.status)));
     requireThat(nullableNumber(row.expected_own_points) && nullableNumber(row.net_difference));
     requireThat(row.reason === null || text(row.reason));
@@ -339,6 +348,46 @@ export async function loadSuggestionHistory(
   options?: RequestOptions,
 ): Promise<SuggestionHistory> {
   requireThat(Number.isSafeInteger(entryId) && entryId > 0);
-  const parsed = await tree.raw(`history/${entryId}.json`, options);
-  return checkedHistory(parsed, entryId, tree.league.leagueId);
+  const reads = await Promise.allSettled([
+    tree.raw(`history/${entryId}.json`, options),
+    tree.raw(`history/requested/${entryId}.json`, options),
+  ]);
+  const histories = reads.map((result) => {
+    if (result.status === "fulfilled")
+      return checkedHistory(result.value, entryId, tree.league.leagueId);
+    if (result.reason instanceof LeagueDataMissing) return null;
+    throw result.reason;
+  });
+  const [published, requested] = histories;
+  if (requested)
+    requireThat(requested.payload.weeks.every((week) => week.advice_source === "requested_server"));
+  if (!published && !requested) throw new LeagueDataMissing(`history/${entryId}.json`);
+  if (!requested) return published!;
+  if (!published) return requested;
+  requireThat(published.payload.season === requested.payload.season);
+  // Recorded plans and refusals take precedence; an explicitly absent record is a gap.
+  const weeks = new Map(requested.payload.weeks.map((week) => [week.gameweek, week]));
+  for (const week of published.payload.weeks) {
+    const absent =
+      week.status === "unavailable" &&
+      week.reason === "no_pre_deadline_record" &&
+      week.advice_snapshot_id === null &&
+      week.advice_sha256 === null &&
+      week.advice_captured_at_utc === null &&
+      week.advice_generated_at_utc === null &&
+      week.expected_own_points === null &&
+      !week.recorded_plans?.length;
+    if (!absent || !weeks.has(week.gameweek)) weeks.set(week.gameweek, week);
+  }
+  const latest =
+    Date.parse(requested.generated_at_utc) > Date.parse(published.generated_at_utc)
+      ? requested
+      : published;
+  return {
+    ...latest,
+    payload: {
+      ...latest.payload,
+      weeks: [...weeks.values()].sort((a, b) => b.gameweek - a.gameweek),
+    },
+  };
 }

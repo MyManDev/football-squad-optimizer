@@ -117,6 +117,146 @@ def world(
 TWO = (352490, 7)
 
 
+@pytest.mark.parametrize("use_receipt", [False, True])
+def test_weekly_requested_history_is_generated_for_two_leagues_and_journalled(
+    tmp_path, use_receipt
+):
+    from tests.unit import test_advice_worker as roster
+    from tests.unit.test_requested_suggestion_history import _store
+
+    from squadopt.application.league_tree_identity import check_tree_identity
+    from squadopt.data.sources.fpl_live import POSITION_CODES
+    from squadopt.platform.advice_job_spec import AdviceJobSpec
+    from squadopt.platform.advice_read import AdviceRequestContext
+    from squadopt.platform.requested_history_snapshot import snapshot_requested_history
+
+    template = world(tmp_path, league_ids=TWO, pages={352490: (101,), 7: (101,)}, seeded_from=TWO)
+    current = read_snapshot(template.paths.snapshots, template.request.snapshot_id)
+    earlier = write_snapshot(
+        template.paths.snapshots,
+        source="fpl-live",
+        captured_at_utc="2026-08-27T08:00:00Z",
+        payloads=current.payloads,
+    )
+    by_code = {
+        p["code"]: p for p in json.loads(current.payloads["bootstrap-static.json"])["elements"]
+    }
+
+    def player(code):
+        return {
+            "player_id": code,
+            "position": POSITION_CODES[by_code[code]["element_type"]],
+            "name": f"Player {code}",
+            "short_name": f"P{code}",
+            "expected_points": 3.0,
+            "team": "Test",
+        }
+
+    context = AdviceRequestContext(
+        "provisional_league_ui_v1",
+        earlier.snapshot_id,
+        "2026-27",
+        2,
+        "f" * 64,
+        "a" * 40,
+        "d" * 64,
+    )
+    spec = AdviceJobSpec(0, 101, "saf-puan", 1, context)
+    payload = {
+        "season": "2026-27",
+        "gameweek": 2,
+        "entry_id": 101,
+        "league_id": 0,
+        "source_snapshot_id": earlier.snapshot_id,
+        "mode": "saf-puan",
+        "window": 1,
+        "starting_xi": [player(code) for code in roster.STARTING_ELEVEN],
+        "bench": [player(code) for code in roster.BENCH],
+        "captain": player(roster.STARTING_ELEVEN[4]),
+        "vice_captain": player(roster.STARTING_ELEVEN[5]),
+        "chip": None,
+        "transfer_hit_points": 0,
+        "expected_own_points": 36.0,
+        "moves": [],
+        "data_quality": "complete",
+        "missing_fields": [],
+    }
+    store = tmp_path / "offline-store"
+    _store(store, spec, payload, captured="2026-08-27T08:00:00Z", completed="2026-08-27T08:01:00Z")
+    history_source = store
+    if use_receipt:
+        history_source = snapshot_requested_history(store, tmp_path / "history-copies").source
+    request = replace(template.request, device_league_ids=TWO)
+    operation = weekly.WeeklyOperations(
+        request,
+        template.paths,
+        run_id="requested",
+        repository_commit="b" * 40,
+        handoff=template.supplied_handoff,
+        requested_history_store=history_source,
+    )
+    receipt = operation.execute()
+    document = json.loads(receipt.read_bytes())
+    assert document["status"] == "completed"
+    league = next(row for row in document["stages"] if row["name"] == "league")
+    selected_store = operation.requested_history_store
+    assert str(selected_store) in [row["path"] for row in league["inputs"]]
+    outputs = []
+    for league_id in TWO:
+        tree = operation.paths.out / "data" / "leagues" / str(league_id)
+        path = tree / "history/requested/101.json"
+        history = json.loads(path.read_bytes())
+        assert history["payload"]["league_id"] == league_id
+        assert history["payload"]["weeks"][0]["advice_source"] == "requested_server"
+        assert history["payload"]["weeks"][0]["status"] == "unsettled"
+        assert "history/requested/101.json" in check_tree_identity(tree)["files"]
+        assert league["value"]["leagues"][str(league_id)]["requested_history_entries"] == [101]
+        outputs.append((path, path.read_bytes()))
+    if use_receipt:
+        newer = snapshot_requested_history(store, tmp_path / "history-copies")
+        assert newer.store != selected_store
+    replay = weekly.WeeklyOperations(
+        request,
+        operation.paths,
+        run_id="requested",
+        repository_commit="b" * 40,
+        handoff=template.supplied_handoff,
+        requested_history_store=history_source,
+        resume=True,
+    )
+    assert replay.requested_history_store == selected_store
+    replay.execute()
+    assert all(path.read_bytes() == raw for path, raw in outputs)
+    cache = next((selected_store / "cache").rglob("*.json"))
+    cache.write_bytes(cache.read_bytes() + b"\n")
+    with pytest.raises(WeeklyJournalError, match="changed"):
+        replay.execute()
+
+
+def test_requested_history_configuration_refuses_missing_store_before_work(tmp_path):
+    template = world(tmp_path)
+    operation = weekly.WeeklyOperations(
+        template.request,
+        template.paths,
+        run_id="missing-history",
+        repository_commit="b" * 40,
+        handoff=template.supplied_handoff,
+        requested_history_store=tmp_path / "absent",
+    )
+    with pytest.raises(WeekError, match="offline store"):
+        operation.execute()
+    assert not (operation.paths.out / "data/leagues.json").exists()
+
+
+def test_scheduled_environment_can_supply_history_store_and_cli_overrides_it(monkeypatch, tmp_path):
+    store = tmp_path / "store"
+    monkeypatch.setenv("SQUADOPT_REQUESTED_HISTORY_STORE", str(store))
+    assert weekly.build_parser().parse_args([]).requested_history_store == store
+    assert weekly.build_parser().parse_args(
+        ["--requested-history-store", "explicit"]
+    ).requested_history_store == Path("explicit")
+
+
 def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
     tmp_path: Path,
 ) -> None:
