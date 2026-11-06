@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { shippedTrees } from "../src/testSupport/shippedTrees";
+import { PUBLIC_ROOT, shippedTrees } from "../src/testSupport/shippedTrees";
 import { claimMember, shippedClaim } from "./identity";
 
 /**
@@ -19,10 +19,20 @@ import { claimMember, shippedClaim } from "./identity";
 
 const WIDTHS = [360, 375, 390] as const;
 
-type Published = { entry: number; strategy: string; window: number; armband: boolean };
+type Published = {
+  entry: number;
+  strategy: string;
+  window: number;
+  armband: boolean;
+  device?: boolean;
+};
 
 /** Each page a tree's indexes offer, and whether its plan names a captain and a vice. */
-function publishedPages(root: string): { leagueId: number; pages: Map<number, Published[]> } {
+function publishedPages(root: string): {
+  leagueId: number;
+  gameweek: number;
+  pages: Map<number, Published[]>;
+} {
   const read = (relative: string) => JSON.parse(readFileSync(join(root, relative), "utf-8"));
   const members = read("members.json").payload;
   const pages = new Map<number, Published[]>();
@@ -31,7 +41,13 @@ function publishedPages(root: string): { leagueId: number; pages: Map<number, Pu
     const entry = member.entry_id as number;
     const index = `advice/${entry}/index.json`;
     if (!existsSync(join(root, index))) continue;
-    const windows = (read(index).payload.windows ?? {}) as Record<string, number[]>;
+    const payload = read(index).payload;
+    if (payload.menu === "device") {
+      expect(payload.computed).toEqual([]);
+      pages.set(entry, [{ entry, strategy: "saf-puan", window: 1, armband: true, device: true }]);
+      continue;
+    }
+    const windows = (payload.windows ?? {}) as Record<string, number[]>;
     pages.set(
       entry,
       Object.entries(windows).flatMap(([strategy, sizes]) =>
@@ -48,7 +64,7 @@ function publishedPages(root: string): { leagueId: number; pages: Map<number, Pu
       ),
     );
   }
-  return { leagueId: members.league_id as number, pages };
+  return { leagueId: members.league_id as number, gameweek: members.gameweek as number, pages };
 }
 
 // Every tree the site lists, each member and each page its index offers.
@@ -62,20 +78,35 @@ test("the published trees have members to check", () => {
 });
 
 for (const language of ["tr", "en"] as const) {
-  for (const [LEAGUE_ID, entry, pages] of TREES.flatMap(({ leagueId, pages }) =>
-    [...pages].map(([entry, rows]) => [leagueId, entry, rows] as const),
+  for (const [LEAGUE_ID, gameweek, entry, pages] of TREES.flatMap(({ leagueId, gameweek, pages }) =>
+    [...pages].map(([entry, rows]) => [leagueId, gameweek, entry, rows] as const),
   )) {
     test(`the captain line holds one line on a phone for ${entry} of ${LEAGUE_ID} in ${language}`, async ({
       page,
     }) => {
+      if (pages.some((row) => row.device)) test.setTimeout(90_000);
       await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
+      const calendar = JSON.parse(
+        readFileSync(join(PUBLIC_ROOT, "data", "fixtures.json"), "utf-8"),
+      ) as {
+        payload: { gameweeks: { gameweek: number; deadline_utc: string }[] };
+      };
+      const deadline = calendar.payload.gameweeks.find(
+        (week) => week.gameweek === gameweek,
+      )!.deadline_utc;
+      await page.clock.setFixedTime(new Date(Date.parse(deadline) - 86_400_000));
       await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
       // The visitor has entered the league and said who they are.
       await claimMember(page, shippedClaim());
-      for (const { strategy, window, armband } of pages) {
+      for (const { strategy, window, armband, device } of pages) {
         if (!armband) continue;
         await page.setViewportSize({ width: WIDTHS[0], height: 800 });
         await page.goto(`/league/${LEAGUE_ID}/members/${entry}?mode=${strategy}&window=${window}`);
+        if (device) {
+          await page.locator("[data-device-compute]").click();
+          await expect(page.locator('[data-device-state="done"]')).toBeVisible({ timeout: 60_000 });
+          await expect(page.locator("[data-device-progress]")).toHaveCount(0, { timeout: 30_000 });
+        }
         const line = page.locator('[data-mark="decision"] p[class*="_captain_"]');
         await expect(line).toBeVisible();
         // The club codes come from the calendar, and the widths from the page's own faces:
