@@ -17,8 +17,10 @@ import tests.unit.test_live_transfers as world_module
 from tests.unit.test_league_views import _legal_squad, _member_picks, _Provider, _world_context
 from tests.unit.test_top100_weight import PREFERRED, _counts, _words
 
+import squadopt.application.advice_chips as chips_module
 from squadopt.application.advice import (
     NO_CHIP_LIMIT,
+    TRACKED_MEMBER_LINEARIZATION_LEVEL,
     AdviseEntryRequest,
     advise_entry,
     advise_with_managers_word,
@@ -264,6 +266,36 @@ def test_a_rebuild_chip_pays_no_hits_and_is_not_below_the_control(world: dict[st
         assert advice.payload["transfer_hit_points"] == 0.0
         assert advice.payload["chip_choice"]["gain_vs_no_chip"] >= -1e-9
         assert not any("below the no-chip control" in note for note in advice.notes)
+
+
+@pytest.mark.parametrize("level", [None, TRACKED_MEMBER_LINEARIZATION_LEVEL])
+def test_the_chip_plan_is_solved_at_its_controls_level(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch, level: int | None
+) -> None:
+    """The gain is measured against the control, so the forced plan follows its level."""
+
+    inputs, projection, rules = _world_context(world)
+    rules = _every_chip_open(rules)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    control = solve_member_control(picks, inputs, projection, rules, linearization_level=level)
+    levels: list[int | None] = []
+    original = chips_module.plan_transfers
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        levels.append(kwargs.get("linearization_level"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(chips_module, "plan_transfers", spy)
+    advise_with_chip(
+        _request(),
+        chip="bboost",
+        provider=_Provider({101: picks}),
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        control=control,
+    )
+    assert levels == [level]
 
 
 def test_the_bench_and_the_third_captain_count_are_what_the_planner_counted(

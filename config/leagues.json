@@ -4,6 +4,7 @@
     {
       "league_id": 352490,
       "menu": "full",
+      "legacy_advice_records": true,
       "label": "the first league the site publishes"
     }
   ]

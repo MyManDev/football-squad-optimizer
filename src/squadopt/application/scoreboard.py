@@ -1,7 +1,7 @@
 """The weekly scoreboard: our paper squad beside the league, the Top-100, and the field.
 
-    python -m scripts.build_scoreboard --league 352490 --out web/public
-    python -m scripts.build_scoreboard --league 352490 --snapshot-id <fpl-live id> \\
+    python -m scripts.build_scoreboard --league <league-id> --out web/public
+    python -m scripts.build_scoreboard --league <league-id> --snapshot-id <fpl-live id> \\
         --cohort-snapshot <fpl-top100 id> --elite-snapshot <fpl-elite-picks id>
 
 Writes ``scoreboard.json`` into the league's tree under ``<out>/data`` in the provisional
