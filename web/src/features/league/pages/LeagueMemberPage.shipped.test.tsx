@@ -35,6 +35,7 @@ import { claimIn, forgetIdentity } from "../../../testSupport/league";
 import { isRefusedMemberIndex, refusedMemberIndex } from "../../../testSupport/refusedMember";
 import { PUBLIC_ROOT as PUBLIC, shippedTrees } from "../../../testSupport/shippedTrees";
 import { resolvePublishedAdvice } from "../advice/adviceSelection";
+import type { FixturesPayload } from "../../fixtures/types";
 import type {
   EntryAdvice,
   EntryAdviceIndex,
@@ -105,6 +106,9 @@ const advisedAfterFirst = humans.slice(1).find(isAdvised);
 
 beforeEach(() => {
   forgetIdentity();
+  const calendar = readPublished<LeagueViewEnvelope<FixturesPayload>>("data/fixtures.json");
+  const deadline = calendar.payload.gameweeks.find((week) => week.gameweek === league.gameweek);
+  if (deadline) vi.setSystemTime(new Date(Date.parse(deadline.deadline_utc) - 60_000));
   vi.stubEnv("MODE", "production");
   vi.stubEnv("DEV", false);
   vi.stubGlobal(
@@ -147,6 +151,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+  vi.useRealTimers();
 });
 
 function openMemberPage(entryId: number, language: Language) {
@@ -282,6 +287,20 @@ async function expectMemberDrawn(entryId: number, language: Language) {
     index,
     { season: squad.season, gameweek: squad.gameweek },
   );
+  if (index.menu === "device") {
+    expect(selection.status).toBe("not-listed");
+    expect(index.computed).toEqual([]);
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: copy.deviceButton })).toBeEnabled(),
+      WAIT,
+    );
+    expect(within(decision).queryByText(copy.noMove)).toBeNull();
+    expect(within(decision).queryAllByRole("heading", { level: 3 })).toHaveLength(0);
+    for (const state of Object.values(copy.publicationStates))
+      expect(within(decision).queryByText(state.title)).toBeNull();
+    expectNoFailure(language);
+    return;
+  }
   expect(selection.status).toBe("ready");
   const plan = readPublished<LeagueViewEnvelope<EntryAdvice>>(
     `${LEAGUE}/${selection.path!}`,
@@ -329,14 +348,28 @@ async function expectBreakageNoticed(entryId: number) {
     index,
     { season: squad.payload.season, gameweek: squad.payload.gameweek },
   );
-  expect(selection.status).toBe("ready");
-  const planPath = `${LEAGUE}/${selection.path!}`;
-  const plan = readServed<LeagueViewEnvelope<EntryAdvice>>(planPath);
-  overrides.set(planPath, JSON.stringify({ ...plan, payload: { ...plan.payload, moves: null } }));
-  await expect(expectMemberDrawn(entryId, "en")).rejects.toThrow();
-
-  cleanup();
-  overrides.delete(planPath);
+  if (index.menu === "device") {
+    expect(selection.status).toBe("not-listed");
+    overrides.set(
+      `${LEAGUE}/entries/${entryId}.json`,
+      JSON.stringify({ ...squad, payload: { ...squad.payload, device_plan: undefined } }),
+    );
+    openMemberPage(entryId, "en");
+    await screen.findByRole("heading", { level: 1, name: squad.payload.entry.team_name! }, WAIT);
+    await waitFor(() => expect(clients.at(-1)!.isFetching()).toBe(0), WAIT);
+    expect(
+      screen.queryByRole("button", { name: MESSAGES.en.leagueMembers.deviceButton }),
+    ).toBeNull();
+    cleanup();
+  } else {
+    expect(selection.status).toBe("ready");
+    const planPath = `${LEAGUE}/${selection.path!}`;
+    const plan = readServed<LeagueViewEnvelope<EntryAdvice>>(planPath);
+    overrides.set(planPath, JSON.stringify({ ...plan, payload: { ...plan.payload, moves: null } }));
+    await expect(expectMemberDrawn(entryId, "en")).rejects.toThrow();
+    cleanup();
+    overrides.delete(planPath);
+  }
   overrides.set(
     `${LEAGUE}/entries/${entryId}.json`,
     JSON.stringify({ ...squad, payload: { ...squad.payload, starting_xi: null } }),
