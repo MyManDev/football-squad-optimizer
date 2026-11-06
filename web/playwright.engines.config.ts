@@ -15,6 +15,7 @@ export default defineConfig({
     "**/player-details.spec.ts",
     "**/forwarded-league.spec.ts",
     "**/member-live-score.spec.ts",
+    "**/opening-signature.spec.ts",
   ],
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

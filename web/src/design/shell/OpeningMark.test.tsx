@@ -1,4 +1,4 @@
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OPENING_LEAVE_MS, OPENING_MS, OPENING_STORAGE_KEY, OpeningMark } from "./OpeningMark";
@@ -46,6 +46,64 @@ describe("the brand's opening", () => {
   it("never shows under the reduced-motion preference", () => {
     preferReducedMotion(true);
     render(<OpeningMark />);
+    expect(cover()).toBeNull();
+  });
+
+  it("dismisses on a click without sending the click to its parent", () => {
+    const click = vi.fn();
+    render(
+      <div onClick={click}>
+        <OpeningMark />
+      </div>,
+    );
+    fireEvent.click(cover()!);
+    expect(cover()).toBeNull();
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it("dismisses on Tab without preventing the page's focus navigation", () => {
+    render(<OpeningMark />);
+    expect(fireEvent.keyDown(document, { key: "Tab" })).toBe(true);
+    expect(cover()).toBeNull();
+  });
+
+  it.each(["Enter", " "])("preserves %j on a focused control while dismissing", (key) => {
+    const click = vi.fn();
+    const { getByRole } = render(
+      <>
+        <OpeningMark />
+        <button onKeyDown={click}>Open</button>
+      </>,
+    );
+    const button = getByRole("button");
+    button.focus();
+    expect(fireEvent.keyDown(button, { key })).toBe(true);
+    expect(cover()).toBeNull();
+    expect(click).toHaveBeenCalledOnce();
+    expect(button).toHaveFocus();
+  });
+
+  it("reveals a focused field without dropping its first typed character", () => {
+    const typed = vi.fn();
+    const { getByRole } = render(
+      <>
+        <OpeningMark />
+        <input onKeyDown={typed} />
+      </>,
+    );
+    expect(fireEvent.keyDown(getByRole("textbox"), { key: "1" })).toBe(true);
+    expect(typed).toHaveBeenCalledOnce();
+    expect(cover()).toBeNull();
+  });
+
+  it("reveals the page when a field is filled without keyboard events", () => {
+    const { getByRole } = render(
+      <>
+        <OpeningMark />
+        <input />
+      </>,
+    );
+    fireEvent.input(getByRole("textbox"), { target: { value: "123" } });
     expect(cover()).toBeNull();
   });
 
