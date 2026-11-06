@@ -14,6 +14,7 @@ from tests.unit.test_league_views import _verified_manager_word
 from tests.unit.test_live_football_model import _forecast
 
 from squadopt.application.advice import (
+    TRACKED_MEMBER_LINEARIZATION_LEVEL,
     AdviseEntryRequest,
     advise_with_managers_word,
     advise_with_top100,
@@ -73,10 +74,25 @@ def exact_score(week):
     )
 
 
-def test_one_week_football_control_keeps_native_resources_and_effective_appearance(football_world):
+@pytest.mark.parametrize("linearization_level", [None, TRACKED_MEMBER_LINEARIZATION_LEVEL])
+def test_one_week_football_control_keeps_native_resources_and_effective_appearance(
+    football_world, linearization_level
+):
     capture, football, picks, held = football_world
-    original, _, _ = plan_transfers(capture.inputs, football.projection, held, capture.rules)
-    selected = solve_member_control(picks, capture.inputs, football.projection, capture.rules)
+    original, _, _ = plan_transfers(
+        capture.inputs,
+        football.projection,
+        held,
+        capture.rules,
+        linearization_level=linearization_level,
+    )
+    selected = solve_member_control(
+        picks,
+        capture.inputs,
+        football.projection,
+        capture.rules,
+        linearization_level=linearization_level,
+    )
     week = selected.plan.weeks[0]
     normalized = replace(
         week,
@@ -103,12 +119,27 @@ def test_one_week_football_control_keeps_native_resources_and_effective_appearan
     )
 
 
-def test_current_control_keeps_legacy_roles_even_with_an_unused_appearance_column(football_world):
+@pytest.mark.parametrize("linearization_level", [None, TRACKED_MEMBER_LINEARIZATION_LEVEL])
+def test_current_control_keeps_legacy_roles_even_with_an_unused_appearance_column(
+    football_world, linearization_level
+):
     capture, _, picks, held = football_world
     table = capture.projection.table.assign(appearance_probability=0.01)
     projection = replace(capture.projection, table=table)
-    original, _, _ = plan_transfers(capture.inputs, projection, held, capture.rules)
-    selected = solve_member_control(picks, capture.inputs, projection, capture.rules)
+    original, _, _ = plan_transfers(
+        capture.inputs,
+        projection,
+        held,
+        capture.rules,
+        linearization_level=linearization_level,
+    )
+    selected = solve_member_control(
+        picks,
+        capture.inputs,
+        projection,
+        capture.rules,
+        linearization_level=linearization_level,
+    )
     assert selected.plan.weeks[0].lineup_expectation is None
     assert "appearance_probability" not in selected.plan.weeks[0].selected_squad
     assert_same_resources(original.weeks[0], selected.plan.weeks[0])
