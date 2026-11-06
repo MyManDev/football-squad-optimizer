@@ -83,6 +83,30 @@ describe("the brand's opening", () => {
     expect(click).toHaveBeenCalledOnce();
   });
 
+  it("reveals a focused field without dropping its first typed character", () => {
+    const typed = vi.fn();
+    const { getByRole } = render(
+      <>
+        <OpeningMark />
+        <input onKeyDown={typed} />
+      </>,
+    );
+    expect(fireEvent.keyDown(getByRole("textbox"), { key: "1" })).toBe(true);
+    expect(typed).toHaveBeenCalledOnce();
+    expect(cover()).toBeNull();
+  });
+
+  it("reveals the page when a field is filled without keyboard events", () => {
+    const { getByRole } = render(
+      <>
+        <OpeningMark />
+        <input />
+      </>,
+    );
+    fireEvent.input(getByRole("textbox"), { target: { value: "123" } });
+    expect(cover()).toBeNull();
+  });
+
   it("draws red on the left and green on the right before the quarter turn", () => {
     render(<OpeningMark />);
     const bars = [...document.querySelectorAll("[data-opening-mark] rect")];

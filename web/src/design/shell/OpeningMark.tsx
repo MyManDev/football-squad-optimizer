@@ -53,13 +53,18 @@ export function OpeningMark() {
     const dismiss = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey || event.key === "Shift") return;
       setOpen(false);
-      if (event.key !== "Tab") {
+      if (["Enter", " ", "Escape"].includes(event.key)) {
         event.preventDefault();
         event.stopImmediatePropagation();
       }
     };
+    const edited = () => setOpen(false);
     document.addEventListener("keydown", dismiss, true);
-    return () => document.removeEventListener("keydown", dismiss, true);
+    document.addEventListener("input", edited, true);
+    return () => {
+      document.removeEventListener("keydown", dismiss, true);
+      document.removeEventListener("input", edited, true);
+    };
   }, [open]);
   if (!open) return null;
   return (
@@ -68,6 +73,11 @@ export function OpeningMark() {
       aria-hidden="true"
       data-opening-mark=""
       onPointerDown={(event) => event.preventDefault()}
+      onTouchEnd={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(false);
+      }}
       onClick={(event) => {
         event.stopPropagation();
         setOpen(false);

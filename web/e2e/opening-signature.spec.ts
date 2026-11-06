@@ -1,6 +1,12 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { installLeagueMocks } from "./leagueMocks";
+
+async function freezeOpeningClock(page: Page) {
+  const time = new Date("2026-11-06T00:00:00Z");
+  await page.clock.install({ time });
+  await page.clock.pauseAt(new Date(time.getTime() + 1000));
+}
 
 for (const { width, touch } of [
   { width: 375, touch: true },
@@ -10,9 +16,8 @@ for (const { width, touch } of [
     test.use({ viewport: { width, height: 844 }, hasTouch: touch, reducedMotion: "no-preference" });
 
     test("dismisses the opening without clicking the covered control", async ({ page }) => {
-      await page.clock.install();
-      await page.clock.pauseAt(new Date());
-      await installLeagueMocks(page);
+      await freezeOpeningClock(page);
+      await installLeagueMocks(page, { opening: true });
       await page.goto("/");
       const opening = page.locator("[data-opening-mark]");
       await expect(opening).toBeAttached();
@@ -37,15 +42,28 @@ for (const { width, touch } of [
     });
 
     test("Tab reveals the page and keeps normal keyboard navigation", async ({ page }) => {
-      await page.clock.install();
-      await page.clock.pauseAt(new Date());
-      await installLeagueMocks(page);
+      await freezeOpeningClock(page);
+      await installLeagueMocks(page, { opening: true });
       await page.goto("/");
       await expect(page.locator("[data-opening-mark]")).toBeAttached();
       await page.keyboard.press("Tab");
       await expect(page.locator("[data-opening-mark]")).toHaveCount(0);
       await expect(page.locator(":focus")).toBeVisible();
       expect(await page.locator(":focus").evaluate((node) => node.tagName)).not.toBe("BODY");
+    });
+
+    test("filling a field reveals it and Enter submits the value", async ({ page }) => {
+      await freezeOpeningClock(page);
+      await installLeagueMocks(page, { opening: true });
+      await page.goto("/");
+      await page.clock.runFor(500);
+      const field = page.getByLabel("Lig numarası", { exact: true });
+      await expect(field).toBeVisible();
+      await expect(page.locator("[data-opening-mark]")).toBeAttached();
+      await field.fill("123");
+      await expect(page.locator("[data-opening-mark]")).toHaveCount(0);
+      await field.press("Enter");
+      await expect(page).toHaveURL("/league/123");
     });
   });
 }
@@ -55,9 +73,8 @@ for (const width of [320, 1280]) {
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 844 });
-    await page.clock.install();
-    await page.clock.pauseAt(new Date());
-    await installLeagueMocks(page);
+    await freezeOpeningClock(page);
+    await installLeagueMocks(page, { opening: true });
     await page.goto("/");
     const opening = page.locator("[data-opening-mark]");
     await expect(opening).toBeAttached();
