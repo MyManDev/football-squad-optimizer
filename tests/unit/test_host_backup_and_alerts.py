@@ -22,7 +22,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -180,6 +180,32 @@ def test_a_new_failed_run_alerts_at_once_and_the_same_one_only_daily(watch: Modu
     assert not watch.read_run([]).bad
 
 
+def test_a_failed_pre_run_hook_alerts_without_a_run_log_then_recovers(watch, monkeypatch):
+    service = "failed"
+    monkeypatch.setattr(
+        watch.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=service),
+    )
+    state = {}
+    assert [alert.key for alert in watch.decide([watch.read_gate()], state, NOW)] == ["gate"]
+    assert watch.decide([watch.read_gate()], state, NOW + timedelta(minutes=15)) == []
+    service = "inactive"
+    assert [
+        alert.title
+        for alert in watch.decide([watch.read_gate()], state, NOW + timedelta(minutes=30))
+    ] == ["SquadOpt gate: resolved"]
+
+
+def test_an_unreadable_gate_state_is_not_reported_as_healthy(watch, monkeypatch):
+    monkeypatch.setattr(
+        watch.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout=""),
+    )
+    assert watch.read_gate().bad
+
+
 def test_the_backup_is_late_after_36_hours_and_missing_until_one_succeeds(
     watch: ModuleType, tmp_path: Path
 ) -> None:
@@ -304,8 +330,9 @@ def test_the_backup_covers_every_store_the_issue_names_and_keeps_a_stamp() -> No
 
 @needs_bash
 @pytest.mark.parametrize("baseline", ["absent", "present", "symlink"])
+@pytest.mark.parametrize("history", ["absent", "present", "symlink", "uninitialized"])
 def test_backup_includes_a_landed_baseline_store_and_refuses_a_link(
-    tmp_path: Path, baseline: str
+    tmp_path: Path, baseline: str, history: str
 ) -> None:
     weekly, backend = tmp_path / "weekly", tmp_path / "backend"
     for relative in (
@@ -328,13 +355,26 @@ def test_backup_includes_a_landed_baseline_store_and_refuses_a_link(
         outside = tmp_path / "outside"
         outside.mkdir()
         store.symlink_to(outside, target_is_directory=True)
+    history_root = tmp_path / "requested-history"
+    if history in ("present", "uninitialized"):
+        history_root.mkdir()
+        if history == "present":
+            (history_root / ".snapshot.lock").touch()
+    elif history == "symlink":
+        history_root.symlink_to(backend, target_is_directory=True)
     binaries = tmp_path / "bin"
     binaries.mkdir()
     scripts = {
         "id": "#!/bin/sh\nprintf '0\\n'\n",
         "python3": f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n',
         "restic": (
-            "#!/usr/bin/env python3\nimport json, os, sys\n"
+            "#!/usr/bin/env python3\nimport json, os, sys, fcntl\n"
+            "history = os.environ['SQUADOPT_REQUESTED_HISTORY_ROOT']\n"
+            "if sys.argv[1] == 'backup' and os.path.isdir(history):\n"
+            "    with open(history + '/.snapshot.lock', 'r+') as lock:\n"
+            "        try: fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)\n"
+            "        except BlockingIOError: pass\n"
+            "        else: sys.exit(17)\n"
             "with open(os.environ['BACKUP_CALLS'], 'a') as out:\n"
             "    out.write(json.dumps(sys.argv[1:]) + '\\n')\n"
             "if sys.argv[1] == 'backup': print(json.dumps({'snapshot_id': 'synthetic'}))\n"
@@ -358,11 +398,12 @@ def test_backup_includes_a_landed_baseline_store_and_refuses_a_link(
         "AWS_ACCESS_KEY_ID": "synthetic",
         "AWS_SECRET_ACCESS_KEY": "synthetic",
         "BACKUP_CALLS": str(calls),
+        "SQUADOPT_REQUESTED_HISTORY_ROOT": str(history_root),
     }
     result = subprocess.run(
         [BASH or "bash", str(BACKUP)], env=environment, capture_output=True, text=True, timeout=15
     )
-    if baseline == "symlink":
+    if baseline == "symlink" or history in ("symlink", "uninitialized"):
         assert result.returncode == 1
         assert not calls.exists()
         assert not (tmp_path / "stamp").exists()
@@ -371,6 +412,7 @@ def test_backup_includes_a_landed_baseline_store_and_refuses_a_link(
         commands = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
         backup = next(arguments for arguments in commands if arguments[0] == "backup")
         assert (str(store) in backup) is (baseline == "present")
+        assert (str(history_root) in backup) is (history == "present")
         assert (tmp_path / "stamp").is_file()
 
 

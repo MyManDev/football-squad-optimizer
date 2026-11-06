@@ -109,6 +109,13 @@ service's group when that service must consume a root-owned backend's history. T
 creates new output roots and snapshots private to their owner. Source and output directories
 must be disjoint.
 
+`--reuse-unchanged` retains the exact previous receipt when the verified completed-answer
+evidence is identical, including after queue archiving. Its timestamp remains the original
+capture time; it is not restamped as a new copy. `--max-snapshot-bytes <bytes>` bounds staged
+payload bytes and refuses before replacing the receipt when the limit is exceeded.
+The opt-in [host hook](../../deploy/weekly-schedule/README.md#requested-history-before-a-weekly-run)
+uses both options, limits total disk use, and includes retained copies in the nightly backup.
+
 ## Weekly integration
 
 The installed weekly command accepts `--requested-history-store /path/to/offline/store`.
@@ -133,6 +140,6 @@ bundle alongside existing history. The scoreboard stage records the final identi
 all league writes. The single-entry builder above produces an inspection artifact; use the
 weekly integration when preparing a complete release tree, so the final identity covers it.
 
-Without the option, existing requested files are retained unchanged. Running the snapshot
-command under the host's service permissions, wiring its pre-run invocation and enabling
-the setting remain rollout prerequisites; no snapshot producer is installed by importing it.
+Without the option, existing requested files are retained unchanged. The host hook and
+drop-in are supplied but not automatically installed. Enable them and verify permissions,
+the shared lock, backup/restore and real requested outcomes after the deployment hold ends.

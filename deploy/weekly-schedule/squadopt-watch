@@ -258,6 +258,34 @@ def timer_active() -> bool:
     return shown.stdout.strip() == "active"
 
 
+def read_gate() -> Reading:
+    """A failed ExecStartPre has no weekly run log, even while its timer stays active."""
+    try:
+        shown = subprocess.run(
+            ["systemctl", "show", "weekly-schedule.service", "--property=ActiveState", "--value"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+        state = shown.stdout.strip()
+        bad = shown.returncode != 0 or state not in {
+            "active",
+            "inactive",
+            "activating",
+            "deactivating",
+            "reloading",
+        }
+    except (OSError, subprocess.SubprocessError):
+        bad = True
+    return Reading(
+        "gate",
+        bad,
+        "The weekly service failed or its state could not be read, including pre-run history. "
+        "Read journalctl -u weekly-schedule on the host.",
+    )
+
+
 def send(alert: Alert) -> bool:
     topic = os.environ.get("NTFY_TOPIC", "")
     if not topic:
@@ -308,6 +336,7 @@ def readings(now: datetime) -> list[Reading]:
         read_backup(BACKUP_STAMP, now),
         read_run(lines),
         read_timer(timer_active()),
+        read_gate(),
         read_capture(bootstrap, newest_capture(SNAPSHOTS), now),
     ]
 

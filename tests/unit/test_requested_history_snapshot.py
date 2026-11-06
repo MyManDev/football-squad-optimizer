@@ -2,10 +2,11 @@
 
 import json
 import os
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from tests.unit.test_requested_history_export import _bytes, _export, _stored
+from tests.unit.test_requested_history_export import SPEC, _bytes, _export, _stored
 
 from squadopt.platform import requested_history_snapshot as snapshot
 from squadopt.platform.advice_cache import FileAdviceCache
@@ -95,6 +96,57 @@ def test_answer_copying_holds_no_queue_lock(tmp_path, monkeypatch):
 
     monkeypatch.setattr(snapshot, "_requested_history", inspect)
     assert capture(store, tmp_path / "history").source.is_file()
+
+
+def test_repeated_checks_and_archiving_reuse_exact_unchanged_evidence(tmp_path):
+    store, output = tmp_path / "backend", tmp_path / "history"
+    _, _, queue = _stored(store)
+    first = capture(store, output)
+    held = _bytes(output)
+    assert queue.archive(now_utc=NOW.isoformat())
+    checked = snapshot.snapshot_requested_history(
+        store, output, clock=lambda: NOW + timedelta(hours=1), reuse_unchanged=True
+    )
+    assert checked == first
+    assert _bytes(output) == held
+    assert not list(output.glob(".building-*"))
+
+
+def test_a_new_completed_request_advances_the_receipt_but_a_waiting_one_does_not(tmp_path):
+    store, output = tmp_path / "backend", tmp_path / "history"
+    _stored(store)
+    first = capture(store, output)
+    _, raw, queue = _stored(store, replace(SPEC, entry_id=SPEC.entry_id + 1), status="running")
+    assert capture(store, output, reuse_unchanged=True) == first
+    running = next(job for job in queue.jobs() if job.status == "running")
+    queue.complete(
+        running, cache=FileAdviceCache(store / "cache"), payload=raw, at_utc=NOW.isoformat()
+    )
+    second = capture(store, output, reuse_unchanged=True)
+    assert second.store != first.store
+    assert len(list((second.store / "jobs").glob("*.json"))) == 2
+    assert first.store.is_dir()
+
+
+def test_size_limit_preserves_previous_receipt_and_removes_staging(tmp_path):
+    store, output = tmp_path / "backend", tmp_path / "history"
+    _stored(store)
+    first = capture(store, output)
+    held = _bytes(output)
+    with pytest.raises(ValueError, match="byte limit"):
+        capture(store, output, max_snapshot_bytes=1)
+    assert snapshot.read_history_snapshot(first.source) == first
+    assert _bytes(output) == held
+    assert not list(output.glob(".building-*"))
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, 1.5])
+def test_invalid_size_limits_are_rejected_before_writing(tmp_path, limit):
+    store, output = tmp_path / "backend", tmp_path / "history"
+    _stored(store)
+    with pytest.raises(ValueError, match="positive integer"):
+        capture(store, output, max_snapshot_bytes=limit)
+    assert not output.exists()
 
 
 @pytest.mark.parametrize("failure", ["cache", "backup", "receipt"])

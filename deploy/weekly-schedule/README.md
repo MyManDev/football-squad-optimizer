@@ -17,6 +17,79 @@ stop the backend. Nothing here is installed or run by committing it.
 | `weekly-schedule.service` | One tick: the checkout's venv runs the gate without `--release` (D1), one solver worker per core, the club-news settings from a private `EnvironmentFile`, no start timeout |
 | `weekly-schedule.timer` | A tick every 15 minutes (`OnCalendar=*:0/15`), and once after the host was off through one (`Persistent=true`) |
 | `dry-run.conf` | A drop-in for the first week: the same tick with `--dry-run`, which writes, starts and posts nothing |
+| `squadopt-requested-history` | Optional pre-run copy of completed answers, inside the running backend image with no network; installed explicitly as a root-owned command |
+| `requested-history.conf` | Optional weekly drop-in that prepares and consumes the private history receipt before each gate tick |
+
+## Requested history before a weekly run
+
+Enable this only after the backend and weekly checkout both contain this change, including
+the snapshot CLI's `--reuse-unchanged` and `--max-snapshot-bytes` options. The API and worker
+must run the same immutable image and mount
+`/root/squadopt/store`. Do not install or enable it during a weekly run or a merge/deployment
+hold. It is independent of the release drop-in; provisioning does not enable it automatically.
+
+The hook reads the active systemd command first and does nothing when it contains `--dry-run`.
+For a real tick it runs the already installed backend image, without a pull, network, extra
+capabilities or root inside the container. Only the durable store and history output are
+mounted. UID 10001 owns the output; the `squadopt` group can read it. The weekly process
+continues as `squadopt`, and no backend service is restarted. A failed copy stops the tick
+instead of silently consuming an old pointer.
+
+After the current weekly run finishes and the deployment hold is lifted, as root:
+
+```sh
+install -o root -g root -m 0755 \
+  /srv/squadopt/weekly/deploy/weekly-schedule/squadopt-requested-history \
+  /usr/local/sbin/squadopt-requested-history
+# Install the updated backup command so snapshots and pinned journals restore together.
+install -o root -g root -m 0755 \
+  /srv/squadopt/weekly/deploy/weekly-schedule/squadopt-backup \
+  /usr/local/sbin/squadopt-backup
+install -o root -g root -m 0755 \
+  /srv/squadopt/weekly/deploy/weekly-schedule/squadopt-watch \
+  /usr/local/sbin/squadopt-watch
+/usr/local/sbin/squadopt-requested-history
+sudo -u squadopt /srv/squadopt/weekly/.venv/bin/python -c \
+  'from pathlib import Path; from squadopt.platform.requested_history_snapshot import read_history_snapshot; read_history_snapshot(Path("/var/lib/squadopt/requested-history/latest.json")); print("history readable and verified")'
+install -D -o root -g root -m 0644 \
+  /srv/squadopt/weekly/deploy/weekly-schedule/requested-history.conf \
+  /etc/systemd/system/weekly-schedule.service.d/requested-history.conf
+systemctl daemon-reload
+```
+
+The manual preparation requires a real gate configuration, not `dry-run.conf`. Verify the
+readable receipt before installing the drop-in. These commands do not start a weekly run;
+the next scheduled tick uses the hook. A restored or resumed run continues to use its
+original pinned snapshot, even if the latest pointer has advanced.
+
+The hook caps one snapshot at 512 MiB of payload and reserves another copy plus 1 GiB of
+free space for staging and metadata. Its private history directory has a conservative
+10 GiB budget. Unchanged evidence reuses the exact previous receipt, so quiet timer ticks
+do not accumulate copies. Requests still waiting or computing do not advance history.
+Failed or timed-out containers are removed by their unique invocation name.
+The existing five-minute watch alerts on a failed weekly service even when its pre-run
+hook stopped before a run log existed. It suppresses repeats and reports recovery.
+
+The nightly backup includes `/var/lib/squadopt/requested-history` when it exists and holds
+the producer's snapshot lock until restic finishes copying it. The weekly journals under
+`data/runtime/weekly` are already included. Restore both at their original paths before
+resuming a run; copying only `latest.json` is insufficient.
+
+No snapshot is automatically deleted. When the capacity guard refuses, retain the current
+receipt's backup and every backup pinned by a resumable run's
+`data/runtime/weekly/<run-id>/run.json` (`request.requested_history_receipt`). Verify the
+off-host backup before archiving completed runs and retiring only their unreferenced
+copies. Read failures or uncertain pins are a reason to retain the copy. The normal host
+disk alert remains enabled. A larger budget requires a reviewed change to the installed
+hook, rather than disabling the guard.
+
+To disable the hook, remove only
+`/etc/systemd/system/weekly-schedule.service.d/requested-history.conf` and reload systemd.
+Keep the retained copies and journals. Disabling it stops future collection; existing
+published histories remain intact. If the history environment variable was also set in
+`weekly-schedule.env`, remove that setting too. Confirm service permissions, lock behavior,
+a real requested answer, backup/restore and the next tick on the host before accepting
+this deployment; local unit tests alone do not establish those outcomes.
 
 ## What a tick does
 

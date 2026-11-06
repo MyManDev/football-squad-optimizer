@@ -15,6 +15,7 @@ readonly WEEKLY="${SQUADOPT_WEEKLY:-/srv/squadopt/weekly}"
 readonly BACKEND="${SQUADOPT_BACKEND_BASE:-/root/squadopt}"
 readonly STAMP="${SQUADOPT_BACKUP_STAMP:-/var/lib/squadopt/backup/last-success}"
 readonly ALERT="${SQUADOPT_ALERT:-/usr/local/sbin/squadopt-alert}"
+readonly REQUESTED_HISTORY="${SQUADOPT_REQUESTED_HISTORY_ROOT:-/var/lib/squadopt/requested-history}"
 readonly PATHS=(
   "$WEEKLY/data/snapshots"
   "$WEEKLY/data/handoffs"
@@ -55,6 +56,16 @@ if [ -e "$baselines" ] || [ -L "$baselines" ]; then
   [ -d "$baselines" ] && [ ! -L "$baselines" ] || fail "$baselines is not a directory"
   paths+=("$baselines")
 fi
+if [ -e "$REQUESTED_HISTORY" ] || [ -L "$REQUESTED_HISTORY" ]; then
+  [ -d "$REQUESTED_HISTORY" ] && [ ! -L "$REQUESTED_HISTORY" ] || fail "requested history is not a directory"
+  [ -f "$REQUESTED_HISTORY/.snapshot.lock" ] && [ ! -L "$REQUESTED_HISTORY/.snapshot.lock" ] ||
+    fail "requested history has no regular snapshot lock"
+  # The producer uses flock on this permanent file too. Hold it until restic has
+  # captured both the pointer and the immutable copies that resumed runs reference.
+  exec {history_lock}<> "$REQUESTED_HISTORY/.snapshot.lock" || fail "requested history lock could not be opened"
+  flock -w 60 "$history_lock" || fail "requested history snapshot is still busy"
+  paths+=("$REQUESTED_HISTORY")
+fi
 ping /start
 restic cat config >/dev/null 2>&1 || fail "the repository is not initialised (README, Backups and alerts)"
 
@@ -62,6 +73,10 @@ summary="$(restic backup --quiet --json --tag nightly --host squadopt-host "${pa
   fail "restic backup exited non-zero"
 snapshot="$(printf '%s' "$summary" | python3 -c 'import json, sys; print(json.load(sys.stdin)["snapshot_id"])' 2>/dev/null)" ||
   fail "restic backup reported no snapshot"
+if [ -n "${history_lock:-}" ]; then
+  flock -u "$history_lock"
+  exec {history_lock}>&-
+fi
 restic forget --quiet --tag nightly --host squadopt-host \
   --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune >/dev/null || fail "restic forget exited non-zero"
 restic check --quiet >/dev/null || fail "restic check found a problem"

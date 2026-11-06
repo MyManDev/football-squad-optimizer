@@ -8,6 +8,7 @@ import math
 import os
 import re
 import secrets
+import stat
 import sys
 import tempfile
 import time
@@ -96,6 +97,8 @@ def snapshot_requested_history(
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     lock_budget_seconds: float = 1.0,
     group_readable: bool = False,
+    reuse_unchanged: bool = False,
+    max_snapshot_bytes: int | None = None,
 ) -> HistorySnapshot:
     """Publish an immutable, verified subset and atomically advance its private receipt.
 
@@ -107,6 +110,10 @@ def snapshot_requested_history(
         raise ValueError("The snapshot destination and backend store must be disjoint.")
     if not math.isfinite(lock_budget_seconds) or lock_budget_seconds <= 0:
         raise ValueError("The metadata lock budget must be positive and finite.")
+    if max_snapshot_bytes is not None and (
+        type(max_snapshot_bytes) is not int or max_snapshot_bytes < 1
+    ):
+        raise ValueError("The snapshot byte limit must be a positive integer.")
     for part in ("jobs", "specs", "cache"):
         if not _safe_path(store / part).is_dir():
             raise ValueError("Expected a backend store with jobs, specs and cache.")
@@ -138,6 +145,15 @@ def snapshot_requested_history(
             staged = Path(addressable(staged))
             for part in ("jobs", "specs", "cache"):
                 (staged / part).mkdir()
+            staged_bytes = 0
+
+            def write(path: Path, content: bytes) -> None:
+                nonlocal staged_bytes
+                staged_bytes += len(content)
+                if max_snapshot_bytes is not None and staged_bytes > max_snapshot_bytes:
+                    raise ValueError("Requested-history snapshot exceeds its byte limit.")
+                path.write_bytes(content)
+
             cutoff = (as_instant(captured) + timedelta(microseconds=1)).isoformat()
             for job_id, raw in sorted(live.items()):
                 job = AdviceJob.from_payload(json.loads(raw))
@@ -169,14 +185,42 @@ def snapshot_requested_history(
                 ):
                     target = staged / part / key[:2] / f"{key}.json"
                     target.parent.mkdir(exist_ok=True)
-                    if target.exists() and target.read_bytes() != content:
-                        raise ValueError("Two jobs disagree on one immutable answer.")
-                    target.write_bytes(content)
-                (staged / "jobs" / f"{job_id}.json").write_bytes(
-                    document_bytes(replace(job, idempotency_key=None).as_payload())
+                    if target.exists():
+                        if target.read_bytes() != content:
+                            raise ValueError("Two jobs disagree on one immutable answer.")
+                    else:
+                        write(target, content)
+                write(
+                    staged / "jobs" / f"{job_id}.json",
+                    document_bytes(replace(job, idempotency_key=None).as_payload()),
                 )
-            (staged / "capture.json").write_bytes(
-                document_bytes({"format": FORMAT, "captured_at_utc": captured})
+            # A timer can check the live store repeatedly without keeping another full
+            # copy of unchanged evidence. The old receipt and its capture time stay exact.
+            if reuse_unchanged and previous is not None:
+                files = {p.relative_to(staged) for p in staged.rglob("*") if p.is_file()}
+                old_files = {
+                    p.relative_to(previous.store)
+                    for p in previous.store.rglob("*")
+                    if p.is_file() and p.name != "capture.json"
+                }
+                sharing_matches = not group_readable
+                if sys.platform != "win32" and group_readable:
+                    sharing_matches = (
+                        stat.S_IMODE(source.stat().st_mode) == 0o640
+                        and source.stat().st_gid == os.getegid()
+                    )
+                if (
+                    sharing_matches
+                    and files == old_files
+                    and all(
+                        (staged / p).read_bytes() == (previous.store / p).read_bytes()
+                        for p in files
+                    )
+                ):
+                    return previous
+            write(
+                staged / "capture.json",
+                document_bytes({"format": FORMAT, "captured_at_utc": captured}),
             )
             destination.mkdir(mode=0o700)
             # The private staging subset has one writer, finished above. The backend
@@ -212,10 +256,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--store", required=True, type=Path)
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument("--group-readable", action="store_true")
+    parser.add_argument("--reuse-unchanged", action="store_true")
+    parser.add_argument("--max-snapshot-bytes", type=int)
     args = parser.parse_args(argv)
     try:
         result = snapshot_requested_history(
-            args.store, args.output_root, group_readable=args.group_readable
+            args.store,
+            args.output_root,
+            group_readable=args.group_readable,
+            reuse_unchanged=args.reuse_unchanged,
+            max_snapshot_bytes=args.max_snapshot_bytes,
         )
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f"Requested history snapshot refused: {error}", file=sys.stderr)
