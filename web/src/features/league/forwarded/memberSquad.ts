@@ -33,6 +33,7 @@ import {
 import type { FplEntryBundle, FplStandingRow } from "../forwarder/documents";
 import { bundleEntryState } from "../forwarder/entryState";
 import type { BundleTableRefusal } from "../forwarder/identity";
+import { memberLineup } from "../live/memberLineup";
 import type {
   EntryChipAvailability,
   EntrySquad,
@@ -89,6 +90,29 @@ function position(value: string): EntrySquadPlayer["position"] {
   return (POSITIONS as readonly string[]).includes(value)
     ? (value as EntrySquadPlayer["position"])
     : "UNK";
+}
+
+/** The played week's actual picks, for display only; planning still uses the held basis. */
+export function currentMemberSquad(
+  squad: EntrySquad,
+  bundle: FplEntryBundle,
+  table: DevicePlanDocument,
+): EntrySquad | null {
+  const current = bundle.current_week;
+  if (
+    current === null ||
+    bundle.entry_id !== squad.entry.entry_id ||
+    bundle.entry.id !== squad.entry.entry_id ||
+    bundle.gameweek !== squad.gameweek ||
+    current.entry_id !== squad.entry.entry_id ||
+    current.gameweek !== squad.gameweek ||
+    table.season !== squad.season ||
+    table.gameweek !== squad.gameweek ||
+    table.source_snapshot_id !== squad.source_snapshot_id
+  )
+    return null;
+  const lineup = memberLineup(current, table);
+  return lineup === null ? null : { ...squad, ...lineup };
 }
 
 /** The season's chip windows the table's rules state, or null where one cannot be read. */

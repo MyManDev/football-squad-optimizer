@@ -12,6 +12,7 @@ import type { LiveActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek, Position, WeekLive } from "../../liveScore/weekLive";
 import { forecastSource } from "../device/chipForecast/member";
 import { DEVICE_PLAN_TABLE_CONTRACT_VERSION, type DevicePlanDocument } from "../device/types";
+import { memberLineup, type PlayedLineup } from "./memberLineup";
 
 const POSITIONS: readonly string[] = ["GK", "DEF", "MID", "FWD"];
 
@@ -40,6 +41,7 @@ export interface MemberLiveScore {
   /** The fifteen's names by element id, as the table states them. */
   names: ReadonlyMap<number, string>;
   activity: PlayerActivity[] | null;
+  lineup: PlayedLineup;
 }
 
 export type MemberLiveResult =
@@ -94,12 +96,19 @@ export function memberLiveScore({
     member,
   );
   if (score.refused) return { ok: false, reason: "score_refused", detail: score.reason };
+  const lineup = memberLineup(
+    member,
+    table,
+    new Map(live.elements.map((element) => [element.element_id, element.points])),
+  );
+  if (lineup === null) return { ok: false, reason: "pick_not_in_table" };
   return {
     ok: true,
     live: {
       gameweek: live.gameweek,
       score,
       names,
+      lineup,
       activity: activity === null ? null : playerActivities(activity, member.pick_order),
     },
   };
