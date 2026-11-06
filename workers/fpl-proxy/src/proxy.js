@@ -28,8 +28,8 @@ export const BUNDLE_CONTRACT = "fpl_entry_bundle_v1";
 export const LIVE_CONTRACT = "week_live_v1";
 export const ACTIVITY_CONTRACT = "week_activity_v1";
 
-/** A classic league page beyond this is refused: the device reads leagues of up to 1,000. */
-export const MAX_STANDINGS_PAGE = 20;
+/** A bounded page range for on-demand classic and country league standings. */
+export const MAX_STANDINGS_PAGE = 1000;
 export const LAST_GAMEWEEK = 38;
 
 /** The chips week_live_v1's member block names; any other chip leaves that block out. */
@@ -66,7 +66,7 @@ export const CACHE_PREFIX = "/api/v1/fpl/.cache/v1/";
 export const SCHEDULE_CACHE_KEY = `${SITE_ORIGIN}${CACHE_PREFIX}schedule`;
 
 const ID_TEXT = /^[1-9][0-9]{0,14}$/;
-const SMALL_TEXT = /^[1-9][0-9]?$/;
+const SMALL_TEXT = /^[1-9][0-9]{0,3}$/;
 const SEASON_TEXT = /^[0-9]{4}-[0-9]{2}$/;
 
 const STANDINGS_PATH = /^\/api\/v1\/fpl\/standings\/([^/]+)$/;
@@ -107,7 +107,7 @@ function onlyParameters(searchParams, names) {
  * query exactly as written, gives { kind, ... }. Any other method on those paths gives a 405
  * refusal; every other path, id or query gives a 404 refusal. Only the URL is read.
  *
- * - /api/v1/fpl/standings/{league}?page={1..20} gives { kind: "standings", league, page }
+ * - /api/v1/fpl/standings/{league}?page={1..1000} gives { kind: "standings", league, page }
  * - /api/v1/fpl/entry/{entry}/bundle?gw={1..38} gives { kind: "bundle", entry, gameweek }
  * - /api/v1/fpl/live/{1..38} gives { kind: "live", gameweek }
  */

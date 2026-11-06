@@ -20,6 +20,40 @@
   overflow-wrap: anywhere;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pagination button,
+.pagination input {
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  color: inherit;
+  background: var(--color-surface);
+  font: inherit;
+  text-align: center;
+}
+
+.pagination input {
+  width: 76px;
+  font-family: var(--font-mono);
+}
+.pagination button {
+  cursor: pointer;
+}
+.pagination button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pagination input[aria-invalid="true"] {
+  border-color: var(--color-primary);
+}
+
 .table {
   width: 100%;
   table-layout: fixed;

@@ -93,7 +93,7 @@ describe("every answer", () => {
       "/api/v1/fpl/live/9",
       "/api/v1/fpl/nothing-here",
       "/api/v1/fpl/standings/abc?page=1",
-      "/api/v1/fpl/standings/314?page=21",
+      "/api/v1/fpl/standings/314?page=1001",
       "/api/v1/fpl/live/12",
     ];
     for (const path of paths) {
@@ -108,7 +108,7 @@ describe("every answer", () => {
     assert.equal(body.error, "method_not_allowed");
   });
 
-  it("refuses a path outside the allowlist, a non-numeric id and page 21 without asking anyone", async () => {
+  it("refuses a path outside the allowlist, a non-numeric id and page 1001 without asking anyone", async () => {
     const { get, upstream } = harness({});
     for (const path of [
       "/api/v1/fpl/bootstrap-static/",
@@ -116,7 +116,7 @@ describe("every answer", () => {
       "/api/v1/fpl/standings/abc?page=1",
       "/api/v1/fpl/entry/0/bundle?gw=10",
       "/api/v1/fpl/entry/-3/bundle?gw=10",
-      "/api/v1/fpl/standings/314?page=21",
+      "/api/v1/fpl/standings/314?page=1001",
       "/api/v1/fpl/live/0",
     ]) {
       const { response, body } = await get(path);
@@ -136,6 +136,20 @@ describe("every answer", () => {
 });
 
 describe("standings", () => {
+  it("reads and caches Turkey page 406 without fetching any intervening page", async () => {
+    const url = fpl(upstreamPaths.classicStandings(239, 406));
+    const { get, upstream } = harness({ [url]: standingsPage({ league: 239, page: 406, rows: 50 }) });
+    const first = await get("/api/v1/fpl/standings/239?page=406");
+    assert.equal(first.response.status, 200);
+    assert.equal(first.body.page, 406);
+    assert.equal(first.body.results.length, 50);
+    assert.deepEqual(problems(await contractFile("fpl_league_standings_v1.schema.json"), first.body), []);
+    const again = await get("/api/v1/fpl/standings/239?page=406");
+    assert.equal(again.response.headers.get(CACHE_HEADER), "hit");
+    assert.deepEqual(again.body, first.body);
+    assert.deepEqual(upstream.calls.map((call) => call.url), [url]);
+  });
+
   it("answers fpl_league_standings_v1 exactly as the committed examples show", async () => {
     const examples = await contractFile("fpl_league_standings_v1.examples.json");
     const schema = await contractFile("fpl_league_standings_v1.schema.json");
