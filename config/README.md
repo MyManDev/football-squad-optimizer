@@ -20,7 +20,9 @@ id to remove from the league list or the `--league` options the run was given.
 `menu` is `full` or `device`; omitting it keeps `full`. A device league publishes the
 standings, member squads, chip states and a device index without solving member advice.
 The weekly journal reports preparation, projection, member and publication timings for
-each league. League 352490 keeps its full menu during the transition.
+each league. League 352490 uses the device menu: members request a server or device
+calculation when needed. The weekly publication performs no per-member advice solves
+and writes no new baseline advice records; existing records remain intact.
 
 | Reader | How it reads the list |
 | --- | --- |
