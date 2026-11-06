@@ -23,8 +23,10 @@ from tests.unit.test_league_views import (
 )
 
 import squadopt.application.top100_weight as top100_module
+import squadopt.live.transfers as transfers_module
 from squadopt.application.advice import (
     TOP100_LIMIT,
+    TRACKED_MEMBER_LINEARIZATION_LEVEL,
     AdviseEntryRequest,
     advise_with_managers_word,
     advise_with_top100,
@@ -538,6 +540,56 @@ def test_with_the_word_the_price_is_the_pairs_and_the_word_still_binds(
     # The plain weighted document is untouched by the word.
     assert "evidence" not in advice.payload
     assert favoured  # the counts favoured someone
+
+
+@pytest.mark.parametrize("level", [None, TRACKED_MEMBER_LINEARIZATION_LEVEL])
+def test_every_plan_compared_with_the_control_is_solved_at_the_controls_level(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch, level: int | None
+) -> None:
+    """The weighted plan, the re-solves under the manager's word and the word's own
+    document follow the level of the control they are compared with, so ``changed``,
+    the price and each move's reason never compare two solver settings."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    picks = _member_picks(world, 101, squad)
+    provider = _Provider({101: picks})
+    control = solve_member_control(picks, inputs, projection, rules, linearization_level=level)
+    assert control.linearization_level == level
+    words = _words(int(control.plan.weeks[0].captain["player_id"]))
+    levels: list[int | None] = []
+    original = transfers_module.optimize_transfer_plan
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        levels.append(kwargs.get("linearization_level"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(transfers_module, "optimize_transfer_plan", spy)
+    advice = advise_with_top100(
+        _request(),
+        weight=50,
+        counts=_counts(PREFERRED),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        control=control,
+        words=words,
+    )
+    word = advise_with_managers_word(
+        _request(),
+        words=words,
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        control=control,
+    )
+    assert advice.word_payload is not None
+    assert word["evidence"]["binding"] is True  # type: ignore[index,call-overload]
+    # The weighted plan, its re-solve under the word, the control's re-solve under the
+    # word (the pair's ``changed``) and the word document's own re-solve.
+    assert levels == [level] * 4
 
 
 def test_a_setting_priced_against_an_unproven_control_publishes_no_ceiling(

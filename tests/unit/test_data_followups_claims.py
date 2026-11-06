@@ -595,20 +595,26 @@ def test_the_weekly_run_builds_the_panel_in_the_stages_item_7_names() -> None:
         for stage in stages
         if (count := builds.count((module, f"WeeklyOperations.{stage}"))) > 0
     }
-    # The league stage builds once per league of the list; the scan counts a loop whose
-    # body builds as more than once (2), and the item says "once per league".
-    assert building == {"_capture": 1, "_handoff": 2, "_league": 2}
+    # One baseline batch precedes the per-league builds. The scan represents a loop's
+    # repeated body by two; the text states the actual per-league count.
+    assert building == {"_capture": 1, "_handoff": 2, "_league": 3}
 
     item = _item("7")
     for phrase in (
-        "(`platform/weekly_operations.py`) builds it up to four times in its own process "
+        "(`platform/weekly_operations.py`) builds it up to five times in its own process "
         "for a one-league list",
         "once in the capture stage",
         "twice in the handoff stage",
         "once per league in the league stage's parent",
+        "once for the shared baseline batch when recording is enabled",
         "No other stage builds one",
     ):
         assert phrase in item, f"Item 7 must say how the weekly run builds the panel: {phrase!r}."
+    # The item's conclusion counts the same builds.
+    conclusion = (
+        "a weekly run makes at most five in its own process (four without advice recording)"
+    )
+    assert conclusion in item, f"Item 7's conclusion must count the builds: {conclusion!r}."
 
 
 def test_the_scan_counts_a_method_and_follows_self_within_its_class() -> None:
