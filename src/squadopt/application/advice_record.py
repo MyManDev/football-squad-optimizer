@@ -92,6 +92,7 @@ from squadopt.live.transfers import MEMBER_PLANNING_POLICY, MEMBER_PLANNING_POLI
 #: stated nothing, so its absence marks an older record rather than an empty value. How an
 #: older record is read is in :func:`build_member_advice_record`.
 MEMBER_ADVICE_RECORD_CONTRACT_VERSION: Final = "member_advice_record_v2"
+MEMBER_BASELINE_RECORD_CONTRACT_VERSION: Final = "member_baseline_record_v1"
 
 #: What the record's player ids are. Everything the projection, the prices and the picks
 #: provider publish is the FPL **element code** — the identifier that survives a transfer
@@ -391,7 +392,7 @@ def _moves(payload: Mapping[str, object]) -> list[dict[str, object]]:
 
 
 def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
-    """One published document, reduced to scoring facts plus publication evidence."""
+    """Scoring facts plus the address and digest of the exact published bytes."""
     return {
         **scoring_document(
             advice.payload,
@@ -588,6 +589,85 @@ def build_member_advice_record(
             f"Entry {picks.entry_id} published no advice documents; a record of nothing "
             "would say a member was advised when they were not."
         )
+    return {
+        **_member_record(
+            picks,
+            projection,
+            [_advice_document(advice) for advice in published],
+            capture=capture,
+            generated_at_utc=generated_at_utc,
+            transfer_config_fingerprint=transfer_config_fingerprint,
+            commit=commit,
+        ),
+        "contract_version": MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
+        "league_id": int(league_id),
+        "league_view_contract_version": league_view_contract_version,
+        "told": dict(told) if told is not None else None,
+        "suggested_strategy": dict(suggested_strategy) if suggested_strategy is not None else None,
+        **({"chip_forecast": _published_forecast(published_index)} if published_index else {}),
+    }
+
+
+def build_member_baseline_record(
+    picks: EntryPicks,
+    projection: Projection,
+    payload: Mapping[str, object],
+    *,
+    capture: RecordCapture,
+    generated_at_utc: str,
+    transfer_config_fingerprint: str | None = None,
+    commit: str | None = None,
+) -> dict[str, object]:
+    """Record one server-solved one-week baseline without claiming page publication.
+
+    League identity belongs to the page envelope. It cannot change the entry's
+    baseline or its digest when the same entry belongs to several tracked leagues.
+    Legacy publication records remain readable and are never migrated in place.
+    """
+    if (payload.get("entry_id"), payload.get("season"), payload.get("gameweek")) != (
+        picks.entry_id,
+        picks.season,
+        picks.gameweek + 1,
+    ):
+        raise AdviceRecordError("The baseline does not identify the recorded member and week.")
+    if (
+        payload.get("mode") != "saf-puan"
+        or type(payload.get("window")) is not int
+        or payload.get("window") != 1
+        or payload.get("source_snapshot_id") != capture.snapshot_id
+    ):
+        raise AdviceRecordError("The baseline must identify one week and the recorded capture.")
+    if any(key in payload for key in ("evidence", "top100", "preferences", "plan_weeks")):
+        raise AdviceRecordError("A baseline must be the unweighted one-week server answer.")
+    independent = {key: value for key, value in payload.items() if key != "league_id"}
+    document = scoring_document(independent, strategy="saf-puan", window=1, rival_entry_id=None)
+    if not document["scoring_complete"]:
+        raise AdviceRecordError("A baseline must contain the complete starting side and bench.")
+    return {
+        **_member_record(
+            picks,
+            projection,
+            [document],
+            capture=capture,
+            generated_at_utc=generated_at_utc,
+            transfer_config_fingerprint=transfer_config_fingerprint,
+            commit=commit,
+        ),
+        "contract_version": MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
+        "source": "server_one_week_baseline",
+    }
+
+
+def _member_record(
+    picks: EntryPicks,
+    projection: Projection,
+    documents: list[dict[str, object]],
+    *,
+    capture: RecordCapture,
+    generated_at_utc: str,
+    transfer_config_fingerprint: str | None,
+    commit: str | None,
+) -> dict[str, object]:
     if picks.source_snapshot_id is not None and picks.source_snapshot_id != capture.snapshot_id:
         raise AdviceRecordError(
             f"Entry {picks.entry_id}'s picks were read from capture "
@@ -596,13 +676,11 @@ def build_member_advice_record(
             "from, or the record is filed under a publish that never happened."
         )
     named: set[int] = set(int(player) for player in picks.squad)
-    documents = [_advice_document(advice) for advice in published]
     for document in documents:
         named |= _player_ids(document)
     players, unresolved = _players_block(projection, named)
     diagnostics = projection.diagnostics
     return {
-        "contract_version": MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
         "season": picks.season,
         # The week the advice is *for*: the picks are the week before it.
         "gameweek": int(picks.gameweek) + 1,
@@ -611,16 +689,8 @@ def build_member_advice_record(
         # document as well as in the path so a file that has been moved still says which
         # publish it is, and so the reader can order publishes without parsing a path.
         "capture": capture.to_document(),
-        "league_id": int(league_id),
         "generated_at_utc": generated_at_utc,
-        "league_view_contract_version": league_view_contract_version,
         "player_id_space": PLAYER_ID_SPACE,
-        "told": dict(told) if told is not None else None,
-        # The rule's pick, kept apart from ``told``: the page labels it and does not open
-        # on it. Always written, so an absent key means an older record, never "no pick".
-        "suggested_strategy": (
-            dict(suggested_strategy) if suggested_strategy is not None else None
-        ),
         # The state the advice was computed from. Without it a review page cannot tell a
         # member who ignored the advice from one who could not afford it, or read a plan
         # that spent a second free transfer the source never proved they had.
@@ -685,7 +755,6 @@ def build_member_advice_record(
         # them. Listing the ids keeps the gap visible instead of silently shortening a map.
         "unresolved_player_ids": unresolved,
         "advice": documents,
-        **({"chip_forecast": _published_forecast(published_index)} if published_index else {}),
     }
 
 
@@ -1105,7 +1174,12 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
         landed = False
         try:
             Path(addressable(staging / RECORD_FILE)).write_bytes(payload)
-            write_manifest(staging, contract_version=MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
+            write_manifest(
+                staging,
+                contract_version=str(
+                    record.get("contract_version", MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
+                ),
+            )
             verify_manifest(staging)
             # One rename: the record exists complete or does not exist at all. Windows
             # refuses that rename while anything still holds a handle on the bytes written
@@ -1154,6 +1228,7 @@ __all__: tuple[str, ...] = (
     "PublishedAdvice",
     "RecordCapture",
     "build_member_advice_record",
+    "build_member_baseline_record",
     "encode_record",
     "entry_directory",
     "load_member_advice_record",

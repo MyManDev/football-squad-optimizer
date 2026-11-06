@@ -1,0 +1,15 @@
+# Starts squadopt-backend-release.service when the release chain leaves a request in the spool:
+# once a scheduled run's release is live, `squadopt.platform.weekly_release` (as squadopt)
+# writes one JSON request there, and the service moves the advice backend to that release as
+# root (#1243, 6605005485). backend.sh installs and enables it; a request is written under a
+# name that does not end in .json and renamed when complete, so a half-written one never
+# starts the service.
+[Unit]
+Description=SquadOpt: a released week waits for the advice backend to move to it
+
+[Path]
+PathExistsGlob=/srv/squadopt/spool/backend/*.json
+Unit=squadopt-backend-release.service
+
+[Install]
+WantedBy=multi-user.target

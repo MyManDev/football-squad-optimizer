@@ -479,6 +479,47 @@ def assert_early_refusal(
     assert not list(request.out_dir.parent.glob("settled-*"))
 
 
+@pytest.mark.parametrize(
+    "change",
+    [{"season": "2025-26"}, {"gameweek": 6}, {"league_id": 7}],
+    ids=["season", "gameweek", "league"],
+)
+def test_only_the_approved_week_of_the_legacy_league_is_published(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: dict[str, object]
+) -> None:
+    request = world(tmp_path)
+    # Unnamed, the league is the one the league list marks as keeping the legacy records.
+    assert request.league_id == 352490
+    assert_early_refusal(
+        replace(request, **change), monkeypatch, "limited to 2026-27 GW5, league 352490"
+    )
+
+
+def test_the_approved_league_is_the_one_the_league_list_marks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listed = {"contract_version": "league_list_v1", "leagues": [{"league_id": 7}]}
+    (tmp_path / "config").mkdir()
+    monkeypatch.chdir(tmp_path)
+    arguments = (
+        tmp_path / "accepted",
+        tmp_path / "snapshots",
+        "capture",
+        tmp_path / "registry.json",
+        tmp_path / "records",
+        tmp_path / "ledger",
+        tmp_path / "out",
+        SEASON,
+        5,
+    )
+    (tmp_path / "config/leagues.json").write_text(json.dumps(listed), encoding="utf-8")
+    with pytest.raises(DataError, match="marks no league"):
+        publication.SettledPublicationRequest(*arguments)
+    listed["leagues"][0]["legacy_advice_records"] = True
+    (tmp_path / "config/leagues.json").write_text(json.dumps(listed), encoding="utf-8")
+    assert publication.SettledPublicationRequest(*arguments).league_id == 7
+
+
 def test_unfinished_week_refuses_before_work(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

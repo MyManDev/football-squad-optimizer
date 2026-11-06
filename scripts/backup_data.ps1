@@ -17,7 +17,9 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $repo 'data'
-$trees = @('snapshots', 'ledger', 'handoffs', 'advice_records', 'entries', 'benchmark_v2_captures')
+$trees = @('snapshots', 'ledger', 'handoffs', 'advice_records', 'entries', 'benchmark_v2_captures', 'member_baselines')
+# Optional: created by the first run that writes into them, so a checkout from before has none.
+$optionalTrees = @('benchmark_v2_captures', 'member_baselines')
 $skippedTransient = New-Object 'Collections.Generic.List[string]'
 
 function File-Hash([string]$path) {
@@ -44,7 +46,7 @@ function Is-Within([string]$path, [string]$root) {
         $path.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
 }
 function Manifest-Path([string]$root, [string]$relative) {
-    if ($relative -notmatch '^(snapshots|ledger|handoffs|advice_records|entries|benchmark_v2_captures)/' -or
+    if ($relative -notmatch '^(snapshots|ledger|handoffs|advice_records|entries|benchmark_v2_captures|member_baselines)/' -or
         $relative.Split('/') -contains '..' -or $relative.Contains('\')) {
         throw 'Invalid relative path in manifest.'
     }
@@ -64,7 +66,7 @@ function Source-Files {
         $root = Join-Path $source $tree
         Assert-NoLinks $root
         if (-not (Test-Path -LiteralPath $root -PathType Container)) {
-            if ($tree -eq 'benchmark_v2_captures') { continue }
+            if ($optionalTrees -contains $tree) { continue }
             throw "Missing source tree: $tree"
         }
         $pending = New-Object 'Collections.Generic.Stack[string]'
