@@ -56,6 +56,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[api,dev]"
 
+      - name: Weekly runtime without API or development extras
+        if: matrix.python-version == '3.13'
+        run: |
+          python -m venv "$RUNNER_TEMP/squadopt-weekly-runtime"
+          "$RUNNER_TEMP/squadopt-weekly-runtime/bin/python" -m pip install -c constraints.txt ".[llm]"
+          "$RUNNER_TEMP/squadopt-weekly-runtime/bin/python" -I -c \
+            "import squadopt.platform.weekly_operations, squadopt.platform.weekly_schedule, squadopt.platform.weekly_release"
+
       - name: Ruff lint
         run: python -m ruff check .
 
