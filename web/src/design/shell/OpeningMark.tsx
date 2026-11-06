@@ -1,0 +1,102 @@
+import { useEffect, useState } from "react";
+import "@fontsource/allura/latin-400.css";
+
+import { MOTION_MS, prefersReducedMotion } from "../motion";
+import styles from "./OpeningMark.module.css";
+
+/** Set once the opening has played in this tab, so a reload or a new page does not replay it. */
+export const OPENING_STORAGE_KEY = "squadopt.openingShown";
+
+/** The opening's one clock: ten data-motion lengths, as `--opening-length` in the stylesheet. */
+export const OPENING_MS = MOTION_MS.data * 10;
+
+/**
+ * When the clock takes the cover off: a beat after its animations end, so they finish rather
+ * than being cancelled by the removal (a cancelled animation rejects its `finished` promise).
+ */
+export const OPENING_LEAVE_MS = OPENING_MS + MOTION_MS.ui;
+
+function shouldOpen(): boolean {
+  if (prefersReducedMotion()) return false;
+  try {
+    return window.sessionStorage.getItem(OPENING_STORAGE_KEY) === null;
+  } catch {
+    /* Storage may be unavailable; the opening then plays on each load of the site. */
+    return true;
+  }
+}
+
+/**
+ * The brand's opening, once per tab: the two bars stand side by side, red on the left and
+ * green on the right, then turn a quarter clockwise into the SquadOpt mark (red over green)
+ * beside SquadOpt. The maker's signature sits in the lower right as the cover fades.
+ *
+ * A click dismisses the cover without activating the obscured page. Keyboard input removes
+ * it too, preserving activation of an already focused control. It is hidden from assistive
+ * technology and never shows under the reduced-motion preference.
+ */
+export function OpeningMark() {
+  const [open, setOpen] = useState(shouldOpen);
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(OPENING_STORAGE_KEY, "1");
+    } catch {
+      /* Nothing to remember it in; see shouldOpen. */
+    }
+    // The cover leaves when its fade ends; a page that draws no frames (a hidden tab) sends
+    // no animationend, so the clock takes it off as well.
+    const timer = window.setTimeout(() => setOpen(false), OPENING_LEAVE_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.key === "Shift") return;
+      setOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
+    const edited = () => setOpen(false);
+    document.addEventListener("keydown", dismiss, true);
+    document.addEventListener("input", edited, true);
+    return () => {
+      document.removeEventListener("keydown", dismiss, true);
+      document.removeEventListener("input", edited, true);
+    };
+  }, [open]);
+  if (!open) return null;
+  return (
+    <div
+      className={styles.cover}
+      aria-hidden="true"
+      data-opening-mark=""
+      onPointerDown={(event) => event.preventDefault()}
+      onTouchEnd={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(false);
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        setOpen(false);
+      }}
+      onAnimationEnd={(event) => {
+        if (event.target === event.currentTarget) setOpen(false);
+      }}
+    >
+      <div className={styles.signature}>
+        <span className={styles.signatureName}>MyManDev</span>
+        <span className={styles.signatureLine}>Still Building</span>
+      </div>
+      <div className={styles.brand}>
+        <svg className={styles.mark} width="40" height="50" viewBox="0 0 16 20">
+          <rect x="0" y="0" width="16" height="9" rx="2" data-bar="out" />
+          <rect x="0" y="11" width="16" height="9" rx="2" data-bar="in" />
+        </svg>
+        <span className={styles.word}>SquadOpt</span>
+      </div>
+    </div>
+  );
+}

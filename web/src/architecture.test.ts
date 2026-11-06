@@ -132,9 +132,8 @@ const NAMED_VALIDATORS = new Set([
 const isValidator = (path: string): boolean =>
   /(^|\/)[^/]+Shape\.ts$/.test(path) || NAMED_VALIDATORS.has(path);
 
-/** Loaders fetch the published documents: each feature's `data.ts`, and the site client. */
-const isLoader = (path: string): boolean =>
-  /^features\/[^/]+\/data\.ts$/.test(path) || path === "data/client.ts";
+/** Loaders fetch the published documents: each feature's `data.ts`. */
+const isLoader = (path: string): boolean => /^features\/[^/]+\/data\.ts$/.test(path);
 
 /** The identity module's private files, pinned so a rename cannot drop one from rule 4. */
 const IDENTITY = "features/league/identity/";
@@ -183,7 +182,7 @@ function valueCycles(edges: readonly Edge[]): string[][] {
 describe("web architecture", () => {
   it("reads the production modules and resolves every relative import", () => {
     expect(PRODUCTION.length).toBeGreaterThan(100);
-    expect(PRODUCTION).toContain("data/client.ts");
+    expect(PRODUCTION).toContain("data/request.ts");
     expect(UNRESOLVED).toEqual([]);
   });
 
@@ -198,7 +197,6 @@ describe("web architecture", () => {
       "features/league/publicationShape.ts",
     ]);
     expect(PRODUCTION.filter(isLoader).sort()).toEqual([
-      "data/client.ts",
       "features/fixtures/data.ts",
       "features/league/data.ts",
     ]);

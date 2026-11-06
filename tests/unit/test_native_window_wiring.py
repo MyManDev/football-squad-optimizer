@@ -201,11 +201,17 @@ def test_the_api_advice_worker_binds_the_native_executor_and_logs_its_outcome(
     )
     assert accepted.status_code == 202, accepted.text
     fields: dict[str, object] = {}
+    progress: list[tuple[int, int]] = []
+
+    def record_progress(_job: Any, *, done: int, total: int) -> None:
+        progress.append((done, total))
+
     compute = advice_worker.build_advice_compute(
-        backend.contexts, backend.job_specs, job_log_fields=fields
+        backend.contexts, backend.job_specs, job_log_fields=fields, progress=record_progress
     )
     document = json.loads(compute(backend.queue.jobs()[0]))
     assert document["payload"]["window"] == 3
+    assert progress == [(0, 1), (1, 1)]
     assert recorder.calls, "the three-week answer never reached the native executor"
     # The job's terminal log event carries which backend answered and why; the answer
     # itself does not.

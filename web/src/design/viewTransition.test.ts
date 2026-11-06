@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MOTION_MS, REDUCED_MOTION_QUERY } from "./motion";
-import { crossfade } from "./viewTransition";
+import { arriveWithoutSnapshot, crossfade } from "./viewTransition";
 
 afterEach(() => vi.useRealTimers());
 
@@ -53,6 +53,20 @@ describe("the crossfade", () => {
     const update = vi.fn();
     crossfade(update, undefined, media(false), {} as Document);
     expect(update).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["AppleWebKit/605.1.15 Version/26.5 Safari/605.1.15", false],
+    ["AppleWebKit/605.1.15 CriOS/144.0 Mobile Safari/604.1", false],
+    ["AppleWebKit/537.36 Chrome/144.0.0.0 Safari/537.36", true],
+    ["Gecko/20100101 Firefox/146.0", true],
+  ])("keeps navigation working for %s", async (userAgent, native) => {
+    const { document, started } = transitions();
+    const update = vi.fn();
+    crossfade(update, undefined, { ...media(false), navigator: { userAgent } }, document);
+    await started[0];
+    expect(update).toHaveBeenCalledOnce();
+    expect(document.startViewTransition).toHaveBeenCalledTimes(native ? 1 : 0);
   });
 
   it("takes the new picture once the page says it is drawn", async () => {
@@ -143,20 +157,72 @@ describe("the crossfade", () => {
   });
 });
 
-describe("the crossfade's stylesheet", () => {
-  it("times the browser's crossfade with the card time and the motion easing", () => {
-    const css = readFileSync(join(__dirname, "transitions.css"), "utf-8");
-    expect(css).toMatch(
-      /::view-transition-old\(root\),\s*::view-transition-new\(root\)\s*\{[^}]*animation-duration: var\(--motion-ui\);[^}]*animation-timing-function: var\(--motion-ease\)/,
-    );
+describe("the live-DOM arrival", () => {
+  const webkit = {
+    ...media(false),
+    navigator: { userAgent: "AppleWebKit/605.1.15 Version/26.5 Safari/605.1.15" },
+  };
+
+  it("animates WebKit without taking snapshots and cancels when the page is left", async () => {
+    const { document } = transitions();
+    let reject: (reason: unknown) => void = () => {};
+    const finished = new Promise<void>((_, fail) => {
+      reject = fail;
+    });
+    const cancel = vi.fn(() => reject(new DOMException("Navigation", "AbortError")));
+    const animate = vi.fn(() => ({ finished, cancel }));
+    const main = { animate } as unknown as HTMLElement;
+    const dispose = arriveWithoutSnapshot(main, webkit, document);
+    expect(animate).toHaveBeenCalledOnce();
+    expect(document.startViewTransition).not.toHaveBeenCalled();
+    dispose?.();
+    await Promise.resolve();
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
-  it("times the group that holds the two pictures in the same rule", () => {
-    // Left out, the group keeps the browser's own quarter second and the step ends later
-    // than its fade.
+  it("adds no second animation beside native snapshots or under reduced motion", () => {
+    const { document } = transitions();
+    const animate = vi.fn();
+    const main = { animate } as unknown as HTMLElement;
+    arriveWithoutSnapshot(main, media(false), document);
+    arriveWithoutSnapshot(main, { ...webkit, ...media(true) }, document);
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("also works without the snapshot API and degrades to instant without animate", () => {
+    const animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }));
+    arriveWithoutSnapshot({ animate } as unknown as HTMLElement, media(false), {} as Document);
+    expect(animate).toHaveBeenCalledOnce();
+    expect(() =>
+      arriveWithoutSnapshot({} as HTMLElement, media(false), {} as Document),
+    ).not.toThrow();
+  });
+});
+
+describe("the page step's stylesheet", () => {
+  it("crossfades both pictures in the same page time", () => {
     const css = readFileSync(join(__dirname, "transitions.css"), "utf-8");
     expect(css).toMatch(
-      /::view-transition-group\(root\),\s*::view-transition-old\(root\),\s*::view-transition-new\(root\)\s*\{[^}]*animation-duration: var\(--motion-ui\);/,
+      /::view-transition-old\(root\)\s*\{\s*animation: page-leave var\(--motion-page\) var\(--motion-route-ease\) both;/,
+    );
+    expect(css).toMatch(
+      /::view-transition-new\(root\)\s*\{\s*animation: page-rise var\(--motion-page\) var\(--motion-route-ease\) both;/,
+    );
+    // Only opacity and transform move.
+    const frames = css.match(/@keyframes page-(?:leave|rise)\s*\{[\s\S]*?\n\}/g) ?? [];
+    expect(frames).toHaveLength(2);
+    for (const block of frames) {
+      const properties = [...block.matchAll(/^\s*([a-z-]+):/gm)].map((match) => match[1]);
+      for (const property of properties) expect(["opacity", "transform"]).toContain(property);
+    }
+  });
+
+  it("times the group that holds the two pictures with them", () => {
+    // Left out, the group keeps the browser's own quarter second and the step ends later
+    // than its motion.
+    const css = readFileSync(join(__dirname, "transitions.css"), "utf-8");
+    expect(css).toMatch(
+      /::view-transition-group\(root\)\s*\{[^}]*animation-duration: var\(--motion-page\);[^}]*animation-timing-function: var\(--motion-route-ease\)/,
     );
   });
 

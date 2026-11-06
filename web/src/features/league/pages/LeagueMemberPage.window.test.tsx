@@ -1,7 +1,6 @@
 /**
- * A three- or five-week window on the card: the first week's moves and lineup as before,
- * then one row per gameweek and the limits the producer states — as sentences the reader
- * can act on in either language, never as a promise about the later weeks.
+ * A three- or five-week window on the card: the first week's moves and lineup, then one row
+ * per gameweek. The limits the producer states stay in the document and off the page.
  */
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -68,7 +67,7 @@ describe("the advice card shows a window week by week", () => {
     expect(screen.getByRole("list", { name: MESSAGES.tr.squad.pitchLabel })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: MESSAGES.tr.leagueMembers.viewList }));
     expect(screen.getByRole("region", { name: "Bu haftaki kadron" })).toBeInTheDocument();
-    // The plan is FEASIBLE, and the page no longer says so.
+    // The plan is FEASIBLE, and the page does not say so.
     expect(screen.queryByText("Kanıt tamamlanamadı")).toBeNull();
   });
 

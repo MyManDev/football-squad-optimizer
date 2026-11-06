@@ -497,7 +497,7 @@ def advice_read_schema() -> dict[str, Any]:
                     "season": {"type": "string"},
                     "gameweek": {"type": "integer", "minimum": 1},
                     "entry_id": {"type": "integer", "minimum": 1},
-                    "league_id": {"type": "integer", "minimum": 1},
+                    "league_id": {"type": "integer", "minimum": 0},
                     "mode": {"type": "string"},
                     "window": {"type": "integer", "enum": list(MEMBER_WINDOWS)},
                     "moves": {

@@ -10,18 +10,15 @@ afterEach(() => vi.unstubAllGlobals());
 const document = () => structuredClone(fixture) as SuggestionHistory;
 
 describe("recorded weekly history", () => {
-  it("accepts optional archived plans and preserves absent settings and prices", () => {
+  it("accepts optional archived plans and preserves absent settings", () => {
     const value = document();
     Object.assign(value.payload.weeks[0], { recorded_plans: structuredClone(rows) });
     const plans = checkedHistory(value, 101).payload.weeks[0].recorded_plans!;
     expect(plans).toEqual(rows);
     expect(plans[0].top100_weight).toBeUndefined();
     expect(plans[0].managers_word).toBeUndefined();
-    expect(plans[0].expected_points_cost).toBe(0);
   });
   it.each([
-    { expected_points_cost: null },
-    { expected_points_cost: Infinity },
     { managers_word: false },
     { moves: [{ player_out: 12, player_in: null }] },
     { published_path: "advice/202/saf-puan/1.json" },
@@ -126,7 +123,11 @@ describe("recorded weekly history", () => {
     async (status) => {
       vi.stubGlobal(
         "fetch",
-        vi.fn().mockResolvedValue(new Response("<!doctype html><html></html>", { status })),
+        vi
+          .fn()
+          .mockImplementation(() =>
+            Promise.resolve(new Response("<!doctype html><html></html>", { status })),
+          ),
       );
       await expect(loadSuggestionHistory(exampleTree, 101)).rejects.toBeInstanceOf(
         LeagueDataMissing,
@@ -135,27 +136,169 @@ describe("recorded weekly history", () => {
   );
 
   it("fails broken JSON as unreadable, and reads valid published data without a fixture fallback", async () => {
-    const fetch = vi
+    const published = vi
       .fn()
       .mockResolvedValueOnce(new Response("{broken"))
       .mockResolvedValueOnce(new Response(JSON.stringify(fixture)));
+    const fetch = vi.fn((url: string) =>
+      url.includes("/requested/")
+        ? Promise.resolve(new Response("", { status: 404 }))
+        : published(),
+    );
     vi.stubGlobal("fetch", fetch);
     await expect(loadSuggestionHistory(exampleTree, 101)).rejects.toBeInstanceOf(LeagueDataError);
     await expect(loadSuggestionHistory(exampleTree, 101)).resolves.toEqual(fixture);
-    expect(fetch).toHaveBeenLastCalledWith(
+    expect(fetch).toHaveBeenCalledWith(
       "/data/league/history/101.json",
       expect.objectContaining({ cache: "no-cache" }),
     );
   });
 
   it("reads a league published under the directory at its own path", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture)));
+    const fetch = vi.fn((url: string) =>
+      Promise.resolve(
+        url.includes("/requested/")
+          ? new Response("", { status: 404 })
+          : new Response(JSON.stringify(fixture)),
+      ),
+    );
     vi.stubGlobal("fetch", fetch);
     const tree = createLeagueTree({ ...EXAMPLE_LEAGUE, path: "leagues/352490" });
     await expect(loadSuggestionHistory(tree, 101)).resolves.toEqual(fixture);
-    expect(fetch).toHaveBeenLastCalledWith(
+    expect(fetch).toHaveBeenCalledWith(
       "/data/leagues/352490/history/101.json",
       expect.objectContaining({ cache: "no-cache" }),
     );
+  });
+});
+
+describe("requested history beside weekly publications", () => {
+  const requested = (week = 5) => {
+    const value = document();
+    value.payload.weeks = [value.payload.weeks[0]];
+    Object.assign(value.payload.weeks[0], {
+      gameweek: week,
+      advice_source: "requested_server",
+      request_cache_key: "a".repeat(64),
+    });
+    return value;
+  };
+  const tree = (published: unknown, computed: unknown) => ({
+    league: EXAMPLE_LEAGUE,
+    raw: vi.fn(async (path: string) => {
+      const value = path.includes("/requested/") ? computed : published;
+      if (value instanceof Error) throw value;
+      return value;
+    }),
+  });
+
+  it("shows requested history when the entry never had a weekly publication", async () => {
+    const value = requested();
+    await expect(
+      loadSuggestionHistory(tree(new LeagueDataMissing("legacy"), value), 101),
+    ).resolves.toEqual(value);
+  });
+
+  it("adds new weeks and preserves every overlapping published week", async () => {
+    const published = document();
+    const computed = requested();
+    computed.payload.weeks.push(requested(4).payload.weeks[0]);
+    const loaded = await loadSuggestionHistory(tree(published, computed), 101);
+    expect(loaded.payload.weeks.map((week) => week.gameweek)).toEqual([5, 4]);
+    expect(loaded.payload.weeks.find((week) => week.gameweek === 4)).toEqual(
+      published.payload.weeks[0],
+    );
+    expect(published).toEqual(document());
+  });
+
+  const withoutRecord = () => {
+    const value = document();
+    Object.assign(value.payload.weeks[0], {
+      status: "unavailable",
+      reason: "no_pre_deadline_record",
+      advice_snapshot_id: null,
+      advice_captured_at_utc: null,
+      advice_generated_at_utc: null,
+      advice_sha256: null,
+      outcome_snapshot_id: null,
+      outcome_captured_at_utc: null,
+      expected_own_points: null,
+      suggested: null,
+      actual: null,
+      actual_reason: null,
+      net_difference: null,
+      players: [],
+    });
+    return value;
+  };
+
+  it("shows a requested plan when the weekly history explicitly has no record", async () => {
+    const published = withoutRecord();
+    const computed = requested(4);
+    const loaded = await loadSuggestionHistory(tree(published, computed), 101);
+    expect(loaded.payload.weeks).toEqual(computed.payload.weeks);
+    expect(published).toEqual(withoutRecord());
+  });
+
+  it.each(["invalid_record", "ambiguous_record", "not_published", "missing_outcomes"])(
+    "keeps a weekly refusal (%s) visible beside a requested plan",
+    async (reason) => {
+      const published = withoutRecord();
+      published.payload.weeks[0].reason = reason;
+      const loaded = await loadSuggestionHistory(tree(published, requested(4)), 101);
+      expect(loaded.payload.weeks).toEqual(published.payload.weeks);
+    },
+  );
+
+  it("does not discard recorded evidence just because its reason says no record", async () => {
+    const published = withoutRecord();
+    published.payload.weeks[0].advice_snapshot_id = "original-capture";
+    published.payload.weeks[0].advice_sha256 = "b".repeat(64);
+    const loaded = await loadSuggestionHistory(tree(published, requested(4)), 101);
+    expect(loaded.payload.weeks).toEqual(published.payload.weeks);
+  });
+
+  it("does not conceal malformed legacy evidence behind a requested result", async () => {
+    await expect(
+      loadSuggestionHistory(tree(new LeagueDataError("broken"), requested()), 101),
+    ).rejects.toBeInstanceOf(LeagueDataError);
+  });
+
+  it("does not claim a weekly document as a requested answer", async () => {
+    await expect(loadSuggestionHistory(tree(document(), document()), 101)).rejects.toBeInstanceOf(
+      LeagueDataError,
+    );
+  });
+
+  it("does not mix seasons", async () => {
+    const value = requested();
+    value.payload.season = "2025-26";
+    await expect(loadSuggestionHistory(tree(document(), value), 101)).rejects.toBeInstanceOf(
+      LeagueDataError,
+    );
+  });
+
+  it.each([
+    {},
+    { advice_source: "requested_server" },
+    { request_cache_key: "a".repeat(64) },
+    { advice_source: "device", request_cache_key: "a".repeat(64) },
+    { advice_source: "requested_server", request_cache_key: "bad" },
+  ])("requires complete requested provenance: %o", async (fields) => {
+    const value = document();
+    Object.assign(value.payload.weeks[0], fields);
+    await expect(
+      loadSuggestionHistory(tree(new LeagueDataMissing("legacy"), value), 101),
+    ).rejects.toBeInstanceOf(LeagueDataError);
+  });
+
+  it("forwards cancellation to both file reads", async () => {
+    const input = tree(document(), new LeagueDataMissing("requested"));
+    const options = { signal: new AbortController().signal };
+    await loadSuggestionHistory(input, 101, options);
+    expect(input.raw.mock.calls).toEqual([
+      ["history/101.json", options],
+      ["history/requested/101.json", options],
+    ]);
   });
 });

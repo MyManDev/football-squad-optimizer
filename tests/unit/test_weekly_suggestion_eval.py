@@ -139,14 +139,6 @@ def test_one_baseline_is_read_by_both_leagues(tmp_path: Path) -> None:
         )
 
 
-def test_baseline_cannot_carry_a_league_identity(tmp_path: Path) -> None:
-    record = recorded()
-    record["contract_version"] = MEMBER_BASELINE_RECORD_CONTRACT_VERSION
-    record_member_advice(tmp_path, record)
-    with pytest.raises(review.SuggestionEvaluationError, match="identity"):
-        choose(tmp_path)
-
-
 def _baseline(**kwargs: Any) -> dict[str, Any]:
     record = recorded(**kwargs)
     del record["league_id"]
@@ -155,6 +147,32 @@ def _baseline(**kwargs: Any) -> dict[str, Any]:
         source="server_one_week_baseline",
     )
     return record
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        pytest.param({"league_id": 352490}, id="league"),
+        pytest.param({"season": "2025-26"}, id="season"),
+        pytest.param({"gameweek": 5}, id="gameweek"),
+        pytest.param({"entry_id": 102}, id="entry"),
+        pytest.param({"player_id_space": "fpl_element_id"}, id="player-id-space"),
+        pytest.param({"source": "published_menu"}, id="source"),
+    ],
+)
+def test_a_baseline_wrong_in_one_identity_is_refused(tmp_path: Path, fault: dict[str, Any]) -> None:
+    """A record that is a sound baseline but for one identity, filed where member 101's
+    gameweek 4 is read, is refused rather than read as that member-week's baseline."""
+    record = {**_baseline(), **fault}
+    # Filed by its own fields, then moved to the requested member-week: the reader, not the
+    # path, has to see the fault.
+    record_member_advice(tmp_path / "filed", record)
+    filed = next((tmp_path / "filed").glob("*/gw*/entry-*/capture-a"))
+    requested = tmp_path / "records" / SEASON / "gw04" / "entry-101" / "capture-a"
+    requested.parent.mkdir(parents=True)
+    filed.rename(requested)
+    with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+        choose(tmp_path / "records")
 
 
 def test_dual_stores_keep_the_original_digest_and_serve_the_second_league(tmp_path):
@@ -1053,6 +1071,49 @@ def test_a_member_week_holding_no_record_is_the_recording_leagues_week(
         assert weeks == [] and other_league_weeks == {(101, 3), (101, 4)}
 
 
+def test_the_recording_league_and_the_readers_default_come_from_the_league_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No league id is written into the code: marking another league in the list moves the
+    empty week and the readers' default league with it."""
+    anchor = week_without_a_record(tmp_path)
+    listed = {
+        "contract_version": "league_list_v1",
+        "leagues": [{"league_id": 352490}, {"league_id": 755941, "legacy_advice_records": True}],
+    }
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "leagues.json").write_text(json.dumps(listed), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    walked = {
+        league_id: [
+            (week.gameweek, week.reason)
+            for week in review.review_member_weeks(
+                record_root=tmp_path / "records",
+                snapshot_root=tmp_path / "snapshots",
+                as_of_snapshot=anchor,
+                season=SEASON,
+                league_id=league_id,
+                entry_ids=[101],
+                published=shown_everywhere([101], (3, 4)),
+            )[101]
+        ]
+        for league_id in (352490, 755941)
+    }
+    # League 352490 keeps the week its record names; the week holding none is now 755941's.
+    assert walked == {352490: [(4, None)], 755941: [(3, "no_pre_deadline_record")]}
+    # Unnamed, a reader's league is the marked one, so 352490's record is another league's.
+    with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+        review.select_record(
+            tmp_path / "records", season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
+        )
+    del listed["leagues"][1]["legacy_advice_records"]
+    (tmp_path / "config" / "leagues.json").write_text(json.dumps(listed), encoding="utf-8")
+    with pytest.raises(review.SuggestionEvaluationError, match="name the league"):
+        review.select_record(
+            tmp_path / "records", season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
+        )
+
+
 def test_the_public_readers_still_refuse_another_leagues_record(tmp_path: Path) -> None:
     """Only the history walk leaves another league's weeks out. A direct reader, such as a
     measurement script, refuses another league's record and reads a week holding no record
@@ -1470,10 +1531,10 @@ def check_contract(document: dict[str, Any]) -> None:
 def reader_keys(histories: Sequence[Path]) -> list[str]:
     """Rebuild the reader's record keys from the published bytes, the way it spells them.
 
-    ``web/src/features/league/history/liveSeries.ts`` keeps an available week that has a
-    suggestion, an actual score and a difference, and names it entry, gameweek, advice digest,
-    outcome capture. This walks the published documents rather than the reviews behind them,
-    so the comparison covers what a browser would actually receive.
+    A reader keeps an available week that has a suggestion, an actual score and a difference,
+    and names it entry, gameweek, advice digest, outcome capture. This walks the published
+    documents rather than the reviews behind them, so the comparison covers what a browser
+    would actually receive.
     """
     keys = []
     for path in histories:

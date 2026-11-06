@@ -56,15 +56,10 @@ export function raceScoreboard(weeks: ScoreboardGameweek[]): Scoreboard {
     captured_at_utc: "2026-10-01T00:00:00Z",
     cohort_snapshot_id: null,
     cohort_picks_snapshot_id: null,
-    registered_members: 3,
-    histories_held: 3,
     gameweeks: weeks,
     cumulative: {
       through_gameweek: null,
       gameweeks: [],
-      ours_net: null,
-      ours_gameweeks: [],
-      ours_basis: null,
     } as unknown as Scoreboard["cumulative"],
   };
 }

@@ -7,10 +7,6 @@ import type { EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
 import { duelOf, type DuelSide } from "./duelSides";
 import styles from "./RivalDuel.module.css";
 
-function nameOf(entry: { team_name: string | null; manager_name: string | null }, id: number) {
-  return entry.team_name ?? entry.manager_name ?? `#${id}`;
-}
-
 function Side({
   side,
   title,
@@ -23,10 +19,16 @@ function Side({
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
-  const position = (code: string) =>
-    Object.hasOwn(messages.positions, code)
-      ? messages.positions[code as keyof typeof messages.positions]
-      : code;
+  // The row leads with the short code, as the week's list does: the full word does not fit
+  // the code's column. The word stays for a screen reader.
+  const code = (position: string) =>
+    Object.hasOwn(messages.positionCodes, position)
+      ? messages.positionCodes[position as keyof typeof messages.positionCodes]
+      : position;
+  const word = (position: string) =>
+    Object.hasOwn(messages.positions, position)
+      ? messages.positions[position as keyof typeof messages.positions]
+      : position;
   return (
     <section className={styles.side} aria-labelledby={titleId}>
       <h3 className={styles.sideTitle} id={titleId}>
@@ -44,7 +46,10 @@ function Side({
               className={styles.player}
               data-shared={both ? "" : undefined}
             >
-              <span className={styles.position}>{position(player.position)}</span>
+              <span className={styles.position}>
+                <span aria-hidden="true">{code(player.position)}</span>
+                <span className="visually-hidden">{word(player.position)}</span>
+              </span>
               <span className={styles.name}>{player.short_name || player.name}</span>
               {player.is_captain ? (
                 <>
@@ -86,7 +91,7 @@ export function RivalDuel({
   candidates: EntryView[];
   selected: number | null;
   rival: LeagueViewEnvelope<EntrySquad> | null;
-  issue?: "loading" | "missing" | "unreadable";
+  issue?: "loading" | "unreadable";
   onSelect: (entryId: number) => void;
 }) {
   const { locale, messages } = useLanguage();
@@ -94,6 +99,8 @@ export function RivalDuel({
   const pickId = useId();
   const duel = rival ? duelOf(squad, rival) : null;
   const own = squad.payload.entry;
+  const nameOf = (entry: { team_name: string | null; manager_name: string | null }) =>
+    entry.team_name ?? entry.manager_name ?? copy.unknownTeam;
 
   return (
     <div className={styles.duel}>
@@ -110,22 +117,20 @@ export function RivalDuel({
               aria-pressed={member.entry_id === selected}
               onClick={() => onSelect(member.entry_id!)}
             >
-              {nameOf(member, member.entry_id)}
+              {nameOf(member)}
             </button>
           ),
         )}
       </div>
       {selected === null ? null : issue === "loading" ? (
         <p className={styles.state}>{copy.duelLoading}</p>
-      ) : issue === "missing" ? (
-        <p className={styles.state}>{copy.duelMissing}</p>
       ) : issue === "unreadable" ? (
         <p className={styles.state}>{copy.duelUnreadable}</p>
       ) : !rival ? null : !duel ? (
-        <p className={styles.state}>{copy.duelMissing}</p>
+        <p className={styles.state}>{copy.duelUnreadable}</p>
       ) : (
         <div className={styles.board} data-duel={duel.rival.entryId}>
-          <Side side={duel.member} title={nameOf(own, own.entry_id)} shared={duel.shared} />
+          <Side side={duel.member} title={nameOf(own)} shared={duel.shared} />
           <dl className={styles.strip}>
             <div className={styles.headline}>
               <dt>{copy.duelDifference}</dt>
@@ -153,11 +158,7 @@ export function RivalDuel({
               <dd>{copy.duelShared(duel.shared.size)}</dd>
             </div>
           </dl>
-          <Side
-            side={duel.rival}
-            title={nameOf(rival!.payload.entry, duel.rival.entryId)}
-            shared={duel.shared}
-          />
+          <Side side={duel.rival} title={nameOf(rival!.payload.entry)} shared={duel.shared} />
         </div>
       )}
     </div>

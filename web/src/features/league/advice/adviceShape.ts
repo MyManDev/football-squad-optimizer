@@ -378,7 +378,7 @@ export function isAdvicePayload(value: unknown): boolean {
   return fields(
     value,
     {
-      league_id: identity,
+      league_id: integer,
       season: text,
       gameweek: identity,
       entry_id: identity,

@@ -90,7 +90,8 @@ class AdviceJobSpec:
             ("entry_id", self.entry_id),
             ("window", self.window),
         ):
-            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            minimum = 0 if label == "league_id" else 1
+            if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
                 raise AdviceJobSpecError(f"{label} must be a positive integer.")
         if not isinstance(self.strategy, str) or not self.strategy.strip():
             raise AdviceJobSpecError("strategy must be non-empty text.")

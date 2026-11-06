@@ -6,6 +6,7 @@ import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import { exampleTree } from "../../../testSupport/league";
 import { LeagueDataMissing } from "../data";
 import { AdviceResponseError } from "./adviceResponse";
+import { adviceRequestKey } from "./adviceJobStore";
 import {
   createAdviceClient,
   AdviceApiError,
@@ -101,6 +102,31 @@ describe("StaticOnlyAdviceClient", () => {
 });
 
 describe("HttpAdviceClient", () => {
+  it.each([239, 0])(
+    "addresses public league %s separately for reads, writes and resume",
+    async (leagueId) => {
+      const transport = vi.fn(async (_url: string, init?: RequestInit) =>
+        init?.method === "POST"
+          ? jsonResponse(202, { job_id: "public-1", status: "queued" })
+          : jsonResponse(404, { error: { code: "NOT_COMPUTED" } }),
+      );
+      const client = new HttpAdviceClient("https://api.example", transport);
+      const selected = { ...REQUEST, leagueId, publicEntry: true };
+      await client.readAdvice(selected);
+      await client.requestAdvice(selected, { idempotencyKey: "one-click" });
+      for (const [url] of transport.mock.calls)
+        expect(url).toBe(
+          `https://api.example/api/v1/public/leagues/${leagueId}/entries/${REQUEST.entryId}/advice?strategy=saf-puan&window=1`,
+        );
+      expect(adviceRequestKey(selected)).not.toBe(
+        adviceRequestKey({ ...selected, publicEntry: false }),
+      );
+      expect(transport.mock.calls[1]![1]?.headers).toMatchObject({
+        "Idempotency-Key": "one-click",
+      });
+    },
+  );
+
   it("carries the football identity in GET and POST without a published fallback", async () => {
     const transport = vi.fn(async (_url: string, init?: RequestInit) =>
       init?.method === "POST"
@@ -140,7 +166,11 @@ describe("HttpAdviceClient", () => {
     try {
       const client = new HttpAdviceClient("https://api.example");
       expect((await client.readAdvice(REQUEST)).kind).toBe("advice");
-      expect(await client.requestAdvice(REQUEST)).toEqual({ kind: "job", jobId: "job-1" });
+      expect(await client.requestAdvice(REQUEST)).toEqual({
+        kind: "job",
+        jobId: "job-1",
+        status: "queued",
+      });
       expect(await client.readJob("job-1")).toEqual({ jobId: "job-1", status: "completed" });
       expect(browserFetch).toHaveBeenCalledTimes(3);
     } finally {

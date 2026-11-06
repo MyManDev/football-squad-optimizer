@@ -80,6 +80,9 @@ export function DecisionPreferencesPanel({
     });
     return () => controller.abort();
   }, [available, squad.season]);
+  // With no service to take them every control would sit disabled, so no card is drawn. A
+  // link that carries preferences keeps it: they can still be read and cleared.
+  if (!available && selected.valid && !selected.value) return null;
   function update(patch: Partial<DecisionPreferences>) {
     const next = new URLSearchParams(params);
     const value = checkedPreferences({ ...preferences, ...patch });
@@ -109,16 +112,9 @@ export function DecisionPreferencesPanel({
     <Card title={tr ? "Karar tercihlerim" : "My decision preferences"}>
       <p>
         {tr
-          ? "Bu kurallar seçtiğiniz 1, 3 veya 5 haftanın tamamında geçerlidir; çözücü bu sınırlar içinde karar verir."
-          : "These constraints apply throughout the selected 1, 3 or 5 weeks; the optimizer decides within these limits."}
+          ? "Bu kurallar seçtiğiniz 1, 3 veya 5 haftanın tamamında geçerlidir."
+          : "These constraints apply throughout the selected 1, 3 or 5 weeks."}
       </p>
-      {!available && (
-        <p>
-          {tr
-            ? "Tercihli hesaplama bu veri çekimi için henüz kullanılabilir değil."
-            : "Preference computation is not available for this capture."}
-        </p>
-      )}
       {unknownHeld && (
         <p role="alert">
           {tr
@@ -225,11 +221,7 @@ export function DecisionPreferencesPanel({
           </select>
         </label>
         {catalogFailed && (
-          <p role="status">
-            {tr
-              ? "Oyuncu listesi yüklenemedi. Kadroda tut ve kaynak tercihleri kullanılabilir."
-              : "Player list unavailable. Keep and resource preferences remain available."}
-          </p>
+          <p role="status">{tr ? "Oyuncu listesi yüklenemedi." : "Player list unavailable."}</p>
         )}
         {(["keep_players", "avoid_players"] as const).map((key) => (
           <ul key={key}>

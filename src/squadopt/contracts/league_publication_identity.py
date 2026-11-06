@@ -9,7 +9,8 @@ from typing import Any
 IDENTITY_FILE = "publication-identity.json"
 IDENTITY_VERSION = "league_publication_identity_v1"
 _PATH = re.compile(
-    r"members\.json|entries/[1-9][0-9]*\.json|history/[1-9][0-9]*\.json|scoreboard\.json|series-horizon\.json"
+    r"members\.json|entries/[1-9][0-9]*\.json|history/(?:requested/)?[1-9][0-9]*\.json"
+    r"|scoreboard\.json|series-horizon\.json"
 )
 
 

@@ -27,7 +27,11 @@ from squadopt.application.advice_record import (
     recorded_captures,
 )
 from squadopt.application.settled_member import ActualMemberDetails, settled_member_details
-from squadopt.contracts.legacy_publication_config import LEGACY_ADVICE_LEAGUE_ID
+from squadopt.contracts.league_list import (
+    LEAGUE_LIST_FILE,
+    LeagueListError,
+    parse_legacy_record_league,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import (
@@ -66,13 +70,10 @@ from squadopt.evaluation.scoring import score_frozen_squad_decision
 from squadopt.live.recommendation import infer_season
 
 CONTRACT_VERSION = "weekly_suggestion_history_v1"
-# Kept for older measurement entry points; every reader accepts an explicit league.
-SUPPORTED_LEAGUE_ID = LEGACY_ADVICE_LEAGUE_ID
 
-# The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. The reader
-# rejects the whole document when any one of these disagrees with the scoreboard it is shown
-# beside, and reports no reason for the rejection, so each constant is the contract's own
-# spelling rather than a description of it.
+# The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. A reader has
+# to reject the whole document when any one of these disagrees with the scoreboard, so each
+# constant is the contract's own spelling rather than a description of it.
 MEMBER_WEEK_HORIZON_CONTRACT_VERSION: Final = "member_week_horizon_v1"
 SERIES_HORIZON_FILE: Final = "series-horizon.json"
 # The contract fixes these two. They are promises about what produced the numbers, so the
@@ -82,12 +83,45 @@ CONTRACT_SCORING_BASIS: Final = ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2.value
 CONTRACT_POPULATION: Final = "recorded_member_suggestions_vs_actual"
 _MEASUREMENT_ARTIFACT = re.compile(r"docs/[a-z0-9_-]+\.json")
 # A recorded advice digest is a lowercase sha256 hexdigest. Checking it here rather than
-# trusting it keeps a malformed key out of a set the reader compares for exact equality.
+# trusting it keeps a malformed key out of a set a reader has to compare for exact equality.
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 
 class SuggestionEvaluationError(DataError):
     """A historical result cannot be supported by its recorded inputs."""
+
+
+def legacy_record_league(league_list: Path = LEAGUE_LIST_FILE) -> int | None:
+    """The league that keeps the legacy advice records, as ``config/leagues.json`` marks it.
+
+    It is the first league the site published (``legacy_advice_records`` on its line). On
+    every recorded run its publications still write ``member_advice_record_v2`` under
+    ``data/advice_records`` (``league_publication.records_advice_for``), and its history
+    reads those records first and reads a member-week directory holding no record as its
+    own week (:func:`_records_advice`). Every other league reads only the baseline records.
+    None when the list marks no league. The default path is relative to the working
+    directory, as the weekly run and the scripts are run from the checkout. It is read on
+    every call, never at import, so a process that never asks needs no list.
+    """
+    try:
+        document = json.loads(Path(league_list).read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise LeagueListError(f"No league list at {league_list}.") from error
+    except ValueError as error:
+        raise LeagueListError(f"{league_list} does not parse as JSON.") from error
+    return parse_legacy_record_league(document)
+
+
+def _named_or_legacy(league_id: int | None) -> int:
+    """``league_id``, or the league that keeps the legacy records when it is None."""
+    if league_id is not None:
+        return league_id
+    legacy = legacy_record_league()
+    if legacy is None:
+        raise SuggestionEvaluationError(
+            "The league list marks no league that keeps legacy advice records; name the league."
+        )
+    return legacy
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,14 +273,14 @@ class _AnotherLeaguesWeek(Exception):
 
 
 def _records_advice(league_id: int) -> bool:
-    """Whether publications of ``league_id`` write member advice records.
+    """Whether publications of ``league_id`` write legacy member advice records.
 
-    The rule ``league_publication.records_advice_for`` applies, which this module cannot
-    import. Only a league that records advice can leave one of its own member-week
-    directories without a record, from a write that never landed. For any other league
-    such a directory was left by the league that does record.
+    The rule ``league_publication.records_advice_for`` applies, and both read
+    :func:`legacy_record_league`. Only a league that records advice can leave one of its own
+    member-week directories without a record, from a write that never landed. For any other
+    league such a directory was left by the league that does record.
     """
-    return league_id == SUPPORTED_LEAGUE_ID
+    return league_id == legacy_record_league()
 
 
 def _check_record_identity(
@@ -304,7 +338,7 @@ def select_record(
     entry_id: int,
     deadline_utc: str,
     published: PublishedCaptures | None = None,
-    league_id: int = SUPPORTED_LEAGUE_ID,
+    league_id: int | None = None,
     baseline_record_root: Path | None = None,
 ) -> dict[str, Any] | None:
     """Select the recorded advice for one member-week, checking both clocks and all identities.
@@ -322,6 +356,8 @@ def select_record(
     :func:`publish_suggestion_histories` requires the map.
 
     An unreadable candidate is refused instead of silently falling back to an older one.
+    Without ``league_id`` the league is the one that keeps the legacy records
+    (:func:`legacy_record_league`).
     """
     return _select_record(
         root,
@@ -330,7 +366,7 @@ def select_record(
         entry_id=entry_id,
         deadline_utc=deadline_utc,
         published=published,
-        league_id=league_id,
+        league_id=_named_or_legacy(league_id),
         other_leagues_absent=False,
         baseline_record_root=baseline_record_root,
     )
@@ -614,9 +650,10 @@ def evaluate_week(
     captures: Sequence[CapturedSnapshot],
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
-    league_id: int = SUPPORTED_LEAGUE_ID,
+    league_id: int | None = None,
     baseline_record_root: Path | None = None,
 ) -> WeekReview:
+    """Review one member-week; without ``league_id``, for :func:`legacy_record_league`."""
     return _evaluate_week(
         root,
         season=season,
@@ -626,7 +663,7 @@ def evaluate_week(
         captures=captures,
         selected_records=selected_records,
         published=published,
-        league_id=league_id,
+        league_id=_named_or_legacy(league_id),
         other_leagues_absent=False,
         baseline_record_root=baseline_record_root,
     )
@@ -683,6 +720,33 @@ def _evaluate_week(
             else "invalid_record"
         )
         return WeekReview(**base, status="unavailable", reason=reason)
+    return score_selected_week(
+        record,
+        advice,
+        base=base,
+        captures=captures,
+        gameweek=gameweek,
+        entry_id=entry_id,
+        deadline_utc=deadline_utc,
+    )
+
+
+def score_selected_week(
+    record: Mapping[str, Any],
+    advice: Mapping[str, Any],
+    *,
+    base: dict[str, Any],
+    captures: Sequence[CapturedSnapshot],
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+) -> WeekReview:
+    """Score an already selected, validated record without selecting or solving a plan.
+
+    Weekly publication and requested-answer history establish different evidence of
+    availability. They share only this settled scoring step, never their record selection.
+    """
+    base = dict(base)
     try:
         settled = [
             capture
@@ -869,8 +933,8 @@ def settled_member_week_comparisons(
     contribute nothing. An unknown actual score is not a difference of zero.
 
     The same filter decides what is measured and what is named, so the published key set and
-    the measured rows are one list rather than two that could drift. The reader applies the
-    matching filter to the histories it loaded; a week either enters both sides or neither.
+    the measured rows are one list rather than two that could drift. A reader has to apply
+    the matching filter to the histories it loads; a week enters both sides or neither.
     """
     comparisons = []
     for entry_id, weeks in reviews.items():
@@ -919,14 +983,13 @@ def series_horizon_document(
 
     None is the whole answer to a refusal. The reading refuses below two settled weeks,
     below any within-week replication and on a record with no variation, and it carries no
-    correlation to publish in those states. The page already renders "not yet" for an absent
-    document, so the true statement is the absent document; a document built from a
-    substituted correlation would be a claim, and zero, the only substitution available, is
-    the most optimistic one there is.
+    correlation to publish in those states. The true statement is the absent document; a
+    document built from a substituted correlation would be a claim, and zero, the only
+    substitution available, is the most optimistic one there is.
 
     ``required_week_clusters`` is floored at the instrument's own two-week minimum. A
     clustered reading does not exist below two settled weeks, so an arithmetic target of one
-    is not a count anyone could measure at, and the reader refuses anything under two. The
+    is not a count anyone could measure at, and the contract refuses anything under two. The
     floor applies to the published target only; the estimator's arithmetic is unchanged.
     """
     if scoring_basis != CONTRACT_SCORING_BASIS or population != CONTRACT_POPULATION:
@@ -949,14 +1012,13 @@ def series_horizon_document(
         "league_id": league_id,
         "scoring_basis": scoring_basis,
         "population": population,
-        # The committed record the target effect and the two error rates come from. The
-        # reader validates the path and never fetches it, so the producer is what stands
-        # behind it being a real, indexed measurement.
+        # The committed record the target effect and the two error rates come from. Nothing
+        # after this fetches the path, so the producer is what stands behind it being a real,
+        # indexed measurement.
         "measurement_artifact": measurement_artifact,
         # Published although nothing renders it: it is the entire distance between this
         # target and the one an independence assumption would have produced, and it cannot be
-        # recovered later from a record that has since grown. Dropping it also pins the page
-        # at "unknown" with no visible cause, because the reader rejects the whole document.
+        # recovered later from a record that has since grown.
         "within_week_correlation": reading.within_week_correlation,
         "required_week_clusters": max(MINIMUM_WEEKS_FOR_CORRELATION, horizon.total_weeks),
         "member_week_keys": list(reading.member_week_keys),
@@ -976,9 +1038,9 @@ def publish_series_horizon(
 ) -> Path | None:
     """Write the horizon handoff, or remove a stale one and publish nothing.
 
-    A previous week's document names a key set this publication no longer measures, which the
-    reader would reject anyway; removing it keeps a target that nothing supports from sitting
-    on disk beside the histories that replaced it.
+    A previous week's document names a key set this publication no longer measures; removing
+    it keeps a target that nothing supports from sitting on disk beside the histories that
+    replaced it.
     """
     path = out_dir / SERIES_HORIZON_FILE
     document = series_horizon_document(
@@ -1117,10 +1179,9 @@ def publish_suggestion_histories(
     """Publish member-safe derived documents from existing verified, bounded captures.
 
     Two documents come out of one walk: each member's history, and the horizon those same
-    member-weeks can support. They are published together because the reader compares the
-    horizon's key set against the keys it builds from these very histories, and two separate
-    walks could return two sets that no reader could reconcile. A record that supports no
-    horizon publishes histories and no horizon file.
+    member-weeks can support. They are published together because the horizon's key set names
+    these very histories, and two separate walks could return two sets that no reader could
+    reconcile. A record that supports no horizon publishes histories and no horizon file.
 
     ``published`` is what the tree these documents join says each member was shown
     (:func:`published_advice_captures`), and it is required: a history shows a week as what

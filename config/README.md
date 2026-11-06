@@ -10,20 +10,33 @@ a positive `league_id`, and no league appears twice; the committed file also giv
 `label` for people. The list names at least one league. Today it names one, league 352490.
 
 A head-to-head league is refused at capture: the list accepts any positive id, but the capture
-reads classic standings only. When FPL has none for a listed id, the capture asks FPL's
-head-to-head standings and stops before writing anything: a league FPL serves there is refused
-as a head-to-head league, and any other id is refused as having no classic standings
-(`squadopt.platform.fpl_capture.classic_standings`). The refusal names the id to remove from
-the league list or the `--league` options the run was given.
+reads classic standings only, and it reads every listed league's first standings page before
+any member's documents. When FPL has none for a listed id, the capture asks FPL's head-to-head
+standings and stops before reading any member's documents or writing anything: a league FPL
+serves there is refused as a head-to-head league, and any other id is refused as having no
+classic standings (`squadopt.platform.fpl_capture.classic_standings`). The refusal names the
+id to remove from the league list or the `--league` options the run was given.
 
 `menu` is `full` or `device`; omitting it keeps `full`. A device league publishes the
 standings, member squads, chip states and a device index without solving member advice.
 The weekly journal reports preparation, projection, member and publication timings for
 each league. League 352490 keeps its full menu during the transition.
 
+`legacy_advice_records`, `true` on at most one line, marks the league that keeps the legacy
+advice records: the first league the site published, today league 352490. A recorded full-menu
+publication writes `member_advice_record_v2` under `data/advice_records`; a device menu only
+reads the retained archive. Its member histories read those records first; every other league
+reads only the league-independent baseline records under `data/member_baselines`. The settled publisher
+(`scripts.build_settled_site`) is limited to this league. No module under `src/squadopt` names
+the league's number: the code reads it from this file, relative to the working directory
+(`legacy_record_league` in `squadopt.application.weekly_suggestion_eval`), so the weekly run and
+the scripts are run from the checkout. A list that sets the flag on no line keeps no legacy
+records.
+
 | Reader | How it reads the list |
 | --- | --- |
-| `squadopt.contracts.league_list` | Defines the contract, the default path (`LEAGUE_LIST_FILE`) and `read_league_list`, which refuses a document that is not `league_list_v1` |
+| `squadopt.contracts.league_list` | Defines the contract, the default path (`LEAGUE_LIST_FILE`) and `read_league_list`, which refuses a document that is not `league_list_v1`; `parse_legacy_record_league` reads the `legacy_advice_records` line |
+| `squadopt.application.weekly_suggestion_eval` | `legacy_record_league` reads the league that keeps the legacy advice records, which the league publication, the member histories and the settled publisher use |
 | The weekly run | `python -m squadopt.platform.weekly_operations --league-list config/leagues.json` captures every listed league's standings, renders each league's tree and writes the site's league directory |
 | `scripts/seed_entry_registry.py` | `--league-list config/leagues.json` rebuilds the private entry registry for every listed league from a captured standings page |
 | `scripts/measure_strategy_rule_scale.py` | Reads the list at the recorded revision for its measurement |

@@ -1,8 +1,8 @@
 /**
  * A Top 100 weighted plan on the advice card: the setting the member chose, whether it
- * moved the plan, one price in base-model points (at most, when a proof is missing), the
- * pair's price when the manager's word is on too, the moves the setting caused, and the
- * limit read back in the member's language. A document for another setting is not shown.
+ * moved the plan, one price (at most, when a proof is missing), the pair's price when the
+ * manager's word is on too, and the moves the setting caused. A document for another
+ * setting is not shown.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -89,6 +89,9 @@ function section(container: HTMLElement): string {
   return container.querySelector('[data-testid="top100-influence"]')?.textContent ?? "";
 }
 
+/** The selection named beside the decision's heading, which states the setting in force. */
+const selectionSummary = () => screen.getByTestId("member-selection-summary");
+
 describe("a Top 100 weighted plan on the advice card", () => {
   it("accepts a selected weight without inventing a paired price or change", () => {
     const advice = weighted(20, false, { selection_top100_weight: 20 });
@@ -111,14 +114,16 @@ describe("a Top 100 weighted plan on the advice card", () => {
       "mode=saf-puan&window=1&top100=20",
     );
     const text = section(container);
-    expect(text).toContain(TOP100_COPY.tr.weightLine(20));
+    expect(selectionSummary()).toHaveTextContent(MESSAGES.tr.leagueMembers.top100Weight(20));
     expect(text).toContain(TOP100_COPY.tr.changed);
     // The setting, what it did and its price; no caveat under them and no limit listed.
     expect(text).not.toMatch(/tercihin bedelidir|ölçümü değildir/);
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.tr.cost("0,4"));
     expect(page).not.toContain(TOP100_COPY.tr.costAtMost("0,4"));
-    expect(page).not.toContain(TOP100_COPY.tr.limit(20));
+    for (const sentence of weighted(20).payload.stated_limits ?? []) {
+      expect(page).not.toContain(sentence);
+    }
   });
 
   it("says an unchanged plan is unchanged, in English", () => {
@@ -154,8 +159,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
 
   it("states no price when the plan it is measured against is unproven", () => {
     // The producer publishes no ceiling then; an older document carries one, which
-    // bounds nothing, so the page prints neither it nor the difference, and does not
-    // promise a price below.
+    // bounds nothing, so the page prints neither it nor the difference.
     const { container } = renderPage(
       "en",
       weighted(30, false, {
@@ -191,8 +195,8 @@ describe("a Top 100 weighted plan on the advice card", () => {
       delete advice.payload.expected_points_cost_ceiling;
       const { container } = renderPage(language, advice, "mode=saf-puan&window=1&top100=30");
       const text = section(container);
-      expect(text).toContain(TOP100_COPY[language].changedNoPrice);
-      expect(text).not.toContain(TOP100_COPY[language].changed);
+      expect(text).toContain(TOP100_COPY[language].changed);
+      expect(text).not.toMatch(language === "tr" ? /bedel/i : /price/i);
       const page = container.textContent ?? "";
       expect(page).not.toContain(TOP100_COPY[language].cost(price));
       expect(page).not.toContain(TOP100_COPY[language].costAtMost(price));
@@ -213,7 +217,8 @@ describe("a Top 100 weighted plan on the advice card", () => {
     expect(page).not.toContain(TOP100_COPY.tr.cost("0,4"));
     expect(page).not.toContain(EVIDENCE_COPY.tr.cost("0,4"));
     expect(container.querySelector('[data-testid="managers-word"]')).not.toBeNull();
-    expect(section(container)).toContain(TOP100_COPY.tr.weightLine(40));
+    expect(section(container)).toContain(TOP100_COPY.tr.unchanged);
+    expect(selectionSummary()).toHaveTextContent(MESSAGES.tr.leagueMembers.top100Weight(40));
   });
 
   it("captions a move the setting caused", () => {
@@ -304,18 +309,19 @@ describe("a Top 100 weighted plan on the advice card", () => {
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.tr.strategyCostAtMost("12,5"));
     expect(page).not.toContain(TOP100_COPY.tr.strategyCost("12,5"));
-    expect(page).not.toContain(TOP100_COPY.tr.limit(20));
     for (const sentence of advice.payload.stated_limits ?? []) {
       expect(page).not.toContain(sentence);
     }
-    expect(section(container)).toContain(TOP100_COPY.tr.weightLine(20));
+    expect(section(container)).toContain(TOP100_COPY.tr.unchanged);
+    expect(selectionSummary()).toHaveTextContent(MESSAGES.tr.leagueMembers.top100Weight(20));
     expect(page).not.toMatch(AS_A_CHANCE);
   });
 
   it("does not show a document for another setting as this one", () => {
     const { container } = renderPage("en", weighted(20), "mode=saf-puan&window=1&top100=30");
     expect(section(container)).toBe("");
-    expect(container.textContent).not.toContain(TOP100_COPY.en.weightLine(20));
+    expect(selectionSummary()).toHaveTextContent(MESSAGES.en.leagueMembers.top100Weight(30));
+    expect(container.textContent).not.toContain(TOP100_COPY.en.cost("0.4"));
   });
 
   it("does not show a weighted document as the published plan", () => {

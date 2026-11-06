@@ -55,6 +55,8 @@ function open(language: Language) {
         <Routes>
           <Route path="/" element={<LeagueEntryPage />} />
           <Route path="/league/:leagueId/members" element={<h1>Member destination</h1>} />
+          <Route path="/league/:leagueId" element={<h1>League destination</h1>} />
+          <Route path="/entry/:entryId" element={<h1>Team destination</h1>} />
         </Routes>
         <LocationProbe />
       </MemoryRouter>
@@ -103,14 +105,35 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     expect(readMemberClaim()).toBeNull();
   });
 
-  it("says what the site does before the field, and keeps the ID help folded", () => {
+  it("keeps the ID help folded", () => {
+    const helpCopy = MESSAGES[language].fplIdHelp;
     open(language);
-    const intro = screen.getByText(copy.intro);
-    const field = screen.getByLabelText(copy.label);
-    expect(intro.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const help = screen.getByText(copy.helpTitle).closest("details")!;
+    const help = screen.getByText(helpCopy.title).closest("details")!;
     expect(help.open).toBe(false);
-    expect(help).toHaveTextContent(copy.help);
+    expect(help).toHaveTextContent(helpCopy.league);
+  });
+
+  it("folds where the league ID is found between the field and its button", async () => {
+    const helpCopy = MESSAGES[language].fplIdHelp;
+    open(language);
+    const field = screen.getByLabelText(copy.label);
+    const help = screen.getByText(helpCopy.title).closest("details")!;
+    const submit = screen.getByRole("button", { name: copy.submit });
+    // Right under the field, inside its form, and before the form's one action.
+    expect(help.parentElement).toBe(field.closest("form"));
+    expect(help.previousElementSibling).toBe(field);
+    expect(help.nextElementSibling).toBe(submit);
+    // The field keeps its own label and description; the help is the next stop, not read
+    // out with the field.
+    expect(field).toHaveAccessibleName(copy.label);
+    expect(field).toHaveAccessibleDescription(expect.stringContaining(copy.hint));
+    expect(field).not.toHaveAccessibleDescription(expect.stringContaining(helpCopy.league));
+    expect(help.querySelector("summary")).toHaveTextContent(helpCopy.title);
+    expect(help.querySelector("code")).toHaveTextContent(
+      "fantasy.premierleague.com/leagues/123456/standings/c",
+    );
+    await userEvent.setup().click(screen.getByText(helpCopy.title));
+    expect(help.open).toBe(true);
   });
 
   it("validates decimal IDs before requesting any publication", async () => {
@@ -124,38 +147,60 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it.each(["unsupported", "missing", "failed"] as const)(
-    "states %s without changing routes",
-    async (state) => {
-      // The directory is read first; a site with none is one league, a 404 everywhere is
-      // nothing published, and a 503 is a site that could not answer.
-      const fetcher =
-        state === "unsupported"
-          ? legacySite()
-          : stubFetchByUrl([
-              [/./, () => new Response("", { status: state === "missing" ? 404 : 503 })],
-            ]);
-      open(language);
-      const user = userEvent.setup();
-      await user.type(
-        screen.getByLabelText(copy.label),
-        state === "unsupported" ? "123" : "352490",
-      );
-      await user.click(screen.getByRole("button", { name: copy.submit }));
-      expect(
-        await screen.findByText(state === "unsupported" ? copy.unsupported(123) : copy[state]),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: copy.title })).toBeInTheDocument();
-      expect(screen.getByTestId("location")).toHaveTextContent("/");
-      if (state === "unsupported") {
-        // Only the directory was read; nothing of league 123 was asked for.
-        expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
-          "/data/leagues.json",
-          "/data/league/members.json",
-        ]);
-      }
-    },
-  );
+  it.each(["missing", "failed"] as const)("states %s without changing routes", async (state) => {
+    // The directory is read first; a 404 everywhere is nothing published, and a 503 is a
+    // site that could not answer.
+    stubFetchByUrl([[/./, () => new Response("", { status: state === "missing" ? 404 : 503 })]]);
+    open(language);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(copy.label), "352490");
+    await user.click(screen.getByRole("button", { name: copy.submit }));
+    expect(await screen.findByText(copy[state])).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: copy.title })).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/");
+  });
+
+  it("opens a league the site does not publish at its own address, for the gate there", async () => {
+    const fetcher = legacySite();
+    open(language);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(copy.label), "123");
+    await user.click(screen.getByRole("button", { name: copy.submit }));
+    expect(await screen.findByRole("heading", { name: "League destination" })).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/league/123");
+    // Only the directory was read here; the gate at the address asks the forwarder.
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      "/data/leagues.json",
+      "/data/league/members.json",
+    ]);
+    expect(readChosenLeague()).toBeNull();
+  });
+
+  it("opens one team on its own by its number", async () => {
+    const fetcher = legacySite();
+    open(language);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: copy.entryMode }));
+    expect(screen.queryByLabelText(copy.label)).toBeNull();
+    await user.type(screen.getByLabelText(copy.entryLabel), "4012");
+    await user.click(screen.getByRole("button", { name: copy.entrySubmit }));
+    expect(await screen.findByRole("heading", { name: "Team destination" })).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/entry/4012");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("validates a team number before opening anything", async () => {
+    const fetcher = legacySite();
+    open(language);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: copy.entryMode }));
+    await user.type(screen.getByLabelText(copy.entryLabel), "40.12");
+    await user.click(screen.getByRole("button", { name: copy.entrySubmit }));
+    expect(await screen.findByText(copy.entryInvalid)).toBeInTheDocument();
+    expect(screen.getByLabelText(copy.entryLabel)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("location")).toHaveTextContent("/");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 
   it("keeps the submitted ID fixed while its result is pending", async () => {
     // The directory read hangs until the test lets it answer; the league's record follows.
@@ -187,12 +232,12 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
 });
 
 describe("the form in place", () => {
-  function openInPlace(address: string, stay: boolean) {
+  function openInPlace(address: string) {
     return render(
       <LanguageProvider initialLanguage="tr">
         <MemoryRouter initialEntries={[address]}>
           <Routes>
-            <Route path="*" element={<LeagueEntryPage inPlace stay={stay} />} />
+            <Route path="*" element={<LeagueEntryPage inPlace />} />
             <Route path="/league/:leagueId/members/:entryId" element={<h1>Member page</h1>} />
           </Routes>
           <LocationProbe />
@@ -203,7 +248,7 @@ describe("the form in place", () => {
 
   it("rewrites an address from before the number, asking the member step there", async () => {
     legacySite();
-    openInPlace("/league/members/35249002", false);
+    openInPlace("/league/members/35249002");
     const user = userEvent.setup();
     await user.type(screen.getByLabelText(MESSAGES.tr.leagueEntry.label), String(LEAGUE));
     await user.click(screen.getByRole("button", { name: MESSAGES.tr.leagueEntry.submit }));
@@ -215,16 +260,5 @@ describe("the form in place", () => {
     // The gate at the new address chooses the league; a choice made here first would let
     // the gate rewrite the old address itself, dropping the step state.
     expect(readChosenLeague()).toBeNull();
-  });
-
-  it("keeps a system page's address with `stay`, asking the member step there", async () => {
-    legacySite();
-    openInPlace("/moves", true);
-    const user = userEvent.setup();
-    await user.type(screen.getByLabelText(MESSAGES.tr.leagueEntry.label), String(LEAGUE));
-    await user.click(screen.getByRole("button", { name: MESSAGES.tr.leagueEntry.submit }));
-    const location = screen.getByTestId("location");
-    await waitFor(() => expect(location.dataset.state).toBe(JSON.stringify(PICK_HERE)));
-    expect(location).toHaveTextContent("/moves");
   });
 });

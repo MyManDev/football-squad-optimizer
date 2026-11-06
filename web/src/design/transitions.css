@@ -1,12 +1,51 @@
-/* A page change the View Transitions API runs (design/viewTransition.ts, #1131): the old
-   picture fades into the new one in the card time of the motion tokens. Opacity only, as
-   the browser's own crossfade is; under reduced motion the token is zero and the script
-   does not start one. The group that holds the two pictures is timed with them, or it
-   keeps the browser's own quarter second and the step ends later than its fade. */
+/* Page snapshots share one gentle crossfade (#1319). Keep travel small and text at its
+   actual size; the two pictures and their group finish together. */
 
-::view-transition-group(root),
-::view-transition-old(root),
+::view-transition-group(root) {
+  animation-duration: var(--motion-page);
+  animation-timing-function: var(--motion-route-ease);
+}
+
+::view-transition-old(root) {
+  animation: page-leave var(--motion-page) var(--motion-route-ease) both;
+}
+
 ::view-transition-new(root) {
-  animation-duration: var(--motion-ui);
-  animation-timing-function: var(--motion-ease);
+  animation: page-rise var(--motion-page) var(--motion-route-ease) both;
+}
+
+@keyframes page-leave {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* The sidebar and the phone's top bar are captured on their own (PageShell.module.css), so
+   they hold still while the page beside or under them rises; a drawer that closes in the
+   step slides to where it now stands in the same time. */
+::view-transition-group(shell-sidebar),
+::view-transition-old(shell-sidebar),
+::view-transition-new(shell-sidebar),
+::view-transition-group(shell-bar),
+::view-transition-old(shell-bar),
+::view-transition-new(shell-bar) {
+  animation-duration: var(--motion-page);
+  animation-timing-function: var(--motion-route-ease);
+}
+
+/* The member pages' pinned top bar (LeagueMemberPage.module.css) is captured on its own, so
+   it holds still while the page under it fades; where two pages' bars differ, one fades into
+   the other in place, in the same time. */
+::view-transition-group(member-bar),
+::view-transition-old(member-bar),
+::view-transition-new(member-bar) {
+  animation-duration: var(--motion-page);
+  animation-timing-function: var(--motion-route-ease);
 }

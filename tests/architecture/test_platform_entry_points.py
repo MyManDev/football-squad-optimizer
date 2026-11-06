@@ -5,8 +5,12 @@ ADR 0011 (decision 8) names the operator entry points that keep working while Ph
 `python -m squadopt.platform.advice_worker`; the console script `squadopt`, whose string in
 `pyproject.toml` stays `squadopt.platform.cli:main`; `advice_load`, `backup_recovery`,
 `benchmark_capture` and `capture_measurement`, run the same way; and
-`squadopt.api.runtime:build_app`, the factory `uvicorn --factory` calls. Two more things sit on
-that surface: `scripts/release/restart_backend.ps1` imports `squadopt.api.runtime` and
+`squadopt.api.runtime:build_app`, the factory `uvicorn --factory` calls. The scheduled gate of
+#1243, `python -m squadopt.platform.weekly_schedule`, joined them: a timer on the host that runs
+the week calls it by that name, so it is held here the same way, and so is the release it
+leaves to a person after the preview (D1 on #1243),
+`python -m squadopt.platform.weekly_release`. Two more things sit on that surface:
+`scripts/release/restart_backend.ps1` imports `squadopt.api.runtime` and
 `squadopt.platform.advice_worker` in a fresh interpreter before it stops the running backend,
 and `package_fingerprint()` in `weekly_operations` writes a digest of every `.py` file of the
 installed package into each run record.
@@ -14,7 +18,7 @@ installed package into each run record.
 This file characterizes that surface on today's tree, so a move that changes a prog name, a
 usage line, the console script's target, the import smoke or the hashed tree fails here:
 
-- each of the seven commands answers `--help` with exit 0 and its usage line in a subprocess
+- each of the nine commands answers `--help` with exit 0 and its usage line in a subprocess
   started the way an operator starts it (`sys.executable -m`, `PYTHONPATH` to this checkout's
   `src`, the checkout as the working directory), and exposes `main(argv=None, ...)` behind a
   `__main__` guard;
@@ -25,7 +29,7 @@ usage line, the console script's target, the import smoke or the hashed tree fai
 - `package_fingerprint()` equals the digest recomputed over `Path(squadopt.__file__).parent`
   by the same rule, so the hashed tree is the whole package.
 
-All seven commands build an `argparse` parser today, so each pins its usage line as well as
+All nine commands build an `argparse` parser today, so each pins its usage line as well as
 its `main`. argparse wraps usage at the terminal width, and the wrap point moved between
 Python 3.11 and 3.13 (3.13 fits one more option on the first line), so `COLUMNS` is fixed
 at 80 and the first line of the help must start with the pinned prefix. Four other
@@ -71,6 +75,8 @@ USAGE_LINES: dict[str, str] = {
     "backup_recovery": "usage: backup_recovery.py [-h] {create,verify,restore} ...",
     "benchmark_capture": "usage: benchmark_capture.py [-h] --snapshot-root SNAPSHOT_ROOT",
     "capture_measurement": "usage: capture_measurement.py [-h] --snapshot-root SNAPSHOT_ROOT",
+    "weekly_schedule": "usage: weekly_schedule.py [-h] [--workspace WORKSPACE]",
+    "weekly_release": "usage: weekly_release.py [-h] [--workspace WORKSPACE] --run-id RUN_ID",
 }
 COMMANDS = tuple(USAGE_LINES)
 

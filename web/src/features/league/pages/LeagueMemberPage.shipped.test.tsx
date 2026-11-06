@@ -11,7 +11,9 @@
  * visitor has said who they are: each page is opened as that member), the real loaders, the real
  * validators, the shell and the route's error boundary, with each request answered from
  * `public/` on disk. Nothing leaves the process, and a request outside `data/` fails the
- * test.
+ * test, except the FPL forwarder's routes (#983 step 3, #1008): they are answered as the site
+ * answers them while no forwarder is deployed, with its HTML shell at 200, which the page
+ * reads as no forwarder and shows nothing for.
  *
  * The loaders serve examples to tests unconditionally, so the build's environment is
  * stubbed to production for these tests: they read the published path, and an example
@@ -43,6 +45,7 @@ import type {
 import { memberAddress } from "../../../lib/leagueAddresses";
 import { LeagueGate } from "./LeagueGate";
 import { LeagueMemberPage } from "./LeagueMemberPage";
+import { hasPublishedPlan } from "./storyPlan";
 
 // The member pages of one tree are drawn. A site that lists more fails here, so a
 // second league's pages are never reported as drawn when they were not.
@@ -110,6 +113,11 @@ beforeEach(() => {
       const address = input instanceof Request ? input.url : String(input);
       const base = import.meta.env.BASE_URL;
       const relative = address.startsWith(base) ? address.slice(base.length) : null;
+      if (relative?.startsWith("api/v1/fpl/")) {
+        return new Response("<!doctype html><html><body><div id=root></div></body></html>", {
+          headers: { "Content-Type": "text/html" },
+        });
+      }
       if (
         relative === null ||
         !relative.startsWith("data/") ||
@@ -172,16 +180,15 @@ function openMemberPage(entryId: number, language: Language) {
 
 const WAIT = { timeout: 20_000 };
 
-/** What the page may say about itself that is a failure rather than a published state. */
+/**
+ * What the page may say about itself that is a failure rather than a published state. The
+ * member list's own failure texts are not among them: only the members page and the picker
+ * print them, and a claimed visitor on this page sees neither, so `expectMemberDrawn` holds
+ * the list to the rank instead.
+ */
 function failureCopy(language: Language): string[] {
   const copy = MESSAGES[language].leagueMembers;
-  return [
-    MESSAGES[language].common.pageFailed,
-    copy.entryUnreadable,
-    copy.membersUnreadable,
-    copy.notAvailable,
-    copy.loadingEntry,
-  ];
+  return [MESSAGES[language].common.pageFailed, copy.entryUnreadable, copy.loadingEntry];
 }
 
 function expectNoFailure(language: Language) {
@@ -190,25 +197,15 @@ function expectNoFailure(language: Language) {
   expect(consoleErrors).toEqual([]);
 }
 
-/**
- * The reason as the page prints it: a code or sentence the copy knows is shown in the
- * reader's language (a plan that did not solve is published as `not_solved_for_member`),
- * and any other reason as it was written.
- */
-function shownReason(language: Language, reason: string): string {
-  const known = MESSAGES[language].leagueMembers.publicationReasons;
-  return Object.hasOwn(known, reason) ? (known[reason] ?? reason) : reason;
-}
-
 async function expectNotAvailable(language: Language, reason: string) {
   const copy = MESSAGES[language].leagueMembers;
   expect(await screen.findByText(copy.entryNotAvailable, undefined, WAIT)).toBeInTheDocument();
   expect(screen.getByText(copy.entryNotAvailableBody)).toBeInTheDocument();
   if (reason) {
-    // The reason arrives with the index, which may land after the missing squad.
-    const shown = shownReason(language, reason);
-    expect(await screen.findByText(shown, undefined, WAIT)).toBeInTheDocument();
-    if (shown !== reason) expect(screen.queryByText(reason)).toBeNull();
+    // The reason arrives with the index, which may land after the missing squad; once every
+    // read has settled it is still not on the page, as a code or as a sentence.
+    await waitFor(() => expect(clients.at(-1)!.isFetching()).toBe(0), WAIT);
+    expect(screen.queryByText(reason)).toBeNull();
   }
   expectNoFailure(language);
 }
@@ -241,9 +238,10 @@ function refuseMember(entryId: number, reason: string) {
 
 /**
  * Open a member's page and hold it to what the tree promises: a refused member says it is
- * not available and why; any other draws its team as the page's heading and, under the
- * decision heading, the plan the index names with no settings chosen (one board per move,
- * or the no-transfer line), with no failure anywhere on the page.
+ * not available; any other draws its team as the page's heading, its rank among the members
+ * the list names and, under the decision heading, the plan the index names with no settings
+ * chosen (one board per move, or the no-transfer line of a solved plan), with no failure
+ * anywhere on the page.
  */
 async function expectMemberDrawn(entryId: number, language: Language) {
   const copy = MESSAGES[language].leagueMembers;
@@ -262,6 +260,14 @@ async function expectMemberDrawn(entryId: number, language: Language) {
   ).payload;
   const team = squad.entry.team_name ?? copy.unknownTeam;
   expect(await screen.findByRole("heading", { level: 1, name: team }, WAIT)).toBeInTheDocument();
+  // The rank counts the league's members, so it stands or falls with the member list's read.
+  await waitFor(
+    () =>
+      expect(screen.getByText(copy.rankLabel).nextElementSibling?.textContent).toBe(
+        `${squad.entry.rank}/${humans.length}`,
+      ),
+    WAIT,
+  );
   const decision = screen
     .getByRole("heading", { level: 2, name: copy.decisionTitle })
     .closest<HTMLElement>('[data-mark="decision"]')!;
@@ -289,10 +295,9 @@ async function expectMemberDrawn(entryId: number, language: Language) {
   ];
   for (const text of missing) expect(within(decision).queryByText(text)).toBeNull();
   if (plan.moves.length === 0) {
-    expect(
-      within(decision).queryByText(copy.noMove) ??
-        within(decision).queryByText(copy.noPlanInRecord),
-    ).not.toBeNull();
+    // No transfer is a finding of a solved plan, and the published tree holds no other kind.
+    expect(hasPublishedPlan(plan)).toBe(true);
+    expect(within(decision).getByText(copy.noMove)).toBeInTheDocument();
   } else {
     plan.moves.forEach((_, position) => {
       expect(
@@ -355,12 +360,12 @@ describe("every member page, from the published tree", () => {
     });
 
     // The refusal is laid over a real member, so these run whether or not the tree holds
-    // one. A sentence the copy does not know is printed as written; the code the producer
-    // writes for a plan that did not solve is printed as the copy's sentence, never as code.
+    // one. The page says the member is not available and prints neither the sentence the
+    // producer wrote nor the code it writes for a plan that did not solve.
     it.each([
-      ["a sentence the copy does not know", FREE_HIT],
+      ["the producer's sentence", FREE_HIT],
       ["the code for a plan that did not solve", "not_solved_for_member"],
-    ])("draws a refused member as not available, giving %s", async (_, reason) => {
+    ])("draws a refused member as not available, leaving out %s", async (_, reason) => {
       const entryId = humans[0]!;
       refuseMember(entryId, reason);
       openMemberPage(entryId, language);

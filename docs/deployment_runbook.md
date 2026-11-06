@@ -565,14 +565,14 @@ After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.c
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
-The trusted smoke test makes **ten** fixed checks, the absent asset and the asset walk, and they are not all "must return 200". The list
+The trusted smoke test makes **seven** fixed checks, the absent asset and the asset walk, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
 paragraph is a reading of it, not a second copy to keep in step.
 
-Seven are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
-`/league`, `/league/members/0`, `/status`, `/fixtures`. The nested member path is there
-deliberately, because a path-scoped not-found rule would break a nested client-side route first
-and nothing else on the list would notice.
+Four are routes that must return HTTP 200 carrying the SPA document: `/`, `/league`,
+`/league/members/0`, `/fixtures`. The nested member path is there deliberately, because a
+path-scoped not-found rule would break a nested client-side route first and nothing else on the
+list would notice.
 
 Two are published documents that must return 200, parse as JSON, and carry the short-lived
 revalidation policy: `/data/index.json` and the league's `members.json`. The site's league
@@ -582,10 +582,10 @@ numbered member page (`/league/<id>/members/0`), its members document and its ab
 0. A site from before the directory answers 404 there and publishes the one tree under
 `/data/league/`, which is then checked in the same way.
 
-**The tenth is the opposite check, and reading it as a 200 inverts it.**
+**The seventh is the opposite check, and reading it as a 200 inverts it.**
 The tree's `entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that
 answers anything but a not-found there has lost the rule that an absent document answers 404
-rather than the application shell. A green smoke is seven route 200s, two JSON 200s and two 404s (entry 0 and the absent asset), then every asset the shell reaches answered as itself.
+rather than the application shell. A green smoke is four route 200s, two JSON 200s and two 404s (entry 0 and the absent asset), then every asset the shell reaches answered as itself.
 
 **Assets.** `/assets/smoke-absent-<random>.js`, a name no build produces and new on every
 run (so a run against a deployment from before this rule poisons nothing anyone asks for
@@ -610,9 +610,6 @@ URL in Cloudflare (Caching, Purge by URL) before members are told, and do not re
 
 Transient edge and propagation failures are retried for roughly one minute, the league
 directory read included.
-
-Two routes are **not** in the gate and their absence is worth knowing before someone assumes
-otherwise: `/gw/:season/:gameweek`, and `/admin`, which was added later. Neither is covered.
 
 Production runs it twice: once against the `pages.dev` alias, then against
 `https://squadopt.mymandev.com`. Both must pass. The second run is what makes a publication
@@ -648,7 +645,7 @@ Run the smoke command immediately against the production alias printed by Wrangl
 
 ## Back up irreplaceable data
 
-From the source checkout, run `powershell -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Destination '<existing-backup-directory>' -DryRun`, then remove `-DryRun` to copy snapshots, ledger, handoffs, advice records and entries, plus the private Benchmark V2 captures (`benchmark_v2_captures`) when that optional tree exists. Choose a second physical drive outside every repository worktree; synced folders such as OneDrive can carry reparse-point attributes and are deliberately refused; the five required source trees must exist, and reparse points are refused. The script never reads runtime/raw or changes the source, never deletes old backups, and preserves conflicts as stamped files named by that run's manifest. A new conflict exits nonzero and lists the finding; an existing variant with the same hash is reused. Paths with any dot-prefixed component are transient by repository convention and are excluded, including from older manifests. Each run reports the excluded source count and a bounded sample, plus the count ignored from an older manifest. Source files missing since the last manifest raise a nonzero alarm with a bounded sample and total count; new files still copy additively, but no new manifest is written. Restore the lost files or explicitly run `-AcceptMissing` to acknowledge the listed loss and write a new manifest; it never deletes old backup files or manifests. `-AcceptMissing` is never part of the scheduled task: a person types it only after inspecting the loss list. Run the same command with `-Verify` to compare both sides with the latest manifest; a missing, changed or unrecorded source file fails. To restore, stop writers first, copy each manifest entry's `destination_path` from the backup to its `path` under the restored checkout's `data`, then run `-Verify -Manifest <that-manifest-name>`; the name must be a `manifest-*.json` file within the backup directory. After restoring an older recovery point, a plain backup can report newer files as missing against the latest manifest: inspect that list, then use `-AcceptMissing` if the older state is intentional. Do not blindly copy a stale canonical file over its newer conflict variant. The first real backup and restore have **never been exercised** here: only temporary fixtures were used. The scheduled task must run as the owner with Git on PATH. The scheduled action appends output to a log outside the repository and preserves the exit code; Task Scheduler alone retains only the last result. Scheduling is the owner's action; after replacing all three path placeholders, this PowerShell line registers a daily action (it does not run the backup now):
+From the source checkout, run `powershell -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Destination '<existing-backup-directory>' -DryRun`, then remove `-DryRun` to copy snapshots, ledger, handoffs, advice records and entries, plus two optional trees when they exist: the private Benchmark V2 captures (`benchmark_v2_captures`) and the member baseline records (`member_baselines`, written by the first recorded weekly run after #1206 and the only source of a second league's history weeks). Choose a second physical drive outside every repository worktree; synced folders such as OneDrive can carry reparse-point attributes and are deliberately refused; the five required source trees must exist, and reparse points are refused. The script never reads runtime/raw or changes the source, never deletes old backups, and preserves conflicts as stamped files named by that run's manifest. A new conflict exits nonzero and lists the finding; an existing variant with the same hash is reused. Paths with any dot-prefixed component are transient by repository convention and are excluded, including from older manifests. Each run reports the excluded source count and a bounded sample, plus the count ignored from an older manifest. Source files missing since the last manifest raise a nonzero alarm with a bounded sample and total count; new files still copy additively, but no new manifest is written. Restore the lost files or explicitly run `-AcceptMissing` to acknowledge the listed loss and write a new manifest; it never deletes old backup files or manifests. `-AcceptMissing` is never part of the scheduled task: a person types it only after inspecting the loss list. Run the same command with `-Verify` to compare both sides with the latest manifest; a missing, changed or unrecorded source file fails. To restore, stop writers first, copy each manifest entry's `destination_path` from the backup to its `path` under the restored checkout's `data`, then run `-Verify -Manifest <that-manifest-name>`; the name must be a `manifest-*.json` file within the backup directory. After restoring an older recovery point, a plain backup can report newer files as missing against the latest manifest: inspect that list, then use `-AcceptMissing` if the older state is intentional. Do not blindly copy a stale canonical file over its newer conflict variant. The first real backup and restore have **never been exercised** here: only temporary fixtures were used. The scheduled task must run as the owner with Git on PATH. The scheduled action appends output to a log outside the repository and preserves the exit code; Task Scheduler alone retains only the last result. Scheduling is the owner's action; after replacing all three path placeholders, this PowerShell line registers a daily action (it does not run the backup now):
 
 ```powershell
 Register-ScheduledTask -TaskName 'SquadOptDataBackup' -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -Command "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File ''<repo>\scripts\backup_data.ps1'' -Destination ''<backup>'' *>> ''<outside-repository-log>''; exit $LASTEXITCODE"') -Trigger (New-ScheduledTaskTrigger -Daily -At '03:00')

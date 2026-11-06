@@ -15,7 +15,15 @@ pytestmark = pytest.mark.skipif(
     POWERSHELL is None or shutil.which("git") is None, reason="requires PowerShell 5.1 and Git"
 )
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts/backup_data.ps1"
-TREES = ("snapshots", "ledger", "handoffs", "advice_records", "entries", "benchmark_v2_captures")
+TREES = (
+    "snapshots",
+    "ledger",
+    "handoffs",
+    "advice_records",
+    "entries",
+    "benchmark_v2_captures",
+    "member_baselines",
+)
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -67,23 +75,27 @@ def test_script_parses_as_ascii_powershell() -> None:
     subprocess.run([str(POWERSHELL), "-NoProfile", "-Command", command], check=True)
 
 
-def test_optional_benchmark_tree_can_be_absent_and_later_added(backup: tuple[Path, Path]) -> None:
+@pytest.mark.parametrize(
+    ("name", "relative"),
+    [
+        ("benchmark_v2_captures", "claims/freeze-2026-27-gw06.json"),
+        ("member_baselines", "2026-27/gw10/entry-101/fpl-live-synthetic/advice.json"),
+    ],
+)
+def test_an_optional_tree_can_be_absent_and_later_added(
+    backup: tuple[Path, Path], name: str, relative: str
+) -> None:
     repo, destination = backup
-    tree = repo / "data/benchmark_v2_captures"
+    tree = repo / "data" / name
     (tree / "record.json").unlink()
     tree.rmdir()
     assert _run(repo, destination).returncode == 0
-    assert not (destination / "benchmark_v2_captures").exists()
-    tree.mkdir()
-    claims = tree / "claims"
-    claims.mkdir()
-    (claims / "freeze-2026-27-gw06.json").write_text(
-        '{"snapshot_id":"synthetic"}', encoding="ascii"
-    )
+    assert not (destination / name).exists()
+    added = tree / relative
+    added.parent.mkdir(parents=True)
+    added.write_text('{"snapshot_id":"synthetic"}', encoding="ascii")
     assert _run(repo, destination).returncode == 0
-    assert (destination / "benchmark_v2_captures/claims/freeze-2026-27-gw06.json").read_bytes() == (
-        claims / "freeze-2026-27-gw06.json"
-    ).read_bytes()
+    assert (destination / name / relative).read_bytes() == added.read_bytes()
     assert _run(repo, destination, "-Verify").returncode == 0
 
 

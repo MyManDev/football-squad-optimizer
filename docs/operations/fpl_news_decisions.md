@@ -8,8 +8,8 @@ calibrated probability of starting. Zero and an unknown value remain different.
 An empty news field with a retained date is reported as cleared text; this is not
 proof that the player has recovered.
 
-The page shows the capture time separately from the news date. It only reflects
-the capture used by that decision. Server readiness does not establish freshness,
+The page shows the news date; the capture time stays in the published document. Both
+reflect only the capture used by that decision. Server readiness does not establish freshness,
 and this feature adds neither a polling service nor a new data scheduler.
 
 ## Coach evidence
@@ -36,9 +36,14 @@ categorical quote. Per-player outcomes explain accepted and withheld statements.
 ## Bounded collection
 
 The existing registry, robots checks, origin restrictions and document bounds
-still apply. Relevant first-team injury and upcoming-match article links have
-priority; youth, women's and commercial links have lower priority. FPL player
-coverage and the much smaller registered coach-news coverage are separate facts.
+still apply. Each registered page's article links are ranked by `article_priority`:
+explicit availability and match links first (injury, fitness, team news, pre-match
+and the like), unclassified links next, and youth, women's and commercial links
+last. Page order decides only within a rank. Registered pages are read in registry
+order, so the rank decides which of a page's links get what is left of the host's
+ten-article cap, as [club news sources](../club_news_sources.md) states in full.
+FPL player coverage and the much smaller registered coach-news coverage are
+separate facts.
 
 `capture_club_news` accepts `--max-model-calls` (default 3, range 0 to 20).
 Configured providers make no automatic transport retries. A failed provider call

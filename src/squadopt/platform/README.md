@@ -7,7 +7,7 @@ with `squadopt.api`, that may import web frameworks, network clients, model SDKs
 (the contract "Frameworks, network and databases stay in api and platform"). No package below
 it in the layer order imports it, and it imports no laboratory module.
 
-Its 65 Python files serve several deployment units: 49 implementation modules and 4
+Its 67 Python files serve several deployment units: 51 implementation modules and 4
 aliases at old paths in the flat folder, the package file, and the seven subpackages of ADR
 0011, of which `storage/` holds the four shared durable-state modules and the six others their
 package file only.
@@ -25,6 +25,8 @@ Review: either owner approves a change here; the `club_news_*` modules are İbra
 | Process | Entry point | Families it uses |
 | --- | --- | --- |
 | Weekly run | `python -m squadopt.platform.weekly_operations` | Weekly run, captures, run records |
+| Weekly schedule | `python -m squadopt.platform.weekly_schedule`, every 15 minutes from the host's scheduler (`deploy/weekly-schedule/` on Linux) | Weekly run (it starts the weekly run, which ends at its site pull request), `fpl_capture`, club news |
+| Weekly release | `python -m squadopt.platform.weekly_release --run-id <id>`, by hand after the run's preview and a yes (D1 on #1243) | Weekly run (its journal, log and preview), the release scripts |
 | Advice API | `uvicorn --factory squadopt.api.runtime:build_app` | Advice API services, built by `backend_runtime` |
 | Advice worker | `python -m squadopt.platform.advice_worker` | Advice queue and workers, with the services `backend_runtime` builds |
 | Installed CLI | the `squadopt` console script (`squadopt.platform.cli:main`) | Installed CLI, run records, `fpl_capture` |
@@ -33,17 +35,21 @@ Review: either owner approves a change here; the `club_news_*` modules are İbra
 Before the moves, `tests/architecture/test_platform_entry_points.py` pins the operator surface
 ADR 0011 keeps: the `--help` usage lines and `main` of the seven `python -m` commands (`cli`,
 `weekly_operations`, `advice_worker`, `advice_load`, `backup_recovery`, `benchmark_capture`,
-`capture_measurement`), the console script's target, the backend restart's import smoke,
+`capture_measurement`), of the scheduled gate of #1243, `weekly_schedule`, and of its release,
+`weekly_release`, the console script's target, the backend restart's import smoke,
 `build_app` as a factory with no arguments, and the tree `package_fingerprint()` hashes.
 
 ## Weekly run
 
-The installed weekly entry point, its durable journal, the member publication service and the
-optional football inputs it seals.
+The installed weekly entry point, the gate that starts it on a schedule and the chain that
+releases it, its durable journal, the member publication service and the optional football
+inputs it seals.
 
 | Module | What it does |
 | --- | --- |
 | `weekly_operations.py` | The installed weekly entry point: typed application services run as stages of a durable journal. |
+| `weekly_schedule.py` | The scheduled gate (#1243): a morning run once a UTC day and a final run a lead before each deadline, each started at most once, with its club news, on any host. |
+| `weekly_release.py` | Releases one completed run by its id, once, after its preview and a yes (D1 on #1243; #1249 in Python): league tree check, the site PR's checks, its enqueue and merge, `ship.sh`, a backend move left to its operator, and the club-news bundle seal. |
 | `weekly_journal.py` | Durable sequential stage execution: ownership lock, input and output fingerprints, resume. |
 | `weekly_publish.py` | Publishes one gameweek's site view: worktree, copy, commit, push and pull request in one command. |
 | `publication_workers.py` | Process scheduling for the member publication service. |
@@ -52,6 +58,8 @@ optional football inputs it seals.
 | `football_minute_basis.py` | Dispatches composite companions with captured roster, deadline and calendar bindings, while retaining legacy fixture-basis reading (`src/squadopt/platform/football_minute_basis.py:88`). |
 | `football_publication.py` | Validates and publishes capture-bound football documents without fitting a model. |
 | `history_documents.py` | The public shape of recorded weekly history (`weekly_suggestion_history_v1`), without computing a score. |
+| `requested_history_snapshot.py` | Takes a short queue metadata snapshot, copies immutable completed answers outside the queue lock and publishes a verified private receipt for the weekly run. |
+| `requested_suggestion_history.py` | Exports completed requests from an offline store, validates their retained captures and publishes scored history through the weekly stage or the two operator commands; never starts a plan solve. |
 
 ## Advice API services
 
@@ -62,6 +70,8 @@ What the API process serves, and the composition root that wires the backend's p
 | `backend_runtime.py` | The composition root: the one place the backend's parts are wired to each other, for the API and the worker. |
 | `advice_read.py` | The read side of on-demand advice: league state and pure cache lookups. |
 | `advice_submit.py` | The write side: one request becomes a job record, with rate and open-job limits. |
+| `public_entry_inputs.py` | Pins one requested team's public FPL inputs separately from the weekly capture. |
+| `public_entry_advice.py` | Read-only cache addressing for public teams, computed through the shared queue. |
 | `advice_documents.py` | The public read contracts: what the advice route and the league route may serve. |
 | `api_contract.py` | Transport-neutral request and response contracts of the HTTP API (`backend_api_v1`). |
 | `queries.py` | The query seam for published application views. |

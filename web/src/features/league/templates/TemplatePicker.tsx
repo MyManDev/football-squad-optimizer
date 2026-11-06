@@ -5,15 +5,19 @@
  * the whole selection stays shareable — the address bar is the state. Triggering
  * the computation itself is the compute-flow's work; until it lands, applying a
  * template shows exactly what the published site can show for that combination.
+ *
+ * The member page puts the picker at the top of the plan settings, one compact row of chips
+ * over the strategy and window it sets, so the plan is chosen in one place. A built-in chip
+ * is named by its strategy and adds only its window; a member's own chip says the whole
+ * selection it stands for, since its name is the member's.
  */
 
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 
-import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { isPlayMode } from "../../../lib/decisionVocabulary";
-import { isMemberStrategy, type AdviceStrategy } from "../types";
+import { isMemberStrategy, type AdviceStrategy, type EntryView } from "../types";
 import {
   builtinTemplates,
   LocalTemplateStore,
@@ -24,10 +28,23 @@ import styles from "./TemplatePicker.module.css";
 
 const DEFAULT_STORE = new LocalTemplateStore();
 
+/** A saved rival's name in the league's list; null where the list has no name for them. */
+function memberName(members: readonly EntryView[], entryId: number): string | null {
+  const member = members.find((candidate) => candidate.entry_id === entryId);
+  // `entry-<id>` is what the producer publishes for a member with no readable name
+  // (`_entry_stand_in` in league_views.py): a number, so it is no name to print.
+  const named = (name: string | null | undefined) =>
+    name && name !== `entry-${entryId}` ? name : null;
+  return named(member?.manager_name) ?? named(member?.team_name);
+}
+
 export function TemplatePicker({
+  members,
   store = DEFAULT_STORE,
   canApply,
 }: {
+  /** The league's list, where a saved template's rival finds the name it is printed by. */
+  members: readonly EntryView[];
   store?: TemplateStore;
   canApply?: (selection: URLSearchParams) => boolean;
 }) {
@@ -91,8 +108,8 @@ export function TemplatePicker({
   }
 
   return (
-    <Card tone="muted" title={copy.templatesTitle}>
-      <p className={styles.hint}>{copy.templatesBody}</p>
+    <fieldset className={styles.presets}>
+      <legend className={styles.legend}>{copy.templatesTitle}</legend>
       <div className={styles.list}>
         {[...builtins, ...saved].map((template) => {
           const active =
@@ -109,15 +126,17 @@ export function TemplatePicker({
               >
                 {template.name}
                 <span className={styles.meta}>
-                  {copy.templateMeta(
-                    isMemberStrategy(template.strategy)
-                      ? copy.strategies[template.strategy].name
-                      : template.strategy,
-                    template.window,
-                    template.rival === "nearest_above"
-                      ? copy.computeRivalNearest
-                      : `#${template.rival}`,
-                  )}
+                  {template.builtin
+                    ? messages.decision.week(template.window)
+                    : copy.templateMeta(
+                        isMemberStrategy(template.strategy)
+                          ? copy.strategies[template.strategy].name
+                          : template.strategy,
+                        template.window,
+                        template.rival === "nearest_above"
+                          ? copy.computeRivalNearest
+                          : memberName(members, template.rival),
+                      )}
                 </span>
               </button>
               {template.builtin ? null : (
@@ -133,19 +152,20 @@ export function TemplatePicker({
             </span>
           );
         })}
+        {/* Saving the current selection is the row's last chip: a name and one button. */}
+        <span className={styles.saveRow}>
+          <input
+            className={styles.nameInput}
+            value={draftName}
+            onChange={(event) => setDraftName(event.target.value)}
+            placeholder={copy.templateNamePlaceholder}
+            aria-label={copy.templateNamePlaceholder}
+          />
+          <button type="button" className={styles.save} onClick={saveCurrent}>
+            {copy.templateSave}
+          </button>
+        </span>
       </div>
-      <div className={styles.saveRow}>
-        <input
-          className={styles.nameInput}
-          value={draftName}
-          onChange={(event) => setDraftName(event.target.value)}
-          placeholder={copy.templateNamePlaceholder}
-          aria-label={copy.templateNamePlaceholder}
-        />
-        <button type="button" className={styles.save} onClick={saveCurrent}>
-          {copy.templateSave}
-        </button>
-      </div>
-    </Card>
+    </fieldset>
   );
 }

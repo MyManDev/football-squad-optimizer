@@ -24,6 +24,13 @@ rather than on every tick, and a job that has been retried past the limit is fai
 code instead of crash-looping forever. An idle worker also archives finished jobs older than
 the retention window, at most once per interval, so the queue's records stay the recent ones.
 
+**Progress.** Before the first solve the compute callback knows which documents this
+attempt has to solve (``documents_to_solve``: the asked one, plus what it is priced or
+compared against that the cache does not hold yet), and it records "0 of N" beside the job,
+then one more as each is solved. The job view serves that count while the job runs. A
+worker also names the job it holds in its heartbeat, so the view can say how many of the
+live workers are busy.
+
 The claim is kept alive while the computation runs. One member's plan is not one solve —
 a rival strategy runs the control plan, the banded plan and the payload's own plan — so the
 wall time that matters is a multiple of the 3.0 to 29.6 s single-solve measurement the 300 s
@@ -43,6 +50,7 @@ import time
 import traceback
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
+from dataclasses import replace
 from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
@@ -54,6 +62,7 @@ from squadopt.application.advice_menu import (
     ManagersWordNotSolved,
     MenuRequest,
     advise_menu_entry,
+    documents_to_solve,
 )
 from squadopt.application.football_participation import INHERITED_ZERO_LIMIT, participation_summary
 from squadopt.application.football_roles import role_forecast_summary
@@ -97,7 +106,12 @@ from squadopt.platform.backend_runtime import (
 from squadopt.platform.capture_context import AdviceCaptureContext
 from squadopt.platform.jobs_contract import AdviceJob
 from squadopt.platform.native_windows import execute_native_window, summarize_native_windows
-from squadopt.platform.queue_contracts import DEFAULT_ARCHIVE_AFTER_SECONDS, QueueLockTimeout
+from squadopt.platform.public_entry_inputs import PUBLIC_ENTRY_SWITCH, PublicEntryInputs
+from squadopt.platform.queue_contracts import (
+    DEFAULT_ARCHIVE_AFTER_SECONDS,
+    ProgressRecorder,
+    QueueLockTimeout,
+)
 from squadopt.platform.worker_heartbeat import (
     IDLE_WAIT_SECONDS,
     PULSE_SECONDS,
@@ -256,6 +270,39 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     )
 
 
+class _DocumentCount:
+    """The documents one attempt has to solve, counted as ``advise_menu_entry`` solves them.
+
+    ``total`` is fixed when the count starts and each document counts once, so what the
+    job view serves only goes up and never passes it. A document another job puts in the
+    cache after the count started is read from there, never solved, and never counted; the
+    job then finishes short of its total, which nobody sees, since a finished job has no
+    progress. A record that cannot be written (the queue's lock stayed busy, the attempt
+    lost its claim) is dropped: the next one carries the count, and the job goes on.
+    """
+
+    def __init__(
+        self, job: AdviceJob, documents: tuple[MenuRequest, ...], record: ProgressRecorder
+    ) -> None:
+        self._job = job
+        self._waiting = set(documents)
+        self._total = len(self._waiting)
+        self._done = 0
+        self._record = record
+        self._write()
+
+    def solved(self, address: MenuRequest) -> None:
+        if address not in self._waiting:
+            return
+        self._waiting.discard(address)
+        self._done += 1
+        self._write()
+
+    def _write(self) -> None:
+        with contextlib.suppress(Exception):
+            self._record(self._job, done=self._done, total=self._total)
+
+
 def build_advice_compute(
     contexts: CaptureContextProvider,
     specs: AdviceJobSpecStore,
@@ -263,6 +310,8 @@ def build_advice_compute(
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     cache: AdviceCacheRepository | None = None,
     job_log_fields: dict[str, object] | None = None,
+    progress: ProgressRecorder | None = None,
+    public_inputs: PublicEntryInputs | None = None,
 ) -> Callable[[AdviceJob], bytes]:
     """Return the callback that turns one claimed job into the bytes it will be served as.
 
@@ -272,6 +321,11 @@ def build_advice_compute(
     is the very payload the computation would produce again, so it is read back instead
     of solved a second time. A window solve is minutes, and this is most of what a
     switched-on window costs.
+
+    ``progress`` records how many of its documents the attempt has solved: "0 of N" once
+    the request is read back and checked, then one more as each document is solved. The
+    documents are the asked one and those it is priced or compared against that the cache
+    does not hold when the count starts. Nothing is recorded inside a solve.
     """
 
     uses_rival = {slug: value.requires_rival for slug, value in menu_capabilities().items()}
@@ -293,9 +347,11 @@ def build_advice_compute(
             configuration_fingerprint=spec.context.configuration_fingerprint,
             rival_entry_id=address.rival_entry_id,
             strategy_uses_rival=uses_rival[address.strategy],
-            switches={MODEL_SWITCH: spec.switches[MODEL_SWITCH]}
-            if MODEL_SWITCH in spec.switches
-            else {},
+            switches={
+                name: identity
+                for name, identity in spec.switches.items()
+                if name in {MODEL_SWITCH, PUBLIC_ENTRY_SWITCH}
+            },
         )
         held = cache.get(key)
         if held is None:
@@ -348,9 +404,37 @@ def build_advice_compute(
                 f"{spec.context.capture_snapshot_id}) is no longer the one this backend "
                 "answers from; ask again to be answered from the current one.",
             )
+        menu_spec = spec
+        if PUBLIC_ENTRY_SWITCH in spec.switches:
+            fingerprint = spec.switch(PUBLIC_ENTRY_SWITCH).get("fingerprint")
+            if (
+                public_inputs is None
+                or set(spec.switches) != {PUBLIC_ENTRY_SWITCH}
+                or spec.strategy != "saf-puan"
+                or spec.window != 1
+                or spec.rival_entry_id is not None
+                or not isinstance(fingerprint, str)
+            ):
+                raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unsupported public team request.")
+            identity = contexts.identity()
+            if identity is None or identity.context != spec.context:
+                raise AdviceComputeRefused(
+                    "CONTEXT_UNAVAILABLE", "The capture changed before computation."
+                )
+            try:
+                provider = public_inputs.provider(
+                    spec.context, spec.entry_id, fingerprint, identity.snapshot.payloads
+                )
+            except (ValueError, OSError) as error:
+                raise AdviceComputeRefused(
+                    "PUBLIC_ENTRY_INPUTS_UNAVAILABLE",
+                    "The requested team's inputs are unavailable.",
+                ) from error
+            capture = replace(capture, provider=provider)
+            menu_spec = replace(spec, switches={})
         if capture.switches.official_injuries is not None:
             require_official_injury_source()
-        request = _menu_request(spec, capture)
+        request = _menu_request(menu_spec, capture)
         football = capture.switches.football if MODEL_SWITCH in spec.switches else None
         projection = football.projection if football is not None else capture.projection
         horizon_builder = (
@@ -365,6 +449,19 @@ def build_advice_compute(
                     f"{label} {entry} is not in the capture this backend answers from, so "
                     "there is no squad to advise from yet.",
                 )
+
+        def prerequisite(address: MenuRequest) -> dict[str, object] | None:
+            return cached_plain(spec, address)
+
+        count = (
+            None
+            if progress is None
+            else _DocumentCount(
+                job,
+                documents_to_solve(request, projection=projection, prerequisite=prerequisite),
+                progress,
+            )
+        )
         native_windows: list[NativeWindowOutcome] = []
         try:
             with (
@@ -381,7 +478,8 @@ def build_advice_compute(
                     top100_counts=capture.top100_counts,
                     manager_words=capture.manager_words,
                     chip_forecast_source=capture.chip_forecast_source if football is None else None,
-                    prerequisite=lambda address: cached_plain(spec, address),
+                    prerequisite=prerequisite,
+                    on_document=None if count is None else count.solved,
                 )
         except ChipUnavailable as error:
             raise AdviceComputeRefused(error.code, str(error)) from error
@@ -509,6 +607,7 @@ def run_advice_worker(
     job_log_fields: dict[str, object] | None = None,
     heartbeat: Callable[[], None] | None = None,
     pulse_seconds: float = PULSE_SECONDS,
+    holding: Callable[[str | None], None] | None = None,
 ) -> int:
     """Claim and compute until told to stop; return how many jobs reached a terminal state.
 
@@ -540,6 +639,10 @@ def run_advice_worker(
     ends, so readiness can tell a busy worker from one that has stopped. A heartbeat that
     cannot be written is logged when it starts failing and when it works again; it never
     ends a round.
+
+    ``holding`` is told the job a round holds when its compute starts, and ``None`` when
+    the round ends, each followed at once by a heartbeat, so the documents say which
+    workers are busy from the start of a solve to its end rather than from the first pulse.
     """
 
     processed = 0
@@ -590,7 +693,7 @@ def run_advice_worker(
                         reason=str(error),
                         snapshot_id=None if context is None else context.capture_snapshot_id,
                     )
-        pulse = None if heartbeat is None else _Pulse(heartbeat, pulse_seconds)
+        pulse = None if heartbeat is None else _Pulse(heartbeat, pulse_seconds, holding)
         try:
             if elapsed - recovered_at >= recover_every_seconds:
                 recovered = queue.recover(clock=lambda: _stamp(now()), lease_seconds=lease_seconds)
@@ -698,20 +801,42 @@ class _Pulse:
     Started by the first compute call, so an empty queue costs no thread, and stopped when
     the round ends, so the completion's own lock waits are covered too. The claim's lease
     heartbeat is a separate thing and stays in ``run_advice_worker_once``.
+
+    Given ``holding``, the first compute call also names its job and beats at once, and the
+    end of the round names none and beats again: a solve shorter than one pulse still shows
+    its worker as busy, and a worker that has finished does not read as busy until its next
+    round, which may be a whole backoff away.
     """
 
-    def __init__(self, heartbeat: Callable[[], None], every_seconds: float) -> None:
+    def __init__(
+        self,
+        heartbeat: Callable[[], None],
+        every_seconds: float,
+        holding: Callable[[str | None], None] | None = None,
+    ) -> None:
         self._heartbeat = heartbeat
         self._every = every_seconds
+        self._holding = holding
+        self._held = False
         self._stopped = threading.Event()
         self._thread: threading.Thread | None = None
 
     def around(self, compute: Callable[[AdviceJob], bytes]) -> Callable[[AdviceJob], bytes]:
         def pulsed(job: AdviceJob) -> bytes:
+            if self._holding is not None:
+                self._held = True
+                self._say(job.job_id)
             self._start()
             return compute(job)
 
         return pulsed
+
+    def _say(self, job_id: str | None) -> None:
+        assert self._holding is not None
+        self._holding(job_id)
+        # The round's own beat reports failures; this one only keeps the count current.
+        with contextlib.suppress(Exception):
+            self._heartbeat()
 
     def _start(self) -> None:
         if self._thread is not None or self._every <= 0.0:
@@ -730,6 +855,9 @@ class _Pulse:
         self._stopped.set()
         if self._thread is not None:
             self._thread.join(timeout=1.0)
+        if self._held:
+            self._held = False
+            self._say(None)
 
 
 def _wait(
@@ -853,6 +981,8 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 max_attempts=arguments.max_attempts,
                 cache=running.cache,
                 job_log_fields=job_log_fields,
+                progress=running.queue.record_progress,
+                public_inputs=running.public_inputs,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.
@@ -864,6 +994,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
             log=running.log,
             job_log_fields=job_log_fields,
             heartbeat=heartbeat.beat,
+            holding=heartbeat.hold,
         )
     running.log.event("advice_worker_stopped", processed=processed)
     return 0

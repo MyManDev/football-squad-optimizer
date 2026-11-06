@@ -40,6 +40,7 @@ from squadopt.application.league_views import (
 )
 from squadopt.application.manager_words import ManagerWords, load_manager_words
 from squadopt.application.mode_selection import build_mode_paths
+from squadopt.application.player_names import game_names, with_game_short_names
 from squadopt.application.publication_history import explicit_archive_seasons
 from squadopt.application.top100_weight import (
     Top100Counts,
@@ -47,7 +48,7 @@ from squadopt.application.top100_weight import (
     load_top100_counts,
 )
 from squadopt.application.weekly_suggestion_eval import (
-    SUPPORTED_LEAGUE_ID,
+    legacy_record_league,
     publish_suggestion_histories,
     published_advice_captures,
     published_page_captures,
@@ -553,12 +554,13 @@ def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] 
 def records_advice_for(league_id: int) -> bool:
     """Whether to retain this league's legacy full-menu archive.
 
-    New tracked leagues all receive independent baseline records. The first league
-    also keeps its existing published-menu records so prospective measurements and
-    historical advice digests retain their original meaning.
+    New tracked leagues all receive independent baseline records. The league
+    ``config/leagues.json`` marks with ``legacy_advice_records`` (the first league the site
+    published, :func:`legacy_record_league`) also keeps its existing published-menu records,
+    so prospective measurements and historical advice digests retain their original meaning.
     """
 
-    return league_id == SUPPORTED_LEAGUE_ID
+    return league_id == legacy_record_league()
 
 
 def settle_legacy_tree(
@@ -847,12 +849,17 @@ def publish_prepared_league(
     # The capture's own table, shared by every league of the run and written once: checked
     # against any table already on disk before a member is solved, written after the tree,
     # which keeps its own copy for pages from before the per-capture table.
-    table_payload = device_plan_capture_table(
-        inputs,
-        projection,
-        read_season_rules(snapshot, season=season),
-        bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
-        top100=top100_counts,
+    # Every page names a player as the game does, and the device table beside them too.
+    short_names = game_names(snapshot.payloads[BOOTSTRAP_PAYLOAD], inputs.players)
+    table_payload = with_game_short_names(
+        device_plan_capture_table(
+            inputs,
+            projection,
+            read_season_rules(snapshot, season=season),
+            bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
+            top100=top100_counts,
+        ),
+        short_names,
     )
     check_device_plan_table(
         site_data, request.snapshot_id, table_payload, remedy=BUILDER_TABLE_REMEDY
@@ -892,6 +899,7 @@ def publish_prepared_league(
         chip_forecast_source=forecast_source(snapshot),
         controls=baselines.controls if baselines is not None else None,
         device_only=request.menu == "device",
+        short_names=short_names,
     )
     if on_stage is not None:
         on_stage("members")

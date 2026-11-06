@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -109,7 +109,7 @@ jobs:
           docker run --rm squadopt-backend:ci python -VV
           docker run --rm squadopt-backend:ci python -m pip freeze
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
           cache: pip
@@ -187,7 +187,9 @@ jobs:
         run: npm run build
 
       - name: Device spec on Chromium, WebKit and Firefox
-        timeout-minutes: 8
+        # The expanded 219-case suite completed in 11m19s; a queue run reached 214 cases
+        # without an assertion failure before the old 12-minute step limit expired.
+        timeout-minutes: 16
         shell: bash
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/device-engines.json
@@ -207,7 +209,7 @@ jobs:
   web:
     name: web (node 22)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: web
@@ -223,7 +225,7 @@ jobs:
       - name: Install
         run: npm ci
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
           cache: pip
@@ -263,6 +265,18 @@ jobs:
             workers/fpl-probe/test/probe.test.mjs \
             workers/fpl-probe/test/deploy-steps.test.mjs
 
+      # The FPL forwarder Worker (ADR 0012), tested the same way: a fake FPL, a fake site and an
+      # in-memory cache, no credentials and no network. Its deploy-steps.test.mjs checks this
+      # list, and the one in deploy-fpl-proxy.yml, against its test directory.
+      - name: FPL forwarder worker tests
+        working-directory: .
+        run: |
+          node --test \
+            workers/fpl-proxy/test/proxy.test.mjs \
+            workers/fpl-proxy/test/activity.test.mjs \
+            workers/fpl-proxy/test/worker.test.mjs \
+            workers/fpl-proxy/test/deploy-steps.test.mjs
+
       - name: Build
         env:
           # Unset or empty is the static site, byte for byte (ADR 0006). A repository
@@ -291,7 +305,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Playwright smoke
-        timeout-minutes: 8
+        timeout-minutes: 15
         env:
           VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run e2e

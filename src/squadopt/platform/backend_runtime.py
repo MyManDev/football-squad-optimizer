@@ -75,6 +75,8 @@ from squadopt.platform.capture_context import (
     load_capture_context,
     load_capture_identity,
 )
+from squadopt.platform.public_entry_advice import PublicEntryAdviceReader
+from squadopt.platform.public_entry_inputs import PublicEntryInputs
 from squadopt.platform.storage.store_probe import StoreProbeResult, probe_store
 from squadopt.platform.worker_heartbeat import WORKER_DIRECTORY, WorkerLiveness
 
@@ -211,6 +213,8 @@ class BackendConfig:
     rate_limit: int = DEFAULT_RATE_LIMIT
     rate_window_seconds: float = DEFAULT_RATE_WINDOW_SECONDS
     max_open_jobs_per_client: int = 4
+    public_entries: bool = False
+    public_queue_limit: int = 32
     artifact_root: Path | None = None
     """The repository's ``artifacts/`` directory, where the weekly run leaves the Top 100
     evidence export (``phase_b/``) and the rotation table (``rotation/``). Optional: unset,
@@ -272,12 +276,17 @@ class BackendConfig:
         season = source.get("SQUADOPT_BACKEND_SEASON", "").strip() or None
         artifact_root = source.get("SQUADOPT_BACKEND_ARTIFACT_ROOT", "").strip()
         club_news_source = source.get("SQUADOPT_BACKEND_CLUB_NEWS_SOURCE", "").strip()
+        public_entries = source.get("SQUADOPT_BACKEND_PUBLIC_ENTRIES", "0").strip()
+        if public_entries not in {"0", "1"}:
+            raise BackendConfigError("SQUADOPT_BACKEND_PUBLIC_ENTRIES must be 0 or 1.")
         return cls(
             store_root=values["store_root"],
             site_data_root=values["site_data_root"],
             snapshot_root=values["snapshot_root"],
             handoff_root=values["handoff_root"],
             allowed_origins=origins,
+            public_entries=public_entries == "1",
+            public_queue_limit=_positive_int(source, "SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT", 32),
             season=season,
             rate_limit=_positive_int(source, "SQUADOPT_BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT),
             max_open_jobs_per_client=_positive_int(
@@ -729,6 +738,9 @@ class AdviceBackend:
     metrics: AdviceMetrics
     log: AdviceLog
     liveness: WorkerLiveness
+    public_inputs: PublicEntryInputs | None = None
+    public_reader: AdviceReadStore | None = None
+    public_submit: AdviceSubmitService | None = None
 
     def queue_depth(self) -> int:
         """Open work, not history: a terminal job is not something a member waits for."""
@@ -782,6 +794,7 @@ def build_backend(
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
     specs = FileAdviceJobSpecStore(config.spec_root)
+    liveness = WorkerLiveness(config.worker_root, queue)
     gate = probe if probe is not None else StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
         config,
@@ -799,17 +812,42 @@ def build_backend(
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
     )
+    limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
         reader,
         queue,
-        rate_limiter=FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds),
+        rate_limiter=limiter,
         max_open_jobs_per_client=config.max_open_jobs_per_client,
         deadline_for=contexts.deadline_for,
         specs=specs,
         # Accepting work the store cannot hold is a promise the deployment cannot keep:
         # the job write would fail, or succeed onto storage nobody will read again.
         store_ready=gate.passed,
+        # The job view's place in line and worker counts come from the look /ready holds.
+        job_look=liveness.look,
+        job_progress=queue.progress,
     )
+    public_inputs = None
+    public_reader = None
+    public_submit = None
+    if config.public_entries:
+        public_inputs = PublicEntryInputs(FileAdviceCache(config.store_root / "public-entries"))
+        public_reader = PublicEntryAdviceReader(
+            FileLeagueDirectory(config.site_data_root), cache, contexts, public_inputs
+        )
+        public_submit = AdviceSubmitService(
+            public_reader,
+            queue,
+            rate_limiter=limiter,
+            specs=specs,
+            store_ready=gate.passed,
+            max_open_jobs_per_client=config.max_open_jobs_per_client,
+            deadline_for=contexts.deadline_for,
+            job_look=liveness.look,
+            job_progress=queue.progress,
+            prepare_inputs=public_inputs.prepare,
+            max_open_jobs=config.public_queue_limit,
+        )
     return AdviceBackend(
         config=config,
         queue=queue,
@@ -821,7 +859,10 @@ def build_backend(
         probe=gate,
         metrics=metrics,
         log=component_log,
-        liveness=WorkerLiveness(config.worker_root, queue),
+        liveness=liveness,
+        public_inputs=public_inputs,
+        public_reader=public_reader,
+        public_submit=public_submit,
     )
 
 

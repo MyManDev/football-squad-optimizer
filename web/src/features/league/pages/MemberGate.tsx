@@ -50,7 +50,7 @@ export function MemberGate({ children }: { children: ReactNode }) {
   const shell = useShell();
   const { messages } = useLanguage();
 
-  // After Onayla, focus goes to the page that replaces the picker, never to a removed node.
+  // After a name is chosen, focus goes to the page that replaces the picker, never to a removed node.
   const focusAfterClaim = useRef(false);
   useEffect(() => {
     if (status === "claimed" && focusAfterClaim.current) {
@@ -70,7 +70,7 @@ export function MemberGate({ children }: { children: ReactNode }) {
     arrived.current = null;
   }, [status, ownPage]);
 
-  // One step per Onayla: a second confirm before the first transition's update has run
+  // One step per choice: a second choice before the first transition's update has run
   // (two Enter presses in one frame) is ignored, so it neither starts a transition that
   // skips the first nor writes the claim and the history entry again. The update clears
   // it, and where there is no transition the update has already run when `crossfade`

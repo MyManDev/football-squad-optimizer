@@ -1,7 +1,7 @@
 /**
  * What the worker posts for a request: one answer, as before, for every request but chip
- * gains; for chip gains the plain plan first, with its own solving time, and the gains
- * after it from the same run. A plain plan that is refused sends no gains, and a failure
+ * gains; for chip gains the plain plan first, with its own solving time, a count as each
+ * chip is tried, and the gains after it from the same run. A plain plan that is refused sends no gains, and a failure
  * after the plan loses the gains, never the plan.
  */
 
@@ -72,7 +72,7 @@ describe("the worker's replies", () => {
     expect(posted.map((reply) => reply.kind)).toEqual(["answer"]);
   });
 
-  it("post the plain plan before the gains, and the plan is the plain plan alone", () => {
+  it("post the plain plan, then a count for each chip, then the gains; the plan is the plain plan alone", () => {
     const setup = clocked();
     const posted: DevicePlanReply[] = [];
     const solvesAtPost: number[] = [];
@@ -89,9 +89,23 @@ describe("the worker's replies", () => {
     expect(solvesAtPost[0]).toBe(plainSolves());
     expect(posted.map((reply) => [reply.id, reply.kind])).toEqual([
       [7, "plan"],
+      [7, "chip"],
+      [7, "chip"],
+      [7, "chip"],
+      [7, "chip"],
       [7, "gains"],
     ]);
-    const [plan, gains] = posted;
+    // Each chip is counted as it is tried, after its own solve.
+    expect(posted.slice(1, -1)).toEqual(
+      CHIPS.map((_, index) => ({ id: 7, kind: "chip", done: index + 1, total: CHIPS.length })),
+    );
+    expect(
+      solvesAtPost
+        .slice(1, -1)
+        .every((count, index, all) => index === 0 || count > all[index - 1]!),
+    ).toBe(true);
+    const plan = posted[0];
+    const gains = posted.at(-1);
     const [alone] = replies(PLAIN);
     if (plan?.kind !== "plan" || gains?.kind !== "gains" || alone?.kind !== "answer") {
       throw new Error("The replies are not a plan, its gains and a plain answer.");
@@ -114,9 +128,10 @@ describe("the worker's replies", () => {
     expect(posted.map((reply) => reply.kind)).toEqual(["failed"]);
   });
 
-  it("read a chip the ceiling stops as unknown, never zero", () => {
+  it("read a chip the ceiling stops as unknown, never zero, and still count it", () => {
     const plain = plainSolves();
     const posted = replies(GAINS, clocked({ stopped: (call) => call >= plain }));
+    expect(posted.filter((reply) => reply.kind === "chip")).toHaveLength(CHIPS.length);
     expect(posted.at(-1)).toMatchObject({
       kind: "gains",
       gains: { wildcard: null, freehit: null, bboost: null, "3xc": null },

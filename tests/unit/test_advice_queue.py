@@ -17,12 +17,17 @@ from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.advice_queue import (
     AdviceComputeRefused,
+    AdviceLeaseLostError,
     AdviceQueueError,
     FileJobQueue,
     run_advice_worker_once,
 )
 from squadopt.platform.jobs_contract import AdviceJob
-from squadopt.platform.queue_contracts import QueueLockTimeout
+from squadopt.platform.queue_contracts import (
+    JOB_PROGRESS_CONTRACT_VERSION,
+    JobProgress,
+    QueueLockTimeout,
+)
 
 FINGERPRINT = "a" * 64
 CACHE_KEY = "b" * 64
@@ -136,6 +141,21 @@ def test_recover_walks_a_dead_workers_job_back_to_queued(tmp_path: Path) -> None
     )
     assert done is not None and done.status == "completed"
     assert done.attempt == 2
+
+
+def test_the_claim_takes_the_oldest_arrival_whatever_the_file_names_say(tmp_path: Path) -> None:
+    """A job id begins with its cache key's hash, so names sort in no useful order."""
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(_job("advice-ffff-1", created="2026-08-27T12:00:00Z"))
+    queue.submit(_job("advice-0000-1", created="2026-08-27T12:00:02Z"))
+    queue.submit(_job("advice-8888-1", created="2026-08-27T12:00:01Z"))
+    claimed = [queue.claim(at_utc="2026-08-27T12:01:00Z") for _ in range(3)]
+    assert [job.job_id for job in claimed if job is not None] == [
+        "advice-ffff-1",
+        "advice-8888-1",
+        "advice-0000-1",
+    ]
 
 
 def test_submit_is_not_upsert_and_store_needs_an_existing_job(tmp_path: Path) -> None:
@@ -553,3 +573,116 @@ def test_a_terminal_record_refused_on_every_attempt_is_stored_as_a_failed_job(
     assert queue.load("job-0001") == done
     assert cache.get(CACHE_KEY) == b'{"advice": 1}'
     assert not list((tmp_path / "jobs").glob("*.tmp"))
+
+
+# -- how far a running job has got ----------------------------------------------------------
+
+
+def _progress_document(job_id: str, *, attempt: int, done: int, total: int) -> dict[str, Any]:
+    return {
+        "attempt": attempt,
+        "contract_version": JOB_PROGRESS_CONTRACT_VERSION,
+        "done": done,
+        "job_id": job_id,
+        "total": total,
+    }
+
+
+def test_the_running_attempt_records_its_count_beside_the_job_until_it_finishes(
+    tmp_path: Path,
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+    record = tmp_path / "jobs" / "job-0001.progress"
+    queued = queue.load("job-0001")
+    assert queued is not None and queue.progress(queued) is None
+
+    running = queue.claim(at_utc="2026-08-27T12:00:05Z")
+    assert running is not None
+    assert queue.progress(running) is None  # nothing until the attempt says how many
+    queue.record_progress(running, done=0, total=3)
+    queue.record_progress(running, done=1, total=3)
+    assert queue.progress(running) == JobProgress(job_id="job-0001", attempt=1, done=1, total=3)
+    assert json.loads(record.read_bytes()) == _progress_document(
+        "job-0001", attempt=1, done=1, total=3
+    )
+    # Beside the record, never read as one: the scan sees one job and sets nothing aside.
+    assert [job.job_id for job in queue.jobs()] == ["job-0001"]
+    assert not (tmp_path / "jobs" / "integrity").exists()
+
+    completed = queue.complete(
+        running, cache=cache, payload=b'{"advice": 1}', at_utc="2026-08-27T12:00:30Z"
+    )
+    assert not record.exists()  # it goes with the claim marker
+    assert queue.progress(completed) is None
+    with pytest.raises(AdviceLeaseLostError):
+        queue.record_progress(running, done=2, total=3)
+    assert not record.exists()  # a finished job is never given a count again
+
+
+def test_a_job_walked_back_counts_again_from_zero_and_the_old_attempt_cannot_write(
+    tmp_path: Path,
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(_job())
+    record = tmp_path / "jobs" / "job-0001.progress"
+    first = queue.claim(at_utc="2026-08-27T12:00:05Z")
+    assert first is not None
+    queue.record_progress(first, done=2, total=3)
+
+    (requeued,) = queue.recover(at_utc="2026-08-27T12:10:00Z", lease_seconds=0.0)
+    assert requeued.attempt == 2
+    assert not record.exists()
+    assert queue.progress(requeued) is None
+    # The first attempt is still computing somewhere: it may write nothing now.
+    with pytest.raises(AdviceLeaseLostError):
+        queue.record_progress(first, done=3, total=3)
+    assert not record.exists()
+
+    second = queue.claim(at_utc="2026-08-27T12:10:05Z")
+    assert second is not None and second.attempt == 2
+    assert queue.progress(second) is None
+    queue.record_progress(second, done=0, total=1)
+    with pytest.raises(AdviceLeaseLostError):
+        queue.record_progress(first, done=3, total=3)  # nor overwrite its successor's count
+    assert queue.progress(second) == JobProgress(job_id="job-0001", attempt=2, done=0, total=1)
+
+    # A count an earlier attempt left behind, or one that cannot be read, is no count.
+    record.write_text(
+        json.dumps(_progress_document("job-0001", attempt=1, done=2, total=3)), encoding="utf-8"
+    )
+    assert queue.progress(second) is None
+    record.write_text("not json", encoding="utf-8")
+    assert queue.progress(second) is None
+    record.write_text(
+        json.dumps(_progress_document("job-0002", attempt=2, done=0, total=1)), encoding="utf-8"
+    )
+    assert queue.progress(second) is None
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"done": 4, "total": 3},
+        {"done": 0, "total": 0},
+        {"done": -1, "total": 3},
+        {"done": True, "total": 3},
+        {"done": 1.0, "total": 3},
+        {"attempt": 0},
+        {"job_id": "../escape"},
+        {"contract_version": "advice_job_progress_v2"},
+    ],
+)
+def test_a_count_that_cannot_be_is_refused(fields: dict[str, Any]) -> None:
+    document = {**_progress_document("job-0001", attempt=1, done=1, total=3), **fields}
+    with pytest.raises(AdviceQueueError):
+        JobProgress.from_payload(document)
+    with pytest.raises(AdviceQueueError):
+        JobProgress.from_payload(
+            {**_progress_document("job-0001", attempt=1, done=1, total=3), "x": 1}
+        )
+    assert JobProgress(job_id="job-0001", attempt=1, done=3, total=3).as_view() == {
+        "done": 3,
+        "total": 3,
+    }

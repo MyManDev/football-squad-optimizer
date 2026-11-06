@@ -12,6 +12,13 @@ a process's first scan claim, recover and the job listing read only open or chan
 Once a finished record is older than the retention window, ``archive`` moves it unchanged
 into ``archive/`` beside two small indexes (by idempotency key and by cache key). ``load``
 and ``history`` still find it there, and its id is never given to another job.
+
+A running job may also have ``<job_id>.progress`` beside its record: how many of its
+documents the owning attempt has solved. Only that attempt writes it, under the lock and
+after the same ownership check as its heartbeat, so a recovered attempt still computing
+cannot overwrite its successor's count. It goes with the claim marker: recovery removes it
+when it walks the job back, and the terminal cleanup when the job finishes. The scan reads
+only ``.json`` records, so it never reads one.
 """
 
 from __future__ import annotations
@@ -45,6 +52,8 @@ from squadopt.platform.queue_contracts import (
     AdviceLeaseLostError,
     AdviceQueueError,
     AdviceQueueIntegrityError,
+    JobProgress,
+    claim_order,
 )
 from squadopt.platform.storage._queue_lock import QueueFileLock
 
@@ -105,6 +114,9 @@ class FileJobQueue:
 
     def _claim_marker(self, job_id: str) -> Path:
         return self._root / f"{self._valid_id(job_id)}.claim"
+
+    def _progress_record(self, job_id: str) -> Path:
+        return self._root / f"{self._valid_id(job_id)}.progress"
 
     def _open_index(self, cache_key: str) -> Path:
         if not re.fullmatch(r"[0-9a-f]{64}", cache_key):
@@ -210,7 +222,7 @@ class FileJobQueue:
             found.append(job)
         self._finished = finished
         self._settled &= {job.job_id for _stamp, job in finished.values()}
-        return tuple(sorted(found, key=lambda j: (j.created_at_utc, j.job_id)))
+        return tuple(sorted(found, key=claim_order))
 
     def jobs(self) -> tuple[AdviceJob, ...]:
         """The records in ``jobs/``: open work, and finished work not yet archived."""
@@ -307,6 +319,7 @@ class FileJobQueue:
 
     def _cleanup(self, job: AdviceJob) -> None:
         self._claim_marker(job.job_id).unlink(missing_ok=True)
+        self._progress_record(job.job_id).unlink(missing_ok=True)
         index = self._open_index(job.cache_key)
         winner = self._index_job(index, repair=False)
         if winner is not None and winner.job_id == job.job_id:
@@ -445,6 +458,42 @@ class FileJobQueue:
             self._owned(job)
             os.utime(self._claim_marker(job_id))
 
+    def record_progress(self, job: AdviceJob, *, done: int, total: int) -> None:
+        """Record how many of its ``total`` documents the owning attempt has solved.
+
+        Fenced like ``heartbeat``: an attempt that no longer owns the job raises
+        ``AdviceLeaseLostError`` and writes nothing, so it can neither overwrite its
+        successor's count nor leave a record behind a finished job.
+        """
+
+        progress = JobProgress(job_id=job.job_id, attempt=job.attempt, done=done, total=total)
+        payload = (json.dumps(progress.as_payload(), sort_keys=True) + "\n").encode("utf-8")
+        with self._lock.hold():
+            self._owned(job)
+            self._publish(self._progress_record(job.job_id), payload, create=False)
+
+    def progress(self, job: AdviceJob) -> JobProgress | None:
+        """The running attempt's count, or ``None`` before that attempt has written one.
+
+        A record from an earlier attempt, or one that cannot be read, is no count. A job
+        that is not running has none.
+        """
+
+        if job.status != "running":
+            return None
+        with self._lock.hold():
+            try:
+                raw = self._progress_record(job.job_id).read_bytes()
+            except FileNotFoundError:
+                return None
+        try:
+            held = JobProgress.from_payload(json.loads(raw))
+        except (ValueError, UnicodeError, TypeError):
+            return None
+        if held.job_id != job.job_id or held.attempt != job.attempt:
+            return None
+        return held
+
     def recover(
         self,
         *,
@@ -493,6 +542,8 @@ class FileJobQueue:
                 requeued = job.transition("queued", at_utc=stamp())
                 self._write(self._path(job.job_id), requeued)
                 marker.unlink(missing_ok=True)
+                # The next attempt counts from zero; this one's count is history.
+                self._progress_record(job.job_id).unlink(missing_ok=True)
                 recovered.append(requeued)
         return tuple(recovered)
 

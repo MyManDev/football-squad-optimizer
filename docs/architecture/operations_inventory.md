@@ -7,14 +7,14 @@ shows it (last checked 26 September 2026).
 
 | Read-only inspection | Finding |
 | --- | --- |
-| GitHub repository environments | Only `cloudflare-pages` returned. |
+| GitHub repository environments | Only `cloudflare-pages` returned on 9 September. Since 21 October also `cloudflare-workers` (`gh api repos/MyManDev/football-squad-optimizer/environments`, read on 1 November), the environment of the two Worker deployments, `.github/workflows/deploy-fpl-probe.yml` and `.github/workflows/deploy-fpl-proxy.yml`, whose secrets they name as `CLOUDFLARE_WORKERS_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. |
 | Repository variables | `CLOUDFLARE_PAGES_PROJECT=football-squad-optimizer` on 9 September. Since 18 September also `ADVICE_API_ORIGIN=https://squadopt-api.mymandev.com` (`gh variable list`), which the site build in `.github/workflows/ci.yml` has passed as `VITE_ADVICE_API_ORIGIN` since #615 ([backend free hosting](../backend_free_hosting.md#3-tell-the-site-build-where-the-api-is)). Optional `BACKEND_ALERT_ASSIGNEE`, read by `.github/workflows/backend-uptime.yml`: the login a new `backend-down` issue is assigned to (`gh variable set BACKEND_ALERT_ASSIGNEE --body <login>`, a login with push access; unset assigns nobody). |
 | Repository secret names (values not read) | Cloudflare account ID and API token; no backend or backup credential name returned. |
 | Recent GitHub scheduled runs | None on 9 September. Since #676 the `Backend uptime` workflow is scheduled (`*/15` in `.github/workflows/backend-uptime.yml`); `gh run list --event schedule` lists its runs, which land hours apart rather than every fifteen minutes (measured in [backend free hosting](../backend_free_hosting.md#recommendation)). |
 | Windows scheduled task names/actions matching squad, football or FPL | No matching task returned. This does not exclude an unrelatedly named task or another machine. |
 | Azure CLI / Wrangler on this host | Not installed. No Azure subscription inventory was obtained. |
 | Docker | Available; existing unrelated containers were left untouched. |
-| Tracked deployment | Cloudflare publishes the static site. Azure Container Apps/NFS is a placeholder template. Since #602 the live backend runs on the owner's Windows PC behind the `squadopt-api` Cloudflare Tunnel ([backend free hosting](../backend_free_hosting.md)), not on this template or on Compose; a shared mount on another host and an external backup remain unverified. |
+| Tracked deployment | Cloudflare publishes the static site. Azure Container Apps/NFS is a placeholder template. Since 2026-11-02 the live backend runs under `deploy/compose.yaml` on the weekly schedule's Contabo host behind the `squadopt-api-contabo` Cloudflare Tunnel ([the host's guide](../../deploy/weekly-schedule/README.md#the-advice-backend)); before that on an Azure VM from 2026-10-15, and on the owner's Windows PC since #602 ([backend free hosting](../backend_free_hosting.md)). It is not on the Container Apps template; a shared mount on another host and an external backup remain unverified. The FPL forwarder Worker ([ADR 0012](decisions/0012-fpl-forwarder.md)) is tracked in `workers/fpl-proxy` and deployed only by `.github/workflows/deploy-fpl-proxy.yml`; it had not been deployed on 1 November. |
 | Weekly timing | Existing weekly runbook targets capture 2–3 hours before the deadline. No new age policy is introduced. |
 
 On 9 September the evidence did not establish an independent backup, backend server, alert
@@ -62,8 +62,8 @@ deployment that changes persistent state. This is a proposed operating procedure
 claim that such a schedule is running. Record the actual interval between protected copies
 and time an isolated restore before setting a recovery-time commitment. The existing site's
 seven-day CI artifact retention is not a backup policy for private ledger/advice records.
-`scripts/backup_data.ps1` (#670) takes an additive, verified copy of snapshots, ledger, handoffs, advice_records, entries and
-private immutable benchmark_v2_captures when that optional tree exists; the
+`scripts/backup_data.ps1` (#670) takes an additive, verified copy of snapshots, ledger, handoffs, advice_records, entries and,
+when those optional trees exist, the private immutable benchmark_v2_captures and member_baselines; the
 repository does not record whether it runs on a schedule.
 
 No notification target was found on 9 September. Since #676 there is one, for the backend

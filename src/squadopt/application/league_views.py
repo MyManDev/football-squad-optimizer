@@ -97,11 +97,13 @@ from squadopt.application.entries import (
 )
 from squadopt.application.manager_words import MANAGERS_WORD_FILE, ManagerWords
 from squadopt.application.mode_selection import (
+    MODE_SLUGS,
     ModeSelectionError,
     choose_rival,
     rival_squad_from_picks,
     select_member_modes,
 )
+from squadopt.application.player_names import GameName, with_game_short_names
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.application.strategies.rule import RIVAL_RULE_STRATEGIES, suggest_strategy
 from squadopt.application.top100_weight import (
@@ -1322,6 +1324,7 @@ def build_league_views(
     chip_forecast_source: ForecastSource | None = None,
     controls: Mapping[int, MemberControl] | None = None,
     device_only: bool = False,
+    short_names: Mapping[int, GameName] | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -1385,6 +1388,10 @@ def build_league_views(
     The records are written after every member's files are on disk, so a refusal can never
     stop the advice being published; the refusal is raised once, after every writable record
     has been written. The published bytes are identical with and without this argument.
+
+    ``short_names``, the capture's own names (``player_names.game_names``), sets every
+    published player's ``short_name`` to the one the game shows, as each file is written.
+    Without it a player keeps the label cut from his full name, the files' bytes as before.
     """
 
     # Every member-typed name is normalised here, once, before anything reads a standings
@@ -1563,12 +1570,15 @@ def build_league_views(
 
     stale_removed: list[str] = []
 
+    def _labelled(payload: Mapping[str, object]) -> Mapping[str, object]:
+        return with_game_short_names(payload, short_names or {})
+
     def _write(relative: str, payload: Mapping[str, object]) -> bytes:
         """Write one published file and return the exact bytes that landed at that path."""
 
         path = out / relative
         path.parent.mkdir(parents=True, exist_ok=True)
-        text = json.dumps(_envelope(payload, generated_at_utc=generated), indent=2)
+        text = json.dumps(_envelope(_labelled(payload), generated_at_utc=generated), indent=2)
         path.write_text(text, encoding="utf-8", newline="\n")
         written.append(relative)
         # ``newline="\n"`` writes the text untranslated, so these are the file's bytes.
@@ -1704,7 +1714,7 @@ def build_league_views(
             picks, inputs, projection, rules, prices, top100_counts
         )
         squad_path.write_text(
-            json.dumps(_envelope(squad_payload, generated_at_utc=generated), indent=2),
+            json.dumps(_envelope(_labelled(squad_payload), generated_at_utc=generated), indent=2),
             encoding="utf-8",
             newline="\n",
         )
@@ -1862,19 +1872,37 @@ def build_league_views(
                 variant_path(entry_id, strategy, window, rival_id, weight)
                 for strategy, window, rival_id, weight, _payload in render.variant_payloads
             ),
+            # The one-week rival files and the default rival's plain copy are written after
+            # this sweep, so they are named here: a rival this run keeps is not removed.
+            *(
+                f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}/vs-{rival_id}.json"
+                for strategy, rival_id, _payload in render.rival_payloads
+            ),
+            *(
+                f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}.json"
+                for strategy, rival_id, _payload in render.rival_payloads
+                if rival_id == task.default_rival_id
+            ),
         }
         member_directory = out / f"advice/{entry_id}"
         if member_directory.is_dir():
-            # A setting's document, a chosen chip's, or a rival strategy's window, that an
-            # earlier publish wrote and this one did not would otherwise stay beside an
-            # index that does not name it.
+            # A setting's document, a chosen chip's, or a rival strategy's file at any
+            # window, that an earlier publish wrote and this one did not would otherwise
+            # stay beside an index that does not name it. The standings pair a member with
+            # new rivals as the table moves, so last week's one-week files against a rival
+            # who is no longer listed are among them (GW8 inherited 56 from GW7).
             candidates = {
                 *member_directory.rglob("top100-*.json"),
                 *member_directory.rglob("chip-*.json"),
                 *(
                     path
-                    for path in member_directory.glob("*/[35]/vs-*.json")
+                    for path in member_directory.glob("*/*/vs-*.json")
                     if path.parent.parent.name != COMPUTED_MODE
+                ),
+                *(
+                    path
+                    for path in member_directory.glob(f"*/{COMPUTED_WINDOW}.json")
+                    if path.parent.name not in MODE_SLUGS.values()
                 ),
             }
             for stale_file in sorted(candidates):
@@ -2211,7 +2239,7 @@ def build_league_views(
     }
     members_path = out / "members.json"
     members_path.write_text(
-        json.dumps(_envelope(members_payload, generated_at_utc=generated), indent=2),
+        json.dumps(_envelope(_labelled(members_payload), generated_at_utc=generated), indent=2),
         encoding="utf-8",
         newline="\n",
     )

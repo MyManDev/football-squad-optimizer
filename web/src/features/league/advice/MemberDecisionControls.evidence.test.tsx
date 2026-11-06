@@ -1,8 +1,7 @@
 /**
  * The switch for the manager's word is shown always and enabled only where the producer
- * solved it: disabled with the reason when no club news was read, disabled with a note
- * when the selection is not the one-week pure-points plan, and marked as example data
- * when the words came from the synthetic fixture.
+ * solved it: disabled when no club news was read, and disabled with a note naming the plan
+ * it needs when the selection is not the one-week pure-points plan.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -11,7 +10,6 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import { MESSAGES } from "../../../i18n/messages";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { EntryAdviceIndex } from "../types";
 import { EVIDENCE_COPY } from "./evidenceCopy";
@@ -48,27 +46,23 @@ function renderControls(
 }
 
 describe("the manager's word switch", () => {
-  it("is disabled with the reason when the publish read no club news", () => {
-    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, {
+  it("is disabled when the publish read no club news", () => {
+    const { container } = renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, {
       available: false,
       reason: "no_evidence_this_run",
     });
     const box = screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ });
     expect(box).toBeDisabled();
     expect(box).not.toBeChecked();
-    expect(screen.getByText(EVIDENCE_COPY.tr.unavailableReasons.no_evidence_this_run)).toBeTruthy();
+    expect(container.textContent).not.toContain("no_evidence_this_run");
   });
 
-  it("switches the URL on and off where the producer solved it, and says it is example data", () => {
-    const { container } = renderControls(
-      `/league/352490/members/${ENTRY}?mode=saf-puan&window=1`,
-      SOLVED,
-    );
+  it("switches the URL on and off where the producer solved it", () => {
+    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED);
     const box = screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ });
     expect(box).toBeEnabled();
     expect(box).not.toBeChecked();
-    expect(container.textContent).toContain(MESSAGES.tr.leagueMembers.exampleData);
-    expect(container.textContent).toContain(EVIDENCE_COPY.tr.sourceExample);
+    expect(box.closest("fieldset")!.querySelector("p")).toBeNull();
 
     fireEvent.click(box);
     expect(screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ })).toBeChecked();
@@ -102,30 +96,11 @@ describe("the manager's word switch", () => {
 });
 
 describe("the manager's word switch, source and reason", () => {
-  it("translates a member-level failure instead of printing the producer's text", () => {
+  it("never prints the producer's text for a member-level failure", () => {
     const { container } = renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, {
       available: false,
       reason: "not_solved_for_member",
     });
-    expect(container.textContent).toContain(
-      EVIDENCE_COPY.tr.unavailableReasons.not_solved_for_member,
-    );
     expect(container.textContent).not.toContain("not_solved_for_member");
-  });
-
-  it("labels any source other than a club-news capture as example data", () => {
-    const fixtureFile = { ...SOLVED, source_kind: "fixture_file" } as EntryAdviceIndex["evidence"];
-    const { container, unmount } = renderControls(
-      `/league/352490/members/${ENTRY}?mode=saf-puan&window=1`,
-      fixtureFile,
-    );
-    expect(container.textContent).toContain(MESSAGES.tr.leagueMembers.exampleData);
-    expect(container.textContent).toContain(EVIDENCE_COPY.tr.sourceExample);
-    unmount();
-
-    const capture = { ...SOLVED, source_kind: "club_news_capture" } as EntryAdviceIndex["evidence"];
-    const real = renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, capture);
-    expect(real.container.textContent).not.toContain(MESSAGES.tr.leagueMembers.exampleData);
-    expect(real.container.textContent).toContain(EVIDENCE_COPY.tr.sourceCapture);
   });
 });

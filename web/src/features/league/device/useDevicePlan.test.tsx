@@ -30,9 +30,8 @@ import {
 import { replyTo } from "./replies";
 import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
+import { deviceChip } from "./selection";
 import {
-  deviceChip,
-  deviceSolvable,
   useDevicePlan,
   type DeviceSolver,
   type DevicePlanPhase,
@@ -381,19 +380,6 @@ describe("what the device can solve", () => {
   });
 
   const squad = squadWith(entry);
-
-  it("is the pure-points plan over one week, a held chip, or a rival strategy", () => {
-    expect(deviceSolvable(REQUEST, squad)).toBe(true);
-    expect(deviceSolvable({ ...REQUEST, window: 3 }, squad)).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, strategy: "ortak-koru", rivalEntryId: 2 }, squad)).toBe(
-      true,
-    );
-    expect(deviceSolvable({ ...REQUEST, strategy: "ortak-koru" }, squad)).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, top100Weight: 20 }, squad)).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, managersWord: true }, squad)).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, chip: "bboost" }, squad)).toBe(true);
-    expect(deviceSolvable({ ...REQUEST, model: "football" }, squad)).toBe(false);
-  });
 
   it("takes a chip only where the squad document says the member can still play it", () => {
     const used = structuredClone(squad);
@@ -1648,6 +1634,12 @@ describe("the chip timing's gains", () => {
         data: { id: request.id, kind: "plan", answer: plan },
       } as MessageEvent<DevicePlanReply>);
     }
+    /** A chip of the request posted `index`th tried: `done` of `total`. */
+    count(index: number, done: number, total: number): void {
+      this.onmessage?.({
+        data: { id: this.posted[index]!.id, kind: "chip", done, total },
+      } as MessageEvent<DevicePlanReply>);
+    }
     /** The gains of the request posted `index`th, or a run that failed after its plan. */
     release(index: number, gains: Record<string, number | null> | null = { wildcard: 9 }): void {
       this.onmessage?.({
@@ -1710,19 +1702,16 @@ describe("the chip timing's gains", () => {
     expect(latest.envelope.payload.chip ?? null).toBeNull();
   });
 
-  it("follow the plan: it is shown first, with its own time, and the gains do not change it", async () => {
+  it("follow the plan: it is shown first, and the gains do not change it", async () => {
     const solver = new HeldGainsSolver();
     const seen = await runOnce(squadWith(entry), REQUEST, solver);
     const first = seen.latest;
     if (first.phase !== "done") throw new Error("The plan was not shown.");
     expect(first.chipTiming).toBeNull();
-    // The timing line counts the plain plan's solve only, as before the chip timing.
-    expect(first.seconds).toBe(0.4);
     await act(async () => solver.release(0));
     const after = seen.latest;
     if (after.phase !== "done") throw new Error("The plan was lost.");
     expect(after.chipTiming?.gains).toEqual({ wildcard: 9 });
-    expect(after.seconds).toBe(0.4);
     expect(after.envelope).toBe(first.envelope);
   });
 
@@ -1815,5 +1804,49 @@ describe("the chip timing's gains", () => {
       expect(seen.latest.phase === "done" && seen.latest.chipTiming).toBeNull();
       cleanup();
     }
+  });
+
+  const progressOf = (state: DevicePlanPhase) =>
+    "progress" in state ? (state.progress ?? null) : null;
+
+  it("count the run's stages: inputs, solver and plan, then each chip, never elapsed time", async () => {
+    const timers = new HandTimers();
+    const solver = new SilentSolver();
+    const { seen } = mount(squadWith(entry), REQUEST, solver, timers);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    // The member holds all four chips: three stages before them, then one for each.
+    expect(progressOf(seen.latest)).toEqual({ step: "plan", done: 2, total: 7 });
+  });
+
+  it("count each chip after the plan is shown, and stop counting when the gains arrive", async () => {
+    const solver = new HeldGainsSolver();
+    const seen = await runOnce(squadWith(entry), REQUEST, solver);
+    expect(progressOf(seen.latest)).toEqual({ step: "chips", done: 3, total: 7 });
+    act(() => solver.count(0, 1, 4));
+    expect(progressOf(seen.latest)).toEqual({ step: "chips", done: 4, total: 7 });
+    // The plan shown does not change while the chips are counted.
+    expect(seen.latest.phase === "done" && seen.latest.chipTiming).toBeNull();
+    await act(async () => solver.release(0));
+    await waitFor(() => expect(progressOf(seen.latest)).toBeNull());
+    expect(seen.latest.phase === "done" && seen.latest.chipTiming).toBeTruthy();
+  });
+
+  it("stop counting when the run fails after its plan, and keep the plan", async () => {
+    const solver = new HeldGainsSolver();
+    const seen = await runOnce(squadWith(entry), REQUEST, solver);
+    await act(async () => solver.release(0, null));
+    await waitFor(() => expect(progressOf(seen.latest)).toBeNull());
+    expect(seen.latest.phase).toBe("done");
+  });
+
+  it("stop counting when the member leaves the selection while its chips are tried", async () => {
+    const solver = new HeldGainsSolver();
+    const { seen, rerender } = mount(squadWith(entry), REQUEST, solver);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(progressOf(seen.latest)?.step).toBe("chips"));
+    rerender({ ...REQUEST, strategy: "saf-puan", window: 3 });
+    rerender(REQUEST);
+    expect(progressOf(seen.latest)).toBeNull();
   });
 });
