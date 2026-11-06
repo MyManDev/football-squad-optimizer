@@ -393,7 +393,7 @@ def _moves(payload: Mapping[str, object]) -> list[dict[str, object]]:
 def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
     """One published document, reduced to scoring facts plus publication evidence."""
     return {
-        **_scoring_document(
+        **scoring_document(
             advice.payload,
             strategy=advice.strategy,
             window=int(advice.window),
@@ -404,7 +404,7 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
     }
 
 
-def _scoring_document(
+def scoring_document(
     payload: Mapping[str, object], *, strategy: str, window: int, rival_entry_id: int | None
 ) -> dict[str, object]:
     """Scoring facts and a payload digest, independent of any publication address."""

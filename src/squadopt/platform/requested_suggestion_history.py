@@ -16,8 +16,9 @@ from typing import Any
 
 import jsonschema
 
-from squadopt.application.advice_record import _scoring_document
+from squadopt.application.advice_record import scoring_document
 from squadopt.application.weekly_suggestion_eval import CONTRACT_VERSION, score_selected_week
+from squadopt.data.atomic import replace_retrying
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
@@ -117,7 +118,7 @@ def requested_week(
         ) != as_instant(deadline):
             raise ValueError("Decision and outcome captures disagree on the deadline.")
         players = _players(payload, capture)
-        advice = _scoring_document(payload, strategy="saf-puan", window=1, rival_entry_id=None)
+        advice = scoring_document(payload, strategy="saf-puan", window=1, rival_entry_id=None)
         semantic = json.dumps(
             {k: v for k, v in payload.items() if k != "league_id"}, sort_keys=True
         )
@@ -451,7 +452,7 @@ def _build_requested_history(
             handle.write(raw)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
+        replace_retrying(Path(temporary), path)
     finally:
         Path(temporary).unlink(missing_ok=True)
     return path
