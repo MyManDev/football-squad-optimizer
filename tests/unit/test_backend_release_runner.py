@@ -15,11 +15,13 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -28,6 +30,8 @@ HOST_FILES = ROOT / "deploy" / "weekly-schedule"
 COMMAND = HOST_FILES / "squadopt-backend-release"
 RUN_ID = "2026-27-gw11-tuesday-20261113T0200Z"
 TAG = "site-2026-27-gw11-fix1"
+COMMIT = "a" * 40
+GIT_STEPS = ["git fetch", "git cat-file", "git rev-parse", "git merge-base"]
 CAPTURE = "fpl-live-20261113T020000Z-0123456789ab"
 NEWS = "club-news-20261121T065000Z-ba9876543210"
 TOP100 = "player_evidence_v1_2026-27_gw11_top100_cc.manifest.json"
@@ -128,11 +132,18 @@ class _Host:
         self.calls.append(call)
         step = call[2] if call[0] == sys.executable else call[0]
         output = json.dumps(PACKED, indent=2) if step == "pack" else ""
+        if call[0] == "git" and call[3] == "cat-file":
+            output = "tag\n"
+        elif call[0] == "git" and call[3] == "rev-parse":
+            output = COMMIT + "\n"
         return self.command.Completed(5 if step == self.failing else 0, output)
 
 
 def _steps(host: _Host) -> list[str]:
-    return [call[2] if call[0] == sys.executable else " ".join(call[:2]) for call in host.calls]
+    return [
+        call[2] if call[0] == sys.executable else f"git {call[3]}" if call[0] == "git" else call[0]
+        for call in host.calls
+    ]
 
 
 def test_a_request_takes_exactly_its_shape(command: ModuleType) -> None:
@@ -153,6 +164,8 @@ def test_a_request_takes_exactly_its_shape(command: ModuleType) -> None:
         _request(gameweek=True),
         _request(gameweek=39),
         _request(deadline_utc="soon"),
+        _request(deadline_utc="2026-11-31T11:00:00Z"),
+        _request(deadline_utc="2026-11-21T25:00:00Z"),
         _request(news=NEWS),
         _request(rotation_manifest=ROTATION),
         _request(run_id="-rf"),
@@ -169,6 +182,9 @@ def test_a_request_takes_exactly_its_shape(command: ModuleType) -> None:
             command.parse_request(raw)
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="the host spool uses POSIX directory descriptors"
+)
 def test_the_oldest_request_is_taken_and_removed(command: ModuleType) -> None:
     spool = command.SPOOL
     spool.mkdir()
@@ -194,6 +210,93 @@ def test_a_request_that_is_a_link_is_never_followed(command: ModuleType, tmp_pat
     assert not list(command.SPOOL.iterdir())
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="the host spool uses POSIX directory descriptors"
+)
+def test_a_broken_request_link_is_removed_without_blocking_the_queue(command: ModuleType) -> None:
+    command.SPOOL.mkdir()
+    (command.SPOOL / "broken.json").symlink_to(command.SPOOL / "missing")
+    (command.SPOOL / "valid.json").write_bytes(b"valid")
+    assert command.take_request(command.SPOOL) == b"valid"
+    assert not list(command.SPOOL.iterdir())
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="the host spool uses POSIX directory descriptors"
+)
+@pytest.mark.parametrize("kind", ["directory", "fifo"])
+def test_non_file_requests_are_quarantined_without_reading_or_blocking(
+    command: ModuleType, kind: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    command.SPOOL.mkdir()
+    invalid = command.SPOOL / "invalid.json"
+    if kind == "directory":
+        invalid.mkdir()
+        (invalid / "keep.txt").write_bytes(b"keep")
+    else:
+        os.mkfifo(invalid)
+    opened = os.open
+
+    def nonblocking(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+        if Path(path).name == invalid.name:
+            assert flags & os.O_NONBLOCK
+        return opened(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", nonblocking)
+    assert command.take_request(command.SPOOL) is None
+    assert not invalid.exists()
+    refused = command.SPOOL / "invalid.json.refused"
+    assert refused.exists()
+    if kind == "directory":
+        assert (refused / "keep.txt").read_bytes() == b"keep"
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="the host spool uses POSIX directory descriptors"
+)
+def test_a_link_in_a_spool_parent_cannot_read_or_remove_outside_files(
+    command: ModuleType, tmp_path: Path
+) -> None:
+    outside = tmp_path / "outside" / "backend"
+    outside.mkdir(parents=True)
+    held = outside / "held.json"
+    held.write_bytes(b"keep")
+    parent = tmp_path / "linked-parent"
+    parent.symlink_to(outside.parent, target_is_directory=True)
+    with pytest.raises(command.Refused, match="plain directory"):
+        command.take_request(parent / "backend")
+    assert held.read_bytes() == b"keep"
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="the host spool uses POSIX directory descriptors"
+)
+def test_replacing_the_spool_after_open_cannot_redirect_a_read_or_delete(
+    command: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    command.SPOOL.mkdir()
+    (command.SPOOL / "request.json").write_bytes(b"request")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    held = outside / "request.json"
+    held.write_bytes(b"keep")
+    listdir = os.listdir
+    swapped = False
+
+    def replace_before_listing(descriptor: Any) -> list[str]:
+        nonlocal swapped
+        if isinstance(descriptor, int) and not swapped:
+            command.SPOOL.rename(command.SPOOL.with_name("retained-spool"))
+            command.SPOOL.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return listdir(descriptor)
+
+    monkeypatch.setattr(os, "listdir", replace_before_listing)
+    assert command.take_request(command.SPOOL) == b"request"
+    assert swapped
+    assert held.read_bytes() == b"keep"
+
+
 def test_the_advice_job_runs_only_while_the_deadline_is_ahead(command: ModuleType) -> None:
     assert command.with_jobs("2026-11-21T11:00:00Z", EARLY) is True
     assert command.with_jobs("2026-11-21T11:00:00Z", LATE) is False
@@ -209,11 +312,13 @@ def test_the_five_steps_run_in_order_from_the_tag_and_the_checkouts_files(
         json.dumps(_request(news=NEWS, rotation_manifest=ROTATION)).encode()
     )
     assert command.move(request, host.run, EARLY, said.append) == 0
-    assert _steps(host) == ["git -C", "pack", "stage", "prepare", "candidate", "activate"]
-    fetch, pack, stage, prepare, candidate, activate = host.calls
+    assert _steps(host) == [*GIT_STEPS, "pack", "stage", "prepare", "candidate", "activate"]
+    fetch, _kind, _commit, _approval, pack, stage, prepare, candidate, activate = host.calls
     assert fetch[-1] == f"refs/tags/{TAG}:refs/tags/{TAG}"
+    assert "--force" not in fetch
+    assert "refs/heads/main:refs/remotes/origin/main" in fetch
     tool = command.STATE / "tools" / f"{TAG}.py"
-    assert tool.read_bytes() == b"# the tool at " + TAG.encode()
+    assert tool.read_bytes() == b"# the tool at " + COMMIT.encode()
     assert pack[:3] == [sys.executable, str(tool), "pack"]
     weekly = command.WEEKLY
     named = dict(zip(pack[3::2], pack[4::2], strict=False))
@@ -257,23 +362,87 @@ def test_after_the_deadline_the_candidate_and_activation_run_no_advice_job(
     assert candidate[-1] == activate[-1] == "--no-jobs"
 
 
+def test_an_unreviewed_tag_stops_before_reading_or_running_the_root_tool(
+    command: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    host = _Host(command)
+
+    def run(arguments: Sequence[str]) -> object:
+        answer = host.run(arguments)
+        if arguments[0] == "git" and arguments[3] == "merge-base":
+            return command.Completed(1, "")
+        return answer
+
+    def forbidden_source(commit: str) -> bytes:
+        pytest.fail("an unreviewed tag must not supply executable code")
+
+    monkeypatch.setattr(command, "tool_source", forbidden_source)
+    request = command.parse_request(json.dumps(_request()).encode())
+    with pytest.raises(command.Refused, match="protected main"):
+        command.move(request, run, EARLY, lambda text: None)
+    assert _steps(host) == GIT_STEPS
+    assert not (command.STATE / "tools").exists()
+
+
+def test_release_approval_uses_real_git_ancestry_and_an_annotated_tag(command: ModuleType) -> None:
+    command.REPO.mkdir(parents=True)
+
+    def git(*arguments: str) -> str:
+        completed = subprocess.run(
+            ["git", "-C", str(command.REPO), *arguments],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return completed.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "Release Test")
+    git("config", "user.email", "release@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "tag.gpgsign", "false")
+    (command.REPO / "release.txt").write_text("reviewed", encoding="utf-8")
+    git("add", "release.txt")
+    git("commit", "-m", "Reviewed release")
+    approved = git("rev-parse", "HEAD")
+    git("update-ref", "refs/remotes/origin/main", approved)
+    git("tag", "-a", TAG, "-m", "Release")
+    git("checkout", "-b", "unreviewed")
+    (command.REPO / "release.txt").write_text("unreviewed", encoding="utf-8")
+    git("commit", "-am", "Unreviewed change")
+    unreviewed = "site-2026-27-gw11-fix2"
+    git("tag", "-a", unreviewed, "-m", "Not released")
+    lightweight = "site-2026-27-gw11-fix3"
+    git("tag", lightweight, approved)
+
+    def run(arguments: Sequence[str]) -> object:
+        completed = subprocess.run(arguments, capture_output=True, text=True, check=False)
+        return command.Completed(completed.returncode, completed.stdout)
+
+    assert command.trusted_release_commit(TAG, run) == approved
+    with pytest.raises(command.Refused, match="protected main"):
+        command.trusted_release_commit(unreviewed, run)
+    with pytest.raises(command.Refused, match="annotated"):
+        command.trusted_release_commit(lightweight, run)
+
+
 @pytest.mark.parametrize(
     ("failing", "ran", "line"),
     [
-        ("pack", ["git -C", "pack"], "stopped: pack exited 5; nothing was staged"),
+        ("pack", [*GIT_STEPS, "pack"], "stopped: pack exited 5; nothing was staged"),
         (
             "prepare",
-            ["git -C", "pack", "stage", "prepare"],
+            [*GIT_STEPS, "pack", "stage", "prepare"],
             "stopped: prepare exited 5; the live backend was not touched",
         ),
         (
             "candidate",
-            ["git -C", "pack", "stage", "prepare", "candidate"],
+            [*GIT_STEPS, "pack", "stage", "prepare", "candidate"],
             "stopped: candidate exited 5; the live backend was not touched",
         ),
         (
             "activate",
-            ["git -C", "pack", "stage", "prepare", "candidate", "activate"],
+            [*GIT_STEPS, "pack", "stage", "prepare", "candidate", "activate"],
             "stopped: activate exited 5; activate restored the kept configuration",
         ),
     ],
@@ -321,6 +490,22 @@ def test_the_prune_keeps_the_live_release_and_the_two_packed_before_it(
     ]
 
 
+def test_prune_cannot_delete_the_backend_base_through_a_parent_component(
+    command: ModuleType,
+) -> None:
+    builds = command.BASE / "build"
+    builds.mkdir()
+    held = command.BASE / "keep.txt"
+    held.write_text("backend state", encoding="utf-8")
+    for day in range(1, 5):
+        build = str(builds / "..") if day == 1 else ""
+        _release(command, f"gw11-r{day}", f"2026-11-1{day}T04:00:00Z", build)
+    host = _Host(command)
+    command.prune("gw11-r4", host.run, lambda text: None)
+    assert held.read_text(encoding="utf-8") == "backend state"
+    assert (command.RELEASES / "gw11-r4").is_dir()
+
+
 def test_the_command_refuses_a_user_who_is_not_root(
     command: ModuleType, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -329,6 +514,9 @@ def test_the_command_refuses_a_user_who_is_not_root(
     assert "Refused: run as root" in capsys.readouterr().err
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="the host spool uses POSIX directory descriptors"
+)
 def test_a_run_is_moved_once_and_its_result_is_left_for_the_chain(
     command: ModuleType, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -402,7 +590,7 @@ def test_pack_is_refused_a_top100_manifest_naming_a_capture_it_should_not_copy(
     request = command.parse_request(json.dumps(_request()).encode())
     with pytest.raises(command.Refused):
         command.move(request, host.run, EARLY, lambda text: None)
-    assert _steps(host) == ["git -C"]
+    assert _steps(host) == GIT_STEPS
 
 
 def test_pack_is_refused_a_named_capture_that_is_not_on_disk(command: ModuleType) -> None:
@@ -420,4 +608,4 @@ def test_pack_is_refused_a_retained_handoff_that_is_not_on_disk(command: ModuleT
     )
     with pytest.raises(command.Refused, match="retained handoff"):
         command.move(request, host.run, EARLY, lambda text: None)
-    assert _steps(host) == ["git -C"]
+    assert _steps(host) == GIT_STEPS

@@ -34,9 +34,11 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -139,23 +141,69 @@ def parse_request(raw: bytes) -> Request:
     )
     if bool(request.news) != bool(request.rotation_manifest):
         raise Refused("the request names club news without its rotation table, or the reverse")
+    try:
+        datetime.strptime(request.deadline_utc, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as error:
+        raise Refused("the request's deadline is not a valid UTC instant") from error
     return request
 
 
-def take_request(spool: Path) -> bytes | None:
-    """The oldest request in `spool`, read without following a link and then removed."""
+def open_spool(spool: Path) -> int:
+    """Pin the spool directory without following links in any of its parent directories."""
 
-    for path in sorted(spool.glob("*.json"), key=lambda item: (item.stat().st_mtime, item.name)):
+    if sys.platform == "win32" or not spool.is_absolute() or ".." in spool.parts:
+        raise Refused("the spool needs an absolute POSIX directory path")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    descriptor = os.open(spool.anchor, flags)
+    try:
+        for part in spool.parts[1:]:
+            child = os.open(part, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+    except OSError as error:
+        os.close(descriptor)
+        raise Refused("the spool or one of its parents is not a plain directory") from error
+    return descriptor
+
+
+def take_request(spool: Path) -> bytes | None:
+    """Read and remove the oldest plain request through a pinned spool directory descriptor."""
+
+    directory = open_spool(spool)
+    try:
+        return _take_request(directory)
+    finally:
+        os.close(directory)
+
+
+def _take_request(directory: int) -> bytes | None:
+    entries: list[tuple[float, str]] = []
+    for name in os.listdir(directory):
+        if name.endswith(".json"):
+            try:
+                metadata = os.stat(name, dir_fd=directory, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            entries.append((metadata.st_mtime, name))
+    for _modified, name in sorted(entries):
         try:
-            descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            descriptor = os.open(
+                name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=directory
+            )
         except OSError:
-            path.unlink(missing_ok=True)
+            with suppress(FileNotFoundError):
+                os.unlink(name, dir_fd=directory)
+            continue
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            os.close(descriptor)
+            os.rename(name, name + ".refused", src_dir_fd=directory, dst_dir_fd=directory)
             continue
         with os.fdopen(descriptor, "rb") as handle:
             raw = handle.read(REQUEST_BYTES + 1)
-        path.unlink(missing_ok=True)
+        with suppress(FileNotFoundError):
+            os.unlink(name, dir_fd=directory)
         if len(raw) > REQUEST_BYTES:
-            raise Refused(f"{path.name} is larger than a request is")
+            raise Refused(f"{name} is larger than a request is")
         return raw
     return None
 
@@ -236,11 +284,30 @@ def copy_handoff(request: Request) -> None:
     request.handoff.write_bytes(source.read_bytes())
 
 
-def tool_source(tag: str) -> bytes | None:
-    """The release tool as the tag holds it, from root's own clone; None when it holds none."""
+def trusted_release_commit(tag: str, run: Run) -> str:
+    """Resolve an annotated release tag only when its commit is on the fetched main history."""
+
+    reference = f"refs/tags/{tag}"
+    kind = run(["git", "-C", str(REPO), "cat-file", "-t", reference])
+    if kind.code != 0 or kind.output.strip() != "tag":
+        raise Refused(f"{tag} is not an annotated release tag")
+    resolved = run(["git", "-C", str(REPO), "rev-parse", "--verify", f"{reference}^{{commit}}"])
+    commit = resolved.output.strip()
+    if resolved.code != 0 or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise Refused(f"{tag} does not resolve to a release commit")
+    approved = run(
+        ["git", "-C", str(REPO), "merge-base", "--is-ancestor", commit, "refs/remotes/origin/main"]
+    )
+    if approved.code != 0:
+        raise Refused(f"{tag} is not on the protected main release history")
+    return commit
+
+
+def tool_source(commit: str) -> bytes | None:
+    """Read the tool by its verified commit, never by a mutable or unreviewed ref."""
 
     shown = subprocess.run(
-        ["git", "-C", str(REPO), "show", f"{tag}:{TOOL_PATH}"], capture_output=True, check=False
+        ["git", "-C", str(REPO), "show", f"{commit}:{TOOL_PATH}"], capture_output=True, check=False
     )
     return shown.stdout if shown.returncode == 0 and shown.stdout else None
 
@@ -262,15 +329,17 @@ def move(request: Request, run: Run, now: datetime, say: Callable[[str], None]) 
             str(REPO),
             "fetch",
             "-q",
-            "--force",
+            "--no-tags",
             "origin",
+            "refs/heads/main:refs/remotes/origin/main",
             f"refs/tags/{request.tag}:refs/tags/{request.tag}",
         ]
     )
     if fetched.code != 0:
         say(f"stopped: fetching {request.tag} into {REPO} exited {fetched.code}")
         return fetched.code
-    source = tool_source(request.tag)
+    commit = trusted_release_commit(request.tag, run)
+    source = tool_source(commit)
     if source is None:
         say(f"stopped: {request.tag} holds no {TOOL_PATH}")
         return 1
@@ -368,7 +437,9 @@ def prune(live: str, run: Run, say: Callable[[str], None]) -> None:
     `KEEP` packed just before it. A release whose package names no creation time is kept."""
 
     releases = [
-        path for path in RELEASES.iterdir() if path.is_dir() and RELEASE_NAME.fullmatch(path.name)
+        path
+        for path in RELEASES.iterdir()
+        if path.is_dir() and not path.is_symlink() and RELEASE_NAME.fullmatch(path.name)
     ]
     created = {
         path.name: str(_read(path / "package.json").get("created_at", "")) for path in releases
@@ -388,8 +459,16 @@ def prune(live: str, run: Run, say: Callable[[str], None]) -> None:
         image, build = str(record.get("image", "")), str(record.get("build_dir", ""))
         if image:
             run(["docker", "image", "rm", image])
-        if build and build not in kept_builds and Path(build).parent == BASE / "build":
-            shutil.rmtree(build, ignore_errors=True)
+        build_path = Path(build)
+        build_root = BASE / "build"
+        if (
+            build
+            and build not in kept_builds
+            and build_path.parent == build_root
+            and not build_path.is_symlink()
+            and build_path.resolve().parent == build_root.resolve()
+        ):
+            shutil.rmtree(build_path, ignore_errors=True)
         shutil.rmtree(path)
         say(f"pruned {path.name}" + (f" and image {image}" if image else ""))
 

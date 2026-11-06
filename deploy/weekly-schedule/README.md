@@ -268,8 +268,12 @@ command as root. It runs the five steps here:
    with `--no-jobs` after;
 5. `activate`, likewise.
 
-The tool runs as the release tag holds it (`git show <tag>:scripts/release/vm_football_release.py`
-in root's clone), never from the checkout, and root runs no git in the checkout: it only reads
+Root fetches the tag and the protected `main` history into its own clone without force-moving
+an existing tag. The tag must be annotated and its commit must belong to that release history.
+The spool is opened without following links in its directory chain. Requests are read and
+removed through that same directory descriptor; directories and pipes are quarantined.
+The tool is read by that verified commit (`git show <commit>:scripts/release/vm_football_release.py`),
+never from the checkout, and root runs no git in the checkout: it only reads
 data files there, which the tool copies with links refused. A request names files, never
 paths, and each is looked for in its one directory. Then the oldest releases, their images and
 their build checkouts are pruned; the live one and the two packed before it stay. The steps'
