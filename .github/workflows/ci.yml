@@ -187,7 +187,9 @@ jobs:
         run: npm run build
 
       - name: Device spec on Chromium, WebKit and Firefox
-        timeout-minutes: 12
+        # The expanded 219-case suite completed in 11m19s; a queue run reached 214 cases
+        # without an assertion failure before the old 12-minute step limit expired.
+        timeout-minutes: 16
         shell: bash
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/device-engines.json
