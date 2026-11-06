@@ -1,7 +1,11 @@
 import type { FixturesPayload } from "../../fixtures/types";
 import { MemberLiveScoreCard } from "../../liveScore/MemberLiveScoreCard";
 import type { EntrySquad } from "../types";
-import { useMemberLiveScore, type MemberLiveDependencies } from "./useMemberLiveScore";
+import {
+  useMemberLiveScore,
+  type MemberLive,
+  type MemberLiveDependencies,
+} from "./useMemberLiveScore";
 
 /**
  * The member's live week on their page (#1008): the card of #1204, with its refresh, once a
@@ -16,7 +20,13 @@ export function MemberLiveWeek({
   fixtures: FixturesPayload;
   dependencies?: MemberLiveDependencies;
 }) {
-  const { shown, refreshing, refresh } = useMemberLiveScore(squad, fixtures, dependencies);
+  const live = useMemberLiveScore(squad, fixtures, dependencies);
+  return <MemberLiveWeekView squad={squad} live={live} />;
+}
+
+/** The card and pitch can share one read and one refresh. */
+export function MemberLiveWeekView({ squad, live }: { squad: EntrySquad; live: MemberLive }) {
+  const { shown, refreshing, refresh } = live;
   if (shown === null) return null;
   return (
     <MemberLiveScoreCard

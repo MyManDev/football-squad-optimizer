@@ -8,7 +8,12 @@ import { useLanguage } from "../../../i18n/context";
 import type { ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import { ClubMark } from "../components/ClubMark";
-import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
+import {
+  MemberBench,
+  MemberPitch,
+  type PitchPlayer,
+  type PitchPointsKind,
+} from "../components/MemberPitch";
 import { PlayerDetails } from "../components/PlayerDetails";
 import { PointsUnit } from "../components/PointsUnit";
 import { modelChangeOf, popChanged, releasePop } from "../advice/modelSwitch";
@@ -36,6 +41,7 @@ export function MemberSquad({
   news = new Map<number, CoachAbsence>(),
   held,
   fixtures,
+  pointsKind = "expected",
 }: {
   onPitch: SquadOnPitch;
   plan: EntryAdvice | null;
@@ -45,6 +51,7 @@ export function MemberSquad({
   news?: ReadonlyMap<number, CoachAbsence>;
   held?: EntrySquad;
   fixtures?: FixturesPayload | null;
+  pointsKind?: PitchPointsKind;
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -145,6 +152,7 @@ export function MemberSquad({
       </div>
       <div ref={field} className={styles.pitchView} hidden={hasList && view !== "pitch"}>
         <MemberPitch
+          pointsKind={pointsKind}
           players={onPitch.eleven}
           codes={codes}
           modelChange={modelChange}
@@ -152,6 +160,7 @@ export function MemberSquad({
           onSelectPlayer={selectPlayer}
         />
         <MemberBench
+          pointsKind={pointsKind}
           players={onPitch.bench}
           codes={codes}
           modelChange={modelChange}
@@ -167,6 +176,7 @@ export function MemberSquad({
       <CoachNews news={news} players={newsPlayers} />
       {selected ? (
         <PlayerDetails
+          pointsKind={pointsKind}
           key={`${context}:${selected.playerId}`}
           player={selected}
           plan={planned ? plan : null}
@@ -198,38 +208,50 @@ function ShortName({ name, shortName }: { name: string; shortName: string }) {
  * led by its published order with the position after the club, and the note that the
  * published squad names no vice-captain (none is inferred).
  */
-export function HeldSquad({ squad, codes }: { squad: EntrySquad; codes: ClubCodes }) {
+export function HeldSquad({
+  squad,
+  codes,
+  pointsKind = "expected",
+}: {
+  squad: EntrySquad;
+  codes: ClubCodes;
+  pointsKind?: PitchPointsKind;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const position = (code: string) =>
     Object.hasOwn(messages.positions, code)
       ? messages.positions[code as keyof typeof messages.positions]
       : code;
-  const row = (player: EntrySquadPlayer, lead: ReactNode, onBench: boolean) => (
-    <li key={player.player_id} className={styles.heldRow}>
-      <span className={styles.heldLead}>{lead}</span>
-      <strong className={styles.heldName}>
-        <ShortName name={player.name} shortName={player.short_name} />
-      </strong>
-      {player.is_captain ? (
-        <>
-          <span className={styles.heldMark} aria-hidden="true">
-            {copy.captainMark}
-          </span>
-          <span className="visually-hidden">{messages.squad.captainLabel}</span>
-        </>
-      ) : null}
-      <span className={styles.heldMeta}>
-        <ClubMark team={player.team} codes={codes} />
-        {onBench ? ` · ${position(player.position)}` : null}
-      </span>
-      {finite(player.expected_points) ? (
-        <span className={styles.heldXp}>
-          {figure(player.expected_points, locale)} <PointsUnit />
+  const row = (player: EntrySquadPlayer, lead: ReactNode, onBench: boolean) => {
+    const points = pointsKind === "actual" ? player.event_points : player.expected_points;
+    return (
+      <li key={player.player_id} className={styles.heldRow}>
+        <span className={styles.heldLead}>{lead}</span>
+        <strong className={styles.heldName}>
+          <ShortName name={player.name} shortName={player.short_name} />
+        </strong>
+        {player.is_captain ? (
+          <>
+            <span className={styles.heldMark} aria-hidden="true">
+              {copy.captainMark}
+            </span>
+            <span className="visually-hidden">{messages.squad.captainLabel}</span>
+          </>
+        ) : null}
+        <span className={styles.heldMeta}>
+          <ClubMark team={player.team} codes={codes} />
+          {onBench ? ` · ${position(player.position)}` : null}
         </span>
-      ) : null}
-    </li>
-  );
+        {finite(points) ? (
+          <span className={styles.heldXp} data-points-kind={pointsKind} data-player-points={points}>
+            {pointsKind === "actual" ? points.toLocaleString(locale) : figure(points, locale)}{" "}
+            {pointsKind === "actual" ? copy.pointsLabel : <PointsUnit />}
+          </span>
+        ) : null}
+      </li>
+    );
+  };
   return (
     <div className={styles.held}>
       <h3 className={styles.heldTitle}>{copy.startingXiLabel}</h3>

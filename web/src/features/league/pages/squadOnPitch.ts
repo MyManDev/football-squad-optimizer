@@ -24,8 +24,7 @@ export function heldBench(bench: readonly EntrySquadPlayer[]): EntrySquadPlayer[
 /**
  * The eleven and the bench the page draws. A plan that publishes its eleven is drawn after
  * its transfers, with its armband and the players its moves bring in; otherwise the squad
- * the member holds is drawn, with the captain the game records and no vice-captain, which
- * the published squad does not name.
+ * the member holds is drawn, with the captain and any vice-captain the game records.
  */
 export function squadOnPitch(plan: EntryAdvice | null, squad: EntrySquad): SquadOnPitch {
   const planned = plan?.starting_xi;
@@ -69,8 +68,9 @@ export function squadOnPitch(plan: EntryAdvice | null, squad: EntrySquad): Squad
         position: player.position,
         team: player.team,
         expectedPoints: finite(player.expected_points) ? player.expected_points : null,
+        eventPoints: finite(player.event_points) ? player.event_points : null,
         captain: player.is_captain,
-        vice: false,
+        vice: player.is_vice_captain === true,
         isNew: false,
       })),
       bench: heldBench(squad.bench).map((player) => ({
@@ -80,6 +80,7 @@ export function squadOnPitch(plan: EntryAdvice | null, squad: EntrySquad): Squad
         position: player.position,
         team: player.team,
         expectedPoints: finite(player.expected_points) ? player.expected_points : null,
+        eventPoints: finite(player.event_points) ? player.event_points : null,
         order: player.bench_order,
       })),
     };

@@ -106,8 +106,9 @@ describe("a member page whose gameweek has closed", () => {
       cleanup();
 
       const closed = renderView(DEADLINE, language);
-      // The closed week's plan is still the page's answer.
-      expect(screen.getByText(copy.squadAfterTitle)).toBeInTheDocument();
+      // Once closed, the pitch shows the held team, not the expired recommendation.
+      expect(screen.getByRole("heading", { name: copy.memberSquad })).toBeInTheDocument();
+      expect(closed.container.querySelectorAll("#kadro [data-player-points]")).toHaveLength(0);
       expect(closed.container.querySelector("#plan-settings")).toBeNull();
       expect(screen.queryByRole("link", { name: copy.changePlan })).toBeNull();
       expect(screen.queryByRole("button", { name: copy.computeButton })).toBeNull();
@@ -212,7 +213,7 @@ describe("a member page whose gameweek has closed", () => {
     cleanup();
 
     renderView(DEADLINE, "tr", "?model=football", props);
-    await screen.findByText(copy.squadAfterTitle);
+    await screen.findByRole("heading", { name: copy.memberSquad });
     expect(screen.queryByTestId("new-information-notice")).toBeNull();
     expect(screen.queryByRole("button", { name: copy.computeButton })).toBeNull();
   });

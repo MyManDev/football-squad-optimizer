@@ -42,10 +42,10 @@ for (const language of ["tr", "en"] as const) {
     await expect(page.getByRole("region", { name: copy.deadlinePassedTitle })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: copy.deadlinePassedTitle })).toHaveCount(0);
     await expect(page.getByTestId("deadline-passed")).toContainText(copy.deadlinePassedTitle);
-    // The closed week's plan is still the answer; nothing that changes or recomputes it is
-    // offered: no settings, no link down to them and no Hesapla.
+    // The current team stays visible; the closed week's computation remains locked.
     const member = MESSAGES[language].leagueMembers;
-    await expect(page.getByRole("heading", { name: member.squadAfterTitle })).toBeVisible();
+    await expect(page.getByRole("heading", { name: member.memberSquad })).toBeVisible();
+    await expect(page.locator('#kadro [data-points-kind="expected"]')).toHaveCount(0);
     await expect(page.locator("#plan-settings")).toHaveCount(0);
     await expect(page.getByRole("link", { name: member.changePlan, exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: member.computeButton, exact: true })).toHaveCount(

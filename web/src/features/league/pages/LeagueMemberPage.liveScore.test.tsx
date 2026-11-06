@@ -2,7 +2,7 @@
  * The member's live week on their page (#1008): read once the week's deadline has passed,
  * shown beside the notice that says so, and never on the open week's page or a tool page.
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -100,6 +100,71 @@ describe("the member's live week on their page", () => {
     await screen.findByRole("heading", { level: 1 });
     expect(live.forwarder.entryBundle).not.toHaveBeenCalled();
     expect(screen.queryByText(`${gameweek}. hafta puanın`)).toBeNull();
+    expect(document.querySelectorAll('#kadro [data-points-kind="expected"]')).toHaveLength(15);
+  });
+
+  it("refreshes the total and all fifteen's raw points from the same live response", async () => {
+    const live = dependencies();
+    const playing = forwardedLive("in_progress", gameweek);
+    const finished = forwardedLive("finished", gameweek);
+    finished.source_time = new Date(Date.parse(playing.source_time) + 60_000).toISOString();
+    live.forwarder.liveWeek
+      .mockResolvedValueOnce({ ok: true, document: playing, copy: "miss" })
+      .mockResolvedValueOnce({ ok: true, document: finished, copy: "miss" });
+    const { container } = renderPage({
+      deadlinePassed: DEADLINE,
+      fixtures: CALENDAR,
+      liveDependencies: live,
+    });
+    const table = exampleTable({ season, gameweek, capture: capture! });
+    const checkPoints = async (week: typeof playing) => {
+      for (const element of week.elements) {
+        const player = table.players.find((row) => row.element_id === element.element_id);
+        if (!player) continue;
+        await waitFor(() =>
+          expect(
+            container.querySelector(
+              `#kadro [data-player-motion="${player.id}"] [data-player-points]`,
+            ),
+          ).toHaveAttribute("data-player-points", String(element.points)),
+        );
+      }
+    };
+    await screen.findByRole("heading", { name: `${gameweek}. hafta puanın` });
+    await checkPoints(playing);
+    expect(container.querySelectorAll('#kadro [data-points-kind="actual"]')).toHaveLength(15);
+    fireEvent.click(screen.getByRole("button", { name: "Yenile" }));
+    await screen.findByText("Bonus eklendi");
+    await checkPoints(finished);
+    expect(live.forwarder.entryBundle).toHaveBeenCalledTimes(1);
+    expect(live.forwarder.liveWeek).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the team without forecast or historical scores when live points cannot be read", async () => {
+    const live = dependencies();
+    live.forwarder.liveWeek.mockResolvedValue({ ok: false, reason: "upstream_unavailable" });
+    const { container } = renderPage({
+      deadlinePassed: DEADLINE,
+      fixtures: CALENDAR,
+      liveDependencies: live,
+    });
+    await waitFor(() => expect(live.forwarder.liveWeek).toHaveBeenCalledOnce());
+    expect(container.querySelectorAll("#kadro [data-player-motion]")).toHaveLength(15);
+    expect(container.querySelectorAll("#kadro [data-player-points]")).toHaveLength(0);
+  });
+
+  it("uses actual points on the current-squad list too", async () => {
+    const live = dependencies();
+    const { container } = renderPage({
+      deadlinePassed: DEADLINE,
+      fixtures: CALENDAR,
+      liveDependencies: live,
+      tool: "current-squad",
+    });
+    await waitFor(() =>
+      expect(container.querySelectorAll('[data-points-kind="actual"]')).toHaveLength(15),
+    );
+    expect(container.querySelectorAll('[data-points-kind="expected"]')).toHaveLength(0);
   });
 
   it("is not read without the calendar, which names each club's id", async () => {
