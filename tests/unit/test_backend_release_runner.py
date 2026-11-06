@@ -15,6 +15,8 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import shutil
+import stat
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -86,6 +88,24 @@ def command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     retained.write_text(json.dumps({"source_snapshot_id": CAPTURE}), encoding="utf-8")
     alias = module.WEEKLY / "data" / "handoffs" / "2026-27-gw11.json"
     alias.write_text('{"source_snapshot_id": "a later run of the week"}', encoding="utf-8")
+    rotation = module.WEEKLY / "artifacts" / "rotation"
+    rotation.mkdir(parents=True)
+    (rotation / ROTATION).write_text('{"table_file": "rotation.csv"}', encoding="utf-8")
+    (rotation / "rotation.csv").write_text("player,minutes\n1,90\n", encoding="utf-8", newline="\n")
+    (module.WEEKLY / "data" / "snapshots" / NEWS).mkdir()
+    if sys.platform == "win32":
+        # Windows exercises the orchestration with a plain-file copy stand-in. The host's
+        # actual descriptor and link defenses below execute only on POSIX (both CI gates).
+        def copy_input(source: Path, target: Path, *, tree: bool = False) -> None:
+            if source.is_symlink() or not (source.is_dir() if tree else source.is_file()):
+                raise module.Refused("not a plain input")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if tree:
+                shutil.copytree(source, target)
+            else:
+                shutil.copyfile(source, target)
+
+        monkeypatch.setattr(module, "copy_input", copy_input)
     return module
 
 
@@ -100,7 +120,12 @@ def _top100(module: ModuleType, names: list[str]) -> None:
             (snapshots / name).mkdir(parents=True, exist_ok=True)
     manifest = module.WEEKLY / "artifacts" / "phase_b" / TOP100
     manifest.parent.mkdir(parents=True, exist_ok=True)
-    manifest.write_text(json.dumps({"source_snapshot_ids": names}), encoding="utf-8")
+    manifest.write_text(
+        json.dumps({"source_snapshot_ids": names, "table_file": "top100.csv"}), encoding="utf-8"
+    )
+    manifest.with_name("top100.csv").write_text(
+        "player,ownership\n1,0.2\n", encoding="utf-8", newline="\n"
+    )
 
 
 def _request(**changes: object) -> dict[str, object]:
@@ -126,12 +151,24 @@ class _Host:
         self.calls: list[list[str]] = []
         self.command = command
         self.failing = failing
+        self.staged: dict[str, bytes] = {}
+        self.staging_root: Path | None = None
 
     def run(self, arguments: Sequence[str]) -> object:
         call = [str(argument) for argument in arguments]
         self.calls.append(call)
         step = call[2] if call[0] == sys.executable else call[0]
         output = json.dumps(PACKED, indent=2) if step == "pack" else ""
+        if step == "pack":
+            named = dict(zip(call[3::2], call[4::2], strict=False))
+            self.staging_root = Path(named["--snapshot-root"]).parent
+            if sys.platform != "win32":
+                assert stat.S_IMODE(self.staging_root.stat().st_mode) == 0o700
+            self.staged = {
+                path.relative_to(self.staging_root).as_posix(): path.read_bytes()
+                for path in self.staging_root.rglob("*")
+                if path.is_file()
+            }
         if call[0] == "git" and call[3] == "cat-file":
             output = "tag\n"
         elif call[0] == "git" and call[3] == "rev-parse":
@@ -152,7 +189,7 @@ def test_a_request_takes_exactly_its_shape(command: ModuleType) -> None:
     assert parsed.retained_handoff == (
         command.WEEKLY / "data" / "handoffs" / "by-capture" / CAPTURE / HANDOFF
     )
-    assert parsed.handoff == command.STATE / "handoffs" / RUN_ID / "2026-27-gw11.json"
+    assert parsed.handoff_name == "2026-27-gw11.json"
     refused = [
         _request(tag="site-2026-27-gw11-fix1; rm -rf /"),
         _request(top100_manifest="../../etc/passwd.json"),
@@ -320,7 +357,8 @@ def test_the_five_steps_run_in_order_from_the_tag_and_the_checkouts_files(
     tool = command.STATE / "tools" / f"{TAG}.py"
     assert tool.read_bytes() == b"# the tool at " + COMMIT.encode()
     assert pack[:3] == [sys.executable, str(tool), "pack"]
-    weekly = command.WEEKLY
+    staged = host.staging_root
+    assert staged is not None and staged.parent == command.STATE / "inputs"
     named = dict(zip(pack[3::2], pack[4::2], strict=False))
     assert named == {
         "--repo": str(command.REPO),
@@ -328,16 +366,19 @@ def test_the_five_steps_run_in_order_from_the_tag_and_the_checkouts_files(
         "--gameweek": "11",
         "--capture": CAPTURE,
         "--tag": TAG,
-        "--snapshot-root": str(weekly / "data" / "snapshots"),
-        "--handoff": str(command.STATE / "handoffs" / RUN_ID / "2026-27-gw11.json"),
-        "--top100-manifest": str(weekly / "artifacts" / "phase_b" / TOP100),
+        "--snapshot-root": str(staged / "snapshots"),
+        "--handoff": str(staged / "handoffs" / "2026-27-gw11.json"),
+        "--top100-manifest": str(staged / "artifacts" / "phase_b" / TOP100),
         "--out": str(command.INCOMING),
-        "--rotation-manifest": str(weekly / "artifacts" / "rotation" / ROTATION),
+        "--rotation-manifest": str(staged / "artifacts" / "rotation" / ROTATION),
         "--news-capture": NEWS,
     }
     # pack reads the run's own retained handoff, never the alias a later run rewrote.
-    copied = (command.STATE / "handoffs" / RUN_ID / "2026-27-gw11.json").read_text(encoding="utf-8")
+    copied = host.staged["handoffs/2026-27-gw11.json"].decode()
     assert CAPTURE in copied
+    assert host.staged["artifacts/phase_b/top100.csv"] == b"player,ownership\n1,0.2\n"
+    assert host.staged["artifacts/rotation/rotation.csv"] == b"player,minutes\n1,90\n"
+    assert not staged.exists()
     assert stage[3:] == ["--tarball", PACKED["tarball"], "--sha256", PACKED["tarball_sha256"]]
     name = str(PACKED["name"])
     assert prepare[3:] == ["--release", name]
@@ -585,7 +626,9 @@ def test_pack_is_refused_a_top100_manifest_naming_a_capture_it_should_not_copy(
     command: ModuleType, names: object
 ) -> None:
     manifest = command.WEEKLY / "artifacts" / "phase_b" / TOP100
-    manifest.write_text(json.dumps({"source_snapshot_ids": names}), encoding="utf-8")
+    manifest.write_text(
+        json.dumps({"source_snapshot_ids": names, "table_file": "top100.csv"}), encoding="utf-8"
+    )
     host = _Host(command)
     request = command.parse_request(json.dumps(_request()).encode())
     with pytest.raises(command.Refused):
@@ -609,3 +652,133 @@ def test_pack_is_refused_a_retained_handoff_that_is_not_on_disk(command: ModuleT
     with pytest.raises(command.Refused, match="retained handoff"):
         command.move(request, host.run, EARLY, lambda text: None)
     assert _steps(host) == GIT_STEPS
+
+
+@pytest.mark.parametrize("table", ["../outside.csv", "/outside.csv", "nested/table.csv", 7])
+def test_a_manifest_cannot_name_a_table_outside_its_directory(
+    command: ModuleType, table: object
+) -> None:
+    manifest = command.WEEKLY / "artifacts" / "phase_b" / TOP100
+    manifest.write_text(json.dumps({"source_snapshot_ids": [CAPTURE], "table_file": table}))
+    host = _Host(command)
+    with pytest.raises(command.Refused, match="unsafe table"):
+        command.move(command.parse_request(json.dumps(_request()).encode()), host.run, EARLY, print)
+    assert _steps(host) == GIT_STEPS
+    assert not list((command.STATE / "inputs").iterdir())
+
+
+def test_pack_uses_the_manifest_copy_even_if_the_original_changes(
+    command: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    copy = command.copy_input
+
+    def changed_after_copy(source: Path, target: Path, *, tree: bool = False) -> None:
+        copy(source, target, tree=tree)
+        if source.name == TOP100:
+            source.write_text('{"table_file": "../outside.csv", "source_snapshot_ids": ["../"]}')
+
+    monkeypatch.setattr(command, "copy_input", changed_after_copy)
+    host = _Host(command)
+    request = command.parse_request(json.dumps(_request()).encode())
+    assert command.move(request, host.run, EARLY, print) == 0
+    manifest = json.loads(host.staged[f"artifacts/phase_b/{TOP100}"])
+    assert manifest["table_file"] == "top100.csv"
+    assert manifest["source_snapshot_ids"] == [CAPTURE, PICKS]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the host reads POSIX directory descriptors")
+@pytest.mark.parametrize("kind", ["symlink", "directory-link", "fifo", "hardlink"])
+def test_input_copy_refuses_links_and_special_files_without_reading_them(
+    command: ModuleType, tmp_path: Path, kind: str
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    secret = outside / "private.txt"
+    secret.write_bytes(b"must not be copied")
+    bad = source / "bad"
+    if kind == "symlink":
+        bad.symlink_to(secret)
+    elif kind == "directory-link":
+        bad.symlink_to(outside, target_is_directory=True)
+    elif kind == "fifo":
+        os.mkfifo(bad)
+    else:
+        os.link(secret, bad)
+    target = tmp_path / "copied"
+    with pytest.raises(command.Refused):
+        command.copy_input(source, target, tree=True)
+    assert not (target / "bad").exists()
+    assert secret.read_bytes() == b"must not be copied"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the host reads POSIX directory descriptors")
+def test_input_copy_refuses_a_link_in_any_parent(command: ModuleType, tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "private.txt").write_bytes(b"must not be copied")
+    linked = tmp_path / "linked"
+    linked.symlink_to(outside, target_is_directory=True)
+    target = tmp_path / "copied"
+    with pytest.raises(command.Refused):
+        command.copy_input(linked / "private.txt", target)
+    assert not target.exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the host reads POSIX directory descriptors")
+def test_swapping_a_capture_after_open_cannot_redirect_its_files(
+    command: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "capture"
+    source.mkdir()
+    (source / "payload.json").write_bytes(b"public capture")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "payload.json").write_bytes(b"must not be copied")
+    listdir = os.listdir
+    swapped = False
+
+    def replace_before_listing(descriptor: Any) -> list[str]:
+        nonlocal swapped
+        if isinstance(descriptor, int) and not swapped:
+            source.rename(tmp_path / "old-capture")
+            source.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return listdir(descriptor)
+
+    monkeypatch.setattr(os, "listdir", replace_before_listing)
+    target = tmp_path / "copied"
+    command.copy_input(source, target, tree=True)
+    assert swapped
+    assert (target / "payload.json").read_bytes() == b"public capture"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the host reads POSIX directory descriptors")
+def test_swapping_a_file_after_stat_cannot_redirect_its_read(
+    command: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "capture"
+    source.mkdir()
+    payload = source / "payload.json"
+    payload.write_bytes(b"public capture")
+    secret = tmp_path / "private.txt"
+    secret.write_bytes(b"must not be copied")
+    original_stat = os.stat
+    swapped = False
+
+    def replace_after_stat(path: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal swapped
+        result = original_stat(path, *args, **kwargs)
+        if path == "payload.json" and kwargs.get("dir_fd") is not None and not swapped:
+            payload.unlink()
+            payload.symlink_to(secret)
+            swapped = True
+        return result
+
+    monkeypatch.setattr(os, "stat", replace_after_stat)
+    target = tmp_path / "copied"
+    with pytest.raises(command.Refused):
+        command.copy_input(source, target, tree=True)
+    assert swapped
+    assert not (target / "payload.json").exists()

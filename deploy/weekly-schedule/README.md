@@ -273,9 +273,13 @@ an existing tag. The tag must be annotated and its commit must belong to that re
 The spool is opened without following links in its directory chain. Requests are read and
 removed through that same directory descriptor; directories and pipes are quarantined.
 The tool is read by that verified commit (`git show <commit>:scripts/release/vm_football_release.py`),
-never from the checkout, and root runs no git in the checkout: it only reads
-data files there, which the tool copies with links refused. A request names files, never
-paths, and each is looked for in its one directory. Then the oldest releases, their images and
+never from the checkout, and root runs no git in the checkout. Before packing, it stages the
+named captures, manifest/table pairs and retained handoff in a private temporary directory
+under `/var/lib/squadopt/backend/inputs`. Each source is opened through pinned directory
+descriptors with links refused, including parent links and hard-linked files. The tool reads
+only those root-owned copies; the temporary directory is removed after pack, including a
+failed pack. A request names files, never paths, and each is looked for in its one directory.
+Then the oldest releases, their images and
 their build checkouts are pruned; the live one and the two packed before it stay. The steps'
 output is in `journalctl -u squadopt-backend-release.service` and
 `/var/lib/squadopt/backend/<run id>.log`, beside the result the chain reads. A `candidate`

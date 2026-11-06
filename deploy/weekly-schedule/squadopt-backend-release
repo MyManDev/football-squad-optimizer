@@ -21,8 +21,9 @@ before it, and writes its result where the chain waits for it.
 What root never does here: run code from the service user's checkout or git inside it (a
 repository's own configuration can run commands, which is what git's "dubious ownership"
 refusal guards against). The tool comes from the release tag in root's own clone, and the
-checkout is read for data files only, which the tool copies with symlinks refused. A request
-names files, never paths; each is looked for in its one directory.
+checkout is read for data files only, through pinned descriptors without following links.
+The tool reads a private root-owned copy. A request names files, never paths; each is looked
+for in its one directory.
 
 Every step's command and output go to the journal and to <state>/<run id>.log. A run is moved
 once: a request for a run that has a result is refused.
@@ -37,6 +38,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
@@ -68,6 +70,7 @@ NEWS = re.compile(r"club-news-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}")
 SNAPSHOT = re.compile(r"(fpl-[a-z0-9]+(-[a-z0-9]+)*|club-news)-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}")
 INSTANT = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
 FILE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.json")
+TABLE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.csv")
 #: A handoff the run retained by capture: its SHA-256 and .json.
 RETAINED = re.compile(r"[0-9a-f]{64}\.json")
 RELEASE_NAME = re.compile(r"[a-z0-9][a-z0-9._-]{2,80}")
@@ -100,10 +103,10 @@ class Request:
         return WEEKLY / "data" / "handoffs" / "by-capture" / self.capture / self.handoff_retained
 
     @property
-    def handoff(self) -> Path:
-        """Root's copy of the retained handoff, under the name pack takes."""
+    def handoff_name(self) -> str:
+        """The name pack takes for the private copy of the retained handoff."""
 
-        return STATE / "handoffs" / self.run_id / f"{self.season}-gw{self.gameweek:02d}.json"
+        return f"{self.season}-gw{self.gameweek:02d}.json"
 
 
 def _text(
@@ -148,28 +151,28 @@ def parse_request(raw: bytes) -> Request:
     return request
 
 
-def open_spool(spool: Path) -> int:
-    """Pin the spool directory without following links in any of its parent directories."""
+def open_directory(directory: Path) -> int:
+    """Pin an absolute directory without following links in any parent directory."""
 
-    if sys.platform == "win32" or not spool.is_absolute() or ".." in spool.parts:
-        raise Refused("the spool needs an absolute POSIX directory path")
+    if sys.platform == "win32" or not directory.is_absolute() or ".." in directory.parts:
+        raise Refused("host inputs need an absolute POSIX directory path")
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
-    descriptor = os.open(spool.anchor, flags)
+    descriptor = os.open(directory.anchor, flags)
     try:
-        for part in spool.parts[1:]:
+        for part in directory.parts[1:]:
             child = os.open(part, flags, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = child
     except OSError as error:
         os.close(descriptor)
-        raise Refused("the spool or one of its parents is not a plain directory") from error
+        raise Refused("the input or one of its parents is not a plain directory") from error
     return descriptor
 
 
 def take_request(spool: Path) -> bytes | None:
     """Read and remove the oldest plain request through a pinned spool directory descriptor."""
 
-    directory = open_spool(spool)
+    directory = open_directory(spool)
     try:
         return _take_request(directory)
     finally:
@@ -250,12 +253,8 @@ def _json_line(output: str, stage: str) -> dict[str, Any]:
     return document
 
 
-def check_captures(manifest: Path, snapshots: Path) -> None:
-    """Refuse a Top 100 manifest naming a capture that is not a plain directory in `snapshots`.
-
-    pack copies every capture the manifest's `source_snapshot_ids` names, and the manifest is
-    the service user's file, so root checks each name before the tool reads it.
-    """
+def capture_names(manifest: Path) -> list[str]:
+    """Read capture names from the private copy of the Top 100 manifest."""
 
     if manifest.is_symlink() or not manifest.is_file():
         raise Refused(f"the Top 100 manifest {manifest.name} is not a plain file")
@@ -269,19 +268,88 @@ def check_captures(manifest: Path, snapshots: Path) -> None:
     for name in names:
         if not isinstance(name, str) or not SNAPSHOT.fullmatch(name):
             raise Refused(f"the Top 100 manifest names a capture this command takes not: {name!r}")
+    return names
+
+
+def check_captures(manifest: Path, snapshots: Path) -> None:
+    """Check the manifest against the private, fully staged capture directories."""
+
+    for name in capture_names(manifest):
         path = snapshots / name
         if path.is_symlink() or not path.is_dir():
             raise Refused(f"the capture {name} is not a plain directory under {snapshots}")
 
 
-def copy_handoff(request: Request) -> None:
-    """Copy the run's retained handoff to the name pack takes, refusing anything but a file."""
+def copy_input(source: Path, target: Path, *, tree: bool = False) -> None:
+    """Copy data through pinned, non-following descriptors into a private root directory."""
 
-    source = request.retained_handoff
-    if source.is_symlink() or not source.is_file():
-        raise Refused(f"the retained handoff {request.handoff_retained} is not a plain file")
-    request.handoff.parent.mkdir(parents=True, exist_ok=True)
-    request.handoff.write_bytes(source.read_bytes())
+    parent = open_directory(source.parent)
+    try:
+        _copy_entry(parent, source.name, target, tree=tree)
+    except OSError as error:
+        raise Refused(f"release input {source.name} is not a readable plain input") from error
+    finally:
+        os.close(parent)
+
+
+def _copy_entry(parent: int, name: str, target: Path, *, tree: bool) -> None:
+    descriptor = os.open(
+        name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=parent
+    )
+    try:
+        metadata = os.fstat(descriptor)
+        if tree and stat.S_ISDIR(metadata.st_mode):
+            target.mkdir(parents=True)
+            for child in sorted(os.listdir(descriptor)):
+                entry = os.stat(child, dir_fd=descriptor, follow_symlinks=False)
+                _copy_entry(descriptor, child, target / child, tree=stat.S_ISDIR(entry.st_mode))
+        elif not tree and stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with (
+                os.fdopen(descriptor, "rb", closefd=False) as incoming,
+                target.open("xb") as output,
+            ):
+                shutil.copyfileobj(incoming, output)
+        else:
+            raise Refused(f"release input {name} is not a plain {'directory' if tree else 'file'}")
+    finally:
+        os.close(descriptor)
+
+
+def stage_inputs(request: Request, root: Path) -> None:
+    """Stage only the named data; no service-owned path is passed to the root release tool."""
+
+    def manifest(group: str, name: str) -> Path:
+        source = WEEKLY / "artifacts" / group
+        target = root / "artifacts" / group / name
+        copy_input(source / name, target)
+        try:
+            table = json.loads(target.read_text(encoding="utf-8"))["table_file"]
+        except (ValueError, KeyError, TypeError) as error:
+            raise Refused(f"manifest {name} names no table") from error
+        if not isinstance(table, str) or not TABLE_NAME.fullmatch(table):
+            raise Refused(f"manifest {name} names an unsafe table")
+        copy_input(source / table, target.with_name(table))
+        return target
+
+    top100 = manifest("phase_b", request.top100_manifest)
+    captures = {request.capture, *capture_names(top100)}
+    if request.news:
+        manifest("rotation", request.rotation_manifest)
+        captures.add(request.news)
+    for capture in sorted(captures):
+        copy_input(
+            WEEKLY / "data" / "snapshots" / capture,
+            root / "snapshots" / capture,
+            tree=True,
+        )
+    check_captures(top100, root / "snapshots")
+    try:
+        copy_input(request.retained_handoff, root / "handoffs" / request.handoff_name)
+    except Refused as error:
+        raise Refused(
+            f"the retained handoff {request.handoff_retained} is not a plain file"
+        ) from error
 
 
 def trusted_release_commit(tag: str, run: Run) -> str:
@@ -319,6 +387,47 @@ def with_jobs(deadline_utc: str, now: datetime) -> bool:
     return now + JOB_MARGIN < deadline
 
 
+def pack_release(request: Request, python: list[str], run: Run) -> Completed:
+    """Keep a private staging directory alive only until the package has been built."""
+
+    inputs = STATE / "inputs"
+    inputs.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f"{request.run_id}-", dir=inputs) as directory:
+        root = Path(directory)
+        stage_inputs(request, root)
+        pack = [
+            *python,
+            "pack",
+            "--repo",
+            str(REPO),
+            "--season",
+            request.season,
+            "--gameweek",
+            str(request.gameweek),
+            "--capture",
+            request.capture,
+            "--tag",
+            request.tag,
+            "--snapshot-root",
+            str(root / "snapshots"),
+            "--handoff",
+            str(root / "handoffs" / request.handoff_name),
+            "--top100-manifest",
+            str(root / "artifacts" / "phase_b" / request.top100_manifest),
+            "--out",
+            str(INCOMING),
+        ]
+        if request.news:
+            pack += [
+                "--rotation-manifest",
+                str(root / "artifacts" / "rotation" / request.rotation_manifest),
+                "--news-capture",
+                request.news,
+            ]
+        INCOMING.mkdir(parents=True, exist_ok=True)
+        return run(pack)
+
+
 def move(request: Request, run: Run, now: datetime, say: Callable[[str], None]) -> int:
     """The five steps for `request`; 0 once the backend serves it, else the failing step's code."""
 
@@ -348,40 +457,7 @@ def move(request: Request, run: Run, now: datetime, say: Callable[[str], None]) 
     tool.write_bytes(source)
     python = [sys.executable, str(tool)]
 
-    snapshots = WEEKLY / "data" / "snapshots"
-    pack = [
-        *python,
-        "pack",
-        "--repo",
-        str(REPO),
-        "--season",
-        request.season,
-        "--gameweek",
-        str(request.gameweek),
-        "--capture",
-        request.capture,
-        "--tag",
-        request.tag,
-        "--snapshot-root",
-        str(snapshots),
-        "--handoff",
-        str(request.handoff),
-        "--top100-manifest",
-        str(WEEKLY / "artifacts" / "phase_b" / request.top100_manifest),
-        "--out",
-        str(INCOMING),
-    ]
-    if request.news:
-        pack += [
-            "--rotation-manifest",
-            str(WEEKLY / "artifacts" / "rotation" / request.rotation_manifest),
-            "--news-capture",
-            request.news,
-        ]
-    check_captures(WEEKLY / "artifacts" / "phase_b" / request.top100_manifest, snapshots)
-    copy_handoff(request)
-    INCOMING.mkdir(parents=True, exist_ok=True)
-    packed = run(pack)
+    packed = pack_release(request, python, run)
     if packed.code != 0:
         say(f"stopped: pack exited {packed.code}; nothing was staged")
         return packed.code
