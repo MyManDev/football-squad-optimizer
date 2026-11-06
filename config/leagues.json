@@ -5,6 +5,11 @@
       "league_id": 352490,
       "menu": "full",
       "label": "the first league the site publishes"
+    },
+    {
+      "league_id": 755941,
+      "menu": "device",
+      "label": "the second league, on the device menu from GW11"
     }
   ]
 }

@@ -24,8 +24,9 @@ def _document(*ids: object) -> dict[str, object]:
     }
 
 
-def test_the_repository_list_names_the_league_the_site_publishes() -> None:
-    assert read_league_list(ROOT / LEAGUE_LIST_FILE) == (352490,)
+def test_the_repository_list_names_the_leagues_the_site_publishes() -> None:
+    assert read_league_list(ROOT / LEAGUE_LIST_FILE) == (352490, 755941)
+    assert read_league_menus(ROOT / LEAGUE_LIST_FILE) == {352490: "full", 755941: "device"}
 
 
 def test_the_list_is_read_in_its_order(tmp_path: Path) -> None:
