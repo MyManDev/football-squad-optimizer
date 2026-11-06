@@ -1,8 +1,8 @@
 {
   "contract_version": "fixtures_v1",
-  "generated_at_utc": "2026-11-04T06:29:19Z",
+  "generated_at_utc": "2026-11-06T14:59:14Z",
   "payload": {
-    "captured_at_utc": "2026-11-04T02:00:46.600538Z",
+    "captured_at_utc": "2026-11-06T08:31:54.156133Z",
     "current_gameweek": 10,
     "gameweeks": [
       {
@@ -2718,23 +2718,6 @@
           },
           {
             "away": {
-              "name": "Everton",
-              "short_name": "EVE",
-              "team_id": 9
-            },
-            "away_score": null,
-            "finished": false,
-            "fixture_id": 159,
-            "home": {
-              "name": "Nott'm Forest",
-              "short_name": "NFO",
-              "team_id": 18
-            },
-            "home_score": null,
-            "kickoff_utc": "2026-12-19T15:00:00Z"
-          },
-          {
-            "away": {
               "name": "Spurs",
               "short_name": "TOT",
               "team_id": 19
@@ -2763,6 +2746,23 @@
               "name": "Brighton",
               "short_name": "BHA",
               "team_id": 5
+            },
+            "home_score": null,
+            "kickoff_utc": "2026-12-20T14:00:00Z"
+          },
+          {
+            "away": {
+              "name": "Everton",
+              "short_name": "EVE",
+              "team_id": 9
+            },
+            "away_score": null,
+            "finished": false,
+            "fixture_id": 159,
+            "home": {
+              "name": "Nott'm Forest",
+              "short_name": "NFO",
+              "team_id": 18
             },
             "home_score": null,
             "kickoff_utc": "2026-12-20T14:00:00Z"
@@ -6695,7 +6695,7 @@
       }
     ],
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+    "source_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
     "unscheduled_count": 0
   }
 }

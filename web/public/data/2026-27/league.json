@@ -1,8 +1,8 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-11-04T06:29:19Z",
+  "generated_at_utc": "2026-11-06T14:59:14Z",
   "payload": {
-    "captured_at_utc": "2026-11-04T02:00:46.600538Z",
+    "captured_at_utc": "2026-11-06T08:31:54.156133Z",
     "league_total_average_score": 167.0,
     "our_total_realized_net_score": 168.0,
     "ownership": {
@@ -13,26 +13,26 @@
         437730,
         503139
       ],
-      "effective_ownership": 345.0,
+      "effective_ownership": 345.9,
       "gameweek": 5,
       "least_owned_starter": 503139,
-      "mean_starter_ownership": 24.181818181818183,
+      "mean_starter_ownership": 24.254545454545454,
       "most_owned_starter": 223094,
       "ownership_percent": {
-        "204936": 7.4,
-        "216616": 2.9,
-        "219168": 21.8,
-        "223094": 79.0,
-        "226182": 11.3,
-        "244723": 4.9,
-        "244850": 52.5,
-        "437730": 6.2,
-        "446008": 20.4,
+        "204936": 7.3,
+        "216616": 2.8,
+        "219168": 22.7,
+        "223094": 79.1,
+        "226182": 11.1,
+        "244723": 4.8,
+        "244850": 53.0,
+        "437730": 6.0,
+        "446008": 20.1,
         "490145": 0.8,
         "494521": 3.3,
         "503139": 2.2,
-        "60307": 46.9,
-        "67089": 15.6,
+        "60307": 47.0,
+        "67089": 15.5,
         "97032": 15.0
       },
       "squad": [
@@ -235,14 +235,14 @@
     },
     "scored_gameweeks": 3,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
+    "source_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
     "total_difference_to_average": 1.0,
     "verdict": "+1 points against the game's average over 3 scored gameweeks — one gameweek is noise, not evidence; the starting eleven averages 24% ownership.",
     "verdict_code": "standing",
     "verdict_params": {
       "caveat": "noise",
       "difference": 1.0,
-      "mean_starter_ownership": 24.2,
+      "mean_starter_ownership": 24.3,
       "scored": 3
     },
     "weeks": [
