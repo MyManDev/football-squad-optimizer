@@ -82,7 +82,7 @@ node --test workers/fpl-probe/test/probe.test.mjs workers/fpl-probe/test/deploy-
 The FPL forwarder row runs its own suites ([ADR 0012](../docs/architecture/decisions/0012-fpl-forwarder.md)):
 
 ```sh
-node --test workers/fpl-proxy/test/proxy.test.mjs workers/fpl-proxy/test/worker.test.mjs workers/fpl-proxy/test/deploy-steps.test.mjs
+node --test workers/fpl-proxy/test/proxy.test.mjs workers/fpl-proxy/test/activity.test.mjs workers/fpl-proxy/test/worker.test.mjs workers/fpl-proxy/test/deploy-steps.test.mjs
 ```
 
 The last row runs, with `SQUADOPT_PUBLICATION_CONTRACT=1` and `SQUADOPT_BROWSER_SMOKE=1` set:

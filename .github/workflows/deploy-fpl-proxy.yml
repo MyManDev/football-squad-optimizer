@@ -73,6 +73,7 @@ jobs:
         run: |
           node --test \
             workers/fpl-proxy/test/proxy.test.mjs \
+            workers/fpl-proxy/test/activity.test.mjs \
             workers/fpl-proxy/test/worker.test.mjs \
             workers/fpl-proxy/test/deploy-steps.test.mjs
 

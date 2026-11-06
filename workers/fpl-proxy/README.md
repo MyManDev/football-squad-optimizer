@@ -13,6 +13,7 @@ The decision, its cache rules and its terms note are
 | `GET /api/v1/fpl/standings/{league}?page={1..1000}` | [`fpl_league_standings_v1`](../../docs/contracts/fpl_league_standings_v1.md) |
 | `GET /api/v1/fpl/entry/{entry}/bundle?gw={table gameweek}` | [`fpl_entry_bundle_v1`](../../docs/contracts/fpl_entry_bundle_v1.md) |
 | `GET /api/v1/fpl/live/{gameweek}` | [`week_live_v1`](../../docs/contracts/week_live_v1.md), without member blocks |
+| `GET /api/v1/fpl/live/{gameweek}?view=activity`            | [`week_activity_v1`](../../docs/contracts/week_activity_v1.md), the same score with optional realized player events |
 
 Every other path answers a JSON 404, and another method on these paths a JSON 405. Every answer
 is JSON and carries `x-squadopt-fpl: 1`; a document also carries `x-squadopt-fpl-cache`, which
@@ -36,7 +37,7 @@ or failed, and the last good copy is served with its original `source_time`).
   root, with no credentials and no network:
 
   ```sh
-  node --test workers/fpl-proxy/test/proxy.test.mjs workers/fpl-proxy/test/worker.test.mjs workers/fpl-proxy/test/deploy-steps.test.mjs
+  node --test workers/fpl-proxy/test/proxy.test.mjs workers/fpl-proxy/test/activity.test.mjs workers/fpl-proxy/test/worker.test.mjs workers/fpl-proxy/test/deploy-steps.test.mjs
   ```
 
 - **Deployment and deletion** happen only through `.github/workflows/deploy-fpl-proxy.yml`,

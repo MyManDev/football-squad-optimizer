@@ -20,11 +20,13 @@ export function MemberLiveWeek({
   if (shown === null) return null;
   return (
     <MemberLiveScoreCard
+      key={`${squad.entry.entry_id}:${squad.season}:${shown.gameweek}`}
       gameweek={shown.gameweek}
       score={shown.score}
       names={shown.names}
       onRefresh={refresh}
       refreshing={refreshing}
+      activity={shown.activity}
     />
   );
 }

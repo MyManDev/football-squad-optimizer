@@ -8,11 +8,13 @@
  */
 
 import { discardBody, withRequestDeadline } from "../../../data/request";
+import type { WeekActivity } from "../../liveScore/weekActivity";
 import type { WeekLive } from "../../liveScore/weekLive";
 import {
   LAST_GAMEWEEK,
   MAX_STANDINGS_PAGE,
   readEntryBundle,
+  readLiveActivity,
   readLiveWeek,
   readStandings,
   type FplEntryBundle,
@@ -105,6 +107,11 @@ export interface ForwarderClient {
     gameweek: number,
     options?: ForwarderReadOptions,
   ): Promise<ForwarderResult<WeekLive, LiveReason>>;
+  /** Opt-in event detail; older clients and the original live route remain valid. */
+  liveActivity?(
+    gameweek: number,
+    options?: ForwarderReadOptions,
+  ): Promise<ForwarderResult<WeekActivity, LiveReason>>;
 }
 
 export interface ForwarderClientOptions {
@@ -219,6 +226,15 @@ export function createForwarderClient({
       return ask(
         `/live/${gameweek}`,
         (value) => readLiveWeek(value, gameweek),
+        ["not_found"] as const,
+        options,
+      );
+    },
+    async liveActivity(gameweek, options) {
+      if (!inRange(gameweek, 1, LAST_GAMEWEEK)) return { ok: false, reason: "not_found" };
+      return ask(
+        `/live/${gameweek}?view=activity`,
+        (value) => readLiveActivity(value, gameweek),
         ["not_found"] as const,
         options,
       );
