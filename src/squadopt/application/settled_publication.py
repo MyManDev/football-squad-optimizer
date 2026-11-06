@@ -26,11 +26,11 @@ import shutil
 import stat
 from collections import Counter
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Final
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import best_match
@@ -41,6 +41,7 @@ from squadopt.application.league_views import MemberStanding, _rank_movement
 from squadopt.application.scoreboard import scoreboard_payload
 from squadopt.application.site import build_site
 from squadopt.application.weekly_suggestion_eval import (
+    legacy_record_league,
     publish_suggestion_histories,
     published_advice_captures,
     review_member_weeks,
@@ -72,6 +73,25 @@ _SEASON_AUXILIARIES = frozenset(
 )
 
 
+#: The one settled publication approved so far, an allow-list: the publisher refuses every
+#: other season and gameweek, and every league but the one that keeps the legacy advice
+#: records (``legacy_record_league``, which ``config/leagues.json`` marks), because the
+#: histories it rebuilds read that league's records.
+APPROVED_SETTLED_SEASON: Final = "2026-27"
+APPROVED_SETTLED_GAMEWEEK: Final = 5
+
+
+def _approved_league() -> int:
+    """The league the approved settled publication is of: the legacy record league."""
+    league = legacy_record_league()
+    if league is None:
+        raise DataError(
+            "The league list marks no league that keeps legacy advice records, so no "
+            "settled publication is approved."
+        )
+    return league
+
+
 @dataclass(frozen=True, slots=True)
 class SettledPublicationRequest:
     accepted_dir: Path
@@ -83,7 +103,7 @@ class SettledPublicationRequest:
     out_dir: Path
     season: str
     gameweek: int
-    league_id: int = 352490
+    league_id: int = field(default_factory=_approved_league)
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,8 +180,16 @@ def _allowed(name: str, request: SettledPublicationRequest) -> bool:
 def _preflight(
     request: SettledPublicationRequest,
 ) -> tuple[dict[str, bytes], dict[str, Any], CapturedSnapshot, dict[int, EntryGameweekPoints]]:
-    if (request.season, request.gameweek, request.league_id) != ("2026-27", 5, 352490):
-        raise DataError("This approved publisher is limited to 2026-27 GW5, league 352490.")
+    league = _approved_league()
+    if (request.season, request.gameweek, request.league_id) != (
+        APPROVED_SETTLED_SEASON,
+        APPROVED_SETTLED_GAMEWEEK,
+        league,
+    ):
+        raise DataError(
+            f"This approved publisher is limited to {APPROVED_SETTLED_SEASON} "
+            f"GW{APPROVED_SETTLED_GAMEWEEK}, league {league}."
+        )
     out = request.out_dir.resolve()
     inputs = (
         request.accepted_dir,

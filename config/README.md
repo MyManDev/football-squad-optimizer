@@ -22,9 +22,21 @@ standings, member squads, chip states and a device index without solving member 
 The weekly journal reports preparation, projection, member and publication timings for
 each league. League 352490 keeps its full menu during the transition.
 
+`legacy_advice_records`, `true` on at most one line, marks the league that keeps the legacy
+advice records: the first league the site published, today league 352490. On every recorded
+run its publications still write `member_advice_record_v2` under `data/advice_records`, and its
+member histories read those records first; every other league reads only the
+league-independent baseline records under `data/member_baselines`. The settled publisher
+(`scripts.build_settled_site`) is limited to this league. No module under `src/squadopt` names
+the league's number: the code reads it from this file, relative to the working directory
+(`legacy_record_league` in `squadopt.application.weekly_suggestion_eval`), so the weekly run and
+the scripts are run from the checkout. A list that sets the flag on no line keeps no legacy
+records.
+
 | Reader | How it reads the list |
 | --- | --- |
-| `squadopt.contracts.league_list` | Defines the contract, the default path (`LEAGUE_LIST_FILE`) and `read_league_list`, which refuses a document that is not `league_list_v1` |
+| `squadopt.contracts.league_list` | Defines the contract, the default path (`LEAGUE_LIST_FILE`) and `read_league_list`, which refuses a document that is not `league_list_v1`; `parse_legacy_record_league` reads the `legacy_advice_records` line |
+| `squadopt.application.weekly_suggestion_eval` | `legacy_record_league` reads the league that keeps the legacy advice records, which the league publication, the member histories and the settled publisher use |
 | The weekly run | `python -m squadopt.platform.weekly_operations --league-list config/leagues.json` captures every listed league's standings, renders each league's tree and writes the site's league directory |
 | `scripts/seed_entry_registry.py` | `--league-list config/leagues.json` rebuilds the private entry registry for every listed league from a captured standings page |
 | `scripts/measure_strategy_rule_scale.py` | Reads the list at the recorded revision for its measurement |
