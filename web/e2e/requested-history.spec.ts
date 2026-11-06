@@ -5,6 +5,33 @@ import { MESSAGES } from "../src/i18n/messages";
 import { installLeagueMocks } from "./leagueMocks";
 import { atRest } from "./atRest";
 
+const unrecorded = {
+  ...fixture,
+  payload: {
+    ...fixture.payload,
+    weeks: [
+      {
+        gameweek: 4,
+        status: "unavailable",
+        reason: "no_pre_deadline_record",
+        deadline_utc: fixture.payload.weeks[0].deadline_utc,
+        advice_snapshot_id: null,
+        advice_captured_at_utc: null,
+        advice_generated_at_utc: null,
+        advice_sha256: null,
+        outcome_snapshot_id: null,
+        outcome_captured_at_utc: null,
+        expected_own_points: null,
+        suggested: null,
+        actual: null,
+        actual_reason: null,
+        net_difference: null,
+        players: [],
+      },
+    ],
+  },
+};
+
 for (const [language, width, height] of [
   ["tr", 375, 812],
   ["en", 1280, 900],
@@ -37,7 +64,12 @@ for (const [language, width, height] of [
       path: testInfo.outputPath(`requested-history-${language}.png`),
       fullPage: true,
     });
+    await page.route("**/data/league/history/101.json", (route) =>
+      route.fulfill({ json: unrecorded }),
+    );
     await page.reload();
     await expect(page.getByText(copy.requested)).toBeVisible();
+    await page.getByRole("combobox", { name: copy.week }).selectOption("4");
+    await expect(page.getByText(`${copy.difference}:`)).toContainText(/−2[,.]0/);
   });
 }

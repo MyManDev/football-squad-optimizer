@@ -75,8 +75,9 @@ their scores, but an older capture or an incomplete store cannot erase them. Eac
 file is replaced atomically only after validation.
 
 The history page reads the requested file beside its existing weekly file. It adds requested
-weeks that have no original published week, retaining the original row on overlap, and
-labels those additions “İstek üzerine” / “On request”. The original weekly files, immutable
+weeks that have no original plan, including an explicit `no_pre_deadline_record` row with
+no advice evidence. Recorded plans and other refusal states retain precedence on overlap.
+Requested rows are labelled “İstek üzerine” / “On request”. The original weekly files, immutable
 advice archives and research horizon remain unchanged. Missing requested files are normal
 for deployments that have not produced them yet; malformed evidence is not silently hidden.
 

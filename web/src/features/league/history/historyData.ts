@@ -365,9 +365,20 @@ export async function loadSuggestionHistory(
   if (!requested) return published!;
   if (!published) return requested;
   requireThat(published.payload.season === requested.payload.season);
-  // Original published weeks remain authoritative; requested weeks fill the gaps.
+  // Recorded plans and refusals take precedence; an explicitly absent record is a gap.
   const weeks = new Map(requested.payload.weeks.map((week) => [week.gameweek, week]));
-  for (const week of published.payload.weeks) weeks.set(week.gameweek, week);
+  for (const week of published.payload.weeks) {
+    const absent =
+      week.status === "unavailable" &&
+      week.reason === "no_pre_deadline_record" &&
+      week.advice_snapshot_id === null &&
+      week.advice_sha256 === null &&
+      week.advice_captured_at_utc === null &&
+      week.advice_generated_at_utc === null &&
+      week.expected_own_points === null &&
+      !week.recorded_plans?.length;
+    if (!absent || !weeks.has(week.gameweek)) weeks.set(week.gameweek, week);
+  }
   const latest =
     Date.parse(requested.generated_at_utc) > Date.parse(published.generated_at_utc)
       ? requested

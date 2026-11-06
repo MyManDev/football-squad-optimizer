@@ -211,6 +211,53 @@ describe("requested history beside weekly publications", () => {
     expect(published).toEqual(document());
   });
 
+  const withoutRecord = () => {
+    const value = document();
+    Object.assign(value.payload.weeks[0], {
+      status: "unavailable",
+      reason: "no_pre_deadline_record",
+      advice_snapshot_id: null,
+      advice_captured_at_utc: null,
+      advice_generated_at_utc: null,
+      advice_sha256: null,
+      outcome_snapshot_id: null,
+      outcome_captured_at_utc: null,
+      expected_own_points: null,
+      suggested: null,
+      actual: null,
+      actual_reason: null,
+      net_difference: null,
+      players: [],
+    });
+    return value;
+  };
+
+  it("shows a requested plan when the weekly history explicitly has no record", async () => {
+    const published = withoutRecord();
+    const computed = requested(4);
+    const loaded = await loadSuggestionHistory(tree(published, computed), 101);
+    expect(loaded.payload.weeks).toEqual(computed.payload.weeks);
+    expect(published).toEqual(withoutRecord());
+  });
+
+  it.each(["invalid_record", "ambiguous_record", "not_published", "missing_outcomes"])(
+    "keeps a weekly refusal (%s) visible beside a requested plan",
+    async (reason) => {
+      const published = withoutRecord();
+      published.payload.weeks[0].reason = reason;
+      const loaded = await loadSuggestionHistory(tree(published, requested(4)), 101);
+      expect(loaded.payload.weeks).toEqual(published.payload.weeks);
+    },
+  );
+
+  it("does not discard recorded evidence just because its reason says no record", async () => {
+    const published = withoutRecord();
+    published.payload.weeks[0].advice_snapshot_id = "original-capture";
+    published.payload.weeks[0].advice_sha256 = "b".repeat(64);
+    const loaded = await loadSuggestionHistory(tree(published, requested(4)), 101);
+    expect(loaded.payload.weeks).toEqual(published.payload.weeks);
+  });
+
   it("does not conceal malformed legacy evidence behind a requested result", async () => {
     await expect(
       loadSuggestionHistory(tree(new LeagueDataError("broken"), requested()), 101),
