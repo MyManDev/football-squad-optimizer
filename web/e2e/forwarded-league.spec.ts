@@ -203,10 +203,16 @@ test("a typed unlisted league opens from the forwarder, and a member opens with 
   await page.getByRole("button", { name: copy.forwarded.nextPage }).click();
   await expect(page.getByRole("link", { name: LAST.results[0]!.entry_name })).toBeVisible();
   await expect(page.getByRole("button", { name: copy.forwarded.nextPage })).toBeDisabled();
-  expect(asked).toEqual([
+  // The league's own tree stands above the table: its scoreboard reads the game's events and
+  // the page's members' seasons once, and nothing of them again for the second page.
+  expect(asked.slice(0, 2)).toEqual([
     `/api/v1/fpl/standings/${LEAGUE}?page=1`,
-    `/api/v1/fpl/standings/${LEAGUE}?page=2`,
+    "/api/v1/fpl/events",
   ]);
+  expect(asked.slice(2, 5).sort()).toEqual(
+    FIRST.results.map((row) => `/api/v1/fpl/entry/${row.entry}/season`).sort(),
+  );
+  expect(asked.slice(5)).toEqual([`/api/v1/fpl/standings/${LEAGUE}?page=2`]);
   // The visitor's league stays the published one: a forwarded league is never chosen.
   expect(await page.evaluate(() => localStorage.getItem("squadopt.league"))).toBe(
     String(PUBLISHED.league_id),

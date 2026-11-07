@@ -14,11 +14,15 @@ import {
   LAST_GAMEWEEK,
   MAX_STANDINGS_PAGE,
   readEntryBundle,
+  readEntrySeason,
+  readEvents,
   readLiveActivity,
   readLiveWeek,
   readStandings,
   type FplEntryBundle,
   type FplLeagueStandings,
+  type FplEntrySeason,
+  type FplEvents,
 } from "./documents";
 
 /** The forwarder's routes, on the site's own origin. */
@@ -112,6 +116,13 @@ export interface ForwarderClient {
     gameweek: number,
     options?: ForwarderReadOptions,
   ): Promise<ForwarderResult<WeekActivity, LiveReason>>;
+  /** One entry's season to date: each played week's points, totals, ranks and transfers. */
+  entrySeason(
+    entry: number,
+    options?: ForwarderReadOptions,
+  ): Promise<ForwarderResult<FplEntrySeason, BundleReason>>;
+  /** The season's gameweeks with the game's average and highest score. */
+  events(options?: ForwarderReadOptions): Promise<ForwarderResult<FplEvents, LiveReason>>;
 }
 
 export interface ForwarderClientOptions {
@@ -239,6 +250,18 @@ export function createForwarderClient({
         options,
       );
     },
+    async entrySeason(entry, options) {
+      if (!positiveId(entry)) return { ok: false, reason: "not_found" };
+      return ask(
+        `/entry/${entry}/season`,
+        (value) => readEntrySeason(value, entry),
+        ["not_found", "entry_not_found"] as const,
+        options,
+      );
+    },
+    async events(options) {
+      return ask("/events", readEvents, ["not_found"] as const, options);
+    },
   };
 }
 
@@ -251,3 +274,6 @@ export const entryBundle: ForwarderClient["entryBundle"] = (entry, gameweek, opt
   forwarder.entryBundle(entry, gameweek, options);
 export const liveWeek: ForwarderClient["liveWeek"] = (gameweek, options) =>
   forwarder.liveWeek(gameweek, options);
+export const entrySeason: ForwarderClient["entrySeason"] = (entry, options) =>
+  forwarder.entrySeason(entry, options);
+export const events: ForwarderClient["events"] = (options) => forwarder.events(options);

@@ -18,6 +18,46 @@ import {
 export const STANDINGS_CONTRACT = "fpl_league_standings_v1";
 export const BUNDLE_CONTRACT = "fpl_entry_bundle_v1";
 export const LIVE_CONTRACT = "week_live_v1";
+export const SEASON_CONTRACT = "fpl_entry_season_v1";
+export const EVENTS_CONTRACT = "fpl_events_v1";
+
+/** One played week of an entry's season: `fpl_entry_season_v1`'s row. */
+export interface FplSeasonWeek {
+  event: number;
+  /** The week's gross, before the transfer hit. */
+  points: number;
+  /** The season total after the week, net of hits. */
+  total_points: number;
+  rank: number | null;
+  overall_rank: number | null;
+  event_transfers: number;
+  event_transfers_cost: number;
+  bank: number | null;
+  value: number | null;
+}
+
+export interface FplEntrySeason {
+  contract_version: typeof SEASON_CONTRACT;
+  entry_id: number;
+  source_time: string;
+  weeks: FplSeasonWeek[];
+  chips: { name: string; event: number }[];
+}
+
+/** One gameweek's state and the game's scores: `fpl_events_v1`'s row. */
+export interface FplEvent {
+  id: number;
+  finished: boolean;
+  data_checked: boolean;
+  average_entry_score: number;
+  highest_score: number | null;
+}
+
+export interface FplEvents {
+  contract_version: typeof EVENTS_CONTRACT;
+  source_time: string;
+  events: FplEvent[];
+}
 
 /** Each request reads one page; country leagues can be browsed beyond the first thousand members. */
 export const MAX_STANDINGS_PAGE = 1000;
@@ -267,5 +307,56 @@ export function readLiveActivity(value: unknown, gameweek: number): WeekActivity
     const document = weekActivity(value);
     need(readLiveWeek(document.week, gameweek) !== null);
     return document;
+  });
+}
+
+/** One entry's season to date, when it is the entry's and its weeks rise without repeats. */
+export function readEntrySeason(value: unknown, entry: number): FplEntrySeason | null {
+  return readOrNull(() => {
+    const document = record(value);
+    need(document.contract_version === SEASON_CONTRACT);
+    need(document.entry_id === entry && sourceTime(document.source_time));
+    const weeks = list(document.weeks).map((value) => {
+      const row = record(value);
+      need(
+        week(row.event) &&
+          integer(row.points) &&
+          integer(row.total_points) &&
+          (row.rank === null || count(row.rank)) &&
+          (row.overall_rank === null || count(row.overall_rank)) &&
+          count(row.event_transfers) &&
+          count(row.event_transfers_cost) &&
+          (row.bank === null || integer(row.bank)) &&
+          (row.value === null || integer(row.value)),
+      );
+      return row.event as number;
+    });
+    need(weeks.every((at, index) => index === 0 || at > weeks[index - 1]!));
+    for (const value of list(document.chips)) {
+      const row = record(value);
+      need(text(row.name) && week(row.event));
+    }
+    return document as unknown as FplEntrySeason;
+  });
+}
+
+/** The season's gameweeks with the game's scores, in gameweek order without repeats. */
+export function readEvents(value: unknown): FplEvents | null {
+  return readOrNull(() => {
+    const document = record(value);
+    need(document.contract_version === EVENTS_CONTRACT && sourceTime(document.source_time));
+    const ids = list(document.events).map((value) => {
+      const row = record(value);
+      need(
+        week(row.id) &&
+          flag(row.finished) &&
+          flag(row.data_checked) &&
+          count(row.average_entry_score) &&
+          (row.highest_score === null || count(row.highest_score)),
+      );
+      return row.id as number;
+    });
+    need(ids.every((at, index) => index === 0 || at > ids[index - 1]!));
+    return document as unknown as FplEvents;
   });
 }
