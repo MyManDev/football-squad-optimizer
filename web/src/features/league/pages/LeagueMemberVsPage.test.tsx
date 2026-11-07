@@ -116,7 +116,7 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
     expect(weeks[1]).toHaveTextContent("Player 20 →");
     expect(weeks[1]).toHaveTextContent(`${copy.difference}: −2`);
     expect(weeks[0]).toHaveTextContent(copy.none);
-    expect(weeks[0]).toHaveTextContent(copy.noCaptain);
+    expect(weeks[0]).toHaveTextContent("—");
   });
 
   it("sums the compared weeks above, and names how many", () => {
@@ -125,7 +125,6 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
     expect(totals).toHaveTextContent("60");
     expect(totals).toHaveTextContent("57");
     expect(totals).toHaveTextContent("+3");
-    expect(screen.getByText(copy.weeksCompared(2))).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(AS_A_CHANCE);
     expect(document.body.textContent).not.toMatch(AS_A_CAVEAT);
   });

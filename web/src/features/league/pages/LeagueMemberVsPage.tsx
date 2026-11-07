@@ -114,7 +114,6 @@ export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) 
                 <dd>{signed(summary.difference)}</dd>
               </div>
             </dl>
-            <p className={styles.count}>{copy.weeksCompared(compared.length)}</p>
           </Card>
           {compared.map((week) => {
             const actual = week.actual!;
@@ -135,7 +134,7 @@ export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) 
                     <h3>{copy.squadopt}</h3>
                     <dl>
                       <dt>{copy.captain}</dt>
-                      <dd>{suggestedCaptain(week) ?? copy.noCaptain}</dd>
+                      <dd>{suggestedCaptain(week) ?? "—"}</dd>
                       <dt>{copy.transfers}</dt>
                       <dd>
                         {moves.length === 0 ? (
@@ -158,7 +157,7 @@ export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) 
                     <h3>{copy.you}</h3>
                     <dl>
                       <dt>{copy.captain}</dt>
-                      <dd>{detail?.captain.name ?? copy.noCaptain}</dd>
+                      <dd>{detail?.captain.name ?? "—"}</dd>
                       <dt>{copy.transfers}</dt>
                       <dd>
                         {detail === null || detail.transfers.length === 0 ? (

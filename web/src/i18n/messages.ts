@@ -11,8 +11,6 @@ const en = {
     net: "Net points",
     difference: "Difference",
     total: "Season so far",
-    weeksCompared: (count: number) => `${count} gameweeks compared`,
-    noCaptain: "No captain recorded",
   },
   suggestionHistory: {
     requested: "On request",
@@ -612,8 +610,6 @@ const tr: MessageSchema<typeof en> = {
     net: "Net puan",
     difference: "Fark",
     total: "Sezonun toplamı",
-    weeksCompared: (count) => `${count} hafta karşılaştırıldı`,
-    noCaptain: "Kaptan kaydı yok",
   },
   suggestionHistory: {
     requested: "İstek üzerine",
