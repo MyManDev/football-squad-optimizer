@@ -49,6 +49,18 @@ describe.each(["tr", "en"] as const)("member live score in %s", (language) => {
       screen.getByText(language === "tr" ? "Bonus eklendi" : "Bonus added"),
     ).toBeInTheDocument();
   });
+  it("draws the forecast before the live points, each under its own word", () => {
+    const score = result("transfer-hit", true);
+    if (score.refused) throw new Error(score.reason);
+    const { container } = show(score, language, { forecast: 61.25 });
+    const text = container.textContent ?? "";
+    const forecastWord = language === "tr" ? "Tahmin" : "Forecast";
+    const liveWord = language === "tr" ? "Canlı puan" : "Live points";
+    expect(text.indexOf(forecastWord)).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf(forecastWord)).toBeLessThan(text.indexOf(liveWord));
+    expect(screen.getByText(language === "tr" ? "61,3" : "61.3")).toBeInTheDocument();
+  });
+
   it("leaves no card for absent or refused data", () => {
     expect(show(null, language).container).toBeEmptyDOMElement();
     cleanup();
@@ -86,7 +98,7 @@ it("keeps a real zero and a negative score visible in the net stat", () => {
   const score = result();
   if (score.refused) throw new Error(score.reason);
   // The transfer hit stat also shows "0" here, so read the value next to the net label only.
-  const net = () => screen.getByText("Net puan", { exact: true }).nextElementSibling;
+  const net = () => screen.getByText("Canlı puan", { exact: true }).nextElementSibling;
   const { rerender } = render(
     <MemberLiveScoreCard gameweek={8} score={{ ...score, net: 0 }} names={names} />,
   );

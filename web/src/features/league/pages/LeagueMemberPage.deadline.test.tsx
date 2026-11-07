@@ -249,8 +249,17 @@ describe("the closed week's heading", () => {
   it.each(["tr", "en"] as const)("is LIVE WEEK, with no plan summary under it (%s)", (language) => {
     const copy = MESSAGES[language].leagueMembers;
     renderView(DEADLINE, language, "", { advice: null, adviceIssue: "not-listed" });
-    expect(screen.getByRole("heading", { name: copy.liveWeek })).toBeInTheDocument();
+    const heading = screen.getByRole("heading", { name: copy.liveWeek });
+    expect(heading).toHaveAttribute("data-live");
     expect(screen.queryByRole("heading", { name: copy.decisionTitle })).toBeNull();
     expect(screen.queryByTestId("member-selection-summary")).toBeNull();
+  });
+
+  it.each(["tr", "en"] as const)("carries no live mark while the week is open (%s)", (language) => {
+    const copy = MESSAGES[language].leagueMembers;
+    renderView(null, language);
+    const heading = screen.getByRole("heading", { name: copy.decisionTitle });
+    expect(heading).not.toHaveAttribute("data-live");
+    expect(screen.queryByRole("heading", { name: copy.liveWeek })).toBeNull();
   });
 });
