@@ -260,3 +260,32 @@ describe("what stays unpublished", () => {
     expect((await tree.devicePlan(CAPTURE)).payload.source_snapshot_id).toBe(CAPTURE);
   });
 });
+
+describe("the requested history", () => {
+  it("is read from the public tree the weekly run publishes for the league's teams", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        asked.push(String(url));
+        return new Response("", { status: 404 });
+      }),
+    );
+    try {
+      const tree = forwardedTree({
+        league: LEAGUE,
+        table: TABLE_ENVELOPE,
+        fixtures: null,
+        sources: sources(),
+      });
+      await expect(tree.raw(`history/requested/${ENTRY}.json`)).rejects.toBeInstanceOf(
+        LeagueDataMissing,
+      );
+      expect(
+        asked.some((url) => url.endsWith(`data/public/314/history/requested/${ENTRY}.json`)),
+      ).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

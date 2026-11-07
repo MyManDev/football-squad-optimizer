@@ -9,9 +9,11 @@
  * league, so every advice document still reads as not published.
  */
 
+import type { RequestOptions } from "../../../data/request";
 import type { FixturesPayload } from "../../fixtures/types";
 import { LeagueDataError, LeagueDataMissing, type LeagueTree } from "../data";
 import type { PublishedLeague } from "../directory";
+import { fetchPublishedJson } from "../publishedJson";
 import { RIVAL_STRATEGIES, type DevicePlanDocument } from "../device/types";
 import {
   entryBundle as readBundle,
@@ -340,9 +342,20 @@ export function forwardedTree({
   }
 
   /** The member histories; the requested history and every other document stay unpublished. */
-  async function raw(relative: string): Promise<unknown> {
+  async function raw(relative: string, options?: RequestOptions): Promise<unknown> {
+    if (league.leagueId <= 0) throw new LeagueDataMissing(relative);
+    // What the member asked the service for, as the weekly run publishes it for public
+    // teams beside the listed leagues' trees: data/public/<league>/history/requested/<id>.json.
+    const requested = /^history\/requested\/([1-9][0-9]*)\.json$/.exec(relative);
+    if (requested !== null) {
+      return fetchPublishedJson(
+        `${import.meta.env.BASE_URL}data/`,
+        `public/${league.leagueId}/${relative}`,
+        options,
+      );
+    }
     const match = /^history\/([1-9][0-9]*)\.json$/.exec(relative);
-    if (match === null || league.leagueId <= 0) throw new LeagueDataMissing(relative);
+    if (match === null) throw new LeagueDataMissing(relative);
     const season = await seasonOf(Number(match[1]));
     if (season === null) throw new LeagueDataMissing(relative);
     return forwardedHistory({ leagueId: league.leagueId, table, season, fixtures });
