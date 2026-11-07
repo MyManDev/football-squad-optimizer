@@ -521,8 +521,14 @@ function LeagueMemberContent({
             <div className={styles.headingRow}>
               <div className={styles.headingText}>
                 {/* Once the deadline has passed the page is the week being played, not a
-                    plan: the heading says so, and the settings' summary goes with the plan. */}
-                <h2 className={styles.decisionTitle} id="entry-advice-title">
+                    plan: the heading says so as a green mark with a pulsing light, and the
+                    settings' summary goes with the plan. */}
+                <h2
+                  className={styles.decisionTitle}
+                  id="entry-advice-title"
+                  data-live={closed || undefined}
+                >
+                  {closed ? <span className={styles.liveLight} aria-hidden="true" /> : null}
                   {closed ? copy.liveWeek : copy.decisionTitle}
                 </h2>
                 {closed ? null : (
