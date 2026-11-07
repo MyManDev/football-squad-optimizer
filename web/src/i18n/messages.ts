@@ -10,7 +10,42 @@ const en = {
     none: "No Transfers",
     net: "Net Points",
     difference: "Difference",
-    total: "Season So Far",
+    chip: "Chip",
+    hits: "Transfer Hit",
+    said: "What SquadOpt Said",
+    did: "What You Did",
+    why: "Where the Difference Came From",
+    lineup: "Rest of the Squad and Bench",
+    squad: "SquadOpt's Squad",
+    player: "Player",
+    points: "Points",
+    counted: "Counted",
+    bench: "bench",
+    otherPlans: "Other Plans",
+    noDetails: "Your transfers and captain were not recorded for this week; only the totals are.",
+    favoursSquadopt: "in SquadOpt's favour",
+    favoursYou: "in your favour",
+    wouldHave: (suggested: string, actual: string) =>
+      `With SquadOpt's plan you would have scored ${suggested}. You scored ${actual}.`,
+    youBeat: (actual: string, suggested: string) =>
+      `You scored ${actual}; SquadOpt's plan would have scored ${suggested}.`,
+    pointsOf: (value: string) => `${value} pts`,
+    countedOf: (points: string, counted: string) => `${points} pts, ${counted} counted`,
+    planName: (strategy: string, window: number) => {
+      const names: Record<string, string> = {
+        "saf-puan": "Pure Points",
+        "fark-yarat": "Make the Difference",
+        "ortak-koru": "Hold the Gap",
+      };
+      return `${names[strategy] ?? strategy} (${window}w)`;
+    },
+    planSaid: (moves: string[], captain: string | null) =>
+      [
+        moves.length === 0 ? "no transfer" : moves.join(", "),
+        captain === null ? null : `captain ${captain}`,
+      ]
+        .filter((part) => part !== null)
+        .join("; "),
   },
   suggestionHistory: {
     requested: "On Request",
@@ -637,7 +672,41 @@ const tr: MessageSchema<typeof en> = {
     none: "Transfer yok",
     net: "Net puan",
     difference: "Fark",
-    total: "Sezonun toplamı",
+    chip: "Çip",
+    hits: "Transfer cezası",
+    said: "SquadOpt ne dedi",
+    did: "Sen ne yaptın",
+    why: "Fark nereden geldi",
+    lineup: "Kadronun kalanı ve yedekler",
+    squad: "SquadOpt'un kadrosu",
+    player: "Oyuncu",
+    points: "Puan",
+    counted: "Sayılan",
+    bench: "yedek",
+    otherPlans: "Diğer planlar",
+    noDetails: "Bu hafta transferlerin ve kaptanın kaydı yok; yalnızca toplamlar var.",
+    favoursSquadopt: "SquadOpt lehine",
+    favoursYou: "senin lehine",
+    wouldHave: (suggested, actual) =>
+      `SquadOpt'un planını uygulasaydın ${suggested} alırdın. Sen ${actual} aldın.`,
+    youBeat: (actual, suggested) => `Sen ${actual} aldın; SquadOpt'un planı ${suggested} alırdı.`,
+    pointsOf: (value) => `${value} puan`,
+    countedOf: (points, counted) => `${points} puan, ${counted} sayıldı`,
+    planName: (strategy, window) => {
+      const names: Record<string, string> = {
+        "saf-puan": "Saf puan",
+        "fark-yarat": "Fark yarat",
+        "ortak-koru": "Ortak koru",
+      };
+      return `${names[strategy] ?? strategy} (${window} hafta)`;
+    },
+    planSaid: (moves, captain) =>
+      [
+        moves.length === 0 ? "transfer yok" : moves.join(", "),
+        captain === null ? null : `kaptan ${captain}`,
+      ]
+        .filter((part) => part !== null)
+        .join("; "),
   },
   suggestionHistory: {
     requested: "İstek üzerine",
