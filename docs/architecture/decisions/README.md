@@ -20,6 +20,7 @@ its header.
 | [0010](0010-clean-architecture-rings-and-repository-layout.md) | Clean-architecture rings and the repository layout | 2026-10-13 | Accepted (owner, 2026-10-13) | [0011](0011-storage-ports-and-platform-split.md) amends two triggers of the deferred moves and answers open questions 1, 2 and 4 |
 | [0011](0011-storage-ports-and-platform-split.md) | Storage ports, a named data vocabulary and the platform split by deployment unit | 2026-10-13 | Accepted (owner, 2026-10-13) | None |
 | [0012](0012-fpl-forwarder.md) | The FPL forwarder, a separate Worker at /api/v1/fpl/* | 2026-11-01 | Accepted (İbo, 2026-11-01) | None |
+| [0013](0013-deadline-reminders.md) | Deadline reminders by Web Push, with no accounts | 2026-11-07 | Accepted (owner, 2026-11-07) | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.
