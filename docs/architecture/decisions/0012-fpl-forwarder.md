@@ -191,3 +191,25 @@ The owner requested Turkey (league 239) live this week. The forwarded standings 
 now 1,000 pages, covering its 20,300 members. A request still fetches exactly one page,
 and the browser renders only that page. Page jumps never fetch intervening pages.
 This does not enroll country leagues in the weekly capture or baseline scheduler.
+
+## 2026-11-07: the season and events routes
+
+The owner's direction of 7 November is that every league works as the published one does:
+a league the site does not publish gets a scoreboard, a race and a member history too, built
+on the device from FPL's own data. Two GET routes join the allowlist, under the same rules
+(decision 2's ids and queries, decision 3's trimmed documents, decision 5's last good copy):
+
+| Route | Answers | Upstream reads |
+| --- | --- | --- |
+| `/api/v1/fpl/entry/{entry}/season` | [`fpl_entry_season_v1`](../../contracts/fpl_entry_season_v1.md): each played week's points, running total, ranks, transfers, hit, bank and value, and the chips played | `entry/{entry}/history/`; kept as a bundle is (until the next deadline once the current week is finished, ten minutes while it is played) |
+| `/api/v1/fpl/events` | [`fpl_events_v1`](../../contracts/fpl_events_v1.md): each gameweek's `finished` and `data_checked` state, the game's average and highest score | `bootstrap-static/`, trimmed to the events; kept for one hour |
+
+The season route reads the same history the bundle reads but keeps the week's points the
+bundle leaves out, so a plan request and a scoreboard read stay two documents with two
+cache lives. The events route is the one exception to "bootstrap-static is never read"
+(decision 3): FPL publishes the game average and the highest score nowhere else. Only the
+events' five fields leave the Worker; the bootstrap's players, clubs and prices stay with
+the weekly run. The bootstrap is FPL's largest document, so the copy lives an hour, and the
+Free plan's CPU limit is watched on the first live deploy as it was for the live route.
+The terms note (D4) is unchanged: both documents are relayed per request and never stored
+beyond the cache, and no league or entry id is logged.

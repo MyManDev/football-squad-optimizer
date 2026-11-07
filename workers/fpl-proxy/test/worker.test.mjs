@@ -14,6 +14,7 @@ import entryPoint from "../src/index.js";
 import {
   BUNDLE_CONTRACT,
   CACHE_HEADER,
+  EVENTS_TTL_SECONDS,
   LAST_GOOD_EXTRA_SECONDS,
   LIVE_CONTRACT,
   MARKER_HEADER,
@@ -36,10 +37,13 @@ import {
   NOW_MS,
   OPENER,
   SITE,
+  bootstrapAnswer,
   bundleWorld,
   deadlineMs,
   fakeFetch,
+  fixturesAnswer,
   fixturesJson,
+  historyAnswer,
   fpl,
   liveWorld,
   memoryCache,
@@ -642,5 +646,58 @@ describe("the schema reader these tests use", () => {
     assert.deepEqual(problems(bundle, { ...late, current_week: null }), []);
     assert.notDeepEqual(problems(bundle, { ...late, current_week: { entry_id: 1 } }), []);
     assert.throws(() => problems({ oneOf: [] }, 1), /does not know the keyword oneOf/);
+  });
+});
+
+describe("the season and events routes", () => {
+  const seasonWorld = () => ({
+    [SCHEDULE_URL]: fixturesJson(),
+    [fpl(upstreamPaths.fixtures(9))]: fixturesAnswer(9, [[91, 1, 2, true]]),
+    [fpl(upstreamPaths.history(5001))]: historyAnswer({
+      weeks: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      chips: [{ name: "bboost", event: 3 }],
+      transfers: { 4: 2 },
+      costs: { 4: 4 },
+    }),
+    [fpl(upstreamPaths.bootstrap())]: bootstrapAnswer(),
+  });
+
+  it("answer fpl_entry_season_v1 and fpl_events_v1 exactly as the committed examples show", async () => {
+    const seasons = await contractFile("fpl_entry_season_v1.examples.json");
+    const seasonSchema = await contractFile("fpl_entry_season_v1.schema.json");
+    const events = await contractFile("fpl_events_v1.examples.json");
+    const eventsSchema = await contractFile("fpl_events_v1.schema.json");
+    const { get, cache, clock } = harness(seasonWorld());
+    clock.set(Date.parse(seasons.nine_weeks.source_time));
+    const season = await get("/api/v1/fpl/entry/5001/season");
+    assert.equal(season.response.status, 200);
+    assert.deepEqual(problems(seasonSchema, season.body), []);
+    assert.deepEqual(season.body, seasons.nine_weeks);
+    assert.ok(!season.text.includes(MARKER));
+    // The current week is finished: the copy lives until the next deadline, as a bundle's does.
+    const kept = cache.stored.get(cacheKeys({ kind: "season", entry: 5001 }).fresh);
+    assert.equal(kept.maxAge, Math.floor((deadlineMs(10) - clock.now()) / 1000));
+
+    const summary = await get("/api/v1/fpl/events");
+    assert.equal(summary.response.status, 200);
+    assert.deepEqual(problems(eventsSchema, summary.body), []);
+    assert.deepEqual(summary.body, events.mid_season);
+    assert.ok(!summary.text.includes(MARKER));
+    assert.equal(cache.stored.get(cacheKeys({ kind: "events" }).fresh).maxAge, EVENTS_TTL_SECONDS);
+    const again = await get("/api/v1/fpl/events");
+    assert.equal(again.response.headers.get(CACHE_HEADER), "hit");
+  });
+
+  it("name an entry FPL does not have, and ask nothing else for it", async () => {
+    const { get, upstream } = harness({
+      [SCHEDULE_URL]: fixturesJson(),
+      [fpl(upstreamPaths.history(77))]: status(404),
+    });
+    const { response, body } = await get("/api/v1/fpl/entry/77/season");
+    assert.equal(response.status, 404);
+    assert.equal(body.error, "entry_not_found");
+    assert.deepEqual(fplCalls(upstream.calls).map((call) => call.url), [
+      fpl(upstreamPaths.history(77)),
+    ]);
   });
 });
