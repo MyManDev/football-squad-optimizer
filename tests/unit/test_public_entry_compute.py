@@ -183,12 +183,96 @@ def test_rate_limit_rejects_another_public_fetch_before_touching_upstream(public
     fetch.assert_called_once()
 
 
-@pytest.mark.parametrize("selection", [{"window": 3}, {"chip": "wildcard"}, {"model": "football"}])
-def test_unsupported_public_selection_does_not_fetch_or_queue(public, selection):
+@pytest.mark.parametrize(
+    ("selection", "code"),
+    [
+        ({"model": "football"}, "MODEL_INPUTS_UNAVAILABLE"),
+        ({"top100_weight": 20}, "TOP100_INPUTS_UNAVAILABLE"),
+        ({"managers_word": True}, "MANAGERS_WORD_UNAVAILABLE"),
+        ({"strategy": "fark-yarat", "rival_entry_id": 1}, "UNSUPPORTED_ADVICE_REQUEST"),
+        ({"window": 2}, "VALIDATION_FAILED"),
+    ],
+)
+def test_a_selection_this_capture_cannot_answer_is_refused_before_any_fetch(
+    public, selection, code
+):
+    """A switch without its input, a rival, or a window nobody computes: refused by name."""
     backend, client, fetch = public
     response = client.post(
         f"/api/v1/public/leagues/239/entries/{ENTRY}/advice", json={**BODY, **selection}
     )
     assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == code
     fetch.assert_not_called()
+    assert backend.queue_depth() == 0
+
+
+@pytest.mark.parametrize("selection", [{"chip": "bboost"}, {"preferences": {"keep_players": []}}])
+def test_a_public_team_gets_every_switch_the_capture_has(public, selection):
+    """The pure-points menu a league's member has: a held chip, the member's preferences."""
+    backend, client, fetch = public
+    route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
+    accepted = client.post(route, json={**BODY, **selection})
+    assert accepted.status_code == 202, accepted.text
+    fetch.assert_called_once_with(ENTRY, 2)
+    completed = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(
+            backend.contexts, backend.job_specs, public_inputs=backend.public_inputs
+        ),
+        at_utc=worker_tests.world_module.GW2_CAPTURED_AT,
+    )
+    assert completed.status == "completed", completed
+    served = client.get(
+        route,
+        params={
+            **BODY,
+            **{k: json.dumps(v) if isinstance(v, dict) else v for k, v in selection.items()},
+        },
+    )
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["entry_id"] == ENTRY
+    if "chip" in selection:
+        assert payload["chip_choice"]["chip"] == "bboost"
+
+
+def test_a_public_team_is_planned_over_a_longer_window(public):
+    """A three-week window is accepted and reaches the menu solve as a league member's does.
+
+    The test world's calendar ends at gameweek 3, so the solve itself stops at the horizon
+    it cannot build; the refusal names that, not the request.
+    """
+    backend, client, fetch = public
+    route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
+    accepted = client.post(route, json={**BODY, "window": 3})
+    assert accepted.status_code == 202, accepted.text
+    fetch.assert_called_once_with(ENTRY, 2)
+    outcome = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(
+            backend.contexts, backend.job_specs, public_inputs=backend.public_inputs
+        ),
+        at_utc=worker_tests.world_module.GW2_CAPTURED_AT,
+    )
+    assert outcome.status == "failed", outcome
+    assert "Projection horizon targets gameweeks absent" in str(outcome)
+    assert "Unsupported public team request" not in str(outcome)
+
+
+def test_a_chip_the_public_team_does_not_hold_is_refused_after_its_inputs_are_pinned(public):
+    backend, client, fetch = public
+    route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
+    fetch.side_effect = lambda entry, week: json.dumps(
+        {
+            **bundle(entry, week),
+            "history": {"current": [], "chips": [{"name": "bboost", "event": 1}]},
+        }
+    ).encode()
+    response = client.post(route, json={**BODY, "chip": "bboost"})
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "CHIP_NOT_HELD"
+    fetch.assert_called_once()
     assert backend.queue_depth() == 0
