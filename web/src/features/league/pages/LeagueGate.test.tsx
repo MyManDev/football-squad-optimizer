@@ -214,8 +214,13 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     expect(readChosenLeague()).toBe(LEAGUE);
     expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
     expect(location()).toBe(memberAddress(OTHER, ENTRY));
-    // The directory, then page 1 of the league's standings from the forwarder.
-    expect(asked(fetcher)).toEqual([...DIRECTORY_READS, `/api/v1/fpl/standings/${OTHER}?page=1`]);
+    // The directory, page 1 of the league's standings from the forwarder, and the calendar
+    // the league's own tree reads for its scoreboard and race.
+    expect(asked(fetcher)).toEqual([
+      ...DIRECTORY_READS,
+      `/api/v1/fpl/standings/${OTHER}?page=1`,
+      "data/fixtures.json",
+    ]);
 
     // The published league, given here, opens its members list: the address named
     // another league's member, who is not in this one.
@@ -279,9 +284,10 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
     expect(location()).toBe("/league/123");
     expect(readChosenLeague()).toBeNull();
-    // Nothing published of league 123 was asked for.
+    // Nothing published of league 123 was asked for: the standings and the calendar only.
     expect(asked(fetcher).filter((url) => !DIRECTORY_READS.includes(url))).toEqual([
       "/api/v1/fpl/standings/123?page=1",
+      "data/fixtures.json",
     ]);
   });
 });
