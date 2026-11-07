@@ -500,8 +500,21 @@ class AdviceReadStore:
         context = self._context.current()
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
+        return self._capabilities_document(
+            league_id, context, tuple(sorted(_member_entry_ids(league)))
+        )
+
+    def _capabilities_document(
+        self, league_id: int, context: AdviceRequestContext, entries: tuple[int, ...]
+    ) -> dict[str, object]:
+        """The capabilities document for ``entries`` under ``context``, checked.
+
+        Shared by a league's members and a public team: the strategies and windows are the
+        reader's, the switches the capture's, the held chips those of the entries named.
+        """
+
         inputs = self._switch_inputs(context)
-        chips = self._held_chips(context, league_id, tuple(sorted(_member_entry_ids(league))))
+        chips = self._held_chips(context, league_id, entries)
         top100 = inputs.top100_counts is not None and any(
             capability.top100_windows for capability in self._capabilities.values()
         )

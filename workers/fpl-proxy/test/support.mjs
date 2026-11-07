@@ -148,10 +148,37 @@ export function historyAnswer({ weeks, chips = [], transfers = {}, costs = {}, b
       event_transfers_cost: costs[event] ?? 0,
       bank,
       value: 1000 + event,
+      total_points: 450 + 51 * event,
+      rank: event === 1 ? null : 100_000 + event,
+      overall_rank: 200_000 - event,
+      points_on_bench: 4,
       raw_only: `${MARKER}-history-row`,
     })),
     past: [{ raw_only: `${MARKER}-past` }],
     chips: chips.map(({ name, event }) => ({ name, event, raw_only: `${MARKER}-chip` })),
+  };
+}
+
+/** FPL's bootstrap-static, as much of it as the events route reads, plus what it must drop. */
+export function bootstrapAnswer({ finished = 9, weeks = 10 } = {}) {
+  return {
+    events: Array.from({ length: weeks }, (_, index) => {
+      const id = index + 1;
+      const done = id <= finished;
+      return {
+        id,
+        name: `Gameweek ${id}`,
+        deadline_time: deadlineText(id),
+        finished: done,
+        data_checked: done,
+        average_entry_score: done ? 40 + id : 0,
+        highest_score: done ? 100 + id : null,
+        raw_only: `${MARKER}-event`,
+      };
+    }),
+    elements: [{ id: 1, web_name: `${MARKER}-element` }],
+    teams: [{ id: 1, name: `${MARKER}-team` }],
+    raw_only: `${MARKER}-bootstrap`,
   };
 }
 
