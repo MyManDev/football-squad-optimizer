@@ -529,3 +529,93 @@ def publish_requested_histories(
         for entry_id, weeks in sorted(weeks_by_entry.items())
         if weeks
     )
+
+
+#: Where a public team's requested history is published, under the site's ``data/``: one
+#: tree per league the team was asked under, in the shape a league's own tree has, so the
+#: page reads it with the same loader. A team asked for on its own (league 0) has no page
+#: that reads a history, and is not published.
+PUBLIC_HISTORY_ROOT = "public"
+
+
+def publish_public_requested_histories(
+    *,
+    store_snapshot: Path,
+    snapshot_root: Path,
+    as_of: CapturedSnapshot,
+    listed_leagues: Sequence[int],
+    out_dir: Path,
+) -> tuple[Path, ...]:
+    """Refresh requested weeks for every public team the store holds, outside listed leagues.
+
+    A member of a league the site does not publish asked the service for a plan through the
+    public route; what that plan scored is theirs to read as a listed member's is. Each
+    (league, entry) pair with a completed plain one-week request, or a requested history
+    published before, gets ``data/public/<league>/history/requested/<entry>.json``. Listed
+    leagues' members are the league publisher's; league 0 is nobody's page.
+    """
+    if not all((store_snapshot / part).is_dir() for part in ("jobs", "specs", "cache")):
+        raise ValueError("Expected an offline store snapshot with jobs, specs and cache.")
+    season = infer_season(as_of)
+    listed = {int(league) for league in listed_leagues}
+    jobs_by_team: dict[tuple[int, int], list[AdviceJob]] = {}
+    weeks_by_team: dict[tuple[int, int], set[int]] = {}
+    for job in _completed(store_snapshot):
+        key = job.cache_key
+        spec = AdviceJobSpec.from_payload(
+            json.loads((store_snapshot / "specs" / key[:2] / f"{key}.json").read_bytes())
+        )
+        if (
+            "public_entry" not in spec.switches
+            or set(spec.switches) != {"public_entry"}
+            or spec.league_id < 1
+            or spec.league_id in listed
+            or spec.context.season != season
+            or spec.strategy != "saf-puan"
+            or spec.window != 1
+            or spec.rival_entry_id is not None
+        ):
+            continue
+        team = (spec.league_id, spec.entry_id)
+        jobs_by_team.setdefault(team, []).append(job)
+        weeks_by_team.setdefault(team, set()).add(spec.context.gameweek)
+    root = out_dir / PUBLIC_HISTORY_ROOT
+    if root.is_dir():
+        for previous in sorted(root.glob("*/history/requested/*.json")):
+            league_text = previous.parents[2].name
+            if not (league_text.isdigit() and previous.stem.isdigit()):
+                continue
+            team = (int(league_text), int(previous.stem))
+            if team[0] in listed:
+                continue
+            document = json.loads(previous.read_bytes())
+            jsonschema.validate(document, history_schema())
+            payload = document["payload"]
+            if (payload["season"], payload["league_id"], payload["entry_id"]) != (
+                season,
+                *team,
+            ):
+                raise ValueError("Existing public history identifies another team or season.")
+            weeks_by_team.setdefault(team, set()).update(
+                row["gameweek"] for row in payload["weeks"]
+            )
+    if not any(weeks_by_team.values()):
+        return ()
+    captures = [
+        read_snapshot(snapshot_root, identifier)
+        for identifier in list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE)
+    ]
+    return tuple(
+        _build_requested_history(
+            store_snapshot=store_snapshot,
+            as_of=as_of,
+            captures=captures,
+            jobs=jobs_by_team.get(team, ()),
+            league_id=team[0],
+            entry_id=team[1],
+            gameweeks=sorted(weeks),
+            out_dir=root / str(team[0]),
+        )
+        for team, weeks in sorted(weeks_by_team.items())
+        if weeks
+    )

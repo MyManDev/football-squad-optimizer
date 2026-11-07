@@ -124,11 +124,16 @@ class AdviceRequestContext:
 
 
 class AdviceInputsNotPreparedError(AdviceNotComputedError):
-    """A public entry has no pinned inputs yet; only a POST may prepare them."""
+    """A public entry has no pinned inputs yet; only a POST may prepare them.
 
-    def __init__(self, context: AdviceRequestContext) -> None:
+    ``entries`` names the teams whose inputs are missing: the member, and the rival of a
+    rival strategy; empty means the member alone.
+    """
+
+    def __init__(self, context: AdviceRequestContext, entries: tuple[int, ...] = ()) -> None:
         super().__init__("This entry has not requested a computation for this capture.")
         self.context = context
+        self.entries = entries
 
 
 class AdviceContextProvider(Protocol):
@@ -409,6 +414,15 @@ class AdviceReadStore:
         self._chip_availability = chip_availability
         self._preference_players = preference_players
 
+    def _preference_players_of(
+        self, context: AdviceRequestContext, league_id: int, entry_id: int
+    ) -> PreferencePlayers | None:
+        """The member's fifteen and the capture's roster, from the injected reader."""
+
+        if self._preference_players is None:
+            return None
+        return self._preference_players(context, league_id, entry_id)
+
     def _check_preference_players(
         self,
         context: AdviceRequestContext,
@@ -426,11 +440,7 @@ class AdviceReadStore:
 
         if not (preferences.keep_players or preferences.avoid_players):
             return
-        players = (
-            None
-            if self._preference_players is None
-            else self._preference_players(context, league_id, entry_id)
-        )
+        players = self._preference_players_of(context, league_id, entry_id)
         if players is None:
             raise UnsupportedAdviceRequestError(
                 "This member's captured squad cannot be read, so kept or avoided players "
@@ -495,8 +505,21 @@ class AdviceReadStore:
         context = self._context.current()
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
+        return self._capabilities_document(
+            league_id, context, tuple(sorted(_member_entry_ids(league)))
+        )
+
+    def _capabilities_document(
+        self, league_id: int, context: AdviceRequestContext, entries: tuple[int, ...]
+    ) -> dict[str, object]:
+        """The capabilities document for ``entries`` under ``context``, checked.
+
+        Shared by a league's members and a public team: the strategies and windows are the
+        reader's, the switches the capture's, the held chips those of the entries named.
+        """
+
         inputs = self._switch_inputs(context)
-        chips = self._held_chips(context, league_id, tuple(sorted(_member_entry_ids(league))))
+        chips = self._held_chips(context, league_id, entries)
         top100 = inputs.top100_counts is not None and any(
             capability.top100_windows for capability in self._capabilities.values()
         )
@@ -540,6 +563,124 @@ class AdviceReadStore:
         validate_league_capabilities(document)
         return document
 
+    def _check_selection(
+        self,
+        *,
+        strategy: str,
+        window: int,
+        entry_id: int,
+        rival_entry_id: int | None,
+        top100_weight: int,
+        managers_word: bool,
+        chip: str | None,
+        model: str,
+        preferences: DecisionPreferences,
+    ) -> None:
+        """Refuse a selection this deployment does not compute, before any league is read.
+
+        The same checks serve a league's member and a public team: the strategies and
+        windows are the deployment's, and so are the windows each switch may be asked at.
+        """
+
+        try:
+            preferences.validate_selection(strategy, managers_word, chip)
+        except ValueError as error:
+            raise UnsupportedAdviceRequestError(str(error)) from error
+        if model not in PREDICTION_MODELS:
+            raise UnsupportedAdviceRequestError("Unknown prediction model.")
+        if strategy not in self._strategies:
+            raise UnknownStrategyError(f"Strategy {strategy!r} is not computed here.")
+        try:
+            validate_advice_selection(
+                strategy=strategy,
+                window=window,
+                entry_id=entry_id,
+                rival_entry_id=rival_entry_id,
+                capabilities=self._capabilities,
+                top100_weight=top100_weight,
+                managers_word=managers_word,
+                chip=chip,
+            )
+        except EntryError as error:
+            raise UnsupportedAdviceRequestError(str(error)) from error
+
+    def _switch_inputs_identity(
+        self,
+        context: AdviceRequestContext,
+        *,
+        top100_weight: int,
+        managers_word: bool,
+        chip: str | None,
+        model: str,
+        preferences: DecisionPreferences,
+    ) -> SwitchIdentity:
+        """The switches' identity under this capture's inputs, or the refusal by name.
+
+        Refused here, before a job exists: a switch whose input this capture does not
+        have can never be computed, and a queued job would only say so later.
+        """
+
+        try:
+            return switch_identity(
+                self._switch_inputs(context)
+                if top100_weight or managers_word or model != "current"
+                else AdviceSwitchInputs(),
+                top100_weight=top100_weight,
+                managers_word=managers_word,
+                chip=chip,
+                model=model,
+                preferences=preferences,
+            )
+        except SwitchInputUnavailable as error:
+            if error.switch == MODEL_SWITCH:
+                raise ModelInputsUnavailableError(str(error)) from error
+            if error.switch == TOP100_SWITCH:
+                raise Top100InputsUnavailableError(str(error)) from error
+            assert error.switch == MANAGERS_WORD_SWITCH
+            raise ManagersWordUnavailableError(str(error)) from error
+
+    def _switches_for(
+        self,
+        context: AdviceRequestContext,
+        league_id: int,
+        entry_id: int,
+        *,
+        top100_weight: int,
+        managers_word: bool,
+        chip: str | None,
+        model: str,
+        preferences: DecisionPreferences,
+    ) -> SwitchIdentity:
+        """The request's switches once the member's own facts allow them.
+
+        A chip must be held, a kept or avoided player must be in the member's captured
+        squad or the capture's roster, and each switch's input must be in this capture.
+        """
+
+        if chip is not None:
+            held = self._held_chips(context, league_id, (entry_id,)).get(entry_id)
+            if held is None or (chip != "auto" and chip not in held):
+                raise ChipUnavailableError(
+                    "CHIP_HISTORY_UNKNOWN" if held is None else "CHIP_NOT_HELD"
+                )
+        self._check_preference_players(context, league_id, entry_id, preferences)
+        if not (
+            top100_weight
+            or managers_word
+            or chip is not None
+            or model != "current"
+            or preferences.active
+        ):
+            return {}
+        return self._switch_inputs_identity(
+            context,
+            top100_weight=top100_weight,
+            managers_word=managers_word,
+            chip=chip,
+            model=model,
+            preferences=preferences,
+        )
+
     def resolve(
         self,
         *,
@@ -561,14 +702,17 @@ class AdviceReadStore:
         the cache disagree about what exists.
         """
 
-        try:
-            preferences.validate_selection(strategy, managers_word, chip)
-        except ValueError as error:
-            raise UnsupportedAdviceRequestError(str(error)) from error
-        if model not in PREDICTION_MODELS:
-            raise UnsupportedAdviceRequestError("Unknown prediction model.")
-        if strategy not in self._strategies:
-            raise UnknownStrategyError(f"Strategy {strategy!r} is not computed here.")
+        self._check_selection(
+            strategy=strategy,
+            window=window,
+            entry_id=entry_id,
+            rival_entry_id=rival_entry_id,
+            top100_weight=top100_weight,
+            managers_word=managers_word,
+            chip=chip,
+            model=model,
+            preferences=preferences,
+        )
         payload = self._directory.league(league_id)
         if payload is None:
             raise LeagueNotConnectedError(f"League {league_id} is not connected here.")
@@ -577,19 +721,6 @@ class AdviceReadStore:
             raise UnknownEntryError(f"Entry {entry_id} is not in league {league_id}.")
         if rival_entry_id is not None and int(rival_entry_id) not in members:
             raise UnknownEntryError(f"Rival {rival_entry_id} is not in league {league_id}.")
-        try:
-            validate_advice_selection(
-                strategy=strategy,
-                window=window,
-                entry_id=entry_id,
-                rival_entry_id=rival_entry_id,
-                capabilities=self._capabilities,
-                top100_weight=top100_weight,
-                managers_word=managers_word,
-                chip=chip,
-            )
-        except EntryError as error:
-            raise UnsupportedAdviceRequestError(str(error)) from error
         context = self._context.current()
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
@@ -603,41 +734,16 @@ class AdviceReadStore:
                 f"capture is for {context.season} gameweek {context.gameweek}; advice "
                 "waits until the two are for the same week."
             )
-        switches: SwitchIdentity = {}
-        if chip is not None:
-            held = self._held_chips(context, league_id, (entry_id,)).get(entry_id)
-            if held is None or (chip != "auto" and chip not in held):
-                raise ChipUnavailableError(
-                    "CHIP_HISTORY_UNKNOWN" if held is None else "CHIP_NOT_HELD"
-                )
-        self._check_preference_players(context, league_id, entry_id, preferences)
-        if (
-            top100_weight
-            or managers_word
-            or chip is not None
-            or model != "current"
-            or preferences.active
-        ):
-            # Refused here, before a job exists: a switch whose input this capture does
-            # not have can never be computed, and a queued job would only say so later.
-            try:
-                switches = switch_identity(
-                    self._switch_inputs(context)
-                    if top100_weight or managers_word or model != "current"
-                    else AdviceSwitchInputs(),
-                    top100_weight=top100_weight,
-                    managers_word=managers_word,
-                    chip=chip,
-                    model=model,
-                    preferences=preferences,
-                )
-            except SwitchInputUnavailable as error:
-                if error.switch == MODEL_SWITCH:
-                    raise ModelInputsUnavailableError(str(error)) from error
-                if error.switch == TOP100_SWITCH:
-                    raise Top100InputsUnavailableError(str(error)) from error
-                assert error.switch == MANAGERS_WORD_SWITCH
-                raise ManagersWordUnavailableError(str(error)) from error
+        switches = self._switches_for(
+            context,
+            league_id,
+            entry_id,
+            top100_weight=top100_weight,
+            managers_word=managers_word,
+            chip=chip,
+            model=model,
+            preferences=preferences,
+        )
         key = advice_cache_key(
             advice_contract_version=context.advice_contract_version,
             capture_snapshot_id=context.capture_snapshot_id,

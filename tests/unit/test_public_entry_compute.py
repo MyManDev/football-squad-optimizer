@@ -6,12 +6,14 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
+import jsonschema
 import pytest
 from fastapi.testclient import TestClient
 from tests.fixtures.backend_app import app_for_capture
 from tests.unit import test_advice_worker as worker_tests
 
 from squadopt.api.runtime import app_for_backend
+from squadopt.platform.advice_documents import league_capabilities_schema
 from squadopt.platform.advice_queue import run_advice_worker_once
 from squadopt.platform.advice_read import AdviceBackendNotReadyError
 from squadopt.platform.advice_submit import FixedWindowRateLimiter
@@ -183,12 +185,166 @@ def test_rate_limit_rejects_another_public_fetch_before_touching_upstream(public
     fetch.assert_called_once()
 
 
-@pytest.mark.parametrize("selection", [{"window": 3}, {"chip": "wildcard"}, {"model": "football"}])
-def test_unsupported_public_selection_does_not_fetch_or_queue(public, selection):
+@pytest.mark.parametrize(
+    ("selection", "code"),
+    [
+        ({"model": "football"}, "MODEL_INPUTS_UNAVAILABLE"),
+        ({"top100_weight": 20}, "TOP100_INPUTS_UNAVAILABLE"),
+        ({"managers_word": True}, "MANAGERS_WORD_UNAVAILABLE"),
+        ({"strategy": "fark-yarat"}, "UNSUPPORTED_ADVICE_REQUEST"),
+        ({"strategy": "fark-yarat", "rival_entry_id": ENTRY}, "UNSUPPORTED_ADVICE_REQUEST"),
+        ({"rival_entry_id": ENTRY + 1}, "UNSUPPORTED_ADVICE_REQUEST"),
+        ({"window": 2}, "VALIDATION_FAILED"),
+    ],
+)
+def test_a_selection_this_capture_cannot_answer_is_refused_before_any_fetch(
+    public, selection, code
+):
+    """A switch without its input, a rival strategy without a rival or against oneself, a
+    rival on the pure-points plan, or a window nobody computes: refused by name."""
     backend, client, fetch = public
     response = client.post(
         f"/api/v1/public/leagues/239/entries/{ENTRY}/advice", json={**BODY, **selection}
     )
     assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == code
     fetch.assert_not_called()
     assert backend.queue_depth() == 0
+
+
+@pytest.mark.parametrize("selection", [{"chip": "bboost"}, {"preferences": {"keep_players": []}}])
+def test_a_public_team_gets_every_switch_the_capture_has(public, selection):
+    """The pure-points menu a league's member has: a held chip, the member's preferences."""
+    backend, client, fetch = public
+    route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
+    accepted = client.post(route, json={**BODY, **selection})
+    assert accepted.status_code == 202, accepted.text
+    fetch.assert_called_once_with(ENTRY, 2)
+    completed = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(
+            backend.contexts, backend.job_specs, public_inputs=backend.public_inputs
+        ),
+        at_utc=worker_tests.world_module.GW2_CAPTURED_AT,
+    )
+    assert completed.status == "completed", completed
+    served = client.get(
+        route,
+        params={
+            **BODY,
+            **{k: json.dumps(v) if isinstance(v, dict) else v for k, v in selection.items()},
+        },
+    )
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["entry_id"] == ENTRY
+    if "chip" in selection:
+        assert payload["chip_choice"]["chip"] == "bboost"
+
+
+def test_a_public_team_is_planned_over_a_longer_window(public):
+    """A three-week window is accepted and reaches the menu solve as a league member's does.
+
+    The test world's calendar ends at gameweek 3, so the solve itself stops at the horizon
+    it cannot build; the refusal names that, not the request.
+    """
+    backend, client, fetch = public
+    route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
+    accepted = client.post(route, json={**BODY, "window": 3})
+    assert accepted.status_code == 202, accepted.text
+    fetch.assert_called_once_with(ENTRY, 2)
+    outcome = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(
+            backend.contexts, backend.job_specs, public_inputs=backend.public_inputs
+        ),
+        at_utc=worker_tests.world_module.GW2_CAPTURED_AT,
+    )
+    assert outcome.status == "failed", outcome
+    assert "Projection horizon targets gameweeks absent" in str(outcome)
+    assert "Unsupported public team request" not in str(outcome)
+
+
+def test_a_chip_the_public_team_does_not_hold_is_refused_after_its_inputs_are_pinned(public):
+    backend, client, fetch = public
+    route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
+    fetch.side_effect = lambda entry, week: json.dumps(
+        {
+            **bundle(entry, week),
+            "history": {"current": [], "chips": [{"name": "bboost", "event": 1}]},
+        }
+    ).encode()
+    response = client.post(route, json={**BODY, "chip": "bboost"})
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "CHIP_NOT_HELD"
+    fetch.assert_called_once()
+    assert backend.queue_depth() == 0
+
+
+@pytest.mark.parametrize("league", [239, 0])
+def test_public_capabilities_name_the_pure_points_menu_and_the_pinned_teams_chips(public, league):
+    """Before a plan is asked the team's chips are unnamed; the first request pins them."""
+    backend, client, fetch = public
+    route = f"/api/v1/public/leagues/{league}/entries/{ENTRY}/capabilities"
+    before = client.get(route)
+    assert before.status_code == 200, before.text
+    document = before.json()
+    jsonschema.validate(document, league_capabilities_schema())
+    assert document["league_id"] == league
+    assert document["capture_snapshot_id"] == backend.contexts.current().capture_snapshot_id
+    assert set(document["strategies"]) == {"saf-puan", "ortak-koru", "fark-yarat"}
+    assert document["strategies"]["saf-puan"] == {"windows": [1, 3, 5], "requires_rival": False}
+    assert document["chips"]["held_by_entry"] == {}
+    fetch.assert_not_called()
+
+    accepted = client.post(f"/api/v1/public/leagues/{league}/entries/{ENTRY}/advice", json=BODY)
+    assert accepted.status_code == 202, accepted.text
+    after = client.get(route).json()
+    assert "bboost" in after["chips"]["held_by_entry"][str(ENTRY)]
+    fetch.assert_called_once()
+
+
+def test_public_capabilities_are_disabled_until_the_deployment_opts_in(tmp_path, monkeypatch):
+    backend = worker_tests._deployment(tmp_path, monkeypatch)["backend"]
+    client = TestClient(app_for_capture(backend, worker_tests.world_module.GW2_CAPTURED_AT))
+    response = client.get(f"/api/v1/public/leagues/239/entries/{ENTRY}/capabilities")
+    assert response.status_code == 503
+
+
+def test_a_public_team_is_planned_against_a_public_rival_whose_inputs_are_pinned_too(public):
+    """A rival strategy fetches and pins the rival beside the member, and the worker solves it."""
+    backend, client, fetch = public
+    rival = ENTRY + 1
+    route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
+    body = {"strategy": "fark-yarat", "window": 1, "rival_entry_id": rival}
+    accepted = client.post(route, json=body)
+    assert accepted.status_code == 202, accepted.text
+    assert sorted(call.args for call in fetch.call_args_list) == [(ENTRY, 2), (rival, 2)]
+    context = backend.contexts.current()
+    assert backend.public_inputs.fingerprint(context, rival)
+    completed = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(
+            backend.contexts, backend.job_specs, public_inputs=backend.public_inputs
+        ),
+        at_utc=worker_tests.world_module.GW2_CAPTURED_AT,
+    )
+    assert completed.status == "completed", completed
+    served = client.get(route, params={"strategy": "fark-yarat", "window": 1, "rival": rival})
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["entry_id"] == ENTRY
+    assert len(payload["starting_xi"]) == 11
+    # Both pins stand for the capture: a pure-points request afterwards fetches nothing more.
+    plain = client.post(route, json=BODY)
+    assert plain.status_code == 202, plain.text
+    assert fetch.call_count == 2
+
+    capabilities = client.get(f"/api/v1/public/leagues/239/entries/{ENTRY}/capabilities").json()
+    assert capabilities["strategies"]["fark-yarat"] == {
+        "windows": [1, 3, 5],
+        "requires_rival": True,
+    }

@@ -45,6 +45,30 @@ const BUNDLE = bundleHolding(ENTRY, TABLE.gameweek, FIFTEEN, {
   vice: 139,
 });
 const MARKED = { "x-squadopt-fpl": "1", "content-type": "application/json; charset=utf-8" };
+/** A head-to-head league's table, as the forwarder serves it (fpl_h2h_standings_v1). */
+const CUP = {
+  contract_version: "fpl_h2h_standings_v1",
+  league: { id: HEAD_TO_HEAD, name: "Synthetic Cup", scoring: "h2h" },
+  page: 1,
+  has_next: false,
+  source_time: "2026-10-19T17:30:00.000Z",
+  results: [
+    {
+      entry: 7001,
+      entry_name: "Cup Team 1",
+      player_name: "Cup Manager 1",
+      rank: 1,
+      rank_sort: 1,
+      last_rank: null,
+      total: 27,
+      matches_played: 9,
+      matches_won: 9,
+      matches_drawn: 0,
+      matches_lost: 0,
+      points_for: 600,
+    },
+  ],
+};
 
 /**
  * The published example league in a directory whose line names the capture's table, a
@@ -117,6 +141,9 @@ async function serveSite(page: Page, forwarder: "up" | "down", closed = false) {
     if (pathname === `/api/v1/fpl/standings/${HEAD_TO_HEAD}`) {
       return answer(404, { error: "head_to_head_league", league: HEAD_TO_HEAD });
     }
+    if (pathname === `/api/v1/fpl/h2h/${HEAD_TO_HEAD}/standings`) {
+      return answer(200, CUP);
+    }
     if (pathname === `/api/v1/fpl/entry/${ENTRY}/bundle` && search === `?gw=${TABLE.gameweek}`) {
       return answer(
         200,
@@ -153,11 +180,13 @@ for (const width of [375, 1280]) {
     await serveSite(page, "up", true);
     await typeLeague(page, LEAGUE);
     await page.getByRole("link", { name: FIRST.results[0]!.entry_name }).click();
+    await sayWhoYouAre(page);
     await expect(page.getByTestId("deadline-passed")).toBeVisible();
     await expect(page.getByRole("heading", { name: copy.leagueMembers.memberSquad })).toBeVisible();
     await expect(page.locator("#kadro [data-player-motion]")).toHaveCount(15);
-    await expect(page.getByRole("button", { name: COMPUTE_COPY.tr.serverButton })).toBeDisabled();
-    await expect(page.locator("[data-device-compute]")).toBeDisabled();
+    // A closed week has no calculation to ask for, as on a published league's page.
+    await expect(page.getByRole("button", { name: COMPUTE_COPY.tr.serverButton })).toHaveCount(0);
+    await expect(page.locator("[data-device-compute]")).toHaveCount(0);
     await expect(page.locator("[data-member-live-score]")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
@@ -173,10 +202,18 @@ async function typeLeague(page: Page, league: number) {
   await page.getByRole("button", { name: copy.leagueEntry.submit, exact: true }).click();
 }
 
+/**
+ * The member step a forwarded league has like a published one: the visitor says they are
+ * the member whose row they opened, from the standings page's names.
+ */
+async function sayWhoYouAre(page: Page) {
+  await page.getByRole("button", { name: new RegExp(FIRST.results[0]!.entry_name) }).click();
+}
+
 /** The device's plan on the page: the real worker solved it, and its moves are named. */
 async function expectDevicePlan(page: Page) {
   await page.locator("[data-device-compute]").click();
-  await expect(page.locator("section[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
   const names = new Map(TABLE.players.map((player) => [player.id, player.name]));
   for (const move of member.reference.moves) {
     await expect(page.getByText(names.get(move.in!)!).first()).toBeVisible();
@@ -193,10 +230,16 @@ test("a typed unlisted league opens from the forwarder, and a member opens with 
   await page.getByRole("button", { name: copy.forwarded.nextPage }).click();
   await expect(page.getByRole("link", { name: LAST.results[0]!.entry_name })).toBeVisible();
   await expect(page.getByRole("button", { name: copy.forwarded.nextPage })).toBeDisabled();
-  expect(asked).toEqual([
+  // The league's own tree stands above the table: its scoreboard reads the game's events and
+  // the page's members' seasons once, and nothing of them again for the second page.
+  expect(asked.slice(0, 2)).toEqual([
     `/api/v1/fpl/standings/${LEAGUE}?page=1`,
-    `/api/v1/fpl/standings/${LEAGUE}?page=2`,
+    "/api/v1/fpl/events",
   ]);
+  expect(asked.slice(2, 5).sort()).toEqual(
+    FIRST.results.map((row) => `/api/v1/fpl/entry/${row.entry}/season`).sort(),
+  );
+  expect(asked.slice(5)).toEqual([`/api/v1/fpl/standings/${LEAGUE}?page=2`]);
   // The visitor's league stays the published one: a forwarded league is never chosen.
   expect(await page.evaluate(() => localStorage.getItem("squadopt.league"))).toBe(
     String(PUBLISHED.league_id),
@@ -205,20 +248,24 @@ test("a typed unlisted league opens from the forwarder, and a member opens with 
   await page.getByRole("button", { name: copy.forwarded.previousPage }).click();
   await page.getByRole("link", { name: FIRST.results[0]!.entry_name }).click();
   await expect(page).toHaveURL(`/league/${LEAGUE}/members/${ENTRY}`);
+  await sayWhoYouAre(page);
   await expect(
     page.getByRole("heading", { level: 1, name: FIRST.results[0]!.entry_name }),
   ).toBeVisible();
   await expectDevicePlan(page);
   expect(asked).toContain(`/api/v1/fpl/entry/${ENTRY}/bundle?gw=${TABLE.gameweek}`);
-  // Nothing of the forwarded league's published tree exists, so nothing of it is shown.
-  await expect(page.getByText(copy.suggestionHistory.title)).toHaveCount(0);
+  // The member page is the same one a published league draws: its history has an address,
+  // while the forwarded league's history itself is not published yet.
+  await expect(page.getByRole("link", { name: copy.suggestionHistory.title })).toHaveCount(1);
 });
 
-test("a typed head-to-head league is named", async ({ page }) => {
+test("a typed head-to-head league opens from its own table", async ({ page }) => {
   await serveSite(page, "up");
   await typeLeague(page, HEAD_TO_HEAD);
   await expect(page).toHaveURL(`/league/${HEAD_TO_HEAD}`);
-  await expect(page.getByRole("status")).toHaveText(copy.leagueEntry.headToHead(HEAD_TO_HEAD));
+  await expect(page.getByRole("heading", { level: 1, name: "Synthetic Cup" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Cup Team 1" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "9-0-0", exact: true })).toBeVisible();
 });
 
 test("with the forwarder down a typed league is not opened, and the listed league still is", async ({
@@ -313,9 +360,15 @@ for (const width of [375, 1280]) {
       expect(box!.width).toBeGreaterThanOrEqual(44);
     }
     await page.getByRole("link", { name: FIRST.results[0]!.entry_name }).click();
+    await sayWhoYouAre(page);
     await expectDevicePlan(page);
-    await page.getByRole("link", { name: copy.forwarded.backToLeague }).click();
-    await expect(page).toHaveURL("/league/239?page=406");
+    // The sidebar's league link, as on a published league's page (behind the phone's menu
+    // button); the table opens at the page the tab last read.
+    if (width < 768) {
+      await page.getByRole("button", { name: copy.shell.openMenu, exact: true }).click();
+    }
+    await page.getByRole("link", { name: copy.shell.league, exact: true }).click();
+    await expect(page).toHaveURL("/league/239/members?page=406");
     await expect(page.getByRole("cell", { name: "20300", exact: true })).toBeVisible();
     expect(pages).toEqual([1, 406]);
   });

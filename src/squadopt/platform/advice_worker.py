@@ -55,7 +55,11 @@ from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
 
-from squadopt.application.advice_capabilities import PREDICTION_MODELS, menu_capabilities
+from squadopt.application.advice_capabilities import (
+    MEMBER_WINDOWS,
+    PREDICTION_MODELS,
+    menu_capabilities,
+)
 from squadopt.application.advice_menu import (
     PLAN_NOT_FOUND_ERRORS,
     ChipUnavailable,
@@ -347,8 +351,14 @@ def build_advice_compute(
             configuration_fingerprint=spec.context.configuration_fingerprint,
             rival_entry_id=address.rival_entry_id,
             strategy_uses_rival=uses_rival[address.strategy],
+            # A public team's prerequisite without a rival was filed under its own pin alone,
+            # whatever rival the asked plan names.
             switches={
-                name: identity
+                name: (
+                    {"fingerprint": identity.get("fingerprint")}
+                    if name == PUBLIC_ENTRY_SWITCH and address.rival_entry_id is None
+                    else identity
+                )
                 for name, identity in spec.switches.items()
                 if name in {MODEL_SWITCH, PUBLIC_ENTRY_SWITCH}
             },
@@ -406,14 +416,17 @@ def build_advice_compute(
             )
         menu_spec = spec
         if PUBLIC_ENTRY_SWITCH in spec.switches:
-            fingerprint = spec.switch(PUBLIC_ENTRY_SWITCH).get("fingerprint")
+            pin = spec.switch(PUBLIC_ENTRY_SWITCH)
+            fingerprint = pin.get("fingerprint")
+            rival_fingerprint = pin.get("rival_fingerprint")
+            # Any member window, with any switch the request recorded beside the pin; a
+            # rival strategy names its rival's pin too, and a plan without a rival names none.
             if (
                 public_inputs is None
-                or set(spec.switches) != {PUBLIC_ENTRY_SWITCH}
-                or spec.strategy != "saf-puan"
-                or spec.window != 1
-                or spec.rival_entry_id is not None
+                or spec.window not in MEMBER_WINDOWS
                 or not isinstance(fingerprint, str)
+                or (spec.rival_entry_id is None) != (rival_fingerprint is None)
+                or (rival_fingerprint is not None and not isinstance(rival_fingerprint, str))
             ):
                 raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unsupported public team request.")
             identity = contexts.identity()
@@ -421,9 +434,12 @@ def build_advice_compute(
                 raise AdviceComputeRefused(
                     "CONTEXT_UNAVAILABLE", "The capture changed before computation."
                 )
+            pins = {spec.entry_id: fingerprint}
+            if spec.rival_entry_id is not None and isinstance(rival_fingerprint, str):
+                pins[spec.rival_entry_id] = rival_fingerprint
             try:
-                provider = public_inputs.provider(
-                    spec.context, spec.entry_id, fingerprint, identity.snapshot.payloads
+                provider = public_inputs.provider_for(
+                    spec.context, pins, identity.snapshot.payloads
                 )
             except (ValueError, OSError) as error:
                 raise AdviceComputeRefused(
@@ -431,7 +447,14 @@ def build_advice_compute(
                     "The requested team's inputs are unavailable.",
                 ) from error
             capture = replace(capture, provider=provider)
-            menu_spec = replace(spec, switches={})
+            menu_spec = replace(
+                spec,
+                switches={
+                    name: value
+                    for name, value in spec.switches.items()
+                    if name != PUBLIC_ENTRY_SWITCH
+                },
+            )
         if capture.switches.official_injuries is not None:
             require_official_injury_source()
         request = _menu_request(menu_spec, capture)

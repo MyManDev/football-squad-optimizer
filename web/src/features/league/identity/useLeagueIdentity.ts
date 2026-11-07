@@ -64,6 +64,16 @@ export interface LeagueIdentity {
  * it names one. `roster`, once the member gate has read it, settles the claim: a claim whose
  * member is not in it is dropped, and changed names are written back.
  */
+/**
+ * The team number the visitor has claimed in `leagueId`, or null: the claim as stored, read
+ * before any roster settles it, for a gate that must look for the member before it can say
+ * the roster does not hold them.
+ */
+export function useClaimedEntry(leagueId: number): number | null {
+  const claim = useSyncExternalStore(subscribeMemberClaim, readMemberClaim, () => null);
+  return claim !== null && claim.leagueId === leagueId ? claim.entryId : null;
+}
+
 export function useLeagueIdentity(league?: number | null, roster?: Roster): LeagueIdentity {
   const claim = useSyncExternalStore(subscribeMemberClaim, readMemberClaim, () => null);
   const chosen = useChosenLeague().leagueId;

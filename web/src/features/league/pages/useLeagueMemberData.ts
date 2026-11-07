@@ -2,14 +2,36 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import type { ComputeService } from "../advice/AdviceRequestPanel";
-import { capabilitiesForPage } from "../advice/adviceCapabilities";
+import {
+  capabilitiesForPage,
+  publicEntryCapabilities,
+  type AdviceCapabilities,
+} from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
+import { isMemberChip } from "../advice/chipChoice";
 import { resolvePublishedAdvice } from "../advice/adviceSelection";
 import { checkedAdvice } from "../advice/adviceResponse";
 import type { DeviceRivalReads } from "../device/computable";
-import { offeredDeviceSelection } from "../device/selection";
-import { isDevicePlanEntry } from "../device/types";
+import { deviceChip, offeredDeviceSelection } from "../device/selection";
+import { DEVICE_CHIPS, isDevicePlanEntry } from "../device/types";
+import type { EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
+
+/**
+ * The capabilities with the team's held chips, where the service named none for it: the
+ * chips the squad's own block says may still be played this gameweek, the rule the device
+ * applies. A document that names the team is left as the service stated it.
+ */
+function withHeldChips(capabilities: AdviceCapabilities, squad: EntrySquad): AdviceCapabilities {
+  const entry = String(squad.entry.entry_id);
+  if (capabilities.chipsByEntry?.[entry] !== undefined || !squad.chips?.known) {
+    return capabilities;
+  }
+  const held = DEVICE_CHIPS.filter((chip) => deviceChip({ chip }, squad) === chip).filter(
+    isMemberChip,
+  );
+  return { ...capabilities, chipsByEntry: { ...capabilities.chipsByEntry, [entry]: held } };
+}
 import {
   CAPABILITIES_READ,
   LEAGUE_READ,
@@ -26,7 +48,7 @@ import { boundedRivalIds } from "./rivalReads";
 export function useLeagueMemberData(entryParam: string | undefined, searchParams: URLSearchParams) {
   const entryId = Number(entryParam);
   const validEntryId = Number.isSafeInteger(entryId) && entryId > 0;
-  const { league, tree } = useLeague();
+  const { league, tree, forwarded = false } = useLeague();
   const squad = useEntrySquad(entryId, validEntryId);
   const membersQuery = useLeagueMembers();
   // The index says which (strategy, rival) files the producer wrote for this member; a
@@ -65,10 +87,22 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
   const leagueId = squad.data?.payload.league_id;
   const canAsk = client.readCapabilities !== undefined;
+  // A forwarded league's member is a public team to the service: its capabilities come
+  // from the public route, or, where that route does not answer, from what the page knows
+  // the route computes (`publicEntryCapabilities`). The team's held chips are named by the
+  // service only once its inputs are pinned, so until then the squad's own chip block
+  // stands in for them.
   const capabilitiesQuery = useQuery({
-    queryKey: ["advice-capabilities", leagueId],
-    queryFn: ({ signal }) => client.readCapabilities!(leagueId!, { signal }),
-    enabled: validEntryId && canAsk && leagueId !== undefined,
+    queryKey: ["advice-capabilities", leagueId, forwarded, squad.data?.payload.source_snapshot_id],
+    queryFn: async ({ signal }) => {
+      if (!forwarded) return client.readCapabilities!(leagueId!, { signal });
+      const own = squad.data!.payload;
+      const served = client.readPublicCapabilities
+        ? await client.readPublicCapabilities(leagueId!, entryId, { signal })
+        : null;
+      return withHeldChips(served ?? publicEntryCapabilities(own), own);
+    },
+    enabled: validEntryId && canAsk && leagueId !== undefined && (!forwarded || !!squad.data),
     ...CAPABILITIES_READ,
   });
   const capabilities = squad.data

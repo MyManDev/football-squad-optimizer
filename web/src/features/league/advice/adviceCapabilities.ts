@@ -16,10 +16,30 @@ import { isDecisionInformation, type DecisionInformation } from "./informationFa
 
 import type { WindowSize } from "../../../lib/decisionVocabulary";
 import { LeagueDataError } from "../dataErrors";
+import type { EntrySquad } from "../types";
 import { isMemberChip, type MemberChip } from "./chipChoice";
 import { isTop100Weight, type Top100Weight } from "./top100";
 
 export const LEAGUE_CAPABILITIES_CONTRACT = "league_capabilities_v1";
+
+/**
+ * What the service answers for a team outside its published leagues (#1327): the plain
+ * one-week plan through its public route, on the capture the member's squad names. The
+ * service publishes no capabilities document for such a team yet, so the page states this
+ * one itself; a public capabilities route replaces it when the service answers more.
+ */
+export function publicEntryCapabilities(squad: EntrySquad): AdviceCapabilities {
+  return {
+    leagueId: squad.league_id,
+    captureSnapshotId: squad.source_snapshot_id ?? "",
+    season: squad.season,
+    gameweek: squad.gameweek,
+    strategies: { "saf-puan": { windows: [1], requiresRival: false } },
+    preferences: false,
+    top100Weights: [0],
+    managersWord: false,
+  };
+}
 
 export interface StrategyCapability {
   windows: WindowSize[];
