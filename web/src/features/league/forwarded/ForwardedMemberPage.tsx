@@ -143,6 +143,10 @@ export function ForwardedMemberPage({
         : null,
     [built, read, tableEnvelope],
   );
+  // What the tree need not read again: the standings page this member was chosen from and
+  // the member's own bundle.
+  const knownPages = useMemo(() => (standings.data ? [standings.data] : []), [standings.data]);
+  const knownBundles = useMemo(() => (read?.ok ? [read.document] : []), [read]);
 
   if (tool !== undefined) return <EmptyState title={messages.shell.notFound} />;
   if (!valid) return <EmptyState title={messages.leagueMembers.invalidEntry} />;
@@ -201,6 +205,9 @@ export function ForwardedMemberPage({
       leagueName={league?.leagueName ?? ""}
       tableRef={tableRef}
       table={tableEnvelope}
+      fixtures={calendar}
+      pages={knownPages}
+      bundles={knownBundles}
     >
       <ForwardedMemberView
         squad={built.squad}
