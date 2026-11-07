@@ -124,13 +124,12 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
     expect(screen.getByText(copy.favoursSquadopt)).toBeInTheDocument();
     expect(screen.getByText(copy.noDetails)).toBeInTheDocument();
     expect(screen.queryByTestId("vs-breakdown")).toBeNull();
-    const select = screen.getByRole("combobox");
-    expect(
-      within(select)
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual([weekWord(5), weekWord(4)]);
-    await userEvent.selectOptions(select, "4");
+    expect(screen.getByTestId("vs-net-bars")).toBeInTheDocument();
+    const strip = within(screen.getByTestId("vs-week-strip"));
+    const weeksInStrip = strip.getAllByRole("button");
+    expect(weeksInStrip.map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true"]);
+    expect(weeksInStrip[1]).toHaveAccessibleName(`${weekWord(5)}, +5`);
+    await userEvent.click(weeksInStrip[0]!);
     expect(screen.getByRole("heading", { level: 2, name: weekWord(4) })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(AS_A_CHANCE);
     expect(document.body.textContent).not.toMatch(AS_A_CAVEAT);
@@ -138,7 +137,7 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
 
   it("shows, for a week with details, what the plan said, what the member did, the other plans and the squad", async () => {
     open(language, history());
-    await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+    await userEvent.click(within(screen.getByTestId("vs-week-strip")).getAllByRole("button")[0]!);
     // Week 4: the plan 20, the member 22, in the member's favour.
     expect(screen.getByTestId("vs-headline")).toHaveTextContent(copy.youBeat("22", "20"));
     expect(screen.getByText(copy.favoursYou)).toBeInTheDocument();
@@ -151,6 +150,7 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
     expect(did.getByText("Player 3")).toBeInTheDocument();
     expect(did.getByText("Player 5")).toBeInTheDocument();
     expect(screen.getByTestId("vs-breakdown")).toBeInTheDocument();
+    expect(screen.getByTestId("vs-difference-bars")).toBeInTheDocument();
     const squad = screen.getByRole("region", { name: copy.squad });
     expect(within(squad).getAllByRole("row").length).toBeGreaterThan(11);
   });

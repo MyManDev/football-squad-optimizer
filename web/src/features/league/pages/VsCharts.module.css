@@ -1,0 +1,105 @@
+/* The pictures of VS SQUADOPT: thin bars with rounded data-ends, the number beside each in the
+   page's ink. SquadOpt is the page's good green, the member the chart's own blue (a pair the
+   palette check passes on both surfaces); every bar also carries its label and number. */
+
+.chart {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  font-family: var(--font-body);
+}
+
+.rowLabel {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  dominant-baseline: middle;
+}
+
+.value {
+  fill: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  dominant-baseline: middle;
+}
+
+.squadopt {
+  fill: var(--color-chart-squadopt);
+}
+
+.you {
+  fill: var(--color-chart-you);
+}
+
+.zero {
+  stroke: var(--color-text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+/* The week strip: one small bar per compared week, up for SquadOpt's favour, down for the
+   member's; the pressed week carries the page's ink under it. */
+.strip {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.stripWeek {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 36px;
+  padding: var(--space-1) 2px 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+
+.stripWeek[aria-pressed="true"] {
+  border-bottom-color: var(--color-text);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.stripBars {
+  display: grid;
+  grid-template-rows: 40px 1px 40px;
+  align-items: end;
+  height: 81px;
+}
+
+.stripBar {
+  width: 14px;
+  border-radius: 3px;
+}
+
+.up {
+  grid-row: 1;
+  align-self: end;
+}
+
+.down {
+  grid-row: 3;
+  align-self: start;
+}
+
+.squadoptFill {
+  background: var(--color-chart-squadopt);
+}
+
+.youFill {
+  background: var(--color-chart-you);
+}
+
+.stripLabel {
+  line-height: 1;
+}

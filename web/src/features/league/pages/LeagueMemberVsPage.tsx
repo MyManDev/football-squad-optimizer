@@ -12,6 +12,7 @@ import { useSuggestionHistory } from "../queries";
 import { useLeague, useLeagueId } from "../useLeague";
 import styles from "./LeagueMemberVsPage.module.css";
 import { breakdown, movesOf, otherPlans, plainPlan } from "./vsBreakdown";
+import { DifferenceBars, NetBars, WeekStrip } from "./VsCharts";
 
 /**
  * VS SQUADOPT: one gameweek at a time, in detail. What the member would have scored with
@@ -81,19 +82,17 @@ export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) 
         <EmptyState title={messages.suggestionHistory.empty} />
       ) : (
         <>
-          <label className={styles.selector}>
-            {messages.suggestionHistory.week}
-            <select
-              value={week.gameweek}
-              onChange={(event) => setChosen(Number(event.target.value))}
-            >
-              {compared.map((item) => (
-                <option key={item.gameweek} value={item.gameweek}>
-                  {messages.suggestionHistory.gameweek(item.gameweek)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <WeekStrip
+            weeks={compared.map((item) => ({
+              gameweek: item.gameweek,
+              difference: item.net_difference!,
+            }))}
+            chosen={week.gameweek}
+            onSelect={setChosen}
+            label={messages.suggestionHistory.week}
+            weekName={messages.suggestionHistory.gameweek}
+            format={(value) => signed(value)}
+          />
           <WeekAnalysis week={week} fmt={fmt} signed={signed} />
         </>
       )}
@@ -137,17 +136,27 @@ function WeekAnalysis({
       data-testid="vs-week"
     >
       <h2 id={`vs-week-${week.gameweek}`}>{history.gameweek(week.gameweek)}</h2>
-      <p className={styles.headline} data-testid="vs-headline">
-        {favoursSystem
-          ? copy.wouldHave(fmt(suggested.net_points), fmt(actual.net_points))
-          : copy.youBeat(fmt(actual.net_points), fmt(suggested.net_points))}
-      </p>
-      <p className={styles.difference}>
-        {copy.difference}: <strong>{signed(week.net_difference)}</strong>{" "}
-        <span className={styles.favour}>
-          {favoursSystem ? copy.favoursSquadopt : copy.favoursYou}
-        </span>
-      </p>
+      <figure className={styles.figure}>
+        <NetBars
+          suggested={suggested.net_points}
+          actual={actual.net_points}
+          labels={{ squadopt: copy.squadopt, you: copy.you }}
+          format={(value) => fmt(value)}
+        />
+        <figcaption>
+          <p className={styles.headline} data-testid="vs-headline">
+            {favoursSystem
+              ? copy.wouldHave(fmt(suggested.net_points), fmt(actual.net_points))
+              : copy.youBeat(fmt(actual.net_points), fmt(suggested.net_points))}
+          </p>
+          <p className={styles.difference}>
+            {copy.difference}: <strong>{signed(week.net_difference)}</strong>{" "}
+            <span className={styles.favour}>
+              {favoursSystem ? copy.favoursSquadopt : copy.favoursYou}
+            </span>
+          </p>
+        </figcaption>
+      </figure>
 
       <div className={styles.sides}>
         <Card title={copy.said}>
@@ -249,7 +258,17 @@ function WeekAnalysis({
 
       {parts !== null ? (
         <Card title={copy.why}>
-          <table className={styles.breakdown} data-testid="vs-breakdown">
+          <DifferenceBars
+            parts={parts}
+            labels={{
+              captain: copy.captain,
+              transfers: copy.transfers,
+              hits: copy.hits,
+              lineup: copy.lineup,
+            }}
+            format={(value) => signed(value)}
+          />
+          <table className={`${styles.breakdown} visually-hidden`} data-testid="vs-breakdown">
             <tbody>
               {(
                 [
