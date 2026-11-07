@@ -1,6 +1,7 @@
 /*
- * VS SQUADOPT: the season's totals, then one section per compared gameweek with the
- * system's side and the member's side beside each other, stacked on a phone.
+ * VS SQUADOPT: one gameweek in detail. The week's sentence and difference first, then what
+ * SquadOpt said beside what the member did, where the difference came from, and SquadOpt's
+ * squad with its points. The two cards stack on a phone.
  */
 
 .page {
@@ -14,37 +15,45 @@
   margin: var(--space-2) 0;
 }
 
-.totals {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.selector {
+  display: flex;
+  align-items: center;
   gap: var(--space-3);
-  margin: 0;
-  font-variant-numeric: tabular-nums;
+  flex-wrap: wrap;
 }
 
-.totals dt {
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-}
-
-.totals dd {
-  margin: 0.3rem 0 0;
-  font-family: var(--font-display);
-  font-size: var(--step-2);
+.selector select {
+  padding: 0.6rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  font: inherit;
 }
 
 .week {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-m);
-  background: var(--color-surface);
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 .week h2 {
   margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+}
+
+.headline {
+  margin: 0;
   font-size: var(--step-1);
+  line-height: 1.4;
+}
+
+.difference {
+  margin: 0;
+  font-size: var(--step-0);
+}
+
+.favour {
+  color: var(--color-text-muted);
 }
 
 .sides {
@@ -53,29 +62,24 @@
   gap: var(--space-4);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .sides {
     grid-template-columns: 1fr;
   }
 }
 
-.side h3 {
-  margin: 0 0 var(--space-2);
-  font-size: var(--step-0);
-}
-
-.side dl {
+.facts {
   margin: 0;
   display: grid;
   gap: var(--space-1);
 }
 
-.side dt {
+.facts dt {
   color: var(--color-text-muted);
   font-size: var(--step--1);
 }
 
-.side dd {
+.facts dd {
   margin: 0 0 var(--space-2);
   overflow-wrap: anywhere;
 }
@@ -88,13 +92,86 @@
   gap: var(--space-1);
 }
 
+.movePoints {
+  margin-left: var(--space-2);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .net {
   font-family: var(--font-display);
   font-size: var(--step-1);
   font-variant-numeric: tabular-nums;
 }
 
-.difference {
-  margin: 0;
+.muted {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.otherPlans {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+
+.otherPlans h3 {
+  margin: 0 0 var(--space-2);
   font-size: var(--step-0);
+}
+
+.otherPlans ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.breakdown,
+.squad {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown th,
+.breakdown td,
+.squad th,
+.squad td {
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+}
+
+.breakdown td,
+.squad td {
+  text-align: right;
+}
+
+.breakdown tfoot th,
+.breakdown tfoot td {
+  font-weight: 700;
+  border-bottom: 0;
+}
+
+.squad thead {
+  color: var(--color-text-muted);
+}
+
+.squad tr[data-role="bench"] {
+  color: var(--color-text-muted);
+}
+
+.badge {
+  font-weight: 700;
+}
+
+.benchWord {
+  font-size: var(--step--1);
+}
+
+.tableWrap {
+  max-width: 100%;
+  overflow-x: auto;
 }

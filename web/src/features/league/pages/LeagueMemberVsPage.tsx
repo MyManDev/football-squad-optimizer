@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { Card } from "../../../design/components/Card";
@@ -7,16 +8,18 @@ import { points, signedPoints } from "../../../lib/format";
 import { memberAddress } from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../dataErrors";
 import type { SuggestionHistory, WeekReview } from "../history/historyData";
-import { summarizeHistory } from "../history/historySummary";
 import { useSuggestionHistory } from "../queries";
 import { useLeague, useLeagueId } from "../useLeague";
 import styles from "./LeagueMemberVsPage.module.css";
+import { breakdown, movesOf, otherPlans, plainPlan } from "./vsBreakdown";
 
 /**
- * VS SQUADOPT: the member against the system's suggestion, gameweek by gameweek. Each
- * settled week the member's history holds a suggestion and a result for is one row: the
- * captain and transfers the system suggested beside the captain and transfers the member
- * made, each side's net points, and the difference. The season's totals stand above.
+ * VS SQUADOPT: one gameweek at a time, in detail. What the member would have scored with
+ * SquadOpt's plan against what they scored; what the plan said (moves, captain, chip, and
+ * each other plan recorded that week) beside what the member did; where the difference came
+ * from (captain, transfers, hits, the rest of the squad); and SquadOpt's squad with every
+ * player's points. The latest settled week opens first; a selector moves between weeks. The
+ * owner asked for this page to analyse, so it is the one page that says things in sentences.
  */
 export function LeagueMemberVsPage() {
   const { messages } = useLanguage();
@@ -56,131 +59,252 @@ function comparable(week: WeekReview): boolean {
   );
 }
 
-/** The captain the recorded squad names, where it names one. */
-function suggestedCaptain(week: WeekReview): string | null {
-  return week.players.find((player) => player.captain)?.name ?? null;
-}
-
-/** The plain one-week plan's moves, out and in, where the week recorded that plan. */
-function suggestedMoves(week: WeekReview): { out: string; in: string }[] {
-  const plan = week.recorded_plans?.find(
-    (row) =>
-      row.strategy === "saf-puan" &&
-      row.rival_entry_id === null &&
-      row.top100_weight === undefined &&
-      row.managers_word === undefined &&
-      row.chip === null,
-  );
-  return (plan?.moves ?? [])
-    .filter((move) => move.player_out !== null && move.player_in !== null)
-    .map((move) => ({ out: move.player_out!, in: move.player_in! }));
-}
-
 export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) {
   const { messages, locale } = useLanguage();
   const leagueId = useLeagueId();
   const copy = messages.vsSquadopt;
   const { entry_id: entryId, weeks } = history.payload;
   const compared = weeks.filter(comparable).sort((a, b) => b.gameweek - a.gameweek);
-  const summary = summarizeHistory(compared);
-  const net = (value: number | null) => (value === null ? "—" : points(value, 1, locale));
-  const signed = (value: number | null) => (value === null ? "—" : signedPoints(value, 1, locale));
+  const [chosen, setChosen] = useState<number | null>(null);
+  const week = compared.find((item) => item.gameweek === chosen) ?? compared[0] ?? null;
+  const fmt = (value: number | null | undefined) =>
+    value == null ? "—" : points(value, Number.isInteger(value) ? 0 : 1, locale);
+  const signed = (value: number | null) =>
+    value === null ? "—" : signedPoints(value, Number.isInteger(value) ? 0 : 1, locale);
   return (
     <div className={styles.page}>
       <header>
         <Link to={memberAddress(leagueId, entryId)}>{messages.suggestionHistory.back}</Link>
         <h1>{copy.title}</h1>
       </header>
-      {compared.length === 0 ? (
+      {week === null ? (
         <EmptyState title={messages.suggestionHistory.empty} />
       ) : (
         <>
-          <Card title={copy.total}>
-            <dl className={styles.totals} data-testid="vs-totals">
-              <div>
-                <dt>{copy.squadopt}</dt>
-                <dd>{net(summary.suggested)}</dd>
-              </div>
-              <div>
-                <dt>{copy.you}</dt>
-                <dd>{net(summary.actual)}</dd>
-              </div>
-              <div>
-                <dt>{copy.difference}</dt>
-                <dd>{signed(summary.difference)}</dd>
-              </div>
-            </dl>
-          </Card>
-          {compared.map((week) => {
-            const actual = week.actual!;
-            const detail = actual.details ?? null;
-            const moves = suggestedMoves(week);
-            return (
-              <section
-                key={week.gameweek}
-                className={styles.week}
-                aria-labelledby={`vs-week-${week.gameweek}`}
-                data-testid="vs-week"
-              >
-                <h2 id={`vs-week-${week.gameweek}`}>
-                  {messages.suggestionHistory.gameweek(week.gameweek)}
-                </h2>
-                <div className={styles.sides}>
-                  <div className={styles.side}>
-                    <h3>{copy.squadopt}</h3>
-                    <dl>
-                      <dt>{copy.captain}</dt>
-                      <dd>{suggestedCaptain(week) ?? "—"}</dd>
-                      <dt>{copy.transfers}</dt>
-                      <dd>
-                        {moves.length === 0 ? (
-                          copy.none
-                        ) : (
-                          <ul className={styles.moves}>
-                            {moves.map((move, index) => (
-                              <li key={index}>
-                                {move.out} → <strong>{move.in}</strong>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </dd>
-                      <dt>{copy.net}</dt>
-                      <dd className={styles.net}>{net(week.suggested!.net_points)}</dd>
-                    </dl>
-                  </div>
-                  <div className={styles.side}>
-                    <h3>{copy.you}</h3>
-                    <dl>
-                      <dt>{copy.captain}</dt>
-                      <dd>{detail?.captain.name ?? "—"}</dd>
-                      <dt>{copy.transfers}</dt>
-                      <dd>
-                        {detail === null || detail.transfers.length === 0 ? (
-                          copy.none
-                        ) : (
-                          <ul className={styles.moves}>
-                            {detail.transfers.map((move, index) => (
-                              <li key={index}>
-                                {move.player_out} → <strong>{move.player_in.name}</strong>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </dd>
-                      <dt>{copy.net}</dt>
-                      <dd className={styles.net}>{net(actual.net_points)}</dd>
-                    </dl>
-                  </div>
-                </div>
-                <p className={styles.difference}>
-                  {copy.difference}: <strong>{signed(week.net_difference)}</strong>
-                </p>
-              </section>
-            );
-          })}
+          <label className={styles.selector}>
+            {messages.suggestionHistory.week}
+            <select
+              value={week.gameweek}
+              onChange={(event) => setChosen(Number(event.target.value))}
+            >
+              {compared.map((item) => (
+                <option key={item.gameweek} value={item.gameweek}>
+                  {messages.suggestionHistory.gameweek(item.gameweek)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <WeekAnalysis week={week} fmt={fmt} signed={signed} />
         </>
       )}
     </div>
+  );
+}
+
+function WeekAnalysis({
+  week,
+  fmt,
+  signed,
+}: {
+  week: WeekReview;
+  fmt: (value: number | null | undefined) => string;
+  signed: (value: number | null) => string;
+}) {
+  const { messages } = useLanguage();
+  const copy = messages.vsSquadopt;
+  const history = messages.suggestionHistory;
+  const suggested = week.suggested!;
+  const actual = week.actual!;
+  const detail = actual.details ?? null;
+  const plan = plainPlan(week);
+  const moves = movesOf(plan);
+  const byName = new Map(week.players.map((player) => [player.name, player]));
+  const captain = week.players.find((player) => player.captain) ?? null;
+  const parts = breakdown(week);
+  const favoursSystem = week.net_difference! >= 0;
+  const chipWord =
+    suggested.chip === "3xc"
+      ? history.triple
+      : suggested.chip
+        ? history[suggested.chip]
+        : history.noChip;
+  const starters = week.players.filter((player) => player.role === "starter");
+  const bench = week.players.filter((player) => player.role === "bench");
+  return (
+    <section
+      className={styles.week}
+      aria-labelledby={`vs-week-${week.gameweek}`}
+      data-testid="vs-week"
+    >
+      <h2 id={`vs-week-${week.gameweek}`}>{history.gameweek(week.gameweek)}</h2>
+      <p className={styles.headline} data-testid="vs-headline">
+        {favoursSystem
+          ? copy.wouldHave(fmt(suggested.net_points), fmt(actual.net_points))
+          : copy.youBeat(fmt(actual.net_points), fmt(suggested.net_points))}
+      </p>
+      <p className={styles.difference}>
+        {copy.difference}: <strong>{signed(week.net_difference)}</strong>{" "}
+        <span className={styles.favour}>
+          {favoursSystem ? copy.favoursSquadopt : copy.favoursYou}
+        </span>
+      </p>
+
+      <div className={styles.sides}>
+        <Card title={copy.said}>
+          <dl className={styles.facts}>
+            <dt>{copy.transfers}</dt>
+            <dd>
+              {moves.length === 0 ? (
+                copy.none
+              ) : (
+                <ul className={styles.moves}>
+                  {moves.map((move, index) => (
+                    <li key={index}>
+                      {move.out} → <strong>{move.in}</strong>
+                      <span className={styles.movePoints}>
+                        {copy.pointsOf(fmt(byName.get(move.in)?.realized_points ?? null))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </dd>
+            <dt>{copy.captain}</dt>
+            <dd>
+              {captain === null ? (
+                "—"
+              ) : (
+                <>
+                  <strong>{captain.name}</strong>
+                  <span className={styles.movePoints}>
+                    {copy.countedOf(fmt(captain.realized_points), fmt(captain.counted_points))}
+                  </span>
+                </>
+              )}
+            </dd>
+            <dt>{copy.chip}</dt>
+            <dd>{chipWord}</dd>
+            <dt>{copy.hits}</dt>
+            <dd>{fmt(suggested.transfer_hit_points)}</dd>
+            <dt>{copy.net}</dt>
+            <dd className={styles.net}>{fmt(suggested.net_points)}</dd>
+          </dl>
+          {otherPlans(week).length > 0 ? (
+            <div className={styles.otherPlans}>
+              <h3>{copy.otherPlans}</h3>
+              <ul>
+                {otherPlans(week).map((row) => (
+                  <li key={row.published_path}>
+                    <strong>{copy.planName(row.strategy, row.window)}</strong>
+                    {": "}
+                    {copy.planSaid(
+                      movesOf(row).map((move) => `${move.out} → ${move.in}`),
+                      row.captain,
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </Card>
+
+        <Card title={copy.did}>
+          {detail === null ? <p className={styles.muted}>{copy.noDetails}</p> : null}
+          <dl className={styles.facts}>
+            {detail !== null ? (
+              <>
+                <dt>{copy.transfers}</dt>
+                <dd>
+                  {detail.transfers.length === 0 ? (
+                    copy.none
+                  ) : (
+                    <ul className={styles.moves}>
+                      {detail.transfers.map((move, index) => (
+                        <li key={index}>
+                          {move.player_out} → <strong>{move.player_in.name}</strong>
+                          <span className={styles.movePoints}>
+                            {copy.pointsOf(fmt(move.player_in.points))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </dd>
+                <dt>{copy.captain}</dt>
+                <dd>
+                  <strong>{detail.captain.name}</strong>
+                  <span className={styles.movePoints}>
+                    {copy.countedOf(fmt(detail.captain.points), fmt(detail.captain.counted_points))}
+                  </span>
+                </dd>
+              </>
+            ) : null}
+            <dt>{copy.hits}</dt>
+            <dd>{fmt(actual.transfer_hit_points)}</dd>
+            <dt>{copy.net}</dt>
+            <dd className={styles.net}>{fmt(actual.net_points)}</dd>
+          </dl>
+        </Card>
+      </div>
+
+      {parts !== null ? (
+        <Card title={copy.why}>
+          <table className={styles.breakdown} data-testid="vs-breakdown">
+            <tbody>
+              {(
+                [
+                  [copy.captain, parts.captain],
+                  [copy.transfers, parts.transfers],
+                  [copy.hits, parts.hits],
+                  [copy.lineup, parts.lineup],
+                ] as const
+              ).map(([label, value]) => (
+                <tr key={label}>
+                  <th scope="row">{label}</th>
+                  <td>{signed(value)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row">{copy.difference}</th>
+                <td>{signed(week.net_difference)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </Card>
+      ) : null}
+
+      {week.players.length > 0 ? (
+        <Card title={copy.squad}>
+          <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={copy.squad}>
+            <table className={styles.squad}>
+              <thead>
+                <tr>
+                  <th scope="col">{copy.player}</th>
+                  <th scope="col">{copy.points}</th>
+                  <th scope="col">{copy.counted}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...starters, ...bench].map((player) => (
+                  <tr key={player.player_id} data-role={player.role}>
+                    <th scope="row">
+                      {player.name}
+                      {player.captain ? <span className={styles.badge}> C</span> : null}
+                      {player.role === "bench" ? (
+                        <span className={styles.benchWord}> {copy.bench}</span>
+                      ) : null}
+                    </th>
+                    <td>{fmt(player.realized_points)}</td>
+                    <td>{fmt(player.counted_points)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : null}
+    </section>
   );
 }
