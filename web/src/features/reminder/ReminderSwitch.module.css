@@ -18,6 +18,9 @@
 
 .sidebarSwitch {
   flex: none;
+  padding: 0;
+  min-width: 44px;
+  justify-content: center;
 }
 
 .inlineSwitch {

@@ -38,6 +38,9 @@ export function ReminderSwitch({
     if (state === "off") enable();
     if (!inline) open();
   };
+  // In the sidebar the switch is the track alone, named for the reader, so the identity block
+  // stays one row beside Değiştir; on the page the word stands beside it.
+  const word = wordFor(state, messages.reminder);
   return (
     <button
       type="button"
@@ -45,6 +48,7 @@ export function ReminderSwitch({
       className={inline ? styles.inlineSwitch : styles.sidebarSwitch}
       aria-checked={on}
       aria-busy={busy || undefined}
+      aria-label={inline ? undefined : word}
       disabled={busy}
       onClick={flip}
       data-reminder={state}
@@ -52,7 +56,7 @@ export function ReminderSwitch({
       <span className={styles.track} aria-hidden="true">
         <span className={styles.knob} />
       </span>
-      <span className={styles.word}>{wordFor(state, messages.reminder)}</span>
+      {inline ? <span className={styles.word}>{word}</span> : null}
     </button>
   );
 }
