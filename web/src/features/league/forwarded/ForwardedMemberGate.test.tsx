@@ -138,6 +138,7 @@ const SOURCES: ForwardedSources = {
       : { ok: false, reason: "entry_not_found" },
   entrySeason: async () => ({ ok: false, reason: "entry_not_found" }),
   events: async () => ({ ok: false, reason: "not_found" }),
+  h2hMatches: async () => ({ ok: false, reason: "not_found" }),
 };
 
 /** What the page under the gate is handed: the league in context and its tree. */
@@ -169,7 +170,7 @@ function open(address: string, child: ReactNode = <Probe />) {
               path="/league/:leagueId/members/:entryId/:tool?"
               element={
                 <ForwardedLeagueContext.Provider
-                  value={{ leagueId: 314, leagueName: "Synthetic League" }}
+                  value={{ leagueId: 314, leagueName: "Synthetic League", scoring: "classic" }}
                 >
                   <ForwardedMemberGate sources={SOURCES}>{child}</ForwardedMemberGate>
                 </ForwardedLeagueContext.Provider>

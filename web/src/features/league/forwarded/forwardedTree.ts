@@ -19,14 +19,16 @@ import {
   entryBundle as readBundle,
   entrySeason as readSeason,
   events as readEvents,
+  h2hMatches as readMatches,
   standings as readStandings,
 } from "../forwarder/client";
 import type { ForwarderClient } from "../forwarder/client";
-import type {
-  FplEntryBundle,
-  FplEntrySeason,
-  FplLeagueStandings,
-  FplStandingRow,
+import {
+  tableRows,
+  type ForwardedRow,
+  type ForwardedTable,
+  type FplEntryBundle,
+  type FplEntrySeason,
 } from "../forwarder/documents";
 import { forwardedHistory, forwardedScoreboard } from "./forwardedScoreboard";
 import { assertAdviceIndex, assertMembers } from "../publicationShape";
@@ -48,6 +50,7 @@ export interface ForwardedSources {
   entryBundle: ForwarderClient["entryBundle"];
   entrySeason: ForwarderClient["entrySeason"];
   events: ForwarderClient["events"];
+  h2hMatches: ForwarderClient["h2hMatches"];
 }
 
 export interface ForwardedTreeInputs {
@@ -57,8 +60,8 @@ export interface ForwardedTreeInputs {
   table: LeagueViewEnvelope<DevicePlanDocument>;
   /** The site's calendar, for the purchase-price replay of each squad. */
   fixtures: FixturesPayload | null;
-  /** The standings pages already read, so the tree reads none of them twice. */
-  pages?: readonly FplLeagueStandings[];
+  /** The table pages already read, so the tree reads none of them twice. */
+  pages?: readonly ForwardedTable[];
   /** The bundles already read, the member's own among them. */
   bundles?: readonly FplEntryBundle[];
   sources?: ForwardedSources;
@@ -69,10 +72,11 @@ const SITE_SOURCES: ForwardedSources = {
   entryBundle: readBundle,
   entrySeason: readSeason,
   events: readEvents,
+  h2hMatches: readMatches,
 };
 
 /** The movement a standings row states, in the member list's words and under its rule. */
-function movementOf(row: FplStandingRow): Pick<EntryView, "movement" | "movement_places"> {
+function movementOf(row: ForwardedRow): Pick<EntryView, "movement" | "movement_places"> {
   if (row.rank <= 0) return { movement: "unknown", movement_places: null };
   if (row.last_rank === null || row.last_rank <= 0) {
     return { movement: "new", movement_places: null };
@@ -87,11 +91,11 @@ function movementOf(row: FplStandingRow): Pick<EntryView, "movement" | "movement
  * hit stated (so no week score is shown, as the list's rule reads a null hit), the total
  * and the movement the standings state. A row repeated across pages keeps its first copy.
  */
-export function standingsMembers(pages: readonly FplLeagueStandings[]): EntryView[] {
+export function standingsMembers(pages: readonly ForwardedTable[]): EntryView[] {
   const seen = new Set<number>();
   const members: EntryView[] = [];
   for (const page of pages) {
-    for (const row of page.results) {
+    for (const row of tableRows(page)) {
       if (seen.has(row.entry)) continue;
       seen.add(row.entry);
       members.push({
@@ -145,28 +149,57 @@ export function forwardedTree({
 }: ForwardedTreeInputs): LeagueTree {
   const unpublished = (relative: string) => () => Promise.reject(new LeagueDataMissing(relative));
   const gameweek = table.payload.gameweek;
-  const standingsPages: FplLeagueStandings[] = [...pages];
+  const standingsPages: ForwardedTable[] = [...pages];
   const squads = new Map<number, Promise<LeagueViewEnvelope<EntrySquad>>>();
   const seasons = new Map<number, Promise<FplEntrySeason | null>>();
   let board: Promise<LeagueViewEnvelope<Scoreboard>> | null = null;
-  let firstPage: Promise<FplLeagueStandings> | null = null;
+  let firstPage: Promise<ForwardedTable> | null = null;
+  const opponents = new Map<number, Promise<number | null>>();
 
-  function standingOf(entryId: number): FplStandingRow | null {
+  function standingOf(entryId: number): ForwardedRow | null {
     for (const page of standingsPages) {
-      const row = page.results.find((result) => result.entry === entryId);
+      const row = tableRows(page).find((result) => result.entry === entryId);
       if (row !== undefined) return row;
     }
     return null;
   }
 
+  /**
+   * A head-to-head member's opponent of the week, from the league's pairings for the
+   * table's gameweek: the rival a rival strategy is played against unless the member names
+   * another. Read once per member, over at most five pages of pairings; null for a classic
+   * league, a bye, the league average, or a member the pages do not pair.
+   */
+  function opponentOf(entryId: number): Promise<number | null> {
+    let found = opponents.get(entryId);
+    if (found === undefined) {
+      found = (async () => {
+        if (standingsPages[0]?.league.scoring !== "h2h") return null;
+        for (let page = 1; page <= 5; page += 1) {
+          const read = await sources.h2hMatches(league.leagueId, gameweek, page);
+          if (!read.ok) return null;
+          for (const match of read.document.results) {
+            if (match.entry_1.entry === entryId) return match.entry_2.entry;
+            if (match.entry_2.entry === entryId) return match.entry_1.entry;
+          }
+          if (!read.document.has_next) break;
+        }
+        return null;
+      })();
+      opponents.set(entryId, found);
+    }
+    return found;
+  }
+
   function build(entryId: number, bundle: FplEntryBundle): LeagueViewEnvelope<EntrySquad> {
+    const standing = standingOf(entryId);
     const built = forwardedMemberSquad({
       bundle,
       table,
       entryId,
       fixtures,
       leagueId: league.leagueId,
-      standing: standingOf(entryId),
+      standing: standing === null ? null : { ...standing, event_total: standing.event_total ?? 0 },
     });
     if (built.ok) return built.squad;
     if (built.reason === "unreadable" || built.reason === "table_unreadable") {
@@ -190,7 +223,7 @@ export function forwardedTree({
   }
 
   /** The pages handed in, else page 1 read once; a standalone entry has no league to read. */
-  async function knownPages(): Promise<readonly FplLeagueStandings[]> {
+  async function knownPages(): Promise<readonly ForwardedTable[]> {
     if (standingsPages.length > 0 || league.leagueId <= 0) return standingsPages;
     firstPage ??= sources.standings(league.leagueId, 1).then((read) => {
       if (!read.ok) throw new LeagueDataError(`The standings could not be read: ${read.reason}.`);
@@ -244,6 +277,7 @@ export function forwardedTree({
     const rivals = roster
       .map((member) => member.entry_id)
       .filter((id): id is number => id !== null && id !== entryId);
+    const opponent = league.leagueId > 0 ? await opponentOf(entryId) : null;
     const index: EntryAdviceIndex = {
       menu: "device",
       source_snapshot_id: table.payload.source_snapshot_id,
@@ -256,7 +290,8 @@ export function forwardedTree({
       windows: Object.fromEntries(["saf-puan", ...RIVAL_STRATEGIES].map((slug) => [slug, []])),
       strategies: ["saf-puan", ...RIVAL_STRATEGIES],
       rival_entry_ids: rivals,
-      default_rival_entry_id: defaultRivalOf(roster, entryId),
+      default_rival_entry_id:
+        opponent !== null && rivals.includes(opponent) ? opponent : defaultRivalOf(roster, entryId),
       evidence: { available: false, reason: "on_device" },
       top100: { available: false, reason: "on_device" },
       chips: { available: false, reason: "on_device" },
@@ -316,7 +351,7 @@ export function forwardedTree({
     if (league.leagueId <= 0) throw new LeagueDataMissing("scoreboard.json");
     board ??= (async () => {
       const pages = await knownPages();
-      const members = pages.flatMap((page) => page.results);
+      const members = pages.flatMap((page) => tableRows(page));
       const [calendar, read] = await Promise.all([
         sources.events(),
         Promise.all(members.map((member) => seasonOf(member.entry))),

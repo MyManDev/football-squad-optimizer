@@ -5,7 +5,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { leagueAddress } from "../../../lib/leagueAddresses";
 import { useFixtures } from "../../fixtures/data";
-import type { FplStandingRow } from "../forwarder/documents";
+import { tableRows, type FplStandingRow } from "../forwarder/documents";
 import { MemberGate } from "../pages/MemberGate";
 import { MemberPageSkeleton } from "../pages/MemberPageSkeleton";
 import { useForwardedLeague } from "./ForwardedLeagueContext";
@@ -82,9 +82,13 @@ export function ForwardedMemberGate({
   const standings = useForwardedStandings(
     league?.leagueId ?? null,
     standingsPage(location.state?.leaguePage),
+    league?.scoring ?? "classic",
   );
-  const standing: FplStandingRow | null =
-    standings.data?.results.find((row) => row.entry === entryId) ?? null;
+  const leagueTable = standings.data;
+  const standing = useMemo<FplStandingRow | null>(() => {
+    const row = leagueTable ? tableRows(leagueTable).find((r) => r.entry === entryId) : undefined;
+    return row === undefined ? null : { ...row, event_total: row.event_total ?? 0 };
+  }, [leagueTable, entryId]);
   const read = bundle.data;
   const tableEnvelope = table.data ?? null;
   const calendar = fixtures.data ?? null;

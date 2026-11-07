@@ -10,7 +10,7 @@ import { useMemo, type ReactNode } from "react";
 import type { FixturesPayload } from "../../fixtures/types";
 import type { DevicePlanTableRef, PublishedLeague } from "../directory";
 import type { DevicePlanDocument } from "../device/types";
-import type { FplEntryBundle, FplLeagueStandings } from "../forwarder/documents";
+import type { ForwardedTable, FplEntryBundle } from "../forwarder/documents";
 import { LeagueContext, type LeagueContextValue } from "../LeagueContext";
 import { forwardedTree, type ForwardedSources } from "./forwardedTree";
 import type { LeagueViewEnvelope } from "../types";
@@ -34,8 +34,8 @@ export function ForwardedTreeProvider({
   tableRef: DevicePlanTableRef;
   table: LeagueViewEnvelope<DevicePlanDocument>;
   fixtures?: FixturesPayload | null;
-  /** The standings pages the page has read. */
-  pages?: readonly FplLeagueStandings[];
+  /** The table pages the page has read, of either scoring. */
+  pages?: readonly ForwardedTable[];
   /** The bundles the page has read, the member's own among them. */
   bundles?: readonly FplEntryBundle[];
   /** The forwarder reads; the site's own unless a test injects them. */

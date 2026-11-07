@@ -12,16 +12,17 @@ import { useLeagueMembers, useLeagueScoreboard } from "../queries";
 import { leagueRace } from "../race/leagueRace";
 import { LeagueRaceCard } from "../race/LeagueRaceCard";
 import { useForwardedLeague } from "./ForwardedLeagueContext";
-import { MAX_STANDINGS_PAGE } from "../forwarder/documents";
-import { standingsPage, useForwardedStandings } from "./reads";
+import { MAX_STANDINGS_PAGE, type FplH2hSide } from "../forwarder/documents";
+import { standingsPage, useForwardedMatches, useForwardedStandings } from "./reads";
 import styles from "./ForwardedLeaguePage.module.css";
 
 /**
- * A classic league the site does not publish, as its standings (#983 step 4): rank, team,
- * manager and total, read from the FPL forwarder a page of fifty at a time as the visitor
- * requests a page. Only that page is rendered, including in country leagues. Each team opens its member
- * page under the league. Nothing is published for such a league, so no history, race,
- * scoreboard or published plan appears here.
+ * A league the site does not publish, as its table (#983 step 4): rank, team, manager and
+ * total for a classic league; the record, head-to-head points and points for a head-to-head
+ * one, with the week's pairings above the table. Read from the FPL forwarder a page of fifty
+ * at a time as the visitor requests a page; only that page is rendered, including in country
+ * leagues. Each team opens its member page under the league. Where the gate stood the
+ * league's tree above the page, its scoreboard and race are drawn as a listed league's are.
  */
 export function ForwardedLeaguePage() {
   const [search] = useSearchParams();
@@ -86,6 +87,7 @@ function ForwardedLeagueTable() {
   const words = messages.forwarded;
   const league = useForwardedLeague();
   const tree = useContext(LeagueContext);
+  const headToHead = league?.scoring === "h2h";
   const [search, setSearch] = useSearchParams();
   const page = standingsPage(search.get("page"));
   const leagueId = league?.leagueId ?? null;
@@ -94,7 +96,11 @@ function ForwardedLeagueTable() {
   }, [leagueId, page]);
   const [pageInput, setPageInput] = useState(String(page));
   const [invalid, setInvalid] = useState(false);
-  const standings = useForwardedStandings(league?.leagueId ?? null, page);
+  const standings = useForwardedStandings(
+    league?.leagueId ?? null,
+    page,
+    league?.scoring ?? "classic",
+  );
 
   function go(nextPage: number) {
     const next = new URLSearchParams(search);
@@ -128,6 +134,9 @@ function ForwardedLeagueTable() {
         {name}
       </h1>
       {tree !== null ? <ForwardedLeagueCards /> : null}
+      {headToHead && tree !== null ? (
+        <ForwardedPairings leagueId={league.leagueId} gameweek={tree.league.gameweek} />
+      ) : null}
       <form className={styles.pagination} onSubmit={submit} aria-label={words.pagination}>
         <button
           type="button"
@@ -187,8 +196,18 @@ function ForwardedLeagueTable() {
               {copy.rank}
             </th>
             <th scope="col">{copy.team}</th>
+            {headToHead ? (
+              <>
+                <th scope="col" className={styles.total}>
+                  {words.record}
+                </th>
+                <th scope="col" className={styles.total}>
+                  {words.h2hPoints}
+                </th>
+              </>
+            ) : null}
             <th scope="col" className={styles.total}>
-              {copy.total}
+              {headToHead ? words.pointsFor : copy.total}
             </th>
           </tr>
         </thead>
@@ -208,11 +227,62 @@ function ForwardedLeagueTable() {
                   <span className={styles.manager}>{row.player_name || copy.unknownMember}</span>
                 </div>
               </td>
-              <td className={`${styles.total} num`}>{points(row.total, 0, locale)}</td>
+              {"matches_won" in row ? (
+                <>
+                  <td className={`${styles.total} num`}>
+                    {`${row.matches_won}-${row.matches_drawn}-${row.matches_lost}`}
+                  </td>
+                  <td className={`${styles.total} num`}>{points(row.total, 0, locale)}</td>
+                  <td className={`${styles.total} num`}>{points(row.points_for, 0, locale)}</td>
+                </>
+              ) : (
+                <td className={`${styles.total} num`}>{points(row.total, 0, locale)}</td>
+              )}
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** One side of a pairing by name; the league average plays without an entry. */
+function sideName(side: FplH2hSide, average: string): string {
+  return side.entry === null ? average : side.name;
+}
+
+/**
+ * The week's pairings of a head-to-head league, page 1: who meets whom and each side's
+ * points so far. The week is the one the league's tree plans for.
+ */
+function ForwardedPairings({ leagueId, gameweek }: { leagueId: number; gameweek: number }) {
+  const { locale, messages } = useLanguage();
+  const words = messages.forwarded;
+  const matches = useForwardedMatches(leagueId, gameweek, 1);
+  if (matches.isPending) return null;
+  if (matches.isError) {
+    return (
+      <p className={styles.note} role="status">
+        {words.pairingsFailed}
+      </p>
+    );
+  }
+  return (
+    <section aria-labelledby="league-pairings-title" className={styles.pairings}>
+      <h2 className={styles.pairingsTitle} id="league-pairings-title">
+        {words.pairings(gameweek)}
+      </h2>
+      <ul className={styles.pairingList}>
+        {matches.data.results.map((match) => (
+          <li key={match.id} className={styles.pairing}>
+            <span>{sideName(match.entry_1, words.average)}</span>
+            <span className="num">
+              {points(match.entry_1.points, 0, locale)} : {points(match.entry_2.points, 0, locale)}
+            </span>
+            <span>{sideName(match.entry_2, words.average)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

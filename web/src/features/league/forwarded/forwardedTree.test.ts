@@ -85,6 +85,7 @@ function sources(overrides: Partial<ForwardedSources> = {}): ForwardedSources {
     entryBundle: vi.fn(async (entry: number) => ok<FplEntryBundle, BundleReason>(bundleFor(entry))),
     entrySeason: vi.fn(async () => ({ ok: false, reason: "entry_not_found" }) as const),
     events: vi.fn(async () => ({ ok: false, reason: "not_found" }) as const),
+    h2hMatches: vi.fn(async () => ({ ok: false, reason: "not_found" }) as const),
     ...overrides,
   };
 }
