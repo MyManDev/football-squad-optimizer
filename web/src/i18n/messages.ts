@@ -201,8 +201,28 @@ const en = {
     newTab: "opens in a new tab",
   },
   reminder: {
-    off: "Remind Me",
+    label: "Reminder",
     on: "Reminder On",
+    title: "How to Get Notifications",
+    back: "Back to Member",
+    statusOff: "Off",
+    statusOn: "On. The notification comes 3 hours before the deadline.",
+    statusUnsupported:
+      "This browser cannot show notifications. On an iPhone, add the site to the home screen first (step 2).",
+    statusDenied:
+      "Notifications are blocked for this site. Allow them in the browser's site settings, then switch on again.",
+    step1Title: "Switch on and Allow",
+    step1:
+      "Switch the reminder on. The browser asks whether this site may send notifications: tap Allow.",
+    allowWord: "Allow",
+    step2Title: "On an iPhone: add to the home screen first",
+    step2:
+      "In Safari tap Share, then Add to Home Screen. Open SquadOpt from that icon and switch the reminder on there.",
+    addWord: "Add",
+    step3Title: "What Arrives",
+    step3: "Three hours before each deadline, one notification. Tap it and your page opens.",
+    sampleTitle: "GW11: 3 Hours Left",
+    sampleBody: "Your plan is ready.",
   },
   memberPicker: {
     title: "Who are you?",
@@ -796,8 +816,28 @@ const tr: MessageSchema<typeof en> = {
     newTab: "yeni sekmede açılır",
   },
   reminder: {
-    off: "Hatırlat",
+    label: "Hatırlatma",
     on: "Hatırlatma açık",
+    title: "Bildirimleri nasıl alırsın",
+    back: "Üyeye dön",
+    statusOff: "Kapalı",
+    statusOn: "Açık. Bildirim son tarihten 3 saat önce gelir.",
+    statusUnsupported:
+      "Bu tarayıcı bildirim gösteremiyor. iPhone'da önce siteyi ana ekrana ekle (2. adım).",
+    statusDenied:
+      "Bu site için bildirimler engellenmiş. Tarayıcının site ayarlarından izin ver, sonra tekrar aç.",
+    step1Title: "Aç ve izin ver",
+    step1:
+      "Hatırlatmayı aç. Tarayıcı bu sitenin bildirim gönderebilir mi diye sorar: İzin ver'e dokun.",
+    allowWord: "İzin ver",
+    step2Title: "iPhone'da: önce ana ekrana ekle",
+    step2:
+      "Safari'de Paylaş'a, sonra Ana Ekrana Ekle'ye dokun. SquadOpt'u o simgeden aç ve hatırlatmayı oradan aç.",
+    addWord: "Ekle",
+    step3Title: "Ne gelir",
+    step3: "Her son tarihten 3 saat önce bir bildirim. Dokununca sayfan açılır.",
+    sampleTitle: "GW11: son 3 saat",
+    sampleBody: "Planın hazır.",
   },
   memberPicker: {
     title: "Sen kimsin?",

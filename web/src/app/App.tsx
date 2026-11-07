@@ -50,6 +50,9 @@ const LeagueMemberHistoryPage = lazy(() =>
   })),
 );
 
+const ReminderPage = lazy(() =>
+  import("../features/reminder/ReminderPage").then((m) => ({ default: m.ReminderPage })),
+);
 const FixturesPage = lazy(() =>
   import("../features/fixtures/FixturesPage").then((m) => ({ default: m.FixturesPage })),
 );
@@ -172,6 +175,12 @@ function LocalizedApp({ basename }: { basename: string }) {
                     />
                   ),
                 )}
+                {/* How notifications are received: the reminder's page under the member's. It
+                    reads no league data, so no gate stands in front of it. */}
+                <Route
+                  path="/league/:leagueId/members/:entryId/reminder"
+                  element={<ReminderPage />}
+                />
                 {/* One FPL team on its own, from the forwarder's bundle: no league, so no
                     gate and no member step. */}
                 <Route
