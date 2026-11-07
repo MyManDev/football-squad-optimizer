@@ -78,7 +78,7 @@ export function LeagueMemberPage() {
     return (
       <EmptyState page title={missing ? copy.entryNotAvailable : copy.entryUnreadable}>
         {missing ? <p>{copy.entryNotAvailableBody}</p> : null}
-        <Link to={membersAddress(leagueId)}>{copy.backToMembers}</Link>{" "}
+        <Link to={leagueId > 0 ? membersAddress(leagueId) : "/"}>{copy.backToMembers}</Link>{" "}
         {!missing ? (
           <button type="button" onClick={() => void squad.refetch()}>
             {copy.retryPublishedRead}

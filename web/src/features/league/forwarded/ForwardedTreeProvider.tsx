@@ -54,6 +54,7 @@ export function ForwardedTreeProvider({
     return {
       league,
       tree: forwardedTree({ league, table, fixtures, pages, bundles, sources }),
+      forwarded: true,
     };
   }, [leagueId, leagueName, tableRef, table, fixtures, pages, bundles, sources]);
   return <LeagueContext.Provider value={value}>{children}</LeagueContext.Provider>;

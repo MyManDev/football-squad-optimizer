@@ -15,7 +15,12 @@ import {
 } from "../../../fixtures/forwarder";
 import { LeagueDataError, LeagueDataMissing } from "../data";
 import type { PublishedLeague } from "../directory";
-import type { ForwarderResult } from "../forwarder/client";
+import type {
+  BundleReason,
+  ForwarderReason,
+  ForwarderResult,
+  StandingsReason,
+} from "../forwarder/client";
 import type { FplEntryBundle, FplLeagueStandings } from "../forwarder/documents";
 import { assertAdviceIndex, assertMembers } from "../publicationShape";
 import {
@@ -70,14 +75,14 @@ function page(): FplLeagueStandings {
   return example;
 }
 
-function ok<T>(document: T): ForwarderResult<T> {
+function ok<T, R extends ForwarderReason>(document: T): ForwarderResult<T, R> {
   return { ok: true, document, copy: "hit" };
 }
 
 function sources(overrides: Partial<ForwardedSources> = {}): ForwardedSources {
   return {
-    standings: vi.fn(async () => ok(page())),
-    entryBundle: vi.fn(async (entry: number) => ok(bundleFor(entry))),
+    standings: vi.fn(async () => ok<FplLeagueStandings, StandingsReason>(page())),
+    entryBundle: vi.fn(async (entry: number) => ok<FplEntryBundle, BundleReason>(bundleFor(entry))),
     ...overrides,
   };
 }
