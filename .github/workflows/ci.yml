@@ -285,6 +285,19 @@ jobs:
             workers/fpl-proxy/test/worker.test.mjs \
             workers/fpl-proxy/test/deploy-steps.test.mjs
 
+      # The deadline reminder Worker (ADR 0013), tested the same way: a fake push service, a fake
+      # site and an in-memory store; the protocol is checked by decrypting and verifying what the
+      # Worker sends. Its deploy-steps.test.mjs checks this list, and the one in
+      # deploy-deadline-push.yml, against its test directory.
+      - name: Deadline reminder worker tests
+        working-directory: .
+        run: |
+          node --test \
+            workers/deadline-push/test/rules.test.mjs \
+            workers/deadline-push/test/webpush.test.mjs \
+            workers/deadline-push/test/worker.test.mjs \
+            workers/deadline-push/test/deploy-steps.test.mjs
+
       - name: Build
         env:
           # Unset or empty is the static site, byte for byte (ADR 0006). A repository

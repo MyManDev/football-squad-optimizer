@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 import { PageShell } from "../design/components/PageShell";
 import { NO_IDENTITY, type ShellIdentity } from "../design/shell/nav";
 import { useLeagueIdentity } from "../features/league/identity/useLeagueIdentity";
+import { ReminderToggle } from "../features/reminder/ReminderToggle";
 import { useLanguage } from "../i18n/context";
 import { FIND_YOURSELF, leagueIdInAddress, membersAddress } from "../lib/leagueAddresses";
 
@@ -13,7 +14,7 @@ import { FIND_YOURSELF, leagueIdInAddress, membersAddress } from "../lib/leagueA
  * as plain props: the sidebar's links, the identity block and its Değiştir.
  */
 export function IdentifiedShell({ children }: { children: ReactNode }) {
-  const { messages } = useLanguage();
+  const { messages, language } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const { leagueId, member, change } = useLeagueIdentity(leagueIdInAddress(location.pathname));
@@ -48,8 +49,20 @@ export function IdentifiedShell({ children }: { children: ReactNode }) {
     navigate(membersAddress(leagueId), { state: FIND_YOURSELF });
   }, [leagueId, change, navigate]);
 
+  const reminder = useMemo(
+    () =>
+      member === null || leagueId === null
+        ? null
+        : { leagueId: member.leagueId, entryId: member.entryId, language },
+    [member, leagueId, language],
+  );
+
   return (
-    <PageShell identity={identity} onChangeMember={onChangeMember}>
+    <PageShell
+      identity={identity}
+      onChangeMember={onChangeMember}
+      whoExtra={<ReminderToggle target={reminder} />}
+    >
       {children}
     </PageShell>
   );
