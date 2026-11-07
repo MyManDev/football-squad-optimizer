@@ -7,9 +7,9 @@ const COPY = {
   tr: { mark: "Yok", title: "Hocanın açıklaması", out: "Hoca: bu maçta yok", source: "Haberi oku" },
   en: {
     mark: "Out",
-    title: "Manager's statement",
-    out: "Manager: out for this match",
-    source: "Read the news",
+    title: "Manager's Statement",
+    out: "Manager: Out for This Match",
+    source: "Read the News",
   },
 };
 

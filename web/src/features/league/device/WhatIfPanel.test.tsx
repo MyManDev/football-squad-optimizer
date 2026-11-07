@@ -113,7 +113,7 @@ async function started() {
 
 const remove = (name: string) =>
   fireEvent.click(screen.getByRole("button", { name: COPY.whatIfRemoveLabel(name) }));
-/** Choose a player in the list, then press the add button: choosing alone adds nothing. */
+/** Choose a Player in the list, then press the add button: choosing alone adds nothing. */
 const add = (id: number) => {
   fireEvent.change(screen.getByLabelText(COPY.whatIfAdd), { target: { value: String(id) } });
   fireEvent.click(screen.getByRole("button", { name: COPY.whatIfAddButton }));

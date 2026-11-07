@@ -10,8 +10,8 @@ const COPY = {
     net: "Ceza sonrası beklenen puan",
   },
   en: {
-    title: "Expected points",
-    net: "Expected points after hits",
+    title: "Expected Points",
+    net: "Expected Points After Hits",
   },
 };
 

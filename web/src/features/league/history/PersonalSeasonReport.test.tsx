@@ -57,7 +57,7 @@ it.each<Language>(["tr", "en"])(
   async (language) => {
     claimIn(101, 352490);
     show(report(), language);
-    const title = screen.getByText(language === "tr" ? "Sezon raporum" : "My season report");
+    const title = screen.getByText(language === "tr" ? "Sezon raporum" : "My Season Report");
     expect(title.closest("details")).not.toHaveAttribute("open");
     await userEvent.click(title);
     const week = screen.getByRole("region", { name: language === "tr" ? "Hafta 4" : "Gameweek 4" });

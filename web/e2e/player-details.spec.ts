@@ -73,7 +73,7 @@ for (const [language, width] of [
     await expect(dialog).toBeVisible();
     await expect(page.locator("html")).toHaveCSS("overflow", "hidden");
     await expect(dialog).toContainText(
-      language === "tr" ? "Beklenen dakika: 67,5" : "Expected minutes: 67.5",
+      language === "tr" ? "Beklenen dakika: 67,5" : "Expected Minutes: 67.5",
     );
     expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
     expect(await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
@@ -99,7 +99,7 @@ for (const [language, width] of [
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Tab");
     await expect(page.locator("dialog")).toContainText(
-      language === "tr" ? "Beklenen puan" : "Expected points",
+      language === "tr" ? "Beklenen puan" : "Expected Points",
     );
   });
 }

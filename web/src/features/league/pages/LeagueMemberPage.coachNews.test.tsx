@@ -47,12 +47,12 @@ describe("the manager's source beside the player", () => {
     (language) => {
       const { item } = show(language);
       const region = screen.getByRole("region", {
-        name: language === "tr" ? "Hocanın açıklaması" : "Manager's statement",
+        name: language === "tr" ? "Hocanın açıklaması" : "Manager's Statement",
       });
       expect(within(region).getByText(item.words!)).toBeVisible();
       expect(within(region).getByText(item.name!)).toBeVisible();
       const link = within(region).getByRole("link", {
-        name: language === "tr" ? "Haberi oku" : "Read the news",
+        name: language === "tr" ? "Haberi oku" : "Read the News",
       });
       expect(link).toHaveAttribute("href", item.source_url);
       expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -66,14 +66,14 @@ describe("the manager's source beside the player", () => {
 
   it("retains the held player's source after a plan transfers him out", () => {
     const { item } = show("en", { outgoing: true });
-    const region = screen.getByRole("region", { name: "Manager's statement" });
+    const region = screen.getByRole("region", { name: "Manager's Statement" });
     expect(within(region).getByText(item.name!)).toBeVisible();
     expect(within(region).getByText(item.words!)).toBeVisible();
   });
 
   it("keeps the squad available without inventing news after a failed read", () => {
     show("en", { failed: true });
-    expect(screen.queryByRole("region", { name: "Manager's statement" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Manager's Statement" })).not.toBeInTheDocument();
     expect(document.querySelector("#kadro")).not.toBeNull();
     expect(document.querySelector("[data-coach-absence]")).toBeNull();
   });

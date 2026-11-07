@@ -44,7 +44,7 @@ describe("LanguageProvider", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /EN.*English/ }));
-    expect(screen.getByLabelText("active language")).toHaveTextContent("en:This week");
+    expect(screen.getByLabelText("active language")).toHaveTextContent("en:This Week");
     expect(document.documentElement).toHaveAttribute("lang", "en");
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("en");
 
@@ -54,7 +54,7 @@ describe("LanguageProvider", () => {
         <Probe />
       </LanguageProvider>,
     );
-    expect(screen.getByLabelText("active language")).toHaveTextContent("en:This week");
+    expect(screen.getByLabelText("active language")).toHaveTextContent("en:This Week");
   });
 
   it("falls back to Turkish when the stored language is invalid", () => {

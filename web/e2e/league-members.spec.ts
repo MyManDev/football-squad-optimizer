@@ -39,7 +39,7 @@ test("member list links to point-labelled advice and preserves its URL state", a
   await expect(page).toHaveURL(/\/league\/352490\/members\/35249001$/);
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
 
-  // Most points is published at three and five weeks; the page lists no assumptions.
+  // Most Points is published at three and five weeks; the page lists no assumptions.
   await expect(page.getByRole("radio", { name: /3 hafta/ })).toBeEnabled();
   await page.getByRole("radio", { name: /3 hafta/ }).click();
   await expect(page).toHaveURL(/window=3/);

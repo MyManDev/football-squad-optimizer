@@ -25,9 +25,9 @@ const copy: CardCopy = {
   viceMark: "V",
   bench: "Bench",
   transfers: "Transfers",
-  noTransfers: "No transfers",
+  noTransfers: "No Transfers",
   hit: (points) => `${points} hit points`,
-  expectedPoints: "Expected points",
+  expectedPoints: "Expected Points",
   chip: "Chip",
   chipNames: { "3xc": "Triple Captain" },
   formatPoints: (value) => value.toFixed(2),
@@ -123,20 +123,20 @@ describe("squadCardSvg", () => {
     expect(svg).toContain(`Captain: ${data.captain!.name}`);
     expect(svg).toContain(">C<");
     expect(svg).not.toContain(">Transfers<");
-    expect(svg).not.toContain(">Expected points<");
+    expect(svg).not.toContain(">Expected Points<");
   });
 
   it("draws only the transfers and the expected points when those two are picked", () => {
     const { data } = plan();
     const { svg } = svgOf(["transfers", "points"]);
     expect(svg).toContain(">Transfers<");
-    if (data.moves.length === 0) expect(svg).toContain(">No transfers<");
+    if (data.moves.length === 0) expect(svg).toContain(">No Transfers<");
     for (const move of data.moves) {
       expect(svg).toContain(`>${move.out}<`);
       expect(svg).toContain(`>${move.in}<`);
     }
     if (data.expectedPoints !== null) {
-      expect(svg).toContain(">Expected points<");
+      expect(svg).toContain(">Expected Points<");
       expect(svg).toContain(`>${data.expectedPoints.toFixed(2)}<`);
     }
     const inMoves = new Set(data.moves.flatMap((move) => [move.out, move.in]));
