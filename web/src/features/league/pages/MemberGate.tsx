@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -6,6 +14,9 @@ import { useShell } from "../../../design/shell/ShellContext";
 import { crossfade } from "../../../design/viewTransition";
 import { useLanguage } from "../../../i18n/context";
 import { asksForOwnPage, memberAddress } from "../../../lib/leagueAddresses";
+import { useForwardedLeague } from "../forwarded/ForwardedLeagueContext";
+import { useForwardedStandings, useForwardedStandingsPages } from "../forwarded/reads";
+import { readMemberClaim, subscribeMemberClaim } from "../identity/memberClaim";
 import { useLeagueIdentity, type Roster, type RosterEntry } from "../identity/useLeagueIdentity";
 import { useLeagueMembers } from "../queries";
 import type { HumanEntryView, LeagueMembers } from "../types";
@@ -15,6 +26,40 @@ import { MemberPicker } from "./MemberPicker";
 /** The league's members a visitor can be: the human rows; the system's own team never. */
 function humanMembers(view: LeagueMembers): HumanEntryView[] {
   return view.members.filter((member): member is HumanEntryView => member.member_kind === "human");
+}
+
+/** The most pages of a forwarded league the member step reads looking for one name. */
+const MOST_PAGES = 40;
+
+/**
+ * The further standings pages of a forwarded league, read one at a time as the member step
+ * asks for them: the rows they add to the roster, whether the last page read says the league
+ * goes on, whether a page is being read now, and the ask itself. A listed league reads none.
+ */
+function useFurtherMembers(leagueId: number | null) {
+  const first = useForwardedStandings(leagueId, 1);
+  const [wanted, setWanted] = useState(0);
+  const pages = useMemo(() => Array.from({ length: wanted }, (_, index) => index + 2), [wanted]);
+  const further = useForwardedStandingsPages(leagueId, pages);
+  const rows = useMemo<RosterEntry[]>(
+    () =>
+      further.flatMap((read) =>
+        read.data
+          ? read.data.results.map((row) => ({
+              entryId: row.entry,
+              managerName: row.player_name,
+              teamName: row.entry_name,
+            }))
+          : [],
+      ),
+    [further],
+  );
+  const last = further.at(-1)?.data ?? first.data;
+  const reading = further.some((read) => read.isPending);
+  const more =
+    leagueId !== null && !reading && (last?.has_next ?? false) && wanted < MOST_PAGES - 1;
+  const ask = useCallback(() => setWanted((count) => Math.min(count + 1, MOST_PAGES - 1)), []);
+  return { rows, more, reading, ask };
 }
 
 /**
@@ -30,19 +75,40 @@ function humanMembers(view: LeagueMembers): HumanEntryView[] {
 export function MemberGate({ children }: { children: ReactNode }) {
   const { league } = useLeague();
   const members = useLeagueMembers();
+  // A forwarded league's roster is page 1 of its table; the pages after it are read as a
+  // name or a claim asks for them, never all at once.
+  const forwarded = useForwardedLeague();
+  const further = useFurtherMembers(forwarded === null ? null : forwarded.leagueId);
+  const { rows: furtherRows, more, reading, ask } = further;
+  const entries = useMemo<RosterEntry[] | undefined>(() => {
+    if (!members.data) return undefined;
+    const own = humanMembers(members.data.payload).map((member) => ({
+      entryId: member.entry_id,
+      managerName: member.manager_name,
+      teamName: member.team_name,
+    }));
+    const known = new Set(own.map((entry) => entry.entryId));
+    return own.concat(furtherRows.filter((row) => !known.has(row.entryId)));
+  }, [members.data, furtherRows]);
+  // A claim made on a later page is looked for there before the roster can drop it: the
+  // roster stays unread until the claimed member is found or the pages run out.
+  const stored = useSyncExternalStore(subscribeMemberClaim, readMemberClaim, () => null);
+  const claimedHere =
+    stored !== null && stored.leagueId === league.leagueId ? stored.entryId : null;
+  const seekingClaim =
+    claimedHere !== null &&
+    entries !== undefined &&
+    !entries.some((entry) => entry.entryId === claimedHere) &&
+    (more || reading);
+  useEffect(() => {
+    if (seekingClaim && more) ask();
+  }, [seekingClaim, more, ask]);
   const roster = useMemo<Roster | undefined>(
     () =>
-      members.data
-        ? {
-            leagueName: league.leagueName,
-            entries: humanMembers(members.data.payload).map((member) => ({
-              entryId: member.entry_id,
-              managerName: member.manager_name,
-              teamName: member.team_name,
-            })),
-          }
+      entries !== undefined && !seekingClaim
+        ? { leagueName: league.leagueName, entries }
         : undefined,
-    [members.data, league.leagueName],
+    [entries, seekingClaim, league.leagueName],
   );
   const { member, status, claimMember } = useLeagueIdentity(league.leagueId, roster);
   const location = useLocation();
@@ -118,6 +184,9 @@ export function MemberGate({ children }: { children: ReactNode }) {
       key={league.leagueId}
       members={members}
       rows={roster?.entries}
+      more={more}
+      reading={reading}
+      onMore={ask}
       onConfirm={confirm}
     />
   );

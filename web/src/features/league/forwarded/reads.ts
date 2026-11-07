@@ -4,7 +4,7 @@
  * bundle for that table's gameweek. Each spreads the league feature's read policy.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { loadDevicePlanTable } from "../data";
 import { loadLeagueDirectory, type DevicePlanTableRef, type LeagueDirectory } from "../directory";
@@ -138,5 +138,25 @@ export function useEntryBundle(entryId: number, gameweek: number | null) {
     },
     enabled: gameweek !== null && Number.isSafeInteger(entryId) && entryId > 0,
     ...LEAGUE_READ,
+  });
+}
+
+/**
+ * The standings pages `pages` names, each under the key the single read uses, so a page the
+ * gate or table already holds is not read again. The member step reads pages 2 onward this
+ * way while a visitor looks for their name beyond page 1. Each page's read fails on its own.
+ */
+export function useForwardedStandingsPages(leagueId: number | null, pages: readonly number[]) {
+  return useQueries({
+    queries: pages.map((page) => ({
+      queryKey: forwardedKeys.standings(leagueId ?? 0, page),
+      queryFn: async ({ signal }: { signal: AbortSignal }): Promise<FplLeagueStandings> => {
+        const read = await standings(leagueId!, page, { signal });
+        if (!read.ok) throw new ForwarderRefused(read.reason);
+        return read.document;
+      },
+      enabled: leagueId !== null,
+      ...LEAGUE_READ,
+    })),
   });
 }

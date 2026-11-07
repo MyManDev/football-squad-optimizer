@@ -8,6 +8,7 @@ import { arrivedToPick } from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../data";
 import type { RosterEntry } from "../identity/useLeagueIdentity";
 import type { useLeagueMembers } from "../queries";
+import { matchingMembers } from "./memberSearch";
 import styles from "./MemberPicker.module.css";
 
 /**
@@ -16,16 +17,30 @@ import styles from "./MemberPicker.module.css";
  * standings. Nothing else of a member is shown here: no points, rank or value. The entry
  * number stays out of the markup too: each button carries no value attribute.
  *
+ * Above the list a field narrows it: a part of a name, or the team number the game gives,
+ * for a league where two members share a name. While the typed text matches none of the
+ * rows read so far and the league has more (`more`), the picker asks for the next page
+ * (`onMore`) until a row matches or the pages run out.
+ *
  * A view only: the member gate decides when it shows and what a choice does.
  */
 export function MemberPicker({
   members,
   rows,
+  more = false,
+  reading = false,
+  onMore,
   onConfirm,
 }: {
   members: ReturnType<typeof useLeagueMembers>;
   /** The human members, once read; the system's own team is never among them. */
   rows: readonly RosterEntry[] | undefined;
+  /** Whether the league has members beyond the rows read so far. */
+  more?: boolean;
+  /** Whether a further page of members is being read now. */
+  reading?: boolean;
+  /** Asks for the next page of members. */
+  onMore?: () => void;
   onConfirm: (entry: RosterEntry) => void;
 }) {
   const { locale, messages } = useLanguage();
@@ -34,6 +49,7 @@ export function MemberPicker({
   const location = useLocation();
   const heading = useRef<HTMLHeadingElement>(null);
   const [selected, setSelected] = useState<number | null>(null);
+  const [typed, setTyped] = useState("");
 
   const sorted = useMemo(() => {
     const collator = new Intl.Collator(locale, { sensitivity: "base" });
@@ -46,6 +62,13 @@ export function MemberPicker({
         a.entryId - b.entryId,
     );
   }, [rows, locale]);
+  const shown = useMemo(() => matchingMembers(sorted, typed), [sorted, typed]);
+
+  // A name typed that no row read so far carries asks for the next page, while there is one.
+  const seeking = typed.trim() !== "" && shown.length === 0 && more;
+  useEffect(() => {
+    if (seeking && !reading) onMore?.();
+  }, [seeking, reading, onMore]);
 
   // Arriving to choose (from the league number, or from Değiştir) puts focus on the
   // question. Only a new arrival moves it, so the effect follows the location's key.
@@ -70,33 +93,58 @@ export function MemberPicker({
   } else if (sorted.length === 0) body = <EmptyState title={copy.empty} />;
   else
     body = (
-      <div role="group" className={styles.group} aria-labelledby="member-picker-legend">
+      <div
+        role="group"
+        className={styles.group}
+        aria-labelledby="member-picker-legend"
+        aria-busy={seeking && reading ? true : undefined}
+      >
         <p id="member-picker-legend" className={styles.legend}>
           {copy.legend}
         </p>
-        <ul className={styles.list}>
-          {sorted.map((row) => (
-            <li key={row.entryId}>
-              <button
-                type="button"
-                className={styles.option}
-                data-selected={selected === row.entryId || undefined}
-                onClick={() => {
-                  setSelected(row.entryId);
-                  onConfirm(row);
-                }}
-              >
-                <span className={styles.names}>
-                  <span className={styles.manager}>
-                    {row.managerName ?? listCopy.unknownMember}
+        <input
+          type="search"
+          className={styles.search}
+          aria-label={copy.search}
+          placeholder={copy.search}
+          autoComplete="off"
+          enterKeyHint="search"
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+        />
+        {shown.length === 0 ? (
+          seeking ? (
+            <PageLoading label={listCopy.loading} />
+          ) : (
+            <p className={styles.noMatch} role="status">
+              {copy.noMatch}
+            </p>
+          )
+        ) : (
+          <ul className={styles.list}>
+            {shown.map((row) => (
+              <li key={row.entryId}>
+                <button
+                  type="button"
+                  className={styles.option}
+                  data-selected={selected === row.entryId || undefined}
+                  onClick={() => {
+                    setSelected(row.entryId);
+                    onConfirm(row);
+                  }}
+                >
+                  <span className={styles.names}>
+                    <span className={styles.manager}>
+                      {row.managerName ?? listCopy.unknownMember}
+                    </span>
+                    <span className="visually-hidden">, </span>
+                    <span className={styles.team}>{row.teamName ?? listCopy.unknownTeam}</span>
                   </span>
-                  <span className="visually-hidden">, </span>
-                  <span className={styles.team}>{row.teamName ?? listCopy.unknownTeam}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     );
 

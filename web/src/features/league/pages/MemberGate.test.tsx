@@ -249,6 +249,65 @@ describe("what the picker shows of a member", () => {
   });
 });
 
+describe("finding yourself in a long list", () => {
+  const rows = (): EntryView[] => {
+    const template = humans[0]!;
+    return [
+      { ...template, entry_id: 41001, manager_name: "Şükrü Yıldız", team_name: "Clubv2 99" },
+      { ...template, entry_id: 41002, manager_name: "Ali Can", team_name: "Pressing Trap" },
+      { ...template, entry_id: 41003, manager_name: "Ali Can", team_name: "Second Ali" },
+    ];
+  };
+
+  it("narrows the names to the typed part, without case or accents", async () => {
+    members.mockResolvedValue(envelopeWith(rows()));
+    const user = userEvent.setup();
+    open();
+    const group = await picker("tr");
+    await user.type(within(group).getByRole("searchbox"), "sukru");
+    expect(
+      within(group)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Şükrü Yıldız, Clubv2 99"]);
+    await user.clear(within(group).getByRole("searchbox"));
+    await user.type(within(group).getByRole("searchbox"), "TRAP");
+    expect(
+      within(group)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Ali Can, Pressing Trap"]);
+  });
+
+  it("tells two members of one name apart by the team number the game gives", async () => {
+    members.mockResolvedValue(envelopeWith(rows()));
+    const user = userEvent.setup();
+    open();
+    const group = await picker("tr");
+    await user.type(within(group).getByRole("searchbox"), "Ali Can");
+    expect(within(group).getAllByRole("button")).toHaveLength(2);
+    await user.clear(within(group).getByRole("searchbox"));
+    await user.type(within(group).getByRole("searchbox"), "41003");
+    expect(
+      within(group)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Ali Can, Second Ali"]);
+    await user.click(within(group).getByRole("button"));
+    expect(readMemberClaim()?.entryId).toBe(41003);
+  });
+
+  it("says when no member matches, in place of the list", async () => {
+    members.mockResolvedValue(envelopeWith(rows()));
+    const user = userEvent.setup();
+    open({ language: "en" });
+    const group = await picker("en");
+    await user.type(within(group).getByRole("searchbox"), "nobody");
+    expect(within(group).queryAllByRole("button")).toHaveLength(0);
+    expect(within(group).getByRole("status")).toHaveTextContent(MESSAGES.en.memberPicker.noMatch);
+  });
+});
+
 describe("after a name is chosen", () => {
   it("opens the page asked for at the same address, with a new history key", async () => {
     const user = userEvent.setup();
@@ -431,6 +490,8 @@ describe("the picker with a keyboard and a screen reader", () => {
     const user = userEvent.setup();
     open();
     const group = await picker("tr");
+    await user.tab();
+    expect(within(group).getByRole("searchbox")).toHaveFocus();
     await user.tab();
     const buttons = within(group).getAllByRole("button");
     expect(buttons[0]).toHaveFocus();

@@ -185,6 +185,8 @@ const en = {
   memberPicker: {
     title: "Who are you?",
     legend: "Pick your name",
+    search: "Name or team ID",
+    noMatch: "No member by that name or ID",
     otherLeague: "Enter a different league number",
     empty: "This league's member list is empty.",
   },
@@ -754,6 +756,8 @@ const tr: MessageSchema<typeof en> = {
   memberPicker: {
     title: "Sen kimsin?",
     legend: "Adını seç",
+    search: "İsim veya takım ID",
+    noMatch: "Bu isim veya ID ile üye yok",
     otherLeague: "Başka bir lig numarası gir",
     empty: "Bu ligin üye listesi boş.",
   },
