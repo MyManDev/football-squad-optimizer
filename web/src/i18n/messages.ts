@@ -185,6 +185,9 @@ const en = {
   memberPicker: {
     title: "Who are you?",
     legend: "Pick your name",
+    teamNumber: "Team ID",
+    find: "Find",
+    noMatch: "No member with that ID",
     otherLeague: "Enter a different league number",
     empty: "This league's member list is empty.",
   },
@@ -353,6 +356,7 @@ const en = {
     } as Record<string, string>,
     // Direction D's member page: the top bar, the decision board, the plan in the sidebar.
     decisionTitle: "This week's move",
+    liveWeek: "LIVE WEEK",
     // The week's decisions in the decision card (#1134): the number of changes beside the
     // gain, and the link from the chosen chip into its detail below.
     storyTransfers: "Transfers",
@@ -754,6 +758,9 @@ const tr: MessageSchema<typeof en> = {
   memberPicker: {
     title: "Sen kimsin?",
     legend: "Adını seç",
+    teamNumber: "Takım ID",
+    find: "Bul",
+    noMatch: "Bu ID ile üye yok",
     otherLeague: "Başka bir lig numarası gir",
     empty: "Bu ligin üye listesi boş.",
   },
@@ -917,6 +924,7 @@ const tr: MessageSchema<typeof en> = {
       freehit: "Free Hit",
     },
     decisionTitle: "Bu haftanın hamlesi",
+    liveWeek: "LIVE WEEK",
     storyTransfers: "Transferler",
     storyMoves: (count) => `${count} değişiklik`,
     storyDetail: "Ayrıntı",

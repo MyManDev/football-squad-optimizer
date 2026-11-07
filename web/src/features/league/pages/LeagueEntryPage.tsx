@@ -12,6 +12,7 @@ import {
   membersAddress,
   PICK_HERE,
 } from "../../../lib/leagueAddresses";
+import { idIn } from "./fplId";
 import { FplIdHelp } from "../components/FplIdHelp";
 import { LeagueDataMissing, lookupPublishedLeague } from "../data";
 import type { PublishedLeague } from "../directory";
@@ -37,11 +38,6 @@ const REFUSAL_STATE: Record<LeagueRefusal, State> = {
 };
 
 /** A positive whole number as the field holds it, or null. */
-function idIn(value: string): number | null {
-  const trimmed = value.trim();
-  const id = Number(trimmed);
-  return /^\d+$/.test(trimmed) && Number.isSafeInteger(id) && id > 0 ? id : null;
-}
 
 /**
  * The league number, the first of the two steps in front of every league page. A
@@ -152,7 +148,7 @@ export function LeagueEntryPage({
 
   function submitEntry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const entryId = idIn(entry);
+    const entryId = idIn(entry, "entry");
     if (entryId === null) {
       setEntryInvalid(true);
       return;

@@ -59,6 +59,7 @@ from squadopt.platform.api_contract import (
     DecisionPreferences,
 )
 from squadopt.platform.contributions import ContributionStore
+from squadopt.platform.public_entry_advice import PublicEntryAdviceReader
 from squadopt.platform.queue_contracts import (
     AdviceQueueError,
     AdviceQueueIntegrityError,
@@ -192,7 +193,7 @@ def create_app(
     view_store: PublishedViewStore | None = None,
     advice_store: AdviceReadStore | None = None,
     advice_submit: AdviceSubmitService | None = None,
-    public_advice_store: AdviceReadStore | None = None,
+    public_advice_store: PublicEntryAdviceReader | None = None,
     public_advice_submit: AdviceSubmitService | None = None,
     allowed_origins: tuple[str, ...] = (),
     metrics: AdviceMetrics | None = None,
@@ -461,6 +462,22 @@ def create_app(
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         return JSONResponse(
             content=advice_store.league_capabilities(league_id),
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    @application.get(
+        "/api/v1/public/leagues/{league_id}/entries/{entry_id}/capabilities",
+        response_class=JSONResponse,
+    )
+    def public_capabilities(
+        league_id: Annotated[int, ApiPath(ge=0)], entry_id: Annotated[int, ApiPath(ge=1)]
+    ) -> JSONResponse:
+        """What may be asked for a team outside the published leagues; league 0 is a team alone."""
+
+        if public_advice_store is None:
+            return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
+        return JSONResponse(
+            content=public_advice_store.public_capabilities(league_id, entry_id),
             headers={"Cache-Control": "no-cache"},
         )
 

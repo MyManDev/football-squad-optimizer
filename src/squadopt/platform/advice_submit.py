@@ -376,7 +376,10 @@ class AdviceSubmitService:
             if limiter is not None and not limiter.allow(f"ip:{client_bucket}"):
                 raise self._rate_limited() from missing
             charged = True
-            self._prepare_inputs(missing.context, entry_id)
+            # The member's inputs, and a rival's where the strategy names one: each is one
+            # bounded read, pinned once per capture.
+            for team in missing.entries or (entry_id,):
+                self._prepare_inputs(missing.context, team)
             resolved = resolve()
         cache_key, context = resolved.key, resolved.context
         cached = self._reader.cached(cache_key)

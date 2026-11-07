@@ -80,7 +80,10 @@ from squadopt.platform.fpl_capture import capture
 from squadopt.platform.native_windows import native_window_version, summarize_native_windows
 from squadopt.platform.publication_workers import league_mapper
 from squadopt.platform.requested_history_snapshot import read_history_snapshot
-from squadopt.platform.requested_suggestion_history import publish_requested_histories
+from squadopt.platform.requested_suggestion_history import (
+    publish_public_requested_histories,
+    publish_requested_histories,
+)
 from squadopt.platform.runlog import RunLog, configure_run_logging
 from squadopt.platform.storage._queue_lock import QueueFileLock
 from squadopt.platform.storage.projection_retention import (
@@ -1079,6 +1082,18 @@ class WeeklyOperations:
                 "window_solvers": window_solvers,
                 "requested_history_entries": [int(path.stem) for path in requested_outputs],
             }
+        # The public teams' requested weeks: members of leagues the site does not list who
+        # asked the service for a plan, published once beside the listed leagues' trees.
+        public_requested: tuple[Path, ...] = ()
+        if self.requested_history_store is not None:
+            public_requested = publish_public_requested_histories(
+                store_snapshot=self.requested_history_store,
+                snapshot_root=self.paths.snapshots,
+                as_of=self._capture_for_publication(self.paths.snapshots, self._capture_id()),
+                listed_leagues=self.request.league_ids,
+                out_dir=self.paths.out / "data",
+            )
+            outputs.extend(public_requested)
         # The publication receipt names whether any rendered member was recorded.
         recorded_any = any(bool(row["advice_recorded"]) for row in leagues.values())
         if record and not recorded_any and getattr(self, "log", None) is not None:
@@ -1107,6 +1122,10 @@ class WeeklyOperations:
                 # every earlier build, removed from the site before this run wrote its own.
                 "removed_trees": removed_trees,
                 "leagues": leagues,
+                # Public teams whose requested weeks were published, as league/entry pairs.
+                "public_requested_history": [
+                    f"{path.parents[2].name}/{path.stem}" for path in public_requested
+                ],
             },
         )
 

@@ -1,0 +1,51 @@
+{
+  "gameweek_nine": {
+    "contract_version": "fpl_h2h_matches_v1",
+    "league": {
+      "id": 4242,
+      "scoring": "h2h"
+    },
+    "gameweek": 9,
+    "page": 1,
+    "has_next": false,
+    "source_time": "2026-10-19T17:30:00.000Z",
+    "results": [
+      {
+        "id": 9000,
+        "entry_1": {
+          "entry": 7001,
+          "name": "Cup Team 1",
+          "player_name": "Cup Manager 1",
+          "points": 60
+        },
+        "entry_2": {
+          "entry": 7002,
+          "name": "Cup Team 2",
+          "player_name": "Cup Manager 2",
+          "points": 50
+        },
+        "winner": 7001,
+        "started": true,
+        "finished": true
+      },
+      {
+        "id": 9001,
+        "entry_1": {
+          "entry": 7003,
+          "name": "Cup Team 3",
+          "player_name": "Cup Manager 3",
+          "points": 61
+        },
+        "entry_2": {
+          "entry": null,
+          "name": "AVERAGE",
+          "player_name": "AVERAGE",
+          "points": 51
+        },
+        "winner": 7003,
+        "started": true,
+        "finished": true
+      }
+    ]
+  }
+}

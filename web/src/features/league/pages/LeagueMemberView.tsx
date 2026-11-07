@@ -520,12 +520,22 @@ function LeagueMemberContent({
           <div className={styles.decision} data-mark="decision">
             <div className={styles.headingRow}>
               <div className={styles.headingText}>
-                <h2 className={styles.decisionTitle} id="entry-advice-title">
-                  {copy.decisionTitle}
+                {/* Once the deadline has passed the page is the week being played, not a
+                    plan: the heading says so as a green mark with a pulsing light, and the
+                    settings' summary goes with the plan. */}
+                <h2
+                  className={styles.decisionTitle}
+                  id="entry-advice-title"
+                  data-live={closed || undefined}
+                >
+                  {closed ? <span className={styles.liveLight} aria-hidden="true" /> : null}
+                  {closed ? copy.liveWeek : copy.decisionTitle}
                 </h2>
-                <p className={styles.selectionSummary} data-testid="member-selection-summary">
-                  {selectionSummary}
-                </p>
+                {closed ? null : (
+                  <p className={styles.selectionSummary} data-testid="member-selection-summary">
+                    {selectionSummary}
+                  </p>
+                )}
                 {/* The settings now sit under the decision, so the way to them is named
                     where the decision says which settings it was made under. A closed
                     week has no settings to go to. */}
@@ -546,7 +556,8 @@ function LeagueMemberContent({
               <EmptyState title={copy.loadingRivals} />
             ) : shown ? (
               <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
-            ) : computeOnly && !rejectedContext ? null : (
+            ) : computeOnly && !rejectedContext ? null : closed &&
+              index?.menu === "device" ? null : ( // is to say. The card would only name a publication that never happens. // is no default plan to point at, and the squad and its score say what there // A device menu publishes no plan for any week: once the week is closed there
               <MissingAdviceCard
                 issue={
                   rejectedContext

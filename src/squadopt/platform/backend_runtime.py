@@ -739,7 +739,7 @@ class AdviceBackend:
     log: AdviceLog
     liveness: WorkerLiveness
     public_inputs: PublicEntryInputs | None = None
-    public_reader: AdviceReadStore | None = None
+    public_reader: PublicEntryAdviceReader | None = None
     public_submit: AdviceSubmitService | None = None
 
     def queue_depth(self) -> int:
