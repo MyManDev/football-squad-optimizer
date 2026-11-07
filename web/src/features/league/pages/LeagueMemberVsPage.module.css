@@ -1,0 +1,105 @@
+/*
+ * VS SQUADOPT: the season's totals, then one section per compared gameweek with the
+ * system's side and the member's side beside each other, stacked on a phone.
+ */
+
+.page {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.page h1 {
+  font-family: var(--font-display);
+  margin: var(--space-2) 0;
+}
+
+.totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.totals dt {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.totals dd {
+  margin: 0.3rem 0 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+}
+
+.count {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+}
+
+.week {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+
+.week h2 {
+  margin: 0;
+  font-size: var(--step-1);
+}
+
+.sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+@media (max-width: 480px) {
+  .sides {
+    grid-template-columns: 1fr;
+  }
+}
+
+.side h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--step-0);
+}
+
+.side dl {
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.side dt {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.side dd {
+  margin: 0 0 var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+.moves {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.net {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.difference {
+  margin: 0;
+  font-size: var(--step-0);
+}

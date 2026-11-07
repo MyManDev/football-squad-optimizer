@@ -1,6 +1,19 @@
 export type Language = "tr" | "en";
 
 const en = {
+  vsSquadopt: {
+    title: "VS SQUADOPT",
+    squadopt: "SquadOpt",
+    you: "You",
+    captain: "Captain",
+    transfers: "Transfers",
+    none: "No transfers",
+    net: "Net points",
+    difference: "Difference",
+    total: "Season so far",
+    weeksCompared: (count: number) => `${count} gameweeks compared`,
+    noCaptain: "No captain recorded",
+  },
   suggestionHistory: {
     requested: "On request",
     recordedPlans: "Suggested move",
@@ -57,6 +70,7 @@ const en = {
     menu: "Menu",
     primary: "Primary",
     findLeague: "Find your league",
+    vsSquadopt: "VS SQUADOPT",
     thisWeek: "This week",
     league: "League",
     currentSquad: "Current squad",
@@ -588,6 +602,19 @@ type MessageSchema<T> = {
 };
 
 const tr: MessageSchema<typeof en> = {
+  vsSquadopt: {
+    title: "VS SQUADOPT",
+    squadopt: "SquadOpt",
+    you: "Sen",
+    captain: "Kaptan",
+    transfers: "Transferler",
+    none: "Transfer yok",
+    net: "Net puan",
+    difference: "Fark",
+    total: "Sezonun toplamı",
+    weeksCompared: (count) => `${count} hafta karşılaştırıldı`,
+    noCaptain: "Kaptan kaydı yok",
+  },
   suggestionHistory: {
     requested: "İstek üzerine",
     recordedPlans: "Önerilen hamle",
@@ -644,6 +671,7 @@ const tr: MessageSchema<typeof en> = {
     menu: "Menü",
     primary: "Ana navigasyon",
     findLeague: "Ligini bul",
+    vsSquadopt: "VS SQUADOPT",
     thisWeek: "Bu hafta",
     league: "Lig",
     currentSquad: "Şu anki kadron",

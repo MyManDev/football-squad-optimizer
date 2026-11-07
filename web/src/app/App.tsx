@@ -39,6 +39,11 @@ const ForwardedMemberGate = lazy(() =>
     default: m.ForwardedMemberGate,
   })),
 );
+const LeagueMemberVsPage = lazy(() =>
+  import("../features/league/pages/LeagueMemberVsPage").then((m) => ({
+    default: m.LeagueMemberVsPage,
+  })),
+);
 const LeagueMemberHistoryPage = lazy(() =>
   import("../features/league/pages/LeagueMemberHistoryPage").then((m) => ({
     default: m.LeagueMemberHistoryPage,
@@ -147,6 +152,26 @@ function LocalizedApp({ basename }: { basename: string }) {
                     }
                   />
                 ))}
+                {/* The member against the system's suggestion, week by week. */}
+                {["/league/members/:entryId/vs", "/league/:leagueId/members/:entryId/vs"].map(
+                  (root) => (
+                    <Route
+                      key={root}
+                      path={root}
+                      element={
+                        <LeagueGate
+                          forwarded={
+                            <ForwardedMemberGate>
+                              <LeagueMemberVsPage />
+                            </ForwardedMemberGate>
+                          }
+                        >
+                          <LeagueMemberVsPage />
+                        </LeagueGate>
+                      }
+                    />
+                  ),
+                )}
                 {/* One FPL team on its own, from the forwarder's bundle: no league, so no
                     gate and no member step. */}
                 <Route
