@@ -39,6 +39,11 @@ const ForwardedMemberGate = lazy(() =>
     default: m.ForwardedMemberGate,
   })),
 );
+const LeagueMemberVsPage = lazy(() =>
+  import("../features/league/pages/LeagueMemberVsPage").then((m) => ({
+    default: m.LeagueMemberVsPage,
+  })),
+);
 const LeagueMemberHistoryPage = lazy(() =>
   import("../features/league/pages/LeagueMemberHistoryPage").then((m) => ({
     default: m.LeagueMemberHistoryPage,
@@ -150,6 +155,26 @@ function LocalizedApp({ basename }: { basename: string }) {
                     }
                   />
                 ))}
+                {/* The member against the system's suggestion, week by week. */}
+                {["/league/members/:entryId/vs", "/league/:leagueId/members/:entryId/vs"].map(
+                  (root) => (
+                    <Route
+                      key={root}
+                      path={root}
+                      element={
+                        <LeagueGate
+                          forwarded={
+                            <ForwardedMemberGate>
+                              <LeagueMemberVsPage />
+                            </ForwardedMemberGate>
+                          }
+                        >
+                          <LeagueMemberVsPage />
+                        </LeagueGate>
+                      }
+                    />
+                  ),
+                )}
                 {/* How notifications are received: the reminder's page under the member's. It
                     reads no league data, so no gate stands in front of it. */}
                 <Route

@@ -495,6 +495,7 @@ base(
       sidebar.getByRole("button", { name: "Kenar çubuğunu kapat" }),
       sidebar.getByRole("button", { name: "Değiştir" }),
       sidebar.getByRole("switch", { name: "Hatırlatma" }),
+      navigation.getByRole("link", { name: "VS SQUADOPT", exact: true }),
       navigation.getByRole("link", { name: "Bu hafta", exact: true }),
       navigation.getByRole("link", { name: "Lig", exact: true }),
       ...[

@@ -93,6 +93,7 @@ test.describe("the sidebar before and after the two steps", () => {
     await page.goto("/fixtures");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(await sidebarLinks(page)).toEqual([
+      `${own(EXAMPLE_CLAIM.entryId)}/vs`,
       own(EXAMPLE_CLAIM.entryId),
       MEMBERS,
       `${own(EXAMPLE_CLAIM.entryId)}/current-squad`,

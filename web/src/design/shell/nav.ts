@@ -19,6 +19,7 @@ import {
   leagueIdInAddress,
   memberAddress,
   memberHistoryAddress,
+  memberVsAddress,
   membersAddress,
   memberToolAddress,
   MEMBER_TOOLS,
@@ -38,7 +39,14 @@ export const TOOL_NAV = {
 type ToolNavKey = (typeof TOOL_NAV)[MemberTool];
 
 export type NavKey =
-  "findLeague" | "thisWeek" | "league" | ToolNavKey | "history" | "fixtures" | "contribute";
+  | "vsSquadopt"
+  | "findLeague"
+  | "thisWeek"
+  | "league"
+  | ToolNavKey
+  | "history"
+  | "fixtures"
+  | "contribute";
 
 export interface NavItem {
   key: NavKey;
@@ -135,7 +143,10 @@ export function navItems(
     const own = memberAddress(leagueId, entryId);
     const league = membersAddress(leagueId);
     const history = memberHistoryAddress(leagueId, entryId);
+    const vs = memberVsAddress(leagueId, entryId);
     items.push(
+      // The member against the system, week by week, first: what the site is for.
+      { key: "vsSquadopt", to: vs, active: pathname === vs },
       { key: "thisWeek", to: `${own}${plan}`, active: pathname === own },
       { key: "league", to: league, active: pathname === league },
       ...MEMBER_TOOLS.map((tool) => {
