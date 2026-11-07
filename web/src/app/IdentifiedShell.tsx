@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 import { PageShell } from "../design/components/PageShell";
 import { NO_IDENTITY, type ShellIdentity } from "../design/shell/nav";
 import { useLeagueIdentity } from "../features/league/identity/useLeagueIdentity";
-import { ReminderToggle } from "../features/reminder/ReminderToggle";
+import { ReminderSwitch } from "../features/reminder/ReminderSwitch";
 import { useLanguage } from "../i18n/context";
 import { FIND_YOURSELF, leagueIdInAddress, membersAddress } from "../lib/leagueAddresses";
 
@@ -61,7 +61,7 @@ export function IdentifiedShell({ children }: { children: ReactNode }) {
     <PageShell
       identity={identity}
       onChangeMember={onChangeMember}
-      whoExtra={<ReminderToggle target={reminder} />}
+      whoExtra={<ReminderSwitch target={reminder} />}
     >
       {children}
     </PageShell>

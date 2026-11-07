@@ -30,6 +30,11 @@ export function memberHistoryAddress(leagueId: number, entryId: number | string)
   return `${memberAddress(leagueId, entryId)}/history`;
 }
 
+/** How notifications are received: the reminder's own page under the member's (ADR 0013). */
+export function memberReminderAddress(leagueId: number, entryId: number | string): string {
+  return `${memberAddress(leagueId, entryId)}/reminder`;
+}
+
 /** The member's week-by-week comparison with the system's suggestion: VS SQUADOPT. */
 export function memberVsAddress(leagueId: number, entryId: number | string): string {
   return `${memberAddress(leagueId, entryId)}/vs`;
