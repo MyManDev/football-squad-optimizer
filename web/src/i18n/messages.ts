@@ -200,6 +200,10 @@ const en = {
       "Sign in on the FPL site and open your league under Leagues & Cups. Your league ID is the number after /leagues/ in the address:",
     newTab: "opens in a new tab",
   },
+  reminder: {
+    off: "Remind me",
+    on: "Reminder on",
+  },
   memberPicker: {
     title: "Who are you?",
     legend: "Pick your name",
@@ -790,6 +794,10 @@ const tr: MessageSchema<typeof en> = {
     league:
       "FPL sitesine giriş yap ve Leagues & Cups bölümünden ligini aç. Lig numaran, adreste /leagues/ kısmından sonraki sayıdır:",
     newTab: "yeni sekmede açılır",
+  },
+  reminder: {
+    off: "Hatırlat",
+    on: "Hatırlatma açık",
   },
   memberPicker: {
     title: "Sen kimsin?",
