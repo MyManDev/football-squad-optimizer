@@ -1,4 +1,4 @@
-// The FPL forwarder's fetch handler: three GET routes under /api/v1/fpl/ on the site's host.
+// The FPL forwarder's fetch handler: the GET routes under /api/v1/fpl/ on the site's host.
 //
 // Each route reads FPL on the visitor's request and answers with one trimmed, versioned
 // document (proxy.js says which fields leave the Worker), never with FPL's own JSON. A copy of
@@ -8,12 +8,14 @@
 // source time, and without one the answer is a JSON 503. Every answer is JSON and carries
 // x-squadopt-fpl: 1.
 // The current week and the next deadline come from the site's own /data/fixtures.json; FPL's
-// bootstrap-static is never read. See docs/architecture/decisions/0012-fpl-forwarder.md.
+// bootstrap-static is read for the events route only, and trimmed to each gameweek's state and
+// scores. See docs/architecture/decisions/0012-fpl-forwarder.md.
 //
 // index.js is the entry point and exports one set of these handlers; tests build their own.
 
 import {
   CACHE_HEADER,
+  EVENTS_TTL_SECONDS,
   FPL_API,
   LAST_GAMEWEEK,
   MARKER_HEADER,
@@ -32,8 +34,11 @@ import {
   cacheKeys,
   declaresLeague,
   entryPart,
+  eventsDocument,
   fixturesPart,
   freeHitWeek,
+  h2hMatchesDocument,
+  h2hStandingsDocument,
   historyPart,
   lastGoodTtl,
   liveActivityDocument,
@@ -45,6 +50,7 @@ import {
   picksPart,
   routeFor,
   scheduleFrom,
+  seasonDocument,
   standingsDocument,
   transfersPart,
   upstreamPaths,
@@ -253,7 +259,7 @@ export function createWorker(options = {}) {
     }
     let raw = null;
     try {
-      raw = await upstream(upstreamPaths.headToHeadStandings(league));
+      raw = await upstream(upstreamPaths.headToHeadStandings(league, 1));
     } catch (error) {
       if (!(error instanceof UpstreamNotFound)) throw error;
     }
@@ -389,7 +395,120 @@ export function createWorker(options = {}) {
     return { document, seconds };
   }
 
-  const builders = { standings, bundle, live };
+  /**
+   * One entry's season to date: its history trimmed to each week's points, totals, ranks,
+   * transfers and bank, kept as a bundle is (until the next deadline once the current week is
+   * finished, ten minutes while it is played). FPL's 404 names an entry it does not have.
+   */
+  async function season({ entry }) {
+    const plan = await schedule();
+    const { latestStarted, nextDeadlineMs } = weekState(plan, now());
+    let raw;
+    try {
+      raw = await upstream(upstreamPaths.history(entry));
+    } catch (error) {
+      if (!(error instanceof UpstreamNotFound)) throw error;
+      throw new Refusal(
+        404,
+        { error: "entry_not_found", entry, detail: `FPL has no entry ${entry}` },
+        NOT_FOUND_TTL_SECONDS,
+      );
+    }
+    const document = seasonDocument(raw, { entry, sourceTime: iso(now()) });
+    const settled = latestStarted === 0 ? true : await finished(latestStarted);
+    return { document, seconds: bundleTtl({ settled, nowMs: now(), nextDeadlineMs }) };
+  }
+
+  /** The season's gameweeks with the game's average and highest score, kept for an hour. */
+  async function events() {
+    const raw = await part(upstreamPaths.bootstrap());
+    return {
+      document: eventsDocument(raw, { sourceTime: iso(now()) }),
+      seconds: EVENTS_TTL_SECONDS,
+    };
+  }
+
+  /**
+   * FPL has no head-to-head page 1 for this league: the classic table is asked once, so a
+   * classic league asked for as head-to-head is named as that; a later page FPL does not
+   * have is refused as that page.
+   */
+  async function notHeadToHead(league, page) {
+    if (page > 1) {
+      return new Refusal(
+        404,
+        {
+          error: "page_not_found",
+          league,
+          page,
+          detail: `FPL has no page ${page} of head-to-head league ${league}`,
+        },
+        NOT_FOUND_TTL_SECONDS,
+      );
+    }
+    let raw = null;
+    try {
+      raw = await upstream(upstreamPaths.classicStandings(league, 1));
+    } catch (error) {
+      if (!(error instanceof UpstreamNotFound)) throw error;
+    }
+    if (raw !== null && declaresLeague(raw, league)) {
+      return new Refusal(
+        404,
+        {
+          error: "classic_league",
+          league,
+          detail: `league ${league} is a classic league; ask for its classic standings`,
+        },
+        NOT_FOUND_TTL_SECONDS,
+      );
+    }
+    return new Refusal(
+      404,
+      { error: "league_not_found", league, detail: `FPL has no head-to-head league ${league}` },
+      NOT_FOUND_TTL_SECONDS,
+    );
+  }
+
+  async function h2hStandings({ league, page }) {
+    let raw;
+    try {
+      raw = await upstream(upstreamPaths.headToHeadStandings(league, page));
+    } catch (error) {
+      if (!(error instanceof UpstreamNotFound)) throw error;
+      throw await notHeadToHead(league, page);
+    }
+    const document = h2hStandingsDocument(raw, { league, page, sourceTime: iso(now()) });
+    return { document, seconds: STANDINGS_TTL_SECONDS };
+  }
+
+  /** A gameweek's pairings: ten minutes while the week is played, as a standings page. */
+  async function h2hMatches({ league, gameweek, page }) {
+    const plan = await schedule();
+    const { latestStarted } = weekState(plan, now());
+    if (gameweek > Math.min(LAST_GAMEWEEK, latestStarted + 1)) {
+      throw new Refusal(
+        404,
+        { error: "not_found", detail: "matches are read for the current week or an earlier one" },
+        0,
+      );
+    }
+    let raw;
+    try {
+      raw = await upstream(upstreamPaths.headToHeadMatches(league, gameweek, page));
+    } catch (error) {
+      if (!(error instanceof UpstreamNotFound)) throw error;
+      throw new Refusal(
+        404,
+        { error: "league_not_found", league, detail: `FPL has no head-to-head league ${league}` },
+        NOT_FOUND_TTL_SECONDS,
+      );
+    }
+    const document = h2hMatchesDocument(raw, { league, gameweek, page, sourceTime: iso(now()) });
+    return { document, seconds: STANDINGS_TTL_SECONDS };
+  }
+
+  const builders = { standings, bundle, live, season, events, h2hStandings, h2hMatches };
 
   async function serve(route) {
     const keys = cacheKeys(route);

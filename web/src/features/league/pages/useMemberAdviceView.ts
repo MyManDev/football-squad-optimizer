@@ -42,7 +42,7 @@ export function useMemberAdviceView(
   searchParams: URLSearchParams,
 ) {
   const view = squad.payload;
-  const { tree } = useLeague();
+  const { tree, forwarded = false } = useLeague();
   const adviceClient = useMemo(
     () => client ?? createAdviceClient(tree.entryAdvice),
     [client, tree],
@@ -51,13 +51,21 @@ export function useMemberAdviceView(
   // What the member's own device can compute from this publish's inputs, stated beside
   // the service's capabilities so the controls offer it the same way. The page's reads
   // resolve through the same function from the same inputs.
-  const { onDevice, resolve } = memberSelection({
+  const { onDevice, resolve: resolveSelection } = memberSelection({
     squad: view,
     members,
     index,
     capabilities,
     deviceRivals,
   });
+  // A forwarded league's member is a public team to the service: the request names it so,
+  // and the service fetches and pins that team's inputs only when the member asks.
+  const resolve = (params: URLSearchParams) => {
+    const resolved = resolveSelection(params);
+    return forwarded
+      ? { ...resolved, request: { ...resolved.request, publicEntry: true } }
+      : resolved;
+  };
   const selection = resolve(searchParams);
   const { request } = selection;
   // A rival strategy nobody published, that the service does not answer, waits for the

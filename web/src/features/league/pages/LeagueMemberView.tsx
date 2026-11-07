@@ -1,4 +1,9 @@
-import { memberAddress, memberHistoryAddress, type MemberTool } from "../../../lib/leagueAddresses";
+import {
+  entryAddress,
+  memberAddress,
+  memberHistoryAddress,
+  type MemberTool,
+} from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { useMemo, useRef, type ReactNode } from "react";
@@ -504,7 +509,7 @@ function LeagueMemberContent({
           <LastWeekCard
             result={lastWeek}
             historyHref={
-              lastWeek.suggested !== null && view.league_id === leagueId
+              lastWeek.suggested !== null && view.league_id === leagueId && leagueId > 0
                 ? memberHistoryAddress(leagueId, entryId)
                 : null
             }
@@ -515,12 +520,16 @@ function LeagueMemberContent({
           <div className={styles.decision} data-mark="decision">
             <div className={styles.headingRow}>
               <div className={styles.headingText}>
+                {/* Once the deadline has passed the page is the week being played, not a
+                    plan: the heading says so, and the settings' summary goes with the plan. */}
                 <h2 className={styles.decisionTitle} id="entry-advice-title">
-                  {copy.decisionTitle}
+                  {closed ? copy.liveWeek : copy.decisionTitle}
                 </h2>
-                <p className={styles.selectionSummary} data-testid="member-selection-summary">
-                  {selectionSummary}
-                </p>
+                {closed ? null : (
+                  <p className={styles.selectionSummary} data-testid="member-selection-summary">
+                    {selectionSummary}
+                  </p>
+                )}
                 {/* The settings now sit under the decision, so the way to them is named
                     where the decision says which settings it was made under. A closed
                     week has no settings to go to. */}
@@ -541,7 +550,8 @@ function LeagueMemberContent({
               <EmptyState title={copy.loadingRivals} />
             ) : shown ? (
               <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
-            ) : computeOnly && !rejectedContext ? null : (
+            ) : computeOnly && !rejectedContext ? null : closed &&
+              index?.menu === "device" ? null : ( // is to say. The card would only name a publication that never happens. // is no default plan to point at, and the squad and its score say what there // A device menu publishes no plan for any week: once the week is closed there
               <MissingAdviceCard
                 issue={
                   rejectedContext
@@ -571,13 +581,20 @@ function LeagueMemberContent({
                   job.state.phase !== "waiting"
                 }
                 // The address the sidebar's own link lands on with no selection.
-                defaultPlan={closed ? memberAddress(leagueId, entryId) : undefined}
+                defaultPlan={
+                  closed
+                    ? leagueId > 0
+                      ? memberAddress(leagueId, entryId)
+                      : entryAddress(entryId)
+                    : undefined
+                }
               />
             )}
             {layout === "phone" ? apply : null}
           </div>
           {squadArea}
-          {view.league_id === leagueId ? (
+          {/* One team on its own (league 0) has no league address for its history. */}
+          {view.league_id === leagueId && leagueId > 0 ? (
             <p className={styles.historyLink}>
               <Link to={memberHistoryAddress(leagueId, entryId)}>
                 {messages.suggestionHistory.title}

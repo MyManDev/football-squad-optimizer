@@ -323,4 +323,32 @@ describe("capabilities", () => {
   it("is not something the static client can be asked", () => {
     expect("readCapabilities" in new StaticOnlyAdviceClient(exampleTree.entryAdvice)).toBe(false);
   });
+
+  it("reads a public team's from the public route, league 0 included", async () => {
+    const { calls, client } = recorder(() =>
+      jsonResponse(200, {
+        ...CAPABILITIES,
+        league_id: 0,
+        strategies: { "saf-puan": CAPABILITIES.strategies["saf-puan"] },
+      }),
+    );
+    const capabilities = await client.readPublicCapabilities(0, ENTRY);
+    expect(calls[0]!.url).toBe(
+      `https://api.example/api/v1/public/leagues/0/entries/${ENTRY}/capabilities`,
+    );
+    expect(capabilities).toMatchObject({
+      leagueId: 0,
+      strategies: { "saf-puan": { windows: [1, 3, 5], requiresRival: false } },
+    });
+  });
+
+  it("is no public capabilities at all when the route does not answer", async () => {
+    const client = new FallbackAdviceClient(
+      new HttpAdviceClient("https://api.example", async () =>
+        jsonResponse(404, { error: { code: "NOT_FOUND" } }),
+      ),
+      new StaticOnlyAdviceClient(exampleTree.entryAdvice),
+    );
+    await expect(client.readPublicCapabilities(239, ENTRY)).resolves.toBeNull();
+  });
 });
