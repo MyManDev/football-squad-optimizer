@@ -32,9 +32,7 @@ export function LeagueMemberVsPage() {
     const missing = query.error instanceof LeagueDataMissing;
     return (
       <EmptyState page title={missing ? copy.empty : copy.unreadable}>
-        {missing ? (
-          <p>{copy.emptyBody}</p>
-        ) : (
+        {missing ? null : (
           <button type="button" onClick={() => void query.refetch()}>
             {copy.retry}
           </button>
@@ -94,9 +92,7 @@ export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) 
         <h1>{copy.title}</h1>
       </header>
       {compared.length === 0 ? (
-        <EmptyState title={messages.suggestionHistory.empty}>
-          <p>{messages.suggestionHistory.emptyBody}</p>
-        </EmptyState>
+        <EmptyState title={messages.suggestionHistory.empty} />
       ) : (
         <>
           <Card title={copy.total}>
