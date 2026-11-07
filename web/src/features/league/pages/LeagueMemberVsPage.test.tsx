@@ -119,7 +119,7 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
     expect(weeks[0]).toHaveTextContent("—");
   });
 
-  it("sums the compared weeks above, and names how many", () => {
+  it("sums the compared weeks above", () => {
     open(language, history());
     const totals = screen.getByTestId("vs-totals");
     expect(totals).toHaveTextContent("60");
