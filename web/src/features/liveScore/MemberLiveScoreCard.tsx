@@ -9,7 +9,8 @@ import styles from "./MemberLiveScoreCard.module.css";
 const COPY = {
   tr: {
     title: (week: number) => `${week}. hafta puanın`,
-    net: "Net puan",
+    forecast: "Tahmin",
+    net: "Canlı puan",
     hit: "Transfer cezası",
     matches: "Maçlar",
     bonusDone: "Bonus eklendi",
@@ -25,7 +26,8 @@ const COPY = {
   },
   en: {
     title: (week: number) => `Your gameweek ${week} score`,
-    net: "Net points",
+    forecast: "Forecast",
+    net: "Live points",
     hit: "Transfer hit",
     matches: "Matches",
     bonusDone: "Bonus added",
@@ -45,6 +47,7 @@ const COPY = {
 export function MemberLiveScoreCard({
   gameweek,
   score,
+  forecast = null,
   names,
   onRefresh,
   refreshing = false,
@@ -52,6 +55,8 @@ export function MemberLiveScoreCard({
 }: {
   gameweek: number;
   score: LiveWeekScore | null;
+  /** What was forecast for the eleven fielded, on the live score's net basis; null unstated. */
+  forecast?: number | null;
   /** Names resolved from the same season's element ids. */
   names: ReadonlyMap<number, string>;
   onRefresh?: () => void;
@@ -91,6 +96,12 @@ export function MemberLiveScoreCard({
         }
       >
         <StatRow>
+          {forecast === null ? null : (
+            <Stat
+              label={copy.forecast}
+              value={forecast.toLocaleString(locale, { maximumFractionDigits: 1 })}
+            />
+          )}
           <Stat label={copy.net} value={integer(score.net)} tone="accent" />
           <Stat label={copy.hit} value={integer(score.transfer_cost)} />
           <Stat

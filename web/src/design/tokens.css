@@ -118,6 +118,8 @@
   --motion-data: 400ms;
   --motion-page: 360ms;
   --motion-panel: 280ms;
+  /* The live week's light: one breath, slow enough to read as a signal and not a flicker. */
+  --motion-pulse: 1400ms;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
   --motion-route-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 
@@ -329,6 +331,7 @@ a.visually-hidden:focus-visible {
     --motion-data: 0ms;
     --motion-page: 0ms;
     --motion-panel: 0ms;
+    --motion-pulse: 0ms;
   }
 
   *,

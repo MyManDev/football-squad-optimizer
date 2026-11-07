@@ -600,7 +600,8 @@ def league_capabilities_schema() -> dict[str, Any]:
                 "type": "string",
                 "const": LEAGUE_CAPABILITIES_CONTRACT_VERSION,
             },
-            "league_id": {"type": "integer", "minimum": 1},
+            # 0 is a public team opened on its own, outside any league.
+            "league_id": {"type": "integer", "minimum": 0},
             "capture_snapshot_id": {"type": "string", "minLength": 1},
             "preferences": {
                 "type": "object",

@@ -331,3 +331,45 @@ def test_future_requests_do_not_require_a_future_capture_when_rebuilding_an_olde
         )
         is None
     )
+
+
+def test_public_teams_outside_listed_leagues_get_their_requested_weeks_published(world):
+    """A forwarded league's member who asked the service: published under data/public/<league>."""
+    from squadopt.platform.requested_suggestion_history import publish_public_requested_histories
+
+    # The world's own request was made for a team on its own (league 0): nobody's page.
+    # Two more public requests: one under a forwarded league, one under the listed league.
+    forwarded = replace(world["spec"], league_id=777, entry_id=303)
+    listed = replace(world["spec"], league_id=239, entry_id=404)
+    _store(
+        world["store_snapshot"], forwarded, {**world["payload"], "league_id": 777, "entry_id": 303}
+    )
+    _store(world["store_snapshot"], listed, {**world["payload"], "league_id": 239, "entry_id": 404})
+    out = world["out_dir"].parent / "site-data"
+    paths = publish_public_requested_histories(
+        store_snapshot=world["store_snapshot"],
+        snapshot_root=world["snapshot_root"],
+        as_of=world["outcome"],
+        listed_leagues=[239],
+        out_dir=out,
+    )
+    assert [path.relative_to(out).as_posix() for path in paths] == [
+        "public/777/history/requested/303.json"
+    ]
+    document = json.loads(paths[0].read_bytes())
+    assert (document["payload"]["league_id"], document["payload"]["entry_id"]) == (777, 303)
+    assert document["payload"]["weeks"][0]["advice_source"] == "requested_server"
+    # Published once, a week is never erased by a store that no longer holds its job: the
+    # next run refuses, as the league publisher does, and the file stands as written.
+    before = paths[0].read_bytes()
+    for job in (world["store_snapshot"] / "jobs").glob("*.json"):
+        job.unlink()
+    with pytest.raises(ValueError, match="erase an existing"):
+        publish_public_requested_histories(
+            store_snapshot=world["store_snapshot"],
+            snapshot_root=world["snapshot_root"],
+            as_of=world["outcome"],
+            listed_leagues=[239],
+            out_dir=out,
+        )
+    assert paths[0].read_bytes() == before

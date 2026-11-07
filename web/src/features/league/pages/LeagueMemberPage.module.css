@@ -570,6 +570,46 @@
   line-height: 28px;
 }
 
+/* The week being played: the heading is a green mark, its light pulsing while the week runs.
+   Under reduced motion the light stands still. */
+.decisionTitle[data-live] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-3);
+  border-radius: 999px;
+  background: var(--color-good);
+  color: var(--color-surface);
+  font-size: var(--step-1);
+  letter-spacing: 0.04em;
+}
+
+.liveLight {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentcolor;
+  animation: live-pulse var(--motion-pulse) ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 currentcolor;
+  }
+  50% {
+    opacity: 0.35;
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveLight {
+    animation: none;
+  }
+}
+
 .selectionSummary {
   margin: 0;
   color: var(--color-text-muted);

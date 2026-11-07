@@ -739,7 +739,7 @@ class AdviceBackend:
     log: AdviceLog
     liveness: WorkerLiveness
     public_inputs: PublicEntryInputs | None = None
-    public_reader: AdviceReadStore | None = None
+    public_reader: PublicEntryAdviceReader | None = None
     public_submit: AdviceSubmitService | None = None
 
     def queue_depth(self) -> int:
@@ -833,7 +833,11 @@ def build_backend(
     if config.public_entries:
         public_inputs = PublicEntryInputs(FileAdviceCache(config.store_root / "public-entries"))
         public_reader = PublicEntryAdviceReader(
-            FileLeagueDirectory(config.site_data_root), cache, contexts, public_inputs
+            FileLeagueDirectory(config.site_data_root),
+            cache,
+            contexts,
+            public_inputs,
+            switches=contexts,
         )
         public_submit = AdviceSubmitService(
             public_reader,

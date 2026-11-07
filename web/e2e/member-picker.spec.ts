@@ -93,6 +93,7 @@ test.describe("the sidebar before and after the two steps", () => {
     await page.goto("/fixtures");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(await sidebarLinks(page)).toEqual([
+      `${own(EXAMPLE_CLAIM.entryId)}/vs`,
       own(EXAMPLE_CLAIM.entryId),
       MEMBERS,
       `${own(EXAMPLE_CLAIM.entryId)}/current-squad`,
@@ -182,7 +183,7 @@ test.describe("before the visitor says who they are", () => {
     await page.goto(MEMBERS);
     const group = page.getByRole("group", { name: TR.memberPicker.legend });
     await expect(group).toBeVisible();
-    const buttons = group.getByRole("button");
+    const buttons = group.locator("li button");
     await expect(buttons).toHaveCount(humans.length);
     await expect(group.getByRole("button", { name: /SquadOpt/ })).toHaveCount(0);
     const names = (await buttons.allTextContents()).map((text) => text.split(", ")[0]!);
@@ -194,6 +195,11 @@ test.describe("before the visitor says who they are", () => {
 
     await expect(page.getByRole("button", { name: /^(Onayla|Confirm)$/ })).toHaveCount(0);
     await pickerHeading(page).focus();
+    // The team-number field and its button come first, then the names.
+    await page.keyboard.press("Tab");
+    await expect(group.getByRole("textbox")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(group.getByRole("button", { name: TR.memberPicker.find })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(buttons.nth(0)).toBeFocused();
     await page.keyboard.press("Tab");

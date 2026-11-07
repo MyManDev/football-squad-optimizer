@@ -185,19 +185,34 @@ class PublicEntryInputs:
         fingerprint: str,
         captured_payloads: Mapping[str, bytes],
     ) -> CapturePicksProvider:
-        raw = self.read(context, entry_id)
-        if raw is None or hashlib.sha256(raw).hexdigest() != fingerprint:
-            raise AdviceBackendNotReadyError("The queued team's pinned inputs no longer match.")
-        document = json.loads(raw)
+        return self.provider_for(context, {entry_id: fingerprint}, captured_payloads)
+
+    def provider_for(
+        self,
+        context: AdviceRequestContext,
+        pins: Mapping[int, str],
+        captured_payloads: Mapping[str, bytes],
+    ) -> CapturePicksProvider:
+        """The capture's picks provider with each pinned team's documents beside the capture's.
+
+        ``pins`` maps a team to the fingerprint its request recorded: the member, and the
+        rival of a rival strategy. A pin that no longer matches is refused, never recomputed.
+        """
+
         payloads = dict(captured_payloads)
 
         def encode(value: object) -> bytes:
             return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
 
-        payloads[f"entry-{entry_id}.json"] = encode(document["entry"])
-        payloads[f"entry-{entry_id}-history.json"] = encode(document["history"])
-        payloads[f"entry-{entry_id}-transfers.json"] = encode(document["transfers"])
-        for picks in document["picks"]:
-            week = picks["entry_history"]["event"]
-            payloads[f"entry-{entry_id}-picks-gw{week:02d}.json"] = encode(picks)
+        for entry_id, fingerprint in pins.items():
+            raw = self.read(context, entry_id)
+            if raw is None or hashlib.sha256(raw).hexdigest() != fingerprint:
+                raise AdviceBackendNotReadyError("The queued team's pinned inputs no longer match.")
+            document = json.loads(raw)
+            payloads[f"entry-{entry_id}.json"] = encode(document["entry"])
+            payloads[f"entry-{entry_id}-history.json"] = encode(document["history"])
+            payloads[f"entry-{entry_id}-transfers.json"] = encode(document["transfers"])
+            for picks in document["picks"]:
+                week = picks["entry_history"]["event"]
+                payloads[f"entry-{entry_id}-picks-gw{week:02d}.json"] = encode(picks)
         return CapturePicksProvider(_Payloads(payloads), context.capture_snapshot_id)

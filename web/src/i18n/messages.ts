@@ -1,6 +1,17 @@
 export type Language = "tr" | "en";
 
 const en = {
+  vsSquadopt: {
+    title: "VS SQUADOPT",
+    squadopt: "SquadOpt",
+    you: "You",
+    captain: "Captain",
+    transfers: "Transfers",
+    none: "No transfers",
+    net: "Net points",
+    difference: "Difference",
+    total: "Season so far",
+  },
   suggestionHistory: {
     requested: "On request",
     recordedPlans: "Suggested move",
@@ -57,6 +68,7 @@ const en = {
     menu: "Menu",
     primary: "Primary",
     findLeague: "Find your league",
+    vsSquadopt: "VS SQUADOPT",
     thisWeek: "This week",
     league: "League",
     currentSquad: "Current squad",
@@ -174,6 +186,12 @@ const en = {
     planNotComputable: "The plan cannot be computed for this team this week.",
     backToLeague: "League table",
     retry: "Try again",
+    record: "W-D-L",
+    h2hPoints: "H2H pts",
+    pointsFor: "Points",
+    pairings: (gameweek: number) => `Gameweek ${gameweek} pairings`,
+    average: "League average",
+    pairingsFailed: "The week's pairings could not be read.",
   },
   // Where the league ID is read from on the FPL site, folded under the entry page's field.
   fplIdHelp: {
@@ -185,6 +203,9 @@ const en = {
   memberPicker: {
     title: "Who are you?",
     legend: "Pick your name",
+    teamNumber: "Team ID",
+    find: "Find",
+    noMatch: "No member with that ID",
     otherLeague: "Enter a different league number",
     empty: "This league's member list is empty.",
   },
@@ -353,6 +374,7 @@ const en = {
     } as Record<string, string>,
     // Direction D's member page: the top bar, the decision board, the plan in the sidebar.
     decisionTitle: "This week's move",
+    liveWeek: "LIVE WEEK",
     // The week's decisions in the decision card (#1134): the number of changes beside the
     // gain, and the link from the chosen chip into its detail below.
     storyTransfers: "Transfers",
@@ -582,6 +604,17 @@ type MessageSchema<T> = {
 };
 
 const tr: MessageSchema<typeof en> = {
+  vsSquadopt: {
+    title: "VS SQUADOPT",
+    squadopt: "SquadOpt",
+    you: "Sen",
+    captain: "Kaptan",
+    transfers: "Transferler",
+    none: "Transfer yok",
+    net: "Net puan",
+    difference: "Fark",
+    total: "Sezonun toplamı",
+  },
   suggestionHistory: {
     requested: "İstek üzerine",
     recordedPlans: "Önerilen hamle",
@@ -638,6 +671,7 @@ const tr: MessageSchema<typeof en> = {
     menu: "Menü",
     primary: "Ana navigasyon",
     findLeague: "Ligini bul",
+    vsSquadopt: "VS SQUADOPT",
     thisWeek: "Bu hafta",
     league: "Lig",
     currentSquad: "Şu anki kadron",
@@ -744,6 +778,12 @@ const tr: MessageSchema<typeof en> = {
     planNotComputable: "Bu takımın planı bu hafta hesaplanamıyor.",
     backToLeague: "Lig tablosu",
     retry: "Yeniden dene",
+    record: "G-B-M",
+    h2hPoints: "H2H puanı",
+    pointsFor: "Puan",
+    pairings: (gameweek) => `${gameweek}. hafta eşleşmeleri`,
+    average: "Lig ortalaması",
+    pairingsFailed: "Haftanın eşleşmeleri okunamadı.",
   },
   fplIdHelp: {
     title: "FPL ID'm nerede?",
@@ -754,6 +794,9 @@ const tr: MessageSchema<typeof en> = {
   memberPicker: {
     title: "Sen kimsin?",
     legend: "Adını seç",
+    teamNumber: "Takım ID",
+    find: "Bul",
+    noMatch: "Bu ID ile üye yok",
     otherLeague: "Başka bir lig numarası gir",
     empty: "Bu ligin üye listesi boş.",
   },
@@ -917,6 +960,7 @@ const tr: MessageSchema<typeof en> = {
       freehit: "Free Hit",
     },
     decisionTitle: "Bu haftanın hamlesi",
+    liveWeek: "LIVE WEEK",
     storyTransfers: "Transferler",
     storyMoves: (count) => `${count} değişiklik`,
     storyDetail: "Ayrıntı",

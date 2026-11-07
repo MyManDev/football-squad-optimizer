@@ -37,6 +37,7 @@ afterEach(() => {
 });
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   forgetIdentity();
 });
 
@@ -49,8 +50,12 @@ function marked(value: unknown, status = 200): Response {
 }
 
 /** A site with one published league, in a directory, and a forwarder answering `standings`. */
-function site(standings: (page: number) => Response) {
+function site(
+  standings: (page: number) => Response,
+  cup: (page: number) => Response = () => marked({ error: "league_not_found" }, 404),
+) {
   return stubFetchByUrl([
+    [/\/api\/v1\/fpl\/h2h\/\d+\/standings\?page=\d+$/, (url) => cup(Number(url.split("=")[1]))],
     [
       "/data/leagues.json",
       () =>
@@ -181,12 +186,53 @@ describe.each(["tr", "en"] as const)("the league gate with the forwarder in %s",
     expect(screen.queryByRole("heading", { name: "Published history" })).toBeNull();
   });
 
-  it("names a head-to-head league", async () => {
+  it("opens a head-to-head league from its own table, record and points for", async () => {
+    const cup = {
+      contract_version: "fpl_h2h_standings_v1",
+      league: { id: FORWARDED, name: "Synthetic Cup", scoring: "h2h" },
+      page: 1,
+      has_next: false,
+      source_time: "2026-10-19T17:30:00.000Z",
+      results: [
+        {
+          entry: 7001,
+          entry_name: "Cup Team 1",
+          player_name: "Cup Manager 1",
+          rank: 1,
+          rank_sort: 1,
+          last_rank: null,
+          total: 27,
+          matches_played: 9,
+          matches_won: 9,
+          matches_drawn: 0,
+          matches_lost: 0,
+          points_for: 600,
+        },
+      ],
+    };
+    const fetcher = site(
+      () => marked({ error: "head_to_head_league", league: FORWARDED }, 404),
+      () => marked(cup),
+    );
+    open(language, `/league/${FORWARDED}`);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Synthetic Cup" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cup Team 1" })).toBeInTheDocument();
+    expect(screen.getByText("9-0-0")).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: MESSAGES[language].forwarded.h2hPoints }),
+    ).toBeInTheDocument();
+    expect(forwarderReads(fetcher)).toEqual([
+      `/api/v1/fpl/standings/${FORWARDED}?page=1`,
+      `/api/v1/fpl/h2h/${FORWARDED}/standings?page=1`,
+    ]);
+  });
+
+  it("still names a head-to-head league the forwarder cannot serve as one", async () => {
     site(() => marked({ error: "head_to_head_league", league: FORWARDED }, 404));
     open(language, `/league/${FORWARDED}`);
     expect(await screen.findByText(copy.headToHead(FORWARDED))).toBeInTheDocument();
-    expect(screen.getByLabelText(copy.label)).toHaveValue(String(FORWARDED));
-    expect(screen.queryByRole("navigation", { name: copy.listedLeagues })).toBeNull();
   });
 
   it("names an id FPL has no league for", async () => {

@@ -153,3 +153,34 @@ th.total {
 .moreButton:disabled {
   cursor: wait;
 }
+
+/* The week's pairings of a head-to-head league, above its table. */
+.pairings {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pairingsTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.pairingList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.pairing {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.pairing > span:last-child {
+  text-align: right;
+}

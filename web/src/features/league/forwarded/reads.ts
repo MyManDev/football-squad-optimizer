@@ -4,22 +4,33 @@
  * bundle for that table's gameweek. Each spreads the league feature's read policy.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { loadDevicePlanTable } from "../data";
 import { loadLeagueDirectory, type DevicePlanTableRef, type LeagueDirectory } from "../directory";
 import {
   entryBundle,
+  h2hMatches,
+  h2hStandings,
   standings,
   type ForwarderReason,
   type StandingsReason,
 } from "../forwarder/client";
-import { MAX_STANDINGS_PAGE, type FplLeagueStandings } from "../forwarder/documents";
+import {
+  MAX_STANDINGS_PAGE,
+  type ForwardedTable,
+  type FplH2hMatches,
+} from "../forwarder/documents";
+import type { ForwardedScoring } from "./ForwardedLeagueContext";
 import { LEAGUE_READ, leagueKeys } from "../queries";
 
 /** The forwarded reads' cache keys, each naming its league, entry or table. */
 export const forwardedKeys = {
+  // One key whatever the scoring asked: a league keeps one table, and the gate's "auto" read
+  // and the page's read of the same page are the same document.
   standings: (leagueId: number, page = 1) => ["fpl-standings", leagueId, page] as const,
+  matches: (leagueId: number, gameweek: number, page = 1) =>
+    ["fpl-h2h-matches", leagueId, gameweek, page] as const,
   table: (table: DevicePlanTableRef | null) =>
     ["device-capture-table", table?.path ?? null, table?.sha256 ?? null] as const,
   bundle: (entryId: number, gameweek: number | null) =>
@@ -57,18 +68,48 @@ export function refusalOf(error: unknown): ForwarderReason {
 }
 
 /**
- * One requested page. The gate and table share page 1; browsing never downloads the
- * intervening pages or every member of a large league. `leagueId` null reads nothing.
+ * One requested page of a league's table. The gate and table share page 1; browsing never
+ * downloads the intervening pages or every member of a large league. `leagueId` null reads
+ * nothing. `scoring` names which table: the gate asks for "auto", the classic table first
+ * and, where the forwarder names a head-to-head league, that league's own table.
  */
-export function useForwardedStandings(leagueId: number | null, page = 1) {
+export function useForwardedStandings(
+  leagueId: number | null,
+  page = 1,
+  scoring: ForwardedScoring | "auto" = "classic",
+) {
   return useQuery({
     queryKey: forwardedKeys.standings(leagueId ?? 0, page),
-    queryFn: async ({ signal }): Promise<FplLeagueStandings> => {
-      const read = await standings(leagueId!, page, { signal });
+    queryFn: async ({ signal }): Promise<ForwardedTable> => {
+      if (scoring !== "h2h") {
+        const classic = await standings(leagueId!, page, { signal });
+        if (classic.ok) return classic.document;
+        if (scoring === "classic" || classic.reason !== "head_to_head_league") {
+          throw new ForwarderRefused(classic.reason);
+        }
+      }
+      const cup = await h2hStandings(leagueId!, page, { signal });
+      // A head-to-head league whose own table the forwarder cannot serve yet is still named
+      // as head-to-head, so the entry form says what it always said of one.
+      if (!cup.ok)
+        throw new ForwarderRefused(scoring === "auto" ? "head_to_head_league" : cup.reason);
+      return cup.document;
+    },
+    enabled: leagueId !== null,
+    ...LEAGUE_READ,
+  });
+}
+
+/** One page of a head-to-head league's pairings for one gameweek; nothing for a null league. */
+export function useForwardedMatches(leagueId: number | null, gameweek: number | null, page = 1) {
+  return useQuery({
+    queryKey: forwardedKeys.matches(leagueId ?? 0, gameweek ?? 0, page),
+    queryFn: async ({ signal }): Promise<FplH2hMatches> => {
+      const read = await h2hMatches(leagueId!, gameweek!, page, { signal });
       if (!read.ok) throw new ForwarderRefused(read.reason);
       return read.document;
     },
-    enabled: leagueId !== null,
+    enabled: leagueId !== null && gameweek !== null,
     ...LEAGUE_READ,
   });
 }
@@ -138,5 +179,32 @@ export function useEntryBundle(entryId: number, gameweek: number | null) {
     },
     enabled: gameweek !== null && Number.isSafeInteger(entryId) && entryId > 0,
     ...LEAGUE_READ,
+  });
+}
+
+/**
+ * The standings pages `pages` names, each under the key the single read uses, so a page the
+ * gate or table already holds is not read again. The member step reads pages 2 onward this
+ * way while a visitor looks for their name beyond page 1. Each page's read fails on its own.
+ */
+export function useForwardedStandingsPages(
+  leagueId: number | null,
+  pages: readonly number[],
+  scoring: ForwardedScoring = "classic",
+) {
+  return useQueries({
+    queries: pages.map((page) => ({
+      queryKey: forwardedKeys.standings(leagueId ?? 0, page),
+      queryFn: async ({ signal }: { signal: AbortSignal }): Promise<ForwardedTable> => {
+        const read =
+          scoring === "h2h"
+            ? await h2hStandings(leagueId!, page, { signal })
+            : await standings(leagueId!, page, { signal });
+        if (!read.ok) throw new ForwarderRefused(read.reason);
+        return read.document;
+      },
+      enabled: leagueId !== null,
+      ...LEAGUE_READ,
+    })),
   });
 }

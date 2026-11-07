@@ -18,6 +18,46 @@ import {
 export const STANDINGS_CONTRACT = "fpl_league_standings_v1";
 export const BUNDLE_CONTRACT = "fpl_entry_bundle_v1";
 export const LIVE_CONTRACT = "week_live_v1";
+export const SEASON_CONTRACT = "fpl_entry_season_v1";
+export const EVENTS_CONTRACT = "fpl_events_v1";
+
+/** One played week of an entry's season: `fpl_entry_season_v1`'s row. */
+export interface FplSeasonWeek {
+  event: number;
+  /** The week's gross, before the transfer hit. */
+  points: number;
+  /** The season total after the week, net of hits. */
+  total_points: number;
+  rank: number | null;
+  overall_rank: number | null;
+  event_transfers: number;
+  event_transfers_cost: number;
+  bank: number | null;
+  value: number | null;
+}
+
+export interface FplEntrySeason {
+  contract_version: typeof SEASON_CONTRACT;
+  entry_id: number;
+  source_time: string;
+  weeks: FplSeasonWeek[];
+  chips: { name: string; event: number }[];
+}
+
+/** One gameweek's state and the game's scores: `fpl_events_v1`'s row. */
+export interface FplEvent {
+  id: number;
+  finished: boolean;
+  data_checked: boolean;
+  average_entry_score: number;
+  highest_score: number | null;
+}
+
+export interface FplEvents {
+  contract_version: typeof EVENTS_CONTRACT;
+  source_time: string;
+  events: FplEvent[];
+}
 
 /** Each request reads one page; country leagues can be browsed beyond the first thousand members. */
 export const MAX_STANDINGS_PAGE = 1000;
@@ -267,5 +307,224 @@ export function readLiveActivity(value: unknown, gameweek: number): WeekActivity
     const document = weekActivity(value);
     need(readLiveWeek(document.week, gameweek) !== null);
     return document;
+  });
+}
+
+/** One entry's season to date, when it is the entry's and its weeks rise without repeats. */
+export function readEntrySeason(value: unknown, entry: number): FplEntrySeason | null {
+  return readOrNull(() => {
+    const document = record(value);
+    need(document.contract_version === SEASON_CONTRACT);
+    need(document.entry_id === entry && sourceTime(document.source_time));
+    const weeks = list(document.weeks).map((value) => {
+      const row = record(value);
+      need(
+        week(row.event) &&
+          integer(row.points) &&
+          integer(row.total_points) &&
+          (row.rank === null || count(row.rank)) &&
+          (row.overall_rank === null || count(row.overall_rank)) &&
+          count(row.event_transfers) &&
+          count(row.event_transfers_cost) &&
+          (row.bank === null || integer(row.bank)) &&
+          (row.value === null || integer(row.value)),
+      );
+      return row.event as number;
+    });
+    need(weeks.every((at, index) => index === 0 || at > weeks[index - 1]!));
+    for (const value of list(document.chips)) {
+      const row = record(value);
+      need(text(row.name) && week(row.event));
+    }
+    return document as unknown as FplEntrySeason;
+  });
+}
+
+/** The season's gameweeks with the game's scores, in gameweek order without repeats. */
+export function readEvents(value: unknown): FplEvents | null {
+  return readOrNull(() => {
+    const document = record(value);
+    need(document.contract_version === EVENTS_CONTRACT && sourceTime(document.source_time));
+    const ids = list(document.events).map((value) => {
+      const row = record(value);
+      need(
+        week(row.id) &&
+          flag(row.finished) &&
+          flag(row.data_checked) &&
+          count(row.average_entry_score) &&
+          (row.highest_score === null || count(row.highest_score)),
+      );
+      return row.id as number;
+    });
+    need(ids.every((at, index) => index === 0 || at > ids[index - 1]!));
+    return document as unknown as FplEvents;
+  });
+}
+
+export const H2H_STANDINGS_CONTRACT = "fpl_h2h_standings_v1";
+export const H2H_MATCHES_CONTRACT = "fpl_h2h_matches_v1";
+
+/** One row of a head-to-head league's table: the record, the head-to-head points, the points for. */
+export interface FplH2hStandingRow {
+  entry: number;
+  entry_name: string;
+  player_name: string;
+  rank: number;
+  rank_sort: number;
+  last_rank: number | null;
+  /** Head-to-head points: three a win, one a draw. */
+  total: number;
+  matches_played: number;
+  matches_won: number;
+  matches_drawn: number;
+  matches_lost: number;
+  /** The member's FPL points over the season, what a classic table calls `total`. */
+  points_for: number;
+}
+
+export interface FplH2hStandings {
+  contract_version: typeof H2H_STANDINGS_CONTRACT;
+  league: { id: number; name: string | null; scoring: "h2h" };
+  page: number;
+  has_next: boolean;
+  source_time: string;
+  results: FplH2hStandingRow[];
+}
+
+/** One side of a head-to-head match; the league average or a bye has no entry. */
+export interface FplH2hSide {
+  entry: number | null;
+  name: string;
+  player_name: string;
+  points: number;
+}
+
+export interface FplH2hMatch {
+  id: number;
+  entry_1: FplH2hSide;
+  entry_2: FplH2hSide;
+  winner: number | null;
+  started: boolean | null;
+  finished: boolean | null;
+}
+
+export interface FplH2hMatches {
+  contract_version: typeof H2H_MATCHES_CONTRACT;
+  league: { id: number; scoring: "h2h" };
+  gameweek: number;
+  page: number;
+  has_next: boolean;
+  source_time: string;
+  results: FplH2hMatch[];
+}
+
+/** A league's table of either scoring, as the forwarded pages read it. */
+export type ForwardedTable = FplLeagueStandings | FplH2hStandings;
+
+/**
+ * A table's rows in one shape, whatever the scoring: a head-to-head row's season points
+ * are its `points_for`, and its week's gross is not stated.
+ */
+export interface ForwardedRow {
+  entry: number;
+  entry_name: string;
+  player_name: string;
+  rank: number;
+  rank_sort: number;
+  last_rank: number | null;
+  total: number;
+  event_total: number | null;
+}
+
+export function tableRows(table: ForwardedTable): ForwardedRow[] {
+  const rows: (FplStandingRow | FplH2hStandingRow)[] = table.results;
+  return rows.map((row) =>
+    "points_for" in row
+      ? {
+          entry: row.entry,
+          entry_name: row.entry_name,
+          player_name: row.player_name,
+          rank: row.rank,
+          rank_sort: row.rank_sort,
+          last_rank: row.last_rank,
+          total: row.points_for,
+          event_total: null,
+        }
+      : { ...row },
+  );
+}
+
+/** One page of a head-to-head league's table, when it is the page of the league asked for. */
+export function readH2hStandings(
+  value: unknown,
+  league: number,
+  page: number,
+): FplH2hStandings | null {
+  return readOrNull(() => {
+    const document = record(value);
+    need(document.contract_version === H2H_STANDINGS_CONTRACT);
+    const named = record(document.league);
+    need(named.id === league && (named.name === null || text(named.name)));
+    need(named.scoring === "h2h");
+    need(document.page === page && page >= 1 && page <= MAX_STANDINGS_PAGE);
+    need(flag(document.has_next));
+    need(sourceTime(document.source_time));
+    const entries = list(document.results).map((value) => {
+      const row = record(value);
+      need(
+        id(row.entry) &&
+          text(row.entry_name) &&
+          text(row.player_name) &&
+          count(row.rank) &&
+          id(row.rank_sort) &&
+          (row.last_rank === null || count(row.last_rank)) &&
+          integer(row.total) &&
+          count(row.matches_played) &&
+          count(row.matches_won) &&
+          count(row.matches_drawn) &&
+          count(row.matches_lost) &&
+          integer(row.points_for),
+      );
+      return row.entry;
+    });
+    need(new Set(entries).size === entries.length);
+    return document as unknown as FplH2hStandings;
+  });
+}
+
+function readH2hSide(value: unknown): void {
+  const side = record(value);
+  need((side.entry === null || id(side.entry)) && text(side.name) && text(side.player_name));
+  need(integer(side.points));
+}
+
+/** One page of a head-to-head league's pairings for one gameweek, when it is the one asked for. */
+export function readH2hMatches(
+  value: unknown,
+  league: number,
+  gameweek: number,
+  page: number,
+): FplH2hMatches | null {
+  return readOrNull(() => {
+    const document = record(value);
+    need(document.contract_version === H2H_MATCHES_CONTRACT);
+    const named = record(document.league);
+    need(named.id === league && named.scoring === "h2h");
+    need(document.gameweek === gameweek && week(gameweek));
+    need(document.page === page && page >= 1 && page <= MAX_STANDINGS_PAGE);
+    need(flag(document.has_next));
+    need(sourceTime(document.source_time));
+    const ids = list(document.results).map((value) => {
+      const row = record(value);
+      need(id(row.id));
+      readH2hSide(row.entry_1);
+      readH2hSide(row.entry_2);
+      need(row.winner === null || id(row.winner));
+      need(row.started === null || flag(row.started));
+      need(row.finished === null || flag(row.finished));
+      return row.id;
+    });
+    need(new Set(ids).size === ids.length);
+    return document as unknown as FplH2hMatches;
   });
 }

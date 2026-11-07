@@ -33,6 +33,7 @@ export function MemberLiveWeekView({ squad, live }: { squad: EntrySquad; live: M
       key={`${squad.entry.entry_id}:${squad.season}:${shown.gameweek}`}
       gameweek={shown.gameweek}
       score={shown.score}
+      forecast={shown.forecast}
       names={shown.names}
       onRefresh={refresh}
       refreshing={refreshing}
