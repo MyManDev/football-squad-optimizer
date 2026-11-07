@@ -1,0 +1,24 @@
+{
+  "league_member": {
+    "contract_version": "push_subscription_v1",
+    "endpoint": "https://push.example.net/send/dGVzdC1lbmRwb2ludC1hbHBoYQ",
+    "keys": {
+      "p256dh": "BK7BePS7FVBicBLMvkKWkFAILk4LJNZLLgTcbdG-AjIMqK76zCrXiEmw-9arKEAPnf1UdoigvohfcBRxC9PsJ58",
+      "auth": "AAECAwQFBgcICQoLDA0ODw"
+    },
+    "language": "tr",
+    "league_id": 352490,
+    "entry_id": 35249001
+  },
+  "team_on_its_own": {
+    "contract_version": "push_subscription_v1",
+    "endpoint": "https://push.example.net/send/dGVzdC1lbmRwb2ludC1icmF2bw",
+    "keys": {
+      "p256dh": "BK7BePS7FVBicBLMvkKWkFAILk4LJNZLLgTcbdG-AjIMqK76zCrXiEmw-9arKEAPnf1UdoigvohfcBRxC9PsJ58",
+      "auth": "Dw4NDAsKCQgHBgUEAwIBAA"
+    },
+    "language": "en",
+    "league_id": 0,
+    "entry_id": 542322
+  }
+}

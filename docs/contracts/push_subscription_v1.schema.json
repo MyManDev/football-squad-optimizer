@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "push_subscription_v1",
+  "description": "A browser's request to be reminded before each deadline: the Push API subscription it holds, the language the notification speaks, and the page a tap on it opens. Sent with PUT to /api/v1/push/subscriptions on the site's host; nothing else about the visitor travels with it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "endpoint", "keys", "language", "league_id", "entry_id"],
+  "properties": {
+    "contract_version": { "const": "push_subscription_v1" },
+    "endpoint": {
+      "type": "string",
+      "description": "The push service address the browser gave, https only.",
+      "pattern": "^https://",
+      "minLength": 12
+    },
+    "keys": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p256dh", "auth"],
+      "properties": {
+        "p256dh": {
+          "type": "string",
+          "description": "The subscription's P-256 public key, base64url without padding (65 bytes).",
+          "pattern": "^[A-Za-z0-9_-]{87}$"
+        },
+        "auth": {
+          "type": "string",
+          "description": "The subscription's 16-byte authentication secret, base64url without padding.",
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        }
+      }
+    },
+    "language": { "enum": ["tr", "en"] },
+    "league_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The league the member's page is under; 0 for a team opened on its own."
+    },
+    "entry_id": { "type": "integer", "minimum": 1, "description": "The member's FPL team number." }
+  }
+}
