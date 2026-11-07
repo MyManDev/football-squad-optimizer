@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import type { ComputeService } from "../advice/AdviceRequestPanel";
-import { capabilitiesForPage } from "../advice/adviceCapabilities";
+import { capabilitiesForPage, publicEntryCapabilities } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { resolvePublishedAdvice } from "../advice/adviceSelection";
 import { checkedAdvice } from "../advice/adviceResponse";
@@ -26,7 +26,7 @@ import { boundedRivalIds } from "./rivalReads";
 export function useLeagueMemberData(entryParam: string | undefined, searchParams: URLSearchParams) {
   const entryId = Number(entryParam);
   const validEntryId = Number.isSafeInteger(entryId) && entryId > 0;
-  const { league, tree } = useLeague();
+  const { league, tree, forwarded = false } = useLeague();
   const squad = useEntrySquad(entryId, validEntryId);
   const membersQuery = useLeagueMembers();
   // The index says which (strategy, rival) files the producer wrote for this member; a
@@ -65,10 +65,15 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
   const leagueId = squad.data?.payload.league_id;
   const canAsk = client.readCapabilities !== undefined;
+  // A forwarded league has no capabilities document on the service: what its public route
+  // answers is stated here from the squad itself (`publicEntryCapabilities`).
   const capabilitiesQuery = useQuery({
-    queryKey: ["advice-capabilities", leagueId],
-    queryFn: ({ signal }) => client.readCapabilities!(leagueId!, { signal }),
-    enabled: validEntryId && canAsk && leagueId !== undefined,
+    queryKey: ["advice-capabilities", leagueId, forwarded, squad.data?.payload.source_snapshot_id],
+    queryFn: ({ signal }) =>
+      forwarded
+        ? Promise.resolve(publicEntryCapabilities(squad.data!.payload))
+        : client.readCapabilities!(leagueId!, { signal }),
+    enabled: validEntryId && canAsk && leagueId !== undefined && (!forwarded || !!squad.data),
     ...CAPABILITIES_READ,
   });
   const capabilities = squad.data

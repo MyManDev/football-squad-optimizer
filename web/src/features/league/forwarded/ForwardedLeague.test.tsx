@@ -37,6 +37,7 @@ afterEach(() => {
 });
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   forgetIdentity();
 });
 

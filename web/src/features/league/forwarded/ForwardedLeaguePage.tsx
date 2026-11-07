@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, Navigate, useSearchParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { crossfade } from "../../../design/viewTransition";
@@ -20,7 +20,38 @@ import styles from "./ForwardedLeaguePage.module.css";
  */
 export function ForwardedLeaguePage() {
   const [search] = useSearchParams();
-  return <ForwardedLeagueTable key={standingsPage(search.get("page"))} />;
+  const league = useForwardedLeague();
+  const named = search.get("page");
+  // A table address naming no page opens at the page the tab last read of this league, so
+  // the way back from a member's page in a country league lands where the visitor was.
+  // Browsing within the table always names its page, so only an arrival reads as none.
+  const remembered = named === null && league !== null ? rememberedPage(league.leagueId) : 1;
+  if (remembered > 1) {
+    const next = new URLSearchParams(search);
+    next.set("page", String(remembered));
+    return <Navigate to={{ search: `?${next.toString()}` }} replace />;
+  }
+  return <ForwardedLeagueTable key={standingsPage(named)} />;
+}
+
+const PAGE_KEY = (leagueId: number) => `squadopt.forwarded.page.${leagueId}`;
+
+/** The page of this league the tab last read, 1 where it read none; the tab's own memory. */
+function rememberedPage(leagueId: number): number {
+  try {
+    return standingsPage(sessionStorage.getItem(PAGE_KEY(leagueId)) ?? 1);
+  } catch {
+    return 1;
+  }
+}
+
+function rememberPage(leagueId: number, page: number): void {
+  try {
+    if (page === 1) sessionStorage.removeItem(PAGE_KEY(leagueId));
+    else sessionStorage.setItem(PAGE_KEY(leagueId), String(page));
+  } catch {
+    // A tab that keeps nothing opens at page 1, as before.
+  }
 }
 
 function ForwardedLeagueTable() {
@@ -30,14 +61,17 @@ function ForwardedLeagueTable() {
   const league = useForwardedLeague();
   const [search, setSearch] = useSearchParams();
   const page = standingsPage(search.get("page"));
+  const leagueId = league?.leagueId ?? null;
+  useEffect(() => {
+    if (leagueId !== null) rememberPage(leagueId, page);
+  }, [leagueId, page]);
   const [pageInput, setPageInput] = useState(String(page));
   const [invalid, setInvalid] = useState(false);
   const standings = useForwardedStandings(league?.leagueId ?? null, page);
 
   function go(nextPage: number) {
     const next = new URLSearchParams(search);
-    if (nextPage === 1) next.delete("page");
-    else next.set("page", String(nextPage));
+    next.set("page", String(nextPage));
     crossfade(() => setSearch(next));
   }
 
