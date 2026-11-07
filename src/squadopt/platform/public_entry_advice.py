@@ -99,6 +99,10 @@ class PublicEntryAdviceReader(AdviceReadStore):
 
         held: dict[int, tuple[str, ...] | None] = {}
         for entry_id in entries:
+            # A team whose inputs are not pinned yet has no chips to name: its capabilities
+            # leave it out, and a plan request pins it first.
+            if self._public_inputs.fingerprint(context, entry_id) is None:
+                continue
             provider, inputs, snapshot = self._pinned(context, entry_id)
             try:
                 held[entry_id] = held_member_chips(
@@ -128,6 +132,30 @@ class PublicEntryAdviceReader(AdviceReadStore):
         roster = frozenset(int(code) for code in inputs.players["player_id"])
         return PreferencePlayers(squad=frozenset(squad), roster=roster)
 
+    @staticmethod
+    def _check_ids(league_id: int, entry_id: int) -> None:
+        if (
+            type(league_id) is not int
+            or not 0 <= league_id <= MAX_ID
+            or type(entry_id) is not int
+            or not 1 <= entry_id <= MAX_ID
+        ):
+            raise UnsupportedAdviceRequestError("A public team needs a league and team number.")
+
+    def public_capabilities(self, league_id: int, entry_id: int) -> dict[str, object]:
+        """What may be asked for one public team right now: the pure-points menu.
+
+        League 0 is a team opened on its own. The team's held chips are named once its
+        inputs are pinned, which the first plan request does; before that the document
+        names no chips for it, and the page offers what the team's own documents show.
+        """
+
+        self._check_ids(league_id, entry_id)
+        context = self._context.current()
+        if context is None:
+            raise AdviceBackendNotReadyError("No capture context is loaded yet.")
+        return self._capabilities_document(league_id, context, (entry_id,))
+
     def resolve(
         self,
         *,
@@ -142,13 +170,8 @@ class PublicEntryAdviceReader(AdviceReadStore):
         model: str = "current",
         preferences: DecisionPreferences = NO_PREFERENCES,
     ) -> ResolvedAdviceRequest:
-        if (
-            type(league_id) is not int
-            or not 0 <= league_id <= MAX_ID
-            or type(entry_id) is not int
-            or not 1 <= entry_id <= MAX_ID
-            or type(window) is not int
-        ):
+        self._check_ids(league_id, entry_id)
+        if type(window) is not int:
             raise UnsupportedAdviceRequestError("A public team needs a league and team number.")
         if rival_entry_id is not None:
             raise UnsupportedAdviceRequestError("A public team is not planned against a rival yet.")
