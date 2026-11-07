@@ -43,6 +43,8 @@ import {
   fakeFetch,
   fixturesAnswer,
   fixturesJson,
+  h2hMatchesPage,
+  h2hStandingsPage,
   historyAnswer,
   fpl,
   liveWorld,
@@ -699,5 +701,53 @@ describe("the season and events routes", () => {
     assert.deepEqual(fplCalls(upstream.calls).map((call) => call.url), [
       fpl(upstreamPaths.history(77)),
     ]);
+  });
+});
+
+describe("the head-to-head routes", () => {
+  const cupWorld = () => ({
+    [SCHEDULE_URL]: fixturesJson(),
+    [fpl(upstreamPaths.headToHeadStandings(4242, 1))]: h2hStandingsPage({ rows: 4 }),
+    [fpl(upstreamPaths.headToHeadMatches(4242, 9, 1))]: h2hMatchesPage({ pairs: 2 }),
+    [fpl(upstreamPaths.headToHeadStandings(314, 1))]: status(404),
+    [fpl(upstreamPaths.classicStandings(314, 1))]: standingsPage({ league: 314 }),
+  });
+
+  it("answer fpl_h2h_standings_v1 and fpl_h2h_matches_v1 exactly as the committed examples show", async () => {
+    const standings = await contractFile("fpl_h2h_standings_v1.examples.json");
+    const standingsSchema = await contractFile("fpl_h2h_standings_v1.schema.json");
+    const matches = await contractFile("fpl_h2h_matches_v1.examples.json");
+    const matchesSchema = await contractFile("fpl_h2h_matches_v1.schema.json");
+    const { get, cache, clock } = harness(cupWorld());
+    clock.set(Date.parse(standings.first_page.source_time));
+    const table = await get("/api/v1/fpl/h2h/4242/standings?page=1");
+    assert.equal(table.response.status, 200);
+    assert.deepEqual(problems(standingsSchema, table.body), []);
+    assert.deepEqual(table.body, standings.first_page);
+    assert.ok(!table.text.includes(MARKER));
+    assert.equal(
+      cache.stored.get(cacheKeys({ kind: "h2hStandings", league: 4242, page: 1 }).fresh).maxAge,
+      STANDINGS_TTL_SECONDS,
+    );
+    const week = await get("/api/v1/fpl/h2h/4242/matches?gw=9&page=1");
+    assert.equal(week.response.status, 200);
+    assert.deepEqual(problems(matchesSchema, week.body), []);
+    assert.deepEqual(week.body, matches.gameweek_nine);
+    assert.ok(!week.text.includes(MARKER));
+  });
+
+  it("name a classic league asked for as head-to-head, and refuse a week not yet paired", async () => {
+    const { get, upstream } = harness(cupWorld());
+    const classic = await get("/api/v1/fpl/h2h/314/standings?page=1");
+    assert.equal(classic.response.status, 404);
+    assert.equal(classic.body.error, "classic_league");
+    assert.deepEqual(fplCalls(upstream.calls).map((call) => call.url), [
+      fpl(upstreamPaths.headToHeadStandings(314, 1)),
+      fpl(upstreamPaths.classicStandings(314, 1)),
+    ]);
+    const ahead = await get("/api/v1/fpl/h2h/4242/matches?gw=12&page=1");
+    assert.equal(ahead.response.status, 404);
+    assert.equal(ahead.body.error, "not_found");
+    assert.equal(fplCalls(upstream.calls).length, 2);
   });
 });

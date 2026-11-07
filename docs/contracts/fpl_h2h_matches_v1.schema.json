@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FPL head-to-head league matches v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "league", "gameweek", "page", "has_next", "source_time", "results"],
+  "properties": {
+    "contract_version": {"const": "fpl_h2h_matches_v1"},
+    "league": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "scoring"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "scoring": {"const": "h2h"}
+      }
+    },
+    "gameweek": {"type": "integer", "minimum": 1, "maximum": 38},
+    "page": {"type": "integer", "minimum": 1, "maximum": 1000},
+    "has_next": {"type": "boolean"},
+    "source_time": {"$ref": "#/$defs/sourceTime"},
+    "results": {"type": "array", "items": {"$ref": "#/$defs/match"}}
+  },
+  "$defs": {
+    "id": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "sourceTime": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?Z$"
+    },
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "name", "player_name", "points"],
+      "properties": {
+        "entry": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "name": {"type": "string"},
+        "player_name": {"type": "string"},
+        "points": {"type": "integer"}
+      }
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "entry_1", "entry_2", "winner", "started", "finished"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "entry_1": {"$ref": "#/$defs/side"},
+        "entry_2": {"$ref": "#/$defs/side"},
+        "winner": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "started": {"type": ["boolean", "null"]},
+        "finished": {"type": ["boolean", "null"]}
+      }
+    }
+  }
+}

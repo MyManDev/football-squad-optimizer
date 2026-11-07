@@ -214,3 +214,65 @@ def test_events_schema_refuses_the_rest_of_the_bootstrap(damage):
     damage(example)
     with pytest.raises(ValidationError):
         _validator(EVENTS).validate(example)
+
+
+H2H_STANDINGS = _load("fpl_h2h_standings_v1.schema.json")
+H2H_STANDINGS_EXAMPLES = _load("fpl_h2h_standings_v1.examples.json")
+H2H_MATCHES = _load("fpl_h2h_matches_v1.schema.json")
+H2H_MATCHES_EXAMPLES = _load("fpl_h2h_matches_v1.examples.json")
+
+
+@pytest.mark.parametrize("name", sorted(H2H_STANDINGS_EXAMPLES))
+def test_h2h_standings_examples_match_the_schema(name):
+    example = H2H_STANDINGS_EXAMPLES[name]
+    _validator(H2H_STANDINGS).validate(example)
+    assert example["contract_version"] == "fpl_h2h_standings_v1"
+    assert example["league"]["scoring"] == "h2h"
+    for row in example["results"]:
+        assert row["matches_played"] == (
+            row["matches_won"] + row["matches_drawn"] + row["matches_lost"]
+        )
+        assert row["total"] == 3 * row["matches_won"] + row["matches_drawn"]
+
+
+@pytest.mark.parametrize("name", sorted(H2H_MATCHES_EXAMPLES))
+def test_h2h_matches_examples_match_the_schema(name):
+    example = H2H_MATCHES_EXAMPLES[name]
+    _validator(H2H_MATCHES).validate(example)
+    assert example["contract_version"] == "fpl_h2h_matches_v1"
+    ids = [row["id"] for row in example["results"]]
+    assert ids == sorted(ids) and len(set(ids)) == len(ids)
+    # The league average plays as a side without an entry; a winner is one of the sides.
+    for row in example["results"]:
+        sides = {row["entry_1"]["entry"], row["entry_2"]["entry"]}
+        assert row["winner"] is None or row["winner"] in sides
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        lambda item: item["results"][0].update(division=1),
+        lambda item: item["results"][0].update(matches_won=-1),
+        lambda item: item["league"].update(scoring="classic"),
+    ],
+)
+def test_h2h_standings_schema_refuses_the_rest_of_the_table(damage):
+    example = copy.deepcopy(H2H_STANDINGS_EXAMPLES["first_page"])
+    damage(example)
+    with pytest.raises(ValidationError):
+        _validator(H2H_STANDINGS).validate(example)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        lambda item: item["results"][0].update(entry_1_win=1),
+        lambda item: item["results"][0]["entry_1"].update(total=27),
+        lambda item: item["results"][0].update(winner=0),
+    ],
+)
+def test_h2h_matches_schema_refuses_the_rest_of_the_pairing(damage):
+    example = copy.deepcopy(H2H_MATCHES_EXAMPLES["gameweek_nine"])
+    damage(example)
+    with pytest.raises(ValidationError):
+        _validator(H2H_MATCHES).validate(example)

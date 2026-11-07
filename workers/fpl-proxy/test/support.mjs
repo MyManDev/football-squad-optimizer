@@ -385,3 +385,78 @@ export function liveWorld({ fixtures = WEEK9_FIXTURES } = {}) {
     ]),
   };
 }
+
+// Head-to-head leagues.
+
+/** One head-to-head standings page: each team's record, and fields the forwarder drops. */
+export function h2hStandingsPage({ league = 4242, page = 1, hasNext = false, rows = 4 } = {}) {
+  return {
+    league: { id: league, name: "Synthetic Cup", raw_only: `${MARKER}-h2h-league` },
+    raw_only: `${MARKER}-h2h-root`,
+    standings: {
+      has_next: hasNext,
+      page,
+      results: Array.from({ length: rows }, (_, index) => {
+        const rank = (page - 1) * 50 + index + 1;
+        return {
+          entry: 7000 + rank,
+          entry_name: `Cup Team ${rank}`,
+          player_name: `Cup Manager ${rank}`,
+          rank,
+          rank_sort: rank,
+          last_rank: index === 0 ? null : rank + 1,
+          total: 27 - 3 * index,
+          matches_played: 9,
+          matches_won: 9 - index,
+          matches_drawn: 0,
+          matches_lost: index,
+          points_for: 600 - index * 7,
+          division: 1,
+          raw_only: `${MARKER}-h2h-standing`,
+        };
+      }),
+    },
+  };
+}
+
+/** One gameweek's pairings of a head-to-head league; the last team meets the average. */
+export function h2hMatchesPage({ league = 4242, gameweek = 9, page = 1, pairs = 2 } = {}) {
+  return {
+    has_next: false,
+    page,
+    raw_only: `${MARKER}-h2h-matches-root`,
+    results: Array.from({ length: pairs }, (_, index) => {
+      const home = 7001 + index * 2;
+      const away = index === pairs - 1 ? null : home + 1;
+      return {
+        id: 9000 + index,
+        entry_1_entry: home,
+        entry_1_name: `Cup Team ${home - 7000}`,
+        entry_1_player_name: `Cup Manager ${home - 7000}`,
+        entry_1_points: 60 + index,
+        entry_1_win: 1,
+        entry_1_draw: 0,
+        entry_1_loss: 0,
+        entry_1_total: 27,
+        entry_2_entry: away,
+        entry_2_name: away === null ? "AVERAGE" : `Cup Team ${away - 7000}`,
+        entry_2_player_name: away === null ? "AVERAGE" : `Cup Manager ${away - 7000}`,
+        entry_2_points: 50 + index,
+        entry_2_win: 0,
+        entry_2_draw: 0,
+        entry_2_loss: 1,
+        entry_2_total: 24,
+        is_knockout: false,
+        league,
+        winner: home,
+        seed_value: null,
+        event: gameweek,
+        tiebreak: null,
+        is_bye: false,
+        started: true,
+        finished: true,
+        raw_only: `${MARKER}-h2h-match`,
+      };
+    }),
+  };
+}

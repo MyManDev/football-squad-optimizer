@@ -29,6 +29,8 @@ export const LIVE_CONTRACT = "week_live_v1";
 export const ACTIVITY_CONTRACT = "week_activity_v1";
 export const SEASON_CONTRACT = "fpl_entry_season_v1";
 export const EVENTS_CONTRACT = "fpl_events_v1";
+export const H2H_STANDINGS_CONTRACT = "fpl_h2h_standings_v1";
+export const H2H_MATCHES_CONTRACT = "fpl_h2h_matches_v1";
 
 /** The season's event summary is kept for an hour: its averages move only while a week is played. */
 export const EVENTS_TTL_SECONDS = 3600;
@@ -79,6 +81,8 @@ const BUNDLE_PATH = /^\/api\/v1\/fpl\/entry\/([^/]+)\/bundle$/;
 const LIVE_PATH = /^\/api\/v1\/fpl\/live\/([^/]+)$/;
 const SEASON_PATH = /^\/api\/v1\/fpl\/entry\/([^/]+)\/season$/;
 const EVENTS_PATH = /^\/api\/v1\/fpl\/events$/;
+const H2H_STANDINGS_PATH = /^\/api\/v1\/fpl\/h2h\/([^/]+)\/standings$/;
+const H2H_MATCHES_PATH = /^\/api\/v1\/fpl\/h2h\/([^/]+)\/matches$/;
 
 /** A document from FPL or the site that does not have the shape this module reads. */
 export class UnreadableError extends Error {
@@ -119,6 +123,9 @@ function onlyParameters(searchParams, names) {
  * - /api/v1/fpl/live/{1..38} gives { kind: "live", gameweek }
  * - /api/v1/fpl/entry/{entry}/season gives { kind: "season", entry }
  * - /api/v1/fpl/events gives { kind: "events" }
+ * - /api/v1/fpl/h2h/{league}/standings?page={1..1000} gives { kind: "h2hStandings", league, page }
+ * - /api/v1/fpl/h2h/{league}/matches?gw={1..38}&page={1..1000} gives
+ *   { kind: "h2hMatches", league, gameweek, page }
  */
 export function routeFor(method, url) {
   const { pathname, searchParams } = url;
@@ -127,12 +134,16 @@ export function routeFor(method, url) {
   const live = LIVE_PATH.exec(pathname);
   const season = SEASON_PATH.exec(pathname);
   const events = EVENTS_PATH.exec(pathname);
+  const h2hStandings = H2H_STANDINGS_PATH.exec(pathname);
+  const h2hMatches = H2H_MATCHES_PATH.exec(pathname);
   if (
     standings === null &&
     bundle === null &&
     live === null &&
     season === null &&
-    events === null
+    events === null &&
+    h2hStandings === null &&
+    h2hMatches === null
   ) {
     return notFound("the forwarder answers only its three routes");
   }
@@ -175,6 +186,28 @@ export function routeFor(method, url) {
     if (!onlyParameters(searchParams, [])) return notFound("the events take no query");
     return { kind: "events" };
   }
+  if (h2hStandings !== null) {
+    const league = positiveId(h2hStandings[1]);
+    if (league === null) return notFound("a league id is a positive integer");
+    if (!onlyParameters(searchParams, ["page"])) {
+      return notFound("head-to-head standings take one query parameter, page");
+    }
+    const page = smallNumber(searchParams.get("page"), MAX_STANDINGS_PAGE);
+    if (page === null) return notFound(`page is a whole number from 1 to ${MAX_STANDINGS_PAGE}`);
+    return { kind: "h2hStandings", league, page };
+  }
+  if (h2hMatches !== null) {
+    const league = positiveId(h2hMatches[1]);
+    if (league === null) return notFound("a league id is a positive integer");
+    if (!onlyParameters(searchParams, ["gw", "page"])) {
+      return notFound("head-to-head matches take two query parameters, gw and page");
+    }
+    const gameweek = smallNumber(searchParams.get("gw"), LAST_GAMEWEEK);
+    const page = smallNumber(searchParams.get("page"), MAX_STANDINGS_PAGE);
+    if (gameweek === null) return notFound(`gw is a whole number from 1 to ${LAST_GAMEWEEK}`);
+    if (page === null) return notFound(`page is a whole number from 1 to ${MAX_STANDINGS_PAGE}`);
+    return { kind: "h2hMatches", league, gameweek, page };
+  }
   const gameweek = smallNumber(live[1], LAST_GAMEWEEK);
   if (gameweek === null) return notFound(`a gameweek is a whole number from 1 to ${LAST_GAMEWEEK}`);
   if (onlyParameters(searchParams, ["view"]) && searchParams.get("view") === "activity") {
@@ -195,6 +228,10 @@ export function cacheKeys(route) {
     tail = `live/${route.gameweek}${route.view === "activity" ? "/activity" : ""}`;
   } else if (route.kind === "season") tail = `season/${route.entry}`;
   else if (route.kind === "events") tail = "events";
+  else if (route.kind === "h2hStandings") tail = `h2h/${route.league}/standings/${route.page}`;
+  else if (route.kind === "h2hMatches") {
+    tail = `h2h/${route.league}/matches/${route.gameweek}/${route.page}`;
+  }
   else throw new TypeError(`no cache keys for a route of kind ${String(route.kind)}`);
   return {
     fresh: `${SITE_ORIGIN}${CACHE_PREFIX}fresh/${tail}`,
@@ -205,7 +242,10 @@ export function cacheKeys(route) {
 /** The FPL paths the forwarder reads, relative to FPL_API. Nothing else is ever asked. */
 export const upstreamPaths = Object.freeze({
   classicStandings: (league, page) => `leagues-classic/${league}/standings/?page_standings=${page}`,
-  headToHeadStandings: (league) => `leagues-h2h/${league}/standings/`,
+  headToHeadStandings: (league, page = 1) =>
+    `leagues-h2h/${league}/standings/?page_standings=${page}`,
+  headToHeadMatches: (league, gameweek, page) =>
+    `leagues-h2h-matches/league/${league}/?page=${page}&event=${gameweek}`,
   entry: (entry) => `entry/${entry}/`,
   history: (entry) => `entry/${entry}/history/`,
   transfers: (entry) => `entry/${entry}/transfers/`,
@@ -776,4 +816,100 @@ export function eventsDocument(raw, { sourceTime }) {
     .sort(byNumber("id"));
   refuseRepeats(events, "id", "event");
   return { contract_version: EVENTS_CONTRACT, source_time: sourceTime, events };
+}
+
+/**
+ * One head-to-head standings page (leagues-h2h/{id}/standings/?page_standings=N) trimmed to
+ * fpl_h2h_standings_v1: each team's head-to-head record and its points for. The page must
+ * declare the league and the page asked for.
+ */
+export function h2hStandingsDocument(raw, { league, page, sourceTime }) {
+  const document = object(raw, "h2h standings");
+  const declared = object(document.league, "standings.league");
+  if (integer(declared.id, "league.id", 1) !== league) {
+    throw new UnreadableError(`the standings page does not declare league ${league}`);
+  }
+  const section = object(document.standings, "standings.standings");
+  if (integer(section.page, "standings.page", 1) !== page) {
+    throw new UnreadableError(`the standings answer is not page ${page}`);
+  }
+  const results = array(section.results, "standings.results").map((value) => {
+    const row = object(value, "standing");
+    return {
+      entry: integer(row.entry, "standing.entry", 1),
+      entry_name: text(row.entry_name, "standing.entry_name"),
+      player_name: text(row.player_name, "standing.player_name"),
+      rank: integer(row.rank, "standing.rank", 0),
+      rank_sort: integer(row.rank_sort, "standing.rank_sort", 1),
+      last_rank: row.last_rank == null ? null : integer(row.last_rank, "standing.last_rank", 0),
+      total: integer(row.total, "standing.total"),
+      matches_played: integer(row.matches_played, "standing.matches_played", 0),
+      matches_won: integer(row.matches_won, "standing.matches_won", 0),
+      matches_drawn: integer(row.matches_drawn, "standing.matches_drawn", 0),
+      matches_lost: integer(row.matches_lost, "standing.matches_lost", 0),
+      points_for: integer(row.points_for, "standing.points_for"),
+    };
+  });
+  refuseRepeats(results, "entry", "entry");
+  return {
+    contract_version: H2H_STANDINGS_CONTRACT,
+    league: {
+      id: league,
+      name: typeof declared.name === "string" ? declared.name : null,
+      scoring: "h2h",
+    },
+    page,
+    has_next: flag(section.has_next, "standings.has_next"),
+    source_time: sourceTime,
+    results,
+  };
+}
+
+/** One side of a head-to-head match; a bye or the average has no entry. */
+function matchSide(row, side) {
+  const entry = row[`${side}_entry`];
+  return {
+    entry: entry == null ? null : integer(entry, `match.${side}_entry`, 1),
+    name: text(row[`${side}_name`], `match.${side}_name`),
+    player_name: text(row[`${side}_player_name`], `match.${side}_player_name`),
+    points: integer(row[`${side}_points`], `match.${side}_points`),
+  };
+}
+
+/**
+ * One page of a head-to-head league's matches for one gameweek
+ * (leagues-h2h-matches/league/{id}/?page=N&event=GW) trimmed to fpl_h2h_matches_v1: each
+ * pairing with both sides' points and the winner once decided.
+ */
+export function h2hMatchesDocument(raw, { league, gameweek, page, sourceTime }) {
+  const document = object(raw, "h2h matches");
+  if (integer(document.page, "matches.page", 1) !== page) {
+    throw new UnreadableError(`the matches answer is not page ${page}`);
+  }
+  const results = array(document.results, "matches.results")
+    .map((value) => {
+      const row = object(value, "match");
+      if (week(row.event, "match.event") !== gameweek) {
+        throw new UnreadableError(`a match is not of gameweek ${gameweek}`);
+      }
+      return {
+        id: integer(row.id, "match.id", 1),
+        entry_1: matchSide(row, "entry_1"),
+        entry_2: matchSide(row, "entry_2"),
+        winner: row.winner == null ? null : integer(row.winner, "match.winner", 1),
+        started: row.started == null ? null : flag(row.started, "match.started"),
+        finished: row.finished == null ? null : flag(row.finished, "match.finished"),
+      };
+    })
+    .sort(byNumber("id"));
+  refuseRepeats(results, "id", "match");
+  return {
+    contract_version: H2H_MATCHES_CONTRACT,
+    league: { id: league, scoring: "h2h" },
+    gameweek,
+    page,
+    has_next: flag(document.has_next, "matches.has_next"),
+    source_time: sourceTime,
+    results,
+  };
 }
