@@ -16,6 +16,8 @@ import {
   readEntryBundle,
   readEntrySeason,
   readEvents,
+  readH2hMatches,
+  readH2hStandings,
   readLiveActivity,
   readLiveWeek,
   readStandings,
@@ -23,6 +25,8 @@ import {
   type FplLeagueStandings,
   type FplEntrySeason,
   type FplEvents,
+  type FplH2hMatches,
+  type FplH2hStandings,
 } from "./documents";
 
 /** The forwarder's routes, on the site's own origin. */
@@ -66,6 +70,7 @@ export function isForwarderRefusal(
 export type ForwarderReason =
   | "not_found"
   | "head_to_head_league"
+  | "classic_league"
   | "league_not_found"
   | "page_not_found"
   | "entry_not_found"
@@ -75,7 +80,8 @@ export type ForwarderReason =
   | "network"
   | "aborted";
 
-type LeagueRefusals = "head_to_head_league" | "league_not_found" | "page_not_found";
+type LeagueRefusals =
+  "head_to_head_league" | "classic_league" | "league_not_found" | "page_not_found";
 /** The reasons any route can give, whatever its own 404s are. */
 type AnyRoute = "upstream_unavailable" | "not_forwarder" | "unreadable" | "network" | "aborted";
 export type StandingsReason = Exclude<ForwarderReason, "entry_not_found">;
@@ -123,6 +129,19 @@ export interface ForwarderClient {
   ): Promise<ForwarderResult<FplEntrySeason, BundleReason>>;
   /** The season's gameweeks with the game's average and highest score. */
   events(options?: ForwarderReadOptions): Promise<ForwarderResult<FplEvents, LiveReason>>;
+  /** One page of a head-to-head league's table, 1 to 1000. */
+  h2hStandings(
+    league: number,
+    page: number,
+    options?: ForwarderReadOptions,
+  ): Promise<ForwarderResult<FplH2hStandings, StandingsReason>>;
+  /** One page of a head-to-head league's pairings for one gameweek. */
+  h2hMatches(
+    league: number,
+    gameweek: number,
+    page: number,
+    options?: ForwarderReadOptions,
+  ): Promise<ForwarderResult<FplH2hMatches, StandingsReason>>;
 }
 
 export interface ForwarderClientOptions {
@@ -262,6 +281,32 @@ export function createForwarderClient({
     async events(options) {
       return ask("/events", readEvents, ["not_found"] as const, options);
     },
+    async h2hStandings(league, page, options) {
+      if (!positiveId(league) || !inRange(page, 1, MAX_STANDINGS_PAGE)) {
+        return { ok: false, reason: "not_found" };
+      }
+      return ask(
+        `/h2h/${league}/standings?page=${page}`,
+        (value) => readH2hStandings(value, league, page),
+        ["not_found", "classic_league", "league_not_found", "page_not_found"] as const,
+        options,
+      );
+    },
+    async h2hMatches(league, gameweek, page, options) {
+      if (
+        !positiveId(league) ||
+        !inRange(gameweek, 1, LAST_GAMEWEEK) ||
+        !inRange(page, 1, MAX_STANDINGS_PAGE)
+      ) {
+        return { ok: false, reason: "not_found" };
+      }
+      return ask(
+        `/h2h/${league}/matches?gw=${gameweek}&page=${page}`,
+        (value) => readH2hMatches(value, league, gameweek, page),
+        ["not_found", "league_not_found", "page_not_found"] as const,
+        options,
+      );
+    },
   };
 }
 
@@ -277,3 +322,7 @@ export const liveWeek: ForwarderClient["liveWeek"] = (gameweek, options) =>
 export const entrySeason: ForwarderClient["entrySeason"] = (entry, options) =>
   forwarder.entrySeason(entry, options);
 export const events: ForwarderClient["events"] = (options) => forwarder.events(options);
+export const h2hStandings: ForwarderClient["h2hStandings"] = (league, page, options) =>
+  forwarder.h2hStandings(league, page, options);
+export const h2hMatches: ForwarderClient["h2hMatches"] = (league, gameweek, page, options) =>
+  forwarder.h2hMatches(league, gameweek, page, options);

@@ -45,6 +45,30 @@ const BUNDLE = bundleHolding(ENTRY, TABLE.gameweek, FIFTEEN, {
   vice: 139,
 });
 const MARKED = { "x-squadopt-fpl": "1", "content-type": "application/json; charset=utf-8" };
+/** A head-to-head league's table, as the forwarder serves it (fpl_h2h_standings_v1). */
+const CUP = {
+  contract_version: "fpl_h2h_standings_v1",
+  league: { id: HEAD_TO_HEAD, name: "Synthetic Cup", scoring: "h2h" },
+  page: 1,
+  has_next: false,
+  source_time: "2026-10-19T17:30:00.000Z",
+  results: [
+    {
+      entry: 7001,
+      entry_name: "Cup Team 1",
+      player_name: "Cup Manager 1",
+      rank: 1,
+      rank_sort: 1,
+      last_rank: null,
+      total: 27,
+      matches_played: 9,
+      matches_won: 9,
+      matches_drawn: 0,
+      matches_lost: 0,
+      points_for: 600,
+    },
+  ],
+};
 
 /**
  * The published example league in a directory whose line names the capture's table, a
@@ -116,6 +140,9 @@ async function serveSite(page: Page, forwarder: "up" | "down", closed = false) {
     }
     if (pathname === `/api/v1/fpl/standings/${HEAD_TO_HEAD}`) {
       return answer(404, { error: "head_to_head_league", league: HEAD_TO_HEAD });
+    }
+    if (pathname === `/api/v1/fpl/h2h/${HEAD_TO_HEAD}/standings`) {
+      return answer(200, CUP);
     }
     if (pathname === `/api/v1/fpl/entry/${ENTRY}/bundle` && search === `?gw=${TABLE.gameweek}`) {
       return answer(
@@ -232,11 +259,13 @@ test("a typed unlisted league opens from the forwarder, and a member opens with 
   await expect(page.getByRole("link", { name: copy.suggestionHistory.title })).toHaveCount(1);
 });
 
-test("a typed head-to-head league is named", async ({ page }) => {
+test("a typed head-to-head league opens from its own table", async ({ page }) => {
   await serveSite(page, "up");
   await typeLeague(page, HEAD_TO_HEAD);
   await expect(page).toHaveURL(`/league/${HEAD_TO_HEAD}`);
-  await expect(page.getByRole("status")).toHaveText(copy.leagueEntry.headToHead(HEAD_TO_HEAD));
+  await expect(page.getByRole("heading", { level: 1, name: "Synthetic Cup" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Cup Team 1" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "9-0-0", exact: true })).toBeVisible();
 });
 
 test("with the forwarder down a typed league is not opened, and the listed league still is", async ({

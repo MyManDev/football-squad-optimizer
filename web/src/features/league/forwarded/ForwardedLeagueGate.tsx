@@ -36,10 +36,15 @@ export function ForwardedLeagueGate({
   children?: ReactNode;
 }) {
   const { messages } = useLanguage();
-  const standings = useForwardedStandings(leagueId);
+  // The classic table first; a league the forwarder names as head-to-head gets its own table.
+  const standings = useForwardedStandings(leagueId, 1, "auto");
   const first = standings.data;
   const name = first?.league.name ?? null;
-  const league = useMemo<ForwardedLeague>(() => ({ leagueId, leagueName: name }), [leagueId, name]);
+  const scoring = first?.league.scoring ?? "classic";
+  const league = useMemo<ForwardedLeague>(
+    () => ({ leagueId, leagueName: name, scoring }),
+    [leagueId, name, scoring],
+  );
   const directory = useDirectory(first !== undefined);
   const tableRef = directory.data ? newestDeviceTable(directory.data) : null;
   const table = useCaptureTable(tableRef);

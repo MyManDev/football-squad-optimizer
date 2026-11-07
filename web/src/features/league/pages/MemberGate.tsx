@@ -6,7 +6,8 @@ import { useShell } from "../../../design/shell/ShellContext";
 import { crossfade } from "../../../design/viewTransition";
 import { useLanguage } from "../../../i18n/context";
 import { asksForOwnPage, memberAddress } from "../../../lib/leagueAddresses";
-import { useForwardedLeague } from "../forwarded/ForwardedLeagueContext";
+import { useForwardedLeague, type ForwardedScoring } from "../forwarded/ForwardedLeagueContext";
+import { tableRows } from "../forwarder/documents";
 import { useForwardedStandings, useForwardedStandingsPages } from "../forwarded/reads";
 import {
   useClaimedEntry,
@@ -32,16 +33,16 @@ const MOST_PAGES = 40;
  * asks for them: the rows they add to the roster, whether the last page read says the league
  * goes on, whether a page is being read now, and the ask itself. A listed league reads none.
  */
-function useFurtherMembers(leagueId: number | null) {
-  const first = useForwardedStandings(leagueId, 1);
+function useFurtherMembers(leagueId: number | null, scoring: ForwardedScoring) {
+  const first = useForwardedStandings(leagueId, 1, scoring);
   const [wanted, setWanted] = useState(0);
   const pages = useMemo(() => Array.from({ length: wanted }, (_, index) => index + 2), [wanted]);
-  const further = useForwardedStandingsPages(leagueId, pages);
+  const further = useForwardedStandingsPages(leagueId, pages, scoring);
   const rows = useMemo<RosterEntry[]>(
     () =>
       further.flatMap((read) =>
         read.data
-          ? read.data.results.map((row) => ({
+          ? tableRows(read.data).map((row) => ({
               entryId: row.entry,
               managerName: row.player_name,
               teamName: row.entry_name,
@@ -74,7 +75,10 @@ export function MemberGate({ children }: { children: ReactNode }) {
   // A forwarded league's roster is page 1 of its table; the pages after it are read as a
   // name or a claim asks for them, never all at once.
   const forwarded = useForwardedLeague();
-  const further = useFurtherMembers(forwarded === null ? null : forwarded.leagueId);
+  const further = useFurtherMembers(
+    forwarded === null ? null : forwarded.leagueId,
+    forwarded?.scoring ?? "classic",
+  );
   const { rows: furtherRows, more, reading, ask } = further;
   const entries = useMemo<RosterEntry[] | undefined>(() => {
     if (!members.data) return undefined;

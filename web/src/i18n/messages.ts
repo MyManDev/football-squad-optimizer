@@ -174,6 +174,12 @@ const en = {
     planNotComputable: "The plan cannot be computed for this team this week.",
     backToLeague: "League table",
     retry: "Try again",
+    record: "W-D-L",
+    h2hPoints: "H2H pts",
+    pointsFor: "Points",
+    pairings: (gameweek: number) => `Gameweek ${gameweek} pairings`,
+    average: "League average",
+    pairingsFailed: "The week's pairings could not be read.",
   },
   // Where the league ID is read from on the FPL site, folded under the entry page's field.
   fplIdHelp: {
@@ -748,6 +754,12 @@ const tr: MessageSchema<typeof en> = {
     planNotComputable: "Bu takımın planı bu hafta hesaplanamıyor.",
     backToLeague: "Lig tablosu",
     retry: "Yeniden dene",
+    record: "G-B-M",
+    h2hPoints: "H2H puanı",
+    pointsFor: "Puan",
+    pairings: (gameweek) => `${gameweek}. hafta eşleşmeleri`,
+    average: "Lig ortalaması",
+    pairingsFailed: "Haftanın eşleşmeleri okunamadı.",
   },
   fplIdHelp: {
     title: "FPL ID'm nerede?",

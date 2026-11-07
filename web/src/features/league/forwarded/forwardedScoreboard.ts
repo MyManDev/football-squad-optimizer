@@ -9,7 +9,7 @@
 
 import type { FixturesPayload } from "../../fixtures/types";
 import type { DevicePlanDocument } from "../device/types";
-import type { FplEntrySeason, FplEvents, FplStandingRow } from "../forwarder/documents";
+import type { FplEntrySeason, FplEvents } from "../forwarder/documents";
 import type { SuggestionHistory } from "../history/historyData";
 import type {
   LeagueViewEnvelope,
@@ -22,7 +22,7 @@ export interface ForwardedScoreboardInputs {
   leagueId: number;
   table: LeagueViewEnvelope<DevicePlanDocument>;
   /** The members the page has read, with the season of each the forwarder answered. */
-  members: readonly FplStandingRow[];
+  members: readonly { entry: number }[];
   seasons: ReadonlyMap<number, FplEntrySeason>;
   events: FplEvents;
   fixtures: FixturesPayload | null;
