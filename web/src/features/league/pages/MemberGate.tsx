@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -16,8 +8,12 @@ import { useLanguage } from "../../../i18n/context";
 import { asksForOwnPage, memberAddress } from "../../../lib/leagueAddresses";
 import { useForwardedLeague } from "../forwarded/ForwardedLeagueContext";
 import { useForwardedStandings, useForwardedStandingsPages } from "../forwarded/reads";
-import { readMemberClaim, subscribeMemberClaim } from "../identity/memberClaim";
-import { useLeagueIdentity, type Roster, type RosterEntry } from "../identity/useLeagueIdentity";
+import {
+  useClaimedEntry,
+  useLeagueIdentity,
+  type Roster,
+  type RosterEntry,
+} from "../identity/useLeagueIdentity";
 import { useLeagueMembers } from "../queries";
 import type { HumanEntryView, LeagueMembers } from "../types";
 import { useLeague } from "../useLeague";
@@ -92,9 +88,7 @@ export function MemberGate({ children }: { children: ReactNode }) {
   }, [members.data, furtherRows]);
   // A claim made on a later page is looked for there before the roster can drop it: the
   // roster stays unread until the claimed member is found or the pages run out.
-  const stored = useSyncExternalStore(subscribeMemberClaim, readMemberClaim, () => null);
-  const claimedHere =
-    stored !== null && stored.leagueId === league.leagueId ? stored.entryId : null;
+  const claimedHere = useClaimedEntry(league.leagueId);
   const seekingClaim =
     claimedHere !== null &&
     entries !== undefined &&

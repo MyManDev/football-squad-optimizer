@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -8,8 +8,8 @@ import { arrivedToPick } from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../data";
 import type { RosterEntry } from "../identity/useLeagueIdentity";
 import type { useLeagueMembers } from "../queries";
-import { matchingMembers } from "./memberSearch";
 import styles from "./MemberPicker.module.css";
+import { rowsNumbered, teamNumberIn } from "./memberSearch";
 
 /**
  * "Sen kimsin?": the league's members by name, each a button that enters as that member
@@ -17,10 +17,10 @@ import styles from "./MemberPicker.module.css";
  * standings. Nothing else of a member is shown here: no points, rank or value. The entry
  * number stays out of the markup too: each button carries no value attribute.
  *
- * Above the list a field narrows it: a part of a name, or the team number the game gives,
- * for a league where two members share a name. While the typed text matches none of the
- * rows read so far and the league has more (`more`), the picker asks for the next page
- * (`onMore`) until a row matches or the pages run out.
+ * Above the list a field takes the team number the game gives, for a visitor who would
+ * rather not read a long list: the row with that number stands alone once found. While the
+ * number is on none of the rows read so far and the league has more (`more`), the picker
+ * asks for the next page (`onMore`) until the row turns up or the pages run out.
  *
  * A view only: the member gate decides when it shows and what a choice does.
  */
@@ -50,6 +50,7 @@ export function MemberPicker({
   const heading = useRef<HTMLHeadingElement>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [typed, setTyped] = useState("");
+  const [sought, setSought] = useState<number | null>(null);
 
   const sorted = useMemo(() => {
     const collator = new Intl.Collator(locale, { sensitivity: "base" });
@@ -62,13 +63,18 @@ export function MemberPicker({
         a.entryId - b.entryId,
     );
   }, [rows, locale]);
-  const shown = useMemo(() => matchingMembers(sorted, typed), [sorted, typed]);
+  const shown = useMemo(() => rowsNumbered(sorted, sought), [sorted, sought]);
 
-  // A name typed that no row read so far carries asks for the next page, while there is one.
-  const seeking = typed.trim() !== "" && shown.length === 0 && more;
+  // A number none of the rows read so far carries asks for the next page, while there is one.
+  const seeking = sought !== null && shown.length === 0 && more;
   useEffect(() => {
     if (seeking && !reading) onMore?.();
   }, [seeking, reading, onMore]);
+
+  function find(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSought(teamNumberIn(typed));
+  }
 
   // Arriving to choose (from the league number, or from Değiştir) puts focus on the
   // question. Only a new arrival moves it, so the effect follows the location's key.
@@ -102,16 +108,23 @@ export function MemberPicker({
         <p id="member-picker-legend" className={styles.legend}>
           {copy.legend}
         </p>
-        <input
-          type="search"
-          className={styles.search}
-          aria-label={copy.search}
-          placeholder={copy.search}
-          autoComplete="off"
-          enterKeyHint="search"
-          value={typed}
-          onChange={(event) => setTyped(event.target.value)}
-        />
+        <form className={styles.find} onSubmit={find}>
+          <input
+            type="text"
+            className={styles.search}
+            aria-label={copy.teamNumber}
+            placeholder={copy.teamNumber}
+            inputMode="numeric"
+            autoComplete="off"
+            enterKeyHint="search"
+            value={typed}
+            onChange={(event) => {
+              setTyped(event.target.value);
+              if (event.target.value.trim() === "") setSought(null);
+            }}
+          />
+          <button type="submit">{copy.find}</button>
+        </form>
         {shown.length === 0 ? (
           seeking ? (
             <PageLoading label={listCopy.loading} />

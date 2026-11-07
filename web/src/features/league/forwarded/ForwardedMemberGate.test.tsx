@@ -201,12 +201,12 @@ describe("a member of a forwarded league", () => {
     });
   });
 
-  it("reads the table's next page when the typed name is not on page 1", async () => {
+  it("reads the table's next page when the team number given is not on page 1", async () => {
     const fetcher = site();
     open(`/league/314/members/${ENTRY}`);
     await screen.findByRole("button", { name: new RegExp(ROW.entry_name) });
     expect(fetcher.mock.calls.some(([url]) => String(url).includes("page=2"))).toBe(false);
-    await userEvent.type(screen.getByRole("searchbox"), LATER.player_name);
+    await userEvent.type(screen.getByRole("textbox"), `${LATER.entry}{Enter}`);
     const option = await screen.findByRole("button", { name: new RegExp(LATER.entry_name) });
     expect(fetcher.mock.calls.filter(([url]) => String(url).includes("page=2"))).toHaveLength(1);
     await userEvent.click(option);
@@ -232,7 +232,7 @@ describe("a member of a forwarded league", () => {
     await waitFor(() =>
       expect(screen.getByTestId("probe")).toHaveTextContent("league 314 forwarded true"),
     );
-    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
     expect(JSON.parse(sessionStorage.getItem("squadopt.member")!)).toMatchObject({
       entryId: LATER.entry,
     });

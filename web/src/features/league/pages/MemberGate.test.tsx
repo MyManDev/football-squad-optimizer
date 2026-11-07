@@ -137,7 +137,7 @@ describe.each(["tr", "en"] as const)("the member step in %s", (language) => {
     expect(screen.getByRole("heading", { level: 1, name: copy.title })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "League page" })).toBeNull();
 
-    const buttons = within(group).getAllByRole("button");
+    const buttons = within(group).getAllByRole("button", { name: /,/ });
     expect(buttons).toHaveLength(humans.length);
     // Sorted by name, never in the file's order (the standings): Arda Demir first, the
     // member without a published name last.
@@ -226,7 +226,7 @@ describe("what the picker shows of a member", () => {
     open();
     const group = await picker("tr");
     const labels = within(group)
-      .getAllByRole("button")
+      .getAllByRole("button", { name: /,/ })
       .map((button) => button.textContent);
     expect(labels).toEqual(["Ali Can, Pressing Trap", "Zeynep Ok, Clubv2 99"]);
     const text = group.textContent ?? "";
@@ -249,62 +249,42 @@ describe("what the picker shows of a member", () => {
   });
 });
 
-describe("finding yourself in a long list", () => {
+describe("finding yourself by the team number", () => {
   const rows = (): EntryView[] => {
     const template = humans[0]!;
     return [
-      { ...template, entry_id: 41001, manager_name: "Şükrü Yıldız", team_name: "Clubv2 99" },
+      { ...template, entry_id: 41001, manager_name: "Zeynep Ok", team_name: "Clubv2 99" },
       { ...template, entry_id: 41002, manager_name: "Ali Can", team_name: "Pressing Trap" },
       { ...template, entry_id: 41003, manager_name: "Ali Can", team_name: "Second Ali" },
     ];
   };
 
-  it("narrows the names to the typed part, without case or accents", async () => {
+  it("leaves the one row with the number given, and enters as it", async () => {
     members.mockResolvedValue(envelopeWith(rows()));
     const user = userEvent.setup();
     open();
     const group = await picker("tr");
-    await user.type(within(group).getByRole("searchbox"), "sukru");
+    expect(within(group).getAllByRole("button", { name: /,/ })).toHaveLength(3);
+    await user.type(within(group).getByRole("textbox"), "41003{Enter}");
     expect(
       within(group)
-        .getAllByRole("button")
-        .map((b) => b.textContent),
-    ).toEqual(["Şükrü Yıldız, Clubv2 99"]);
-    await user.clear(within(group).getByRole("searchbox"));
-    await user.type(within(group).getByRole("searchbox"), "TRAP");
-    expect(
-      within(group)
-        .getAllByRole("button")
-        .map((b) => b.textContent),
-    ).toEqual(["Ali Can, Pressing Trap"]);
-  });
-
-  it("tells two members of one name apart by the team number the game gives", async () => {
-    members.mockResolvedValue(envelopeWith(rows()));
-    const user = userEvent.setup();
-    open();
-    const group = await picker("tr");
-    await user.type(within(group).getByRole("searchbox"), "Ali Can");
-    expect(within(group).getAllByRole("button")).toHaveLength(2);
-    await user.clear(within(group).getByRole("searchbox"));
-    await user.type(within(group).getByRole("searchbox"), "41003");
-    expect(
-      within(group)
-        .getAllByRole("button")
+        .getAllByRole("button", { name: /,/ })
         .map((b) => b.textContent),
     ).toEqual(["Ali Can, Second Ali"]);
-    await user.click(within(group).getByRole("button"));
+    await user.click(within(group).getByRole("button", { name: /,/ }));
     expect(readMemberClaim()?.entryId).toBe(41003);
   });
 
-  it("says when no member matches, in place of the list", async () => {
+  it("says when no member has the number, and lists everyone again once it is cleared", async () => {
     members.mockResolvedValue(envelopeWith(rows()));
     const user = userEvent.setup();
     open({ language: "en" });
     const group = await picker("en");
-    await user.type(within(group).getByRole("searchbox"), "nobody");
-    expect(within(group).queryAllByRole("button")).toHaveLength(0);
+    await user.type(within(group).getByRole("textbox"), "77{Enter}");
+    expect(within(group).queryAllByRole("button", { name: /,/ })).toHaveLength(0);
     expect(within(group).getByRole("status")).toHaveTextContent(MESSAGES.en.memberPicker.noMatch);
+    await user.clear(within(group).getByRole("textbox"));
+    expect(within(group).getAllByRole("button", { name: /,/ })).toHaveLength(3);
   });
 });
 
@@ -491,9 +471,13 @@ describe("the picker with a keyboard and a screen reader", () => {
     open();
     const group = await picker("tr");
     await user.tab();
-    expect(within(group).getByRole("searchbox")).toHaveFocus();
+    expect(within(group).getByRole("textbox")).toHaveFocus();
     await user.tab();
-    const buttons = within(group).getAllByRole("button");
+    expect(
+      within(group).getByRole("button", { name: MESSAGES.tr.memberPicker.find }),
+    ).toHaveFocus();
+    await user.tab();
+    const buttons = within(group).getAllByRole("button", { name: /,/ });
     expect(buttons[0]).toHaveFocus();
     await user.tab();
     expect(buttons[1]).toHaveFocus();

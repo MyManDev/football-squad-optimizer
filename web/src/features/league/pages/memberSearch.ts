@@ -1,36 +1,22 @@
 /**
- * Who a typed text names among a league's members: a part of a manager's or team's name,
- * without case or accents, or the team number the game gives, for two members of one name.
+ * The team number a visitor gives to find their own row: the game's own number, the one
+ * thing about a member that is theirs alone. Names are not searched; two members can share
+ * one.
  */
 
 import type { RosterEntry } from "../identity/useLeagueIdentity";
 
-/** A name as typed and as listed compare without case or accents: "sukru" finds "Şükrü". */
-function plain(value: string | null): string {
-  return (value ?? "")
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/ı/g, "i")
-    .toLocaleLowerCase("en");
+/** The whole positive number typed, or null for anything else. */
+export function teamNumberIn(typed: string): number | null {
+  const trimmed = typed.trim();
+  const id = Number(trimmed);
+  return /^\d+$/.test(trimmed) && Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-/**
- * The rows the typed text leaves: by name (manager or team, any part), or, as the game's
- * own team number when the text is digits only, by that number. Nothing typed keeps every
- * row.
- */
-export function matchingMembers(
+/** The rows carrying the sought team number: one, or none while it is not among them. */
+export function rowsNumbered(
   rows: readonly RosterEntry[],
-  typed: string,
+  sought: number | null,
 ): readonly RosterEntry[] {
-  const query = typed.trim();
-  if (query === "") return rows;
-  if (/^\d+$/.test(query)) {
-    const entryId = Number(query);
-    return rows.filter((row) => row.entryId === entryId);
-  }
-  const needle = plain(query);
-  return rows.filter(
-    (row) => plain(row.managerName).includes(needle) || plain(row.teamName).includes(needle),
-  );
+  return sought === null ? rows : rows.filter((row) => row.entryId === sought);
 }
