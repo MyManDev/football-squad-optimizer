@@ -6,8 +6,8 @@ from the FPL forwarder (``PublicEntryInputs``), and the menu it is offered is th
 plan at every window the deployment computes, with every switch the capture has the input
 for: the Top 100 setting, the manager's word, the football model, a held chip and the
 member's preferences. The chip a public team holds and the squad its preferences are checked
-against are read from its pinned inputs, never from the capture. A rival strategy is not
-offered yet: it needs a second team's inputs pinned beside the first.
+against are read from its pinned inputs, never from the capture. A rival strategy pins the
+rival's inputs beside the member's, and the answer is filed under both pins.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from typing import Protocol
 
 from squadopt.application.advice import AdviseEntryRequest
-from squadopt.application.advice_capabilities import COMPUTED_MODE, menu_capabilities
+from squadopt.application.advice_capabilities import menu_capabilities
 from squadopt.application.advice_menu import held_member_chips, held_member_squad
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
@@ -66,8 +66,8 @@ class PublicEntryAdviceReader(AdviceReadStore):
             directory,
             cache,
             context,
-            {COMPUTED_MODE: menu[COMPUTED_MODE].requires_rival},
-            capabilities={COMPUTED_MODE: menu[COMPUTED_MODE]},
+            {slug: capability.requires_rival for slug, capability in menu.items()},
+            capabilities=menu,
             switches=switches,
         )
         self._contexts = context
@@ -173,13 +173,15 @@ class PublicEntryAdviceReader(AdviceReadStore):
         self._check_ids(league_id, entry_id)
         if type(window) is not int:
             raise UnsupportedAdviceRequestError("A public team needs a league and team number.")
-        if rival_entry_id is not None:
-            raise UnsupportedAdviceRequestError("A public team is not planned against a rival yet.")
+        if rival_entry_id is not None and (
+            type(rival_entry_id) is not int or not 1 <= rival_entry_id <= MAX_ID
+        ):
+            raise UnsupportedAdviceRequestError("A rival is a team number.")
         self._check_selection(
             strategy=strategy,
             window=window,
             entry_id=entry_id,
-            rival_entry_id=None,
+            rival_entry_id=rival_entry_id,
             top100_weight=top100_weight,
             managers_word=managers_word,
             chip=chip,
@@ -200,11 +202,24 @@ class PublicEntryAdviceReader(AdviceReadStore):
                 model=model,
                 preferences=NO_PREFERENCES,
             )
-        fingerprint = self._public_inputs.fingerprint(context, entry_id)
-        if fingerprint is None:
-            raise AdviceInputsNotPreparedError(context)
+        # The member's pin, and the rival's where the strategy names one. Whichever is missing
+        # is named, so the submitter fetches exactly those before asking again.
+        teams = (entry_id,) if rival_entry_id is None else (entry_id, rival_entry_id)
+        pins: dict[int, str] = {}
+        missing: list[int] = []
+        for team in teams:
+            pinned = self._public_inputs.fingerprint(context, team)
+            if pinned is None:
+                missing.append(team)
+            else:
+                pins[team] = pinned
+        if missing:
+            raise AdviceInputsNotPreparedError(context, tuple(missing))
+        public: dict[str, str | int | bool | None] = {"fingerprint": pins[entry_id]}
+        if rival_entry_id is not None:
+            public["rival_fingerprint"] = pins[rival_entry_id]
         switches: SwitchIdentity = {
-            PUBLIC_ENTRY_SWITCH: {"fingerprint": fingerprint},
+            PUBLIC_ENTRY_SWITCH: public,
             **self._switches_for(
                 context,
                 league_id,
@@ -228,6 +243,8 @@ class PublicEntryAdviceReader(AdviceReadStore):
             projection_handoff_fingerprint=context.projection_handoff_fingerprint,
             repository_commit=context.repository_commit,
             configuration_fingerprint=context.configuration_fingerprint,
+            rival_entry_id=rival_entry_id,
+            strategy_uses_rival=self._strategies[strategy],
             switches=switches,
         )
         return ResolvedAdviceRequest(key=key, context=context, switches=switches)

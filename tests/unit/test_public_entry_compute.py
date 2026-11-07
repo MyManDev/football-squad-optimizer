@@ -191,14 +191,17 @@ def test_rate_limit_rejects_another_public_fetch_before_touching_upstream(public
         ({"model": "football"}, "MODEL_INPUTS_UNAVAILABLE"),
         ({"top100_weight": 20}, "TOP100_INPUTS_UNAVAILABLE"),
         ({"managers_word": True}, "MANAGERS_WORD_UNAVAILABLE"),
-        ({"strategy": "fark-yarat", "rival_entry_id": 1}, "UNSUPPORTED_ADVICE_REQUEST"),
+        ({"strategy": "fark-yarat"}, "UNSUPPORTED_ADVICE_REQUEST"),
+        ({"strategy": "fark-yarat", "rival_entry_id": ENTRY}, "UNSUPPORTED_ADVICE_REQUEST"),
+        ({"rival_entry_id": ENTRY + 1}, "UNSUPPORTED_ADVICE_REQUEST"),
         ({"window": 2}, "VALIDATION_FAILED"),
     ],
 )
 def test_a_selection_this_capture_cannot_answer_is_refused_before_any_fetch(
     public, selection, code
 ):
-    """A switch without its input, a rival, or a window nobody computes: refused by name."""
+    """A switch without its input, a rival strategy without a rival or against oneself, a
+    rival on the pure-points plan, or a window nobody computes: refused by name."""
     backend, client, fetch = public
     response = client.post(
         f"/api/v1/public/leagues/239/entries/{ENTRY}/advice", json={**BODY, **selection}
@@ -291,7 +294,8 @@ def test_public_capabilities_name_the_pure_points_menu_and_the_pinned_teams_chip
     jsonschema.validate(document, league_capabilities_schema())
     assert document["league_id"] == league
     assert document["capture_snapshot_id"] == backend.contexts.current().capture_snapshot_id
-    assert document["strategies"] == {"saf-puan": {"windows": [1, 3, 5], "requires_rival": False}}
+    assert set(document["strategies"]) == {"saf-puan", "ortak-koru", "fark-yarat"}
+    assert document["strategies"]["saf-puan"] == {"windows": [1, 3, 5], "requires_rival": False}
     assert document["chips"]["held_by_entry"] == {}
     fetch.assert_not_called()
 
@@ -307,3 +311,40 @@ def test_public_capabilities_are_disabled_until_the_deployment_opts_in(tmp_path,
     client = TestClient(app_for_capture(backend, worker_tests.world_module.GW2_CAPTURED_AT))
     response = client.get(f"/api/v1/public/leagues/239/entries/{ENTRY}/capabilities")
     assert response.status_code == 503
+
+
+def test_a_public_team_is_planned_against_a_public_rival_whose_inputs_are_pinned_too(public):
+    """A rival strategy fetches and pins the rival beside the member, and the worker solves it."""
+    backend, client, fetch = public
+    rival = ENTRY + 1
+    route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
+    body = {"strategy": "fark-yarat", "window": 1, "rival_entry_id": rival}
+    accepted = client.post(route, json=body)
+    assert accepted.status_code == 202, accepted.text
+    assert sorted(call.args for call in fetch.call_args_list) == [(ENTRY, 2), (rival, 2)]
+    context = backend.contexts.current()
+    assert backend.public_inputs.fingerprint(context, rival)
+    completed = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(
+            backend.contexts, backend.job_specs, public_inputs=backend.public_inputs
+        ),
+        at_utc=worker_tests.world_module.GW2_CAPTURED_AT,
+    )
+    assert completed.status == "completed", completed
+    served = client.get(route, params={"strategy": "fark-yarat", "window": 1, "rival": rival})
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["entry_id"] == ENTRY
+    assert len(payload["starting_xi"]) == 11
+    # Both pins stand for the capture: a pure-points request afterwards fetches nothing more.
+    plain = client.post(route, json=BODY)
+    assert plain.status_code == 202, plain.text
+    assert fetch.call_count == 2
+
+    capabilities = client.get(f"/api/v1/public/leagues/239/entries/{ENTRY}/capabilities").json()
+    assert capabilities["strategies"]["fark-yarat"] == {
+        "windows": [1, 3, 5],
+        "requires_rival": True,
+    }
