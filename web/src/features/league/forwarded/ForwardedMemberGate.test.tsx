@@ -58,6 +58,9 @@ const PAGE = (() => {
   return page;
 })();
 const ROW = PAGE.results[0]!;
+/** The table goes on: page 1 says so, and page 2 holds the last members. */
+const PAGE_TWO = STANDINGS_EXAMPLES.last_page as FplLeagueStandings;
+const LATER = PAGE_TWO.results[1]!;
 
 function text(value: unknown): string {
   return JSON.stringify(value);
@@ -126,6 +129,7 @@ function site({
     ["/data/fixtures.json", () => jsonResponse(OPEN_WEEK)],
     [`/api/v1/fpl/entry/${ENTRY}/bundle?gw=${TABLE.gameweek}`, bundle],
     [/\/api\/v1\/fpl\/standings\/314\?page=1$/, () => marked(PAGE)],
+    [/\/api\/v1\/fpl\/standings\/314\?page=2$/, () => marked(PAGE_TWO)],
   ]);
 }
 
@@ -199,6 +203,43 @@ describe("a member of a forwarded league", () => {
       leagueId: 314,
       entryId: ENTRY,
       teamName: ROW.entry_name,
+    });
+  });
+
+  it("reads the table's next page when the team number given is not on page 1", async () => {
+    const fetcher = site();
+    open(`/league/314/members/${ENTRY}`);
+    await screen.findByRole("button", { name: new RegExp(ROW.entry_name) });
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes("page=2"))).toBe(false);
+    await userEvent.type(screen.getByRole("textbox"), `${LATER.entry}{Enter}`);
+    const option = await screen.findByRole("button", { name: new RegExp(LATER.entry_name) });
+    expect(fetcher.mock.calls.filter(([url]) => String(url).includes("page=2"))).toHaveLength(1);
+    await userEvent.click(option);
+    expect(JSON.parse(sessionStorage.getItem("squadopt.member")!)).toMatchObject({
+      leagueId: 314,
+      entryId: LATER.entry,
+    });
+  });
+
+  it("keeps a claim made on a later page, reading the table until the member is found", async () => {
+    site();
+    sessionStorage.setItem(
+      "squadopt.member",
+      JSON.stringify({
+        leagueId: 314,
+        leagueName: "Synthetic League",
+        entryId: LATER.entry,
+        managerName: LATER.player_name,
+        teamName: LATER.entry_name,
+      }),
+    );
+    open(`/league/314/members/${ENTRY}`);
+    await waitFor(() =>
+      expect(screen.getByTestId("probe")).toHaveTextContent("league 314 forwarded true"),
+    );
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(JSON.parse(sessionStorage.getItem("squadopt.member")!)).toMatchObject({
+      entryId: LATER.entry,
     });
   });
 
