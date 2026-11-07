@@ -37,6 +37,8 @@ import {
   eventsDocument,
   fixturesPart,
   freeHitWeek,
+  h2hMatchesDocument,
+  h2hStandingsDocument,
   historyPart,
   lastGoodTtl,
   liveActivityDocument,
@@ -257,7 +259,7 @@ export function createWorker(options = {}) {
     }
     let raw = null;
     try {
-      raw = await upstream(upstreamPaths.headToHeadStandings(league));
+      raw = await upstream(upstreamPaths.headToHeadStandings(league, 1));
     } catch (error) {
       if (!(error instanceof UpstreamNotFound)) throw error;
     }
@@ -426,7 +428,87 @@ export function createWorker(options = {}) {
     };
   }
 
-  const builders = { standings, bundle, live, season, events };
+  /**
+   * FPL has no head-to-head page 1 for this league: the classic table is asked once, so a
+   * classic league asked for as head-to-head is named as that; a later page FPL does not
+   * have is refused as that page.
+   */
+  async function notHeadToHead(league, page) {
+    if (page > 1) {
+      return new Refusal(
+        404,
+        {
+          error: "page_not_found",
+          league,
+          page,
+          detail: `FPL has no page ${page} of head-to-head league ${league}`,
+        },
+        NOT_FOUND_TTL_SECONDS,
+      );
+    }
+    let raw = null;
+    try {
+      raw = await upstream(upstreamPaths.classicStandings(league, 1));
+    } catch (error) {
+      if (!(error instanceof UpstreamNotFound)) throw error;
+    }
+    if (raw !== null && declaresLeague(raw, league)) {
+      return new Refusal(
+        404,
+        {
+          error: "classic_league",
+          league,
+          detail: `league ${league} is a classic league; ask for its classic standings`,
+        },
+        NOT_FOUND_TTL_SECONDS,
+      );
+    }
+    return new Refusal(
+      404,
+      { error: "league_not_found", league, detail: `FPL has no head-to-head league ${league}` },
+      NOT_FOUND_TTL_SECONDS,
+    );
+  }
+
+  async function h2hStandings({ league, page }) {
+    let raw;
+    try {
+      raw = await upstream(upstreamPaths.headToHeadStandings(league, page));
+    } catch (error) {
+      if (!(error instanceof UpstreamNotFound)) throw error;
+      throw await notHeadToHead(league, page);
+    }
+    const document = h2hStandingsDocument(raw, { league, page, sourceTime: iso(now()) });
+    return { document, seconds: STANDINGS_TTL_SECONDS };
+  }
+
+  /** A gameweek's pairings: ten minutes while the week is played, as a standings page. */
+  async function h2hMatches({ league, gameweek, page }) {
+    const plan = await schedule();
+    const { latestStarted } = weekState(plan, now());
+    if (gameweek > Math.min(LAST_GAMEWEEK, latestStarted + 1)) {
+      throw new Refusal(
+        404,
+        { error: "not_found", detail: "matches are read for the current week or an earlier one" },
+        0,
+      );
+    }
+    let raw;
+    try {
+      raw = await upstream(upstreamPaths.headToHeadMatches(league, gameweek, page));
+    } catch (error) {
+      if (!(error instanceof UpstreamNotFound)) throw error;
+      throw new Refusal(
+        404,
+        { error: "league_not_found", league, detail: `FPL has no head-to-head league ${league}` },
+        NOT_FOUND_TTL_SECONDS,
+      );
+    }
+    const document = h2hMatchesDocument(raw, { league, gameweek, page, sourceTime: iso(now()) });
+    return { document, seconds: STANDINGS_TTL_SECONDS };
+  }
+
+  const builders = { standings, bundle, live, season, events, h2hStandings, h2hMatches };
 
   async function serve(route) {
     const keys = cacheKeys(route);

@@ -22,6 +22,8 @@ import {
   entryPart,
   eventsDocument,
   fixturesPart,
+  h2hMatchesDocument,
+  h2hStandingsDocument,
   historyPart,
   lastGoodTtl,
   liveDocument,
@@ -48,6 +50,8 @@ import {
   fifteen,
   fixturesAnswer,
   fixturesJson,
+  h2hMatchesPage,
+  h2hStandingsPage,
   historyAnswer,
   liveAnswer,
   picksAnswer,
@@ -178,6 +182,8 @@ describe("cache keys", () => {
     const paths = [
       upstreamPaths.classicStandings(314, 3),
       upstreamPaths.headToHeadStandings(314),
+      upstreamPaths.headToHeadStandings(314, 2),
+      upstreamPaths.headToHeadMatches(314, 9, 1),
       upstreamPaths.entry(101),
       upstreamPaths.history(101),
       upstreamPaths.transfers(101),
@@ -187,7 +193,9 @@ describe("cache keys", () => {
     ];
     assert.deepEqual(paths, [
       "leagues-classic/314/standings/?page_standings=3",
-      "leagues-h2h/314/standings/",
+      "leagues-h2h/314/standings/?page_standings=1",
+      "leagues-h2h/314/standings/?page_standings=2",
+      "leagues-h2h-matches/league/314/?page=1&event=9",
       "entry/101/",
       "entry/101/history/",
       "entry/101/transfers/",
@@ -626,5 +634,107 @@ describe("the season and events routes", () => {
     const twice = bootstrapAnswer({ weeks: 2 });
     twice.events[1].id = 1;
     assert.throws(() => eventsDocument(twice, { sourceTime: SOURCE_TIME }), /appears twice/);
+  });
+});
+
+describe("the head-to-head routes", () => {
+  it("read their paths and queries, and have cache keys of their own", () => {
+    assert.deepEqual(route("/api/v1/fpl/h2h/4242/standings?page=1"), {
+      kind: "h2hStandings",
+      league: 4242,
+      page: 1,
+    });
+    assert.deepEqual(route("/api/v1/fpl/h2h/4242/matches?gw=9&page=2"), {
+      kind: "h2hMatches",
+      league: 4242,
+      gameweek: 9,
+      page: 2,
+    });
+    for (const path of [
+      "/api/v1/fpl/h2h/abc/standings?page=1",
+      "/api/v1/fpl/h2h/4242/standings",
+      "/api/v1/fpl/h2h/4242/standings?page=0",
+      "/api/v1/fpl/h2h/4242/matches?gw=9",
+      "/api/v1/fpl/h2h/4242/matches?gw=39&page=1",
+      "/api/v1/fpl/h2h/4242/table",
+    ]) {
+      assert.equal(route(path).status, 404, path);
+    }
+    assert.deepEqual(cacheKeys({ kind: "h2hStandings", league: 4242, page: 2 }), {
+      fresh: `${SITE}${CACHE_PREFIX}fresh/h2h/4242/standings/2`,
+      lastGood: `${SITE}${CACHE_PREFIX}last-good/h2h/4242/standings/2`,
+    });
+    assert.deepEqual(cacheKeys({ kind: "h2hMatches", league: 4242, gameweek: 9, page: 1 }), {
+      fresh: `${SITE}${CACHE_PREFIX}fresh/h2h/4242/matches/9/1`,
+      lastGood: `${SITE}${CACHE_PREFIX}last-good/h2h/4242/matches/9/1`,
+    });
+    assert.equal(
+      upstreamPaths.headToHeadMatches(4242, 9, 2),
+      "leagues-h2h-matches/league/4242/?page=2&event=9",
+    );
+  });
+
+  it("trims a standings page to each team's record and drops the rest", () => {
+    const document = h2hStandingsDocument(h2hStandingsPage({ rows: 2 }), {
+      league: 4242,
+      page: 1,
+      sourceTime: SOURCE_TIME,
+    });
+    assert.equal(document.contract_version, "fpl_h2h_standings_v1");
+    assert.deepEqual(document.league, { id: 4242, name: "Synthetic Cup", scoring: "h2h" });
+    assert.deepEqual(document.results[1], {
+      entry: 7002,
+      entry_name: "Cup Team 2",
+      player_name: "Cup Manager 2",
+      rank: 2,
+      rank_sort: 2,
+      last_rank: 3,
+      total: 24,
+      matches_played: 9,
+      matches_won: 8,
+      matches_drawn: 0,
+      matches_lost: 1,
+      points_for: 593,
+    });
+    assert.ok(!JSON.stringify(document).includes(MARKER));
+    assert.throws(
+      () =>
+        h2hStandingsDocument(h2hStandingsPage({ league: 1 }), {
+          league: 4242,
+          page: 1,
+          sourceTime: SOURCE_TIME,
+        }),
+      /declare league/,
+    );
+  });
+
+  it("trims a gameweek's pairings, the average as a side without an entry", () => {
+    const document = h2hMatchesDocument(h2hMatchesPage(), {
+      league: 4242,
+      gameweek: 9,
+      page: 1,
+      sourceTime: SOURCE_TIME,
+    });
+    assert.equal(document.contract_version, "fpl_h2h_matches_v1");
+    assert.equal(document.results.length, 2);
+    assert.deepEqual(document.results[0].entry_1, {
+      entry: 7001,
+      name: "Cup Team 1",
+      player_name: "Cup Manager 1",
+      points: 60,
+    });
+    assert.equal(document.results[1].entry_2.entry, null);
+    assert.equal(document.results[0].winner, 7001);
+    assert.ok(!JSON.stringify(document).includes(MARKER));
+    assert.throws(
+      () =>
+        h2hMatchesDocument(h2hMatchesPage({ gameweek: 8 }), {
+          league: 4242,
+          gameweek: 9,
+          page: 1,
+          sourceTime: SOURCE_TIME,
+        }),
+      /not of gameweek 9/,
+    );
   });
 });

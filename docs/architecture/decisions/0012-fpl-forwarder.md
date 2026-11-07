@@ -213,3 +213,19 @@ the weekly run. The bootstrap is FPL's largest document, so the copy lives an ho
 Free plan's CPU limit is watched on the first live deploy as it was for the live route.
 The terms note (D4) is unchanged: both documents are relayed per request and never stored
 beyond the cache, and no league or entry id is logged.
+
+## 2026-11-07: head-to-head leagues
+
+The same direction brings head-to-head leagues in. Two more GET routes join the allowlist
+under the same rules; the classic standings route still refuses a head-to-head league by
+name, and these refuse a classic one (`classic_league`), so a page asks for one table or
+the other, never both:
+
+| Route | Answers | Upstream reads |
+| --- | --- | --- |
+| `/api/v1/fpl/h2h/{league}/standings?page={1..1000}` | [`fpl_h2h_standings_v1`](../../contracts/fpl_h2h_standings_v1.md): each team's record, head-to-head points and points for | `leagues-h2h/{league}/standings/?page_standings={page}`; on a 404 for page 1, `leagues-classic/{league}/standings/?page_standings=1` once, to name a classic league in the refusal; kept ten minutes |
+| `/api/v1/fpl/h2h/{league}/matches?gw={1..38}&page={1..1000}` | [`fpl_h2h_matches_v1`](../../contracts/fpl_h2h_matches_v1.md): the week's pairings, both sides' points and the winner | `leagues-h2h-matches/league/{league}/?page={page}&event={gw}`, for the current week or an earlier one; kept ten minutes |
+
+The pairings are what makes a head-to-head league's member page its own: the opponent of
+the week is the rival a rival strategy is played against unless the member names another.
+The terms note (D4) is unchanged.
