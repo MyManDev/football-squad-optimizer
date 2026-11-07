@@ -130,7 +130,7 @@ describe("member decision controls", () => {
   });
 
   it("writes a strategy change with a listed window into the shareable URL", () => {
-    // Most points solved five weeks, so the radio is clickable; every rival strategy is
+    // Most Points solved five weeks, so the radio is clickable; every rival strategy is
     // published at one week only. The window must not survive the change and leave the
     // control showing a checked radio it has just disabled.
     renderControls(`/league/352490/members/${ENTRY}?window=5`);
@@ -210,7 +210,7 @@ describe("member decision controls", () => {
     };
     renderControls(`/league/352490/members/${ENTRY}`, index, "en");
 
-    const marked = screen.getByRole("radio", { name: /Close the gap.*Recommended/s });
+    const marked = screen.getByRole("radio", { name: /Close the Gap.*Recommended/s });
     expect(marked).not.toBeChecked();
     // The rule marks; the URL still chooses. Nothing was selected on the member's behalf.
     expect(screen.getByDisplayValue("saf-puan")).toBeChecked();
@@ -270,7 +270,7 @@ describe("member decision controls", () => {
   // repository's slug counts stay as Part D records them.
   it.each([
     ["tr", ["En çok puan", "Farkı koru", "Farkı kapat"], "Plan süresi"],
-    ["en", ["Most points", "Hold the gap", "Close the gap"], "Plan length"],
+    ["en", ["Most Points", "Hold the Gap", "Close the Gap"], "Plan Length"],
   ] as const)(
     "renders the approved strategy and plan length names in %s",
     (language, names, legend) => {
