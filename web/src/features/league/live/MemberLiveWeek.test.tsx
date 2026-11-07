@@ -82,7 +82,7 @@ const expected = (name: LiveExample) => {
   return result.live.score;
 };
 
-const net = () => screen.getByText("Net puan", { exact: true }).nextElementSibling;
+const net = () => screen.getByText("Canlı puan", { exact: true }).nextElementSibling;
 
 it("reads and refreshes realized activity through the real opt-in client without extra live requests", async () => {
   const live = forwardedLive("in_progress", WEEK);

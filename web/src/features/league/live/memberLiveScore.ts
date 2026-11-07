@@ -42,6 +42,25 @@ export interface MemberLiveScore {
   names: ReadonlyMap<number, string>;
   activity: PlayerActivity[] | null;
   lineup: PlayedLineup;
+  /**
+   * What the table forecast for the eleven the member fielded: each starter's expected
+   * points, the captain's doubled (tripled under the triple captain), the bench's added
+   * under the bench boost, less the week's transfer cost. The number the live score is
+   * read against.
+   */
+  forecast: number;
+}
+
+/** The forecast of the fielded eleven, on the same net basis as the live score. */
+export function forecastPoints(lineup: PlayedLineup, member: MemberWeek): number {
+  const armband = member.active_chip === "3xc" ? 3 : 2;
+  const counted =
+    member.active_chip === "bboost" ? [...lineup.starting_xi, ...lineup.bench] : lineup.starting_xi;
+  const gross = counted.reduce(
+    (sum, player) => sum + player.expected_points * (player.is_captain ? armband : 1),
+    0,
+  );
+  return gross - member.transfer_cost;
 }
 
 export type MemberLiveResult =
@@ -109,6 +128,7 @@ export function memberLiveScore({
       score,
       names,
       lineup,
+      forecast: forecastPoints(lineup, member),
       activity: activity === null ? null : playerActivities(activity, member.pick_order),
     },
   };

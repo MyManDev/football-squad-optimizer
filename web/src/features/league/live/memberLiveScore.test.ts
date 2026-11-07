@@ -41,6 +41,14 @@ describe("the member's live week from the forwarder and the capture's table", ()
           (id) => live.elements.find((player) => player.element_id === id)!.points,
         ),
       );
+      // The forecast is the fielded eleven's expected points, captain doubled, less the hit.
+      const starters = result.live.lineup.starting_xi;
+      const expected =
+        starters.reduce(
+          (sum, player) => sum + player.expected_points * (player.is_captain ? 2 : 1),
+          0,
+        ) - member.transfer_cost;
+      expect(result.live.forecast).toBeCloseTo(expected, 6);
       // The captain's plate states his raw score; the team score applies the multiplier.
       expect(picked.find((player) => player.is_captain)?.event_points).toBe(
         live.elements.find((player) => player.element_id === member.captain)!.points,
