@@ -13,7 +13,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import deviceInstances from "../../../fixtures/device-plan/instances.json";
 import {
@@ -23,7 +23,7 @@ import {
 } from "../../../fixtures/forwarder";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
-import { jsonResponse, stubFetchByUrl } from "../../../testSupport/fetchByUrl";
+import { jsonResponse, stubFetchByUrl, type FetchRoute } from "../../../testSupport/fetchByUrl";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { FplEntryBundle, FplLeagueStandings } from "../forwarder/documents";
 import { LeagueMemberPage } from "../pages/LeagueMemberPage";
@@ -114,8 +114,10 @@ const OPEN_WEEK = envelope(
 function site({
   bundle = () => marked(BUNDLE),
   lines = [line(352490, 6, OLDER, OLDER_BYTES), line(755941, 7, CAPTURE, TABLE_BYTES)],
-}: { bundle?: () => Response; lines?: unknown[] } = {}) {
+  extra = [],
+}: { bundle?: () => Response; lines?: unknown[]; extra?: FetchRoute[] } = {}) {
   return stubFetchByUrl([
+    ...extra,
     ["/data/leagues.json", () => jsonResponse(envelope({ leagues: lines }, "league_directory_v1"))],
     [
       /\/data\/device\/[^/]+\/device-plan\.json\?v=/,
@@ -243,5 +245,50 @@ describe("a team the gate cannot bind", () => {
     site();
     open("/entry/abc");
     expect(await screen.findByText(copy.leagueMembers.invalidEntry)).toBeInTheDocument();
+  });
+});
+
+describe("with a compute service configured", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("asks the public capabilities route for the team, under league 0", async () => {
+    vi.stubEnv("VITE_ADVICE_API_ORIGIN", "https://api.example");
+    const capabilities = {
+      contract_version: "league_capabilities_v1",
+      league_id: 0,
+      capture_snapshot_id: CAPTURE,
+      season: TABLE.season,
+      gameweek: TABLE.gameweek,
+      strategies: { "saf-puan": { windows: [1, 3, 5], requires_rival: false } },
+      top100: { available: false, weights: [0] },
+      managers_word: { available: false },
+      preferences: { available: true },
+      chips: {
+        strategy: { version: "dated_joint_opportunity_v3", windows: [1, 3, 5] },
+        held_by_entry: {},
+      },
+    };
+    const fetcher = site({
+      extra: [
+        [
+          `/api/v1/public/leagues/0/entries/${ENTRY}/capabilities`,
+          () => jsonResponse(capabilities),
+        ],
+      ],
+    });
+    open(`/entry/${ENTRY}`, <LeagueMemberPage />);
+    await screen.findByRole("heading", { level: 1, name: BUNDLE.entry.name });
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.some(([url]) =>
+          String(url).endsWith(`/api/v1/public/leagues/0/entries/${ENTRY}/capabilities`),
+        ),
+      ).toBe(true),
+    );
+    expect(
+      fetcher.mock.calls.some(([url]) => String(url).includes("/api/v1/leagues/0/capabilities")),
+    ).toBe(false);
   });
 });

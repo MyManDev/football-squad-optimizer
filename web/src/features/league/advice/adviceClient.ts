@@ -90,6 +90,15 @@ export interface AdviceClient {
    * say. Optional: a client without it is a static site, and the page asks nothing.
    */
   readCapabilities?(leagueId: number, options?: RequestOptions): Promise<AdviceCapabilities | null>;
+  /**
+   * What the service computes right now for a team outside its published leagues (league
+   * 0 is a team on its own), or null when it cannot say. Optional, like `readCapabilities`.
+   */
+  readPublicCapabilities?(
+    leagueId: number,
+    entryId: number,
+    options?: RequestOptions,
+  ): Promise<AdviceCapabilities | null>;
 }
 
 export interface AdviceJobStatus {
@@ -443,6 +452,21 @@ export class HttpAdviceClient implements AdviceClient {
       return checkedCapabilities(await response.json(), leagueId);
     }, options);
   }
+
+  async readPublicCapabilities(
+    leagueId: number,
+    entryId: number,
+    options?: RequestOptions,
+  ): Promise<AdviceCapabilities | null> {
+    return withRequestDeadline(async (signal) => {
+      const response = await this.fetcher(
+        `${this.origin}/api/v1/public/leagues/${leagueId}/entries/${entryId}/capabilities`,
+        { cache: "no-cache", signal },
+      );
+      if (!response.ok) throw await apiError(response);
+      return checkedCapabilities(await response.json(), leagueId);
+    }, options);
+  }
 }
 
 /**
@@ -517,6 +541,21 @@ export class FallbackAdviceClient implements AdviceClient {
     if (!this.primary.readCapabilities) return null;
     try {
       return await this.primary.readCapabilities(leagueId, options);
+    } catch (error) {
+      if (isAbortError(error) || options?.signal?.aborted) throw error;
+      return null;
+    }
+  }
+
+  /** As `readCapabilities`: a public route that does not answer is no capabilities. */
+  async readPublicCapabilities(
+    leagueId: number,
+    entryId: number,
+    options?: RequestOptions,
+  ): Promise<AdviceCapabilities | null> {
+    if (!this.primary.readPublicCapabilities) return null;
+    try {
+      return await this.primary.readPublicCapabilities(leagueId, entryId, options);
     } catch (error) {
       if (isAbortError(error) || options?.signal?.aborted) throw error;
       return null;
