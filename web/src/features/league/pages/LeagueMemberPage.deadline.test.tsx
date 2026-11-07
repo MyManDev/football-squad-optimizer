@@ -218,3 +218,29 @@ describe("a member page whose gameweek has closed", () => {
     expect(screen.queryByRole("button", { name: copy.computeButton })).toBeNull();
   });
 });
+
+describe("a closed week on a device menu", () => {
+  it.each(["tr", "en"] as const)(
+    "shows no card about a publication that never happens, and no default-plan link (%s)",
+    (language) => {
+      const copy = MESSAGES[language].leagueMembers;
+      const props: Partial<LeagueMemberViewProps> = {
+        advice: null,
+        adviceIssue: "not-listed",
+        capabilities: null,
+        index: {
+          ...INDEX,
+          menu: "device",
+          computed: [],
+          unavailable: [],
+          windows: { "saf-puan": [], "ortak-koru": [], "fark-yarat": [] },
+        },
+      };
+      renderView(DEADLINE, language, "", props);
+      expect(screen.getByTestId("deadline-passed")).toBeInTheDocument();
+      expect(screen.queryByText(copy.closedNotListed.title)).toBeNull();
+      expect(screen.queryByRole("link", { name: copy.closedNotListed.link })).toBeNull();
+      expect(screen.queryByText(copy.publicationStates["not-listed"].title)).toBeNull();
+    },
+  );
+});

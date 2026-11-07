@@ -541,7 +541,12 @@ function LeagueMemberContent({
               <EmptyState title={copy.loadingRivals} />
             ) : shown ? (
               <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
-            ) : computeOnly && !rejectedContext ? null : (
+            ) : computeOnly && !rejectedContext ? null : closed &&
+              index?.menu ===
+                "device" ? // A device menu publishes no plan for any week: once the week is closed there
+            // is no default plan to point at, and the squad and its score say what there
+            // is to say. The card would only name a publication that never happens.
+            null : (
               <MissingAdviceCard
                 issue={
                   rejectedContext
