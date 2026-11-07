@@ -30,6 +30,11 @@ export function memberHistoryAddress(leagueId: number, entryId: number | string)
   return `${memberAddress(leagueId, entryId)}/history`;
 }
 
+/** The member's week-by-week comparison with the system's suggestion: VS SQUADOPT. */
+export function memberVsAddress(leagueId: number, entryId: number | string): string {
+  return `${memberAddress(leagueId, entryId)}/vs`;
+}
+
 /**
  * The member's tools, each a page of its own under the member's page that the sidebar
  * links once the visitor has said who they are: the squad held now, the what-if squad, the duel, the chips and free transfers, and the squad card.

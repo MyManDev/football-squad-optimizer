@@ -55,6 +55,7 @@ test.describe("a visitor who has said who they are", () => {
         .locator("#sidebar a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
     ).toEqual([
+      "/league/352490/members/35249001/vs",
       "/league/352490/members/35249001",
       "/league/352490/members",
       "/league/352490/members/35249001/current-squad",

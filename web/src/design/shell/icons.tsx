@@ -17,6 +17,7 @@ const STROKE = {
 } as const;
 
 const NAV_PATHS: Record<NavKey, ReactNode> = {
+  vsSquadopt: <path d="M2 4.5l3.5 9 3.5-9M10.5 13.5h3.5a2 2 0 0 0 0-4h-1.5a2 2 0 0 1 0-4H16" />,
   findLeague: (
     <>
       <circle cx="7.5" cy="7.5" r="5" />
