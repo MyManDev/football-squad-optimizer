@@ -6,12 +6,14 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
+import jsonschema
 import pytest
 from fastapi.testclient import TestClient
 from tests.fixtures.backend_app import app_for_capture
 from tests.unit import test_advice_worker as worker_tests
 
 from squadopt.api.runtime import app_for_backend
+from squadopt.platform.advice_documents import league_capabilities_schema
 from squadopt.platform.advice_queue import run_advice_worker_once
 from squadopt.platform.advice_read import AdviceBackendNotReadyError
 from squadopt.platform.advice_submit import FixedWindowRateLimiter
@@ -276,3 +278,32 @@ def test_a_chip_the_public_team_does_not_hold_is_refused_after_its_inputs_are_pi
     assert response.json()["error"]["code"] == "CHIP_NOT_HELD"
     fetch.assert_called_once()
     assert backend.queue_depth() == 0
+
+
+@pytest.mark.parametrize("league", [239, 0])
+def test_public_capabilities_name_the_pure_points_menu_and_the_pinned_teams_chips(public, league):
+    """Before a plan is asked the team's chips are unnamed; the first request pins them."""
+    backend, client, fetch = public
+    route = f"/api/v1/public/leagues/{league}/entries/{ENTRY}/capabilities"
+    before = client.get(route)
+    assert before.status_code == 200, before.text
+    document = before.json()
+    jsonschema.validate(document, league_capabilities_schema())
+    assert document["league_id"] == league
+    assert document["capture_snapshot_id"] == backend.contexts.current().capture_snapshot_id
+    assert document["strategies"] == {"saf-puan": {"windows": [1, 3, 5], "requires_rival": False}}
+    assert document["chips"]["held_by_entry"] == {}
+    fetch.assert_not_called()
+
+    accepted = client.post(f"/api/v1/public/leagues/{league}/entries/{ENTRY}/advice", json=BODY)
+    assert accepted.status_code == 202, accepted.text
+    after = client.get(route).json()
+    assert "bboost" in after["chips"]["held_by_entry"][str(ENTRY)]
+    fetch.assert_called_once()
+
+
+def test_public_capabilities_are_disabled_until_the_deployment_opts_in(tmp_path, monkeypatch):
+    backend = worker_tests._deployment(tmp_path, monkeypatch)["backend"]
+    client = TestClient(app_for_capture(backend, worker_tests.world_module.GW2_CAPTURED_AT))
+    response = client.get(f"/api/v1/public/leagues/239/entries/{ENTRY}/capabilities")
+    assert response.status_code == 503
