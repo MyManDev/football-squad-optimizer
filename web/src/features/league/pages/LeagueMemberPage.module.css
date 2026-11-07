@@ -589,7 +589,7 @@
   height: 10px;
   border-radius: 50%;
   background: currentcolor;
-  animation: live-pulse 1.4s ease-in-out infinite;
+  animation: live-pulse var(--motion-pulse) ease-in-out infinite;
 }
 
 @keyframes live-pulse {
