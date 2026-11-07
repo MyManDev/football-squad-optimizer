@@ -1,0 +1,68 @@
+/* The reminder's switch: a track and a knob, the word beside it. Off it reads in the page's
+   ink; on, the track fills with the marking colour. The sidebar form is as tall as Değiştir. */
+
+.sidebarSwitch,
+.inlineSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sidebarSwitch {
+  flex: none;
+}
+
+.inlineSwitch {
+  font-size: var(--step-1);
+}
+
+.sidebarSwitch:disabled,
+.inlineSwitch:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.track {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 22px;
+  border: 1px solid var(--color-text);
+  border-radius: 999px;
+  background: var(--color-surface);
+  transition: background-color var(--motion-ui-fast);
+}
+
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-text);
+  transition: transform var(--motion-ui-fast);
+}
+
+[aria-checked="true"] .track {
+  background: var(--color-mark);
+  color: var(--color-mark-text);
+  border-color: var(--color-text);
+}
+
+[aria-checked="true"] .knob {
+  transform: translateX(18px);
+  background: currentcolor;
+}
+
+.word {
+  white-space: nowrap;
+}
