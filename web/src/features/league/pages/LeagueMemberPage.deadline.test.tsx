@@ -244,3 +244,13 @@ describe("a closed week on a device menu", () => {
     },
   );
 });
+
+describe("the closed week's heading", () => {
+  it.each(["tr", "en"] as const)("is LIVE WEEK, with no plan summary under it (%s)", (language) => {
+    const copy = MESSAGES[language].leagueMembers;
+    renderView(DEADLINE, language, "", { advice: null, adviceIssue: "not-listed" });
+    expect(screen.getByRole("heading", { name: copy.liveWeek })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: copy.decisionTitle })).toBeNull();
+    expect(screen.queryByTestId("member-selection-summary")).toBeNull();
+  });
+});
