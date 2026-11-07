@@ -124,11 +124,16 @@ class AdviceRequestContext:
 
 
 class AdviceInputsNotPreparedError(AdviceNotComputedError):
-    """A public entry has no pinned inputs yet; only a POST may prepare them."""
+    """A public entry has no pinned inputs yet; only a POST may prepare them.
 
-    def __init__(self, context: AdviceRequestContext) -> None:
+    ``entries`` names the teams whose inputs are missing: the member, and the rival of a
+    rival strategy; empty means the member alone.
+    """
+
+    def __init__(self, context: AdviceRequestContext, entries: tuple[int, ...] = ()) -> None:
         super().__init__("This entry has not requested a computation for this capture.")
         self.context = context
+        self.entries = entries
 
 
 class AdviceContextProvider(Protocol):
@@ -500,8 +505,21 @@ class AdviceReadStore:
         context = self._context.current()
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
+        return self._capabilities_document(
+            league_id, context, tuple(sorted(_member_entry_ids(league)))
+        )
+
+    def _capabilities_document(
+        self, league_id: int, context: AdviceRequestContext, entries: tuple[int, ...]
+    ) -> dict[str, object]:
+        """The capabilities document for ``entries`` under ``context``, checked.
+
+        Shared by a league's members and a public team: the strategies and windows are the
+        reader's, the switches the capture's, the held chips those of the entries named.
+        """
+
         inputs = self._switch_inputs(context)
-        chips = self._held_chips(context, league_id, tuple(sorted(_member_entry_ids(league))))
+        chips = self._held_chips(context, league_id, entries)
         top100 = inputs.top100_counts is not None and any(
             capability.top100_windows for capability in self._capabilities.values()
         )

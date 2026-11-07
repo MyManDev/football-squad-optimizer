@@ -20,7 +20,10 @@ import {
   bundleWeekAllowed,
   cacheKeys,
   entryPart,
+  eventsDocument,
   fixturesPart,
+  h2hMatchesDocument,
+  h2hStandingsDocument,
   historyPart,
   lastGoodTtl,
   liveDocument,
@@ -30,6 +33,7 @@ import {
   picksPart,
   routeFor,
   scheduleFrom,
+  seasonDocument,
   standingsDocument,
   transfersPart,
   untilNextDeadline,
@@ -40,11 +44,14 @@ import {
 import {
   MARKER,
   SITE,
+  bootstrapAnswer,
   deadlineMs,
   entryAnswer,
   fifteen,
   fixturesAnswer,
   fixturesJson,
+  h2hMatchesPage,
+  h2hStandingsPage,
   historyAnswer,
   liveAnswer,
   picksAnswer,
@@ -175,6 +182,8 @@ describe("cache keys", () => {
     const paths = [
       upstreamPaths.classicStandings(314, 3),
       upstreamPaths.headToHeadStandings(314),
+      upstreamPaths.headToHeadStandings(314, 2),
+      upstreamPaths.headToHeadMatches(314, 9, 1),
       upstreamPaths.entry(101),
       upstreamPaths.history(101),
       upstreamPaths.transfers(101),
@@ -184,7 +193,9 @@ describe("cache keys", () => {
     ];
     assert.deepEqual(paths, [
       "leagues-classic/314/standings/?page_standings=3",
-      "leagues-h2h/314/standings/",
+      "leagues-h2h/314/standings/?page_standings=1",
+      "leagues-h2h/314/standings/?page_standings=2",
+      "leagues-h2h-matches/league/314/?page=1&event=9",
       "entry/101/",
       "entry/101/history/",
       "entry/101/transfers/",
@@ -551,5 +562,179 @@ describe("the live week", () => {
       [91, 1, 2, true],
     ]);
     assert.throws(() => fixturesPart(twice, 9), /appears twice/);
+  });
+});
+
+describe("the season and events routes", () => {
+  it("read their paths, take no query, and have cache keys of their own", () => {
+    assert.deepEqual(route("/api/v1/fpl/entry/123456/season"), { kind: "season", entry: 123456 });
+    assert.deepEqual(route("/api/v1/fpl/events"), { kind: "events" });
+    for (const path of [
+      "/api/v1/fpl/entry/abc/season",
+      "/api/v1/fpl/entry/0/season",
+      "/api/v1/fpl/entry/123456/season?gw=1",
+      "/api/v1/fpl/events?page=1",
+      "/api/v1/fpl/events/",
+    ]) {
+      assert.equal(route(path).status, 404, path);
+    }
+    assert.equal(route("/api/v1/fpl/events", "POST").status, 405);
+    assert.deepEqual(cacheKeys({ kind: "season", entry: 5 }), {
+      fresh: `${SITE}${CACHE_PREFIX}fresh/season/5`,
+      lastGood: `${SITE}${CACHE_PREFIX}last-good/season/5`,
+    });
+    assert.deepEqual(cacheKeys({ kind: "events" }), {
+      fresh: `${SITE}${CACHE_PREFIX}fresh/events`,
+      lastGood: `${SITE}${CACHE_PREFIX}last-good/events`,
+    });
+    assert.equal(upstreamPaths.bootstrap(), "bootstrap-static/");
+  });
+
+  it("trims a history to the season's weeks and chips, and drops everything else", () => {
+    const raw = historyAnswer({
+      weeks: [2, 1],
+      chips: [{ name: "wildcard", event: 2 }],
+      costs: { 2: 4 },
+    });
+    raw.current[0].rank = null;
+    const document = seasonDocument(raw, { entry: 5001, sourceTime: SOURCE_TIME });
+    assert.equal(document.contract_version, "fpl_entry_season_v1");
+    assert.equal(document.entry_id, 5001);
+    assert.deepEqual(
+      document.weeks.map((row) => [row.event, row.points, row.total_points, row.event_transfers_cost]),
+      [
+        [1, 51, 501, 0],
+        [2, 52, 552, 4],
+      ],
+    );
+    assert.equal(document.weeks[0].rank, null);
+    assert.equal(document.weeks[1].rank, null);
+    assert.deepEqual(document.chips, [{ name: "wildcard", event: 2 }]);
+    assert.ok(!JSON.stringify(document).includes(MARKER));
+    assert.throws(
+      () => seasonDocument(historyAnswer({ weeks: [3, 3] }), { entry: 5001, sourceTime: SOURCE_TIME }),
+      /appears twice/,
+    );
+    const noPoints = historyAnswer({ weeks: [1] });
+    delete noPoints.current[0].points;
+    assert.throws(() => seasonDocument(noPoints, { entry: 5001, sourceTime: SOURCE_TIME }), /points/);
+  });
+
+  it("trims the bootstrap to each gameweek's state and scores", () => {
+    const document = eventsDocument(bootstrapAnswer({ finished: 2, weeks: 3 }), {
+      sourceTime: SOURCE_TIME,
+    });
+    assert.equal(document.contract_version, "fpl_events_v1");
+    assert.deepEqual(document.events, [
+      { id: 1, finished: true, data_checked: true, average_entry_score: 41, highest_score: 101 },
+      { id: 2, finished: true, data_checked: true, average_entry_score: 42, highest_score: 102 },
+      { id: 3, finished: false, data_checked: false, average_entry_score: 0, highest_score: null },
+    ]);
+    assert.ok(!JSON.stringify(document).includes(MARKER));
+    const twice = bootstrapAnswer({ weeks: 2 });
+    twice.events[1].id = 1;
+    assert.throws(() => eventsDocument(twice, { sourceTime: SOURCE_TIME }), /appears twice/);
+  });
+});
+
+describe("the head-to-head routes", () => {
+  it("read their paths and queries, and have cache keys of their own", () => {
+    assert.deepEqual(route("/api/v1/fpl/h2h/4242/standings?page=1"), {
+      kind: "h2hStandings",
+      league: 4242,
+      page: 1,
+    });
+    assert.deepEqual(route("/api/v1/fpl/h2h/4242/matches?gw=9&page=2"), {
+      kind: "h2hMatches",
+      league: 4242,
+      gameweek: 9,
+      page: 2,
+    });
+    for (const path of [
+      "/api/v1/fpl/h2h/abc/standings?page=1",
+      "/api/v1/fpl/h2h/4242/standings",
+      "/api/v1/fpl/h2h/4242/standings?page=0",
+      "/api/v1/fpl/h2h/4242/matches?gw=9",
+      "/api/v1/fpl/h2h/4242/matches?gw=39&page=1",
+      "/api/v1/fpl/h2h/4242/table",
+    ]) {
+      assert.equal(route(path).status, 404, path);
+    }
+    assert.deepEqual(cacheKeys({ kind: "h2hStandings", league: 4242, page: 2 }), {
+      fresh: `${SITE}${CACHE_PREFIX}fresh/h2h/4242/standings/2`,
+      lastGood: `${SITE}${CACHE_PREFIX}last-good/h2h/4242/standings/2`,
+    });
+    assert.deepEqual(cacheKeys({ kind: "h2hMatches", league: 4242, gameweek: 9, page: 1 }), {
+      fresh: `${SITE}${CACHE_PREFIX}fresh/h2h/4242/matches/9/1`,
+      lastGood: `${SITE}${CACHE_PREFIX}last-good/h2h/4242/matches/9/1`,
+    });
+    assert.equal(
+      upstreamPaths.headToHeadMatches(4242, 9, 2),
+      "leagues-h2h-matches/league/4242/?page=2&event=9",
+    );
+  });
+
+  it("trims a standings page to each team's record and drops the rest", () => {
+    const document = h2hStandingsDocument(h2hStandingsPage({ rows: 2 }), {
+      league: 4242,
+      page: 1,
+      sourceTime: SOURCE_TIME,
+    });
+    assert.equal(document.contract_version, "fpl_h2h_standings_v1");
+    assert.deepEqual(document.league, { id: 4242, name: "Synthetic Cup", scoring: "h2h" });
+    assert.deepEqual(document.results[1], {
+      entry: 7002,
+      entry_name: "Cup Team 2",
+      player_name: "Cup Manager 2",
+      rank: 2,
+      rank_sort: 2,
+      last_rank: 3,
+      total: 24,
+      matches_played: 9,
+      matches_won: 8,
+      matches_drawn: 0,
+      matches_lost: 1,
+      points_for: 593,
+    });
+    assert.ok(!JSON.stringify(document).includes(MARKER));
+    assert.throws(
+      () =>
+        h2hStandingsDocument(h2hStandingsPage({ league: 1 }), {
+          league: 4242,
+          page: 1,
+          sourceTime: SOURCE_TIME,
+        }),
+      /declare league/,
+    );
+  });
+
+  it("trims a gameweek's pairings, the average as a side without an entry", () => {
+    const document = h2hMatchesDocument(h2hMatchesPage(), {
+      league: 4242,
+      gameweek: 9,
+      page: 1,
+      sourceTime: SOURCE_TIME,
+    });
+    assert.equal(document.contract_version, "fpl_h2h_matches_v1");
+    assert.equal(document.results.length, 2);
+    assert.deepEqual(document.results[0].entry_1, {
+      entry: 7001,
+      name: "Cup Team 1",
+      player_name: "Cup Manager 1",
+      points: 60,
+    });
+    assert.equal(document.results[1].entry_2.entry, null);
+    assert.equal(document.results[0].winner, 7001);
+    assert.ok(!JSON.stringify(document).includes(MARKER));
+    assert.throws(
+      () =>
+        h2hMatchesDocument(h2hMatchesPage({ gameweek: 8 }), {
+          league: 4242,
+          gameweek: 9,
+          page: 1,
+          sourceTime: SOURCE_TIME,
+        }),
+      /not of gameweek 9/,
+    );
   });
 });

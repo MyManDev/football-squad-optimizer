@@ -1,0 +1,71 @@
+{
+  "first_page": {
+    "contract_version": "fpl_h2h_standings_v1",
+    "league": {
+      "id": 4242,
+      "name": "Synthetic Cup",
+      "scoring": "h2h"
+    },
+    "page": 1,
+    "has_next": false,
+    "source_time": "2026-10-19T17:30:00.000Z",
+    "results": [
+      {
+        "entry": 7001,
+        "entry_name": "Cup Team 1",
+        "player_name": "Cup Manager 1",
+        "rank": 1,
+        "rank_sort": 1,
+        "last_rank": null,
+        "total": 27,
+        "matches_played": 9,
+        "matches_won": 9,
+        "matches_drawn": 0,
+        "matches_lost": 0,
+        "points_for": 600
+      },
+      {
+        "entry": 7002,
+        "entry_name": "Cup Team 2",
+        "player_name": "Cup Manager 2",
+        "rank": 2,
+        "rank_sort": 2,
+        "last_rank": 3,
+        "total": 24,
+        "matches_played": 9,
+        "matches_won": 8,
+        "matches_drawn": 0,
+        "matches_lost": 1,
+        "points_for": 593
+      },
+      {
+        "entry": 7003,
+        "entry_name": "Cup Team 3",
+        "player_name": "Cup Manager 3",
+        "rank": 3,
+        "rank_sort": 3,
+        "last_rank": 4,
+        "total": 21,
+        "matches_played": 9,
+        "matches_won": 7,
+        "matches_drawn": 0,
+        "matches_lost": 2,
+        "points_for": 586
+      },
+      {
+        "entry": 7004,
+        "entry_name": "Cup Team 4",
+        "player_name": "Cup Manager 4",
+        "rank": 4,
+        "rank_sort": 4,
+        "last_rank": 5,
+        "total": 18,
+        "matches_played": 9,
+        "matches_won": 6,
+        "matches_drawn": 0,
+        "matches_lost": 3,
+        "points_for": 579
+      }
+    ]
+  }
+}

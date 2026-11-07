@@ -1,0 +1,78 @@
+{
+  "mid_season": {
+    "contract_version": "fpl_events_v1",
+    "source_time": "2026-10-19T17:30:00.000Z",
+    "events": [
+      {
+        "id": 1,
+        "finished": true,
+        "data_checked": true,
+        "average_entry_score": 41,
+        "highest_score": 101
+      },
+      {
+        "id": 2,
+        "finished": true,
+        "data_checked": true,
+        "average_entry_score": 42,
+        "highest_score": 102
+      },
+      {
+        "id": 3,
+        "finished": true,
+        "data_checked": true,
+        "average_entry_score": 43,
+        "highest_score": 103
+      },
+      {
+        "id": 4,
+        "finished": true,
+        "data_checked": true,
+        "average_entry_score": 44,
+        "highest_score": 104
+      },
+      {
+        "id": 5,
+        "finished": true,
+        "data_checked": true,
+        "average_entry_score": 45,
+        "highest_score": 105
+      },
+      {
+        "id": 6,
+        "finished": true,
+        "data_checked": true,
+        "average_entry_score": 46,
+        "highest_score": 106
+      },
+      {
+        "id": 7,
+        "finished": true,
+        "data_checked": true,
+        "average_entry_score": 47,
+        "highest_score": 107
+      },
+      {
+        "id": 8,
+        "finished": true,
+        "data_checked": true,
+        "average_entry_score": 48,
+        "highest_score": 108
+      },
+      {
+        "id": 9,
+        "finished": true,
+        "data_checked": true,
+        "average_entry_score": 49,
+        "highest_score": 109
+      },
+      {
+        "id": 10,
+        "finished": false,
+        "data_checked": false,
+        "average_entry_score": 0,
+        "highest_score": null
+      }
+    ]
+  }
+}

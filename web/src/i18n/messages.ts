@@ -353,6 +353,7 @@ const en = {
     } as Record<string, string>,
     // Direction D's member page: the top bar, the decision board, the plan in the sidebar.
     decisionTitle: "This week's move",
+    liveWeek: "LIVE WEEK",
     // The week's decisions in the decision card (#1134): the number of changes beside the
     // gain, and the link from the chosen chip into its detail below.
     storyTransfers: "Transfers",
@@ -917,6 +918,7 @@ const tr: MessageSchema<typeof en> = {
       freehit: "Free Hit",
     },
     decisionTitle: "Bu haftanın hamlesi",
+    liveWeek: "LIVE WEEK",
     storyTransfers: "Transferler",
     storyMoves: (count) => `${count} değişiklik`,
     storyDetail: "Ayrıntı",

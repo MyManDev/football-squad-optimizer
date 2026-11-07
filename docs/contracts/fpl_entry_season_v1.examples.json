@@ -1,0 +1,114 @@
+{
+  "nine_weeks": {
+    "contract_version": "fpl_entry_season_v1",
+    "entry_id": 5001,
+    "source_time": "2026-10-19T17:30:00.000Z",
+    "weeks": [
+      {
+        "event": 1,
+        "points": 51,
+        "total_points": 501,
+        "rank": null,
+        "overall_rank": 199999,
+        "event_transfers": 0,
+        "event_transfers_cost": 0,
+        "bank": 5,
+        "value": 1001
+      },
+      {
+        "event": 2,
+        "points": 52,
+        "total_points": 552,
+        "rank": 100002,
+        "overall_rank": 199998,
+        "event_transfers": 0,
+        "event_transfers_cost": 0,
+        "bank": 5,
+        "value": 1002
+      },
+      {
+        "event": 3,
+        "points": 53,
+        "total_points": 603,
+        "rank": 100003,
+        "overall_rank": 199997,
+        "event_transfers": 0,
+        "event_transfers_cost": 0,
+        "bank": 5,
+        "value": 1003
+      },
+      {
+        "event": 4,
+        "points": 54,
+        "total_points": 654,
+        "rank": 100004,
+        "overall_rank": 199996,
+        "event_transfers": 2,
+        "event_transfers_cost": 4,
+        "bank": 5,
+        "value": 1004
+      },
+      {
+        "event": 5,
+        "points": 55,
+        "total_points": 705,
+        "rank": 100005,
+        "overall_rank": 199995,
+        "event_transfers": 0,
+        "event_transfers_cost": 0,
+        "bank": 5,
+        "value": 1005
+      },
+      {
+        "event": 6,
+        "points": 56,
+        "total_points": 756,
+        "rank": 100006,
+        "overall_rank": 199994,
+        "event_transfers": 0,
+        "event_transfers_cost": 0,
+        "bank": 5,
+        "value": 1006
+      },
+      {
+        "event": 7,
+        "points": 57,
+        "total_points": 807,
+        "rank": 100007,
+        "overall_rank": 199993,
+        "event_transfers": 0,
+        "event_transfers_cost": 0,
+        "bank": 5,
+        "value": 1007
+      },
+      {
+        "event": 8,
+        "points": 58,
+        "total_points": 858,
+        "rank": 100008,
+        "overall_rank": 199992,
+        "event_transfers": 0,
+        "event_transfers_cost": 0,
+        "bank": 5,
+        "value": 1008
+      },
+      {
+        "event": 9,
+        "points": 59,
+        "total_points": 909,
+        "rank": 100009,
+        "overall_rank": 199991,
+        "event_transfers": 0,
+        "event_transfers_cost": 0,
+        "bank": 5,
+        "value": 1009
+      }
+    ],
+    "chips": [
+      {
+        "name": "bboost",
+        "event": 3
+      }
+    ]
+  }
+}
