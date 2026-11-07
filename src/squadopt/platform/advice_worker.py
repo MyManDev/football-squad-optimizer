@@ -55,7 +55,11 @@ from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
 
-from squadopt.application.advice_capabilities import PREDICTION_MODELS, menu_capabilities
+from squadopt.application.advice_capabilities import (
+    MEMBER_WINDOWS,
+    PREDICTION_MODELS,
+    menu_capabilities,
+)
 from squadopt.application.advice_menu import (
     PLAN_NOT_FOUND_ERRORS,
     ChipUnavailable,
@@ -407,11 +411,12 @@ def build_advice_compute(
         menu_spec = spec
         if PUBLIC_ENTRY_SWITCH in spec.switches:
             fingerprint = spec.switch(PUBLIC_ENTRY_SWITCH).get("fingerprint")
+            # The pure-points plan at any member window, with any switch the request
+            # recorded beside the pin; a rival strategy waits for a second pinned team.
             if (
                 public_inputs is None
-                or set(spec.switches) != {PUBLIC_ENTRY_SWITCH}
                 or spec.strategy != "saf-puan"
-                or spec.window != 1
+                or spec.window not in MEMBER_WINDOWS
                 or spec.rival_entry_id is not None
                 or not isinstance(fingerprint, str)
             ):
@@ -431,7 +436,14 @@ def build_advice_compute(
                     "The requested team's inputs are unavailable.",
                 ) from error
             capture = replace(capture, provider=provider)
-            menu_spec = replace(spec, switches={})
+            menu_spec = replace(
+                spec,
+                switches={
+                    name: value
+                    for name, value in spec.switches.items()
+                    if name != PUBLIC_ENTRY_SWITCH
+                },
+            )
         if capture.switches.official_injuries is not None:
             require_official_injury_source()
         request = _menu_request(menu_spec, capture)
