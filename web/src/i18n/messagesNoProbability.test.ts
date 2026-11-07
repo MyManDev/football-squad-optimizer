@@ -234,7 +234,7 @@ describe("every string a production component writes inline", () => {
       at.startsWith("features/league/advice/InformationReview.tsx:"),
     );
     expect(review.some(({ text }) => text === "FPL oynama değeri")).toBe(true);
-    expect(review.some(({ text }) => text === "FPL playing value")).toBe(true);
+    expect(review.some(({ text }) => text === "FPL Playing Value")).toBe(true);
     expect(review.filter(({ text }) => text === "%")).toEqual([]);
   });
   it("was actually read: literals, template text and JSX text, in both languages", () => {

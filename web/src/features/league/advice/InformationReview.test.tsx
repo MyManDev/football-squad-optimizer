@@ -43,7 +43,7 @@ it.each(["tr", "en"] as const)(
     );
     const comparison = screen.getByTestId("policy-comparison");
     expect(comparison).toHaveTextContent(
-      language === "tr" ? "Bu ilk hamleden sonra: 2 ücretsiz" : "After this first action: 2 free",
+      language === "tr" ? "Bu ilk hamleden sonra: 2 ücretsiz" : "After This First Action: 2 free",
     );
     expect(comparison).not.toHaveTextContent("110");
     expect(comparison).not.toHaveTextContent("130");
@@ -113,7 +113,7 @@ it("does not relabel a missing weighted rescore as zero points", () => {
     </LanguageProvider>,
   );
   expect(screen.getByTestId("information-review")).toHaveTextContent(
-    "Expected window net points: —",
+    "Expected Window Net Points: —",
   );
 });
 
@@ -145,7 +145,7 @@ it("shows the first vice and bench order when alternatives differ only in lineup
   const region = screen.getByTestId("information-review");
   expect(region).toHaveTextContent("Vice-captain: Starter 3");
   expect(region).toHaveTextContent(
-    "Bench order: Reserve keeper → First substitute → Second substitute → Third substitute",
+    "Bench Order: Reserve keeper → First substitute → Second substitute → Third substitute",
   );
   expect(isAdvicePayload(data)).toBe(true);
   data.information_review!.candidates[0]!.first_lineup.bench.pop();
@@ -182,8 +182,8 @@ it.each([3, 5] as const)(
     for (const branch of candidate.branches) {
       const summary = screen.getByText(
         branch.state === "eligible"
-          ? "If eligibility is confirmed"
-          : "If unavailability is confirmed",
+          ? "If Eligibility Is Confirmed"
+          : "If Unavailability Is Confirmed",
       );
       fireEvent.click(summary);
       const section = summary.closest("details")!;

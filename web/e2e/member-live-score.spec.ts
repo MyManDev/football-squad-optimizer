@@ -154,7 +154,7 @@ for (const language of ["tr", "en"] as const) {
     const notice = page.getByTestId("deadline-passed");
     await expect(notice).toContainText(COMPUTE_COPY[language].deadlinePassedTitle);
     const card = page.locator("[data-member-live-score]");
-    await expect(card).toContainText(language === "tr" ? "Bonus bekleniyor" : "Bonus pending");
+    await expect(card).toContainText(language === "tr" ? "Bonus bekleniyor" : "Bonus Pending");
     await expect(card.getByRole("heading", { level: 2 })).toContainText(String(gameweek));
     // The card is the notice's next sibling: it stands beside it, before the decision.
     expect(
@@ -180,7 +180,7 @@ for (const language of ["tr", "en"] as const) {
 
     // Refresh reads the live points again, and nothing else.
     await card.getByRole("button", { name: language === "tr" ? "Yenile" : "Refresh" }).click();
-    await expect(card).toContainText(language === "tr" ? "Bonus eklendi" : "Bonus added");
+    await expect(card).toContainText(language === "tr" ? "Bonus eklendi" : "Bonus Added");
     await assertPlayerPoints("finished");
     expect(asked.live).toHaveLength(2);
     expect(asked.bundle).toHaveLength(1);

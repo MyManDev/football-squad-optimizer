@@ -169,7 +169,7 @@ describe("the latest finished week's card", () => {
     ],
     [
       "en",
-      "Last week's result",
+      "Last Week's Result",
       "GW1",
       "+12.6 against the league mean",
       "up 2 places",

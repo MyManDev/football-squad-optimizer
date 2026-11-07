@@ -129,7 +129,7 @@ describe("the controls with the service's capabilities", () => {
         chipsByEntry: { [ENTRY]: ["3xc"] },
       });
       expect(inputs("chip").map((input) => input.value)).not.toContain("auto");
-      expect(container).not.toHaveTextContent(/Otomatik strateji|Automatic strategy/);
+      expect(container).not.toHaveTextContent(/Otomatik strateji|Automatic Strategy/);
       expect(enabledValues("chip")).toEqual(["", "3xc"]);
       expect(inputs("chip").find((input) => input.value === "")).toBeChecked();
       fireEvent.click(inputs("chip").find((input) => input.value === "3xc")!);

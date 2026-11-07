@@ -16,14 +16,14 @@ const COPY = {
     none: "Transfer yok",
   },
   en: {
-    title: "My season report",
+    title: "My Season Report",
     week: "Gameweek",
-    actual: "My squad points",
-    advice: "Suggested squad",
-    hits: "Transfer hit",
+    actual: "My Squad Points",
+    advice: "Suggested Squad",
+    hits: "Transfer Hit",
     captain: "Captain",
-    transfers: "My transfers",
-    none: "No transfers",
+    transfers: "My Transfers",
+    none: "No Transfers",
   },
 };
 

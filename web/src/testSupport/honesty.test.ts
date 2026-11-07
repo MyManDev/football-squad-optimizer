@@ -74,7 +74,7 @@ describe("the shared product-copy honesty guard", () => {
   );
 
   it.each([
-    "Free transfers: unknown",
+    "Free Transfers: unknown",
     "Ücretsiz transfer: bilinmiyor",
     "No chip information",
     "Chip bilgisi yok",
