@@ -27,6 +27,11 @@ export const STANDINGS_CONTRACT = "fpl_league_standings_v1";
 export const BUNDLE_CONTRACT = "fpl_entry_bundle_v1";
 export const LIVE_CONTRACT = "week_live_v1";
 export const ACTIVITY_CONTRACT = "week_activity_v1";
+export const SEASON_CONTRACT = "fpl_entry_season_v1";
+export const EVENTS_CONTRACT = "fpl_events_v1";
+
+/** The season's event summary is kept for an hour: its averages move only while a week is played. */
+export const EVENTS_TTL_SECONDS = 3600;
 
 /** A bounded page range for on-demand classic and country league standings. */
 export const MAX_STANDINGS_PAGE = 1000;
@@ -72,6 +77,8 @@ const SEASON_TEXT = /^[0-9]{4}-[0-9]{2}$/;
 const STANDINGS_PATH = /^\/api\/v1\/fpl\/standings\/([^/]+)$/;
 const BUNDLE_PATH = /^\/api\/v1\/fpl\/entry\/([^/]+)\/bundle$/;
 const LIVE_PATH = /^\/api\/v1\/fpl\/live\/([^/]+)$/;
+const SEASON_PATH = /^\/api\/v1\/fpl\/entry\/([^/]+)\/season$/;
+const EVENTS_PATH = /^\/api\/v1\/fpl\/events$/;
 
 /** A document from FPL or the site that does not have the shape this module reads. */
 export class UnreadableError extends Error {
@@ -110,13 +117,23 @@ function onlyParameters(searchParams, names) {
  * - /api/v1/fpl/standings/{league}?page={1..1000} gives { kind: "standings", league, page }
  * - /api/v1/fpl/entry/{entry}/bundle?gw={1..38} gives { kind: "bundle", entry, gameweek }
  * - /api/v1/fpl/live/{1..38} gives { kind: "live", gameweek }
+ * - /api/v1/fpl/entry/{entry}/season gives { kind: "season", entry }
+ * - /api/v1/fpl/events gives { kind: "events" }
  */
 export function routeFor(method, url) {
   const { pathname, searchParams } = url;
   const standings = STANDINGS_PATH.exec(pathname);
   const bundle = BUNDLE_PATH.exec(pathname);
   const live = LIVE_PATH.exec(pathname);
-  if (standings === null && bundle === null && live === null) {
+  const season = SEASON_PATH.exec(pathname);
+  const events = EVENTS_PATH.exec(pathname);
+  if (
+    standings === null &&
+    bundle === null &&
+    live === null &&
+    season === null &&
+    events === null
+  ) {
     return notFound("the forwarder answers only its three routes");
   }
   if (method !== "GET") {
@@ -148,6 +165,16 @@ export function routeFor(method, url) {
     if (gameweek === null) return notFound(`gw is a whole number from 1 to ${LAST_GAMEWEEK}`);
     return { kind: "bundle", entry, gameweek };
   }
+  if (season !== null) {
+    const entry = positiveId(season[1]);
+    if (entry === null) return notFound("an entry id is a positive integer");
+    if (!onlyParameters(searchParams, [])) return notFound("a season takes no query");
+    return { kind: "season", entry };
+  }
+  if (events !== null) {
+    if (!onlyParameters(searchParams, [])) return notFound("the events take no query");
+    return { kind: "events" };
+  }
   const gameweek = smallNumber(live[1], LAST_GAMEWEEK);
   if (gameweek === null) return notFound(`a gameweek is a whole number from 1 to ${LAST_GAMEWEEK}`);
   if (onlyParameters(searchParams, ["view"]) && searchParams.get("view") === "activity") {
@@ -166,7 +193,9 @@ export function cacheKeys(route) {
   else if (route.kind === "bundle") tail = `bundle/${route.entry}/${route.gameweek}`;
   else if (route.kind === "live") {
     tail = `live/${route.gameweek}${route.view === "activity" ? "/activity" : ""}`;
-  } else throw new TypeError(`no cache keys for a route of kind ${String(route.kind)}`);
+  } else if (route.kind === "season") tail = `season/${route.entry}`;
+  else if (route.kind === "events") tail = "events";
+  else throw new TypeError(`no cache keys for a route of kind ${String(route.kind)}`);
   return {
     fresh: `${SITE_ORIGIN}${CACHE_PREFIX}fresh/${tail}`,
     lastGood: `${SITE_ORIGIN}${CACHE_PREFIX}last-good/${tail}`,
@@ -183,6 +212,8 @@ export const upstreamPaths = Object.freeze({
   picks: (entry, gameweek) => `entry/${entry}/event/${gameweek}/picks/`,
   live: (gameweek) => `event/${gameweek}/live/`,
   fixtures: (gameweek) => `fixtures/?event=${gameweek}`,
+  /** Read for the events route only, and trimmed to each gameweek's state and scores. */
+  bootstrap: () => "bootstrap-static/",
 });
 
 // Readers. Each one takes a parsed JSON value and returns only the fields named, or throws
@@ -684,4 +715,65 @@ function activityFrom(live, fixtures, week) {
   }
   appearances.sort((a, b) => a.element_id - b.element_id || a.fixture_id - b.fixture_id);
   return { in_play_fixtures: inPlay, appearances };
+}
+
+/** An integer FPL gives, or null where it gives none or a value below `minimum`. */
+function integerOrNull(value, minimum = Number.MIN_SAFE_INTEGER) {
+  return Number.isSafeInteger(value) && value >= minimum ? value : null;
+}
+
+/**
+ * entry/{id}/history/ trimmed to fpl_entry_season_v1: each played week's points, running
+ * total, ranks, transfers, hit, bank and value, and the chips played. What a league the site
+ * does not publish needs for its scoreboard, race and history, read on the visitor's request.
+ */
+export function seasonDocument(raw, { entry, sourceTime }) {
+  const document = object(raw, "history");
+  const weeks = array(document.current, "history.current")
+    .map((value) => {
+      const row = object(value, "history row");
+      return {
+        event: week(row.event, "history.event"),
+        points: integer(row.points, "history.points"),
+        total_points: integer(row.total_points, "history.total_points"),
+        rank: integerOrNull(row.rank, 0),
+        overall_rank: integerOrNull(row.overall_rank, 0),
+        event_transfers: integer(row.event_transfers, "history.event_transfers", 0),
+        event_transfers_cost: integer(row.event_transfers_cost, "history.event_transfers_cost", 0),
+        bank: integerOrNull(row.bank),
+        value: integerOrNull(row.value),
+      };
+    })
+    .sort(byNumber("event"));
+  refuseRepeats(weeks, "event", "gameweek");
+  return {
+    contract_version: SEASON_CONTRACT,
+    entry_id: entry,
+    source_time: sourceTime,
+    weeks,
+    chips: historyPart(raw).chips,
+  };
+}
+
+/**
+ * bootstrap-static/ trimmed to fpl_events_v1: each gameweek's state and the game's average and
+ * highest score. Nothing else of the bootstrap (players, clubs, prices) leaves the Worker; the
+ * weekly run publishes what the device needs of those.
+ */
+export function eventsDocument(raw, { sourceTime }) {
+  const document = object(raw, "bootstrap");
+  const events = array(document.events, "bootstrap.events")
+    .map((value) => {
+      const row = object(value, "event");
+      return {
+        id: week(row.id, "event.id"),
+        finished: flag(row.finished, "event.finished"),
+        data_checked: flag(row.data_checked, "event.data_checked"),
+        average_entry_score: integer(row.average_entry_score, "event.average_entry_score", 0),
+        highest_score: integerOrNull(row.highest_score, 0),
+      };
+    })
+    .sort(byNumber("id"));
+  refuseRepeats(events, "id", "event");
+  return { contract_version: EVENTS_CONTRACT, source_time: sourceTime, events };
 }

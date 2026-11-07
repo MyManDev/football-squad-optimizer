@@ -25,6 +25,10 @@ STANDINGS = _load("fpl_league_standings_v1.schema.json")
 STANDINGS_EXAMPLES = _load("fpl_league_standings_v1.examples.json")
 BUNDLE = _load("fpl_entry_bundle_v1.schema.json")
 BUNDLE_EXAMPLES = _load("fpl_entry_bundle_v1.examples.json")
+SEASON = _load("fpl_entry_season_v1.schema.json")
+SEASON_EXAMPLES = _load("fpl_entry_season_v1.examples.json")
+EVENTS = _load("fpl_events_v1.schema.json")
+EVENTS_EXAMPLES = _load("fpl_events_v1.examples.json")
 WEEK_LIVE = _load("week_live_v1.schema.json")
 
 
@@ -153,3 +157,60 @@ def test_bundle_without_a_member_week_is_still_a_bundle():
     example = copy.deepcopy(BUNDLE_EXAMPLES["late_joiner"])
     example["current_week"] = None
     _validator(BUNDLE).validate(example)
+
+
+@pytest.mark.parametrize("name", sorted(SEASON_EXAMPLES))
+def test_season_examples_match_the_schema_and_rise_week_by_week(name):
+    example = SEASON_EXAMPLES[name]
+    _validator(SEASON).validate(example)
+    assert example["contract_version"] == "fpl_entry_season_v1"
+    weeks = [row["event"] for row in example["weeks"]]
+    assert weeks == sorted(weeks) and len(set(weeks)) == len(weeks)
+    # The week's points are here and nowhere in the bundle, so the two documents stay apart.
+    assert all("points" in row and "total_points" in row for row in example["weeks"])
+    assert all("points" not in row for row in BUNDLE_EXAMPLES["late_joiner"]["history"]["current"])
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        lambda item: item["weeks"][0].update(points_on_bench=4),
+        lambda item: item["weeks"][0].update(event_transfers_cost=-4),
+        lambda item: item["weeks"][0].pop("total_points"),
+        lambda item: item["chips"][0].update(time="2026-09-01T00:00:00Z"),
+        lambda item: item.update(entry_id=0),
+    ],
+)
+def test_season_schema_refuses_malformed_or_unrequested_values(damage):
+    example = copy.deepcopy(SEASON_EXAMPLES["nine_weeks"])
+    damage(example)
+    with pytest.raises(ValidationError):
+        _validator(SEASON).validate(example)
+
+
+@pytest.mark.parametrize("name", sorted(EVENTS_EXAMPLES))
+def test_events_examples_match_the_schema(name):
+    example = EVENTS_EXAMPLES[name]
+    _validator(EVENTS).validate(example)
+    assert example["contract_version"] == "fpl_events_v1"
+    ids = [row["id"] for row in example["events"]]
+    assert ids == sorted(ids) and len(set(ids)) == len(ids)
+    for row in example["events"]:
+        if not row["finished"]:
+            assert row["highest_score"] is None
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        lambda item: item["events"][0].update(deadline_time="2026-08-21T17:30:00Z"),
+        lambda item: item["events"][0].update(finished="true"),
+        lambda item: item["events"][0].update(id=39),
+        lambda item: item.update(elements=[]),
+    ],
+)
+def test_events_schema_refuses_the_rest_of_the_bootstrap(damage):
+    example = copy.deepcopy(EVENTS_EXAMPLES["mid_season"])
+    damage(example)
+    with pytest.raises(ValidationError):
+        _validator(EVENTS).validate(example)

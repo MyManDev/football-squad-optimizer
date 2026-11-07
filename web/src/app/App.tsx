@@ -34,9 +34,9 @@ const ForwardedLeaguePage = lazy(() =>
     default: m.ForwardedLeaguePage,
   })),
 );
-const ForwardedMemberPage = lazy(() =>
-  import("../features/league/forwarded/ForwardedMemberPage").then((m) => ({
-    default: m.ForwardedMemberPage,
+const ForwardedMemberGate = lazy(() =>
+  import("../features/league/forwarded/ForwardedMemberGate").then((m) => ({
+    default: m.ForwardedMemberGate,
   })),
 );
 const LeagueMemberHistoryPage = lazy(() =>
@@ -115,7 +115,13 @@ function LocalizedApp({ basename }: { basename: string }) {
                     key={root}
                     path={root}
                     element={
-                      <LeagueGate forwarded={<ForwardedMemberPage />}>
+                      <LeagueGate
+                        forwarded={
+                          <ForwardedMemberGate>
+                            <LeagueMemberPage />
+                          </ForwardedMemberGate>
+                        }
+                      >
                         <LeagueMemberPage />
                       </LeagueGate>
                     }
@@ -129,7 +135,13 @@ function LocalizedApp({ basename }: { basename: string }) {
                     key={root}
                     path={root}
                     element={
-                      <LeagueGate>
+                      <LeagueGate
+                        forwarded={
+                          <ForwardedMemberGate>
+                            <LeagueMemberHistoryPage />
+                          </ForwardedMemberGate>
+                        }
+                      >
                         <LeagueMemberHistoryPage />
                       </LeagueGate>
                     }
@@ -137,7 +149,14 @@ function LocalizedApp({ basename }: { basename: string }) {
                 ))}
                 {/* One FPL team on its own, from the forwarder's bundle: no league, so no
                     gate and no member step. */}
-                <Route path="/entry/:entryId" element={<ForwardedMemberPage />} />
+                <Route
+                  path="/entry/:entryId"
+                  element={
+                    <ForwardedMemberGate standalone>
+                      <LeagueMemberPage />
+                    </ForwardedMemberGate>
+                  }
+                />
                 <Route path="/fixtures" element={<FixturesPage />} />
                 {import.meta.env.VITE_ADVICE_API_ORIGIN && (
                   <Route path="/contribute" element={<ContributePage />} />
