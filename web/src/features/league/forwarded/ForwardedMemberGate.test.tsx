@@ -140,6 +140,8 @@ const SOURCES: ForwardedSources = {
     entry === ENTRY
       ? { ok: true, document: BUNDLE as FplEntryBundle, copy: "hit" }
       : { ok: false, reason: "entry_not_found" },
+  entrySeason: async () => ({ ok: false, reason: "entry_not_found" }),
+  events: async () => ({ ok: false, reason: "not_found" }),
 };
 
 /** What the page under the gate is handed: the league in context and its tree. */

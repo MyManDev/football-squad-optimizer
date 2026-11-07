@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useContext, useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -6,6 +6,11 @@ import { crossfade } from "../../../design/viewTransition";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { memberAddress } from "../../../lib/leagueAddresses";
+import { ScoreboardSection } from "../components/ScoreboardCard";
+import { LeagueContext } from "../LeagueContext";
+import { useLeagueMembers, useLeagueScoreboard } from "../queries";
+import { leagueRace } from "../race/leagueRace";
+import { LeagueRaceCard } from "../race/LeagueRaceCard";
 import { useForwardedLeague } from "./ForwardedLeagueContext";
 import { MAX_STANDINGS_PAGE } from "../forwarder/documents";
 import { standingsPage, useForwardedStandings } from "./reads";
@@ -54,11 +59,33 @@ function rememberPage(leagueId: number, page: number): void {
   }
 }
 
+/**
+ * The scoreboard and the race a listed league's pages show, read through the forwarded
+ * league's tree: the members' seasons and the game's events, built on the device. Drawn only
+ * where the gate stood a tree above the page.
+ */
+function ForwardedLeagueCards() {
+  const scoreboard = useLeagueScoreboard();
+  const members = useLeagueMembers();
+  const view = members.data?.payload;
+  const race =
+    scoreboard.data && view
+      ? leagueRace(scoreboard.data.payload, view.members, view.scored_gameweek)
+      : null;
+  return (
+    <>
+      <ScoreboardSection />
+      {race && view ? <LeagueRaceCard race={race} members={view.members} /> : null}
+    </>
+  );
+}
+
 function ForwardedLeagueTable() {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const words = messages.forwarded;
   const league = useForwardedLeague();
+  const tree = useContext(LeagueContext);
   const [search, setSearch] = useSearchParams();
   const page = standingsPage(search.get("page"));
   const leagueId = league?.leagueId ?? null;
@@ -100,6 +127,7 @@ function ForwardedLeagueTable() {
       <h1 className={styles.title} id="league-table-title">
         {name}
       </h1>
+      {tree !== null ? <ForwardedLeagueCards /> : null}
       <form className={styles.pagination} onSubmit={submit} aria-label={words.pagination}>
         <button
           type="button"

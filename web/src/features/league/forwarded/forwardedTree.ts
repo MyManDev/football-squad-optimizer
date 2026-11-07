@@ -4,17 +4,29 @@
  * standings pages read, each member's squad from their bundle and the capture's table, and
  * a device-menu index for each, so the member page's shared hooks (`useLeagueMemberData`,
  * `useDevicePlan`, `useMemberLiveScore`) read a forwarded league exactly as they read a
- * published one. Nothing is solved ahead for such a league, so every advice document, the
- * scoreboard and the history still read as not published.
+ * published one. The scoreboard and each member's history are built from the members'
+ * seasons and the game's events (`forwardedScoreboard`). Nothing is solved ahead for such a
+ * league, so every advice document still reads as not published.
  */
 
 import type { FixturesPayload } from "../../fixtures/types";
 import { LeagueDataError, LeagueDataMissing, type LeagueTree } from "../data";
 import type { PublishedLeague } from "../directory";
 import { RIVAL_STRATEGIES, type DevicePlanDocument } from "../device/types";
-import { entryBundle as readBundle, standings as readStandings } from "../forwarder/client";
+import {
+  entryBundle as readBundle,
+  entrySeason as readSeason,
+  events as readEvents,
+  standings as readStandings,
+} from "../forwarder/client";
 import type { ForwarderClient } from "../forwarder/client";
-import type { FplEntryBundle, FplLeagueStandings, FplStandingRow } from "../forwarder/documents";
+import type {
+  FplEntryBundle,
+  FplEntrySeason,
+  FplLeagueStandings,
+  FplStandingRow,
+} from "../forwarder/documents";
+import { forwardedHistory, forwardedScoreboard } from "./forwardedScoreboard";
 import { assertAdviceIndex, assertMembers } from "../publicationShape";
 import type {
   EntryAdviceIndex,
@@ -24,6 +36,7 @@ import type {
   LeagueMembers,
   LeagueViewEnvelope,
   RankMovement,
+  Scoreboard,
 } from "../types";
 import { forwardedMemberSquad } from "./memberSquad";
 
@@ -31,6 +44,8 @@ import { forwardedMemberSquad } from "./memberSquad";
 export interface ForwardedSources {
   standings: ForwarderClient["standings"];
   entryBundle: ForwarderClient["entryBundle"];
+  entrySeason: ForwarderClient["entrySeason"];
+  events: ForwarderClient["events"];
 }
 
 export interface ForwardedTreeInputs {
@@ -47,7 +62,12 @@ export interface ForwardedTreeInputs {
   sources?: ForwardedSources;
 }
 
-const SITE_SOURCES: ForwardedSources = { standings: readStandings, entryBundle: readBundle };
+const SITE_SOURCES: ForwardedSources = {
+  standings: readStandings,
+  entryBundle: readBundle,
+  entrySeason: readSeason,
+  events: readEvents,
+};
 
 /** The movement a standings row states, in the member list's words and under its rule. */
 function movementOf(row: FplStandingRow): Pick<EntryView, "movement" | "movement_places"> {
@@ -125,6 +145,8 @@ export function forwardedTree({
   const gameweek = table.payload.gameweek;
   const standingsPages: FplLeagueStandings[] = [...pages];
   const squads = new Map<number, Promise<LeagueViewEnvelope<EntrySquad>>>();
+  const seasons = new Map<number, Promise<FplEntrySeason | null>>();
+  let board: Promise<LeagueViewEnvelope<Scoreboard>> | null = null;
   let firstPage: Promise<FplLeagueStandings> | null = null;
 
   function standingOf(entryId: number): FplStandingRow | null {
@@ -266,7 +288,63 @@ export function forwardedTree({
     entryAdviceChip: unpublished("advice"),
     entryAdviceTop100: unpublished("advice"),
     entryAdviceIndex,
-    scoreboard: unpublished("scoreboard.json"),
-    raw: (relative) => Promise.reject(new LeagueDataMissing(relative)),
+    scoreboard,
+    raw,
   };
+
+  /** One member's season, read once per tree; a team FPL does not have reads as none. */
+  function seasonOf(entryId: number): Promise<FplEntrySeason | null> {
+    let season = seasons.get(entryId);
+    if (season === undefined) {
+      season = sources.entrySeason(entryId).then((read) => {
+        if (read.ok) return read.document;
+        if (read.reason === "entry_not_found" || read.reason === "not_found") return null;
+        throw new LeagueDataError(`The season of ${entryId} could not be read: ${read.reason}.`);
+      });
+      seasons.set(entryId, season);
+    }
+    return season;
+  }
+
+  /**
+   * The scoreboard, from the members the pages name: each one's season and the game's
+   * events, read once per tree. A league with no page read yet reads page 1 first.
+   */
+  async function scoreboard(): Promise<LeagueViewEnvelope<Scoreboard>> {
+    if (league.leagueId <= 0) throw new LeagueDataMissing("scoreboard.json");
+    board ??= (async () => {
+      const pages = await knownPages();
+      const members = pages.flatMap((page) => page.results);
+      const [calendar, read] = await Promise.all([
+        sources.events(),
+        Promise.all(members.map((member) => seasonOf(member.entry))),
+      ]);
+      if (!calendar.ok) {
+        throw new LeagueDataError(`The game's events could not be read: ${calendar.reason}.`);
+      }
+      const answered = new Map<number, FplEntrySeason>();
+      members.forEach((member, index) => {
+        const season = read[index];
+        if (season !== null && season !== undefined) answered.set(member.entry, season);
+      });
+      return forwardedScoreboard({
+        leagueId: league.leagueId,
+        table,
+        members,
+        seasons: answered,
+        events: calendar.document,
+        fixtures,
+      });
+    })();
+    return board;
+  }
+
+  /** The member histories; the requested history and every other document stay unpublished. */
+  async function raw(relative: string): Promise<unknown> {
+    const match = /^history\/([1-9][0-9]*)\.json$/.exec(relative);
+    if (match === null || league.leagueId <= 0) throw new LeagueDataMissing(relative);
+    const season = await seasonOf(Number(match[1]));
+    if (season === null) throw new LeagueDataMissing(relative);
+    return forwardedHistory({ leagueId: league.leagueId, table, season, fixtures });
+  }
 }

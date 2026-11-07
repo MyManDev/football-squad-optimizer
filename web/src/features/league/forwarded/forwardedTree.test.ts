@@ -83,6 +83,8 @@ function sources(overrides: Partial<ForwardedSources> = {}): ForwardedSources {
   return {
     standings: vi.fn(async () => ok<FplLeagueStandings, StandingsReason>(page())),
     entryBundle: vi.fn(async (entry: number) => ok<FplEntryBundle, BundleReason>(bundleFor(entry))),
+    entrySeason: vi.fn(async () => ({ ok: false, reason: "entry_not_found" }) as const),
+    events: vi.fn(async () => ({ ok: false, reason: "not_found" }) as const),
     ...overrides,
   };
 }
@@ -240,8 +242,20 @@ describe("what stays unpublished", () => {
       sources: sources(),
     });
     await expect(tree.entryAdvice(ENTRY, "saf-puan", 1)).rejects.toBeInstanceOf(LeagueDataMissing);
-    await expect(tree.scoreboard()).rejects.toBeInstanceOf(LeagueDataMissing);
+    // The scoreboard and the history are built from the forwarder: a team FPL does not have
+    // has no history, a game whose events cannot be read has no scoreboard, and a team on
+    // its own has neither.
+    await expect(tree.scoreboard()).rejects.toBeInstanceOf(LeagueDataError);
     await expect(tree.raw("history/1.json")).rejects.toBeInstanceOf(LeagueDataMissing);
+    await expect(tree.raw("scoreboard.json")).rejects.toBeInstanceOf(LeagueDataMissing);
+    const alone = forwardedTree({
+      league: { ...LEAGUE, leagueId: 0, leagueName: "" },
+      table: TABLE_ENVELOPE,
+      fixtures: null,
+      sources: sources(),
+    });
+    await expect(alone.scoreboard()).rejects.toBeInstanceOf(LeagueDataMissing);
+    await expect(alone.raw(`history/${ENTRY}.json`)).rejects.toBeInstanceOf(LeagueDataMissing);
     await expect(tree.devicePlan("other")).rejects.toBeInstanceOf(LeagueDataMissing);
     expect((await tree.devicePlan(CAPTURE)).payload.source_snapshot_id).toBe(CAPTURE);
   });
