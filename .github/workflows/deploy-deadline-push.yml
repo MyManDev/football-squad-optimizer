@@ -1,0 +1,162 @@
+name: Deploy deadline reminder
+
+# The deadline reminder Worker (ADR 0013): push subscriptions in D1, a quarter-hour cron that
+# sends one notification per subscriber three hours before a deadline. Dispatched by hand from
+# the default branch, like the forwarder; nothing here runs on push. The Pages site is not
+# touched. The VAPID private key lives only in the cloudflare-workers environment's secrets and
+# is written to the Worker as a secret here; its public half is in wrangler.toml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: deploy the reminder Worker, or delete it
+        required: true
+        type: choice
+        options:
+          - deploy
+          - delete
+        default: deploy
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: "4.123.0"
+  WORKER_NAME: squadopt-deadline-push
+  DATABASE_NAME: squadopt-push
+
+jobs:
+  reject_untrusted_dispatch:
+    name: reject non-default dispatch
+    if: github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          echo "::error::The deadline reminder must be dispatched from the default branch."
+          exit 1
+
+  reminder:
+    name: ${{ inputs.action }} deadline reminder
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: cloudflare-workers
+    concurrency:
+      group: cloudflare-workers-deadline-push
+      queue: max
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Require the credentials
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          missing=""
+          if [[ -z "$CLOUDFLARE_API_TOKEN" ]]; then missing="$missing CLOUDFLARE_WORKERS_API_TOKEN"; fi
+          if [[ -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then missing="$missing CLOUDFLARE_ACCOUNT_ID"; fi
+          if [[ "${{ inputs.action }}" == "deploy" && -z "$VAPID_PRIVATE_KEY" ]]; then missing="$missing VAPID_PRIVATE_KEY"; fi
+          if [[ -n "$missing" ]]; then
+            echo "::error::The cloudflare-workers environment has no secret named:$missing."
+            exit 1
+          fi
+
+      - name: Checkout the Worker
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      # The same files as the CI step in ci.yml; deploy-steps.test.mjs checks both lists against
+      # the test directory.
+      - name: Test the Worker before it ships
+        if: inputs.action == 'deploy'
+        run: |
+          node --test \
+            workers/deadline-push/test/rules.test.mjs \
+            workers/deadline-push/test/webpush.test.mjs \
+            workers/deadline-push/test/worker.test.mjs \
+            workers/deadline-push/test/deploy-steps.test.mjs
+
+      # The database is created once; every later deploy finds it. Its id is written into
+      # wrangler.toml for this run only (the committed file holds a placeholder).
+      - name: Find or create the database
+        if: inputs.action == 'deploy'
+        working-directory: workers/deadline-push
+        shell: bash
+        run: |
+          id=$(npx --yes wrangler@"$WRANGLER_VERSION" d1 list --json | node -e '
+            const rows = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const row = rows.find((r) => r.name === process.argv[1]);
+            if (row) process.stdout.write(row.uuid);
+          ' "$DATABASE_NAME")
+          if [[ -z "$id" ]]; then
+            npx --yes wrangler@"$WRANGLER_VERSION" d1 create "$DATABASE_NAME" >/dev/null
+            id=$(npx --yes wrangler@"$WRANGLER_VERSION" d1 list --json | node -e '
+              const rows = JSON.parse(require("fs").readFileSync(0, "utf8"));
+              process.stdout.write(rows.find((r) => r.name === process.argv[1]).uuid);
+            ' "$DATABASE_NAME")
+            echo "created database $DATABASE_NAME"
+          fi
+          [[ -n "$id" ]] || { echo "::error::no database id"; exit 1; }
+          sed -i "s/DATABASE_ID_SET_BY_DEPLOY/$id/" wrangler.toml
+          grep -q "database_id = \"$id\"" wrangler.toml
+
+      - name: Apply the migrations
+        if: inputs.action == 'deploy'
+        working-directory: workers/deadline-push
+        run: npx --yes wrangler@"$WRANGLER_VERSION" d1 migrations apply "$DATABASE_NAME" --remote
+
+      - name: Deploy the Worker
+        id: deploy
+        if: inputs.action == 'deploy'
+        working-directory: workers/deadline-push
+        run: npx --yes wrangler@"$WRANGLER_VERSION" deploy
+
+      # The secret is written after the first deploy, which creates the Worker, and on every
+      # deploy after it, so a rotated key in the environment reaches the Worker.
+      - name: Write the VAPID private key
+        if: steps.deploy.outcome == 'success'
+        working-directory: workers/deadline-push
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        shell: bash
+        run: printf '%s' "$VAPID_PRIVATE_KEY" | npx --yes wrangler@"$WRANGLER_VERSION" secret put VAPID_PRIVATE_KEY
+
+      - name: Smoke the Worker
+        id: smoke
+        if: steps.deploy.outcome == 'success'
+        run: node workers/deadline-push/scripts/deploy-steps.mjs smoke
+
+      # --force skips wrangler's check for dependent Workers, which this one has none of. The
+      # database and its rows are kept: deleting them is a decision, not a step.
+      - name: Delete the Worker
+        id: delete_worker
+        if: inputs.action == 'delete'
+        continue-on-error: true
+        run: npx --yes wrangler@"$WRANGLER_VERSION" delete --name "$WORKER_NAME" --force
+
+      - name: Report the result
+        if: always()
+        env:
+          ACTION: ${{ inputs.action }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          DELETE_WORKER_OUTCOME: ${{ steps.delete_worker.outcome }}
+        run: |
+          echo "## Deadline reminder: $ACTION" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$ACTION" == "deploy" ]]; then
+            echo "- Deploy: ${DEPLOY_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Smoke: ${SMOKE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Routes: https://squadopt.mymandev.com/api/v1/push/" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Worker delete: ${DELETE_WORKER_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          fi

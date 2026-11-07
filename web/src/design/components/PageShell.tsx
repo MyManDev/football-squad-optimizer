@@ -61,10 +61,13 @@ export function PageShell({
   children,
   identity = NO_IDENTITY,
   onChangeMember,
+  whoExtra = null,
 }: {
   children: ReactNode;
   identity?: ShellIdentity;
   onChangeMember?: () => void;
+  /** A control drawn in the identity block after Değiştir; the shell knows nothing of it. */
+  whoExtra?: ReactNode;
 }) {
   const { messages } = useLanguage();
   const copy = messages.shell;
@@ -493,6 +496,7 @@ export function PageShell({
                   >
                     {copy.changeMember}
                   </button>
+                  {whoExtra}
                 </div>
               ) : null}
               {own !== null && rail ? (

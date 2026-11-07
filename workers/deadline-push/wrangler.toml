@@ -1,0 +1,43 @@
+# The deadline reminder: a Worker that keeps push subscriptions in D1 and, on a quarter-hour
+# cron, sends one notification per subscriber when a gameweek's deadline is three hours away
+# (docs/architecture/decisions/0013-deadline-reminders.md). Deployed only by
+# .github/workflows/deploy-deadline-push.yml. The Pages site stays static.
+
+name = "squadopt-deadline-push"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+workers_dev = false
+preview_urls = false
+
+# Every path under /api/v1/push/ on the site's host reaches this Worker; it answers two of
+# them and gives everything else its JSON 404. The forwarder's prefix, /api/v1/fpl/, does not
+# overlap it. The zone's /api/v1/ rate-limit rule applies in front of it.
+routes = [
+  { pattern = "squadopt.mymandev.com/api/v1/push/*", zone_name = "mymandev.com" },
+]
+
+# Every quarter hour: a run between deadlines reads one small document and sends nothing.
+[triggers]
+crons = ["*/15 * * * *"]
+
+# The database the deploy workflow creates on first use; it writes the id in before deploying.
+[[d1_databases]]
+binding = "PUSH_DB"
+database_name = "squadopt-push"
+database_id = "DATABASE_ID_SET_BY_DEPLOY"
+migrations_dir = "migrations"
+
+# The VAPID public key is public by design: every page reads it from /api/v1/push/key. Its
+# private half is the secret VAPID_PRIVATE_KEY, set by the deploy workflow, never written here.
+[vars]
+VAPID_PUBLIC_KEY = "BK7BePS7FVBicBLMvkKWkFAILk4LJNZLLgTcbdG-AjIMqK76zCrXiEmw-9arKEAPnf1UdoigvohfcBRxC9PsJ58"
+VAPID_SUBJECT = "https://squadopt.mymandev.com"
+
+# Console lines only (counts per run, a refused push); the per-request invocation logs, which
+# would record every subscriber's endpoint, are not kept.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false
