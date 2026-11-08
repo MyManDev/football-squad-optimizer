@@ -27,10 +27,10 @@
 
 | Command | Prints | Exit |
 | --- | --- | --- |
-| Step 3 | `87 of 87 record checks hold` | 0 |
+| Step 3 | `90 of 90 record checks hold` | 0 |
 | Step 4 | `Wrote 5 paper figures to ...` | 0 |
-| Step 6 | a 26-page `squadopt_walk_forward_paper.pdf` | 0 |
-| Check | `87 of 87 record checks hold`; `39 of 41 manifest rows match`, two `unpinned` | 0 |
+| Step 6 | a 27-page `squadopt_walk_forward_paper.pdf` | 0 |
+| Check | `90 of 90 record checks hold`; `39 of 41 manifest rows match`, two `unpinned` | 0 |
 
 ## Inputs
 
@@ -48,21 +48,21 @@
 | R10 | `docs/research/rank_conditional_shrinkage.json` | `bddfcb03976c73cf53bf2c7706f5386bbc9c315a` | `31d487322ef15a713751f1577c83242c09f5bd5186ff2ab2909e2a052a6272d7` |
 | R11 | `docs/research/team_match_block_sampler.json` | `f70dc6a4061297870541a9a484364799b603e26e` | `797264048f2a14658a8ecac89d5c82fae466e504392da4231159d10848cf1173` |
 | R12 | `docs/measurement_instrument.json` | `e9b946d962fe16a082dae0a2d509cca12bd7fe4f` | `da987a13c0d74b164175f5baf1018929f0634c3d7373ef367f336af00ebdc845` |
-| C1 | `scripts/paper_record_tables.py` | `732e0542fa90080c9930198c67681aac4d627922` | `b911499eeb4fd4e501707d0c5c45fe086ed520276293166791d37bddcd229abc` |
+| C1 | `scripts/paper_record_tables.py` | `85f0d7011eeb2ebd3e560563dce56c20ef5430ff` | `48db1825ac32fd4848cc948332f2b186a23e3f7f222c29556db2b2b09bdc23bf` |
 | C2 | `scripts/paper_figures.py` | `247540ac734db572db1680480d6967653068b57d` | `f142e0cd4bcf1935c709e2ae6b0755e0e271da19b32f8b1c9df87ca6444f5830` |
 
 ## Tables (step 3)
 
 | Output | Step | Inputs | SHA-256 |
 | --- | --- | --- | --- |
-| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, C1 | `f104aa6cef4f32e9e52077d6e4452b1bdccc0da97c209c0f5194f5ed5ffcc793` |
+| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, C1 | `980930c8dd19c31c8c208a41f326b540407a0ad4e196d83341f51c545f4b4bdb` |
 | `tables/figure_accuracy_against_decision.csv` | 3 | R4, R5, R7, R8, R9, C1 | `a36b6cf86f2b4869415f00f4b64b5d68735c91e9466a007ea57c4026842471c9` |
 | `tables/figure_decision_by_season.csv` | 3 | R4, R5, R7, R8, R9, C1 | `3f8537d3067ce4c2bb68e724d3b30232089afbf653f92e013b7ba576214ad3c0` |
 | `tables/figure_decision_fold_differences.csv` | 3 | R4, R5, R7, R8, R9, C1 | `1d20d93c1799fd1e09f9493265cd9e33f792c16271cde420e017a0c5034966f5` |
 | `tables/figure_sampler_pit.csv` | 3 | R2, R6, R11, C1 | `81e9b36ddaad14cb5baaa014914cc8208c586f5baa0669c20769e6a6e1c7d527` |
-| `tables/provenance.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, C1 | `61c768bb9be875486b3d3ba74d12bd6fe21624f250c47a824f801a7264974609` |
+| `tables/provenance.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, C1 | `dcc5a16f987dd01c2c6267bef17a6f0b5eaaf4a3136abd7b8f5de1f82760cf14` |
 | `tables/records.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, C1 | names the checked-out commit |
-| `tables/table_candidates_block_sensitivity.csv` | 3 | R4, R5, R7, R8, R9, C1 | `0bf37cca52f11b1ef76f40cf374a95da3c6d706dc5f560457232132d3fc82f76` |
+| `tables/table_candidates_block_sensitivity.csv` | 3 | R4, R5, R7, R8, R9, C1 | `c33f512412424f72f75c804cc55cfa790bac29c526913fff710a2b80fac3c9ec` |
 | `tables/table_candidates_decision_level.csv` | 3 | R1, R4, R5, R7, R8, R9, C1 | `e837229887dbd30b01d0fc91d954a15c3c90a5624f3ff28507b1c217da6aea16` |
 | `tables/table_candidates_player_level.csv` | 3 | R4, R5, R7, R8, R9, C1 | `c358c43a8980519c387d46ab10a2a9ead17fae5f284febe66847dfc783f8e6ea` |
 | `tables/table_candidates_precision.csv` | 3 | R4, R5, R7, R8, R9, R12, C1 | `e54d2058f440b4414b27ff7f56ea5b2cc6f3b352a0882158a1677b4ab834203a` |

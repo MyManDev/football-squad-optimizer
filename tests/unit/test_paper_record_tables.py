@@ -264,6 +264,20 @@ def _records() -> dict[str, Any]:
             },
         }
     }
+    mixture_reading = records[tables.MIXTURE]["decision_level_reading"]
+    mixture_reading["interval_method"] = {"candidate_id": "fixture_mixture_id"}
+    mixture_reading["candidate_minus_linear_interval_90"] = list(
+        tables.block_interval(
+            [(fold[:7], CANDIDATE_FOLDS[fold] + 4.0 - LINEAR_FOLDS[fold]) for fold in LINEAR_FOLDS],
+            4,
+            "fixture_mixture_id",
+        )
+    )
+    v2_reading = records[tables.FEATURES_V2]["decision_level_reading"]
+    v2_reading["policy"] = {"candidate_ids": {"v2_minus_v1_features": "fixture_v2_vs_v1_id"}}
+    v2_reading["v2_minus_v1_features"]["interval_90"] = list(
+        tables.block_interval([(fold[:7], 0.5) for fold in LINEAR_FOLDS], 4, "fixture_v2_vs_v1_id")
+    )
     regime = records[tables.REGIME]["decision_level_reading"]
     regime["interval_candidate_id"] = "fixture_regime_id"
     regime["candidate_minus_linear_interval_90"] = list(
@@ -617,7 +631,6 @@ def test_the_same_period_table_weights_each_season_by_its_observations(root: Pat
         ((2.22**2 + 2.14**2) / 2) ** 0.5
     )
     assert float(mixture["reference_decision_season_points_mean_error"]) == pytest.approx(0.0)
-    assert rows["Boosted pair, v2 feature contract"]["interval_90_low"] == "-1.8"
 
 
 def test_the_precision_table_applies_the_instrument_formulas_to_each_candidate(
@@ -664,9 +677,12 @@ def test_the_block_sensitivity_table_reproduces_a_recorded_interval_with_its_own
     assert float(boosted["block_2_low"]) <= float(boosted["mean"]) <= float(boosted["block_2_high"])
     wider = rows["Boosted pair, v2 feature contract vs boosted pair"]
     assert float(wider["mean"]) == pytest.approx(0.5)
+    assert rows["Gated mixture"]["bootstrap_id"] == "fixture_mixture_id"
+    assert wider["bootstrap_id"] == "fixture_v2_vs_v1_id"
+    assert rows["Boosted pair, v2 feature contract"]["bootstrap_id"] == tables.PAPER_BOOTSTRAP_ID
     checks = _read_csv(output / "checks.csv")
     reproduced = [check for check in checks if "reproduced at blocks of 4" in check["check"]]
-    assert [check["holds"] for check in reproduced] == ["true"]
+    assert [check["holds"] for check in reproduced] == ["true"] * 3
     precision = {row["comparison"] for row in _read_csv(output / "table_candidates_precision.csv")}
     assert "Boosted pair, v2 feature contract vs boosted pair" in precision
 

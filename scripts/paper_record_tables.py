@@ -1265,7 +1265,8 @@ def precision_table(records: Records) -> Table:
         "deviation of the recorded per-fold differences, and the mean over the folds of the "
         "other seasons when one season is left out; the last row is the instrument record's "
         "own reading of the linear components against the ridge control. Folds overlap in "
-        "squads and weeks, so these are lower bounds on the true widths, not gates",
+        "squads and weeks, so these are descriptive approximations that ignore dependence, "
+        "not bounds and not gates",
         columns,
         rows,
     )
@@ -1370,6 +1371,27 @@ def block_interval(
     return _percentile(means, alpha), _percentile(means, 1.0 - alpha)
 
 
+def _recorded_bootstrap_id(records: Records, candidate: Candidate) -> Cell | None:
+    """The bootstrap id a record names for this comparison, at whichever key it uses.
+
+    The regime record keeps `interval_candidate_id` at the top of the reading, the mixture
+    record `interval_method/candidate_id`, and the wider-contract record one id per
+    comparison under `policy/candidate_ids`; the boosted-pair and points-only records name
+    none.
+    """
+
+    block = candidate.mean.rsplit("/", 1)[0]
+    for pointer in (
+        f"{DECISION}/interval_candidate_id",
+        f"{DECISION}/interval_method/candidate_id",
+        f"{DECISION}/policy/candidate_ids/{_escape(block.rsplit('/', 1)[1])}",
+    ):
+        cell = records.optional(candidate.record, pointer)
+        if cell is not None and isinstance(cell.value, str):
+            return cell
+    return None
+
+
 def block_sensitivity_table(records: Records) -> tuple[Table, list[Check]]:
     """Each paired decision reading's interval at three block lengths, beside the recorded one."""
 
@@ -1389,7 +1411,7 @@ def block_sensitivity_table(records: Records) -> tuple[Table, list[Check]]:
         record = candidate.record
         differences = [(fold[:7], value) for fold, value in _fold_differences(records, candidate)]
         folds = f"{candidate.candidate_arm}/folds/<fold> - {candidate.linear_arm}/folds/<fold>"
-        recorded_id = records.optional(record, f"{DECISION}/interval_candidate_id")
+        recorded_id = _recorded_bootstrap_id(records, candidate)
         bootstrap_id = str(recorded_id.value) if recorded_id is not None else PAPER_BOOTSTRAP_ID
         row = {
             "comparison": _label(candidate.label),
@@ -1437,9 +1459,10 @@ def block_sensitivity_table(records: Records) -> tuple[Table, list[Check]]:
         "length: the recorded interval (blocks of 4) beside intervals recomputed here from the "
         "recorded per-fold differences at blocks of 2, 4 and 8 with the repository's "
         "season-aware moving-block procedure (5,000 resamples, seed 0). Where a record names "
-        "its bootstrap id the block-4 interval reproduces the recorded one exactly and "
-        "checks.csv says so; elsewhere the id is this extractor's own, so the block-4 interval "
-        "differs from the recorded one by the random stream alone",
+        "its bootstrap id (the regime, mixture and wider-contract records) the block-4 interval "
+        "reproduces the recorded one exactly and checks.csv says so; the boosted-pair and "
+        "points-only records name none, so there the id is this extractor's own and the "
+        "block-4 interval differs from the recorded one by the random stream alone",
         columns,
         rows,
     )
