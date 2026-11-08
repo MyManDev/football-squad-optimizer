@@ -31,6 +31,7 @@ export function MemberPicker({
   reading = false,
   onMore,
   onConfirm,
+  onWarm,
 }: {
   members: ReturnType<typeof useLeagueMembers>;
   /** The human members, once read; the system's own team is never among them. */
@@ -42,6 +43,11 @@ export function MemberPicker({
   /** Asks for the next page of members. */
   onMore?: () => void;
   onConfirm: (entry: RosterEntry) => void;
+  /**
+   * Told the row a finger or the focus has landed on, before the tap confirms it: the gate
+   * starts that member's reads then, so the page opens on documents already on their way.
+   */
+  onWarm?: (entry: RosterEntry) => void;
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.memberPicker;
@@ -141,6 +147,8 @@ export function MemberPicker({
                   type="button"
                   className={styles.option}
                   data-selected={selected === row.entryId || undefined}
+                  onPointerDown={() => onWarm?.(row)}
+                  onFocus={() => onWarm?.(row)}
                   onClick={() => {
                     setSelected(row.entryId);
                     onConfirm(row);
