@@ -66,7 +66,7 @@ it.each(["tr", "en"] as const)("shows the flagged player and the news date in %s
   expect(card).toHaveTextContent("75/100");
   expect(card).toHaveTextContent("Bukayo Saka");
   expect(card).toHaveTextContent(language === "tr" ? "Arsenal · Şüpheli" : "Arsenal · Doubtful");
-  expect(card).toHaveTextContent(language === "tr" ? "Haberin tarihi:" : "News date:");
+  expect(card).toHaveTextContent(language === "tr" ? "Haberin tarihi:" : "News Date:");
   expect(card.querySelectorAll("time")).toHaveLength(1);
   expect(card.querySelector("time")).toHaveAttribute("datetime", "2026-10-01T16:00:00Z");
   expect(card.querySelector("a")).toBeNull();

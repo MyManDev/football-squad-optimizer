@@ -158,7 +158,7 @@ describe("the advice card carries the whole decision", () => {
     const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
     renderAdvice({ ...base, payload: { ...base.payload, chip: "3xc" } }, "en");
     openList("en");
-    const lineup = screen.getByRole("region", { name: "Your gameweek" });
+    const lineup = screen.getByRole("region", { name: "Your Gameweek" });
     expect(within(lineup).getByText("Triple Captain")).toBeInTheDocument();
   });
 
@@ -280,7 +280,7 @@ describe("a squad basis the two documents disagree about", () => {
       expect(planOnPage(language)).toBeInTheDocument();
       expect(screen.queryByText(/Free Hit played;|Free Hit oynadın;/)).not.toBeInTheDocument();
       openList(language);
-      const lineup = language === "en" ? "Your gameweek" : "Bu haftaki kadron";
+      const lineup = language === "en" ? "Your Gameweek" : "Bu haftaki kadron";
       expect(
         within(screen.getByRole("region", { name: lineup })).getByText("Wildcard"),
       ).toBeInTheDocument();

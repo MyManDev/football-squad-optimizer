@@ -224,14 +224,14 @@ test.describe("a visitor who has not said who they are", () => {
       );
       await page.goto("/");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-        language === "tr" ? "Ligini bul" : "Find your league",
+        language === "tr" ? "Ligini bul" : "Find Your League",
       );
       await expect(page.getByLabel(language === "tr" ? "Lig numarası" : "League ID")).toHaveValue(
         "",
       );
       await page.getByLabel(language === "tr" ? "Lig numarası" : "League ID").fill("352490");
       await page
-        .getByRole("button", { name: language === "tr" ? "Ligi bul" : "Find league" })
+        .getByRole("button", { name: language === "tr" ? "Ligi bul" : "Find League" })
         .click();
 
       // After the number comes "Sen kimsin?", in place of the table, by name only.

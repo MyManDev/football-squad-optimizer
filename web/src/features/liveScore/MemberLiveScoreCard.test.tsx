@@ -31,7 +31,7 @@ describe.each(["tr", "en"] as const)("member live score in %s", (language) => {
     expect(screen.getByText(String(score.transfer_cost), { exact: true })).toBeInTheDocument();
     expect(screen.getByText("0 / 1")).toBeInTheDocument();
     expect(
-      screen.getByText(language === "tr" ? "Bonus bekleniyor" : "Bonus pending"),
+      screen.getByText(language === "tr" ? "Bonus bekleniyor" : "Bonus Pending"),
     ).toBeInTheDocument();
     expect(screen.getByText(language === "tr" ? "Güncellendi" : "Updated")).toBeInTheDocument();
     expect(container.querySelector("time")).toHaveAttribute("datetime", score.source_time);
@@ -46,7 +46,7 @@ describe.each(["tr", "en"] as const)("member live score in %s", (language) => {
     expect(screen.getByText("Player 12")).toBeInTheDocument();
     expect(screen.getByText(names.get(score.captain!)!)).toBeInTheDocument();
     expect(
-      screen.getByText(language === "tr" ? "Bonus eklendi" : "Bonus added"),
+      screen.getByText(language === "tr" ? "Bonus eklendi" : "Bonus Added"),
     ).toBeInTheDocument();
   });
   it("draws the forecast before the live points, each under its own word", () => {
@@ -55,7 +55,7 @@ describe.each(["tr", "en"] as const)("member live score in %s", (language) => {
     const { container } = show(score, language, { forecast: 61.25 });
     const text = container.textContent ?? "";
     const forecastWord = language === "tr" ? "Tahmin" : "Forecast";
-    const liveWord = language === "tr" ? "Canlı puan" : "Live points";
+    const liveWord = language === "tr" ? "Canlı puan" : "Live Points";
     expect(text.indexOf(forecastWord)).toBeGreaterThanOrEqual(0);
     expect(text.indexOf(forecastWord)).toBeLessThan(text.indexOf(liveWord));
     expect(screen.getByText(language === "tr" ? "61,3" : "61.3")).toBeInTheDocument();

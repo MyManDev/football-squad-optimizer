@@ -135,7 +135,7 @@ describe("the picker", () => {
 
 describe.each([
   ["tr", "Farkı kapat · 1h"],
-  ["en", "Close the gap · 1w"],
+  ["en", "Close the Gap · 1w"],
 ] as const)("a saved template's rival in %s", (language, meta) => {
   /** What the saved template's chip says, its name and then its selection. */
   function savedChip(rival: GameTemplate["rival"], members: readonly EntryView[] = MEMBERS) {

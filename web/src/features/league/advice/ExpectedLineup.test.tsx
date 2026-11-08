@@ -37,12 +37,12 @@ it.each(["tr", "en"] as const)(
     );
     const region = screen.getByTestId("lineup-expectation");
     expect(screen.getByRole("heading")).toHaveTextContent(
-      language === "tr" ? /^Beklenen puan$/ : /^Expected points$/,
+      language === "tr" ? /^Beklenen puan$/ : /^Expected Points$/,
     );
     expect(region).toHaveTextContent(
       language === "tr"
         ? /Ceza sonrası beklenen puan: 42,\d/
-        : /Expected points after hits: 42\.\d/,
+        : /Expected Points After Hits: 42\.\d/,
     );
     expect(region).not.toHaveTextContent(
       language === "tr" ? "Yedeklere sabit bir puan payı eklenmez" : "No fixed share of bench",

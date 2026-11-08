@@ -45,7 +45,7 @@ for (const language of ["tr", "en"] as const) {
     );
     await page.setViewportSize({ width: 360, height: 780 });
     await page.goto("/league/352490/members/35249001/history");
-    const title = language === "tr" ? "Sezon raporum" : "My season report";
+    const title = language === "tr" ? "Sezon raporum" : "My Season Report";
     await page.getByText(title, { exact: true }).click();
     const report = page
       .locator("details")

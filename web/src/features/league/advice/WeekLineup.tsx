@@ -12,10 +12,10 @@ const COPY = {
   },
   en: {
     title: "This week's starting eleven and bench",
-    starters: "Starting eleven",
+    starters: "Starting Eleven",
     captain: "Captain",
     vice: "Vice-captain",
-    bench: "Bench order",
+    bench: "Bench Order",
   },
 };
 

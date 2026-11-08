@@ -173,7 +173,7 @@ describe.each(["tr", "en"] as const)("the member's live week in %s", (language) 
     const { container } = show({ forwarder, loadTable }, language);
     const score = expected("in_progress");
     expect(
-      await screen.findByText(language === "tr" ? "Bonus bekleniyor" : "Bonus pending"),
+      await screen.findByText(language === "tr" ? "Bonus bekleniyor" : "Bonus Pending"),
     ).toBeInTheDocument();
     expect(container).toHaveTextContent(`${score.fixtures_finished} / ${score.fixtures_total}`);
     expect(container.querySelector("time")).toHaveAttribute("datetime", score.source_time);
@@ -191,7 +191,7 @@ describe.each(["tr", "en"] as const)("the member's live week in %s", (language) 
     const { container } = show({ forwarder, loadTable: tableLoader() }, language);
     const score = expected("finished");
     expect(
-      await screen.findByText(language === "tr" ? "Bonus eklendi" : "Bonus added"),
+      await screen.findByText(language === "tr" ? "Bonus eklendi" : "Bonus Added"),
     ).toBeInTheDocument();
     expect(container).toHaveTextContent(`${score.fixtures_total} / ${score.fixtures_total}`);
   });
