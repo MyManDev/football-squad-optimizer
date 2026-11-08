@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Navigate, useLocation, useParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -8,10 +8,9 @@ import { leagueIdInAddress, legacyLeagueAddress } from "../../../lib/leagueAddre
 import { LeagueDataMissing } from "../data";
 import { createLeagueTree } from "../data";
 import { findLeague, loadLeagueDirectory } from "../directory";
-import { readMemberClaim, subscribeMemberClaim } from "../identity/memberClaim";
 import { entryIdInAddress, prefetchMemberReads } from "../prefetch";
 import { ForwardedLeagueGate } from "../forwarded/ForwardedLeagueGate";
-import { useLeagueIdentity } from "../identity/useLeagueIdentity";
+import { useLeagueIdentity, useClaimedEntry } from "../identity/useLeagueIdentity";
 import { LeagueProvider } from "../LeagueProvider";
 import { LEAGUE_READ, leagueKeys } from "../queries";
 import { LeagueEntryPage } from "./LeagueEntryPage";
@@ -71,9 +70,8 @@ export function LeagueGate({
   // this league, nothing of a member is read: the picker shows names only, so the address's
   // member is started only under a claim for the league it names.
   const queryClient = useQueryClient();
-  const claim = useSyncExternalStore(subscribeMemberClaim, readMemberClaim, () => null);
-  const claimedHere = claim !== null && league !== null && claim.leagueId === league.leagueId;
-  const entryId = claimedHere ? entryIdInAddress(entryParameter) : null;
+  const claimedEntry = useClaimedEntry(league?.leagueId ?? 0);
+  const entryId = claimedEntry !== null ? entryIdInAddress(entryParameter) : null;
   useEffect(() => {
     if (league !== null) prefetchMemberReads(queryClient, createLeagueTree(league), entryId);
   }, [league, entryId, queryClient]);
