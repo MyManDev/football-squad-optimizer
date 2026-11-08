@@ -148,10 +148,15 @@ def _reproduction(name: str, mine: dict[str, dict[str, Any]], root: Path) -> dic
         fold: {
             "recorded": recorded[fold],
             "rerun_ignoring_cards": mine[fold]["realized_score_ignoring_cards"],
+            "rerun_solver_status": mine[fold]["solver_status"],
         }
         for fold in folds
         if float(recorded[fold]) != float(mine[fold]["realized_score_ignoring_cards"])
     }
+    differing_statuses: dict[str, int] = {}
+    for item in differing.values():
+        status = item["rerun_solver_status"]
+        differing_statuses[status] = differing_statuses.get(status, 0) + 1
     return {
         "record": record,
         "pointer": pointer,
@@ -159,6 +164,12 @@ def _reproduction(name: str, mine: dict[str, dict[str, Any]], root: Path) -> dic
         "folds_missing_from_rerun": sorted(set(recorded) - set(mine)),
         "folds_reproduced": len(folds) - len(differing),
         "folds_differing": differing,
+        "differing_rerun_statuses": dict(sorted(differing_statuses.items())),
+        "differing_sum_rerun_minus_recorded": sum(
+            float(item["rerun_ignoring_cards"]) - float(item["recorded"])
+            for item in differing.values()
+        ),
+        "rerun_statuses": _statuses(mine),
     }
 
 
@@ -226,15 +237,31 @@ def _budget(low: dict[str, dict[str, Any]], high: dict[str, dict[str, Any]]) -> 
 
 
 def summarize(inputs: Path, root: Path) -> dict[str, Any]:
+    """The record built from whichever of the declared budgets have all three evaluations.
+
+    The 5.0 budget is required (it carries the reproduction check and the card rule); a
+    budget whose three evaluations are not all present is left out and named under
+    `budgets_absent`, so an interim record can be written while the 60.0 runs finish.
+    """
+
+    budgets = tuple(
+        budget
+        for budget in BUDGETS
+        if all((inputs / f"eval_{name}_b{budget}.json").is_file() for name in TABLES)
+    )
+    if "5.0" not in budgets:
+        raise SystemExit(f"{inputs}: the three budget-5.0 evaluations are required")
     documents = {
         (name, budget): _load(inputs / f"eval_{name}_b{budget}.json")
         for name in TABLES
-        for budget in BUDGETS
+        for budget in budgets
     }
     decisions = {key: _decisions(document) for key, document in documents.items()}
     result: dict[str, Any] = {
         "contract_version": "phase_c_solver_budget_cards_v1",
         "declaration": "docs/research/phase_c_solver_budget_cards_method.md",
+        "budgets_present": list(budgets),
+        "budgets_absent": [budget for budget in BUDGETS if budget not in budgets],
         "descriptive_only": True,
         "promotion_decision": "not_evaluated",
         "operational_control_changed": False,
@@ -260,11 +287,13 @@ def summarize(inputs: Path, root: Path) -> dict[str, Any]:
         "card_rule": {
             f"{name}_b{budget}": _cards(decisions[(name, budget)])
             for name in TABLES
-            for budget in BUDGETS
+            for budget in budgets
         },
         "budget": {
             name: _budget(decisions[(name, "5.0")], decisions[(name, "60.0")]) for name in TABLES
-        },
+        }
+        if "60.0" in budgets
+        else {},
         "pairs": {},
     }
     for mine, theirs, label in PAIRS:
@@ -276,7 +305,7 @@ def summarize(inputs: Path, root: Path) -> dict[str, Any]:
                 "interval_90": _resolve(recorded, interval_pointer),
             },
         }
-        for budget in BUDGETS:
+        for budget in budgets:
             for key, suffix in (
                 ("realized_score_ignoring_cards", "ignoring_cards"),
                 ("realized_score", "official_card_rule"),
@@ -309,7 +338,7 @@ def main(argv: list[str] | None = None) -> int:
         reproduced, compared = block["folds_reproduced"], block["folds_compared"]
         print(f"{name}: {reproduced} of {compared} fold scores reproduced")
     for label, block in result["pairs"].items():
-        for budget in BUDGETS:
+        for budget in result["budgets_present"]:
             paired = block[f"budget_{budget}_official_card_rule"]
             print(f"{label} at {budget}: mean {paired['mean']:+.3f} {paired['interval_90']}")
     return 0
