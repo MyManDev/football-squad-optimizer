@@ -160,13 +160,16 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     expect(readChosenLeague()).toBe(LEAGUE);
   });
 
-  it("asks who you are at a published league address, keeping the address", async () => {
-    legacySite();
+  it("asks who you are at a published league address, keeping the address, and reads nothing of the member", async () => {
+    const fetcher = legacySite();
     writeChosenLeague(LEAGUE);
     open(language, memberAddress(LEAGUE, 35249003));
     expect(await screen.findByRole("heading", { name: picker.title })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
     expect(location()).toBe(memberAddress(LEAGUE, 35249003));
+    // No claim in this league yet: the picker shows names only, and the address's member
+    // is not started (the fixtures read would be the one to reach the network).
+    expect(asked(fetcher)).toEqual(DIRECTORY_READS);
   });
 
   it("asks again, and drops the claim, when the address names another league than the claim's", async () => {
