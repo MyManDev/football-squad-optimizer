@@ -79,6 +79,7 @@ BLOCK = "docs/research/team_match_block_sampler.json"
 JOINT = "docs/research/moe_sampler.json"
 RANK_SHRINKAGE = "docs/research/rank_conditional_shrinkage.json"
 MEAN_REVERSION = "docs/research/mean_reversion_discount.json"
+SOLVER_BUDGET = "docs/research/phase_c_solver_budget_cards.json"
 
 
 class RecordError(ValueError):
@@ -1736,6 +1737,168 @@ def extractor_digest() -> Digest:
         raise RecordError(f"{EXTRACTOR}: the extractor run cannot be read ({error})") from error
 
 
+#: The re-evaluated tables of the solver-budget record, with the label each row carries.
+BUDGET_TABLES = (
+    ("linear_dec", "linear components"),
+    ("gbm_v1_dec", "boosted pair (v1 features)"),
+    ("gbm_v2_dec", "wider contract (v2 features)"),
+)
+#: Its two paired readings, with the label each row carries.
+BUDGET_PAIRS = (
+    ("boosted_pair_vs_linear", "boosted pair minus linear components"),
+    ("wider_contract_vs_boosted_pair", "wider contract minus boosted pair"),
+)
+
+
+def solver_budget_table(records: Records) -> tuple[Table, list[Check]]:
+    """The solver-budget record at the measurement budget: per re-evaluated table, how many of
+    the recorded fold scores the rerun reproduced when cards are ignored, the solver statuses of
+    the folds that differ and of the rerun, and how many folds the official card rule moved;
+    per pair, the paired reading under the official rule and the squad overlap.
+
+    Checks: the reproduced and differing folds of each table add up to the folds compared, and
+    a pair whose two tables the card rule left untouched has the same paired mean under both
+    scoring conventions.
+    """
+
+    columns = (
+        "comparison",
+        "scope",
+        "folds",
+        "reproduced",
+        "differing_feasible",
+        "optimal",
+        "feasible",
+        "card_rule_folds_changed",
+        "mean",
+        "interval_low",
+        "interval_high",
+        "wins",
+        "ties",
+        "losses",
+        "shared_squad_of_15",
+        "shared_starters_of_11",
+        "same_captain_folds",
+        "identical_squad_folds",
+        "tied_folds",
+        "tied_identical_squads",
+    )
+    at = partial(records.cell, SOLVER_BUDGET)
+    budget = str(at("/budgets_present/0").value)
+    rows: list[dict[str, Cell]] = []
+    checks: list[Check] = []
+    changed: dict[str, int] = {}
+    for name, label in BUDGET_TABLES:
+        block = f"/reproduction_at_5_0/{name}"
+        compared = int(at(f"{block}/folds_compared").value)
+        reproduced = int(at(f"{block}/folds_reproduced").value)
+        differing = len(records.keys(SOLVER_BUDGET, f"{block}/folds_differing"))
+        feasible_differing = records.optional(
+            SOLVER_BUDGET, f"{block}/differing_rerun_statuses/FEASIBLE"
+        )
+        cards = at(f"/card_rule/{name}_b{budget}/folds_changed_by_the_card_rule")
+        changed[name] = int(cards.value)
+        rows.append(
+            {
+                "comparison": _label(label),
+                "scope": _label(f"rerun at deterministic budget {budget} against its record"),
+                "folds": at(f"{block}/folds_compared"),
+                "reproduced": at(f"{block}/folds_reproduced"),
+                "differing_feasible": (
+                    feasible_differing
+                    if feasible_differing is not None
+                    else Cell(
+                        0,
+                        SOLVER_BUDGET,
+                        f"{DERIVED}no FEASIBLE key under {block}/differing_rerun_statuses",
+                    )
+                ),
+                "optimal": at(f"{block}/rerun_statuses/OPTIMAL"),
+                "feasible": (
+                    records.optional(SOLVER_BUDGET, f"{block}/rerun_statuses/FEASIBLE")
+                    or Cell(
+                        0, SOLVER_BUDGET, f"{DERIVED}no FEASIBLE key under {block}/rerun_statuses"
+                    )
+                ),
+                "card_rule_folds_changed": cards,
+            }
+        )
+        control = f"/arms/{name}_b{budget}/ridge_control"
+        rows.append(
+            {
+                "comparison": _label(f"ridge control beside the {label}"),
+                "scope": _label(f"rerun at deterministic budget {budget}"),
+                "folds": at(f"{control}/folds"),
+                "optimal": at(f"{control}/statuses/OPTIMAL"),
+                "feasible": (
+                    records.optional(SOLVER_BUDGET, f"{control}/statuses/FEASIBLE")
+                    or Cell(0, SOLVER_BUDGET, f"{DERIVED}no FEASIBLE key under {control}/statuses")
+                ),
+                "mean": at(f"{control}/mean_realized_score"),
+            }
+        )
+        checks.append(
+            Check(
+                f"{name}: the reproduced and differing folds add up to the folds compared",
+                SOLVER_BUDGET,
+                f"{block}/folds_compared",
+                compared,
+                reproduced + differing,
+                compared == reproduced + differing,
+            )
+        )
+    tables_of = {
+        "boosted_pair_vs_linear": ("gbm_v1_dec", "linear_dec"),
+        "wider_contract_vs_boosted_pair": ("gbm_v2_dec", "gbm_v1_dec"),
+    }
+    for pair, label in BUDGET_PAIRS:
+        official = f"/pairs/{pair}/budget_{budget}_official_card_rule"
+        ignoring = f"/pairs/{pair}/budget_{budget}_ignoring_cards"
+        overlap = f"/pairs/{pair}/budget_{budget}_overlap"
+        rows.append(
+            {
+                "comparison": _label(label),
+                "scope": _label(f"paired at deterministic budget {budget}, official card rule"),
+                "folds": at(f"{official}/paired_folds"),
+                "mean": at(f"{official}/mean"),
+                "interval_low": at(f"{official}/interval_90/0"),
+                "interval_high": at(f"{official}/interval_90/1"),
+                "wins": at(f"{official}/wins_ties_losses/0"),
+                "ties": at(f"{official}/wins_ties_losses/1"),
+                "losses": at(f"{official}/wins_ties_losses/2"),
+                "shared_squad_of_15": at(f"{overlap}/mean_shared_squad_members_of_15"),
+                "shared_starters_of_11": at(f"{overlap}/mean_shared_starters_of_11"),
+                "same_captain_folds": at(f"{overlap}/same_captain_folds"),
+                "identical_squad_folds": at(f"{overlap}/identical_squad_folds"),
+                "tied_folds": at(f"{overlap}/tied_folds"),
+                "tied_identical_squads": at(f"{overlap}/tied_folds_with_identical_squads"),
+            }
+        )
+        untouched = all(changed[name] == 0 for name in tables_of[pair])
+        same_mean = float(at(f"{official}/mean").value) == float(at(f"{ignoring}/mean").value)
+        checks.append(
+            Check(
+                f"{pair}: with no fold moved by the card rule the paired mean is the same under "
+                "both scoring conventions",
+                SOLVER_BUDGET,
+                f"{official}/mean",
+                at(f"{official}/mean").value,
+                at(f"{ignoring}/mean").value,
+                same_mean if untouched else True,
+            )
+        )
+    table = Table(
+        "table_solver_budget_cards",
+        "The solver-budget record at the measurement budget: each re-evaluated table against its "
+        "record (fold scores reproduced with cards ignored, the solver statuses of the differing "
+        "folds and of the rerun, folds the official card rule moved) and each paired reading "
+        "under the official rule with its squad overlap",
+        columns,
+        rows,
+    )
+    return table, checks
+
+
 def commit_rows(
     records: Records, extractor: Digest, commit: str | None
 ) -> tuple[list[list[str]], list[Check]]:
@@ -1795,6 +1958,8 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
     ]
     block_table, block_checks = block_sensitivity_table(records)
     tables.append(block_table)
+    budget_table, budget_checks = solver_budget_table(records)
+    tables.append(budget_table)
     fold_points, fold_checks = fold_differences(records)
     pit_points, pit_checks = sampler_folds(records)
     figures = {
@@ -1811,6 +1976,7 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         *pooled_mae_checks(records),
         *precision_checks(records),
         *block_checks,
+        *budget_checks,
     ]
     commit = checked_out_commit(records.root)
     digests, commit_checks = commit_rows(records, extractor_digest(), commit)

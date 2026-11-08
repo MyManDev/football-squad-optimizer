@@ -27,10 +27,10 @@
 
 | Command | Prints | Exit |
 | --- | --- | --- |
-| Step 3 | `90 of 90 record checks hold` | 0 |
+| Step 3 | `96 of 96 record checks hold` | 0 |
 | Step 4 | `Wrote 5 paper figures to ...` | 0 |
-| Step 6 | a 27-page `squadopt_walk_forward_paper.pdf` | 0 |
-| Check | `90 of 90 record checks hold`; `39 of 41 manifest rows match`, two `unpinned` | 0 |
+| Step 6 | a 28-page `squadopt_walk_forward_paper.pdf` | 0 |
+| Check | `96 of 96 record checks hold`; `41 of 43 manifest rows match`, two `unpinned` | 0 |
 
 ## Inputs
 
@@ -48,20 +48,21 @@
 | R10 | `docs/research/rank_conditional_shrinkage.json` | `bddfcb03976c73cf53bf2c7706f5386bbc9c315a` | `31d487322ef15a713751f1577c83242c09f5bd5186ff2ab2909e2a052a6272d7` |
 | R11 | `docs/research/team_match_block_sampler.json` | `f70dc6a4061297870541a9a484364799b603e26e` | `797264048f2a14658a8ecac89d5c82fae466e504392da4231159d10848cf1173` |
 | R12 | `docs/measurement_instrument.json` | `e9b946d962fe16a082dae0a2d509cca12bd7fe4f` | `da987a13c0d74b164175f5baf1018929f0634c3d7373ef367f336af00ebdc845` |
-| C1 | `scripts/paper_record_tables.py` | `85f0d7011eeb2ebd3e560563dce56c20ef5430ff` | `48db1825ac32fd4848cc948332f2b186a23e3f7f222c29556db2b2b09bdc23bf` |
+| R13 | `docs/research/phase_c_solver_budget_cards.json` | `45ecd72de307d1bbb8fff0428c924581b635dd47` | `8f6b019076aedfe0e30f273787518e4f299a70b0d8407cb9fb2b096d0175e31f` |
+| C1 | `scripts/paper_record_tables.py` | `3b7fd6a1194313d56afe23bbddec70190a582cef` | `2ec67acadb53ad15815757a2ec877a87b0a15883a8aa38fcfeee1f25101bf459` |
 | C2 | `scripts/paper_figures.py` | `247540ac734db572db1680480d6967653068b57d` | `f142e0cd4bcf1935c709e2ae6b0755e0e271da19b32f8b1c9df87ca6444f5830` |
 
 ## Tables (step 3)
 
 | Output | Step | Inputs | SHA-256 |
 | --- | --- | --- | --- |
-| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, C1 | `980930c8dd19c31c8c208a41f326b540407a0ad4e196d83341f51c545f4b4bdb` |
+| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | `fbe2489eae972246d64c54ff1dd3a1b5722766d2cea135a82592c907dbefa8e5` |
 | `tables/figure_accuracy_against_decision.csv` | 3 | R4, R5, R7, R8, R9, C1 | `a36b6cf86f2b4869415f00f4b64b5d68735c91e9466a007ea57c4026842471c9` |
 | `tables/figure_decision_by_season.csv` | 3 | R4, R5, R7, R8, R9, C1 | `3f8537d3067ce4c2bb68e724d3b30232089afbf653f92e013b7ba576214ad3c0` |
 | `tables/figure_decision_fold_differences.csv` | 3 | R4, R5, R7, R8, R9, C1 | `1d20d93c1799fd1e09f9493265cd9e33f792c16271cde420e017a0c5034966f5` |
 | `tables/figure_sampler_pit.csv` | 3 | R2, R6, R11, C1 | `81e9b36ddaad14cb5baaa014914cc8208c586f5baa0669c20769e6a6e1c7d527` |
-| `tables/provenance.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, C1 | `dcc5a16f987dd01c2c6267bef17a6f0b5eaaf4a3136abd7b8f5de1f82760cf14` |
-| `tables/records.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, C1 | names the checked-out commit |
+| `tables/provenance.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | `876d5e326bb2f71b58da24b2503d6c6772516ecacdd436407e9039ae18051304` |
+| `tables/records.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | names the checked-out commit |
 | `tables/table_candidates_block_sensitivity.csv` | 3 | R4, R5, R7, R8, R9, C1 | `c33f512412424f72f75c804cc55cfa790bac29c526913fff710a2b80fac3c9ec` |
 | `tables/table_candidates_decision_level.csv` | 3 | R1, R4, R5, R7, R8, R9, C1 | `e837229887dbd30b01d0fc91d954a15c3c90a5624f3ff28507b1c217da6aea16` |
 | `tables/table_candidates_player_level.csv` | 3 | R4, R5, R7, R8, R9, C1 | `c358c43a8980519c387d46ab10a2a9ead17fae5f284febe66847dfc783f8e6ea` |
@@ -75,8 +76,9 @@
 | `tables/table_planning_measurements.csv` | 3 | R3, R10, C1 | `58abc76707286bc6c8cedaf6ed391752d4f5782c473bab44e60f04b9f3ae6705` |
 | `tables/table_sampler_calibration.csv` | 3 | R2, R6, R11, C1 | `990c10383e91f8721cba87809cb835aad11337f9c9c17e8eb81d3c057b3fc0bc` |
 | `tables/table_sampler_calibration_by_season.csv` | 3 | R6, R11, C1 | `74b30879267c17c2cefdf71f7f1a67273cfc08faf49a471815274c7b8b2059e2` |
+| `tables/table_solver_budget_cards.csv` | 3 | R13, C1 | `f5b632a386fe8954b15a824e379c9b7e1fda11cf4d5be0c8a3eb37fd17882a7a` |
 | `tables/table_solver_status.csv` | 3 | R1, R9, C1 | `e8e938acf040eb5fc1a86b51f06cc0983ec6410deb998f6339c112048f6fc62d` |
-| `tables/tables.md` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, C1 | names the checked-out commit |
+| `tables/tables.md` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | names the checked-out commit |
 
 ## Figures (step 4)
 

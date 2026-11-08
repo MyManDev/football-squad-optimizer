@@ -341,6 +341,7 @@ def _records() -> dict[str, Any]:
             }
         }
     }
+    records[tables.SOLVER_BUDGET] = _solver_budget_record()
     records[tables.FROZEN_EVALUATION] = {
         "decision_comparison": {
             "diagnostics": {"comparable_folds": 3, "mean_difference": 4.5},
@@ -381,6 +382,70 @@ def _records() -> dict[str, Any]:
         "verdict": {"noise_floor_points_per_gameweek": 1.5, "status": "measured, not certified"},
     }
     return records
+
+
+def _solver_budget_record() -> dict[str, Any]:
+    def reproduction(differing: dict[str, Any], statuses: dict[str, int]) -> dict[str, Any]:
+        return {
+            "folds_compared": 3,
+            "folds_reproduced": 3 - len(differing),
+            "folds_differing": differing,
+            "differing_rerun_statuses": {"FEASIBLE": len(differing)} if differing else {},
+            "rerun_statuses": statuses,
+        }
+
+    def paired(mean: float) -> dict[str, Any]:
+        return {
+            "paired_folds": 3,
+            "mean": mean,
+            "interval_90": [mean - 1.0, mean + 1.0],
+            "wins_ties_losses": [1, 1, 1],
+        }
+
+    overlap = {
+        "mean_shared_squad_members_of_15": 6.0,
+        "mean_shared_starters_of_11": 5.0,
+        "same_captain_folds": 2,
+        "identical_squad_folds": 1,
+        "tied_folds": 1,
+        "tied_folds_with_identical_squads": 1,
+    }
+    differing = {"2021-22-gw03": {"recorded": 50.0, "rerun_ignoring_cards": 48.0}}
+    control = {
+        "folds": 3,
+        "statuses": {"OPTIMAL": 2, "FEASIBLE": 1},
+        "mean_realized_score": 50.0,
+        "mean_realized_score_ignoring_cards": 50.0,
+    }
+    return {
+        "budgets_present": ["5.0"],
+        "budgets_absent": ["60.0"],
+        "arms": {
+            f"{name}_b5.0": {"candidate": control, "ridge_control": control}
+            for name in ("linear_dec", "gbm_v1_dec", "gbm_v2_dec")
+        },
+        "reproduction_at_5_0": {
+            "linear_dec": reproduction(differing, {"OPTIMAL": 2, "FEASIBLE": 1}),
+            "gbm_v1_dec": reproduction({}, {"OPTIMAL": 3}),
+            "gbm_v2_dec": reproduction({}, {"OPTIMAL": 3}),
+        },
+        "card_rule": {
+            f"{name}_b5.0": {"folds_changed_by_the_card_rule": 0}
+            for name in ("linear_dec", "gbm_v1_dec", "gbm_v2_dec")
+        },
+        "pairs": {
+            "boosted_pair_vs_linear": {
+                "budget_5.0_official_card_rule": paired(-0.5),
+                "budget_5.0_ignoring_cards": paired(-0.5),
+                "budget_5.0_overlap": overlap,
+            },
+            "wider_contract_vs_boosted_pair": {
+                "budget_5.0_official_card_rule": paired(0.25),
+                "budget_5.0_ignoring_cards": paired(0.25),
+                "budget_5.0_overlap": overlap,
+            },
+        },
+    }
 
 
 def _write(root: Path, records: dict[str, Any]) -> None:
@@ -426,6 +491,7 @@ def test_every_table_number_resolves_to_its_record_and_pointer(root: Path) -> No
         "table_solver_status",
         "table_sampler_calibration_by_season",
         "table_candidates_block_sensitivity",
+        "table_solver_budget_cards",
     }
     derived = 0
     for row in provenance:
@@ -709,6 +775,63 @@ def test_the_solver_status_table_counts_the_frozen_statuses_and_reads_the_split(
     ]
 
 
+def test_the_solver_budget_table_reads_each_rerun_and_pair_and_checks_them(
+    root: Path,
+) -> None:
+    code, output = _run(root)
+
+    assert code == 0
+    rows = {row["comparison"]: row for row in _read_csv(output / "table_solver_budget_cards.csv")}
+    linear = rows["linear components"]
+    assert (linear["folds"], linear["reproduced"], linear["differing_feasible"]) == ("3", "2", "1")
+    assert (linear["optimal"], linear["feasible"], linear["card_rule_folds_changed"]) == (
+        "2",
+        "1",
+        "0",
+    )
+    boosted = rows["boosted pair (v1 features)"]
+    assert (boosted["reproduced"], boosted["differing_feasible"], boosted["feasible"]) == (
+        "3",
+        "0",
+        "0",
+    )
+    control = rows["ridge control beside the linear components"]
+    assert (control["optimal"], control["feasible"], control["mean"]) == ("2", "1", "50.0")
+    pair = rows["wider contract minus boosted pair"]
+    assert (pair["mean"], pair["wins"], pair["ties"], pair["losses"]) == ("0.25", "1", "1", "1")
+    assert (pair["shared_squad_of_15"], pair["tied_folds"], pair["tied_identical_squads"]) == (
+        "6.0",
+        "1",
+        "1",
+    )
+    checks = [
+        row for row in _read_csv(output / "checks.csv") if row["record"] == tables.SOLVER_BUDGET
+    ]
+    assert len(checks) == 5
+    assert all(check["holds"] == "true" for check in checks)
+
+
+def test_a_card_rule_that_moved_a_fold_but_not_the_mean_still_holds_and_a_moved_mean_fails(
+    root: Path,
+) -> None:
+    path = root / tables.SOLVER_BUDGET
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["pairs"]["boosted_pair_vs_linear"]["budget_5.0_ignoring_cards"]["mean"] = -0.75
+    path.write_text(json.dumps(document), encoding="utf-8", newline="\n")
+
+    code, output = _run(root)
+
+    assert code == 1
+    failing = [
+        row
+        for row in _read_csv(output / "checks.csv")
+        if row["record"] == tables.SOLVER_BUDGET and row["holds"] == "false"
+    ]
+    assert [row["check"][: len("boosted_pair_vs_linear")] for row in failing] == [
+        "boosted_pair_vs_linear"
+    ]
+
+
 def _extractor_lf() -> bytes:
     """The extractor this test imports, with CRLF read as LF, as a checkout commits it."""
 
@@ -726,7 +849,7 @@ def test_outside_a_git_checkout_the_records_name_no_commit(root: Path) -> None:
 
     assert code == 0
     rows = _read_csv(output / "records.csv")
-    assert len(rows) == 13
+    assert len(rows) == 14
     assert [row["record"] for row in rows] == [*sorted(_records()), tables.EXTRACTOR]
     assert rows[-1]["sha256_lf"] == hashlib.sha256(_extractor_lf()).hexdigest()
     assert {(row["commit"], row["matches_commit"]) for row in rows} == {("", "")}
@@ -765,7 +888,7 @@ def test_each_record_is_compared_with_the_committed_one_line_endings_aside(root:
     first = {row["record"]: row for row in _read_csv(output / "records.csv")}
 
     assert code == 0
-    assert len(first) == 13
+    assert len(first) == 14
     assert {row["matches_commit"] for row in first.values()} == {"true"}
     assert {row["commit"] for row in first.values()} == {head}
     assert all(row["blob_at_commit"] == row["git_blob_lf"] for row in first.values())
@@ -815,7 +938,7 @@ def test_an_extractor_edited_after_the_commit_fails_like_an_edited_record(
 
     assert code == 1
     rows = _read_csv(output / "records.csv")
-    assert [row["matches_commit"] for row in rows] == ["true"] * 12 + ["false"]
+    assert [row["matches_commit"] for row in rows] == ["true"] * 13 + ["false"]
     extractor = rows[-1]
     assert extractor["record"] == tables.EXTRACTOR
     assert extractor["commit"] == head
