@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import "@fontsource/allura/latin-400.css";
 
 import { MOTION_MS, prefersReducedMotion } from "../motion";
 import styles from "./OpeningMark.module.css";
@@ -27,6 +26,16 @@ function shouldOpen(): boolean {
 }
 
 /**
+ * The signature's script face, fetched only for an opening that plays: every later page of
+ * the tab, and every visit under reduced motion, used to download the 25 kB file for a mark
+ * it never drew. The stylesheet declares the face with `font-display: swap`, so a signature
+ * drawn before the file lands shows in the fallback and swaps.
+ */
+function loadSignatureFace(): void {
+  void import("@fontsource/allura/latin-400.css");
+}
+
+/**
  * The brand's opening, once per tab: the two bars stand side by side, red on the left and
  * green on the right, then turn a quarter clockwise into the SquadOpt mark (red over green)
  * beside SquadOpt. The maker's signature sits in the lower right as the cover fades.
@@ -37,6 +46,9 @@ function shouldOpen(): boolean {
  */
 export function OpeningMark() {
   const [open, setOpen] = useState(shouldOpen);
+  useEffect(() => {
+    if (open) loadSignatureFace();
+  }, [open]);
   useEffect(() => {
     try {
       window.sessionStorage.setItem(OPENING_STORAGE_KEY, "1");

@@ -6,6 +6,31 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="description" content="SquadOpt: haftalık FPL kararı." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- The faces the first screen sets before the stylesheet has been read: body text in
+         Plex Sans 400 (latin, and latin-ext for the Turkish letters) and headings in Barlow
+         800. Vite rewrites these to the hashed files the stylesheet's @font-face rules name,
+         so each is fetched once; the other weights load as the stylesheet asks for them. -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="./node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2"
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="./node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-ext-400-normal.woff2"
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="./node_modules/@fontsource/barlow-semi-condensed/files/barlow-semi-condensed-latin-800-normal.woff2"
+    />
     <title>SquadOpt</title>
   </head>
   <body>
