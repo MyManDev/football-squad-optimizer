@@ -1,4 +1,4 @@
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useQuery, type QueryClient, type UseQueryResult } from "@tanstack/react-query";
 
 import { discardBody, withRequestDeadline } from "../../data/request";
 import type { Fixture, FixtureGameweek, FixturesPayload } from "./types";
@@ -84,11 +84,19 @@ export async function loadFixtures(signal?: AbortSignal): Promise<FixturesPayloa
   }
 }
 
+/** The one fixtures read: the hook below and a page's prefetch share its key and policy. */
+export const FIXTURES_QUERY = {
+  queryKey: ["fixtures"] as const,
+  queryFn: ({ signal }: { signal?: AbortSignal }) => loadFixtures(signal),
+  staleTime: 60_000,
+  retry: false,
+} as const;
+
 export function useFixtures(): UseQueryResult<FixturesPayload | null> {
-  return useQuery({
-    queryKey: ["fixtures"],
-    queryFn: ({ signal }) => loadFixtures(signal),
-    staleTime: 60_000,
-    retry: false,
-  });
+  return useQuery(FIXTURES_QUERY);
+}
+
+/** Starts the fixtures read ahead of the page that will ask for it, under the same key. */
+export function prefetchFixtures(client: QueryClient): void {
+  void client.prefetchQuery(FIXTURES_QUERY);
 }

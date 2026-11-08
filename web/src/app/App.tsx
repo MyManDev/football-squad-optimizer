@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { lazy, Suspense, use, useEffect } from "react";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
 import { PageLoading } from "../design/components/PageLoading";
@@ -24,11 +24,48 @@ const LeagueMembersPage = lazy(() =>
     default: m.LeagueMembersPage,
   })),
 );
-const LeagueMemberPage = lazy(() =>
-  import("../features/league/pages/LeagueMemberPage").then((m) => ({
-    default: m.LeagueMemberPage,
-  })),
-);
+type MemberPageModule = typeof import("../features/league/pages/LeagueMemberPage");
+let memberPage: Promise<MemberPageModule> | null = null;
+
+/**
+ * The member page's code, loaded once. `RoutePreload` starts it as the address arrives; the
+ * page component below reads it with `use`, which returns a settled promise's value at once.
+ * `lazy` would suspend on its first render even with the module already here, and the
+ * suspense fallback that then shows is held for React's throttle, about 300 ms, before the
+ * page is let in: measured as the gap between the directory resolving and the page's first
+ * read, on the live site and in the end-to-end preview alike.
+ */
+function loadLeagueMemberPage(): Promise<MemberPageModule> {
+  if (memberPage === null) {
+    const loading = import("../features/league/pages/LeagueMemberPage");
+    memberPage = loading;
+    // The settled state React's `use` reads synchronously (the thenable protocol): a
+    // promise with `status: "fulfilled"` and its `value` is returned without suspending.
+    void loading.then((module) => {
+      Object.assign(loading, { status: "fulfilled", value: module });
+    });
+  }
+  return memberPage;
+}
+
+function LeagueMemberPage() {
+  const module = use(loadLeagueMemberPage());
+  return <module.LeagueMemberPage />;
+}
+
+/**
+ * A member page's code starts loading as its address arrives, in the same turn as the gate's,
+ * instead of after the gate has read the directory: on a phone that was one round trip of
+ * the five the page used to pay before anything of it was drawn.
+ */
+const MEMBER_PAGE_ADDRESS = /^\/league(?:\/\d+)?\/members\/\d+/;
+function RoutePreload() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (MEMBER_PAGE_ADDRESS.test(pathname)) void loadLeagueMemberPage();
+  }, [pathname]);
+  return null;
+}
 const ForwardedLeaguePage = lazy(() =>
   import("../features/league/forwarded/ForwardedLeaguePage").then((m) => ({
     default: m.ForwardedLeaguePage,
@@ -79,6 +116,7 @@ function LocalizedApp({ basename }: { basename: string }) {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basename}>
         {/* The shell reads the visitor's league and member through the identity module. */}
+        <RoutePreload />
         <IdentifiedShell>
           <RouteErrorBoundary>
             <Suspense fallback={<PageLoading label={messages.common.loading} />}>
