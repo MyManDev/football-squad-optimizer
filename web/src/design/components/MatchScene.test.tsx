@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -28,6 +31,26 @@ describe("MatchScene", () => {
     expect(ball(container)).toBe(first);
     rerender(<MatchScene tall={false} arrival="/b" />);
     expect(ball(container)).not.toBe(first);
+  });
+});
+
+describe("the scene's layer on a phone", () => {
+  const css = readFileSync(join(__dirname, "MatchScene.module.css"), "utf-8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+  const scene = css.match(/\.scene \{[^}]*\}/)?.[0] ?? "";
+
+  it("is sized to the largest viewport and contained, so the address bar cannot repaint it", () => {
+    expect(scene).toMatch(/height: 100lvh;/);
+    expect(scene).not.toMatch(/inset: 0;/);
+    expect(scene).not.toMatch(/bottom: 0;/);
+    expect(scene).toMatch(/contain: strict;/);
+  });
+
+  it("keeps the ball still under 600 px", () => {
+    const phone = css.match(/@media \(max-width: 599\.98px\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(phone).toMatch(/\.ball \{\s*animation: none;\s*\}/);
   });
 });
 
