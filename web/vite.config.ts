@@ -2,11 +2,12 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+import { firstTurn } from "./vite/firstTurn.ts";
 import { pagesNotFound } from "./vite/pagesNotFound.ts";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), pagesNotFound()],
+  plugins: [react(), pagesNotFound(), firstTurn()],
   // Hosting-agnostic: set VITE_BASE_PATH (e.g. "/football-squad-optimizer/") for a
   // sub-path deployment such as GitHub Pages; "/" for a root domain.
   base: process.env.VITE_BASE_PATH ?? "/",

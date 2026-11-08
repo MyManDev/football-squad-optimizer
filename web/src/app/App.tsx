@@ -5,6 +5,11 @@ import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import { EmptyState } from "../design/components/EmptyState";
 import { PageLoading } from "../design/components/PageLoading";
 import { OpeningMark } from "../design/shell/OpeningMark";
+// Every league address passes the gate, so its code ships with the shell rather than as a
+// lazy chunk: a lazy gate suspended on the first render of nearly every visit, and the
+// suspense fallback it showed was held for React's throttle (about 300 ms) before the gate
+// could mount and ask for the directory. Its graph is loaded on every such visit anyway.
+import { LeagueGate } from "../features/league/pages/LeagueGate";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 import { IdentifiedShell } from "./IdentifiedShell";
@@ -15,9 +20,6 @@ const LeagueEntryPage = lazy(() =>
 );
 const LeaguePage = lazy(() =>
   import("../features/league/pages/LeaguePage").then((m) => ({ default: m.LeaguePage })),
-);
-const LeagueGate = lazy(() =>
-  import("../features/league/pages/LeagueGate").then((m) => ({ default: m.LeagueGate })),
 );
 const LeagueMembersPage = lazy(() =>
   import("../features/league/pages/LeagueMembersPage").then((m) => ({
