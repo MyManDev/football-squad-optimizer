@@ -7,8 +7,9 @@ component samplers and the two planning measurements the paper sits beside), fit
 measures nothing and opens no network connection. Every number in a table or figure file is a
 value of one record, the difference of two values of one record, or an arithmetic summary of
 values of one record (an observation-weighted mean over seasons, a count of statuses, the
-sample standard deviation of per-fold differences and the two IID precision formulas of the
-instrument record); the file names the record and the JSON pointer (RFC 6901) of each, a
+sample standard deviation of per-fold differences, the two IID precision formulas of the
+instrument record and the repository's season-aware block bootstrap of per-fold differences
+at three block lengths); the file names the record and the JSON pointer (RFC 6901) of each, a
 derived cell's pointer starting with `derived:` and naming the pointers it combines, so any
 cell can be checked against its record.
 
@@ -48,6 +49,7 @@ import csv
 import hashlib
 import io
 import json
+import random
 import statistics
 import subprocess
 import sys
@@ -133,6 +135,7 @@ def _candidate(key: str, label: str, record: str, arm: str, prefix: str) -> Cand
 
 
 _V2 = "/decision_level_reading/v2_features_minus_linear"
+_V2B = "/decision_level_reading/v2_minus_v1_features"
 
 #: The five Phase C candidate records committed under docs/research, in the order they ran.
 CANDIDATES: tuple[Candidate, ...] = (
@@ -1047,6 +1050,54 @@ def _weighted_points_mae(records: Records, record: str, arm: str, seasons: Seque
     )
 
 
+def _season_points(
+    records: Records, record: str, arm: str, seasons: Sequence[str]
+) -> list[tuple[str, int, dict[str, float]]]:
+    """Each season's points block: its pointer, observations and the three error metrics."""
+
+    blocks = []
+    for season in seasons:
+        at = f"/comparison/metrics/{arm}/by_season/{_escape(season)}/points"
+        count = int(records.cell(record, f"{at}/observations").value)
+        values = {
+            name: float(records.cell(record, f"{at}/{name}").value)
+            for name in ("mean_absolute_error", "root_mean_squared_error", "mean_error")
+        }
+        blocks.append((at, count, values))
+    if not sum(count for _, count, _ in blocks):
+        raise RecordError(f"{record}: no points observations over {', '.join(seasons)}")
+    return blocks
+
+
+def _weighted_points_rmse(records: Records, record: str, arm: str, seasons: Sequence[str]) -> Cell:
+    """An arm's points RMSE over `seasons`: the root of the observation-weighted mean of
+    each season's squared RMSE, which is the RMSE over the seasons' rows together."""
+
+    blocks = _season_points(records, record, arm, seasons)
+    total = sum(count for _, count, _ in blocks)
+    mean_square = sum(v["root_mean_squared_error"] ** 2 * n for _, n, v in blocks) / total
+    return Cell(
+        mean_square**0.5,
+        record,
+        f"{DERIVED}root of the observation-weighted mean of the squared "
+        f"/comparison/metrics/{arm}/by_season/<season>/points/root_mean_squared_error over "
+        f"{','.join(seasons)}",
+    )
+
+
+def _weighted_points_mean_error(
+    records: Records, record: str, arm: str, seasons: Sequence[str]
+) -> Cell:
+    blocks = _season_points(records, record, arm, seasons)
+    total = sum(count for _, count, _ in blocks)
+    return Cell(
+        sum(v["mean_error"] * n for _, n, v in blocks) / total,
+        record,
+        f"{DERIVED}observation-weighted mean over {','.join(seasons)} of "
+        f"/comparison/metrics/{arm}/by_season/<season>/points/mean_error",
+    )
+
+
 def same_period_table(records: Records) -> Table:
     """Each candidate's accuracy and decision readings over the same seasons and reference."""
 
@@ -1057,10 +1108,12 @@ def same_period_table(records: Records) -> Table:
         "reference_decision_season_points_mae",
         "candidate_decision_season_points_mae",
         "decision_season_paired_difference",
-        "reference_points_rmse",
-        "candidate_points_rmse",
-        "reference_points_mean_error",
-        "candidate_points_mean_error",
+        "reference_decision_season_points_rmse",
+        "candidate_decision_season_points_rmse",
+        "reference_decision_season_points_mean_error",
+        "candidate_decision_season_points_mean_error",
+        "reference_pooled_points_rmse",
+        "candidate_pooled_points_rmse",
         "candidate_minus_reference_decision_mean",
         "interval_90_low",
         "interval_90_high",
@@ -1089,16 +1142,23 @@ def same_period_table(records: Records) -> Table:
         }
         for side, arm in (("reference", "control"), ("candidate", "candidate")):
             overall = f"/comparison/metrics/{arm}/overall/points"
-            row[f"{side}_points_rmse"] = at(f"{overall}/root_mean_squared_error")
-            row[f"{side}_points_mean_error"] = at(f"{overall}/mean_error")
+            row[f"{side}_pooled_points_rmse"] = at(f"{overall}/root_mean_squared_error")
+            row[f"{side}_decision_season_points_rmse"] = _weighted_points_rmse(
+                records, candidate.record, arm, seasons
+            )
+            row[f"{side}_decision_season_points_mean_error"] = _weighted_points_mean_error(
+                records, candidate.record, arm, seasons
+            )
         rows.append(row)
     return Table(
         "table_candidates_same_period",
         "Each candidate against the reference arm of its own record on the seasons of the "
         "decision folds: the points MAE of both arms over those seasons (each recorded season "
         "weighted by its observations), the paired difference as reference minus candidate, "
-        "the pooled points RMSE and mean error of both arms, and the decision reading against "
-        "the same reference (the wider contract against the boosted pair at both levels)",
+        "both arms' points RMSE and mean error (prediction minus realized) over the same "
+        "seasons, their pooled RMSE over every recorded season, and the decision reading "
+        "against the same reference (the wider contract against the boosted pair at both "
+        "levels)",
         columns,
         rows,
     )
@@ -1131,7 +1191,7 @@ def precision_table(records: Records) -> Table:
     seasons = sorted(
         {
             fold[:7]
-            for candidate in CANDIDATES
+            for candidate in (*CANDIDATES, WIDER_VS_BOOSTED)
             for fold in records.keys(candidate.record, f"{candidate.candidate_arm}/folds")
         }
     )
@@ -1145,15 +1205,20 @@ def precision_table(records: Records) -> Table:
         *(f"leave_out_{season}_mean" for season in seasons),
     )
     rows = []
-    for candidate in CANDIDATES:
+    for candidate in (*CANDIDATES, WIDER_VS_BOOSTED):
         differences = _fold_differences(records, candidate)
         values = [value for _, value in differences]
         count = len(values)
         deviation = statistics.stdev(values) if count > 1 else float("nan")
         error = deviation / count**0.5
         folds = f"{candidate.candidate_arm}/folds/<fold> - {candidate.linear_arm}/folds/<fold>"
+        label = (
+            candidate.label
+            if " vs " in candidate.label
+            else f"{candidate.label} vs linear components"
+        )
         row = {
-            "comparison": _label(f"{candidate.label} vs linear components"),
+            "comparison": _label(label),
             "paired_folds": records.cell(candidate.record, candidate.paired_folds),
             "mean": Cell(statistics.fmean(values), candidate.record, f"{DERIVED}mean of {folds}"),
             "standard_deviation": Cell(
@@ -1231,6 +1296,154 @@ def precision_checks(records: Records) -> list[Check]:
             )
         )
     return checks
+
+
+#: The wider contract against the boosted pair on v1 features: the same reference as its
+#: player-level comparison, at the decision level.
+WIDER_VS_BOOSTED = Candidate(
+    key="feature_contract_v2_vs_boosted",
+    label="Boosted pair, v2 feature contract vs boosted pair",
+    record=FEATURES_V2,
+    paired_folds=f"{_V2B}/paired_folds",
+    mean=f"{_V2B}/mean",
+    median=f"{_V2B}/median",
+    interval=f"{_V2B}/interval_90",
+    wins_ties_losses=f"{_V2B}/wins_ties_losses",
+    by_season=f"{_V2B}/by_season_mean",
+    candidate_arm="/decision_level_reading/arms/gbm_v2_features",
+    linear_arm="/decision_level_reading/arms/gbm_v1_features",
+)
+
+#: The bootstrap of `squadopt.evaluation.statistics`, as the records describe it: moving blocks
+#: within a season, a seed derived from a candidate id, percentile interval.
+BOOTSTRAP_RESAMPLES = 5000
+BOOTSTRAP_SEED = 0
+BOOTSTRAP_CONFIDENCE = 0.9
+BLOCK_LENGTHS = (2, 4, 8)
+#: The id this extractor seeds its own resamples with; a record's own id reproduces its
+#: interval exactly where the record names one.
+PAPER_BOOTSTRAP_ID = "paper_block_sensitivity"
+
+
+def _bootstrap_seed(base_seed: int, candidate_id: str) -> int:
+    digest = hashlib.sha256(candidate_id.encode("utf-8")).hexdigest()
+    return base_seed + int(digest[:8], 16)
+
+
+def _percentile(values: list[float], probability: float) -> float:
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * probability
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] + fraction * (ordered[upper] - ordered[lower])
+
+
+def block_interval(
+    differences: Sequence[tuple[str, float]], block_length: int, candidate_id: str
+) -> tuple[float, float]:
+    """The season-aware moving-block percentile interval of the repository's helper.
+
+    `differences` pairs each fold's season with its paired difference, in fold order. Blocks
+    are resampled within a season and never across one; the generator is seeded from the
+    candidate id as the helper seeds it, so a record's own id reproduces its interval.
+    """
+
+    grouped: dict[str, list[int]] = {}
+    for index, (season, _) in enumerate(differences):
+        grouped.setdefault(season, []).append(index)
+    generator = random.Random(_bootstrap_seed(BOOTSTRAP_SEED, candidate_id))
+    means = []
+    for _ in range(BOOTSTRAP_RESAMPLES):
+        sample: list[int] = []
+        for season in sorted(grouped):
+            indices = grouped[season]
+            length = min(block_length, len(indices))
+            starts = len(indices) - length + 1
+            season_sample: list[int] = []
+            while len(season_sample) < len(indices):
+                start = generator.randrange(starts)
+                season_sample.extend(indices[start : start + length])
+            sample.extend(season_sample[: len(indices)])
+        means.append(statistics.fmean(differences[index][1] for index in sample))
+    alpha = (1.0 - BOOTSTRAP_CONFIDENCE) / 2.0
+    return _percentile(means, alpha), _percentile(means, 1.0 - alpha)
+
+
+def block_sensitivity_table(records: Records) -> tuple[Table, list[Check]]:
+    """Each paired decision reading's interval at three block lengths, beside the recorded one."""
+
+    columns = (
+        "comparison",
+        "paired_folds",
+        "mean",
+        "recorded_interval_low",
+        "recorded_interval_high",
+        "recorded_block_length",
+        *(f"block_{length}_{side}" for length in BLOCK_LENGTHS for side in ("low", "high")),
+        "bootstrap_id",
+    )
+    rows = []
+    checks = []
+    for candidate in (*CANDIDATES, WIDER_VS_BOOSTED):
+        record = candidate.record
+        differences = [(fold[:7], value) for fold, value in _fold_differences(records, candidate)]
+        folds = f"{candidate.candidate_arm}/folds/<fold> - {candidate.linear_arm}/folds/<fold>"
+        recorded_id = records.optional(record, f"{DECISION}/interval_candidate_id")
+        bootstrap_id = str(recorded_id.value) if recorded_id is not None else PAPER_BOOTSTRAP_ID
+        row = {
+            "comparison": _label(candidate.label),
+            "paired_folds": records.cell(record, candidate.paired_folds),
+            "mean": Cell(
+                statistics.fmean(value for _, value in differences),
+                record,
+                f"{DERIVED}mean of {folds}",
+            ),
+            "recorded_interval_low": records.cell(record, f"{candidate.interval}/0"),
+            "recorded_interval_high": records.cell(record, f"{candidate.interval}/1"),
+            "recorded_block_length": _label("4"),
+        }
+        for length in BLOCK_LENGTHS:
+            low, high = block_interval(differences, length, bootstrap_id)
+            pointer = (
+                f"{DERIVED}season-aware moving-block bootstrap of {folds}: blocks of {length}, "
+                f"{BOOTSTRAP_RESAMPLES} resamples, seed {BOOTSTRAP_SEED} with id {bootstrap_id}, "
+                f"{BOOTSTRAP_CONFIDENCE:.0%} percentile interval"
+            )
+            row[f"block_{length}_low"] = Cell(low, record, pointer)
+            row[f"block_{length}_high"] = Cell(high, record, pointer)
+            if length == 4 and recorded_id is not None:
+                recorded = (
+                    float(row["recorded_interval_low"].value),
+                    float(row["recorded_interval_high"].value),
+                )
+                checks.append(
+                    Check(
+                        f"{candidate.key}: the recorded interval is reproduced at blocks of 4 "
+                        "with the record's bootstrap id",
+                        record,
+                        candidate.interval,
+                        list(recorded),
+                        [low, high],
+                        abs(recorded[0] - low) <= FOLD_TOLERANCE
+                        and abs(recorded[1] - high) <= FOLD_TOLERANCE,
+                    )
+                )
+        row["bootstrap_id"] = recorded_id if recorded_id is not None else _label(PAPER_BOOTSTRAP_ID)
+        rows.append(row)
+    table = Table(
+        "table_candidates_block_sensitivity",
+        "Sensitivity of each paired decision reading's 90% interval to the bootstrap block "
+        "length: the recorded interval (blocks of 4) beside intervals recomputed here from the "
+        "recorded per-fold differences at blocks of 2, 4 and 8 with the repository's "
+        "season-aware moving-block procedure (5,000 resamples, seed 0). Where a record names "
+        "its bootstrap id the block-4 interval reproduces the recorded one exactly and "
+        "checks.csv says so; elsewhere the id is this extractor's own, so the block-4 interval "
+        "differs from the recorded one by the random stream alone",
+        columns,
+        rows,
+    )
+    return table, checks
 
 
 def solver_status_table(records: Records) -> Table:
@@ -1557,6 +1770,8 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         solver_status_table(records),
         sampler_season_table(records),
     ]
+    block_table, block_checks = block_sensitivity_table(records)
+    tables.append(block_table)
     fold_points, fold_checks = fold_differences(records)
     pit_points, pit_checks = sampler_folds(records)
     figures = {
@@ -1572,6 +1787,7 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         *seed_checks(records),
         *pooled_mae_checks(records),
         *precision_checks(records),
+        *block_checks,
     ]
     commit = checked_out_commit(records.root)
     digests, commit_checks = commit_rows(records, extractor_digest(), commit)

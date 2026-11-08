@@ -554,6 +554,7 @@ def test_the_committed_manifest_names_every_output_and_input_once() -> None:
                 "candidates_precision",
                 "solver_status",
                 "sampler_calibration_by_season",
+                "candidates_block_sensitivity",
             )
         ),
         *(f"tables/{table}" for figure in figures.FIGURES for table in figure.tables),

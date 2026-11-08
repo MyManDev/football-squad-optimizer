@@ -62,7 +62,14 @@ def _metrics(log_loss: float, minutes: float, points: float) -> dict[str, Any]:
     # Four seasons of ten rows each around the pooled MAE, so the pooled value is their mean;
     # the two decision seasons of the fixture folds are the first two.
     seasons = {
-        season: {"points": {"mean_absolute_error": points + offset, "observations": 10}}
+        season: {
+            "points": {
+                "mean_absolute_error": points + offset,
+                "observations": 10,
+                "root_mean_squared_error": 2 * (points + offset),
+                "mean_error": offset,
+            }
+        }
         for season, offset in (
             ("2021-22", 0.02),
             ("2022-23", -0.02),
@@ -126,11 +133,13 @@ def _candidate_record(candidate: tables.Candidate, shift: float) -> dict[str, An
     folds = {fold: score + shift for fold, score in CANDIDATE_FOLDS.items()}
     arms = {arm: _arm(folds), linear: _arm(LINEAR_FOLDS)}
     if candidate.mean.endswith("/mean"):
+        boosted = {fold: score - 0.5 for fold, score in folds.items()}
+        arms["gbm_v1_features"] = _arm(boosted)
         decision: dict[str, Any] = {
             "v2_features_minus_linear": _summary("", folds),
             "v2_minus_v1_features": {
                 **_summary("", folds),
-                "mean": -0.2,
+                "mean": 0.5,
                 "interval_90": [-1.8, 1.0],
             },
             "arms": arms,
@@ -255,6 +264,15 @@ def _records() -> dict[str, Any]:
             },
         }
     }
+    regime = records[tables.REGIME]["decision_level_reading"]
+    regime["interval_candidate_id"] = "fixture_regime_id"
+    regime["candidate_minus_linear_interval_90"] = list(
+        tables.block_interval(
+            [(fold[:7], CANDIDATE_FOLDS[fold] + 3.0 - LINEAR_FOLDS[fold]) for fold in LINEAR_FOLDS],
+            4,
+            "fixture_regime_id",
+        )
+    )
     records[tables.INSTRUMENT] = {
         "precision": {
             "covariates": [
@@ -393,6 +411,7 @@ def test_every_table_number_resolves_to_its_record_and_pointer(root: Path) -> No
         "table_candidates_precision",
         "table_solver_status",
         "table_sampler_calibration_by_season",
+        "table_candidates_block_sensitivity",
     }
     derived = 0
     for row in provenance:
@@ -576,7 +595,7 @@ def test_the_accuracy_figure_carries_both_arms_by_season_and_the_same_reference(
     # The wider contract is paired with the boosted pair at both levels, the others with the
     # linear arm.
     wider = rows["Boosted pair, v2 feature contract"]
-    assert wider["candidate_minus_reference_decision_mean"] == "-0.2"
+    assert wider["candidate_minus_reference_decision_mean"] == "0.5"
     assert wider["candidate_minus_reference_decision_mean_pointer"] == (
         "/decision_level_reading/v2_minus_v1_features/mean"
     )
@@ -592,7 +611,12 @@ def test_the_same_period_table_weights_each_season_by_its_observations(root: Pat
     assert float(mixture["reference_decision_season_points_mae"]) == pytest.approx(1.07)
     assert float(mixture["candidate_decision_season_points_mae"]) == pytest.approx(1.09)
     assert float(mixture["decision_season_paired_difference"]) == pytest.approx(-0.02)
-    assert float(mixture["candidate_points_rmse"]) == pytest.approx(2.18)
+    assert float(mixture["candidate_pooled_points_rmse"]) == pytest.approx(2.18)
+    # Decision-season RMSE: the root of the mean of (2 x 1.11)^2 and (2 x 1.07)^2.
+    assert float(mixture["candidate_decision_season_points_rmse"]) == pytest.approx(
+        ((2.22**2 + 2.14**2) / 2) ** 0.5
+    )
+    assert float(mixture["reference_decision_season_points_mean_error"]) == pytest.approx(0.0)
     assert rows["Boosted pair, v2 feature contract"]["interval_90_low"] == "-1.8"
 
 
@@ -620,6 +644,31 @@ def test_the_precision_table_applies_the_instrument_formulas_to_each_candidate(
     checks = _read_csv(output / "checks.csv")
     assert all(check["holds"] == "true" for check in checks if "instrument" in check["check"])
     assert any("instrument" in check["check"] for check in checks)
+
+
+def test_the_block_sensitivity_table_reproduces_a_recorded_interval_with_its_own_id(
+    root: Path,
+) -> None:
+    _, output = _run(root)
+
+    rows = {
+        row["comparison"]: row
+        for row in _read_csv(output / "table_candidates_block_sensitivity.csv")
+    }
+    regime = rows["Regime-gated experts"]
+    assert regime["bootstrap_id"] == "fixture_regime_id"
+    assert float(regime["block_4_low"]) == float(regime["recorded_interval_low"])
+    assert float(regime["block_4_high"]) == float(regime["recorded_interval_high"])
+    boosted = rows["Boosted pair"]
+    assert boosted["bootstrap_id"] == tables.PAPER_BOOTSTRAP_ID
+    assert float(boosted["block_2_low"]) <= float(boosted["mean"]) <= float(boosted["block_2_high"])
+    wider = rows["Boosted pair, v2 feature contract vs boosted pair"]
+    assert float(wider["mean"]) == pytest.approx(0.5)
+    checks = _read_csv(output / "checks.csv")
+    reproduced = [check for check in checks if "reproduced at blocks of 4" in check["check"]]
+    assert [check["holds"] for check in reproduced] == ["true"]
+    precision = {row["comparison"] for row in _read_csv(output / "table_candidates_precision.csv")}
+    assert "Boosted pair, v2 feature contract vs boosted pair" in precision
 
 
 def test_the_solver_status_table_counts_the_frozen_statuses_and_reads_the_split(
