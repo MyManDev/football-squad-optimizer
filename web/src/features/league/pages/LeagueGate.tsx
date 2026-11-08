@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, type ReactNode } from "react";
 import { Navigate, useLocation, useParams } from "react-router";
 
@@ -6,7 +6,9 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { leagueIdInAddress, legacyLeagueAddress } from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../data";
+import { createLeagueTree } from "../data";
 import { findLeague, loadLeagueDirectory } from "../directory";
+import { entryIdInAddress, prefetchMemberReads } from "../prefetch";
 import { ForwardedLeagueGate } from "../forwarded/ForwardedLeagueGate";
 import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import { LeagueProvider } from "../LeagueProvider";
@@ -44,7 +46,7 @@ export function LeagueGate({
   forwarded?: ReactNode;
 }) {
   const { messages } = useLanguage();
-  const { leagueId: parameter } = useParams();
+  const { leagueId: parameter, entryId: entryParameter } = useParams();
   const location = useLocation();
   // The claim's league, else the chosen one: where an address without a number goes.
   const { leagueId: current, chooseLeague } = useLeagueIdentity();
@@ -63,6 +65,13 @@ export function LeagueGate({
   useEffect(() => {
     if (addressLeague !== null) chooseLeague(addressLeague);
   }, [addressLeague, chooseLeague]);
+  // The page's own reads start here, in the same turn as its code, rather than one by one
+  // once the page has mounted (prefetch.ts).
+  const queryClient = useQueryClient();
+  const entryId = entryIdInAddress(entryParameter);
+  useEffect(() => {
+    if (league !== null) prefetchMemberReads(queryClient, createLeagueTree(league), entryId);
+  }, [league, entryId, queryClient]);
   if (parameter === undefined) {
     // The old shape of the address: the current league's version of it, or the form.
     const legacy = current === null ? null : legacyLeagueAddress(location.pathname, current);

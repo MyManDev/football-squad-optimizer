@@ -181,8 +181,9 @@ describe("league reads", () => {
     let reads = 0;
     for (const { name, text } of leagueSources()) {
       // A `useQueries` call spreads the policy once, into the options every read it maps takes,
-      // and a `useInfiniteQuery` call once for every page it reads.
-      const calls = text.match(/\buse(?:Infinite)?Quer(?:y|ies)\(/g)?.length ?? 0;
+      // a `useInfiniteQuery` call once for every page it reads, and a `prefetchQuery` call
+      // (prefetch.ts) once for the read it starts ahead of the page.
+      const calls = text.match(/\b(?:use(?:Infinite)?Quer(?:y|ies)|prefetchQuery)\(/g)?.length ?? 0;
       const policed = text.match(/\.\.\.(?:LEAGUE_READ|CAPABILITIES_READ)\b/g)?.length ?? 0;
       if (calls !== policed)
         offenders.push(`${name}: ${policed} of ${calls} reads use a central league read policy`);

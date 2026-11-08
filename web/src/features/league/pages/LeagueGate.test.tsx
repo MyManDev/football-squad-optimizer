@@ -146,13 +146,16 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     expect(location()).toBe(memberAddress(LEAGUE, 35249002));
   });
 
-  it("opens the page at its league address for a claimed visitor, reading only the directory", async () => {
+  it("opens the page at its league address for a claimed visitor, starting the page's own reads with the directory", async () => {
     const fetcher = legacySite();
     claimIn();
     open(language, memberAddress(LEAGUE, ENTRY));
     expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: copy.title })).toBeNull();
-    expect(asked(fetcher)).toEqual(DIRECTORY_READS);
+    // The gate starts the member's documents as soon as it knows the league (prefetch.ts):
+    // the squad and the advice index are served from the example under test, the fixtures
+    // are the one read of theirs that reaches the network.
+    expect(asked(fetcher)).toEqual([...DIRECTORY_READS, "data/fixtures.json"]);
     // The league in the address is the one the visitor is in from here on.
     expect(readChosenLeague()).toBe(LEAGUE);
   });

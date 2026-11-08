@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { lazy, Suspense, useEffect } from "react";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
 import { PageLoading } from "../design/components/PageLoading";
@@ -24,11 +24,24 @@ const LeagueMembersPage = lazy(() =>
     default: m.LeagueMembersPage,
   })),
 );
+const loadLeagueMemberPage = () => import("../features/league/pages/LeagueMemberPage");
 const LeagueMemberPage = lazy(() =>
-  import("../features/league/pages/LeagueMemberPage").then((m) => ({
-    default: m.LeagueMemberPage,
-  })),
+  loadLeagueMemberPage().then((m) => ({ default: m.LeagueMemberPage })),
 );
+
+/**
+ * A member page's code starts loading as its address arrives, in the same turn as the gate's,
+ * instead of after the gate has read the directory: on a phone that was one round trip of
+ * the five the page used to pay before anything of it was drawn.
+ */
+const MEMBER_PAGE_ADDRESS = /^\/league(?:\/\d+)?\/members\/\d+/;
+function RoutePreload() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (MEMBER_PAGE_ADDRESS.test(pathname)) void loadLeagueMemberPage();
+  }, [pathname]);
+  return null;
+}
 const ForwardedLeaguePage = lazy(() =>
   import("../features/league/forwarded/ForwardedLeaguePage").then((m) => ({
     default: m.ForwardedLeaguePage,
@@ -79,6 +92,7 @@ function LocalizedApp({ basename }: { basename: string }) {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basename}>
         {/* The shell reads the visitor's league and member through the identity module. */}
+        <RoutePreload />
         <IdentifiedShell>
           <RouteErrorBoundary>
             <Suspense fallback={<PageLoading label={messages.common.loading} />}>
