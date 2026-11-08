@@ -1,11 +1,20 @@
 /* The fixed picture behind the whole page (MatchScene.tsx). Panels, cards and bars keep their
-   own fills and pass over it; only bare page shows it. */
+   own fills and pass over it; only bare page shows it. It is sized to the largest viewport,
+   not the current one: a phone's address bar grows and shrinks as the page scrolls, and a
+   layer that followed it (`inset: 0`) would be laid out and painted again, the whole picture,
+   at every turn of the bar. `contain: strict` keeps that work inside the layer when it does
+   happen. */
 .scene {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 100vh;
+  height: 100lvh;
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
+  contain: strict;
 }
 
 /* A page that is one question stands alone: it says so with this attribute. */
@@ -61,6 +70,15 @@ body:has([data-no-match-scene]) .scene {
 @keyframes ball-flight {
   from {
     offset-distance: 0%;
+  }
+}
+
+/* On a phone the ball rests in the gloves from the start: its run would repaint the whole
+   picture at every frame for two seconds, just as a page arrives and the reader starts to
+   scroll. */
+@media (max-width: 599.98px) {
+  .ball {
+    animation: none;
   }
 }
 
