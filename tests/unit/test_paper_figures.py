@@ -555,6 +555,7 @@ def test_the_committed_manifest_names_every_output_and_input_once() -> None:
                 "solver_status",
                 "sampler_calibration_by_season",
                 "candidates_block_sensitivity",
+                "solver_budget_cards",
             )
         ),
         *(f"tables/{table}" for figure in figures.FIGURES for table in figure.tables),
@@ -580,5 +581,6 @@ def test_the_committed_manifest_names_every_output_and_input_once() -> None:
         tables.RANK_SHRINKAGE,
         tables.MEAN_REVERSION,
         tables.INSTRUMENT,
+        tables.SOLVER_BUDGET,
     }
     assert set(manifest.inputs) == records | {tables.EXTRACTOR, figures.SCRIPT}

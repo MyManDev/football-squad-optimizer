@@ -56,7 +56,7 @@
 
 | Output | Step | Inputs | SHA-256 |
 | --- | --- | --- | --- |
-| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | `fbe2489eae972246d64c54ff1dd3a1b5722766d2cea135a82592c907dbefa8e5` |
+| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | `fd8ad53154155f085bf007078bc5efe8c979cd9c9f88e9948579f5749d7f35a5` |
 | `tables/figure_accuracy_against_decision.csv` | 3 | R4, R5, R7, R8, R9, C1 | `a36b6cf86f2b4869415f00f4b64b5d68735c91e9466a007ea57c4026842471c9` |
 | `tables/figure_decision_by_season.csv` | 3 | R4, R5, R7, R8, R9, C1 | `3f8537d3067ce4c2bb68e724d3b30232089afbf653f92e013b7ba576214ad3c0` |
 | `tables/figure_decision_fold_differences.csv` | 3 | R4, R5, R7, R8, R9, C1 | `1d20d93c1799fd1e09f9493265cd9e33f792c16271cde420e017a0c5034966f5` |
