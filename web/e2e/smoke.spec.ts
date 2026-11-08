@@ -51,12 +51,12 @@ test.describe("a visitor who has said who they are", () => {
     await page.getByRole("button", { name: /EN.*English/ }).click();
 
     // The page's title is the member's team, so the words that change stand under it.
-    await expect(page.getByRole("heading", { level: 2, name: "Plan settings" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Plan Settings" })).toBeVisible();
     await expect(page.getByRole("radio", { name: /3 weeks/ })).toBeChecked();
     await expect(page).toHaveURL(/mode=saf-puan&window=3/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
-    // 'League' is the member list, titled with the league's name; 'This week' is the
+    // 'League' is the member list, titled with the league's name; 'This Week' is the
     // visitor's own page.
     await page.getByRole("link", { name: "League", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(member.leagueName!);
@@ -65,16 +65,16 @@ test.describe("a visitor who has said who they are", () => {
       "href",
       `/league/${member.leagueId}/members`,
     );
-    await expect(page.getByRole("link", { name: "This week", exact: true })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: "This Week", exact: true })).toHaveAttribute(
       "href",
       `/league/${member.leagueId}/members/${member.entryId}`,
     );
   });
 });
 
-test("the sidebar's 'Find your league' leads to the step without a member", async ({ page }) => {
+test("the sidebar's 'Find Your League' leads to the step without a member", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
   await page.goto("/fixtures");
-  await page.getByRole("link", { name: "Find your league", exact: true }).click();
+  await page.getByRole("link", { name: "Find Your League", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Who are you?");
 });

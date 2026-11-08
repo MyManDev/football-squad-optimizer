@@ -19,18 +19,18 @@ const COPY = {
     total: "Toplam oyuncu puanı",
   },
   en: {
-    title: "Starting role and expected minutes",
-    minutes: "Expected minutes",
-    pointsTitle: "Expected points for this fixture",
+    title: "Starting Role and Expected Minutes",
+    minutes: "Expected Minutes",
+    pointsTitle: "Expected Points for This Fixture",
     pointTerms: {
-      appearance: "Appearance points",
+      appearance: "Appearance Points",
       goals: "Goals",
       assists: "Assists",
-      clean_sheet: "Clean sheet",
-      defcon: "Defensive contributions",
-      other: "Other contributions",
+      clean_sheet: "Clean Sheet",
+      defcon: "Defensive Contributions",
+      other: "Other Contributions",
     },
-    total: "Total player points",
+    total: "Total Player Points",
   },
 };
 

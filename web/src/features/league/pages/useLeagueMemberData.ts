@@ -85,7 +85,10 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   // on entry and again on focus once stale. A service that is down, slow or answering
   // for another capture leaves the page on the published tree, never an error.
   const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
-  const leagueId = squad.data?.payload.league_id;
+  // A published league's capabilities are asked for the league the address names, in the
+  // same turn as the squad read; a forwarded league's wait for the squad, whose chips and
+  // snapshot they are read against.
+  const leagueId = forwarded ? squad.data?.payload.league_id : league.leagueId;
   const canAsk = client.readCapabilities !== undefined;
   // A forwarded league's member is a public team to the service: its capabilities come
   // from the public route, or, where that route does not answer, from what the page knows
@@ -93,7 +96,12 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   // service only once its inputs are pinned, so until then the squad's own chip block
   // stands in for them.
   const capabilitiesQuery = useQuery({
-    queryKey: ["advice-capabilities", leagueId, forwarded, squad.data?.payload.source_snapshot_id],
+    queryKey: [
+      "advice-capabilities",
+      leagueId,
+      forwarded,
+      forwarded ? squad.data?.payload.source_snapshot_id : null,
+    ],
     queryFn: async ({ signal }) => {
       if (!forwarded) return client.readCapabilities!(leagueId!, { signal });
       const own = squad.data!.payload;

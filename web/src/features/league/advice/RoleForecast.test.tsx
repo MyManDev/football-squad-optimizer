@@ -45,7 +45,7 @@ it.each(["tr", "en"] as const)(
     );
     const section = screen.getByTestId("role-forecast");
     expect(section).toHaveTextContent(
-      language === "tr" ? "Beklenen dakika: 34,0" : "Expected minutes: 34.0",
+      language === "tr" ? "Beklenen dakika: 34,0" : "Expected Minutes: 34.0",
     );
     expect(section.textContent).not.toMatch(AS_A_CHANCE);
     expect(section).not.toHaveTextContent(
@@ -75,7 +75,7 @@ it("says nothing more for an unknown starting role, and refuses out-of-range or 
       <RoleForecast view={view} />
     </LanguageProvider>,
   );
-  expect(screen.getByTestId("role-forecast")).toHaveTextContent("Expected minutes: 34.0");
+  expect(screen.getByTestId("role-forecast")).toHaveTextContent("Expected Minutes: 34.0");
   expect(screen.getByTestId("role-forecast").textContent).not.toMatch(AS_A_CHANCE);
   expect(screen.getByTestId("role-forecast")).not.toHaveTextContent(
     "Insufficient recorded starting-role evidence",
@@ -137,16 +137,16 @@ it.each(["tr", "en"] as const)(
     fireEvent.click(detail.querySelector("summary")!);
     expect(detail).toHaveAttribute("open");
     expect(detail).toHaveTextContent(
-      language === "tr" ? "Süre puanı: 0,70" : "Appearance points: 0.70",
+      language === "tr" ? "Süre puanı: 0,70" : "Appearance Points: 0.70",
     );
     expect(detail).toHaveTextContent(
-      language === "tr" ? "Diğer katkılar: -0,10" : "Other contributions: -0.10",
+      language === "tr" ? "Diğer katkılar: -0,10" : "Other Contributions: -0.10",
     );
     expect(detail).toHaveTextContent(
-      language === "tr" ? "Savunma katkısı: 0,20" : "Defensive contributions: 0.20",
+      language === "tr" ? "Savunma katkısı: 0,20" : "Defensive Contributions: 0.20",
     );
     expect(detail).toHaveTextContent(
-      language === "tr" ? "Toplam oyuncu puanı: 2,30" : "Total player points: 2.30",
+      language === "tr" ? "Toplam oyuncu puanı: 2,30" : "Total Player Points: 2.30",
     );
     expect(detail).not.toHaveTextContent(
       language === "tr" ? "yalnızca bu maç" : "this fixture only",
@@ -181,9 +181,9 @@ it("counts the floor at zero under the other term, so the rows add up to the tot
     </LanguageProvider>,
   );
   const detail = screen.getByTestId("role-point-components");
-  expect(detail).toHaveTextContent("Other contributions: -0.10");
+  expect(detail).toHaveTextContent("Other Contributions: -0.10");
   expect(detail).not.toHaveTextContent("Zero-floor adjustment");
-  expect(detail).toHaveTextContent("Total player points: 0.00");
+  expect(detail).toHaveTextContent("Total Player Points: 0.00");
   const rows = [...detail.querySelectorAll(":scope > ul .num")].map((cell) =>
     Number(cell.textContent),
   );
@@ -227,7 +227,7 @@ it.each([
       <RoleForecast view={view} />
     </LanguageProvider>,
   );
-  expect(screen.getByTestId("role-forecast")).toHaveTextContent("Expected minutes: 34.0");
+  expect(screen.getByTestId("role-forecast")).toHaveTextContent("Expected Minutes: 34.0");
   expect(screen.getByTestId("role-forecast").textContent).not.toMatch(AS_A_CHANCE);
   for (const invalid of ["unknown", "football_joint_role_retained_flags_v1"]) {
     expect(

@@ -64,7 +64,7 @@ describe("the information review", () => {
       });
       const week = language === "tr" ? `OH${view.gameweek}` : `GW${view.gameweek}`;
       expect(region).toHaveTextContent(
-        language === "tr" ? `İlk haftanın on biri: ${week}` : `First week's eleven: ${week}`,
+        language === "tr" ? `İlk haftanın on biri: ${week}` : `First Week's Eleven: ${week}`,
       );
     },
   );

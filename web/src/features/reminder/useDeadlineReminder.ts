@@ -10,24 +10,26 @@ import {
   type ReminderTarget,
 } from "./deadlineReminder";
 
-export type ReminderState = "hidden" | "off" | "on" | "busy";
+/**
+ * Where the reminder stands for this browser and member: not yet known, a browser that cannot
+ * hold one, a permission refused, off, on, or changing.
+ */
+export type ReminderState = "unknown" | "unsupported" | "denied" | "off" | "on" | "busy";
 
 type Held = "off" | "on" | "busy";
 
 /**
- * The reminder control's state for one member: hidden where the browser cannot hold a
- * reminder or has refused, and until the browser has said whether it holds one; else off or
- * on, and busy while a change is under way. `toggle` turns it on or off; a refusal leaves
- * the state as it was. A new member starts unknown again.
+ * The reminder for one member in this browser. `enable` asks the browser's permission and
+ * subscribes; `disable` drops the subscription; a refusal leaves the state as it was. A new
+ * member starts unknown again. `target` null gives "unknown" and does nothing.
  */
 export function useDeadlineReminder(
   target: ReminderTarget | null,
   browser?: ReminderBrowser,
-): { state: ReminderState; toggle(): void } {
+): { state: ReminderState; enable(): void; disable(): void } {
   const page = useMemo(() => browser ?? pageBrowser(), [browser]);
   const support = reminderSupport(page);
   const key = target === null ? null : `${target.leagueId}:${target.entryId}`;
-  const hidden = key === null || support !== "available";
   const [known, setKnown] = useState<{ key: string | null; held: Held | null }>({
     key: null,
     held: null,
@@ -35,7 +37,7 @@ export function useDeadlineReminder(
   const held = known.key === key ? known.held : null;
 
   useEffect(() => {
-    if (hidden || key === null) return;
+    if (key === null || support !== "available") return;
     let live = true;
     currentSubscription(page)
       .then((subscription) => {
@@ -47,18 +49,27 @@ export function useDeadlineReminder(
     return () => {
       live = false;
     };
-  }, [hidden, key, page]);
+  }, [key, support, page]);
 
-  const toggle = useCallback(() => {
-    if (target === null || hidden || held === null || held === "busy") return;
-    const was = held;
+  const state: ReminderState =
+    key === null ? "unknown" : support !== "available" ? support : (held ?? "unknown");
+
+  const enable = useCallback(() => {
+    if (target === null || state !== "off") return;
     setKnown({ key, held: "busy" });
-    const change: Promise<Held> =
-      was === "on"
-        ? disableReminder(page).then((): Held => "off")
-        : enableReminder(page, target).then((kept): Held => (kept === null ? "off" : "on"));
-    change.then((next) => setKnown({ key, held: next })).catch(() => setKnown({ key, held: was }));
-  }, [target, hidden, held, key, page]);
+    enableReminder(page, target)
+      .then((kept): Held => (kept === null ? "off" : "on"))
+      .then((next) => setKnown({ key, held: next }))
+      .catch(() => setKnown({ key, held: "off" }));
+  }, [target, state, key, page]);
 
-  return { state: hidden || held === null ? "hidden" : held, toggle };
+  const disable = useCallback(() => {
+    if (state !== "on") return;
+    setKnown({ key, held: "busy" });
+    disableReminder(page)
+      .then(() => setKnown({ key, held: "off" }))
+      .catch(() => setKnown({ key, held: "on" }));
+  }, [state, key, page]);
+
+  return { state, enable, disable };
 }

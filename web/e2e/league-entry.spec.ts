@@ -38,7 +38,7 @@ for (const language of ["tr", "en"] as const) {
     await page.goto("/");
     const field = page.getByLabel(language === "tr" ? "Lig numarası" : "League ID");
     const submit = page.getByRole("button", {
-      name: language === "tr" ? "Ligi bul" : "Find league",
+      name: language === "tr" ? "Ligi bul" : "Find League",
     });
     await field.fill("123");
     await submit.click();

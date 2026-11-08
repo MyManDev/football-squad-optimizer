@@ -314,7 +314,7 @@ async function expectMemberDrawn(entryId: number, language: Language) {
   ];
   for (const text of missing) expect(within(decision).queryByText(text)).toBeNull();
   if (plan.moves.length === 0) {
-    // No transfer is a finding of a solved plan, and the published tree holds no other kind.
+    // No Transfer is a finding of a solved plan, and the published tree holds no other kind.
     expect(hasPublishedPlan(plan)).toBe(true);
     expect(within(decision).getByText(copy.noMove)).toBeInTheDocument();
   } else {
