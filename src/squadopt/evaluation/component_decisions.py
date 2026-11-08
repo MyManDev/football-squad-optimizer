@@ -6,6 +6,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from statistics import fmean, median
 from types import MappingProxyType
+from typing import Any
 
 import pandas as pd
 
@@ -302,17 +303,24 @@ def _recorded_decision(
     ignoring_cards = score_frozen_squad_decision(decision, without_cards).total_points
     return {
         "solver_status": result.solver_status.value,
-        "objective_value": result.objective_value,
-        "best_objective_bound": diagnostics.get("best_objective_bound"),
-        "deterministic_time_used": diagnostics.get("deterministic_time_used"),
-        "squad": sorted(int(value) for value in result.selected_squad["player_id"].tolist()),
-        "starting_xi": list(decision.starting_xi),
-        "bench_order": list(decision.bench),
-        "captain_id": decision.captain_id,
-        "vice_captain_id": decision.vice_captain_id,
-        "realized_score": score,
-        "realized_score_ignoring_cards": ignoring_cards,
+        "objective_value": _plain(result.objective_value),
+        "best_objective_bound": _plain(diagnostics.get("best_objective_bound")),
+        "deterministic_time_used": _plain(diagnostics.get("deterministic_time_used")),
+        "squad": sorted(_plain(value) for value in result.selected_squad["player_id"].tolist()),
+        "starting_xi": [_plain(value) for value in decision.starting_xi],
+        "bench_order": [_plain(value) for value in decision.bench],
+        "captain_id": _plain(decision.captain_id),
+        "vice_captain_id": _plain(decision.vice_captain_id),
+        "realized_score": _plain(score),
+        "realized_score_ignoring_cards": _plain(ignoring_cards),
     }
+
+
+def _plain(value: object) -> Any:
+    """A JSON-serializable copy of a numpy or pandas scalar; other values unchanged."""
+
+    item = getattr(value, "item", None)
+    return item() if callable(item) else value
 
 
 def _detail(

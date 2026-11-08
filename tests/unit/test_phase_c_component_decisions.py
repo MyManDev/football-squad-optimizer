@@ -1,5 +1,6 @@
 """Tests for exact-key Phase C decision-level comparison."""
 
+import json
 from dataclasses import replace
 
 import pandas as pd
@@ -268,6 +269,8 @@ def test_card_participation_is_carried_and_both_scores_are_recorded() -> None:
         assert isinstance(decision["realized_score_ignoring_cards"], float)
     document = phase_c_decision_comparison_to_dict(comparison)
     assert set(document["decisions"]) == {"2022-23-gw02"}
+    # Every recorded value is a plain Python scalar, so the document can be written as JSON.
+    assert json.loads(json.dumps(document["decisions"])) == document["decisions"]
 
 
 def test_without_the_card_column_the_decisions_block_is_absent() -> None:
