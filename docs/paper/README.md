@@ -8,6 +8,7 @@
 | Requirements | Python 3.11 or later (standard library only), git on `PATH`, no network; the tests: the development install of [contributing](../../CONTRIBUTING.md) |
 | Outputs in git | none; written under `artifacts/` (git-ignored) or outside the checkout |
 | Records read at | `144e3f7be824115b64ec8321d8b60c6831092973` (develop) |
+| Manuscript | [squadopt_walk_forward_paper.tex](squadopt_walk_forward_paper.tex); its figures are the step 4 SVGs converted to PDF under `artifacts/paper/figures-pdf/` (git-ignored); compile from this folder with `tectonic --outdir ../../artifacts/paper squadopt_walk_forward_paper.tex` (XeTeX, fontspec) |
 
 ## Commands from a clean clone
 
