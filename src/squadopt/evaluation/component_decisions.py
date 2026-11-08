@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from statistics import fmean, median
 from types import MappingProxyType
 
@@ -16,6 +16,8 @@ from squadopt.evaluation.models import (
     EvaluationFold,
     EvaluationResult,
     EvaluationValidationError,
+    FoldEvaluationResult,
+    FrozenSquadDecision,
     ScoringPolicy,
 )
 from squadopt.evaluation.scoring import (
@@ -53,11 +55,22 @@ class PhaseCDecisionDiagnostics:
 
 @dataclass(frozen=True, slots=True)
 class PhaseCDecisionComparison:
-    """Control and component-base decisions scored on identical folds."""
+    """Control and component-base decisions scored on identical folds.
+
+    ``decisions`` is empty unless the caller asked for the solved squads: then it maps each
+    fold id to the two arms' squads, lineups, captaincy, objective, bound, solver work and
+    both scores (official rule, and the same rule with card participation ignored), so a
+    reader can measure squad overlap and the share of a paired difference that is the
+    scoring convention rather than the forecast.
+    """
 
     control: EvaluationResult
     component_base: EvaluationResult
     diagnostics: PhaseCDecisionDiagnostics
+    decisions: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "decisions", MappingProxyType(dict(self.decisions)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +80,7 @@ class _FoldDecisionDetail:
     zero_minute_starters: int
     autosub_points: float
     vice_recovered: bool
+    decision: Mapping[str, object] = field(default_factory=dict)
 
 
 def _folds(values: Iterable[EvaluationFold]) -> tuple[EvaluationFold, ...]:
@@ -87,6 +101,14 @@ def _folds(values: Iterable[EvaluationFold]) -> tuple[EvaluationFold, ...]:
 
 
 def _outcomes(rows: pd.DataFrame, actual: pd.DataFrame, fold_id: str) -> pd.DataFrame:
+    """The fold's realized outcomes keyed to the handoff roster.
+
+    ``card_participation`` is carried through when the control fold's outcomes hold it: a
+    player booked without a minute counts as having played for the automatic substitution
+    under the official rules, and the scorer reads that column. A fold without the column
+    scores as before, with every participation read from minutes alone.
+    """
+
     appeared = rows["appearance_target"].eq(1.0)
     if bool(rows["appearance_target"].isna().any()):
         raise EvaluationValidationError(
@@ -160,13 +182,28 @@ def _outcomes(rows: pd.DataFrame, actual: pd.DataFrame, fold_id: str) -> pd.Data
             raise EvaluationValidationError(
                 f"Control fold {fold_id!r} changes handoff minutes outcomes."
             )
-    return pd.DataFrame(
+    outcomes = pd.DataFrame(
         {
             "player_id": merged["player_id"],
             "total_points": merged["total_points"],
             "minutes": minutes,
         }
     )
+    if "card_participation" in actual:
+        cards = actual.loc[:, ["player_id", "card_participation"]]
+        if cards["card_participation"].isna().any() or any(
+            type(value) is not bool for value in cards["card_participation"].tolist()
+        ):
+            raise EvaluationValidationError(
+                f"Control fold {fold_id!r} card_participation must contain non-missing booleans."
+            )
+        outcomes = outcomes.merge(cards, on="player_id", how="left", validate="one_to_one")
+        if bool(outcomes["card_participation"].isna().any()):
+            raise EvaluationValidationError(
+                f"Control fold {fold_id!r} card_participation does not cover the roster."
+            )
+        outcomes["card_participation"] = outcomes["card_participation"].astype(bool)
+    return outcomes
 
 
 def prepare_phase_c_component_folds(
@@ -251,8 +288,38 @@ def prepare_phase_c_component_folds(
     return tuple(candidate_folds)
 
 
+def _recorded_decision(
+    item: FoldEvaluationResult,
+    decision: FrozenSquadDecision,
+    fold: EvaluationFold,
+    score: float,
+) -> dict[str, object]:
+    """One arm's solved decision on one fold, with both scoring conventions."""
+
+    result = item.optimization_result
+    diagnostics = result.diagnostics
+    without_cards = fold.realized_points.assign(card_participation=False)
+    ignoring_cards = score_frozen_squad_decision(decision, without_cards).total_points
+    return {
+        "solver_status": result.solver_status.value,
+        "objective_value": result.objective_value,
+        "best_objective_bound": diagnostics.get("best_objective_bound"),
+        "deterministic_time_used": diagnostics.get("deterministic_time_used"),
+        "squad": sorted(int(value) for value in result.selected_squad["player_id"].tolist()),
+        "starting_xi": list(decision.starting_xi),
+        "bench_order": list(decision.bench),
+        "captain_id": decision.captain_id,
+        "vice_captain_id": decision.vice_captain_id,
+        "realized_score": score,
+        "realized_score_ignoring_cards": ignoring_cards,
+    }
+
+
 def _detail(
-    result: EvaluationResult, folds: tuple[EvaluationFold, ...]
+    result: EvaluationResult,
+    folds: tuple[EvaluationFold, ...],
+    *,
+    record_decisions: bool = False,
 ) -> list[_FoldDecisionDetail]:
     rows: list[_FoldDecisionDetail] = []
     for item, fold in zip(result.folds, folds, strict=True):
@@ -275,6 +342,11 @@ def _detail(
                     scored.captain_bonus_player_id == decision.vice_captain_id
                     and decision.vice_captain_id != decision.captain_id
                 ),
+                decision=(
+                    _recorded_decision(item, decision, fold, scored.total_points)
+                    if record_decisions
+                    else {}
+                ),
             )
         )
     return rows
@@ -286,12 +358,15 @@ def evaluate_phase_c_component_decisions(
     config: EvaluationConfig,
     *,
     development_contract: str | None = None,
+    record_decisions: bool = False,
 ) -> PhaseCDecisionComparison:
     """Compare component-base and historical control decisions without promoting either.
 
     ``development_contract`` admits a handoff read under the Phase C v2 development
     contract, and only that one; the frozen v1 path leaves it ``None`` and a development
     artifact is then refused, as :func:`prepare_phase_c_component_folds` states.
+    ``record_decisions`` keeps each arm's solved squad, lineup, captaincy, objective, bound
+    and both scores per fold on the result, for a measurement that reads them.
     """
 
     if not isinstance(config, EvaluationConfig):
@@ -315,8 +390,14 @@ def evaluate_phase_c_component_decisions(
     )
     control_result = evaluate_prepared_folds(normalized_controls, config)
     candidate_result = evaluate_prepared_folds(candidates, config)
-    control_detail = {row.fold_id: row for row in _detail(control_result, normalized_controls)}
-    candidate_detail = {row.fold_id: row for row in _detail(candidate_result, candidates)}
+    control_detail = {
+        row.fold_id: row
+        for row in _detail(control_result, normalized_controls, record_decisions=record_decisions)
+    }
+    candidate_detail = {
+        row.fold_id: row
+        for row in _detail(candidate_result, candidates, record_decisions=record_decisions)
+    }
     comparable_ids = [
         fold.fold_id
         for fold in controls
@@ -353,7 +434,18 @@ def evaluate_phase_c_component_decisions(
         ),
         control_vice_captain_recoveries=sum(row.vice_recovered for row in control_detail.values()),
     )
-    return PhaseCDecisionComparison(control_result, candidate_result, diagnostics)
+    decisions = (
+        {
+            fold_id: {
+                "control": control_detail[fold_id].decision,
+                "component_base": candidate_detail[fold_id].decision,
+            }
+            for fold_id in comparable_ids
+        }
+        if record_decisions
+        else {}
+    )
+    return PhaseCDecisionComparison(control_result, candidate_result, diagnostics, decisions)
 
 
 __all__ = [

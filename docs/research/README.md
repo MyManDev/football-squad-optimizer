@@ -15,6 +15,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Phase C gradient-boosting candidate (declaration and comparison method) | [Gradient-boosting method](phase_c_gradient_boosting_method.md) |
 | Phase C feature contract v2 (declaration and comparison method) | [Feature contract v2 method](phase_c_feature_contract_v2_method.md) |
 | Phase C points-only gradient-boosting candidate (declaration, comparison method and decision-level reading) | [Points-only gradient-boosting method](phase_c_gradient_boosting_points_method.md) |
+| Phase C solver budget and card rule in the decision reading (declaration, descriptive measurement) | [Solver budget and card rule method](phase_c_solver_budget_cards_method.md) |
 | Regime-gated experts for the Phase C components (mixture-of-experts line 3: declaration, rule and decision-level reading) | [Regime pre-registration](moe_regime_prereg.md) |
 | Mixture-of-experts line 1: gated mixture for the conditional components (pre-registration and record) | [Mixture pre-registration](moe_mixture_prereg.md), [record](moe_mixture.md) |
 | Prospective benchmark of the live decisions (the Phase A exit) | [Benchmark V2 pre-registration](../benchmark_v2_prereg.md) |

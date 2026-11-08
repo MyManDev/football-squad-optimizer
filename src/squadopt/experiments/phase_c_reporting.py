@@ -180,8 +180,10 @@ def phase_c_decision_comparison_to_dict(
             }
         )
     diagnostics = result.diagnostics
+    decisions = {fold_id: dict(arms) for fold_id, arms in result.decisions.items()}
     return {
         "artifact_type": "phase_c_decision_comparison",
+        **({"decisions": decisions} if decisions else {}),
         "contract_version": PHASE_C_DECISION_REPORT_VERSION,
         "promotion_decision": "not_evaluated",
         "scoring_policy": result.control.config.scoring_policy.value,
