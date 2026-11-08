@@ -34,8 +34,12 @@ describe("prefetchMemberReads", () => {
     expect(tree.members).toHaveBeenCalledTimes(1);
     expect(tree.entrySquad).toHaveBeenCalledWith(35249001);
     expect(tree.entryAdviceIndex).toHaveBeenCalledWith(35249001);
-    expect(client.getQueryState(leagueKeys.entrySquad(tree.league.leagueId, 35249001))).toBeDefined();
-    expect(client.getQueryState(leagueKeys.adviceIndex(tree.league.leagueId, 35249001))).toBeDefined();
+    expect(
+      client.getQueryState(leagueKeys.entrySquad(tree.league.leagueId, 35249001)),
+    ).toBeDefined();
+    expect(
+      client.getQueryState(leagueKeys.adviceIndex(tree.league.leagueId, 35249001)),
+    ).toBeDefined();
     expect(client.getQueryState(FIXTURES_QUERY.queryKey)).toBeDefined();
   });
 
