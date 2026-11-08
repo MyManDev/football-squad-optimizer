@@ -56,9 +56,10 @@ function LeagueMemberPage() {
 /**
  * A member page's code starts loading as its address arrives, in the same turn as the gate's,
  * instead of after the gate has read the directory: on a phone that was one round trip of
- * the five the page used to pay before anything of it was drawn.
+ * the five the page used to pay before anything of it was drawn. The member list is the
+ * step before a member page, so its address starts the same code.
  */
-const MEMBER_PAGE_ADDRESS = /^\/league(?:\/\d+)?\/members\/\d+/;
+const MEMBER_PAGE_ADDRESS = /^\/league(?:\/\d+)?\/members(?:\/|$)/;
 function RoutePreload() {
   const { pathname } = useLocation();
   useEffect(() => {

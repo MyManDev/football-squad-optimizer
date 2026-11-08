@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Navigate, useLocation, useNavigate } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -17,6 +18,7 @@ import {
 } from "../identity/useLeagueIdentity";
 import { useLeagueMembers } from "../queries";
 import type { HumanEntryView, LeagueMembers } from "../types";
+import { prefetchMemberReads } from "../prefetch";
 import { useLeague } from "../useLeague";
 import { MemberPicker } from "./MemberPicker";
 
@@ -70,7 +72,14 @@ function useFurtherMembers(leagueId: number | null, scoring: ForwardedScoring) {
  * still being read; one the list does not hold is dropped and the picker shows.
  */
 export function MemberGate({ children }: { children: ReactNode }) {
-  const { league } = useLeague();
+  const { league, tree } = useLeague();
+  // A row the finger lands on has its member's documents started before the tap confirms
+  // it (prefetch.ts), so the page it opens finds them in the cache or on their way.
+  const queryClient = useQueryClient();
+  const warm = useCallback(
+    (entry: RosterEntry) => prefetchMemberReads(queryClient, tree, entry.entryId),
+    [queryClient, tree],
+  );
   const members = useLeagueMembers();
   // A forwarded league's roster is page 1 of its table; the pages after it are read as a
   // name or a claim asks for them, never all at once.
@@ -186,6 +195,7 @@ export function MemberGate({ children }: { children: ReactNode }) {
       reading={reading}
       onMore={ask}
       onConfirm={confirm}
+      onWarm={warm}
     />
   );
 }
