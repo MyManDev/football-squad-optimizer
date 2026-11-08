@@ -27,7 +27,8 @@ and 2,520 s (wider contract, v2 features), one search worker, seed 0, both arms.
 | wider contract, v2 features | yes | 147 of 147 | none | 147 proven |
 
 The ridge control, solved beside every table, ended 116 proven and 31 feasible (record: 117
-and 30), with a mean of 58.57 realized points against the recorded 58.52. The two boosted
+and 30), with a mean of 58.57 realized points against the recorded 58.52; the record holds
+both arms' status counts and means under `arms/<table>_b5.0`. The two boosted
 tables re-exported byte for byte and every decision came back the same; the ridge table did
 not re-export byte for byte (a linear fit on a different interpreter and numerical library),
 and every fold whose score moved is a fold the solver stopped at its budget. The 103 folds the
@@ -39,7 +40,9 @@ solver proved reproduce exactly. The 12 folds are listed in the record under
 Scoring every solved squad under the official rule, where a player booked without a minute
 counts as having played for the automatic substitution, changed the realized score of **no
 fold** in any of the six arm-tables (147 folds each, both arms). None of the nine booked
-zero-minute player-gameweeks of the four decision seasons sat in a solved squad. The paired
+zero-minute player-gameweeks of the four decision seasons was a starter, or a bench player
+reached by the automatic substitution, in a solved squad (a booked player left unused on the
+bench changes nothing and is not detected by this measurement). The paired
 means are therefore identical under the two conventions; the intervals differ in the second
 decimal only because each convention has its own bootstrap candidate id (boosted pair minus
 linear: `[-2.49, 1.03]` official against `[-2.54, 1.04]` ignoring cards).

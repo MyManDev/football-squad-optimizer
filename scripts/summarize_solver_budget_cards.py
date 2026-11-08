@@ -77,11 +77,24 @@ def _load(path: Path) -> dict[str, Any]:
     return document
 
 
-def _decisions(document: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _decisions(document: dict[str, Any], arm: str = "component_base") -> dict[str, dict[str, Any]]:
     decisions = document["decision_comparison"].get("decisions")
     if not decisions:
         raise SystemExit(f"{document.get('generated_at_utc')}: no recorded decisions")
-    return {fold: arms["component_base"] for fold, arms in decisions.items()}
+    return {fold: arms[arm] for fold, arms in decisions.items()}
+
+
+def _arm_summary(mine: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """An arm's status counts and mean realized scores over its folds."""
+
+    return {
+        "folds": len(mine),
+        "statuses": _statuses(mine),
+        "mean_realized_score": statistics.fmean(float(a["realized_score"]) for a in mine.values()),
+        "mean_realized_score_ignoring_cards": statistics.fmean(
+            float(a["realized_score_ignoring_cards"]) for a in mine.values()
+        ),
+    }
 
 
 def _interval(differences: list[tuple[str, float]], candidate_id: str) -> list[float]:
@@ -283,6 +296,13 @@ def summarize(inputs: Path, root: Path) -> dict[str, Any]:
         },
         "reproduction_at_5_0": {
             name: _reproduction(name, decisions[(name, "5.0")], root) for name in TABLES
+        },
+        "arms": {
+            f"{name}_b{budget}": {
+                "candidate": _arm_summary(decisions[(name, budget)]),
+                "ridge_control": _arm_summary(_decisions(document, "control")),
+            }
+            for (name, budget), document in documents.items()
         },
         "card_rule": {
             f"{name}_b{budget}": _cards(decisions[(name, budget)])

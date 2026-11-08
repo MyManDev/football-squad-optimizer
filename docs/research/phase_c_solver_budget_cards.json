@@ -1,4 +1,64 @@
 {
+  "arms": {
+    "gbm_v1_dec_b5.0": {
+      "candidate": {
+        "folds": 147,
+        "mean_realized_score": 62.666666666666664,
+        "mean_realized_score_ignoring_cards": 62.666666666666664,
+        "statuses": {
+          "OPTIMAL": 147
+        }
+      },
+      "ridge_control": {
+        "folds": 147,
+        "mean_realized_score": 58.57142857142857,
+        "mean_realized_score_ignoring_cards": 58.57142857142857,
+        "statuses": {
+          "FEASIBLE": 31,
+          "OPTIMAL": 116
+        }
+      }
+    },
+    "gbm_v2_dec_b5.0": {
+      "candidate": {
+        "folds": 147,
+        "mean_realized_score": 62.46258503401361,
+        "mean_realized_score_ignoring_cards": 62.46258503401361,
+        "statuses": {
+          "OPTIMAL": 147
+        }
+      },
+      "ridge_control": {
+        "folds": 147,
+        "mean_realized_score": 58.57142857142857,
+        "mean_realized_score_ignoring_cards": 58.57142857142857,
+        "statuses": {
+          "FEASIBLE": 31,
+          "OPTIMAL": 116
+        }
+      }
+    },
+    "linear_dec_b5.0": {
+      "candidate": {
+        "folds": 147,
+        "mean_realized_score": 63.36054421768708,
+        "mean_realized_score_ignoring_cards": 63.36054421768708,
+        "statuses": {
+          "FEASIBLE": 44,
+          "OPTIMAL": 103
+        }
+      },
+      "ridge_control": {
+        "folds": 147,
+        "mean_realized_score": 58.57142857142857,
+        "mean_realized_score_ignoring_cards": 58.57142857142857,
+        "statuses": {
+          "FEASIBLE": 31,
+          "OPTIMAL": 116
+        }
+      }
+    }
+  },
   "budget": {},
   "budgets_absent": [
     "60.0"
