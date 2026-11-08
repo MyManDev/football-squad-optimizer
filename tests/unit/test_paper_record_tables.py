@@ -59,16 +59,27 @@ S2_BOUNDS = [0.04, 0.16]
 
 
 def _metrics(log_loss: float, minutes: float, points: float) -> dict[str, Any]:
-    # Two seasons of ten rows each around the pooled MAE, so the pooled value is their mean.
+    # Four seasons of ten rows each around the pooled MAE, so the pooled value is their mean;
+    # the two decision seasons of the fixture folds are the first two.
     seasons = {
         season: {"points": {"mean_absolute_error": points + offset, "observations": 10}}
-        for season, offset in (("2024-25", -0.01), ("2025-26", 0.01))
+        for season, offset in (
+            ("2021-22", 0.02),
+            ("2022-23", -0.02),
+            ("2024-25", -0.01),
+            ("2025-26", 0.01),
+        )
     }
     return {
         "overall": {
             "appearance": {"log_loss": log_loss},
             "minutes": {"mean_absolute_error": minutes},
-            "points": {"mean_absolute_error": points, "observations": 20},
+            "points": {
+                "mean_absolute_error": points,
+                "observations": 40,
+                "root_mean_squared_error": points * 2,
+                "mean_error": -0.01,
+            },
         },
         "by_season": seasons,
     }
@@ -115,7 +126,15 @@ def _candidate_record(candidate: tables.Candidate, shift: float) -> dict[str, An
     folds = {fold: score + shift for fold, score in CANDIDATE_FOLDS.items()}
     arms = {arm: _arm(folds), linear: _arm(LINEAR_FOLDS)}
     if candidate.mean.endswith("/mean"):
-        decision: dict[str, Any] = {"v2_features_minus_linear": _summary("", folds), "arms": arms}
+        decision: dict[str, Any] = {
+            "v2_features_minus_linear": _summary("", folds),
+            "v2_minus_v1_features": {
+                **_summary("", folds),
+                "mean": -0.2,
+                "interval_90": [-1.8, 1.0],
+            },
+            "arms": arms,
+        }
     else:
         prefix = candidate.mean.rsplit("/", 1)[1].removesuffix("mean")
         decision = {**_summary(prefix, folds), "arms": arms}
@@ -156,7 +175,16 @@ def _sampler_arm(pits: tuple[float, ...], seasons: bool = True) -> dict[str, Any
             "s2_bounds": S2_BOUNDS,
             "mean_pit_within_s1_bounds": S1_BOUNDS[0] <= mean <= S1_BOUNDS[1],
             "tail_rate_within_s2_bounds": S2_BOUNDS[0] <= rate <= S2_BOUNDS[1],
-            "seasons": {"2021-22": {"fold_count": 2, "realized_below_lower_quantile_count": below}},
+            "seasons": {
+                "2021-22": {
+                    "fold_count": 2,
+                    "mean_probability_integral_transform": mean,
+                    "mean_pit_within_s1_bounds": True,
+                    "realized_below_lower_quantile_count": below,
+                    "realized_below_lower_quantile_rate": rate,
+                    "tail_rate_within_s2_bounds": False,
+                }
+            },
         }
     return block
 
@@ -207,6 +235,41 @@ def _records() -> dict[str, Any]:
     v2["decision_level_reading"] |= {"added_after_result": True, "descriptive_only": True}
     boosted = records["docs/research/phase_c_gradient_boosting_comparison.json"]
     boosted["decision_level_reading"]["note"] = "reported beside the rule; not part of it"
+    points = records[tables.GBM_POINTS]["decision_level_reading"]
+    points["arms"]["linear"] |= {
+        "component_solver_status_counts": {"OPTIMAL": 2, "FEASIBLE": 1},
+        "ridge_control_solver_status_counts": {"OPTIMAL": 3},
+    }
+    points["arms"]["gradient_boosting_points"]["component_solver_status_counts"] = {"OPTIMAL": 3}
+    points["added_after_the_result"] = {
+        "by_linear_solver_status": {
+            "FEASIBLE": {
+                "folds": 1,
+                "candidate_minus_linear_mean": -5.0,
+                "wins_ties_losses": [0, 0, 1],
+            },
+            "OPTIMAL": {
+                "folds": 2,
+                "candidate_minus_linear_mean": 2.0,
+                "wins_ties_losses": [1, 1, 0],
+            },
+        }
+    }
+    records[tables.INSTRUMENT] = {
+        "precision": {
+            "covariates": [
+                {
+                    "unconditional_mean_precision": {
+                        "folds": 4,
+                        "mean": 1.0,
+                        "standard_deviation": 2.0,
+                        "iid_90_interval_half_width": tables.Z_90,
+                        "iid_mde_alpha_0_05_power_0_8": tables.Z_MDE,
+                    }
+                }
+            ]
+        }
+    }
     for record in (FOUNDATION, BLOCK, JOINT):
         records[record] = _sampler_record(record)
     records[FOUNDATION]["verdict"].update({"s1_passes": True, "s2_passes": False})
@@ -251,6 +314,14 @@ def _records() -> dict[str, Any]:
             "diagnostics": {"comparable_folds": 3, "mean_difference": 4.5},
             "control": {"mean_realized_squad_points": 45.0},
             "component_base": {"mean_realized_squad_points": 49.5},
+            "folds": [
+                {"fold_id": fold, "component_solver_status": mine, "control_solver_status": theirs}
+                for fold, mine, theirs in (
+                    ("2021-22-gw02", "OPTIMAL", "OPTIMAL"),
+                    ("2021-22-gw03", "FEASIBLE", "OPTIMAL"),
+                    ("2022-23-gw02", "OPTIMAL", "FEASIBLE"),
+                )
+            ],
         }
     }
     comparison = {
@@ -318,10 +389,19 @@ def test_every_table_number_resolves_to_its_record_and_pointer(root: Path) -> No
         "table_mixture_distribution",
         "table_mixture_log_score_folds",
         "table_planning_measurements",
+        "table_candidates_same_period",
+        "table_candidates_precision",
+        "table_solver_status",
+        "table_sampler_calibration_by_season",
     }
+    derived = 0
     for row in provenance:
+        if row["pointer"].startswith(tables.DERIVED):
+            derived += 1
+            continue
         document = json.loads((root / row["record"]).read_text(encoding="utf-8"))
         assert tables._text(resolve(document, row["pointer"])) == row["value"], row
+    assert derived > 0
 
 
 def test_every_figure_value_resolves_to_its_pointer(root: Path) -> None:
@@ -329,10 +409,9 @@ def test_every_figure_value_resolves_to_its_pointer(root: Path) -> None:
 
     figures = sorted(output.glob("figure_*.csv"))
     assert [path.stem for path in figures] == [
+        "figure_accuracy_against_decision",
         "figure_decision_by_season",
         "figure_decision_fold_differences",
-        "figure_points_mae_against_squad_points",
-        "figure_s2_counts",
         "figure_sampler_pit",
     ]
     for path in figures:
@@ -376,7 +455,7 @@ def test_each_candidate_label_reads_its_own_record(root: Path) -> None:
     for name, label in (
         ("figure_decision_fold_differences", "candidate"),
         ("figure_decision_by_season", "candidate"),
-        ("figure_points_mae_against_squad_points", "arm"),
+        ("figure_accuracy_against_decision", "candidate"),
     ):
         for row in _read_csv(output / f"{name}.csv"):
             expected = CANDIDATE_RECORDS.get(row[label], (CANDIDATE_RECORDS["Boosted pair"][0],))
@@ -478,16 +557,91 @@ def test_the_reading_status_is_shown_as_each_record_states_it(root: Path) -> Non
     assert "| reading 4; how it was scored |" in status_section
 
 
-def test_the_mae_figure_carries_each_season_beside_the_pooled_value(root: Path) -> None:
+def test_the_accuracy_figure_carries_both_arms_by_season_and_the_same_reference(
+    root: Path,
+) -> None:
     _, output = _run(root)
 
-    rows = _read_csv(output / "figure_points_mae_against_squad_points.csv")
-    mixture = next(row for row in rows if row["arm"] == "Gated mixture")
-    assert float(mixture["points_mae_2025-26"]) == 1.05 + 4.0 / 100 + 0.01
-    assert mixture["points_observations_2025-26"] == "10"
-    assert mixture["points_mae_2025-26_pointer"] == (
+    rows = {
+        row["candidate"]: row for row in _read_csv(output / "figure_accuracy_against_decision.csv")
+    }
+    mixture = rows["Gated mixture"]
+    assert float(mixture["candidate_points_mae_2025-26"]) == 1.05 + 4.0 / 100 + 0.01
+    assert mixture["candidate_points_observations_2025-26"] == "10"
+    assert mixture["reference_points_mae_2025-26"] == "1.08"
+    assert mixture["candidate_points_mae_2025-26_pointer"] == (
         "/comparison/metrics/candidate/by_season/2025-26/points/mean_absolute_error"
     )
+    assert float(mixture["candidate_minus_reference_decision_mean"]) == 4.0 - 1.0
+    # The wider contract is paired with the boosted pair at both levels, the others with the
+    # linear arm.
+    wider = rows["Boosted pair, v2 feature contract"]
+    assert wider["candidate_minus_reference_decision_mean"] == "-0.2"
+    assert wider["candidate_minus_reference_decision_mean_pointer"] == (
+        "/decision_level_reading/v2_minus_v1_features/mean"
+    )
+
+
+def test_the_same_period_table_weights_each_season_by_its_observations(root: Path) -> None:
+    _, output = _run(root)
+
+    rows = {row["candidate"]: row for row in _read_csv(output / "table_candidates_same_period.csv")}
+    mixture = rows["Gated mixture"]
+    # The decision seasons are 2021-22 and 2022-23: offsets +0.02 and -0.02 at ten rows each.
+    assert mixture["decision_seasons"] == "2021-22 to 2022-23"
+    assert float(mixture["reference_decision_season_points_mae"]) == pytest.approx(1.07)
+    assert float(mixture["candidate_decision_season_points_mae"]) == pytest.approx(1.09)
+    assert float(mixture["decision_season_paired_difference"]) == pytest.approx(-0.02)
+    assert float(mixture["candidate_points_rmse"]) == pytest.approx(2.18)
+    assert rows["Boosted pair, v2 feature contract"]["interval_90_low"] == "-1.8"
+
+
+def test_the_precision_table_applies_the_instrument_formulas_to_each_candidate(
+    root: Path,
+) -> None:
+    _, output = _run(root)
+
+    rows = {row["comparison"]: row for row in _read_csv(output / "table_candidates_precision.csv")}
+    boosted = rows["Boosted pair vs linear components"]
+    differences = [CANDIDATE_FOLDS[fold] - LINEAR_FOLDS[fold] for fold in LINEAR_FOLDS]
+    deviation = statistics.stdev(differences)
+    assert float(boosted["standard_deviation"]) == pytest.approx(deviation)
+    assert float(boosted["iid_90_interval_half_width"]) == pytest.approx(
+        tables.Z_90 * deviation / 3**0.5
+    )
+    assert float(boosted["iid_mde_alpha_0_05_power_0_8"]) == pytest.approx(
+        tables.Z_MDE * deviation / 3**0.5
+    )
+    assert float(boosted["leave_out_2022-23_mean"]) == pytest.approx(
+        statistics.fmean(differences[:2])
+    )
+    instrument = rows["Linear components vs ridge control (instrument record)"]
+    assert instrument["iid_90_interval_half_width"] == str(tables.Z_90)
+    checks = _read_csv(output / "checks.csv")
+    assert all(check["holds"] == "true" for check in checks if "instrument" in check["check"])
+    assert any("instrument" in check["check"] for check in checks)
+
+
+def test_the_solver_status_table_counts_the_frozen_statuses_and_reads_the_split(
+    root: Path,
+) -> None:
+    _, output = _run(root)
+
+    rows = _read_csv(output / "table_solver_status.csv")
+    frozen = {row["arm"]: row for row in rows if row["record"] == tables.FROZEN_EVALUATION}
+    assert (frozen["component base"]["optimal"], frozen["component base"]["feasible"]) == (
+        "2",
+        "1",
+    )
+    assert (frozen["ridge control"]["optimal"], frozen["ridge control"]["feasible"]) == ("2", "1")
+    points = {row["arm"]: row for row in rows if row["scope"].startswith("decision folds")}
+    assert points["points-only boosting"]["feasible"] == "0"
+    assert points["ridge control"]["optimal"] == "3"
+    split = [row for row in rows if "added after the result" in row["scope"]]
+    assert [(row["folds"], row["candidate_minus_linear_mean"]) for row in split] == [
+        ("1", "-5.0"),
+        ("2", "2.0"),
+    ]
 
 
 def _extractor_lf() -> bytes:
@@ -507,7 +661,7 @@ def test_outside_a_git_checkout_the_records_name_no_commit(root: Path) -> None:
 
     assert code == 0
     rows = _read_csv(output / "records.csv")
-    assert len(rows) == 12
+    assert len(rows) == 13
     assert [row["record"] for row in rows] == [*sorted(_records()), tables.EXTRACTOR]
     assert rows[-1]["sha256_lf"] == hashlib.sha256(_extractor_lf()).hexdigest()
     assert {(row["commit"], row["matches_commit"]) for row in rows} == {("", "")}
@@ -546,7 +700,7 @@ def test_each_record_is_compared_with_the_committed_one_line_endings_aside(root:
     first = {row["record"]: row for row in _read_csv(output / "records.csv")}
 
     assert code == 0
-    assert len(first) == 12
+    assert len(first) == 13
     assert {row["matches_commit"] for row in first.values()} == {"true"}
     assert {row["commit"] for row in first.values()} == {head}
     assert all(row["blob_at_commit"] == row["git_blob_lf"] for row in first.values())
@@ -596,7 +750,7 @@ def test_an_extractor_edited_after_the_commit_fails_like_an_edited_record(
 
     assert code == 1
     rows = _read_csv(output / "records.csv")
-    assert [row["matches_commit"] for row in rows] == ["true"] * 11 + ["false"]
+    assert [row["matches_commit"] for row in rows] == ["true"] * 12 + ["false"]
     extractor = rows[-1]
     assert extractor["record"] == tables.EXTRACTOR
     assert extractor["commit"] == head

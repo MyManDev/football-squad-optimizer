@@ -4,7 +4,8 @@ Issue #1152 lets a model extract tables and figures from the committed records a
 more: no section of the paper is drafted here. This runner reads the CSV files that
 `scripts/paper_record_tables.py` writes, fits and measures nothing, opens no network connection
 and uses the standard library only. Every mark is a value of one CSV row, or a count or mean of
-the rows named below; the panels, series, seasons, axis ranges and ticks come from the rows. The
+the rows named below (an observation-weighted mean of a row's seasons in the third); the panels,
+series, seasons, axis ranges and ticks come from the rows. The
 output is byte-stable: coordinates are written with two decimals, nothing carries a time, and
 rows are read in the order the tables hold them.
 
@@ -20,14 +21,15 @@ The figures, each with the table files it reads:
   fold differences as a bar;
 - `fig2_decision_by_season.svg` (`figure_decision_by_season.csv`): each candidate's recorded
   mean difference by season;
-- `fig3_points_mae_against_squad_points.svg` (`figure_points_mae_against_squad_points.csv` and
-  the seasons of `figure_decision_by_season.csv`, which only label an axis): a point per arm,
-  its squad points on the decision folds against its pooled points MAE, both as recorded;
+- `fig3_accuracy_against_decision.svg` (`figure_accuracy_against_decision.csv` and the seasons
+  of `figure_decision_by_season.csv`): a point per candidate, its recorded paired decision mean
+  with its recorded 90% interval against the reference minus candidate points MAE over those
+  seasons, each season's recorded MAE weighted by its recorded observations;
 - `fig4_sampler_pit.svg` (`figure_sampler_pit.csv`): a PIT histogram per record and arm, with
   the count a uniform PIT puts in each bin;
-- `fig5_s2_counts.svg` (`figure_s2_counts.csv` and `table_sampler_calibration.csv`): each
-  arm's pooled count of folds realized below the scenario tenth percentile, with its S2 bounds
-  as fold counts where its record holds them.
+- `fig5_seed_counts.svg` (`table_joint_sampler_seeds.csv`): each arm's count of folds realized
+  below the scenario tenth percentile at every redrawn scenario seed, against the S2 ceiling
+  of the band as a fold count.
 
 The output directory (default `artifacts/paper_figures/`, git-ignored) must sit under
 `artifacts/` when it is inside the checkout, as the extractor's does. `--check` regenerates the
@@ -222,14 +224,15 @@ class Svg:
         }
         if bold:
             attributes["font-weight"] = "bold"
-        if halo:
-            # A ring of the surface colour under the glyphs, so a label stays legible on a mark.
-            attributes |= {
-                "stroke": SURFACE,
-                "stroke-width": 3,
-                "stroke-linejoin": "round",
-                "paint-order": "stroke",
-            }
+        if halo and not rotate:
+            # A box of the surface colour under the glyphs, so a label stays legible on a mark.
+            # A box rather than a stroke ring: the PDF converters the paper uses ignore
+            # paint-order and would draw the ring over the glyphs.
+            width = _width(content, size)
+            x = {"start": position[0], "middle": position[0] - width / 2}.get(
+                anchor, position[0] - width
+            )
+            self.rect((x - 2, position[1] - size), (width + 4, size + 4), SURFACE)
         if rotate:
             attributes["transform"] = f"rotate(-90 {_number(position[0])} {_number(position[1])})"
         self.parts.append(f"<text {_attributes(attributes)}>{escape(content)}</text>")
@@ -544,9 +547,6 @@ def decision_by_season(rows: Rows) -> str:
     return svg.render()
 
 
-MAE_COLUMN = re.compile(r"points_mae_(\d{4}-\d{2})")
-
-
 def _labelled_points(
     svg: Svg,
     points: Sequence[tuple[float, float, str, str]],
@@ -587,32 +587,68 @@ def _labelled_points(
     return reach
 
 
-def points_mae_against_squad_points(rows: Rows, decision_seasons: Sequence[str]) -> str:
-    """Squad points on the decision folds against the pooled points MAE, both as recorded.
+SEASON_COLUMN = re.compile(r"(reference|candidate)_points_mae_(\d{4}-\d{2})")
 
-    The seasons of the pooled MAE are read from the per-season columns, and those of the
-    decision folds from `figure_decision_by_season.csv`; both are axis labels only.
+
+def _weighted_mae(name: str, row: dict[str, str], side: str, seasons: Sequence[str]) -> float:
+    """One arm's points MAE over `seasons`, each season weighted by its observations."""
+
+    weighted = 0.0
+    observations = 0.0
+    for season in seasons:
+        count = _float(name, row, f"{side}_points_observations_{season}")
+        weighted += _float(name, row, f"{side}_points_mae_{season}") * count
+        observations += count
+    if observations <= 0:
+        raise FigureError(f"{name}: no points observations over {', '.join(seasons)}")
+    return weighted / observations
+
+
+def accuracy_against_decision(rows: Rows, decision_seasons: Sequence[str]) -> str:
+    """Each candidate's accuracy gain against its decision reading, same seasons, same reference.
+
+    Horizontal: reference minus candidate points MAE over the decision seasons, each season's
+    recorded MAE weighted by its recorded observations (positive favours the candidate).
+    Vertical: the recorded paired decision mean against the same reference arm, with its
+    recorded 90% interval as a bar. The decision seasons are those of
+    `figure_decision_by_season.csv`; a season the row lacks is refused.
     """
 
-    name = "figure_points_mae_against_squad_points.csv"
-    _require(name, rows, ("arm", "squad_points_decision_folds", "points_mae_pooled_all_seasons"))
+    name = "figure_accuracy_against_decision.csv"
+    _require(
+        name,
+        rows,
+        (
+            "candidate",
+            "reference_arm",
+            "candidate_minus_reference_decision_mean",
+            "interval_90_low",
+            "interval_90_high",
+        ),
+    )
     if not decision_seasons:
         raise FigureError("figure_decision_by_season.csv: no decision seasons")
-    pooled_seasons = sorted(
-        match.group(1) for column in rows[0] if (match := MAE_COLUMN.fullmatch(column))
-    )
-    if not pooled_seasons:
-        raise FigureError(f"{name}: no points_mae_<season> column")
-    squad = [_float(name, row, "squad_points_decision_folds") for row in rows]
-    pooled = [_float(name, row, "points_mae_pooled_all_seasons") for row in rows]
-    x_axis = ticks(min(pooled), max(pooled), 4)
-    y_axis = ticks(min(squad), max(squad), 5)
-    left, width, height, top = 74.0, 400.0, 300.0, 24.0
+    for season in decision_seasons:
+        for side in ("reference", "candidate"):
+            _require(
+                name, rows, (f"{side}_points_mae_{season}", f"{side}_points_observations_{season}")
+            )
+    gains = [
+        _weighted_mae(name, row, "reference", decision_seasons)
+        - _weighted_mae(name, row, "candidate", decision_seasons)
+        for row in rows
+    ]
+    means = [_float(name, row, "candidate_minus_reference_decision_mean") for row in rows]
+    lows = [_float(name, row, "interval_90_low") for row in rows]
+    highs = [_float(name, row, "interval_90_high") for row in rows]
+    x_axis = ticks(min(*gains, 0.0), max(*gains, 0.0), 4)
+    y_axis = ticks(min(*lows, 0.0), max(*highs, 0.0), 5)
+    left, width, height, top = 74.0, 420.0, 300.0, 24.0
     bottom = top + height
     svg = Svg(
         left + width + 24,
         bottom + 62,
-        "Points MAE against realized squad points",
+        "Accuracy gain against decision value, same seasons and reference",
         f"Drawn from {name} and the seasons of figure_decision_by_season.csv by "
         "scripts/paper_figures.py.",
     )
@@ -620,27 +656,121 @@ def points_mae_against_squad_points(rows: Rows, decision_seasons: Sequence[str])
     x_scale = Scale(x_axis.low, x_axis.high, left, left + width)
     _y_grid(svg, y_scale, y_axis, left, left + width, labels=True)
     _x_grid(svg, x_scale, x_axis, top, bottom)
+    svg.line((left, y_scale(0.0)), (left + width, y_scale(0.0)), MUTED, 1.0)
+    svg.line((x_scale(0.0), top), (x_scale(0.0), bottom), MUTED, 1.0)
+    for row, gain, low, high in zip(rows, gains, lows, highs, strict=True):
+        svg.line(
+            (x_scale(gain), y_scale(low)),
+            (x_scale(gain), y_scale(high)),
+            SERIES[0],
+            1.5,
+            title=f"{row['candidate']} 90% interval: {row['interval_90_low']} to "
+            f"{row['interval_90_high']}",
+        )
     svg.text(
         (left + width / 2, bottom + 36),
-        f"points MAE pooled over {_span(pooled_seasons)}, as recorded",
+        f"reference minus candidate points MAE over {_span(decision_seasons)}, "
+        "observation-weighted",
         11,
         "middle",
     )
     points = [
         (
-            x_scale(x),
-            y_scale(y),
-            row["arm"],
-            f"{row['arm']}: points MAE {row['points_mae_pooled_all_seasons']}, "
-            f"squad points {row['squad_points_decision_folds']}",
+            x_scale(gain),
+            y_scale(mean),
+            row["candidate"],
+            f"{row['candidate']}: MAE gain {gain:.6f}, decision difference "
+            f"{row['candidate_minus_reference_decision_mean']}",
         )
-        for row, x, y in zip(rows, pooled, squad, strict=True)
+        for row, gain, mean in zip(rows, gains, means, strict=True)
     ]
     reach = _labelled_points(svg, points, left, width, top, bottom)
     svg.width = max(svg.width, reach + 16)
     centre = (top + bottom) / 2
-    svg.text((18, centre), "mean realized squad points a gameweek", 11, "middle", rotate=True)
+    svg.text(
+        (18, centre),
+        "candidate minus reference, squad points a gameweek",
+        11,
+        "middle",
+        rotate=True,
+    )
     svg.text((32, centre), f"decision folds {_span(decision_seasons)}", 11, "middle", rotate=True)
+    return svg.render()
+
+
+def seed_counts(rows: Rows) -> str:
+    """Each arm's lower-tail fold count by scenario seed, against the S2 ceiling as a count."""
+
+    name = "table_joint_sampler_seeds.csv"
+    _require(name, rows, ("arm", "seed", "below_q10_count", "band_ceiling_count"))
+    arms = _ordered(row["arm"] for row in rows)
+    seeds = sorted({int(_float(name, row, "seed")) for row in rows})
+    if not seeds:
+        raise FigureError(f"{name}: no seeds")
+    counts = [_float(name, row, "below_q10_count") for row in rows]
+    ceilings = sorted({_float(name, row, "band_ceiling_count") for row in rows})
+    axis = ticks(min(*counts, *ceilings) - 1, max(*counts, *ceilings) + 1, 5)
+    left, width, height, top = 64.0, 420.0, 240.0, 44.0
+    bottom = top + height
+    svg = Svg(
+        left + width + 24,
+        bottom + 56,
+        "Lower-tail fold counts by scenario seed",
+        f"Drawn from {name} by scripts/paper_figures.py.",
+    )
+    y_scale = Scale(axis.low, axis.high, bottom, top)
+    step = width / max(len(seeds), 1)
+    x_of = {seed: left + step * (index + 0.5) for index, seed in enumerate(seeds)}
+    _y_grid(svg, y_scale, axis, left, left + width, labels=True)
+    for seed in seeds:
+        svg.text((x_of[seed], bottom + 15), str(seed), 10, "middle", SECONDARY)
+    for ceiling in ceilings:
+        svg.line(
+            (left, y_scale(ceiling)),
+            (left + width, y_scale(ceiling)),
+            INK,
+            1.0,
+            "4 3",
+            title=f"S2 ceiling {ceiling:g} folds",
+        )
+    for index, arm in enumerate(arms):
+        colour = SERIES[index % len(SERIES)]
+        shape = MARKERS[index % len(MARKERS)]
+        mine = sorted(
+            (row for row in rows if row["arm"] == arm),
+            key=lambda row: int(_float(name, row, "seed")),
+        )
+        svg.polyline(
+            [
+                (
+                    x_of[int(_float(name, row, "seed"))],
+                    y_scale(_float(name, row, "below_q10_count")),
+                )
+                for row in mine
+            ],
+            colour,
+            1.5,
+        )
+        for row in mine:
+            seed = int(_float(name, row, "seed"))
+            svg.marker(
+                shape,
+                (x_of[seed], y_scale(_float(name, row, "below_q10_count"))),
+                colour,
+                f"{arm}, seed {seed}: {row['below_q10_count']} folds below q10",
+            )
+        svg.marker(shape, (left + 10 + index * 190, 18.0), colour)
+        svg.text((left + 20 + index * 190, 22), arm, 11, fill=SECONDARY)
+    svg.line((left + 10, 36.0), (left + 32, 36.0), INK, 1.0, "4 3")
+    svg.text((left + 38, 40), "S2 ceiling of the band, as folds", 11, fill=SECONDARY)
+    svg.text((left + width / 2, bottom + 36), "scenario seed", 11, "middle")
+    svg.text(
+        (18, (top + bottom) / 2),
+        "folds realized below the scenario tenth percentile",
+        11,
+        "middle",
+        rotate=True,
+    )
     return svg.render()
 
 
@@ -711,98 +841,6 @@ def sampler_pit(rows: Rows, bins: int = PIT_BINS) -> str:
     return svg.render()
 
 
-def s2_counts(rows: Rows, calibration: Rows) -> str:
-    """Each arm's pooled lower-tail fold count, with its S2 bounds as counts where recorded."""
-
-    name = "figure_s2_counts.csv"
-    _require(name, rows, ("sampler", "arm", "scope", "fold_count", "below_q10_count", "record"))
-    table = "table_sampler_calibration.csv"
-    _require(table, calibration, ("record", "arm", "s2_bounds_low", "s2_bounds_high"))
-    pooled = [row for row in rows if row["scope"] == "pooled"]
-    if not pooled:
-        raise FigureError(f"{name}: no pooled rows")
-    bounds: dict[tuple[str, str], tuple[float, float] | None] = {}
-    for row in calibration:
-        recorded = row["s2_bounds_low"] != "" and row["s2_bounds_high"] != ""
-        bounds[(row["record"], row["arm"])] = (
-            (_float(table, row, "s2_bounds_low"), _float(table, row, "s2_bounds_high"))
-            if recorded
-            else None
-        )
-    bars = []
-    for row in pooled:
-        key = (row["record"], row["arm"])
-        if key not in bounds:
-            raise FigureError(f"{table}: no row for {key[0]} {key[1]}")
-        folds = _float(name, row, "fold_count")
-        band = bounds[key]
-        counts = None if band is None else (band[0] * folds, band[1] * folds)
-        bars.append((row, _float(name, row, "below_q10_count"), folds, counts))
-    reach = [count for _, count, _, _ in bars]
-    reach += [edge for *_, counts in bars if counts is not None for edge in counts]
-    axis = ticks(0.0, max(reach), 5)
-    labels = [(row["sampler"], f"{Path(row['record']).stem} {row['arm']}") for row, *_ in bars]
-    left = 24 + max(max(_width(a, 11), _width(b, 10)) for a, b in labels)
-    width, row_height, top = 420.0, 46.0, 52.0
-    bottom = top + row_height * len(bars)
-    scale = Scale(axis.low, axis.high, left, left + width)
-    notes = [
-        f"{row['below_q10_count']} of {row['fold_count']}"
-        + (", no S2 bounds in the record" if counts is None else "")
-        for row, _, _, counts in bars
-    ]
-    reach_right = max(
-        scale(count) + 6 + _width(note, 10)
-        for (_, count, _, _), note in zip(bars, notes, strict=True)
-    )
-    svg = Svg(
-        max(left + width, reach_right) + 16,
-        bottom + 56,
-        "S2 lower-tail fold counts",
-        f"Drawn from {name} and {table} by scripts/paper_figures.py.",
-    )
-    svg.rect((left, 12.0), (22.0, 12.0), BAND)
-    svg.line((left, 12), (left, 24), MUTED, 1.0, "3 2")
-    svg.line((left + 22, 12), (left + 22, 24), MUTED, 1.0, "3 2")
-    svg.text((left + 28, 22), "S2 bounds of the record, as fold counts", 11, fill=SECONDARY)
-    svg.rect((left + 290, 12.0), (22.0, 12.0), SERIES[0])
-    svg.text((left + 318, 22), "folds realized below q10", 11, fill=SECONDARY)
-    for value in axis.values:
-        svg.line((scale(value), top), (scale(value), bottom), GRID)
-        svg.text((scale(value), bottom + 15), axis.label(value), 10, "middle", SECONDARY)
-    for index, ((row, count, folds, counts), (first, second), note) in enumerate(
-        zip(bars, labels, notes, strict=True)
-    ):
-        y = top + index * row_height
-        centre = y + row_height / 2
-        svg.text((left - 10, centre - 3), first, 11, "end", bold=True)
-        svg.text((left - 10, centre + 11), second, 10, "end", SECONDARY)
-        if counts is not None:
-            svg.rect(
-                (scale(counts[0]), y + 5),
-                (scale(counts[1]) - scale(counts[0]), row_height - 10),
-                BAND,
-                f"S2 bounds of {second}: {counts[0]:.2f} to {counts[1]:.2f} of {folds:g} folds",
-            )
-            for edge in counts:
-                svg.line((scale(edge), y + 5), (scale(edge), y + row_height - 5), MUTED, 1.0, "3 2")
-        svg.rect(
-            (left, centre - 8),
-            (scale(count) - left, 16.0),
-            SERIES[0],
-            f"{second}: {row['below_q10_count']} of {row['fold_count']} folds",
-        )
-        svg.text((scale(count) + 6, centre + 4), note, 10, fill=INK, halo=True)
-    svg.line((left, top), (left, bottom), MUTED)
-    svg.text(
-        (left + width / 2, bottom + 36),
-        "folds realized below the scenario tenth percentile, pooled",
-        11,
-        "middle",
-    )
-    return svg.render()
-
-
 @dataclass(frozen=True)
 class Figure:
     file: str
@@ -822,10 +860,10 @@ FIGURES: tuple[Figure, ...] = (
         lambda t: decision_by_season(t["figure_decision_by_season.csv"]),
     ),
     Figure(
-        "fig3_points_mae_against_squad_points.svg",
-        ("figure_points_mae_against_squad_points.csv", "figure_decision_by_season.csv"),
-        lambda t: points_mae_against_squad_points(
-            t["figure_points_mae_against_squad_points.csv"],
+        "fig3_accuracy_against_decision.svg",
+        ("figure_accuracy_against_decision.csv", "figure_decision_by_season.csv"),
+        lambda t: accuracy_against_decision(
+            t["figure_accuracy_against_decision.csv"],
             sorted({row["season"] for row in t["figure_decision_by_season.csv"]}),
         ),
     ),
@@ -835,9 +873,9 @@ FIGURES: tuple[Figure, ...] = (
         lambda t: sampler_pit(t["figure_sampler_pit.csv"]),
     ),
     Figure(
-        "fig5_s2_counts.svg",
-        ("figure_s2_counts.csv", "table_sampler_calibration.csv"),
-        lambda t: s2_counts(t["figure_s2_counts.csv"], t["table_sampler_calibration.csv"]),
+        "fig5_seed_counts.svg",
+        ("table_joint_sampler_seeds.csv",),
+        lambda t: seed_counts(t["table_joint_sampler_seeds.csv"]),
     ),
 )
 

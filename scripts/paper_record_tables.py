@@ -5,8 +5,12 @@ section of the paper is drafted here. This runner reads JSON records under `docs
 checked out (the Phase C candidate comparisons, the S1 and S2 calibration records of the
 component samplers and the two planning measurements the paper sits beside), fits nothing,
 measures nothing and opens no network connection. Every number in a table or figure file is a
-value of one record, or the difference of two values of one record, and the file names the
-record and the JSON pointer (RFC 6901) of each, so any cell can be checked against its record.
+value of one record, the difference of two values of one record, or an arithmetic summary of
+values of one record (an observation-weighted mean over seasons, a count of statuses, the
+sample standard deviation of per-fold differences and the two IID precision formulas of the
+instrument record); the file names the record and the JSON pointer (RFC 6901) of each, a
+derived cell's pointer starting with `derived:` and naming the pointers it combines, so any
+cell can be checked against its record.
 
     python -m scripts.paper_record_tables
     python -m scripts.paper_record_tables --output-dir /some/folder/outside/the/checkout
@@ -935,55 +939,6 @@ def sampler_folds(records: Records) -> tuple[list[dict[str, Cell]], list[Check]]
     return points, checks
 
 
-def _points_mae(records: Records, record: str, arm: str) -> dict[str, Cell]:
-    """An arm's points MAE pooled over every season of its comparison, then season by season
-    with the observations of each, so a plot can match the seasons of the decision folds."""
-
-    metrics = f"/comparison/metrics/{arm}"
-    cells = {
-        "points_mae_pooled_all_seasons": records.cell(
-            record, f"{metrics}/overall/points/mean_absolute_error"
-        )
-    }
-    for season in records.keys(record, f"{metrics}/by_season"):
-        at = f"{metrics}/by_season/{_escape(season)}/points"
-        cells[f"points_mae_{season}"] = records.cell(record, f"{at}/mean_absolute_error")
-        cells[f"points_observations_{season}"] = records.cell(record, f"{at}/observations")
-    return cells
-
-
-def mae_against_decision(records: Records) -> list[dict[str, Cell]]:
-    """One point per arm: points MAE against squad points on the decision folds, as recorded.
-
-    The pooled MAE covers every season of the comparison (2021-22 to 2025-26) and the squad
-    points only the decision seasons (2021-22 to 2024-25), so each season's MAE and
-    observations are on the row as well: their observation-weighted mean over the decision
-    seasons is the matched value (`checks.csv` shows that the pooled MAE is that mean over
-    every season)."""
-
-    first = CANDIDATES[0]
-    points = [
-        {
-            "arm": _label("Linear components"),
-            "squad_points_decision_folds": records.cell(
-                first.record, f"{first.linear_arm}/component_mean"
-            ),
-            **_points_mae(records, first.record, "control"),
-        }
-    ]
-    for candidate in CANDIDATES:
-        points.append(
-            {
-                "arm": _label(candidate.label),
-                "squad_points_decision_folds": records.cell(
-                    candidate.record, f"{candidate.candidate_arm}/component_mean"
-                ),
-                **_points_mae(records, candidate.record, "candidate"),
-            }
-        )
-    return points
-
-
 def pooled_mae_checks(records: Records) -> list[Check]:
     """Each arm's pooled points MAE and observations against its seasons."""
 
@@ -1041,27 +996,403 @@ def decision_by_season(records: Records) -> list[dict[str, Cell]]:
     return rows
 
 
-def s2_counts(records: Records) -> list[dict[str, Cell]]:
+INSTRUMENT = "docs/measurement_instrument.json"
+#: The precision block of the instrument record: the component arm against the ridge control.
+INSTRUMENT_PRECISION = "/precision/covariates/0/unconditional_mean_precision"
+#: Standard normal quantiles of the instrument record's IID formulas: a 90% half-width is
+#: z(0.95) standard errors, a two-sided MDE at alpha 0.05 and power 0.8 is z(0.975) + z(0.8).
+Z_90 = 1.6448536269514722
+Z_MDE = 1.959963984540054 + 0.8416212335729143
+#: A derived cell's pointer starts with this and then says which pointers it combines.
+DERIVED = "derived: "
+
+#: Where a record pairs the candidate at the decision level against the same reference its
+#: player-level comparison uses, when that reference is not the linear arm: the wider feature
+#: contract's reference is the boosted pair on v1 features at both levels.
+SAME_REFERENCE_DECISION: dict[str, str] = {
+    "feature_contract_v2": "/decision_level_reading/v2_minus_v1_features",
+}
+
+
+def _decision_reference(records: Records, candidate: Candidate) -> tuple[Cell, Cell, Cell]:
+    """The decision mean and 90% interval against the candidate's player-level reference."""
+
+    prefix = SAME_REFERENCE_DECISION.get(candidate.key)
+    if prefix is None:
+        mean, interval = candidate.mean, candidate.interval
+    else:
+        mean, interval = f"{prefix}/mean", f"{prefix}/interval_90"
+    at = partial(records.cell, candidate.record)
+    return at(mean), at(f"{interval}/0"), at(f"{interval}/1")
+
+
+def _weighted_points_mae(records: Records, record: str, arm: str, seasons: Sequence[str]) -> Cell:
+    """An arm's points MAE over `seasons`, each season weighted by its observations."""
+
+    metrics = f"/comparison/metrics/{arm}/by_season"
+    weighted = 0.0
+    observations = 0
+    for season in seasons:
+        at = f"{metrics}/{_escape(season)}/points"
+        count = int(records.cell(record, f"{at}/observations").value)
+        weighted += float(records.cell(record, f"{at}/mean_absolute_error").value) * count
+        observations += count
+    if not observations:
+        raise RecordError(f"{record}: no points observations over {', '.join(seasons)}")
+    return Cell(
+        weighted / observations,
+        record,
+        f"{DERIVED}observation-weighted mean over {','.join(seasons)} of "
+        f"{metrics}/<season>/points/mean_absolute_error",
+    )
+
+
+def same_period_table(records: Records) -> Table:
+    """Each candidate's accuracy and decision readings over the same seasons and reference."""
+
+    columns = (
+        "candidate",
+        "reference_arm",
+        "decision_seasons",
+        "reference_decision_season_points_mae",
+        "candidate_decision_season_points_mae",
+        "decision_season_paired_difference",
+        "reference_points_rmse",
+        "candidate_points_rmse",
+        "reference_points_mean_error",
+        "candidate_points_mean_error",
+        "candidate_minus_reference_decision_mean",
+        "interval_90_low",
+        "interval_90_high",
+    )
+    rows = []
+    for candidate in CANDIDATES:
+        at = partial(records.cell, candidate.record)
+        seasons = records.keys(candidate.record, candidate.by_season)
+        reference, low, high = _decision_reference(records, candidate)
+        control = _weighted_points_mae(records, candidate.record, "control", seasons)
+        mine = _weighted_points_mae(records, candidate.record, "candidate", seasons)
+        row = {
+            "candidate": _label(candidate.label),
+            "reference_arm": at("/comparison/arms/control/name"),
+            "decision_seasons": _label(f"{seasons[0]} to {seasons[-1]}"),
+            "reference_decision_season_points_mae": control,
+            "candidate_decision_season_points_mae": mine,
+            "decision_season_paired_difference": Cell(
+                float(control.value) - float(mine.value),
+                candidate.record,
+                f"{DERIVED}reference minus candidate of the two weighted means",
+            ),
+            "candidate_minus_reference_decision_mean": reference,
+            "interval_90_low": low,
+            "interval_90_high": high,
+        }
+        for side, arm in (("reference", "control"), ("candidate", "candidate")):
+            overall = f"/comparison/metrics/{arm}/overall/points"
+            row[f"{side}_points_rmse"] = at(f"{overall}/root_mean_squared_error")
+            row[f"{side}_points_mean_error"] = at(f"{overall}/mean_error")
+        rows.append(row)
+    return Table(
+        "table_candidates_same_period",
+        "Each candidate against the reference arm of its own record on the seasons of the "
+        "decision folds: the points MAE of both arms over those seasons (each recorded season "
+        "weighted by its observations), the paired difference as reference minus candidate, "
+        "the pooled points RMSE and mean error of both arms, and the decision reading against "
+        "the same reference (the wider contract against the boosted pair at both levels)",
+        columns,
+        rows,
+    )
+
+
+def _fold_differences(records: Records, candidate: Candidate) -> list[tuple[str, float]]:
+    candidate_folds = f"{candidate.candidate_arm}/folds"
+    linear_folds = f"{candidate.linear_arm}/folds"
+    return [
+        (
+            fold,
+            float(records.cell(candidate.record, f"{candidate_folds}/{_escape(fold)}").value)
+            - float(records.cell(candidate.record, f"{linear_folds}/{_escape(fold)}").value),
+        )
+        for fold in records.keys(candidate.record, candidate_folds)
+    ]
+
+
+def precision_table(records: Records) -> Table:
+    """The IID precision diagnostics of each candidate's paired decision reading.
+
+    The instrument record measured a 90% half-width and a minimal detectable effect for one
+    comparison, the component arm against the ridge control, treating folds as independent.
+    The same two formulas are applied here to each candidate's recorded per-fold differences,
+    with the sample standard deviation, and the instrument row is read from its record so the
+    formulas can be checked against it. Leave-one-season-out means are the mean of the other
+    seasons' folds. All of it is descriptive: folds overlap in squads and weeks.
+    """
+
+    seasons = sorted(
+        {
+            fold[:7]
+            for candidate in CANDIDATES
+            for fold in records.keys(candidate.record, f"{candidate.candidate_arm}/folds")
+        }
+    )
+    columns = (
+        "comparison",
+        "paired_folds",
+        "mean",
+        "standard_deviation",
+        "iid_90_interval_half_width",
+        "iid_mde_alpha_0_05_power_0_8",
+        *(f"leave_out_{season}_mean" for season in seasons),
+    )
+    rows = []
+    for candidate in CANDIDATES:
+        differences = _fold_differences(records, candidate)
+        values = [value for _, value in differences]
+        count = len(values)
+        deviation = statistics.stdev(values) if count > 1 else float("nan")
+        error = deviation / count**0.5
+        folds = f"{candidate.candidate_arm}/folds/<fold> - {candidate.linear_arm}/folds/<fold>"
+        row = {
+            "comparison": _label(f"{candidate.label} vs linear components"),
+            "paired_folds": records.cell(candidate.record, candidate.paired_folds),
+            "mean": Cell(statistics.fmean(values), candidate.record, f"{DERIVED}mean of {folds}"),
+            "standard_deviation": Cell(
+                deviation, candidate.record, f"{DERIVED}sample standard deviation of {folds}"
+            ),
+            "iid_90_interval_half_width": Cell(
+                Z_90 * error,
+                candidate.record,
+                f"{DERIVED}{Z_90:.6f} x standard deviation / sqrt(folds) of {folds}",
+            ),
+            "iid_mde_alpha_0_05_power_0_8": Cell(
+                Z_MDE * error,
+                candidate.record,
+                f"{DERIVED}{Z_MDE:.6f} x standard deviation / sqrt(folds) of {folds}",
+            ),
+        }
+        for season in seasons:
+            rest = [value for fold, value in differences if fold[:7] != season]
+            if rest:
+                row[f"leave_out_{season}_mean"] = Cell(
+                    statistics.fmean(rest),
+                    candidate.record,
+                    f"{DERIVED}mean of {folds} over the folds not in {season}",
+                )
+        rows.append(row)
+    at = partial(records.cell, INSTRUMENT)
+    rows.append(
+        {
+            "comparison": _label("Linear components vs ridge control (instrument record)"),
+            "paired_folds": at(f"{INSTRUMENT_PRECISION}/folds"),
+            "mean": at(f"{INSTRUMENT_PRECISION}/mean"),
+            "standard_deviation": at(f"{INSTRUMENT_PRECISION}/standard_deviation"),
+            "iid_90_interval_half_width": at(f"{INSTRUMENT_PRECISION}/iid_90_interval_half_width"),
+            "iid_mde_alpha_0_05_power_0_8": at(
+                f"{INSTRUMENT_PRECISION}/iid_mde_alpha_0_05_power_0_8"
+            ),
+        }
+    )
+    return Table(
+        "table_candidates_precision",
+        "IID precision diagnostics of each paired decision reading, by the two formulas of the "
+        "instrument record (90% half-width z(0.95) x sd / sqrt(folds); two-sided MDE at alpha "
+        "0.05 and power 0.8, (z(0.975) + z(0.8)) x sd / sqrt(folds)), with the sample standard "
+        "deviation of the recorded per-fold differences, and the mean over the folds of the "
+        "other seasons when one season is left out; the last row is the instrument record's "
+        "own reading of the linear components against the ridge control. Folds overlap in "
+        "squads and weeks, so these are lower bounds on the true widths, not gates",
+        columns,
+        rows,
+    )
+
+
+def precision_checks(records: Records) -> list[Check]:
+    """The instrument record's half-width and MDE against the formulas applied here."""
+
+    at = partial(records.cell, INSTRUMENT)
+    folds = int(at(f"{INSTRUMENT_PRECISION}/folds").value)
+    deviation = float(at(f"{INSTRUMENT_PRECISION}/standard_deviation").value)
+    error = deviation / folds**0.5
+    checks = []
+    for name, factor, column in (
+        ("90% half-width", Z_90, "iid_90_interval_half_width"),
+        ("MDE", Z_MDE, "iid_mde_alpha_0_05_power_0_8"),
+    ):
+        recorded = at(f"{INSTRUMENT_PRECISION}/{column}")
+        checks.append(
+            Check(
+                f"instrument record: the {name} equals its IID formula on the recorded "
+                "standard deviation and folds",
+                INSTRUMENT,
+                recorded.pointer,
+                recorded.value,
+                factor * error,
+                abs(float(recorded.value) - factor * error) <= 1e-6,
+            )
+        )
+    return checks
+
+
+def solver_status_table(records: Records) -> Table:
+    """Solver status counts where a record holds them, and the split of one reading by status."""
+
+    columns = (
+        "record",
+        "arm",
+        "scope",
+        "folds",
+        "optimal",
+        "feasible",
+        "candidate_minus_linear_mean",
+        "wins",
+        "ties",
+        "losses",
+    )
+    rows: list[dict[str, Cell]] = []
+    frozen_folds = "/decision_comparison/folds"
+    count = records.length(FROZEN_EVALUATION, frozen_folds)
+    for arm, column in (
+        ("component base", "component_solver_status"),
+        ("ridge control", "control_solver_status"),
+    ):
+        statuses = [
+            str(records.cell(FROZEN_EVALUATION, f"{frozen_folds}/{index}/{column}").value)
+            for index in range(count)
+        ]
+        row = {
+            "record": _label(FROZEN_EVALUATION),
+            "arm": _label(arm),
+            "scope": _label("frozen v1 evaluation, ten-second limit"),
+            "folds": Cell(count, FROZEN_EVALUATION, f"{DERIVED}length of {frozen_folds}"),
+        }
+        for status in ("OPTIMAL", "FEASIBLE"):
+            row[status.lower()] = Cell(
+                statuses.count(status),
+                FROZEN_EVALUATION,
+                f"{DERIVED}count of {frozen_folds}/<fold>/{column} equal to {status}",
+            )
+        rows.append(row)
+    arms = f"{DECISION}/arms"
+    for arm, block in (
+        ("linear components", f"{arms}/linear/component_solver_status_counts"),
+        ("ridge control", f"{arms}/linear/ridge_control_solver_status_counts"),
+        (
+            "points-only boosting",
+            f"{arms}/gradient_boosting_points/component_solver_status_counts",
+        ),
+    ):
+        row = {
+            "record": _label(GBM_POINTS),
+            "arm": _label(arm),
+            "scope": _label("decision folds, deterministic budget 5.0"),
+            "folds": records.cell(GBM_POINTS, f"{DECISION}/paired_folds"),
+        }
+        for status in ("OPTIMAL", "FEASIBLE"):
+            cell = records.optional(GBM_POINTS, f"{block}/{status}")
+            row[status.lower()] = (
+                cell
+                if cell is not None
+                else Cell(0, GBM_POINTS, f"{DERIVED}no {status} key under {block}")
+            )
+        rows.append(row)
+    split = f"{DECISION}/added_after_the_result/by_linear_solver_status"
+    for status in records.keys(GBM_POINTS, split):
+        at = f"{split}/{_escape(status)}"
+        rows.append(
+            {
+                "record": _label(GBM_POINTS),
+                "arm": _label("points-only boosting minus linear components"),
+                "scope": _label(f"folds the linear arm ended {status}, added after the result"),
+                "folds": records.cell(GBM_POINTS, f"{at}/folds"),
+                "candidate_minus_linear_mean": records.cell(
+                    GBM_POINTS, f"{at}/candidate_minus_linear_mean"
+                ),
+                "wins": records.cell(GBM_POINTS, f"{at}/wins_ties_losses/0"),
+                "ties": records.cell(GBM_POINTS, f"{at}/wins_ties_losses/1"),
+                "losses": records.cell(GBM_POINTS, f"{at}/wins_ties_losses/2"),
+            }
+        )
+    return Table(
+        "table_solver_status",
+        "Solver status of the decision solves where a record holds it: the frozen v1 evaluation "
+        "(counted over its per-fold statuses) and the points-only boosting record (its per-arm "
+        "counts, and its paired reading split by the linear arm's status). The boosted pair, "
+        "wider contract, regime and mixture records hold no per-arm status counts",
+        columns,
+        rows,
+    )
+
+
+def sampler_season_table(records: Records) -> Table:
+    columns = (
+        "sampler",
+        "record",
+        "arm",
+        "season",
+        "fold_count",
+        "mean_pit",
+        "mean_pit_within_s1_bounds",
+        "below_q10_count",
+        "below_q10_rate",
+        "tail_rate_within_s2_bounds",
+    )
     rows = []
     for sampler, record, arm, _ in SAMPLER_ARMS:
-        scopes: list[tuple[str, str]] = [("pooled", arm)]
-        if arm != "/verdict":
-            scopes += [
-                (season, f"{arm}/seasons/{_escape(season)}")
-                for season in records.keys(record, f"{arm}/seasons")
-            ]
-        for scope, at in scopes:
+        if arm == "/verdict":
+            continue
+        for season in records.keys(record, f"{arm}/seasons"):
+            at = partial(records.cell, record)
+            season_at = f"{arm}/seasons/{_escape(season)}"
             rows.append(
                 {
                     "sampler": _label(sampler),
+                    "record": _label(record),
                     "arm": _label(arm),
-                    "scope": _label(scope),
-                    "fold_count": records.cell(record, f"{at}/fold_count"),
-                    "below_q10_count": records.cell(
-                        record, f"{at}/realized_below_lower_quantile_count"
-                    ),
+                    "season": _label(season),
+                    "fold_count": at(f"{season_at}/fold_count"),
+                    "mean_pit": at(f"{season_at}/mean_probability_integral_transform"),
+                    "mean_pit_within_s1_bounds": at(f"{season_at}/mean_pit_within_s1_bounds"),
+                    "below_q10_count": at(f"{season_at}/realized_below_lower_quantile_count"),
+                    "below_q10_rate": at(f"{season_at}/realized_below_lower_quantile_rate"),
+                    "tail_rate_within_s2_bounds": at(f"{season_at}/tail_rate_within_s2_bounds"),
                 }
             )
+    return Table(
+        "table_sampler_calibration_by_season",
+        "Season readings of every sampler arm whose record holds them (the binding foundation "
+        "record holds pooled readings only): mean PIT and lower-tail count by season, with the "
+        "record's own flags against the S1 and S2 bands, descriptive",
+        columns,
+        rows,
+    )
+
+
+def accuracy_against_decision(records: Records) -> list[dict[str, Cell]]:
+    """One row per candidate: both arms' points MAE and observations by season, as recorded,
+    and the decision reading against the same reference arm.
+
+    The figure weights each season's MAE by its observations over the decision seasons (read
+    from `figure_decision_by_season.csv`), so the accuracy and the decision axes cover the same
+    folds and the same pair of arms."""
+
+    rows = []
+    for candidate in CANDIDATES:
+        at = partial(records.cell, candidate.record)
+        reference, low, high = _decision_reference(records, candidate)
+        row = {
+            "candidate": _label(candidate.label),
+            "reference_arm": at("/comparison/arms/control/name"),
+        }
+        for side, arm in (("reference", "control"), ("candidate", "candidate")):
+            metrics = f"/comparison/metrics/{arm}/by_season"
+            for season in records.keys(candidate.record, metrics):
+                season_at = f"{metrics}/{_escape(season)}/points"
+                row[f"{side}_points_mae_{season}"] = at(f"{season_at}/mean_absolute_error")
+                row[f"{side}_points_observations_{season}"] = at(f"{season_at}/observations")
+        row["candidate_minus_reference_decision_mean"] = reference
+        row["interval_90_low"] = low
+        row["interval_90_high"] = high
+        rows.append(row)
     return rows
 
 
@@ -1221,15 +1552,18 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         distribution_table(records),
         distribution_fold_table(records),
         planning_table(records),
+        same_period_table(records),
+        precision_table(records),
+        solver_status_table(records),
+        sampler_season_table(records),
     ]
     fold_points, fold_checks = fold_differences(records)
     pit_points, pit_checks = sampler_folds(records)
     figures = {
         "figure_decision_fold_differences": fold_points,
         "figure_decision_by_season": decision_by_season(records),
-        "figure_points_mae_against_squad_points": mae_against_decision(records),
+        "figure_accuracy_against_decision": accuracy_against_decision(records),
         "figure_sampler_pit": pit_points,
-        "figure_s2_counts": s2_counts(records),
     }
     checks = [
         *fold_checks,
@@ -1237,6 +1571,7 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         *sampler_gate_checks(records),
         *seed_checks(records),
         *pooled_mae_checks(records),
+        *precision_checks(records),
     ]
     commit = checked_out_commit(records.root)
     digests, commit_checks = commit_rows(records, extractor_digest(), commit)
