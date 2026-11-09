@@ -760,7 +760,7 @@ def seed_counts(rows: Rows) -> str:
                 f"{arm}, seed {seed}: {row['below_q10_count']} folds below q10",
             )
         svg.marker(shape, (left + 10 + index * 190, 18.0), colour)
-        svg.text((left + 20 + index * 190, 22), arm, 11, fill=SECONDARY)
+        svg.text((left + 20 + index * 190, 22), _shown(ARM_NAMES, arm), 11, fill=SECONDARY)
     svg.line((left + 10, 36.0), (left + 32, 36.0), INK, 1.0, "4 3")
     svg.text((left + 38, 40), "S2 ceiling of the band, as folds", 11, fill=SECONDARY)
     svg.text((left + width / 2, bottom + 36), "scenario seed", 11, "middle")
@@ -779,6 +779,31 @@ def _bin(name: str, value: float, bins: int) -> int:
         raise FigureError(f"{name}: PIT {value} is outside [0, 1]")
     edges = [index / bins for index in range(bins + 1)]
     return min(bisect_right(edges, value) - 1, bins - 1)
+
+
+#: How the paper names the sampler arms a figure labels; anything else is shown as written.
+SAMPLER_NAMES = {
+    "foundation": "Foundation",
+    "team_match_block": "Club block",
+    "team_match_joint": "Joint club-match",
+}
+RECORD_NAMES = {
+    "phase_d_component_squad_calibration": "binding record (R2)",
+    "team_match_block_sampler": "block record (R11)",
+    "moe_sampler": "joint record (R6)",
+}
+ARM_NAMES = {
+    "/verdict": "",
+    "/control_arm": "control arm",
+    "/candidate_arm": "candidate arm",
+    "/block_arm": "block arm",
+    "block_arm": "Club block",
+    "candidate": "Joint club-match",
+}
+
+
+def _shown(mapping: dict[str, str], key: str) -> str:
+    return mapping.get(key, key)
 
 
 def sampler_pit(rows: Rows, bins: int = PIT_BINS) -> str:
@@ -818,9 +843,9 @@ def sampler_pit(rows: Rows, bins: int = PIT_BINS) -> str:
         scale = Scale(axis.low, axis.high, bottom, top)
         x_scale = Scale(0.0, 1.0, left, right)
         _y_grid(svg, scale, axis, left, right, labels=index % grid.columns == 0)
-        svg.text((left, top - 36), f"{sampler}, n = {total}", 11, bold=True)
-        svg.text((left, top - 22), Path(record).stem, 10, fill=SECONDARY)
-        svg.text((left, top - 8), arm, 10, fill=SECONDARY)
+        svg.text((left, top - 36), f"{_shown(SAMPLER_NAMES, sampler)}, n = {total}", 11, bold=True)
+        svg.text((left, top - 22), _shown(RECORD_NAMES, Path(record).stem), 10, fill=SECONDARY)
+        svg.text((left, top - 8), _shown(ARM_NAMES, arm), 10, fill=SECONDARY)
         for position, count in enumerate(counts):
             x0, x1 = x_scale(position / bins), x_scale((position + 1) / bins)
             svg.rect(

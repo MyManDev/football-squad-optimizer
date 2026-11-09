@@ -2414,6 +2414,58 @@ def solver_budget_decisions(records: Records) -> tuple[str | None, list[Check]]:
     return _csv(DECISION_COLUMNS, rows), checks
 
 
+LINEAR_VS_RIDGE = "table_linear_vs_ridge_rerun"
+LINEAR_VS_RIDGE_COLUMNS = (
+    "budget",
+    "folds",
+    "mean",
+    "median",
+    "interval_low",
+    "interval_high",
+    "wins",
+    "ties",
+    "losses",
+    "bootstrap_id",
+)
+
+
+def linear_vs_ridge_table(records: Records) -> str | None:
+    """The linear arm against the ridge control at each budget of the re-evaluation record,
+    as arithmetic on its fold decisions: the paired mean and median of realized points, the
+    90% season-aware block-bootstrap interval under this extractor's id, and wins, ties and
+    losses. No record holds this pair, so there is nothing to check it against; the table
+    exists because the paper quotes the linear arm's advantage over the ridge control without
+    an interval anywhere else. None when the record holds no decisions."""
+
+    block = records.optional(SOLVER_BUDGET, "/decisions")
+    if block is None or not isinstance(block.value, dict):
+        return None
+    decisions: dict[str, Any] = block.value
+    budgets = [str(value) for value in records.cell(SOLVER_BUDGET, "/budgets_present").value]
+    rows: list[list[str]] = []
+    for budget in budgets:
+        key = f"linear_dec_b{budget}"
+        if key not in decisions:
+            raise RecordError(f"{SOLVER_BUDGET}: no decisions under /decisions/{key}")
+        linear = dict(sorted(decisions[key]["candidate"].items()))
+        ridge = dict(sorted(decisions[key]["ridge_control"].items()))
+        bootstrap_id = f"paper_linear_vs_ridge_{budget}"
+        paired = _paired_block(linear, ridge, "realized_score", bootstrap_id)
+        rows.append(
+            [
+                budget,
+                str(paired["paired_folds"]),
+                _text(paired["mean"]),
+                _text(paired["median"]),
+                _text(paired["interval_90"][0]),
+                _text(paired["interval_90"][1]),
+                *(str(count) for count in paired["wins_ties_losses"]),
+                bootstrap_id,
+            ]
+        )
+    return _csv(LINEAR_VS_RIDGE_COLUMNS, rows)
+
+
 def commit_rows(
     records: Records, extractor: Digest, commit: str | None
 ) -> tuple[list[list[str]], list[Check]]:
@@ -2520,6 +2572,9 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
     files |= {f"{name}.csv": _figure_csv(name, rows) for name, rows in figures.items()}
     if decisions_csv is not None:
         files[f"{DECISIONS_CSV}.csv"] = decisions_csv
+    linear_vs_ridge = linear_vs_ridge_table(records)
+    if linear_vs_ridge is not None:
+        files[f"{LINEAR_VS_RIDGE}.csv"] = linear_vs_ridge
     files["tables.md"] = _markdown(tables, _commit_line(commit, commit_checks))
     files["records.csv"] = _csv(
         ("record", "sha256_lf", "git_blob_lf", "commit", "blob_at_commit", "matches_commit"),
