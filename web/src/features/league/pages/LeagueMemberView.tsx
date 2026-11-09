@@ -6,10 +6,11 @@ import {
 } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
-import { useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 
+import { recordUsage } from "../../../data/usage";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useShellLayout } from "../../../design/shell/layout";
 import { useShell } from "../../../design/shell/ShellContext";
@@ -144,6 +145,7 @@ function LeagueMemberContent({
   history = null,
   tool,
 }: LeagueMemberViewProps) {
+  useEffect(() => recordUsage({ step: "tool" }), [tool]);
   const { language, messages } = useLanguage();
   const leagueId = useLeagueId();
   const copy = messages.leagueMembers;

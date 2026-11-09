@@ -36,7 +36,10 @@ import { LeagueDataError, LeagueDataMissing, type LeagueTree } from "../data";
 import type { PublishedLeague } from "../directory";
 import { readMemberClaim, writeMemberClaim } from "../identity/memberClaim";
 import type { EntryView, LeagueMembers, LeagueViewEnvelope } from "../types";
+import { recordUsage } from "../../../data/usage";
 import { MemberGate } from "./MemberGate";
+
+vi.mock("../../../data/usage", () => ({ recordUsage: vi.fn() }));
 
 const LEAGUE = EXAMPLE_LEAGUE.leagueId;
 const LEAGUE_NAME = "SquadOpt Classic League";
@@ -126,6 +129,28 @@ function envelopeWith(rows: EntryView[]): LeagueViewEnvelope<LeagueMembers> {
     payload: { ...mockLeagueMembersEnvelope.payload, members: rows },
   };
 }
+
+describe("what the usage record is told", () => {
+  beforeEach(() => vi.mocked(recordUsage).mockClear());
+
+  const steps = () => vi.mocked(recordUsage).mock.calls.map(([event]) => event.step);
+
+  it("the picker shown once, and a name taken in it", async () => {
+    open();
+    const group = await picker("tr");
+    expect(steps()).toEqual(["picker_shown"]);
+    await userEvent.click(within(within(group).getAllByRole("listitem")[0]!).getByRole("button"));
+    await screen.findByRole("heading", { name: "League page" });
+    expect(steps()).toEqual(["picker_shown", "picker_claimed"]);
+  });
+
+  it("nothing for a visitor whose name is already kept", async () => {
+    claimIn(LEAGUE);
+    open();
+    await screen.findByRole("heading", { name: "League page" });
+    expect(steps()).toEqual([]);
+  });
+});
 
 describe.each(["tr", "en"] as const)("the member step in %s", (language) => {
   const copy = MESSAGES[language].memberPicker;

@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useSearchParams } from "react-router";
 
+import { recordUsage } from "../../data/usage";
 import { EmptyState } from "../../design/components/EmptyState";
 import { useLanguage } from "../../i18n/context";
 import { useMinuteClock } from "../../lib/useMinuteClock";
@@ -20,6 +22,7 @@ import styles from "./Fixtures.module.css";
  * title the deadlines still ahead can be taken into a calendar app as a file.
  */
 export function FixturesPage() {
+  useEffect(() => recordUsage({ step: "tool" }), []);
   const { language, messages } = useLanguage();
   const copy = FIXTURES_COPY[language];
   const { data, isPending } = useFixtures();

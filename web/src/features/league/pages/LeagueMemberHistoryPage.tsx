@@ -1,8 +1,9 @@
 import { memberAddress } from "../../../lib/leagueAddresses";
 import { useLeague, useLeagueId } from "../useLeague";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
+import { recordUsage } from "../../../data/usage";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useShellLayout } from "../../../design/shell/layout";
@@ -18,6 +19,7 @@ import { PersonalSeasonReport } from "../history/PersonalSeasonReport";
 import { useSuggestionHistory } from "../queries";
 
 export function LeagueMemberHistoryPage() {
+  useEffect(() => recordUsage({ step: "tool" }), []);
   const { messages } = useLanguage();
   const { league } = useLeague();
   const leagueId = league.leagueId;

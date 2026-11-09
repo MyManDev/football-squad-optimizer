@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
+import { recordUsage } from "../../../data/usage";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
@@ -23,6 +24,7 @@ import { DifferenceBars, NetBars, WeekStrip } from "./VsCharts";
  * owner asked for this page to analyse, so it is the one page that says things in sentences.
  */
 export function LeagueMemberVsPage() {
+  useEffect(() => recordUsage({ step: "tool" }), []);
   const { messages } = useLanguage();
   const { league } = useLeague();
   const copy = messages.suggestionHistory;

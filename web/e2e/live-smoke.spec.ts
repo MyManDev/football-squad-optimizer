@@ -54,7 +54,9 @@ test("published league and member journey works without submitting a solve", asy
       request.failure()?.errorText === "net::ERR_ABORTED" &&
       (/^\/api\/v1\/fpl\/live\/\d+$/.test(url.pathname) ||
         /^\/data\/device\/[^/]+\/device-plan\.json$/.test(url.pathname));
-    if (url.origin === origin && !cancelledRead) failures.push(request.url());
+    // A usage beacon may be cut off by the page it left; the record never holds a release back.
+    const usageBeacon = url.pathname === "/api/v1/usage/events";
+    if (url.origin === origin && !cancelledRead && !usageBeacon) failures.push(request.url());
   });
   page.on("response", (response) => {
     if (
