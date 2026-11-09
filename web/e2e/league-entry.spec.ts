@@ -18,8 +18,11 @@ for (const language of ["tr", "en"] as const) {
     const requests: string[] = [];
     page.on("request", (request) => {
       // The shell's fixture list is site-level and read on every page, whatever is typed here.
+      // The directory's first read is the document's own preload (resource type "other"),
+      // which the form's fetch then joins, so a published document counts by its address.
       const path = new URL(request.url()).pathname;
-      if (["fetch", "xhr"].includes(request.resourceType()) && path !== "/data/fixtures.json") {
+      if (path === "/data/fixtures.json") return;
+      if (["fetch", "xhr"].includes(request.resourceType()) || path.startsWith("/data/")) {
         requests.push(path);
       }
     });
