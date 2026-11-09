@@ -124,17 +124,21 @@ export function createWorker(options = {}) {
     return deadlinesFrom(await response.json());
   }
 
-  /** One run: the due gameweek, if any, and one message to each subscriber not yet reminded of it. */
+  /**
+   * One run: the due gameweek, if any, and one message to each subscriber not yet reminded of
+   * it. The signing key is read first, on every run, so a secret the Worker cannot use fails
+   * the next quarter-hour run in the log rather than the first deadline.
+   */
   async function remind(env) {
     const nowMs = now();
-    const due = windowGameweek(await readDeadlines(), nowMs);
-    if (due === null) return { gameweek: null, sent: 0, gone: 0, failed: 0 };
-    const store = storeOf(env);
     const vapid = {
       signingKey: await importVapidKey(env.VAPID_PRIVATE_KEY, env.VAPID_PUBLIC_KEY),
       publicKey: env.VAPID_PUBLIC_KEY,
       subject: env.VAPID_SUBJECT,
     };
+    const due = windowGameweek(await readDeadlines(), nowMs);
+    if (due === null) return { gameweek: null, sent: 0, gone: 0, failed: 0 };
+    const store = storeOf(env);
     const counts = { gameweek: due.gameweek, sent: 0, gone: 0, failed: 0 };
     for (const subscription of await store.due(due.gameweek, BATCH)) {
       const payload = JSON.stringify(payloadFor(due.gameweek, subscription));
