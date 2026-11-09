@@ -340,12 +340,37 @@ def summarize(inputs: Path, root: Path) -> dict[str, Any]:
             "decision seasons; 2025-26 is not read by any fold here"
         ),
         "produced_by": {
+            "exporter": (
+                "scripts/export_component_oof.py at the producer_repository_commit each input "
+                "names, writing the handoff table whose digest the input names"
+            ),
             "runner": (
                 "scripts/evaluate_phase_c_components.py at the repository_commit each input "
                 "names, writing the raw evaluation documents"
             ),
             "summarizer": "scripts/summarize_solver_budget_cards.py",
             "summarizer_sha256": _sha256_lf(Path(__file__).read_bytes()),
+            "command_forms": {
+                "export": (
+                    "python -m scripts.export_component_oof --archive-root <archive> "
+                    "--development-scope v2 --season-weighting equal "
+                    "--seasons 2021-22,2022-23,2023-24,2024-25 --output-dir <tables>/<table> "
+                    "[--estimator gradient_boosting [--feature-contract v2]]"
+                ),
+                "evaluate": (
+                    "python -m scripts.evaluate_phase_c_components --table <table>.csv "
+                    "--manifest <table>.manifest.json --roster <table>.roster.csv "
+                    "--producer-environment <table>.environment.json --archive-root <archive> "
+                    "--development-contract phase_c_component_oof_development_v2 "
+                    "--solver-deterministic-budget <budget> --solver-wall-cap-seconds <cap> "
+                    "--card-participation --record-decisions "
+                    "--json-output <inputs>/eval_<table>_b<budget>.json"
+                ),
+                "summarize": (
+                    "python -m scripts.summarize_solver_budget_cards --inputs-dir <inputs> "
+                    "--output docs/research/phase_c_solver_budget_cards.json"
+                ),
+            },
         },
         "raw_evaluation_documents": {
             f"{name}_b{budget}": {
@@ -359,6 +384,7 @@ def summarize(inputs: Path, root: Path) -> dict[str, Any]:
             f"{name}_b{budget}": {
                 "generated_at_utc": document["generated_at_utc"],
                 "repository_commit": document["provenance"]["repository_commit"],
+                "producer_repository_commit": document["source"]["producer_repository_commit"],
                 "table_sha256": document["source"]["table_sha256"],
                 "measurement_options": document["measurement_options"],
                 "solver": document["solver"],

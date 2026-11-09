@@ -2182,13 +2182,16 @@ def _overlap_block(mine: Decisions, theirs: Decisions) -> dict[str, Any]:
 
 def solver_budget_decisions(records: Records) -> tuple[str | None, list[Check]]:
     """The re-evaluation record's fold-level decisions as one CSV row per table, budget, arm
-    and fold, and the checks that every summary the record holds is the arithmetic of those
-    decisions: each arm's status counts, means and folds moved by the card rule; each budget
-    block (changed squads, elevens and captains, folds proven at both budgets, objective gains,
-    the gap to the bound, score changes); each pair's paired reading on both scoring
-    conventions, its 90% interval recomputed under the record's own bootstrap id, and its squad
-    overlap; and that the summarizer the record names is the one in this checkout. A record
-    without the decisions block yields no file and no check.
+    and fold, and the checks that the record's summary blocks are the arithmetic of those
+    decisions: the budgets the record says it holds are the ones the decisions hold; each
+    table's reproduction block against the fold scores of the record it names; each arm's
+    status counts, means, and the folds and sum the card rule moved; each budget block (changed
+    squads, elevens and captains, folds proven at both budgets, objective gains, the gap to the
+    bound, score changes); each pair's paired reading on both scoring conventions, with the
+    bootstrap id the summarizer derives and the 90% interval recomputed under it, and its
+    squad overlap; and that the summarizer the record names is the one in this checkout. The
+    copies of recorded means under `pairs/<pair>/recorded` are not re-read. A record without
+    the decisions block yields no file and no check.
     """
 
     block = records.optional(SOLVER_BUDGET, "/decisions")
@@ -2211,6 +2214,63 @@ def solver_budget_decisions(records: Records) -> tuple[str | None, list[Check]]:
     rows: list[list[str]] = []
     checks: list[Check] = []
     arms = ("candidate", "ridge_control")
+    held = sorted({str(key).rsplit("_b", 1)[1] for key in decisions}, key=float)
+    checks.append(
+        compare(
+            "budgets_present names every budget the fold decisions hold",
+            "/budgets_present",
+            sorted(budgets, key=float),
+            held,
+        )
+    )
+    for name, _label in BUDGET_TABLES:
+        block_pointer = f"/reproduction_at_5_0/{name}"
+        reproduction = at(block_pointer).value
+        if not isinstance(reproduction, dict):
+            raise RecordError(f"{SOLVER_BUDGET}: {block_pointer} is not an object")
+        recorded_scores = records.cell(
+            str(reproduction["record"]), str(reproduction["pointer"])
+        ).value
+        if not isinstance(recorded_scores, dict):
+            raise RecordError(
+                f"{reproduction['record']}: {reproduction['pointer']} is not an object"
+            )
+        rerun = arm_folds(name, budgets[0], "candidate")
+        common = sorted(set(rerun) & set(recorded_scores))
+        differing = {
+            fold: {
+                "recorded": recorded_scores[fold],
+                "rerun_ignoring_cards": rerun[fold]["realized_score_ignoring_cards"],
+                "rerun_solver_status": rerun[fold]["solver_status"],
+            }
+            for fold in common
+            if float(recorded_scores[fold]) != float(rerun[fold]["realized_score_ignoring_cards"])
+        }
+        statuses: dict[str, int] = {}
+        for item in differing.values():
+            status = str(item["rerun_solver_status"])
+            statuses[status] = statuses.get(status, 0) + 1
+        recomputed_reproduction = {
+            "folds_compared": len(common),
+            "folds_missing_from_rerun": sorted(set(recorded_scores) - set(rerun)),
+            "folds_reproduced": len(common) - len(differing),
+            "folds_differing": differing,
+            "differing_rerun_statuses": dict(sorted(statuses.items())),
+            "differing_sum_rerun_minus_recorded": sum(
+                float(item["rerun_ignoring_cards"]) - float(item["recorded"])
+                for item in differing.values()
+            ),
+            "rerun_statuses": _statuses(rerun),
+        }
+        checks.append(
+            compare(
+                f"{name}: the reproduction block is the arithmetic of the fold decisions at "
+                f"budget {budgets[0]} and the fold scores of {reproduction['record']}",
+                block_pointer,
+                {key: reproduction.get(key) for key in recomputed_reproduction},
+                recomputed_reproduction,
+            )
+        )
     for name, _label in BUDGET_TABLES:
         for budget in budgets:
             for arm in arms:
@@ -2244,6 +2304,12 @@ def solver_budget_decisions(records: Records) -> tuple[str | None, list[Check]]:
                     "folds_changed_by_the_card_rule": at(
                         f"{cards}/folds_changed_by_the_card_rule"
                     ).value,
+                    "sum_of_changes": at(f"{cards}/sum_of_changes").value,
+                }
+                moved = {
+                    fold: decision
+                    for fold, decision in folds.items()
+                    if decision["realized_score"] != decision["realized_score_ignoring_cards"]
                 }
                 recomputed = {
                     "folds": len(folds),
@@ -2252,15 +2318,17 @@ def solver_budget_decisions(records: Records) -> tuple[str | None, list[Check]]:
                     "mean_realized_score_ignoring_cards": _fold_mean(
                         folds, "realized_score_ignoring_cards"
                     ),
-                    "folds_changed_by_the_card_rule": sum(
-                        decision["realized_score"] != decision["realized_score_ignoring_cards"]
-                        for decision in folds.values()
+                    "folds_changed_by_the_card_rule": len(moved),
+                    "sum_of_changes": sum(
+                        float(decision["realized_score"])
+                        - float(decision["realized_score_ignoring_cards"])
+                        for decision in moved.values()
                     ),
                 }
                 checks.append(
                     compare(
                         f"{name}_b{budget}/{arm}: the fold decisions give the recorded statuses, "
-                        "means and card-rule count",
+                        "means, and the folds and sum the card rule moved",
                         summary,
                         recorded,
                         recomputed,
@@ -2303,13 +2371,13 @@ def solver_budget_decisions(records: Records) -> tuple[str | None, list[Check]]:
                 if not isinstance(recorded_block, dict):
                     raise RecordError(f"{SOLVER_BUDGET}: {pointer} is not an object")
                 recomputed = _paired_block(
-                    mine, theirs, key, str(at(f"{pointer}/candidate_id").value)
+                    mine, theirs, key, f"paper_solver_budget_{pair}_{budget}_{suffix}"
                 )
                 checks.append(
                     compare(
                         f"{pair} at budget {budget}, {suffix.replace('_', ' ')}: the fold "
-                        "decisions give the recorded paired reading, its interval under the "
-                        "record's bootstrap id included",
+                        "decisions give the recorded paired reading, with the bootstrap id the "
+                        "summarizer derives and the interval drawn under it",
                         pointer,
                         {key: recorded_block.get(key) for key in recomputed},
                         recomputed,

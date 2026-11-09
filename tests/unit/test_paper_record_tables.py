@@ -916,9 +916,21 @@ def test_a_card_rule_that_moved_a_fold_but_not_the_mean_still_holds_and_a_moved_
     ]
 
 
-def _decisions_record(root: Path) -> dict[str, Any]:
+#: Where the summarizer reads each table's recorded fold scores for its reproduction block.
+REPRODUCTION_POINTERS = {
+    "linear_dec": (tables.GBM, "/decision_level_reading/arms/linear/folds"),
+    "gbm_v1_dec": (tables.GBM, "/decision_level_reading/arms/gradient_boosting/folds"),
+    "gbm_v2_dec": (tables.FEATURES_V2, "/decision_level_reading/arms/gbm_v2_features/folds"),
+}
+
+
+def _decisions_record(root: Path, records: dict[str, Any]) -> dict[str, Any]:
     """The solver-budget record with a decisions block its summaries are the arithmetic of,
-    and the summarizer file the record names written into the checkout at `root`."""
+    and the summarizer file the record names written into the checkout at `root`.
+
+    The summary blocks are built with the extractor's own helpers and then held against
+    hand-computed values, so a helper that drifted from the summarizer's arithmetic fails here.
+    """
 
     record = _solver_budget_record()
     names = ("linear_dec", "gbm_v1_dec", "gbm_v2_dec")
@@ -968,6 +980,8 @@ def _decisions_record(root: Path) -> dict[str, Any]:
     record["decisions"] = decisions
     for name in names:
         for budget in ("5.0", "60.0"):
+            record["card_rule"][f"{name}_b{budget}"]["sum_of_changes"] = 0.0
+            record["card_rule"][f"{name}_b{budget}"]["ridge_control"]["sum_of_changes"] = 0.0
             for arm in ("candidate", "ridge_control"):
                 arm_folds = decisions[f"{name}_b{budget}"][arm]
                 record["arms"][f"{name}_b{budget}"][arm] = {
@@ -982,6 +996,35 @@ def _decisions_record(root: Path) -> dict[str, Any]:
             record["budget"][name][arm] = tables._budget_block(
                 decisions[f"{name}_b5.0"][arm], decisions[f"{name}_b60.0"][arm]
             )
+        source, pointer = REPRODUCTION_POINTERS[name]
+        recorded_scores = resolve(records[source], pointer)
+        rerun = decisions[f"{name}_b5.0"]["candidate"]
+        differing = {
+            fold: {
+                "recorded": recorded_scores[fold],
+                "rerun_ignoring_cards": rerun[fold]["realized_score_ignoring_cards"],
+                "rerun_solver_status": rerun[fold]["solver_status"],
+            }
+            for fold in folds
+            if float(recorded_scores[fold]) != float(rerun[fold]["realized_score_ignoring_cards"])
+        }
+        record["reproduction_at_5_0"][name] = {
+            "record": source,
+            "pointer": pointer,
+            "folds_compared": len(folds),
+            "folds_missing_from_rerun": sorted(set(recorded_scores) - set(rerun)),
+            "folds_reproduced": len(folds) - len(differing),
+            "folds_differing": differing,
+            "differing_rerun_statuses": {
+                status: sum(item["rerun_solver_status"] == status for item in differing.values())
+                for status in sorted({item["rerun_solver_status"] for item in differing.values()})
+            },
+            "differing_sum_rerun_minus_recorded": sum(
+                float(item["rerun_ignoring_cards"]) - float(item["recorded"])
+                for item in differing.values()
+            ),
+            "rerun_statuses": {"FEASIBLE": 1, "OPTIMAL": 2},
+        }
     pairs = {
         "boosted_pair_vs_linear": ("gbm_v1_dec", "linear_dec"),
         "wider_contract_vs_boosted_pair": ("gbm_v2_dec", "gbm_v1_dec"),
@@ -995,9 +1038,34 @@ def _decisions_record(root: Path) -> dict[str, Any]:
                 ("realized_score_ignoring_cards", "ignoring_cards"),
             ):
                 record["pairs"][pair][f"budget_{budget}_{suffix}"] = tables._paired_block(
-                    own, other, key, f"test_{pair}_{budget}_{suffix}"
+                    own, other, key, f"paper_solver_budget_{pair}_{budget}_{suffix}"
                 )
             record["pairs"][pair][f"budget_{budget}_overlap"] = tables._overlap_block(own, other)
+
+    # The helpers against hand arithmetic on the decisions above.
+    linear = record["budget"]["linear_dec"]["candidate"]
+    assert (linear["squad_changed_folds"], linear["captain_changed_folds"]) == (1, 0)
+    assert (linear["proven_at_both_budgets_folds"], linear["status_counts_low"]) == (
+        2,
+        {"FEASIBLE": 1, "OPTIMAL": 2},
+    )
+    assert round(linear["objective_gain_mean"], 9) == round(0.01 / 3, 9)
+    assert linear["low_budget_feasible_gap_to_bound_mean"] == 5.0
+    assert round(linear["realized_score_change_mean"], 9) == round(-1.0 / 3, 9)
+    assert record["budget"]["gbm_v1_dec"]["ridge_control"]["objective_gain_mean"] == 0.0
+    assert (
+        record["budget"]["gbm_v1_dec"]["ridge_control"]["low_budget_feasible_gap_to_bound_mean"]
+        is None
+    )
+    paired = record["pairs"]["boosted_pair_vs_linear"]["budget_5.0_official_card_rule"]
+    assert (paired["mean"], paired["wins_ties_losses"]) == (-1.0, [1, 1, 1])
+    assert paired["by_season_mean"] == {"2021-22": 1.0, "2022-23": -5.0}
+    overlap = record["pairs"]["boosted_pair_vs_linear"]["budget_60.0_overlap"]
+    assert (overlap["mean_shared_squad_members_of_15"], overlap["identical_squad_folds"]) == (
+        15.0,
+        3,
+    )
+    assert (overlap["tied_folds"], overlap["tied_folds_with_identical_squads"]) == (1, 1)
     summarizer = root / tables.SUMMARIZER
     summarizer.parent.mkdir(parents=True, exist_ok=True)
     summarizer.write_bytes(b"print('the summarizer')\n")
@@ -1012,7 +1080,7 @@ def test_the_fold_decisions_are_written_out_and_reproduce_every_summary_of_the_r
     tmp_path: Path,
 ) -> None:
     records = _records()
-    records[tables.SOLVER_BUDGET] = _decisions_record(tmp_path)
+    records[tables.SOLVER_BUDGET] = _decisions_record(tmp_path, records)
     _write(tmp_path, records)
 
     code, output = _run(tmp_path)
@@ -1038,10 +1106,12 @@ def test_the_fold_decisions_are_written_out_and_reproduce_every_summary_of_the_r
     checks = [
         row for row in _read_csv(output / "checks.csv") if row["record"] == tables.SOLVER_BUDGET
     ]
-    assert len(checks) == 19 + 12 + 6 + 8 + 4 + 1
+    assert len(checks) == 19 + 1 + 3 + 12 + 6 + 8 + 4 + 1
     assert all(check["holds"] == "true" for check in checks)
-    interval_checks = [row for row in checks if "bootstrap id included" in row["check"]]
+    interval_checks = [row for row in checks if "the interval drawn under it" in row["check"]]
     assert len(interval_checks) == 8
+    reproduction = [row for row in checks if "reproduction block" in row["check"]]
+    assert len(reproduction) == 3
 
     path = tmp_path / tables.SOLVER_BUDGET
     document = json.loads(path.read_text(encoding="utf-8"))

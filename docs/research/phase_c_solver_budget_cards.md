@@ -31,7 +31,7 @@ limit as the binding one, and every unproven solve stopped at 60.0 units of work
 
 | Table | Table digest equals the record's | Fold scores reproduced (cards ignored) | Folds differing | Rerun statuses, candidate arm |
 | --- | --- | --- | --- | --- |
-| linear components | no (`20eb4776…` against `13330e61…`) | 135 of 147 | 12, every one `FEASIBLE` in the rerun; sum of differences −8 points (−0.054 a fold); rerun mean 63.36 against the recorded 63.42 | 103 proven, 44 feasible (record: 106 and 41) |
+| linear components | no (`20eb4776…` against the decision-level `source_table_sha256` `d8827053…` of the boosted-pair record) | 135 of 147 | 12, every one `FEASIBLE` in the rerun; sum of differences −8 points (−0.054 a fold); rerun mean 63.36 against the recorded 63.42 | 103 proven, 44 feasible (record: 106 and 41) |
 | boosted pair, v1 features | yes | 147 of 147 | none | 147 proven |
 | wider contract, v2 features | yes | 147 of 147 | none | 147 proven |
 
@@ -80,8 +80,9 @@ Twelve times the measurement budget, per arm, over the same 147 folds (record bl
 Every fold proven at both budgets returned the same fifteen players (103 of the linear arm's,
 116 of the control's, all 147 of each boosted arm's;
 `proven_at_both_budgets_squad_changed_folds` is 0 everywhere). The gap the 5.0 budget left
-between incumbent and bound on its unproven folds (about five to nine expected points) is
-almost entirely bound, not solution: twelve times the work raised the objective by 0.011
+between incumbent and bound on its unproven folds (5.3 expected points on average for the
+linear arm and 5.9 for the control, from 1.7 up to 9.0) is almost entirely bound, not
+solution: twelve times the work raised the objective by 0.011
 expected points a fold on the linear arm (at most 0.305 on one fold) and by 0.007 on the
 control, proved 33 and 24 more folds, and moved 16 and 5 squads. The realized score of the
 squads moved by −0.163 a fold on the linear arm and +0.007 on the control, so the longer
@@ -124,13 +125,16 @@ differing, not repaired.
 
 ## Provenance and reproduction
 
-The record was produced in two stages, which it names under `produced_by`, `inputs` and
-`raw_evaluation_documents`.
+The record was produced in three stages, which it names under `produced_by` (with the command
+form of each), `inputs` and `raw_evaluation_documents`.
 
-**Stage 1, the runner.** Each of the six evaluation documents names `repository_commit`
-`5d5e6fbd` (this branch, the commit that fixed the serialization of recorded decisions). The
-driver on the host exported the three decision-season tables and ran the six evaluations in
-this form, from a clone of this branch with `PYTHONPATH=src:.` and the pinned archive:
+**Stage 1, the exporter and the runner.** The three handoff tables were exported at commit
+`3a3920bd` (the commit that first carried the method note; each input's
+`producer_repository_commit` names it, and `table_sha256` is the table's handle), and each
+of the six evaluation documents names `repository_commit` `5d5e6fbd` (this branch, the
+commit that fixed the serialization of recorded decisions). The driver on the host exported
+the tables and ran the six evaluations in this form, from a clone of this branch with
+`PYTHONPATH=src:.` and the pinned archive:
 
 ```bash
 python -m scripts.export_component_oof --archive-root <archive> --development-scope v2 \
@@ -170,9 +174,12 @@ python -m scripts.summarize_solver_budget_cards --inputs-dir artifacts/paper_mea
 
 The summarizer at `5d5e6fbd` wrote an interim form of this record without the second budget,
 the per-arm blocks and the fold decisions; the record committed here is the one the summarizer
-at `d582b626` writes, and `produced_by/summarizer_sha256` is the digest of that file, so the
-two stages are told apart by the record itself. Rerunning stage 2 on the six documents above
-reproduces the committed record byte for byte.
+at the branch tip writes (first `d582b626`, then the commit that added the command forms and
+the exporter commit to `produced_by`), and `produced_by/summarizer_sha256` is the digest of
+that file, so the stages are told apart by the record itself. Rerunning stage 2 on the six
+documents above reproduces the committed record byte for byte. The exporter and runner
+options of stage 1 live on this branch; the record, this readout and the summarizer are also
+on the manuscript branch `docs/paper-manuscript`.
 
 **What the record holds per fold.** Under `decisions/<table>_b<budget>/{candidate,ridge_control}/<fold>`:
 the fifteen (`squad`) and the starting eleven (`starting_xi`), each as sorted player codes on

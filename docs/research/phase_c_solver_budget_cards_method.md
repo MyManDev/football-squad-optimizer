@@ -46,7 +46,9 @@ reaches it is reported as such.
    bound at each budget and whether the squad changed; the paired candidate-minus-reference
    mean at each budget, with the recorded 90% season-aware moving-block interval procedure
    (`squadopt.evaluation.statistics`, blocks of 4, 5,000 resamples, seed 0, candidate id
-   `paper_solver_budget_<pair>_<budget>`).
+   `paper_solver_budget_<pair>_<budget>`; as run, the id also ends in the scoring convention,
+   `_official_card_rule` or `_ignoring_cards`, so each convention has its own resample
+   stream, and the record names the id each interval was drawn under).
 3. Squad overlap: per fold, the number of shared squad members, shared starters and whether
    the captain is the same between each candidate arm and the linear arm, at each budget; the
    share of the folds that tie on realized points whose squads are identical.
