@@ -5,7 +5,9 @@
  * cookie and no measurement of the device leave the browser.
  *
  * Nothing here can reach a page: every failure is swallowed, the beacon is queued by the
- * browser, and a build whose `VITE_USAGE_ORIGIN` is empty (the default) sends nothing at all.
+ * browser. A page sends only when `VITE_USAGE_ORIGIN` names its own origin: an empty value
+ * (the default) sends nothing, and neither does a build with the variable set served from
+ * anywhere else, such as a preview address or the end-to-end suite's local server.
  */
 import { LANGUAGE_STORAGE_KEY } from "../i18n/LanguageProvider";
 import { isMemberTool } from "../lib/leagueAddresses";
@@ -101,7 +103,8 @@ export function recordUsage({ step }: { step: UsageStep }): void {
       /\/+$/,
       "",
     );
-    if (origin === "") return;
+    // The Worker refuses every other origin, so a beacon from one could only log a failure.
+    if (origin !== window.location.origin) return;
     // A string goes as text/plain, which a browser sends without asking a preflight first.
     navigator.sendBeacon(
       `${origin}/api/v1/usage/events`,

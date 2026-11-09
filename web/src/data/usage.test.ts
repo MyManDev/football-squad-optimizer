@@ -1,7 +1,8 @@
 /// <reference types="node" />
 /**
- * The usage event as it leaves the browser: only when the build names an origin, only words
- * of the Worker's lists, nothing of the address, and never an error for the page.
+ * The usage event as it leaves the browser: only when the build names this page's own
+ * origin, only words of the Worker's lists, nothing of the address, and never an error for
+ * the page.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -12,7 +13,7 @@ import { LANGUAGE_STORAGE_KEY } from "../i18n/LanguageProvider";
 import { MEMBER_TOOLS } from "../lib/leagueAddresses";
 import { recordUsage, usagePlace, type UsagePlace, type UsageStep } from "./usage";
 
-const ORIGIN = "https://squadopt.example";
+const ORIGIN = window.location.origin;
 const LEAGUE = 352490;
 const ENTRY = 35249001;
 const SESSION_KEY = "squadopt.usage.session";
@@ -56,6 +57,16 @@ describe("what is sent", () => {
     expect(beacon).not.toHaveBeenCalled();
     expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
   });
+
+  it.each(["https://squadopt.example", "not an origin", `${ORIGIN}/some/path`])(
+    "sends nothing from a page on another origin than the build names: %s",
+    (configured) => {
+      vi.stubEnv("VITE_USAGE_ORIGIN", configured);
+      recordUsage({ step: "open" });
+      expect(beacon).not.toHaveBeenCalled();
+      expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+    },
+  );
 
   it("posts the event to the origin's route, as a string", () => {
     vi.stubEnv("VITE_USAGE_ORIGIN", `${ORIGIN}/`);
