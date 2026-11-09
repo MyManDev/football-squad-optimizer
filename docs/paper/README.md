@@ -30,8 +30,8 @@
 | --- | --- | --- |
 | Step 3 | `145 of 145 record checks hold` | 0 |
 | Step 4 | `Wrote 5 paper figures to ...` | 0 |
-| Step 6 | a 30-page `squadopt_walk_forward_paper.pdf` | 0 |
-| Check | `145 of 145 record checks hold`; `42 of 44 manifest rows match`, two `unpinned` | 0 |
+| Step 6 | a 25-page `squadopt_walk_forward_paper.pdf` | 0 |
+| Check | `145 of 145 record checks hold`; `43 of 45 manifest rows match`, two `unpinned` | 0 |
 
 ## Inputs
 
@@ -50,14 +50,14 @@
 | R11 | `docs/research/team_match_block_sampler.json` | `f70dc6a4061297870541a9a484364799b603e26e` | `797264048f2a14658a8ecac89d5c82fae466e504392da4231159d10848cf1173` |
 | R12 | `docs/measurement_instrument.json` | `e9b946d962fe16a082dae0a2d509cca12bd7fe4f` | `da987a13c0d74b164175f5baf1018929f0634c3d7373ef367f336af00ebdc845` |
 | R13 | `docs/research/phase_c_solver_budget_cards.json` | `1fdae790fb59e793541ecf5a9ce70abb7e62b0af` | `5ee5784ead9625f8d8adea26aece65f55f0303a5550eb72cb880780d02ca8814` |
-| C1 | `scripts/paper_record_tables.py` | `b90f3518357efe70cc33c75fb7721768185c10e9` | `2c767d689a77e5b8dde48dad74845742c9afbe7221c4fbea6dfc9ba0a0635706` |
-| C2 | `scripts/paper_figures.py` | `247540ac734db572db1680480d6967653068b57d` | `f142e0cd4bcf1935c709e2ae6b0755e0e271da19b32f8b1c9df87ca6444f5830` |
+| C1 | `scripts/paper_record_tables.py` | `30db0603ebb323c347cc113dc44558d368c6871b` | `d9aeba026f665969e4c707af96863b28cf497353fdd3f8f08a784e31f263ab41` |
+| C2 | `scripts/paper_figures.py` | `3b5f158ba6027004471c882a9f1b0d1b6030614d` | `1fa2396de070d002517a028cc0008f49e1f0f25de1980f6fd74b436d73ef7496` |
 
 ## Tables (step 3)
 
 | Output | Step | Inputs | SHA-256 |
 | --- | --- | --- | --- |
-| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | `ebfbe49b4342e2d7ea87cf86933c59cd7189eee3e44bb6cf910631b51ee16ddd` |
+| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | `8cf1b5fd6a1e15c2c6a7b07adb3e96914440eed1174c7852daeb2979bfdf809b` |
 | `tables/decisions_solver_budget_cards.csv` | 3 | R13, C1 | `4a954876c9cc02233821a38aa1c4f437ee53720330cdb14235a6dea540a78971` |
 | `tables/figure_accuracy_against_decision.csv` | 3 | R4, R5, R7, R8, R9, C1 | `a36b6cf86f2b4869415f00f4b64b5d68735c91e9466a007ea57c4026842471c9` |
 | `tables/figure_decision_by_season.csv` | 3 | R4, R5, R7, R8, R9, C1 | `3f8537d3067ce4c2bb68e724d3b30232089afbf653f92e013b7ba576214ad3c0` |
@@ -73,6 +73,7 @@
 | `tables/table_candidates_same_period.csv` | 3 | R4, R5, R7, R8, R9, C1 | `599520c1d3400309cc14816e8a1106b7e09ce8b36ff73b664f472e1b5a23e3da` |
 | `tables/table_joint_sampler_seed_summary.csv` | 3 | R6, C1 | `924fffb6412b1764003d01f005efa82755f0d8f6cfd0232401b45799a23dae7e` |
 | `tables/table_joint_sampler_seeds.csv` | 3 | R6, C1 | `51aeea06ea82d8cc18e43facbb4b71639cfb9d589d696ebca91f5858fd8c2f9c` |
+| `tables/table_linear_vs_ridge_rerun.csv` | 3 | R13, C1 | `4f39ad374b34ca5d29347dfe83ec83057ecd6939ffdafd4a7bda8c4e49b4b529` |
 | `tables/table_mixture_distribution.csv` | 3 | R4, C1 | `e2f499b51bed13fee85251fdc1039dc15269471760c6dbc3e32750d5523559e3` |
 | `tables/table_mixture_log_score_folds.csv` | 3 | R4, C1 | `53422aa3030223390bef3fa1a3e96d6a3097fc968d13f88fc32e461b0ba6cc85` |
 | `tables/table_planning_measurements.csv` | 3 | R3, R10, C1 | `58abc76707286bc6c8cedaf6ed391752d4f5782c473bab44e60f04b9f3ae6705` |
@@ -89,5 +90,5 @@
 | `figures/fig1_decision_fold_differences.svg` | 4 | `tables/figure_decision_fold_differences.csv`, C2 | `99e8bc75c1d5d88af3223c4b2a1695a6d2ec599dbd9e75e7db9d70d0203171a7` |
 | `figures/fig2_decision_by_season.svg` | 4 | `tables/figure_decision_by_season.csv`, C2 | `fd06c34b2584ddd60ec4fa38329eb62de0de7b776cb9113abc2d7fbcdd726b0c` |
 | `figures/fig3_accuracy_against_decision.svg` | 4 | `tables/figure_accuracy_against_decision.csv`, `tables/figure_decision_by_season.csv`, C2 | `db1c1cce5c165de159893ac02014d9ca0c1bf9ff25996f1f847b770507b37db9` |
-| `figures/fig4_sampler_pit.svg` | 4 | `tables/figure_sampler_pit.csv`, C2 | `ec8182a7261ef2f5d3f5a642b44f0fd1d8b703451e1ae4259731022704e3a1f2` |
-| `figures/fig5_seed_counts.svg` | 4 | `tables/table_joint_sampler_seeds.csv`, C2 | `50fedb99884abc582ee636de5e9cb915cfdc892e52ec0aefc73ae4e09298f6a8` |
+| `figures/fig4_sampler_pit.svg` | 4 | `tables/figure_sampler_pit.csv`, C2 | `d1807837a09c4965ba3330ddc9f797b22dacf5504183370783bf328ab68adc97` |
+| `figures/fig5_seed_counts.svg` | 4 | `tables/table_joint_sampler_seeds.csv`, C2 | `7e75e91782cc4baf9ce2a3155a50a5bd68b4b3d0cbe1e76fb283c628cd701bed` |
