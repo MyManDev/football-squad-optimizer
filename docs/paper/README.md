@@ -30,7 +30,7 @@
 | --- | --- | --- |
 | Step 3 | `145 of 145 record checks hold` | 0 |
 | Step 4 | `Wrote 5 paper figures to ...` | 0 |
-| Step 6 | a 25-page `squadopt_walk_forward_paper.pdf` | 0 |
+| Step 6 | a 22-page `squadopt_walk_forward_paper.pdf` | 0 |
 | Check | `145 of 145 record checks hold`; `43 of 45 manifest rows match`, two `unpinned` | 0 |
 
 ## Inputs
