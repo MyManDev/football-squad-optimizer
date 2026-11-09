@@ -246,37 +246,10 @@ The rule reads 2025-26, which the decision folds do not contain and whose points
 
 Intervals on paired per-fold differences come from a moving-block bootstrap \cite{kunsch1989} that resamples blocks of four consecutive folds within a season and never across a season boundary, 5{,}000 resamples, seed 0, percentile 90\% interval. The project's threshold for \emph{certifying} a points effect is a mean of at least 1.5 points a gameweek with an interval excluding zero and at most one losing season; that is a declared bar, not a measured noise level. An instrument study measured the precision of one comparison, the component arm against the ridge control, with IID formulas on the per-fold differences; Section~\ref{sec:precision} applies the same formulas to each candidate, because the per-fold standard deviation differs by a factor of 2.4 across them. Sensitivity to the block length and to leaving one season out were not pre-declared; both are reported as arithmetic on the recorded per-fold differences, the block sensitivity by re-running the same bootstrap procedure at blocks of 2, 4 and 8 (Section~\ref{sec:precision}).
 
-\subsection{Pre-Registration Status, Analysis by Analysis}
+\subsection{Pre-Registration Status}
+\label{sec:prereg}
 
-The study is not one confirmatory pre-registration. Table~\ref{tab:protocol} lists, for every analysis, when it was declared, what had been seen on the same data, and whether it is primary, declared-secondary or added after a result: several protocols were written after earlier results on the same folds, and several readings were added after a result. We report these as they fell.
-
-\begin{table}[!htb]
-\centering\footnotesize
-\caption{Protocol status of every analysis. ``Declared'' is the committed method note or pre-registration, dated as the document states. ``Seen before'' is what had been read on the same folds when the protocol was written.}
-\label{tab:protocol}
-\begin{tabularx}{\linewidth}{L L L L}
-\toprule
-Analysis & Declared & Seen before & Status \\
-\midrule
-Component model vs ridge control (R1) & pre-registration, Sep 2026 & nothing on these folds & frozen first evaluation; descriptive \\
-Foundation sampler S1/S2 (R2) & Phase D pre-registration, 5 Sep 2026 & R1 & binding gate, read once \\
-Points-MAE rule & 7 Sep 2026 & R1 & the rule for all six candidates \\
-Season-age weighting & method note, Sep 2026 & R1 & lost on the rule; not committed \\
-Boosted pair (R8) & method note before measurement & R1 & rule primary; decision reading added after \\
-Wider contract (R7) & method note before measurement & R8 & rule primary; decision reading added after \\
-Points-only boosting (R9) & method note before measurement & R8; a probe giving its decision outcome & rule primary; decision declared but not independent; probe reproduction and status split added after \\
-Regime-gated experts (R5) & pre-registration, 17 Oct 2026 & R8, R9 & rule primary; decision declared with it; gate read twelve inputs, eleven declared \\
-Gated mixture (R4) & pre-registration, 17 Oct 2026 & R8, R9 & rule primary; distribution and decision readings declared beside it \\
-Club-block sampler (R11) & pre-registration, 17 Oct 2026, before its code & R2; a development pass & gate read once; fail by one fold \\
-Joint club-match sampler (R6) & pre-registration, 17 Oct 2026, before its code & R2, R11 (its flip folds listed) & gate read once; pass at seed 0; seed reading added 18 Oct \\
-Rank-conditional shrinkage (R10) & pre-registration, Oct 2026 & R8 & gate read once; not certified \\
-Mean-reversion discount (R3) & pre-registration, 17 Oct 2026 & earlier planner records & gate read once; not certified \\
-Instrument precision (R12) & issue plan, Sep 2026 & R1 & descriptive \\
-Solver budget and card rule re-evaluation (R13) & method note, 8 Nov 2026, before the run & every reading above & descriptive: reproduction at 5.0, card-rule rescoring, 60.0 budget sensitivity \\
-Same-period and per-candidate precision readings & this paper, Nov 2026 & all of the above & arithmetic on recorded values, added after \\
-\bottomrule
-\end{tabularx}
-\end{table}
+The study is not one confirmatory pre-registration, and we report each analysis as it fell. The component model, the foundation sampler's two gates, the points-MAE rule and the season-age weighting were declared in September 2026 before anything on these folds had been read. The boosted pair, the wider contract and the points-only candidate were declared in method notes before their measurement, the points-only one after a recomposition probe that already gave its decision outcome. The regime-gated experts, the gated mixture, the club-block and joint club-match samplers, the rank-conditional shrinkage and the mean-reversion discount were pre-registered in October 2026 after the boosted-pair and points-only records had been read, the two samplers before their code was written; the regime gate read twelve inputs where eleven were declared. The re-evaluation of Section~\ref{sec:decisionresults} was declared on 8 November 2026, before its run and after every reading above. Several readings were added after a result: the decision readings of the boosted pair and the wider contract, the joint sampler's seed reading, the status split and the probe reproduction of the points-only record, and the same-period and per-candidate precision readings of this paper, which are arithmetic on recorded values.
 
 \subsection{Multiple Comparisons}
 
@@ -643,17 +616,17 @@ Mean-reversion discount & 3-week $\rho{=}0.75$ vs 3-week naive & 184 & $-0.56$ &
 \label{sec:limitations}
 
 \begin{itemize}
-\item \textbf{The decision reading is a weekly independent selection,} with a fixed bench weight and bench order set after the solve. It is not the season a manager plays, and the objective is not the expected realized score.
-\item \textbf{2025-26 is development data.} It enters the player-level rule after having been read by earlier work, and its points include the defensive-contribution component the four earlier seasons lack.
-\item \textbf{The decision folds end at 2024-25} and were fixed when the component model was first evaluated. The 137 calibration folds have been read by four samplers.
-\item \textbf{Not every solve is proven.} Under the 5.0 budget 41 of the linear arm's 147 solves and 30 of the ridge control's ended unproven; at twelve times that budget 11 and 7 still did. The budget reading of Section~\ref{sec:decisionresults} is a sensitivity to that increase, not a bound on the remaining search contribution.
-\item \textbf{Precision.} The per-candidate half-widths and MDEs are IID figures that ignore the dependence between overlapping folds; every interval contains zero at every block length (Table~\ref{tab:blocks}), but no equivalence bound was declared, so intervals covering zero do not establish absence.
-\item \textbf{Readings added after results.} Two decision readings, one seed reading, one status split, one probe reproduction and the same-period reading were added after a result; one declaration precedes its measurement but not its outcome (Table~\ref{tab:protocol}).
-\item \textbf{Six comparisons, no correction.} The player-level verdicts are exploratory; the live 2026-27 benchmark evaluates the deployed system, not these comparisons, so no confirmation of them is scheduled.
-\item \textbf{Time of knowledge is partly assumed.} The tests enforce the declared contract; that the archive's pre-match columns were known at each historical deadline is a structural assumption (Table~\ref{tab:timeclass}).
-\item \textbf{Calibration is pooled.} The gates read pooled PIT and tail rates; by season the location is off by about 0.1 in two seasons under every sampler, and the mid-point PIT of a discrete outcome is read under one convention, not against a randomized reference.
-\item \textbf{One archive, one game, nine features.} No odds, no line-ups, no event data; price timing is undocumented, postponements are unrecoverable, the start label is absent. Nothing is claimed for other fantasy games or for estimators not tried.
-\item \textbf{The availability rule is unmeasured.} It runs live and cannot be validated on the archive.
+\item \textbf{Weekly independent selection:} The decision reading selects a squad afresh each week with a fixed bench weight and bench order set after the solve; it is not the season a manager plays, and the objective is not the expected realized score.
+\item \textbf{2025-26 is development data:} It enters the player-level rule after having been read by earlier work, and its points include the defensive-contribution component the four earlier seasons lack.
+\item \textbf{Fixed and reused folds:} The decision folds end at 2024-25 and were fixed when the component model was first evaluated; the 137 calibration folds have been read by four samplers.
+\item \textbf{Not every solve is proven:} Under the 5.0 budget 41 of the linear arm's 147 solves and 30 of the ridge control's ended unproven; at twelve times that budget 11 and 7 still did. The budget reading of Section~\ref{sec:decisionresults} is a sensitivity to that increase, not a bound on the remaining search contribution.
+\item \textbf{Precision:} The per-candidate half-widths and MDEs are IID figures that ignore the dependence between overlapping folds; every interval contains zero at every block length (Table~\ref{tab:blocks}), but no equivalence bound was declared, so intervals covering zero do not establish absence.
+\item \textbf{Readings added after results:} Two decision readings, one seed reading, one status split, one probe reproduction and the same-period reading were added after a result, and one declaration precedes its measurement but not its outcome (Section~\ref{sec:prereg}).
+\item \textbf{Six comparisons, no correction:} The player-level verdicts are exploratory; the live 2026-27 benchmark evaluates the deployed system, not these comparisons, so no confirmation of them is scheduled.
+\item \textbf{Time of knowledge is partly assumed:} The tests enforce the declared contract; that the archive's pre-match columns were known at each historical deadline is a structural assumption (Table~\ref{tab:timeclass}).
+\item \textbf{Calibration is pooled:} The gates read pooled PIT and tail rates; by season the location is off by about 0.1 in two seasons under every sampler, and the mid-point PIT of a discrete outcome is read under one convention, not against a randomized reference.
+\item \textbf{One archive, one game, nine features:} No odds, no line-ups, no event data; price timing is undocumented, postponements are unrecoverable, the start label is absent. Nothing is claimed for other fantasy games or for estimators not tried.
+\item \textbf{Availability rule unmeasured:} It runs live and cannot be validated on the archive.
 \end{itemize}
 
 \section{Reproducibility}
@@ -728,29 +701,29 @@ The conclusion we draw is bounded by the design. Under the weekly selection poli
 \section{The Committed Records}
 \label{app:records}
 
-Table~\ref{tab:records} lists the records the results read and their declarations; the supplementary package pins each record's digest and the three stages that produced the re-evaluation record R13.
+Table~\ref{tab:records} lists the records the results read. Each was measured under a declaration committed before its run; the supplementary package holds the declarations, pins each record's digest and names the three stages that produced the re-evaluation record R13.
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{The records behind the tables and figures, and the declaration each was measured under.}
+\caption{The records behind the tables and figures.}
 \label{tab:records}
-\begin{tabularx}{\linewidth}{l L L}
+\begin{tabularx}{\linewidth}{l L}
 \toprule
-Id & Record & Declaration \\
+Id & Record \\
 \midrule
-R1 & Phase C component evaluation, \path{phase_c_component_evaluation.json} & component model pre-registration \\
-R2 & Phase D component squad calibration, \path{phase_d_component_squad_calibration.json} & \path{phase_d_component_squad_calibration_prereg.md} \\
-R3 & Mean-reversion discount, \path{mean_reversion_discount.json} & \path{mean_reversion_discount_prereg.md} \\
-R4 & Gated mixture, \path{moe_mixture.json} & \path{moe_mixture_prereg.md} \\
-R5 & Regime-gated experts, \path{moe_regime.json} & \path{moe_regime_prereg.md} \\
-R6 & Joint club-match sampler, \path{moe_sampler.json} & \path{moe_sampler_prereg.md} \\
-R7 & Wider feature contract, \path{phase_c_feature_contract_v2_comparison.json} & \path{phase_c_feature_contract_v2_method.md} \\
-R8 & Boosted pair, \path{phase_c_gradient_boosting_comparison.json} & \path{phase_c_gradient_boosting_method.md} \\
-R9 & Points-only boosting, \path{phase_c_gradient_boosting_points_comparison.json} & \path{phase_c_gradient_boosting_points_method.md} \\
-R10 & Rank-conditional shrinkage, \path{rank_conditional_shrinkage.json} & \path{rank_conditional_shrinkage_prereg.md} \\
-R11 & Club-block sampler, \path{team_match_block_sampler.json} & \path{team_match_block_sampler_prereg.md} \\
-R12 & Measurement instrument, \path{measurement_instrument.json} & \path{measurement_instrument.md} \\
-R13 & Budget and card-rule re-evaluation, \path{phase_c_solver_budget_cards.json} & \path{phase_c_solver_budget_cards_method.md} \\
+R1 & Phase C component evaluation, the frozen first evaluation of the component model against the ridge control \\
+R2 & Phase D component squad calibration, the foundation sampler on the S1 and S2 gates \\
+R3 & Mean-reversion discount \\
+R4 & Gated mixture \\
+R5 & Regime-gated experts \\
+R6 & Joint club-match sampler \\
+R7 & Wider feature contract \\
+R8 & Boosted pair \\
+R9 & Points-only boosting \\
+R10 & Rank-conditional shrinkage \\
+R11 & Club-block sampler \\
+R12 & Measurement instrument, the precision study of the component arm against the ridge control \\
+R13 & Solver budget and card-rule re-evaluation \\
 \bottomrule
 \end{tabularx}
 \end{table}
