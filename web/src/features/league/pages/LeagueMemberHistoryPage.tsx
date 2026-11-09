@@ -1,12 +1,15 @@
 import { memberAddress } from "../../../lib/leagueAddresses";
 import { useLeague, useLeagueId } from "../useLeague";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
+import { useShellLayout } from "../../../design/shell/layout";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
+import { RowDetailsFigures, RowDetailsToggle } from "../components/RowDetails";
+import { useOpenRows } from "../components/useOpenRows";
 import { LeagueDataMissing } from "../dataErrors";
 import type { SuggestionHistory, WeekReview } from "../history/historyData";
 import styles from "./LeagueMemberHistoryPage.module.css";
@@ -98,6 +101,11 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
   );
 }
 
+/**
+ * On a phone the table keeps the week and the two net scores on the screen, with no sideways
+ * scroll; each week's two differences fold out under its row, and the footer carries the
+ * season's difference under its label.
+ */
 function HistoryOverview({
   weeks,
   onSelect,
@@ -111,58 +119,110 @@ function HistoryOverview({
   const format = (value: number | null | undefined) =>
     value == null ? "—" : points(value, 1, locale);
   const signed = (value: number | null) => (value === null ? "—" : signedPoints(value, 1, locale));
+  const phone = useShellLayout() === "phone";
+  const fold = useOpenRows();
+  const details = messages.leagueMembers.storyDetail;
   return (
     <Card title={copy.overview}>
       <div className={styles.overviewScroll} tabIndex={0} role="region" aria-label={copy.overview}>
         <table className={styles.overviewTable}>
           <thead>
             <tr>
-              {[
-                copy.week,
-                copy.systemNet,
-                copy.memberNet,
-                copy.weekDifference,
-                copy.cumulative,
-              ].map((label) => (
+              {(phone
+                ? [copy.week, copy.systemNet, copy.memberNet]
+                : [copy.week, copy.systemNet, copy.memberNet, copy.weekDifference, copy.cumulative]
+              ).map((label) => (
                 <th key={label} scope="col">
                   {label}
                 </th>
               ))}
+              {phone ? (
+                <th scope="col">
+                  <span className="visually-hidden">{details}</span>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
-            {summary.rows.map(({ week, cumulative }) => (
-              <tr key={week.gameweek}>
-                <th scope="row">
-                  <button
-                    type="button"
-                    className={styles.weekLink}
-                    onClick={() => onSelect(week.gameweek)}
-                    aria-label={`${messages.common.gameweekShort(week.gameweek)}, ${copy.gameweek(week.gameweek)}`}
-                  >
-                    {messages.common.gameweekShort(week.gameweek)}
-                  </button>
-                  {week.status === "unsettled" && (
-                    <span className={styles.rowStatus}>{copy.unsettled}</span>
-                  )}
-                  {week.advice_source === "requested_server" && (
-                    <span className={styles.rowStatus}>{copy.requested}</span>
-                  )}
-                </th>
-                <td>{format(week.status === "available" ? week.suggested?.net_points : null)}</td>
-                <td>{format(week.status === "available" ? week.actual?.net_points : null)}</td>
-                <td>{signed(week.status === "available" ? week.net_difference : null)}</td>
-                <td>{signed(cumulative)}</td>
-              </tr>
-            ))}
+            {summary.rows.map(({ week, cumulative }) => {
+              const open = phone && fold.isOpen(week.gameweek);
+              const detailsId = `history-week-${week.gameweek}-details`;
+              const difference = signed(week.status === "available" ? week.net_difference : null);
+              return (
+                <Fragment key={week.gameweek}>
+                  <tr>
+                    <th scope="row">
+                      <button
+                        type="button"
+                        className={styles.weekLink}
+                        onClick={() => onSelect(week.gameweek)}
+                        aria-label={`${messages.common.gameweekShort(week.gameweek)}, ${copy.gameweek(week.gameweek)}`}
+                      >
+                        {messages.common.gameweekShort(week.gameweek)}
+                      </button>
+                      {week.status === "unsettled" && (
+                        <span className={styles.rowStatus}>{copy.unsettled}</span>
+                      )}
+                      {week.advice_source === "requested_server" && (
+                        <span className={styles.rowStatus}>{copy.requested}</span>
+                      )}
+                    </th>
+                    <td>
+                      {format(week.status === "available" ? week.suggested?.net_points : null)}
+                    </td>
+                    <td>{format(week.status === "available" ? week.actual?.net_points : null)}</td>
+                    {phone ? (
+                      <td className={styles.detailsCell}>
+                        <RowDetailsToggle
+                          open={open}
+                          controls={detailsId}
+                          label={`${details}, ${copy.gameweek(week.gameweek)}`}
+                          onToggle={() => fold.toggle(week.gameweek)}
+                        />
+                      </td>
+                    ) : (
+                      <>
+                        <td>{difference}</td>
+                        <td>{signed(cumulative)}</td>
+                      </>
+                    )}
+                  </tr>
+                  {open ? (
+                    <tr id={detailsId} className={styles.detailRow}>
+                      <td colSpan={4}>
+                        <RowDetailsFigures
+                          figures={[
+                            { label: copy.weekDifference, value: difference },
+                            { label: copy.cumulative, value: signed(cumulative) },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr>
-              <th scope="row">{copy.total}</th>
+              <th scope="row">
+                {copy.total}
+                {phone ? (
+                  <span className={styles.rowStatus}>
+                    {copy.difference}: {signed(summary.difference)}
+                  </span>
+                ) : null}
+              </th>
               <td>{format(summary.suggested)}</td>
               <td>{format(summary.actual)}</td>
-              <td>{signed(summary.difference)}</td>
-              <td>{signed(summary.difference)}</td>
+              {phone ? (
+                <td />
+              ) : (
+                <>
+                  <td>{signed(summary.difference)}</td>
+                  <td>{signed(summary.difference)}</td>
+                </>
+              )}
             </tr>
           </tfoot>
         </table>

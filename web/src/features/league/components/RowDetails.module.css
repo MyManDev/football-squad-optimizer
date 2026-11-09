@@ -1,0 +1,50 @@
+/* A phone thumb's target in a table cell: 44 px each way, no fill of its own, so the row's
+   own colour (the viewer's mark among them) shows through. */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+  border-radius: var(--radius-s);
+}
+
+/* The chevron points along the row while it is closed and down once it is open. */
+.icon {
+  transition: transform var(--motion-ui) var(--motion-ease);
+}
+
+.toggle[aria-expanded="true"] .icon {
+  transform: rotate(90deg);
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.figures dt {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.figures dd {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--step-0);
+  font-weight: 500;
+  line-height: 20px;
+}

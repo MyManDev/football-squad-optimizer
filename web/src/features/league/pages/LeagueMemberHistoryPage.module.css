@@ -152,6 +152,57 @@
   font-size: var(--step--1);
   font-weight: 400;
 }
+/* A phone keeps the week and the two net scores on the screen and folds the differences
+   under the row, so the table fits and nothing slides under the week column. The header and
+   the footer stay pinned to the box's own vertical scroll. */
+@media (max-width: 599.98px) {
+  .overviewTable {
+    min-width: 0;
+    table-layout: fixed;
+  }
+  .overviewTable th,
+  .overviewTable td {
+    padding: var(--space-2);
+  }
+  .overviewTable th:first-child {
+    min-width: 0;
+    max-width: none;
+  }
+  .overviewTable tbody th:first-child {
+    position: static;
+    background: none;
+  }
+  .overviewTable thead th {
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+  .overviewTable thead th:nth-child(2),
+  .overviewTable thead th:nth-child(3) {
+    width: 30%;
+  }
+  .overviewTable thead th:last-child {
+    width: 44px;
+    padding-inline: 0;
+    /* Its one word is hidden; right-aligned, that 1 px box would stand past the table's edge. */
+    text-align: left;
+  }
+  .overviewTable td.detailsCell {
+    padding: 0;
+  }
+  /* An open row and its figures read as one row. */
+  .overviewTable tbody tr:has(+ .detailRow) > * {
+    border-bottom: 0;
+  }
+  .overviewTable .detailRow td {
+    padding: 0 var(--space-2) var(--space-3);
+    text-align: left;
+  }
+  .weekLink {
+    min-width: 44px;
+    min-height: 44px;
+    text-align: left;
+  }
+}
 @media (max-width: 600px) {
   .scores {
     font-size: var(--step--1);

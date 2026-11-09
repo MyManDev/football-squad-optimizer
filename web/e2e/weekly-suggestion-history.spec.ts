@@ -207,7 +207,9 @@ test("overview accumulates weeks, preserves totals while scrolling and opens wee
   await overview.evaluate((element) => {
     element.scrollLeft = element.scrollWidth;
   });
-  await expect(overview.getByRole("button", { name: "Oyun haftası 4" })).toBeInViewport();
+  await expect(
+    overview.getByRole("button", { name: "OH4, Oyun haftası 4", exact: true }),
+  ).toBeInViewport();
   expect(
     await page.locator("main").evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
