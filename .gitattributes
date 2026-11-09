@@ -17,3 +17,10 @@ data/sources/vaastav_fpl_manifest.json text eol=lf
 # what ran (#997), and the record and the protocols name their sha256. Most of them hold CRLF and
 # one holds LF; no checkout may convert either.
 docs/research/football_role_followups_2026_10_03/** -text
+
+# Images and fonts under the web app are bytes, whatever the text rule above says for its sources.
+web/**/*.png binary
+web/**/*.jpg binary
+web/**/*.ico binary
+web/**/*.woff binary
+web/**/*.woff2 binary
