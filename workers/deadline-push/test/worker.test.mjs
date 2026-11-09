@@ -214,7 +214,7 @@ describe("a scheduled run", () => {
     assert.deepEqual(lines.at(-1), { event: "run_failed", error: "Error: VAPID private key is not 32 bytes" });
     await run(undefined);
     assert.deepEqual(lines.at(-1), { event: "run_failed", error: "Error: VAPID private key is missing" });
-    // The key is read before the fixture list, so a bad secret shows ten minutes outside the window.
+    // The key is read before the fixture list, so a bad secret shows on any run, far from a deadline.
     assert.deepEqual(upstream.calls, []);
     await run(env.VAPID_PRIVATE_KEY);
     assert.deepEqual(lines.at(-1), { event: "reminded", gameweek: null, sent: 0, gone: 0, failed: 0 });
