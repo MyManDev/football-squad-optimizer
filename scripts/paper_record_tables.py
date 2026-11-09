@@ -1751,14 +1751,19 @@ BUDGET_PAIRS = (
 
 
 def solver_budget_table(records: Records) -> tuple[Table, list[Check]]:
-    """The solver-budget record at the measurement budget: per re-evaluated table, how many of
-    the recorded fold scores the rerun reproduced when cards are ignored, the solver statuses of
-    the folds that differ and of the rerun, and how many folds the official card rule moved;
-    per pair, the paired reading under the official rule and the squad overlap.
+    """The solver-budget record: per re-evaluated table, how many of the recorded fold scores the
+    rerun at the measurement budget reproduced when cards are ignored, the solver statuses of the
+    folds that differ and of each rerun at each budget present, how many folds the official card
+    rule moved; per table and arm, what the second budget changed against the first (squads,
+    starting elevens, captains, objective, the gap to the bound the first budget left, realized
+    score); per pair, the paired reading under the official rule and the squad overlap at each
+    budget.
 
-    Checks: the reproduced and differing folds of each table add up to the folds compared, and
-    a pair whose two tables the card rule left untouched has the same paired mean under both
-    scoring conventions.
+    Checks: the reproduced and differing folds of each table add up to the folds compared; at
+    the second budget each arm's proven count in the budget block equals the one in its arm
+    summary, and the budget block's mean score change times its folds equals the difference of
+    the two arm means; a pair whose two tables the card rule left untouched has the same paired
+    mean under both scoring conventions at each budget.
     """
 
     columns = (
@@ -1782,59 +1787,51 @@ def solver_budget_table(records: Records) -> tuple[Table, list[Check]]:
         "identical_squad_folds",
         "tied_folds",
         "tied_identical_squads",
+        "squad_changed",
+        "xi_changed",
+        "captain_changed",
+        "objective_gain_mean",
+        "objective_gain_max",
+        "gap_to_bound_mean",
+        "gap_to_bound_max",
+        "score_change_folds",
+        "score_change_mean",
+        "proven_both",
+        "proven_both_squad_changed",
     )
     at = partial(records.cell, SOLVER_BUDGET)
-    budget = str(at("/budgets_present/0").value)
+    budgets = [str(value) for value in at("/budgets_present").value]
+    base = budgets[0]
+    second = budgets[1] if len(budgets) > 1 else None
+
+    def count(pointer: str, status: str) -> Cell:
+        cell = records.optional(SOLVER_BUDGET, f"{pointer}/{status}")
+        return cell or Cell(0, SOLVER_BUDGET, f"{DERIVED}no {status} key under {pointer}")
+
+    def maybe(pointer: str, absent: str) -> Cell:
+        cell = records.optional(SOLVER_BUDGET, pointer)
+        if cell is None or cell.value is None:
+            return Cell("", SOLVER_BUDGET, f"{DERIVED}{absent}")
+        return cell
+
     rows: list[dict[str, Cell]] = []
     checks: list[Check] = []
-    changed: dict[str, int] = {}
+    changed: dict[tuple[str, str], int] = {}
+    arms = (("candidate", "{label}"), ("ridge_control", "ridge control beside the {label}"))
     for name, label in BUDGET_TABLES:
         block = f"/reproduction_at_5_0/{name}"
         compared = int(at(f"{block}/folds_compared").value)
         reproduced = int(at(f"{block}/folds_reproduced").value)
         differing = len(records.keys(SOLVER_BUDGET, f"{block}/folds_differing"))
-        feasible_differing = records.optional(
-            SOLVER_BUDGET, f"{block}/differing_rerun_statuses/FEASIBLE"
-        )
-        cards = at(f"/card_rule/{name}_b{budget}/folds_changed_by_the_card_rule")
-        changed[name] = int(cards.value)
         rows.append(
             {
                 "comparison": _label(label),
-                "scope": _label(f"rerun at deterministic budget {budget} against its record"),
+                "scope": _label(f"rerun at deterministic budget {base} against its record"),
                 "folds": at(f"{block}/folds_compared"),
                 "reproduced": at(f"{block}/folds_reproduced"),
-                "differing_feasible": (
-                    feasible_differing
-                    if feasible_differing is not None
-                    else Cell(
-                        0,
-                        SOLVER_BUDGET,
-                        f"{DERIVED}no FEASIBLE key under {block}/differing_rerun_statuses",
-                    )
-                ),
+                "differing_feasible": count(f"{block}/differing_rerun_statuses", "FEASIBLE"),
                 "optimal": at(f"{block}/rerun_statuses/OPTIMAL"),
-                "feasible": (
-                    records.optional(SOLVER_BUDGET, f"{block}/rerun_statuses/FEASIBLE")
-                    or Cell(
-                        0, SOLVER_BUDGET, f"{DERIVED}no FEASIBLE key under {block}/rerun_statuses"
-                    )
-                ),
-                "card_rule_folds_changed": cards,
-            }
-        )
-        control = f"/arms/{name}_b{budget}/ridge_control"
-        rows.append(
-            {
-                "comparison": _label(f"ridge control beside the {label}"),
-                "scope": _label(f"rerun at deterministic budget {budget}"),
-                "folds": at(f"{control}/folds"),
-                "optimal": at(f"{control}/statuses/OPTIMAL"),
-                "feasible": (
-                    records.optional(SOLVER_BUDGET, f"{control}/statuses/FEASIBLE")
-                    or Cell(0, SOLVER_BUDGET, f"{DERIVED}no FEASIBLE key under {control}/statuses")
-                ),
-                "mean": at(f"{control}/mean_realized_score"),
+                "feasible": count(f"{block}/rerun_statuses", "FEASIBLE"),
             }
         )
         checks.append(
@@ -1847,52 +1844,143 @@ def solver_budget_table(records: Records) -> tuple[Table, list[Check]]:
                 compared == reproduced + differing,
             )
         )
+        for budget in budgets:
+            cards = at(f"/card_rule/{name}_b{budget}/folds_changed_by_the_card_rule")
+            changed[(name, budget)] = int(cards.value)
+            for arm, pattern in arms:
+                summary = f"/arms/{name}_b{budget}/{arm}"
+                rows.append(
+                    {
+                        "comparison": _label(pattern.format(label=label)),
+                        "scope": _label(f"rerun at deterministic budget {budget}"),
+                        "folds": at(f"{summary}/folds"),
+                        "optimal": at(f"{summary}/statuses/OPTIMAL"),
+                        "feasible": count(f"{summary}/statuses", "FEASIBLE"),
+                        "card_rule_folds_changed": cards
+                        if arm == "candidate"
+                        else at(
+                            f"/card_rule/{name}_b{budget}/ridge_control"
+                            "/folds_changed_by_the_card_rule"
+                        ),
+                        "mean": at(f"{summary}/mean_realized_score"),
+                    }
+                )
+        if second is None:
+            continue
+        for arm, pattern in arms:
+            budget_block = f"/budget/{name}/{arm}"
+            summary_low = f"/arms/{name}_b{base}/{arm}"
+            summary_high = f"/arms/{name}_b{second}/{arm}"
+            folds = int(at(f"{budget_block}/folds").value)
+            rows.append(
+                {
+                    "comparison": _label(pattern.format(label=label)),
+                    "scope": _label(f"from deterministic budget {base} to {second}"),
+                    "folds": at(f"{budget_block}/folds"),
+                    "optimal": at(f"{budget_block}/status_counts_high/OPTIMAL"),
+                    "feasible": count(f"{budget_block}/status_counts_high", "FEASIBLE"),
+                    "squad_changed": at(f"{budget_block}/squad_changed_folds"),
+                    "xi_changed": at(f"{budget_block}/starting_xi_changed_folds"),
+                    "captain_changed": at(f"{budget_block}/captain_changed_folds"),
+                    "objective_gain_mean": maybe(
+                        f"{budget_block}/objective_gain_mean", "no fold with both objectives"
+                    ),
+                    "objective_gain_max": maybe(
+                        f"{budget_block}/objective_gain_max", "no fold with both objectives"
+                    ),
+                    "gap_to_bound_mean": maybe(
+                        f"{budget_block}/low_budget_feasible_gap_to_bound_mean",
+                        f"no unproven fold at budget {base}",
+                    ),
+                    "gap_to_bound_max": maybe(
+                        f"{budget_block}/low_budget_feasible_gap_to_bound_max",
+                        f"no unproven fold at budget {base}",
+                    ),
+                    "score_change_folds": at(f"{budget_block}/realized_score_change_folds"),
+                    "score_change_mean": at(f"{budget_block}/realized_score_change_mean"),
+                    "proven_both": at(f"{budget_block}/proven_at_both_budgets_folds"),
+                    "proven_both_squad_changed": at(
+                        f"{budget_block}/proven_at_both_budgets_squad_changed_folds"
+                    ),
+                }
+            )
+            proven_block = int(at(f"{budget_block}/status_counts_high/OPTIMAL").value)
+            proven_summary = int(at(f"{summary_high}/statuses/OPTIMAL").value)
+            checks.append(
+                Check(
+                    f"{name}/{arm}: the proven count at budget {second} is the same in the budget "
+                    "block and the arm summary",
+                    SOLVER_BUDGET,
+                    f"{budget_block}/status_counts_high/OPTIMAL",
+                    proven_block,
+                    proven_summary,
+                    proven_block == proven_summary,
+                )
+            )
+            change_sum = float(at(f"{budget_block}/realized_score_change_mean").value) * folds
+            mean_difference = (
+                float(at(f"{summary_high}/mean_realized_score").value)
+                - float(at(f"{summary_low}/mean_realized_score").value)
+            ) * folds
+            checks.append(
+                Check(
+                    f"{name}/{arm}: the mean score change from budget {base} to {second} times "
+                    "the folds equals the difference of the two arm means times the folds",
+                    SOLVER_BUDGET,
+                    f"{budget_block}/realized_score_change_mean",
+                    round(change_sum, 6),
+                    round(mean_difference, 6),
+                    abs(change_sum - mean_difference) < 1e-6,
+                )
+            )
     tables_of = {
         "boosted_pair_vs_linear": ("gbm_v1_dec", "linear_dec"),
         "wider_contract_vs_boosted_pair": ("gbm_v2_dec", "gbm_v1_dec"),
     }
     for pair, label in BUDGET_PAIRS:
-        official = f"/pairs/{pair}/budget_{budget}_official_card_rule"
-        ignoring = f"/pairs/{pair}/budget_{budget}_ignoring_cards"
-        overlap = f"/pairs/{pair}/budget_{budget}_overlap"
-        rows.append(
-            {
-                "comparison": _label(label),
-                "scope": _label(f"paired at deterministic budget {budget}, official card rule"),
-                "folds": at(f"{official}/paired_folds"),
-                "mean": at(f"{official}/mean"),
-                "interval_low": at(f"{official}/interval_90/0"),
-                "interval_high": at(f"{official}/interval_90/1"),
-                "wins": at(f"{official}/wins_ties_losses/0"),
-                "ties": at(f"{official}/wins_ties_losses/1"),
-                "losses": at(f"{official}/wins_ties_losses/2"),
-                "shared_squad_of_15": at(f"{overlap}/mean_shared_squad_members_of_15"),
-                "shared_starters_of_11": at(f"{overlap}/mean_shared_starters_of_11"),
-                "same_captain_folds": at(f"{overlap}/same_captain_folds"),
-                "identical_squad_folds": at(f"{overlap}/identical_squad_folds"),
-                "tied_folds": at(f"{overlap}/tied_folds"),
-                "tied_identical_squads": at(f"{overlap}/tied_folds_with_identical_squads"),
-            }
-        )
-        untouched = all(changed[name] == 0 for name in tables_of[pair])
-        same_mean = float(at(f"{official}/mean").value) == float(at(f"{ignoring}/mean").value)
-        checks.append(
-            Check(
-                f"{pair}: with no fold moved by the card rule the paired mean is the same under "
-                "both scoring conventions",
-                SOLVER_BUDGET,
-                f"{official}/mean",
-                at(f"{official}/mean").value,
-                at(f"{ignoring}/mean").value,
-                same_mean if untouched else True,
+        for budget in budgets:
+            official = f"/pairs/{pair}/budget_{budget}_official_card_rule"
+            ignoring = f"/pairs/{pair}/budget_{budget}_ignoring_cards"
+            overlap = f"/pairs/{pair}/budget_{budget}_overlap"
+            rows.append(
+                {
+                    "comparison": _label(label),
+                    "scope": _label(f"paired at deterministic budget {budget}, official card rule"),
+                    "folds": at(f"{official}/paired_folds"),
+                    "mean": at(f"{official}/mean"),
+                    "interval_low": at(f"{official}/interval_90/0"),
+                    "interval_high": at(f"{official}/interval_90/1"),
+                    "wins": at(f"{official}/wins_ties_losses/0"),
+                    "ties": at(f"{official}/wins_ties_losses/1"),
+                    "losses": at(f"{official}/wins_ties_losses/2"),
+                    "shared_squad_of_15": at(f"{overlap}/mean_shared_squad_members_of_15"),
+                    "shared_starters_of_11": at(f"{overlap}/mean_shared_starters_of_11"),
+                    "same_captain_folds": at(f"{overlap}/same_captain_folds"),
+                    "identical_squad_folds": at(f"{overlap}/identical_squad_folds"),
+                    "tied_folds": at(f"{overlap}/tied_folds"),
+                    "tied_identical_squads": at(f"{overlap}/tied_folds_with_identical_squads"),
+                }
             )
-        )
+            untouched = all(changed[(name, budget)] == 0 for name in tables_of[pair])
+            same_mean = float(at(f"{official}/mean").value) == float(at(f"{ignoring}/mean").value)
+            checks.append(
+                Check(
+                    f"{pair} at budget {budget}: with no fold moved by the card rule the paired "
+                    "mean is the same under both scoring conventions",
+                    SOLVER_BUDGET,
+                    f"{official}/mean",
+                    at(f"{official}/mean").value,
+                    at(f"{ignoring}/mean").value,
+                    same_mean if untouched else True,
+                )
+            )
     table = Table(
         "table_solver_budget_cards",
-        "The solver-budget record at the measurement budget: each re-evaluated table against its "
-        "record (fold scores reproduced with cards ignored, the solver statuses of the differing "
-        "folds and of the rerun, folds the official card rule moved) and each paired reading "
-        "under the official rule with its squad overlap",
+        "The solver-budget record: each re-evaluated table against its record (fold scores "
+        "reproduced with cards ignored, the solver statuses of the differing folds), each arm's "
+        "statuses, mean score and folds the official card rule moved at each budget, what the "
+        "second budget changed against the first per arm, and each paired reading under the "
+        "official rule with its squad overlap at each budget",
         columns,
         rows,
     )

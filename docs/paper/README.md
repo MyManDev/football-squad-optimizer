@@ -27,10 +27,10 @@
 
 | Command | Prints | Exit |
 | --- | --- | --- |
-| Step 3 | `96 of 96 record checks hold` | 0 |
+| Step 3 | `110 of 110 record checks hold` | 0 |
 | Step 4 | `Wrote 5 paper figures to ...` | 0 |
-| Step 6 | a 28-page `squadopt_walk_forward_paper.pdf` | 0 |
-| Check | `96 of 96 record checks hold`; `41 of 43 manifest rows match`, two `unpinned` | 0 |
+| Step 6 | a 29-page `squadopt_walk_forward_paper.pdf` | 0 |
+| Check | `110 of 110 record checks hold`; `41 of 43 manifest rows match`, two `unpinned` | 0 |
 
 ## Inputs
 

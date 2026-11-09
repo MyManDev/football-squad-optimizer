@@ -411,18 +411,56 @@ def _solver_budget_record() -> dict[str, Any]:
         "tied_folds_with_identical_squads": 1,
     }
     differing = {"2021-22-gw03": {"recorded": 50.0, "rerun_ignoring_cards": 48.0}}
-    control = {
-        "folds": 3,
-        "statuses": {"OPTIMAL": 2, "FEASIBLE": 1},
-        "mean_realized_score": 50.0,
-        "mean_realized_score_ignoring_cards": 50.0,
-    }
+    names = ("linear_dec", "gbm_v1_dec", "gbm_v2_dec")
+
+    def arm(statuses: dict[str, int], mean: float) -> dict[str, Any]:
+        return {
+            "folds": 3,
+            "statuses": statuses,
+            "mean_realized_score": mean,
+            "mean_realized_score_ignoring_cards": mean,
+        }
+
+    def budget(squads: int, change: float, gap: float | None) -> dict[str, Any]:
+        return {
+            "folds": 3,
+            "status_counts_low": {"OPTIMAL": 2, "FEASIBLE": 1},
+            "status_counts_high": {"OPTIMAL": 3},
+            "proven_at_both_budgets_folds": 2,
+            "proven_at_both_budgets_squad_changed_folds": 0,
+            "squad_changed_folds": squads,
+            "starting_xi_changed_folds": squads,
+            "captain_changed_folds": 0,
+            "objective_gain_mean": 0.01,
+            "objective_gain_max": 0.3,
+            "low_budget_feasible_gap_to_bound_mean": gap,
+            "low_budget_feasible_gap_to_bound_max": gap,
+            "realized_score_change_folds": squads,
+            "realized_score_change_mean": change,
+            "mean_realized_score_low": 50.0,
+            "mean_realized_score_high": 50.0 + change,
+        }
+
+    control_low = arm({"OPTIMAL": 2, "FEASIBLE": 1}, 50.0)
     return {
-        "budgets_present": ["5.0"],
-        "budgets_absent": ["60.0"],
+        "budgets_present": ["5.0", "60.0"],
+        "budgets_absent": [],
         "arms": {
-            f"{name}_b5.0": {"candidate": control, "ridge_control": control}
-            for name in ("linear_dec", "gbm_v1_dec", "gbm_v2_dec")
+            **{
+                f"{name}_b5.0": {"candidate": control_low, "ridge_control": control_low}
+                for name in names
+            },
+            **{
+                f"{name}_b60.0": {
+                    "candidate": arm({"OPTIMAL": 3}, 49.0),
+                    "ridge_control": arm({"OPTIMAL": 3}, 50.0),
+                }
+                for name in names
+            },
+        },
+        "budget": {
+            name: {"candidate": budget(1, -1.0, 5.0), "ridge_control": budget(0, 0.0, None)}
+            for name in names
         },
         "reproduction_at_5_0": {
             "linear_dec": reproduction(differing, {"OPTIMAL": 2, "FEASIBLE": 1}),
@@ -430,19 +468,29 @@ def _solver_budget_record() -> dict[str, Any]:
             "gbm_v2_dec": reproduction({}, {"OPTIMAL": 3}),
         },
         "card_rule": {
-            f"{name}_b5.0": {"folds_changed_by_the_card_rule": 0}
-            for name in ("linear_dec", "gbm_v1_dec", "gbm_v2_dec")
+            f"{name}_b{budget}": {
+                "folds_changed_by_the_card_rule": 0,
+                "ridge_control": {"folds_changed_by_the_card_rule": 0},
+            }
+            for name in names
+            for budget in ("5.0", "60.0")
         },
         "pairs": {
             "boosted_pair_vs_linear": {
                 "budget_5.0_official_card_rule": paired(-0.5),
                 "budget_5.0_ignoring_cards": paired(-0.5),
                 "budget_5.0_overlap": overlap,
+                "budget_60.0_official_card_rule": paired(-0.25),
+                "budget_60.0_ignoring_cards": paired(-0.25),
+                "budget_60.0_overlap": overlap,
             },
             "wider_contract_vs_boosted_pair": {
                 "budget_5.0_official_card_rule": paired(0.25),
                 "budget_5.0_ignoring_cards": paired(0.25),
                 "budget_5.0_overlap": overlap,
+                "budget_60.0_official_card_rule": paired(0.25),
+                "budget_60.0_ignoring_cards": paired(0.25),
+                "budget_60.0_overlap": overlap,
             },
         },
     }
@@ -781,33 +829,68 @@ def test_the_solver_budget_table_reads_each_rerun_and_pair_and_checks_them(
     code, output = _run(root)
 
     assert code == 0
-    rows = {row["comparison"]: row for row in _read_csv(output / "table_solver_budget_cards.csv")}
-    linear = rows["linear components"]
+    rows = {
+        (row["comparison"], row["scope"]): row
+        for row in _read_csv(output / "table_solver_budget_cards.csv")
+    }
+    linear = rows[("linear components", "rerun at deterministic budget 5.0 against its record")]
     assert (linear["folds"], linear["reproduced"], linear["differing_feasible"]) == ("3", "2", "1")
-    assert (linear["optimal"], linear["feasible"], linear["card_rule_folds_changed"]) == (
+    assert (linear["optimal"], linear["feasible"]) == ("2", "1")
+    at_5 = rows[("linear components", "rerun at deterministic budget 5.0")]
+    assert (at_5["optimal"], at_5["feasible"], at_5["card_rule_folds_changed"], at_5["mean"]) == (
         "2",
         "1",
         "0",
+        "50.0",
     )
-    boosted = rows["boosted pair (v1 features)"]
+    at_60 = rows[("linear components", "rerun at deterministic budget 60.0")]
+    assert (at_60["optimal"], at_60["feasible"], at_60["mean"]) == ("3", "0", "49.0")
+    boosted = rows[
+        ("boosted pair (v1 features)", "rerun at deterministic budget 5.0 against its record")
+    ]
     assert (boosted["reproduced"], boosted["differing_feasible"], boosted["feasible"]) == (
         "3",
         "0",
         "0",
     )
-    control = rows["ridge control beside the linear components"]
+    control = rows[
+        ("ridge control beside the linear components", "rerun at deterministic budget 5.0")
+    ]
     assert (control["optimal"], control["feasible"], control["mean"]) == ("2", "1", "50.0")
-    pair = rows["wider contract minus boosted pair"]
+    moved = rows[("linear components", "from deterministic budget 5.0 to 60.0")]
+    assert (moved["squad_changed"], moved["score_change_mean"], moved["gap_to_bound_mean"]) == (
+        "1",
+        "-1.0",
+        "5.0",
+    )
+    assert (moved["proven_both"], moved["proven_both_squad_changed"]) == ("2", "0")
+    still = rows[
+        ("ridge control beside the linear components", "from deterministic budget 5.0 to 60.0")
+    ]
+    assert (still["squad_changed"], still["gap_to_bound_mean"]) == ("0", "")
+    pair = rows[
+        (
+            "wider contract minus boosted pair",
+            "paired at deterministic budget 5.0, official card rule",
+        )
+    ]
     assert (pair["mean"], pair["wins"], pair["ties"], pair["losses"]) == ("0.25", "1", "1", "1")
     assert (pair["shared_squad_of_15"], pair["tied_folds"], pair["tied_identical_squads"]) == (
         "6.0",
         "1",
         "1",
     )
+    later = rows[
+        (
+            "boosted pair minus linear components",
+            "paired at deterministic budget 60.0, official card rule",
+        )
+    ]
+    assert later["mean"] == "-0.25"
     checks = [
         row for row in _read_csv(output / "checks.csv") if row["record"] == tables.SOLVER_BUDGET
     ]
-    assert len(checks) == 5
+    assert len(checks) == 19
     assert all(check["holds"] == "true" for check in checks)
 
 
@@ -827,8 +910,9 @@ def test_a_card_rule_that_moved_a_fold_but_not_the_mean_still_holds_and_a_moved_
         for row in _read_csv(output / "checks.csv")
         if row["record"] == tables.SOLVER_BUDGET and row["holds"] == "false"
     ]
-    assert [row["check"][: len("boosted_pair_vs_linear")] for row in failing] == [
-        "boosted_pair_vs_linear"
+    assert [row["check"] for row in failing] == [
+        "boosted_pair_vs_linear at budget 5.0: with no fold moved by the card rule the paired "
+        "mean is the same under both scoring conventions"
     ]
 
 
