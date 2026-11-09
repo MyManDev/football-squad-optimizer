@@ -5,6 +5,8 @@
  */
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { LanguageProvider } from "../i18n/LanguageProvider";
@@ -13,6 +15,7 @@ import {
   COLOUR_SCHEME_KEY,
   currentColourScheme,
   DARK_SCHEME_QUERY,
+  THEME_COLOURS,
 } from "./colourScheme";
 import { ThemeToggle } from "./components/ThemeToggle";
 
@@ -64,6 +67,37 @@ const pressed = () =>
     .map((button) => button.getAttribute("aria-label"));
 
 describe("the colour scheme", () => {
+  it("names each palette's background as tokens.css paints it", () => {
+    const css = readFileSync(resolve("src/design/tokens.css"), "utf8");
+    const light = css.match(/:root\s*\{[^}]*--color-bg:\s*(#[0-9a-f]{6})/i)?.[1];
+    const dark = css
+      .slice(css.indexOf(':root[data-theme="dark"]'))
+      .match(/--color-bg:\s*(#[0-9a-f]{6})/i)?.[1];
+    expect(THEME_COLOURS).toEqual({ light, dark });
+  });
+
+  it("paints the browser's own bars with the palette on screen", async () => {
+    const meta = document.createElement("meta");
+    meta.name = "theme-color";
+    document.head.append(meta);
+    try {
+      applyStoredColourScheme();
+      expect(meta.content).toBe(THEME_COLOURS.light);
+      const user = userEvent.setup();
+      toggle();
+      act(() => systemPrefers(true));
+      expect(meta.content).toBe(THEME_COLOURS.dark);
+      await user.click(screen.getByRole("button", { name: "Gündüz" }));
+      expect(meta.content).toBe(THEME_COLOURS.light);
+      // The viewer's choice holds against the system here too.
+      act(() => systemPrefers(false));
+      act(() => systemPrefers(true));
+      expect(meta.content).toBe(THEME_COLOURS.light);
+    } finally {
+      meta.remove();
+    }
+  });
+
   it("follows the system until the viewer chooses, storing nothing", () => {
     expect(currentColourScheme()).toBe("light");
     systemPrefers(true);
