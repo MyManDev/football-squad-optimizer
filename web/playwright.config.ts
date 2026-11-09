@@ -1,6 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { refuseMismatchedBuild } from "./e2e/buildOrigin";
 import { rememberedLeague } from "./e2e/leagueState";
+
+refuseMismatchedBuild();
 
 const baseURL = "http://127.0.0.1:4173";
 
