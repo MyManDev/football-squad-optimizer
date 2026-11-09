@@ -162,8 +162,10 @@ for (const width of [390, 820, 1179]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/league/352490/members");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(LEAGUE_NAME);
-    // No row carries a control of its own: the table is names and figures.
-    await expect(page.locator("#league-member-list button")).toHaveCount(0);
+    // A row carries one control of its own only where its figures fold, on a phone.
+    await expect(page.locator("#league-member-list button")).toHaveCount(
+      width < 600 ? humans.length : 0,
+    );
     // No sideways scroll, in the page or in the table: on a phone the gap to the leader
     // gives way instead.
     expect(
