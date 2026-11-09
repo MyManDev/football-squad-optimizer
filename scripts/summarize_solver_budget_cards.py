@@ -13,11 +13,19 @@ measured here, every number is arithmetic on those documents.
 Pairs read: the boosted pair against the linear arm, and the boosted pair on v2 features
 against the boosted pair on v1 features. Intervals use the repository's season-aware
 moving-block bootstrap under the measurement policy with the candidate ids this note declares.
+
+The record also keeps every fold's decision for every arm at every budget (`decisions`: the
+fifteen, the eleven, the bench in order, captaincy, solver status and work, objective and bound,
+the realized score under both conventions), the SHA-256 of each evaluation document it was
+summarized from (`raw_evaluation_documents`) and the digest of this script (`produced_by`), so
+every summary above can be recomputed from the record alone and the two production stages,
+the runner at the commit each input names and this summarizer, are told apart.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import statistics
 import sys
@@ -95,6 +103,42 @@ def _arm_summary(mine: dict[str, dict[str, Any]]) -> dict[str, Any]:
             float(a["realized_score_ignoring_cards"]) for a in mine.values()
         ),
     }
+
+
+#: The scalar fields of a fold's decision the record keeps, as the evaluation wrote them.
+DECISION_FIELDS = (
+    "solver_status",
+    "objective_value",
+    "best_objective_bound",
+    "deterministic_time_used",
+    "realized_score",
+    "realized_score_ignoring_cards",
+    "captain_id",
+    "vice_captain_id",
+)
+
+
+def _compact(arm: dict[str, Any]) -> dict[str, Any]:
+    """One fold's decision as the record keeps it.
+
+    Player lists are space-separated identifiers on one line (the squad and the starting
+    eleven sorted, the bench in its order) so the record stays readable and diffable.
+    """
+
+    return {
+        **{field: arm[field] for field in DECISION_FIELDS},
+        "squad": " ".join(str(player) for player in sorted(int(p) for p in arm["squad"])),
+        "starting_xi": " ".join(
+            str(player) for player in sorted(int(p) for p in arm["starting_xi"])
+        ),
+        "bench_order": " ".join(str(int(player)) for player in arm["bench_order"]),
+    }
+
+
+def _sha256_lf(raw: bytes) -> str:
+    """SHA-256 of bytes with CRLF read as LF, as the paper package digests a file."""
+
+    return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def _interval(differences: list[tuple[str, float]], candidate_id: str) -> list[float]:
@@ -275,11 +319,12 @@ def summarize(inputs: Path, root: Path) -> dict[str, Any]:
     )
     if "5.0" not in budgets:
         raise SystemExit(f"{inputs}: the three budget-5.0 evaluations are required")
-    documents = {
-        (name, budget): _load(inputs / f"eval_{name}_b{budget}.json")
+    paths = {
+        (name, budget): inputs / f"eval_{name}_b{budget}.json"
         for name in TABLES
         for budget in budgets
     }
+    documents = {key: _load(path) for key, path in paths.items()}
     decisions = {key: _decisions(document) for key, document in documents.items()}
     result: dict[str, Any] = {
         "contract_version": "phase_c_solver_budget_cards_v1",
@@ -294,6 +339,22 @@ def summarize(inputs: Path, root: Path) -> dict[str, Any]:
             "the handoff tables were exported under the v2 development scope for the four "
             "decision seasons; 2025-26 is not read by any fold here"
         ),
+        "produced_by": {
+            "runner": (
+                "scripts/evaluate_phase_c_components.py at the repository_commit each input "
+                "names, writing the raw evaluation documents"
+            ),
+            "summarizer": "scripts/summarize_solver_budget_cards.py",
+            "summarizer_sha256": _sha256_lf(Path(__file__).read_bytes()),
+        },
+        "raw_evaluation_documents": {
+            f"{name}_b{budget}": {
+                "file": path.name,
+                "bytes": path.stat().st_size,
+                "sha256": _sha256_lf(path.read_bytes()),
+            }
+            for (name, budget), path in paths.items()
+        },
         "inputs": {
             f"{name}_b{budget}": {
                 "generated_at_utc": document["generated_at_utc"],
@@ -301,7 +362,21 @@ def summarize(inputs: Path, root: Path) -> dict[str, Any]:
                 "table_sha256": document["source"]["table_sha256"],
                 "measurement_options": document["measurement_options"],
                 "solver": document["solver"],
+                "started_at_utc": document["execution"]["started_at_utc"],
+                "completed_at_utc": document["execution"]["completed_at_utc"],
                 "elapsed_seconds": document["execution"]["elapsed_seconds"],
+            }
+            for (name, budget), document in documents.items()
+        },
+        "decisions": {
+            f"{name}_b{budget}": {
+                "candidate": {
+                    fold: _compact(arm) for fold, arm in sorted(decisions[(name, budget)].items())
+                },
+                "ridge_control": {
+                    fold: _compact(arm)
+                    for fold, arm in sorted(_decisions(document, "control").items())
+                },
             }
             for (name, budget), document in documents.items()
         },
