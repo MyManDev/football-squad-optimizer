@@ -31,9 +31,13 @@ checkout only a folder under `artifacts/` is accepted) receives:
   the record's value unchanged;
 - `provenance.csv`: one row per table cell read from a record, with its record and pointer;
 - `figure_*.csv`: one row per plotted point, with the record and pointers on the row;
+- `decisions_solver_budget_cards.csv`: the re-evaluation record's fold-level decisions, one
+  row per table, budget, arm and fold (squad, starting eleven, bench order, captaincy, solver
+  status and work, objective and bound, the realized score under both scoring conventions);
 - `checks.csv`: arithmetic checks of each record against its own detail (a recorded mean
   against the mean of its folds or seeds, a recorded count against the count of its flags, a
-  gate flag against its recorded bounds, a pooled error against its seasons) and, in a git
+  gate flag against its recorded bounds, a pooled error against its seasons, every summary of
+  the re-evaluation record against its fold decisions, its intervals included) and, in a git
   checkout, of each record and of the extractor against the one committed at the checked-out
   commit, with the recomputed value beside the recorded one.
 
@@ -1987,6 +1991,361 @@ def solver_budget_table(records: Records) -> tuple[Table, list[Check]]:
     return table, checks
 
 
+#: The re-evaluation record's fold-level decisions, written out as one CSV.
+DECISIONS_CSV = "decisions_solver_budget_cards"
+DECISION_COLUMNS = (
+    "table",
+    "budget",
+    "arm",
+    "fold",
+    "season",
+    "gameweek",
+    "solver_status",
+    "objective_value",
+    "best_objective_bound",
+    "deterministic_time_used",
+    "realized_score",
+    "realized_score_ignoring_cards",
+    "captain_id",
+    "vice_captain_id",
+    "starting_xi",
+    "bench_order",
+    "squad",
+)
+#: The script whose digest the re-evaluation record names as the one that summarized it.
+SUMMARIZER = "scripts/summarize_solver_budget_cards.py"
+#: The keys of a budget block, recomputed from the two budgets' decisions in this order.
+BUDGET_BLOCK_KEYS = (
+    "folds",
+    "status_counts_low",
+    "status_counts_high",
+    "proven_at_both_budgets_folds",
+    "proven_at_both_budgets_squad_changed_folds",
+    "mean_realized_score_low",
+    "mean_realized_score_high",
+    "squad_changed_folds",
+    "starting_xi_changed_folds",
+    "captain_changed_folds",
+    "objective_gain_mean",
+    "objective_gain_max",
+    "low_budget_feasible_gap_to_bound_mean",
+    "low_budget_feasible_gap_to_bound_max",
+    "realized_score_change_mean",
+    "realized_score_change_folds",
+    "deterministic_time_used_mean_high",
+)
+
+Decisions = dict[str, dict[str, Any]]
+
+
+def _players(text: Any) -> frozenset[int]:
+    """A decision's player list, kept in the record as space-separated identifiers."""
+
+    return frozenset(int(item) for item in str(text).split())
+
+
+def _rounded(value: Any, places: int = 9) -> Any:
+    """`value` with every float rounded, so two routes to one mean compare equal."""
+
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        return round(value, places)
+    if isinstance(value, dict):
+        return {key: _rounded(item, places) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_rounded(item, places) for item in value]
+    return value
+
+
+def _statuses(folds: Decisions) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for decision in folds.values():
+        status = str(decision["solver_status"])
+        counts[status] = counts.get(status, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _fold_mean(folds: Decisions, key: str) -> float:
+    return statistics.fmean(float(decision[key]) for decision in folds.values())
+
+
+def _budget_block(low: Decisions, high: Decisions) -> dict[str, Any]:
+    """What the second budget changed against the first, as the summarizer computes it."""
+
+    folds = sorted(set(low) & set(high))
+    squad_changed = [f for f in folds if _players(low[f]["squad"]) != _players(high[f]["squad"])]
+    xi_changed = [
+        f for f in folds if _players(low[f]["starting_xi"]) != _players(high[f]["starting_xi"])
+    ]
+    captain_changed = [f for f in folds if low[f]["captain_id"] != high[f]["captain_id"]]
+    objective_gain = [
+        float(high[f]["objective_value"]) - float(low[f]["objective_value"])
+        for f in folds
+        if high[f]["objective_value"] is not None and low[f]["objective_value"] is not None
+    ]
+    gaps = []
+    for f in folds:
+        bound, value = low[f].get("best_objective_bound"), low[f].get("objective_value")
+        if low[f]["solver_status"] == "FEASIBLE" and bound is not None and value is not None:
+            gaps.append(float(bound) - float(value))
+    score_change = [
+        float(high[f]["realized_score"]) - float(low[f]["realized_score"]) for f in folds
+    ]
+    proven_both = [
+        f for f in folds if low[f]["solver_status"] == high[f]["solver_status"] == "OPTIMAL"
+    ]
+    times = [
+        float(high[f]["deterministic_time_used"])
+        for f in folds
+        if high[f].get("deterministic_time_used") is not None
+    ]
+    return {
+        "folds": len(folds),
+        "status_counts_low": _statuses(low),
+        "status_counts_high": _statuses(high),
+        "proven_at_both_budgets_folds": len(proven_both),
+        "proven_at_both_budgets_squad_changed_folds": sum(
+            _players(low[f]["squad"]) != _players(high[f]["squad"]) for f in proven_both
+        ),
+        "mean_realized_score_low": statistics.fmean(float(low[f]["realized_score"]) for f in folds),
+        "mean_realized_score_high": statistics.fmean(
+            float(high[f]["realized_score"]) for f in folds
+        ),
+        "squad_changed_folds": len(squad_changed),
+        "starting_xi_changed_folds": len(xi_changed),
+        "captain_changed_folds": len(captain_changed),
+        "objective_gain_mean": statistics.fmean(objective_gain) if objective_gain else None,
+        "objective_gain_max": max(objective_gain) if objective_gain else None,
+        "low_budget_feasible_gap_to_bound_mean": statistics.fmean(gaps) if gaps else None,
+        "low_budget_feasible_gap_to_bound_max": max(gaps) if gaps else None,
+        "realized_score_change_mean": statistics.fmean(score_change),
+        "realized_score_change_folds": sum(v != 0 for v in score_change),
+        "deterministic_time_used_mean_high": statistics.fmean(times) if times else None,
+    }
+
+
+def _paired_block(
+    mine: Decisions, theirs: Decisions, key: str, candidate_id: str
+) -> dict[str, Any]:
+    """A pair's paired reading on one score key, its interval under the record's own id."""
+
+    folds = sorted(set(mine) & set(theirs))
+    differences = [(fold[:7], float(mine[fold][key]) - float(theirs[fold][key])) for fold in folds]
+    values = [value for _, value in differences]
+    seasons: dict[str, list[float]] = {}
+    for season, value in differences:
+        seasons.setdefault(season, []).append(value)
+    low, high = block_interval(differences, 4, candidate_id)
+    return {
+        "paired_folds": len(values),
+        "mean": statistics.fmean(values),
+        "median": statistics.median(values),
+        "interval_90": [low, high],
+        "candidate_id": candidate_id,
+        "wins_ties_losses": [
+            sum(v > 0 for v in values),
+            sum(v == 0 for v in values),
+            sum(v < 0 for v in values),
+        ],
+        "by_season_mean": {
+            season: statistics.fmean(items) for season, items in sorted(seasons.items())
+        },
+    }
+
+
+def _overlap_block(mine: Decisions, theirs: Decisions) -> dict[str, Any]:
+    """Two arms' squad overlap on their common folds, as the summarizer computes it."""
+
+    folds = sorted(set(mine) & set(theirs))
+    shared_squad = [len(_players(mine[f]["squad"]) & _players(theirs[f]["squad"])) for f in folds]
+    shared_xi = [
+        len(_players(mine[f]["starting_xi"]) & _players(theirs[f]["starting_xi"])) for f in folds
+    ]
+    identical = [_players(mine[f]["squad"]) == _players(theirs[f]["squad"]) for f in folds]
+    tied = [f for f in folds if mine[f]["realized_score"] == theirs[f]["realized_score"]]
+    return {
+        "folds": len(folds),
+        "mean_shared_squad_members_of_15": statistics.fmean(shared_squad),
+        "mean_shared_starters_of_11": statistics.fmean(shared_xi),
+        "same_captain_folds": sum(mine[f]["captain_id"] == theirs[f]["captain_id"] for f in folds),
+        "identical_squad_folds": sum(identical),
+        "tied_folds": len(tied),
+        "tied_folds_with_identical_squads": sum(
+            _players(mine[f]["squad"]) == _players(theirs[f]["squad"]) for f in tied
+        ),
+        "shared_squad_members_histogram": {
+            str(k): shared_squad.count(k) for k in sorted(set(shared_squad))
+        },
+    }
+
+
+def solver_budget_decisions(records: Records) -> tuple[str | None, list[Check]]:
+    """The re-evaluation record's fold-level decisions as one CSV row per table, budget, arm
+    and fold, and the checks that every summary the record holds is the arithmetic of those
+    decisions: each arm's status counts, means and folds moved by the card rule; each budget
+    block (changed squads, elevens and captains, folds proven at both budgets, objective gains,
+    the gap to the bound, score changes); each pair's paired reading on both scoring
+    conventions, its 90% interval recomputed under the record's own bootstrap id, and its squad
+    overlap; and that the summarizer the record names is the one in this checkout. A record
+    without the decisions block yields no file and no check.
+    """
+
+    block = records.optional(SOLVER_BUDGET, "/decisions")
+    if block is None or not isinstance(block.value, dict):
+        return None, []
+    decisions: dict[str, Any] = block.value
+    at = partial(records.cell, SOLVER_BUDGET)
+    budgets = [str(value) for value in at("/budgets_present").value]
+
+    def arm_folds(name: str, budget: str, arm: str) -> Decisions:
+        key = f"{name}_b{budget}"
+        if key not in decisions or arm not in decisions[key]:
+            raise RecordError(f"{SOLVER_BUDGET}: no decisions under /decisions/{key}/{arm}")
+        return dict(sorted(decisions[key][arm].items()))
+
+    def compare(name: str, pointer: str, recorded: Any, recomputed: Any) -> Check:
+        recorded, recomputed = _rounded(recorded), _rounded(recomputed)
+        return Check(name, SOLVER_BUDGET, pointer, recorded, recomputed, recorded == recomputed)
+
+    rows: list[list[str]] = []
+    checks: list[Check] = []
+    arms = ("candidate", "ridge_control")
+    for name, _label in BUDGET_TABLES:
+        for budget in budgets:
+            for arm in arms:
+                folds = arm_folds(name, budget, arm)
+                for fold, decision in folds.items():
+                    rows.append(
+                        [
+                            name,
+                            budget,
+                            arm,
+                            fold,
+                            fold[:7],
+                            str(int(fold.rsplit("gw", 1)[1])),
+                            *(_text(decision[column]) for column in DECISION_COLUMNS[6:14]),
+                            str(decision["starting_xi"]),
+                            str(decision["bench_order"]),
+                            str(decision["squad"]),
+                        ]
+                    )
+                summary = f"/arms/{name}_b{budget}/{arm}"
+                cards = f"/card_rule/{name}_b{budget}" + (
+                    "" if arm == "candidate" else "/ridge_control"
+                )
+                recorded = {
+                    "folds": at(f"{summary}/folds").value,
+                    "statuses": at(f"{summary}/statuses").value,
+                    "mean_realized_score": at(f"{summary}/mean_realized_score").value,
+                    "mean_realized_score_ignoring_cards": at(
+                        f"{summary}/mean_realized_score_ignoring_cards"
+                    ).value,
+                    "folds_changed_by_the_card_rule": at(
+                        f"{cards}/folds_changed_by_the_card_rule"
+                    ).value,
+                }
+                recomputed = {
+                    "folds": len(folds),
+                    "statuses": _statuses(folds),
+                    "mean_realized_score": _fold_mean(folds, "realized_score"),
+                    "mean_realized_score_ignoring_cards": _fold_mean(
+                        folds, "realized_score_ignoring_cards"
+                    ),
+                    "folds_changed_by_the_card_rule": sum(
+                        decision["realized_score"] != decision["realized_score_ignoring_cards"]
+                        for decision in folds.values()
+                    ),
+                }
+                checks.append(
+                    compare(
+                        f"{name}_b{budget}/{arm}: the fold decisions give the recorded statuses, "
+                        "means and card-rule count",
+                        summary,
+                        recorded,
+                        recomputed,
+                    )
+                )
+        if len(budgets) < 2:
+            continue
+        for arm in arms:
+            pointer = f"/budget/{name}/{arm}"
+            recorded_block = at(pointer).value
+            if not isinstance(recorded_block, dict):
+                raise RecordError(f"{SOLVER_BUDGET}: {pointer} is not an object")
+            recomputed = _budget_block(
+                arm_folds(name, budgets[0], arm), arm_folds(name, budgets[1], arm)
+            )
+            checks.append(
+                compare(
+                    f"{name}/{arm}: the fold decisions at budgets {budgets[0]} and {budgets[1]} "
+                    "give the recorded budget block",
+                    pointer,
+                    {key: recorded_block.get(key) for key in BUDGET_BLOCK_KEYS},
+                    recomputed,
+                )
+            )
+    tables_of = {
+        "boosted_pair_vs_linear": ("gbm_v1_dec", "linear_dec"),
+        "wider_contract_vs_boosted_pair": ("gbm_v2_dec", "gbm_v1_dec"),
+    }
+    for pair, _label in BUDGET_PAIRS:
+        mine_name, theirs_name = tables_of[pair]
+        for budget in budgets:
+            mine = arm_folds(mine_name, budget, "candidate")
+            theirs = arm_folds(theirs_name, budget, "candidate")
+            for key, suffix in (
+                ("realized_score", "official_card_rule"),
+                ("realized_score_ignoring_cards", "ignoring_cards"),
+            ):
+                pointer = f"/pairs/{pair}/budget_{budget}_{suffix}"
+                recorded_block = at(pointer).value
+                if not isinstance(recorded_block, dict):
+                    raise RecordError(f"{SOLVER_BUDGET}: {pointer} is not an object")
+                recomputed = _paired_block(
+                    mine, theirs, key, str(at(f"{pointer}/candidate_id").value)
+                )
+                checks.append(
+                    compare(
+                        f"{pair} at budget {budget}, {suffix.replace('_', ' ')}: the fold "
+                        "decisions give the recorded paired reading, its interval under the "
+                        "record's bootstrap id included",
+                        pointer,
+                        {key: recorded_block.get(key) for key in recomputed},
+                        recomputed,
+                    )
+                )
+            pointer = f"/pairs/{pair}/budget_{budget}_overlap"
+            recorded_block = at(pointer).value
+            if not isinstance(recorded_block, dict):
+                raise RecordError(f"{SOLVER_BUDGET}: {pointer} is not an object")
+            recomputed = _overlap_block(mine, theirs)
+            checks.append(
+                compare(
+                    f"{pair} at budget {budget}: the fold decisions give the recorded squad "
+                    "overlap",
+                    pointer,
+                    {key: recorded_block.get(key) for key in recomputed},
+                    recomputed,
+                )
+            )
+    named = records.optional(SOLVER_BUDGET, "/produced_by/summarizer_sha256")
+    if named is not None:
+        path = records.root / SUMMARIZER
+        digest = Digest.of(path.read_bytes()).sha256_lf if path.is_file() else "absent"
+        checks.append(
+            Check(
+                "the re-evaluation record names the summarizer whose source is in this checkout",
+                SOLVER_BUDGET,
+                "/produced_by/summarizer_sha256",
+                named.value,
+                digest,
+                named.value == digest,
+            )
+        )
+    return _csv(DECISION_COLUMNS, rows), checks
+
+
 def commit_rows(
     records: Records, extractor: Digest, commit: str | None
 ) -> tuple[list[list[str]], list[Check]]:
@@ -2048,6 +2407,7 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
     tables.append(block_table)
     budget_table, budget_checks = solver_budget_table(records)
     tables.append(budget_table)
+    decisions_csv, decision_checks = solver_budget_decisions(records)
     fold_points, fold_checks = fold_differences(records)
     pit_points, pit_checks = sampler_folds(records)
     figures = {
@@ -2065,6 +2425,7 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         *precision_checks(records),
         *block_checks,
         *budget_checks,
+        *decision_checks,
     ]
     commit = checked_out_commit(records.root)
     digests, commit_checks = commit_rows(records, extractor_digest(), commit)
@@ -2089,6 +2450,8 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         provenance, ("table", "row", "column", "value", "record", "pointer")
     )
     files |= {f"{name}.csv": _figure_csv(name, rows) for name, rows in figures.items()}
+    if decisions_csv is not None:
+        files[f"{DECISIONS_CSV}.csv"] = decisions_csv
     files["tables.md"] = _markdown(tables, _commit_line(commit, commit_checks))
     files["records.csv"] = _csv(
         ("record", "sha256_lf", "git_blob_lf", "commit", "blob_at_commit", "matches_commit"),

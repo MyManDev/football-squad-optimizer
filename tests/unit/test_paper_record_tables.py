@@ -916,6 +916,154 @@ def test_a_card_rule_that_moved_a_fold_but_not_the_mean_still_holds_and_a_moved_
     ]
 
 
+def _decisions_record(root: Path) -> dict[str, Any]:
+    """The solver-budget record with a decisions block its summaries are the arithmetic of,
+    and the summarizer file the record names written into the checkout at `root`."""
+
+    record = _solver_budget_record()
+    names = ("linear_dec", "gbm_v1_dec", "gbm_v2_dec")
+    folds = ("2021-22-gw02", "2021-22-gw03", "2022-23-gw02")
+    players = list(range(1, 16))
+
+    def decision(
+        status: str, score: float, objective: float, bound: float, shift: int = 0
+    ) -> dict[str, Any]:
+        squad = [player + (shift if player == 15 else 0) for player in players]
+        return {
+            "solver_status": status,
+            "objective_value": objective,
+            "best_objective_bound": bound,
+            "deterministic_time_used": 1.0,
+            "realized_score": score,
+            "realized_score_ignoring_cards": score,
+            "captain_id": 1,
+            "vice_captain_id": 2,
+            "squad": " ".join(str(player) for player in squad),
+            "starting_xi": " ".join(str(player) for player in squad[:11]),
+            "bench_order": " ".join(str(player) for player in squad[11:]),
+        }
+
+    scores = {
+        "linear_dec": (50.0, 60.0, 40.0),
+        "gbm_v1_dec": (52.0, 60.0, 35.0),
+        "gbm_v2_dec": (52.0, 61.0, 35.0),
+    }
+    decisions: dict[str, Any] = {}
+    for name in names:
+        for budget in ("5.0", "60.0"):
+            high = budget == "60.0"
+            decisions[f"{name}_b{budget}"] = {
+                "candidate": {
+                    fold: decision(
+                        "OPTIMAL" if high or index else "FEASIBLE",
+                        scores[name][index] - (1.0 if high and not index else 0.0),
+                        80.0 + (0.01 if high and not index else 0.0),
+                        85.0,
+                        shift=1 if high and not index else 0,
+                    )
+                    for index, fold in enumerate(folds)
+                },
+                "ridge_control": {fold: decision("OPTIMAL", 45.0, 70.0, 70.0) for fold in folds},
+            }
+    record["decisions"] = decisions
+    for name in names:
+        for budget in ("5.0", "60.0"):
+            for arm in ("candidate", "ridge_control"):
+                arm_folds = decisions[f"{name}_b{budget}"][arm]
+                record["arms"][f"{name}_b{budget}"][arm] = {
+                    "folds": len(arm_folds),
+                    "statuses": tables._statuses(arm_folds),
+                    "mean_realized_score": tables._fold_mean(arm_folds, "realized_score"),
+                    "mean_realized_score_ignoring_cards": tables._fold_mean(
+                        arm_folds, "realized_score_ignoring_cards"
+                    ),
+                }
+        for arm in ("candidate", "ridge_control"):
+            record["budget"][name][arm] = tables._budget_block(
+                decisions[f"{name}_b5.0"][arm], decisions[f"{name}_b60.0"][arm]
+            )
+    pairs = {
+        "boosted_pair_vs_linear": ("gbm_v1_dec", "linear_dec"),
+        "wider_contract_vs_boosted_pair": ("gbm_v2_dec", "gbm_v1_dec"),
+    }
+    for pair, (mine, theirs) in pairs.items():
+        for budget in ("5.0", "60.0"):
+            own = decisions[f"{mine}_b{budget}"]["candidate"]
+            other = decisions[f"{theirs}_b{budget}"]["candidate"]
+            for key, suffix in (
+                ("realized_score", "official_card_rule"),
+                ("realized_score_ignoring_cards", "ignoring_cards"),
+            ):
+                record["pairs"][pair][f"budget_{budget}_{suffix}"] = tables._paired_block(
+                    own, other, key, f"test_{pair}_{budget}_{suffix}"
+                )
+            record["pairs"][pair][f"budget_{budget}_overlap"] = tables._overlap_block(own, other)
+    summarizer = root / tables.SUMMARIZER
+    summarizer.parent.mkdir(parents=True, exist_ok=True)
+    summarizer.write_bytes(b"print('the summarizer')\n")
+    record["produced_by"] = {
+        "summarizer": tables.SUMMARIZER,
+        "summarizer_sha256": tables.Digest.of(summarizer.read_bytes()).sha256_lf,
+    }
+    return record
+
+
+def test_the_fold_decisions_are_written_out_and_reproduce_every_summary_of_the_record(
+    tmp_path: Path,
+) -> None:
+    records = _records()
+    records[tables.SOLVER_BUDGET] = _decisions_record(tmp_path)
+    _write(tmp_path, records)
+
+    code, output = _run(tmp_path)
+
+    assert code == 0
+    rows = _read_csv(output / "decisions_solver_budget_cards.csv")
+    assert len(rows) == 3 * 2 * 2 * 3
+    assert list(rows[0]) == list(tables.DECISION_COLUMNS)
+    first = rows[0]
+    assert (first["table"], first["budget"], first["arm"], first["fold"]) == (
+        "linear_dec",
+        "5.0",
+        "candidate",
+        "2021-22-gw02",
+    )
+    assert (first["season"], first["gameweek"], first["solver_status"]) == (
+        "2021-22",
+        "2",
+        "FEASIBLE",
+    )
+    assert first["squad"].split() == [str(player) for player in range(1, 16)]
+    assert first["bench_order"] == "12 13 14 15"
+    checks = [
+        row for row in _read_csv(output / "checks.csv") if row["record"] == tables.SOLVER_BUDGET
+    ]
+    assert len(checks) == 19 + 12 + 6 + 8 + 4 + 1
+    assert all(check["holds"] == "true" for check in checks)
+    interval_checks = [row for row in checks if "bootstrap id included" in row["check"]]
+    assert len(interval_checks) == 8
+
+    path = tmp_path / tables.SOLVER_BUDGET
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["pairs"]["wider_contract_vs_boosted_pair"]["budget_60.0_overlap"][
+        "same_captain_folds"
+    ] = 0
+    path.write_text(json.dumps(document), encoding="utf-8", newline="\n")
+
+    code, output = _run(tmp_path, "tables_moved")
+
+    assert code == 1
+    failing = [
+        row["check"]
+        for row in _read_csv(output / "checks.csv")
+        if row["record"] == tables.SOLVER_BUDGET and row["holds"] == "false"
+    ]
+    assert failing == [
+        "wider_contract_vs_boosted_pair at budget 60.0: the fold decisions give the recorded "
+        "squad overlap"
+    ]
+
+
 def _extractor_lf() -> bytes:
     """The extractor this test imports, with CRLF read as LF, as a checkout commits it."""
 

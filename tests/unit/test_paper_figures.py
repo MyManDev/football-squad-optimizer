@@ -562,6 +562,7 @@ def test_the_committed_manifest_names_every_output_and_input_once() -> None:
         "tables/provenance.csv",
         "tables/records.csv",
         "tables/checks.csv",
+        "tables/decisions_solver_budget_cards.csv",
         "tables/tables.md",
         *(f"figures/{figure.file}" for figure in figures.FIGURES),
     }
