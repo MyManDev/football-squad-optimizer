@@ -20,6 +20,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { recordUsage } from "../../../data/usage";
 import { useLeague } from "../useLeague";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "../advice/adviceClient";
@@ -405,6 +406,7 @@ export function useDevicePlan(
     const alive = () => generation.current === run;
     const timing = runTimeline(timeline);
     timing.mark("press");
+    recordUsage({ step: "device_solve" });
     setState({ phase: "loading", progress: { step: "inputs", done: 0, total: null } });
     void (async () => {
       let document: DevicePlanDocument;

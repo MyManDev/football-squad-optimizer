@@ -315,6 +315,8 @@ jobs:
           # Unset or empty is the static site, byte for byte (ADR 0006). A repository
           # variable, not a secret: the value ships in the bundle.
           VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
+          # Unset or empty sends no usage events (ADR 0014). Also a variable: it ships too.
+          VITE_USAGE_ORIGIN: ${{ vars.USAGE_ORIGIN }}
         run: npm run build
 
       - name: Deployment assets
