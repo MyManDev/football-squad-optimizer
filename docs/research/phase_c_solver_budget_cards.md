@@ -164,7 +164,7 @@ CRLF read as LF:
 | `eval_gbm_v2_dec_b5.0.json` | 411,632 | `d91fea91e41615df365e6c900066f364b24f699cb85259a6f1dc95f3b554d900` |
 | `eval_gbm_v2_dec_b60.0.json` | 411,598 | `7cf86c6748b731068d7dccad078996fea7d6259fbedf5b738286935edae6a8b6` |
 
-**Stage 2, the summarizer.** `scripts/summarize_solver_budget_cards.py` at commit `d582b626`
+**Stage 2, the summarizer.** `scripts/summarize_solver_budget_cards.py` at commit `6aae375b`
 of this branch (pull request #1369) read the six documents and wrote the record:
 
 ```bash
@@ -174,8 +174,8 @@ python -m scripts.summarize_solver_budget_cards --inputs-dir artifacts/paper_mea
 
 The summarizer at `5d5e6fbd` wrote an interim form of this record without the second budget,
 the per-arm blocks and the fold decisions; the record committed here is the one the summarizer
-at the branch tip writes (first `d582b626`, then the commit that added the command forms and
-the exporter commit to `produced_by`), and `produced_by/summarizer_sha256` is the digest of
+at `6aae375b` writes (`d582b626` added the fold decisions and the digests, `6aae375b` the
+exporter commit and the command forms), and `produced_by/summarizer_sha256` is the digest of
 that file, so the stages are told apart by the record itself. Rerunning stage 2 on the six
 documents above reproduces the committed record byte for byte. The exporter and runner
 options of stage 1 live on this branch; the record, this readout and the summarizer are also
