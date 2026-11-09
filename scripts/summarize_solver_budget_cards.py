@@ -239,9 +239,7 @@ def _budget(low: dict[str, dict[str, Any]], high: dict[str, dict[str, Any]]) -> 
         "proven_at_both_budgets_squad_changed_folds": sum(
             set(low[f]["squad"]) != set(high[f]["squad"]) for f in proven_both
         ),
-        "mean_realized_score_low": statistics.fmean(
-            float(low[f]["realized_score"]) for f in folds
-        ),
+        "mean_realized_score_low": statistics.fmean(float(low[f]["realized_score"]) for f in folds),
         "mean_realized_score_high": statistics.fmean(
             float(high[f]["realized_score"]) for f in folds
         ),
