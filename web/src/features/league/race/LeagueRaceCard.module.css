@@ -46,6 +46,13 @@
   font: inherit;
 }
 
+/* Under 16px, iPhone Safari zooms the page in when this control takes focus (tokens.css). */
+@media (max-width: 599.98px) {
+  .memberPick select {
+    font-size: max(16px, 1em);
+  }
+}
+
 .stepper {
   display: flex;
   align-items: center;
