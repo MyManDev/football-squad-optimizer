@@ -8,6 +8,7 @@
 | Requirements | Python 3.11 or later (standard library only), git on `PATH`, no network; the tests: the development install of [contributing](../../CONTRIBUTING.md) |
 | Outputs in git | none; written under `artifacts/` (git-ignored) or outside the checkout |
 | Records read at | `144e3f7be824115b64ec8321d8b60c6831092973` (develop) |
+| R13's origin | branch `measure/paper-solver-budget-cards` (PR #1369), not yet on develop: handoff tables exported at `3a3920bd`, evaluations run at `5d5e6fbd`, record summarized at the branch tip; the record, its readout and the summarizer are on this branch, the exporter and runner options of the first two stages only on that one until the PR merges |
 | Manuscript | [squadopt_walk_forward_paper.tex](squadopt_walk_forward_paper.tex), built by steps 5 and 6 below; the manuscript and this package move together on the branch `docs/paper-manuscript`, and a submission is pinned by a tag `paper/<venue>-<date>` on that branch |
 | Tool versions used for the manuscript | Python 3.13.5 for steps 3 and 4 (standard library only); PyMuPDF 1.27.2.3 for step 5; Tectonic 0.17.0 (XeTeX, fontspec) for step 6 |
 
@@ -27,10 +28,10 @@
 
 | Command | Prints | Exit |
 | --- | --- | --- |
-| Step 3 | `141 of 141 record checks hold` | 0 |
+| Step 3 | `145 of 145 record checks hold` | 0 |
 | Step 4 | `Wrote 5 paper figures to ...` | 0 |
 | Step 6 | a 30-page `squadopt_walk_forward_paper.pdf` | 0 |
-| Check | `141 of 141 record checks hold`; `42 of 44 manifest rows match`, two `unpinned` | 0 |
+| Check | `145 of 145 record checks hold`; `42 of 44 manifest rows match`, two `unpinned` | 0 |
 
 ## Inputs
 
@@ -48,15 +49,15 @@
 | R10 | `docs/research/rank_conditional_shrinkage.json` | `bddfcb03976c73cf53bf2c7706f5386bbc9c315a` | `31d487322ef15a713751f1577c83242c09f5bd5186ff2ab2909e2a052a6272d7` |
 | R11 | `docs/research/team_match_block_sampler.json` | `f70dc6a4061297870541a9a484364799b603e26e` | `797264048f2a14658a8ecac89d5c82fae466e504392da4231159d10848cf1173` |
 | R12 | `docs/measurement_instrument.json` | `e9b946d962fe16a082dae0a2d509cca12bd7fe4f` | `da987a13c0d74b164175f5baf1018929f0634c3d7373ef367f336af00ebdc845` |
-| R13 | `docs/research/phase_c_solver_budget_cards.json` | `ae8232f0111aa967f570cd82a9b07516627f67ff` | `ba4ddc4ac5b00af310c1ca1357d3ecdf94c88a82f12555e1b4853a5defe7682e` |
-| C1 | `scripts/paper_record_tables.py` | `982fd19931eb7898ee43191c2c15376ecc4b779a` | `b8ee858d05f6d0ce34f5c5f51f789b88c0cd796a7f3a280eb29f82ac492c8e94` |
+| R13 | `docs/research/phase_c_solver_budget_cards.json` | `1fdae790fb59e793541ecf5a9ce70abb7e62b0af` | `5ee5784ead9625f8d8adea26aece65f55f0303a5550eb72cb880780d02ca8814` |
+| C1 | `scripts/paper_record_tables.py` | `b90f3518357efe70cc33c75fb7721768185c10e9` | `2c767d689a77e5b8dde48dad74845742c9afbe7221c4fbea6dfc9ba0a0635706` |
 | C2 | `scripts/paper_figures.py` | `247540ac734db572db1680480d6967653068b57d` | `f142e0cd4bcf1935c709e2ae6b0755e0e271da19b32f8b1c9df87ca6444f5830` |
 
 ## Tables (step 3)
 
 | Output | Step | Inputs | SHA-256 |
 | --- | --- | --- | --- |
-| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | `c9a1f6563e7f606727d0c44651c9420c02e7839e2669bc0fbaee10a973241a1b` |
+| `tables/checks.csv` | 3 | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, C1 | `ebfbe49b4342e2d7ea87cf86933c59cd7189eee3e44bb6cf910631b51ee16ddd` |
 | `tables/decisions_solver_budget_cards.csv` | 3 | R13, C1 | `4a954876c9cc02233821a38aa1c4f437ee53720330cdb14235a6dea540a78971` |
 | `tables/figure_accuracy_against_decision.csv` | 3 | R4, R5, R7, R8, R9, C1 | `a36b6cf86f2b4869415f00f4b64b5d68735c91e9466a007ea57c4026842471c9` |
 | `tables/figure_decision_by_season.csv` | 3 | R4, R5, R7, R8, R9, C1 | `3f8537d3067ce4c2bb68e724d3b30232089afbf653f92e013b7ba576214ad3c0` |
