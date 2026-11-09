@@ -206,6 +206,20 @@ describe("a scheduled run", () => {
     assert.deepEqual(lines.at(-1), { event: "run_failed", error: "RefusedError: fixtures_status_503" });
   });
 
+  it("fails every run, between deadlines too, on a private key the Worker cannot sign with", async () => {
+    const { worker, env, upstream, lines } = await harness();
+    const run = (privateKey) =>
+      worker.scheduled({ cron: "*/15 * * * *" }, { ...env, VAPID_PRIVATE_KEY: privateKey }, { waitUntil() {} });
+    await run("bm90LWEta2V5");
+    assert.deepEqual(lines.at(-1), { event: "run_failed", error: "Error: VAPID private key is not 32 bytes" });
+    await run(undefined);
+    assert.deepEqual(lines.at(-1), { event: "run_failed", error: "Error: VAPID private key is missing" });
+    // The key is read before the fixture list, so a bad secret shows on any run, far from a deadline.
+    assert.deepEqual(upstream.calls, []);
+    await run(env.VAPID_PRIVATE_KEY);
+    assert.deepEqual(lines.at(-1), { event: "reminded", gameweek: null, sent: 0, gone: 0, failed: 0 });
+  });
+
   it("reads the site's own fixture list and never FPL", async () => {
     const { worker, env, upstream } = await harness();
     await worker.scheduled({ cron: "*/15 * * * *" }, env, { waitUntil() {} });
