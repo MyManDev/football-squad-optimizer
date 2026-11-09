@@ -1,15 +1,18 @@
 import { memberAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { Link } from "react-router";
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 
 import { EmptyState } from "../../../design/components/EmptyState";
+import { useShellLayout } from "../../../design/shell/layout";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { useFixtures } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
 import { gameweekDeadline, useDeadlinePassed } from "../advice/deadline";
 import { viewerChipLines } from "../chipShape";
+import { RowDetailsFigures, RowDetailsToggle } from "../components/RowDetails";
+import { useOpenRows } from "../components/useOpenRows";
 import { ViewerChips } from "../components/ViewerChips";
 import { leagueRace } from "../race/leagueRace";
 import { LeagueRaceCard } from "../race/LeagueRaceCard";
@@ -79,6 +82,10 @@ export function LeagueMembersPage() {
  * Every figure is a published one or arithmetic on published ones: the week net of that
  * week's hit, and the gap to the leader's total. An unknown number is a dash, never 0.
  * The system's paper squad is never a row here, and nothing here links to it.
+ *
+ * On a phone a row carries what a member looks for first: rank, movement, the team and the
+ * manager, and the total. The week's net and the gap to the leader fold out under the row
+ * from a chevron at its end, so no column shrinks its figures to fit the screen.
  */
 export function LeagueMembersView({
   envelope,
@@ -122,6 +129,15 @@ export function LeagueMembersView({
   const count = (value: number) => points(value, 0, locale);
   const race =
     scoreboard !== null ? leagueRace(scoreboard, view.members, view.scored_gameweek) : null;
+  const phone = useShellLayout() === "phone";
+  // Only a phone draws the fold.
+  const fold = useOpenRows();
+  // The header the week's figures stand under, in full: the view is labelled with the
+  // coming gameweek, the scores are an earlier one's, and net of that week's hits.
+  const weekHeading =
+    view.scored_gameweek === null
+      ? copy.gameweekNetPoints
+      : copy.gameweekNetPointsFor(view.scored_gameweek);
 
   return (
     <div className={styles.page}>
@@ -147,22 +163,24 @@ export function LeagueMembersView({
                   <span className="visually-hidden">{copy.movement}</span>
                 </th>
                 <th scope="col">{copy.team}</th>
-                <th scope="col" className={styles.week}>
-                  <span aria-hidden="true">{copy.lastWeekLabel}</span>
-                  {/* The view is labelled with the coming gameweek; the scores are an earlier
-                      one's, and net of that week's hits. The header says which, in full. */}
-                  <span className="visually-hidden">
-                    {view.scored_gameweek === null
-                      ? copy.gameweekNetPoints
-                      : copy.gameweekNetPointsFor(view.scored_gameweek)}
-                  </span>
-                </th>
+                {phone ? null : (
+                  <th scope="col" className={styles.week}>
+                    <span aria-hidden="true">{copy.lastWeekLabel}</span>
+                    <span className="visually-hidden">{weekHeading}</span>
+                  </th>
+                )}
                 <th scope="col" className={styles.total}>
                   {copy.total}
                 </th>
-                <th scope="col" className={styles.gap}>
-                  {copy.leaderGap}
-                </th>
+                {phone ? (
+                  <th scope="col" className={styles.details}>
+                    <span className="visually-hidden">{copy.storyDetail}</span>
+                  </th>
+                ) : (
+                  <th scope="col" className={styles.gap}>
+                    {copy.leaderGap}
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -170,47 +188,78 @@ export function LeagueMembersView({
                 const isViewer = member === viewerRow;
                 const net = netWeekPoints(member);
                 const gap = gapToLeader(lead, member);
+                const open = phone && fold.isOpen(member.entry_id!);
+                const detailsId = `league-member-${member.entry_id}-details`;
+                const gapCell =
+                  gap === null ? (
+                    "—"
+                  ) : gap === 0 ? (
+                    <span className={styles.leader}>{copy.leaderMark}</span>
+                  ) : (
+                    count(gap)
+                  );
                 return (
-                  <tr
-                    key={member.entry_id}
-                    className={isViewer ? styles.viewerRow : undefined}
-                    style={{ "--row": index } as CSSProperties}
-                    aria-current={isViewer ? "true" : undefined}
-                  >
-                    <td className={styles.rank}>{member.rank > 0 ? member.rank : "—"}</td>
-                    <td className={styles.move}>
-                      <Movement movement={member.movement} places={member.movement_places} />
-                    </td>
-                    <td>
-                      <div className={styles.teamCell}>
-                        <span className={styles.teamName}>
-                          {member.team_name ?? copy.unknownTeam}
-                        </span>
-                        <span className={styles.manager}>
-                          <Link
-                            className={styles.memberLink}
-                            to={memberAddress(leagueId, member.entry_id!)}
-                          >
-                            {member.manager_name ?? copy.unknownMember}
-                          </Link>
-                          {isViewer ? <span> · {copy.viewerYouBadge}</span> : null}
-                        </span>
-                      </div>
-                    </td>
-                    <td className={`${styles.week} num`}>{net === null ? "—" : count(net)}</td>
-                    <td className={`${styles.total} num`}>
-                      {member.total_points === null ? "—" : count(member.total_points)}
-                    </td>
-                    <td className={`${styles.gap} num`}>
-                      {gap === null ? (
-                        "—"
-                      ) : gap === 0 ? (
-                        <span className={styles.leader}>{copy.leaderMark}</span>
-                      ) : (
-                        count(gap)
+                  <Fragment key={member.entry_id}>
+                    <tr
+                      className={isViewer ? styles.viewerRow : undefined}
+                      style={{ "--row": index } as CSSProperties}
+                      aria-current={isViewer ? "true" : undefined}
+                    >
+                      <td className={styles.rank}>{member.rank > 0 ? member.rank : "—"}</td>
+                      <td className={styles.move}>
+                        <Movement movement={member.movement} places={member.movement_places} />
+                      </td>
+                      <td className={styles.teamColumn}>
+                        <div className={styles.teamCell}>
+                          <span className={styles.teamName}>
+                            {member.team_name ?? copy.unknownTeam}
+                          </span>
+                          <span className={styles.manager}>
+                            <Link
+                              className={styles.memberLink}
+                              to={memberAddress(leagueId, member.entry_id!)}
+                            >
+                              {member.manager_name ?? copy.unknownMember}
+                            </Link>
+                            {isViewer ? <span> · {copy.viewerYouBadge}</span> : null}
+                          </span>
+                        </div>
+                      </td>
+                      {phone ? null : (
+                        <td className={`${styles.week} num`}>{net === null ? "—" : count(net)}</td>
                       )}
-                    </td>
-                  </tr>
+                      <td className={`${styles.total} num`}>
+                        {member.total_points === null ? "—" : count(member.total_points)}
+                      </td>
+                      {phone ? (
+                        <td className={styles.details}>
+                          <RowDetailsToggle
+                            open={open}
+                            controls={detailsId}
+                            label={`${copy.storyDetail}, ${member.team_name ?? copy.unknownTeam}`}
+                            onToggle={() => fold.toggle(member.entry_id!)}
+                          />
+                        </td>
+                      ) : (
+                        <td className={`${styles.gap} num`}>{gapCell}</td>
+                      )}
+                    </tr>
+                    {open ? (
+                      <tr
+                        id={detailsId}
+                        className={`${styles.detailRow} ${isViewer ? styles.viewerRow : ""}`}
+                      >
+                        <td colSpan={5}>
+                          <RowDetailsFigures
+                            figures={[
+                              { label: weekHeading, value: net === null ? "—" : count(net) },
+                              { label: copy.leaderGap, value: gapCell },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>
