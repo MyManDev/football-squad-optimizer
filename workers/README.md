@@ -10,6 +10,7 @@ token.
 | --- | --- | --- | --- | --- |
 | [`fpl-probe/`](fpl-probe/README.md) | Measures whether the FPL API answers requests that leave Cloudflare's network | `.github/workflows/deploy-fpl-probe.yml`, dispatched by hand from the default branch | The `FPL probe worker tests` step of the CI web job | [FPL forwarder probe](../docs/fpl_forwarder_probe.md) |
 | [`fpl-proxy/`](fpl-proxy/README.md) | The FPL forwarder: reads FPL on a visitor's request and answers at `/api/v1/fpl/*` with trimmed, versioned documents | `.github/workflows/deploy-fpl-proxy.yml`, dispatched by hand from the default branch | The `FPL forwarder worker tests` step of the CI web job | [ADR 0012](../docs/architecture/decisions/0012-fpl-forwarder.md) |
+| [`usage/`](usage/README.md) | The usage record: takes one small event per step of a visit at `/api/v1/usage/*` and writes it to Analytics Engine, with no personal data | `.github/workflows/deploy-usage.yml`, dispatched by hand from the default branch | The `Usage worker tests` step of the CI web job | [ADR 0014](../docs/architecture/decisions/0014-usage-measurement.md) |
 
 The probe was the prerequisite for the FPL forwarder Worker at `/api/v1/fpl/*` on the site's
 host, which lets a member's browser read FPL through the site's own origin. Issue #979 tracked

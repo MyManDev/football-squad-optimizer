@@ -106,6 +106,7 @@ updated and the bytes regenerated.
 | Advice worker | `squadopt.platform.advice_worker` | `python -m squadopt.platform.advice_worker` | Claims jobs from the shared store and writes the answer cache | The owner's PC, several processes beside the API |
 | FPL probe | `workers/fpl-probe/` | The `Deploy FPL probe` workflow, dispatched by hand | A Workers KV namespace | Cloudflare Workers, only while deployed ([FPL forwarder probe](docs/fpl_forwarder_probe.md)) |
 | FPL forwarder | `workers/fpl-proxy/` | The `Deploy FPL forwarder` workflow, dispatched by hand | Short copies in each Cloudflare data centre's Cache API; no store of its own | Cloudflare Workers, at `squadopt.mymandev.com/api/v1/fpl/*` once deployed ([ADR 0012](docs/architecture/decisions/0012-fpl-forwarder.md)) |
+| Usage record | `workers/usage/` | The `Deploy usage record` workflow, dispatched by hand | Anonymous events in an Analytics Engine dataset, kept three months | Cloudflare Workers, at `squadopt.mymandev.com/api/v1/usage/*` once deployed ([ADR 0014](docs/architecture/decisions/0014-usage-measurement.md)) |
 | Backend uptime check | `.github/workflows/backend-uptime.yml` | A schedule every 15 minutes | Opens and closes `backend-down` issues | GitHub Actions |
 
 [ADR 0006](docs/architecture/decisions/0006-backend-hosting.md) decides that the API and the
