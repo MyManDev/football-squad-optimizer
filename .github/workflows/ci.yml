@@ -298,6 +298,18 @@ jobs:
             workers/deadline-push/test/worker.test.mjs \
             workers/deadline-push/test/deploy-steps.test.mjs
 
+      # The usage record (ADR 0014), tested the same way: a fake dataset and handed-in rows, no
+      # credentials and no network. Its deploy-steps.test.mjs checks this list, and the one in
+      # deploy-usage.yml, against its test directory.
+      - name: Usage worker tests
+        working-directory: .
+        run: |
+          node --test \
+            workers/usage/test/rules.test.mjs \
+            workers/usage/test/worker.test.mjs \
+            workers/usage/test/report.test.mjs \
+            workers/usage/test/deploy-steps.test.mjs
+
       - name: Build
         env:
           # Unset or empty is the static site, byte for byte (ADR 0006). A repository

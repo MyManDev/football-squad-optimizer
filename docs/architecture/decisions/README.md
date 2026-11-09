@@ -21,6 +21,7 @@ its header.
 | [0011](0011-storage-ports-and-platform-split.md) | Storage ports, a named data vocabulary and the platform split by deployment unit | 2026-10-13 | Accepted (owner, 2026-10-13) | None |
 | [0012](0012-fpl-forwarder.md) | The FPL forwarder, a separate Worker at /api/v1/fpl/* | 2026-11-01 | Accepted (İbo, 2026-11-01) | None |
 | [0013](0013-deadline-reminders.md) | Deadline reminders by Web Push, with no accounts | 2026-11-07 | Accepted (owner, 2026-11-07) | None |
+| [0014](0014-usage-measurement.md) | A usage record with no personal data, in Analytics Engine | 2026-11-09 | Proposed | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.
