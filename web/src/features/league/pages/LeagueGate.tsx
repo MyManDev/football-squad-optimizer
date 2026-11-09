@@ -72,9 +72,14 @@ export function LeagueGate({
   const queryClient = useQueryClient();
   const claimedEntry = useClaimedEntry(league?.leagueId ?? 0);
   const entryId = claimedEntry !== null ? entryIdInAddress(entryParameter) : null;
+  const address = new URLSearchParams(location.search);
+  const rival = address.get("rival");
+  const duel = address.get("duel");
   useEffect(() => {
-    if (league !== null) prefetchMemberReads(queryClient, createLeagueTree(league), entryId);
-  }, [league, entryId, queryClient]);
+    if (league === null) return;
+    const rivals = [entryIdInAddress(rival), entryIdInAddress(duel)];
+    prefetchMemberReads(queryClient, createLeagueTree(league), entryId, rivals);
+  }, [league, entryId, rival, duel, queryClient]);
   if (parameter === undefined) {
     // The old shape of the address: the current league's version of it, or the form.
     const legacy = current === null ? null : legacyLeagueAddress(location.pathname, current);
