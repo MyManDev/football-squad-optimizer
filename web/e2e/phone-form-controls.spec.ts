@@ -40,6 +40,10 @@ test("the member picker's team number field is at least 16px on a phone", async 
 
 test("the contribution form's controls are at least 16px on a phone", async ({ page }) => {
   test.skip(!process.env.VITE_ADVICE_API_ORIGIN, "An origin-less build has no contribution page");
+  // The form stands once the page has read the comments; the preview runs no backend.
+  await page.route("**/api/v1/contributions**", (route) =>
+    route.fulfill({ json: { comments: [] } }),
+  );
   await page.goto("/contribute");
   await settled(page);
   const controls = await controlSizes(page);
