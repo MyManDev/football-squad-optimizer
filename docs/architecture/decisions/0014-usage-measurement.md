@@ -40,9 +40,10 @@ cookie or fingerprint.
    `https://squadopt.mymandev.com` gets a 403, and CORS names no other origin. The header can be
    forged by a program that is not a browser, so this keeps other sites' pages out, not a
    determined writer; the zone's `/api/v1/` rate-limit rule stands in front of that case.
-6. **The build decides whether anything is sent.** The web module sends only when
-   `VITE_USAGE_ORIGIN` names an origin. With it empty, the site sends nothing, which is every
-   local build, every test and the end-to-end suite.
+6. **The build names the one origin that may send.** A page sends only when `VITE_USAGE_ORIGIN`
+   equals its own origin. With the variable empty, nothing is sent. With it set, a page on any
+   other origin stays silent, so the same build served by the end-to-end suite or a preview
+   address sends nothing and logs no refusal.
 7. **The report is a script run by the owner**, `scripts/usage_report.mjs`, not a Worker route: a
    route would put the read token on a public address for no gain.
 
