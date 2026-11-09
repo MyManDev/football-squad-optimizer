@@ -226,6 +226,13 @@
   box-sizing: border-box;
 }
 
+/* iPhone Safari enlarges body text on its own when the phone turns to landscape unless the
+   page says its sizes are final. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background: var(--color-bg);
@@ -266,6 +273,19 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/* iPhone Safari zooms the page in on a text control smaller than 16px when it takes focus,
+   and the page stays zoomed once the control is left. A control inherits the body's 14px, so
+   on a phone every control that takes typing or a choice is at least 16px; one already
+   larger keeps its size. A rule that sets a control's font itself (font: inherit) outranks
+   this one and repeats it where it applies. */
+@media (max-width: 599.98px) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
 }
 
 :where(button, a, input, select, textarea) {

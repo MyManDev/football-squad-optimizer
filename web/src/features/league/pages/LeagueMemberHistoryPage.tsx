@@ -38,7 +38,9 @@ export function LeagueMemberHistoryPage() {
           </button>
         )}
         <p>
-          <Link to={memberAddress(leagueId, entryId)}>{copy.back}</Link>
+          <Link to={memberAddress(leagueId, entryId)} className={styles.back}>
+            {copy.back}
+          </Link>
         </p>
       </EmptyState>
     );
@@ -57,7 +59,9 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
   return (
     <div className={styles.page}>
       <header>
-        <Link to={memberAddress(leagueId, entryId)}>{copy.back}</Link>
+        <Link to={memberAddress(leagueId, entryId)} className={styles.back}>
+          {copy.back}
+        </Link>
         <h1>{copy.title}</h1>
       </header>
       <PersonalSeasonReport history={history} />

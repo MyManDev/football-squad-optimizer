@@ -22,7 +22,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: typeof payload.body === "string" ? payload.body : "",
-      icon: "/favicon.svg",
+      // A notification shows no SVG; the home-screen icon is the same mark as a PNG.
+      icon: "/apple-touch-icon.png",
       tag: typeof payload.gameweek === "number" ? `deadline-gw${payload.gameweek}` : "deadline",
       data: { url: typeof payload.url === "string" ? payload.url : "/" },
     }),

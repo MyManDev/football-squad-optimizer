@@ -42,7 +42,9 @@ export function LeagueMemberVsPage() {
           </button>
         )}
         <p>
-          <Link to={memberAddress(league.leagueId, entryId)}>{copy.back}</Link>
+          <Link to={memberAddress(league.leagueId, entryId)} className={styles.back}>
+            {copy.back}
+          </Link>
         </p>
       </EmptyState>
     );
@@ -75,7 +77,9 @@ export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) 
   return (
     <div className={styles.page}>
       <header>
-        <Link to={memberAddress(leagueId, entryId)}>{messages.suggestionHistory.back}</Link>
+        <Link to={memberAddress(leagueId, entryId)} className={styles.back}>
+          {messages.suggestionHistory.back}
+        </Link>
         <h1>{copy.title}</h1>
       </header>
       {week === null ? (
