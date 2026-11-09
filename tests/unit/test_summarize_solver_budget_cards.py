@@ -53,7 +53,7 @@ def _document(budget: str, candidate_scores: dict[str, float]) -> dict[str, Any]
     return {
         "generated_at_utc": f"2026-11-08T00:00:00+00:00 {budget}",
         "provenance": {"repository_commit": "5d5e6fbd" + "0" * 32},
-        "source": {"table_sha256": "a" * 64},
+        "source": {"table_sha256": "a" * 64, "producer_repository_commit": "3a3920bd" + "0" * 32},
         "measurement_options": {"solver_deterministic_budget": float(budget)},
         "solver": {"binding_limit": "deterministic_time"},
         "execution": {
@@ -143,6 +143,9 @@ def test_the_record_keeps_every_fold_decision_and_names_what_produced_it(tmp_pat
     source = Path(summary.__file__).read_bytes().replace(b"\r\n", b"\n")
     assert record["produced_by"]["summarizer_sha256"] == hashlib.sha256(source).hexdigest()
     assert record["inputs"]["linear_dec_b5.0"]["completed_at_utc"] == "2026-11-08T01:00:00+00:00"
+    assert record["inputs"]["linear_dec_b5.0"]["producer_repository_commit"].startswith("3a3920bd")
+    assert set(record["produced_by"]["command_forms"]) == {"export", "evaluate", "summarize"}
+    assert "--record-decisions" in record["produced_by"]["command_forms"]["evaluate"]
 
     # The summaries the decisions must reproduce: one unproven fold at 5.0 moved at 60.0.
     budget = record["budget"]["linear_dec"]["candidate"]

@@ -23335,6 +23335,7 @@
         "solver_deterministic_budget": 5.0,
         "solver_wall_cap_seconds": 600.0
       },
+      "producer_repository_commit": "3a3920bddbf4ff27b4ef36685a722887bb54cb8f",
       "repository_commit": "5d5e6fbdb5fb2a054fb227920f78f8664bfba67f",
       "solver": {
         "binding_limit": "deterministic_time",
@@ -23359,6 +23360,7 @@
         "solver_deterministic_budget": 60.0,
         "solver_wall_cap_seconds": 1800.0
       },
+      "producer_repository_commit": "3a3920bddbf4ff27b4ef36685a722887bb54cb8f",
       "repository_commit": "5d5e6fbdb5fb2a054fb227920f78f8664bfba67f",
       "solver": {
         "binding_limit": "deterministic_time",
@@ -23383,6 +23385,7 @@
         "solver_deterministic_budget": 5.0,
         "solver_wall_cap_seconds": 600.0
       },
+      "producer_repository_commit": "3a3920bddbf4ff27b4ef36685a722887bb54cb8f",
       "repository_commit": "5d5e6fbdb5fb2a054fb227920f78f8664bfba67f",
       "solver": {
         "binding_limit": "deterministic_time",
@@ -23407,6 +23410,7 @@
         "solver_deterministic_budget": 60.0,
         "solver_wall_cap_seconds": 1800.0
       },
+      "producer_repository_commit": "3a3920bddbf4ff27b4ef36685a722887bb54cb8f",
       "repository_commit": "5d5e6fbdb5fb2a054fb227920f78f8664bfba67f",
       "solver": {
         "binding_limit": "deterministic_time",
@@ -23431,6 +23435,7 @@
         "solver_deterministic_budget": 5.0,
         "solver_wall_cap_seconds": 600.0
       },
+      "producer_repository_commit": "3a3920bddbf4ff27b4ef36685a722887bb54cb8f",
       "repository_commit": "5d5e6fbdb5fb2a054fb227920f78f8664bfba67f",
       "solver": {
         "binding_limit": "deterministic_time",
@@ -23455,6 +23460,7 @@
         "solver_deterministic_budget": 60.0,
         "solver_wall_cap_seconds": 1800.0
       },
+      "producer_repository_commit": "3a3920bddbf4ff27b4ef36685a722887bb54cb8f",
       "repository_commit": "5d5e6fbdb5fb2a054fb227920f78f8664bfba67f",
       "solver": {
         "binding_limit": "deterministic_time",
@@ -23753,9 +23759,15 @@
     }
   },
   "produced_by": {
+    "command_forms": {
+      "evaluate": "python -m scripts.evaluate_phase_c_components --table <table>.csv --manifest <table>.manifest.json --roster <table>.roster.csv --producer-environment <table>.environment.json --archive-root <archive> --development-contract phase_c_component_oof_development_v2 --solver-deterministic-budget <budget> --solver-wall-cap-seconds <cap> --card-participation --record-decisions --json-output <inputs>/eval_<table>_b<budget>.json",
+      "export": "python -m scripts.export_component_oof --archive-root <archive> --development-scope v2 --season-weighting equal --seasons 2021-22,2022-23,2023-24,2024-25 --output-dir <tables>/<table> [--estimator gradient_boosting [--feature-contract v2]]",
+      "summarize": "python -m scripts.summarize_solver_budget_cards --inputs-dir <inputs> --output docs/research/phase_c_solver_budget_cards.json"
+    },
+    "exporter": "scripts/export_component_oof.py at the producer_repository_commit each input names, writing the handoff table whose digest the input names",
     "runner": "scripts/evaluate_phase_c_components.py at the repository_commit each input names, writing the raw evaluation documents",
     "summarizer": "scripts/summarize_solver_budget_cards.py",
-    "summarizer_sha256": "91830ad67bf163f53d21afa8b2d1845ead7c390513906fc20d08e90edda93471"
+    "summarizer_sha256": "0a20fde454858d8c9d1696425426ac0692a41372f2c893d603782397c4449440"
   },
   "promotion_decision": "not_evaluated",
   "raw_evaluation_documents": {
