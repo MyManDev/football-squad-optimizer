@@ -71,14 +71,19 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   );
   expect(await absent.text()).not.toContain('"contract_version"');
 
-  await page.goto("/");
   const leagueRequests: string[] = [];
   page.on("request", (request) => {
     // The shell reads the fixture list on every page, whenever its chunk lands; it is not
     // a league lookup, and counting it made this assertion depend on timing.
-    if (request.url().endsWith("/data/fixtures.json")) return;
-    if (["fetch", "xhr"].includes(request.resourceType())) leagueRequests.push(request.url());
+    const path = new URL(request.url()).pathname;
+    if (path === "/data/fixtures.json") return;
+    // The directory's first read is the document's own preload (resource type "other"),
+    // which the form's fetch then joins, so a published document counts by its address.
+    if (["fetch", "xhr"].includes(request.resourceType()) || path.startsWith("/data/")) {
+      leagueRequests.push(request.url());
+    }
   });
+  await page.goto("/");
   const leagueField = page.getByLabel("Lig numarası");
   const findLeague = page.getByRole("button", { name: "Ligi bul", exact: true });
   await leagueField.fill("123");
