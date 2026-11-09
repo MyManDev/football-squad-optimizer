@@ -228,10 +228,23 @@ def _budget(low: dict[str, dict[str, Any]], high: dict[str, dict[str, Any]]) -> 
     score_change = [
         float(high[f]["realized_score"]) - float(low[f]["realized_score"]) for f in folds
     ]
+    proven_both = [
+        f for f in folds if low[f]["solver_status"] == high[f]["solver_status"] == "OPTIMAL"
+    ]
     return {
         "folds": len(folds),
         "status_counts_low": _statuses(low),
         "status_counts_high": _statuses(high),
+        "proven_at_both_budgets_folds": len(proven_both),
+        "proven_at_both_budgets_squad_changed_folds": sum(
+            set(low[f]["squad"]) != set(high[f]["squad"]) for f in proven_both
+        ),
+        "mean_realized_score_low": statistics.fmean(
+            float(low[f]["realized_score"]) for f in folds
+        ),
+        "mean_realized_score_high": statistics.fmean(
+            float(high[f]["realized_score"]) for f in folds
+        ),
         "squad_changed_folds": len(squad_changed),
         "starting_xi_changed_folds": len(xi_changed),
         "captain_changed_folds": len(captain_changed),
@@ -305,12 +318,21 @@ def summarize(inputs: Path, root: Path) -> dict[str, Any]:
             for (name, budget), document in documents.items()
         },
         "card_rule": {
-            f"{name}_b{budget}": _cards(decisions[(name, budget)])
-            for name in TABLES
-            for budget in budgets
+            f"{name}_b{budget}": {
+                **_cards(decisions[(name, budget)]),
+                "ridge_control": _cards(_decisions(document, "control")),
+            }
+            for (name, budget), document in documents.items()
         },
         "budget": {
-            name: _budget(decisions[(name, "5.0")], decisions[(name, "60.0")]) for name in TABLES
+            name: {
+                "candidate": _budget(decisions[(name, "5.0")], decisions[(name, "60.0")]),
+                "ridge_control": _budget(
+                    _decisions(documents[(name, "5.0")], "control"),
+                    _decisions(documents[(name, "60.0")], "control"),
+                ),
+            }
+            for name in TABLES
         }
         if "60.0" in budgets
         else {},

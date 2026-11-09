@@ -19,6 +19,25 @@
         }
       }
     },
+    "gbm_v1_dec_b60.0": {
+      "candidate": {
+        "folds": 147,
+        "mean_realized_score": 62.666666666666664,
+        "mean_realized_score_ignoring_cards": 62.666666666666664,
+        "statuses": {
+          "OPTIMAL": 147
+        }
+      },
+      "ridge_control": {
+        "folds": 147,
+        "mean_realized_score": 58.57823129251701,
+        "mean_realized_score_ignoring_cards": 58.57823129251701,
+        "statuses": {
+          "FEASIBLE": 7,
+          "OPTIMAL": 140
+        }
+      }
+    },
     "gbm_v2_dec_b5.0": {
       "candidate": {
         "folds": 147,
@@ -35,6 +54,25 @@
         "statuses": {
           "FEASIBLE": 31,
           "OPTIMAL": 116
+        }
+      }
+    },
+    "gbm_v2_dec_b60.0": {
+      "candidate": {
+        "folds": 147,
+        "mean_realized_score": 62.46258503401361,
+        "mean_realized_score_ignoring_cards": 62.46258503401361,
+        "statuses": {
+          "OPTIMAL": 147
+        }
+      },
+      "ridge_control": {
+        "folds": 147,
+        "mean_realized_score": 58.57823129251701,
+        "mean_realized_score_ignoring_cards": 58.57823129251701,
+        "statuses": {
+          "FEASIBLE": 7,
+          "OPTIMAL": 140
         }
       }
     },
@@ -57,32 +95,258 @@
           "OPTIMAL": 116
         }
       }
+    },
+    "linear_dec_b60.0": {
+      "candidate": {
+        "folds": 147,
+        "mean_realized_score": 63.197278911564624,
+        "mean_realized_score_ignoring_cards": 63.197278911564624,
+        "statuses": {
+          "FEASIBLE": 11,
+          "OPTIMAL": 136
+        }
+      },
+      "ridge_control": {
+        "folds": 147,
+        "mean_realized_score": 58.57823129251701,
+        "mean_realized_score_ignoring_cards": 58.57823129251701,
+        "statuses": {
+          "FEASIBLE": 7,
+          "OPTIMAL": 140
+        }
+      }
     }
   },
-  "budget": {},
-  "budgets_absent": [
-    "60.0"
-  ],
+  "budget": {
+    "gbm_v1_dec": {
+      "candidate": {
+        "captain_changed_folds": 0,
+        "deterministic_time_used_mean_high": 0.991299109092137,
+        "folds": 147,
+        "low_budget_feasible_gap_to_bound_max": null,
+        "low_budget_feasible_gap_to_bound_mean": null,
+        "mean_realized_score_high": 62.666666666666664,
+        "mean_realized_score_low": 62.666666666666664,
+        "objective_gain_max": 0.0,
+        "objective_gain_mean": 0.0,
+        "proven_at_both_budgets_folds": 147,
+        "proven_at_both_budgets_squad_changed_folds": 0,
+        "realized_score_change_folds": 0,
+        "realized_score_change_mean": 0.0,
+        "squad_changed_folds": 0,
+        "starting_xi_changed_folds": 0,
+        "status_counts_high": {
+          "OPTIMAL": 147
+        },
+        "status_counts_low": {
+          "OPTIMAL": 147
+        }
+      },
+      "ridge_control": {
+        "captain_changed_folds": 0,
+        "deterministic_time_used_mean_high": 15.524964453239686,
+        "folds": 147,
+        "low_budget_feasible_gap_to_bound_max": 8.553000000000004,
+        "low_budget_feasible_gap_to_bound_mean": 5.920935483870968,
+        "mean_realized_score_high": 58.57823129251701,
+        "mean_realized_score_low": 58.57142857142857,
+        "objective_gain_max": 0.4140000000000015,
+        "objective_gain_mean": 0.007040816326530685,
+        "proven_at_both_budgets_folds": 116,
+        "proven_at_both_budgets_squad_changed_folds": 0,
+        "realized_score_change_folds": 4,
+        "realized_score_change_mean": 0.006802721088435374,
+        "squad_changed_folds": 5,
+        "starting_xi_changed_folds": 4,
+        "status_counts_high": {
+          "FEASIBLE": 7,
+          "OPTIMAL": 140
+        },
+        "status_counts_low": {
+          "FEASIBLE": 31,
+          "OPTIMAL": 116
+        }
+      }
+    },
+    "gbm_v2_dec": {
+      "candidate": {
+        "captain_changed_folds": 0,
+        "deterministic_time_used_mean_high": 0.9980872323734932,
+        "folds": 147,
+        "low_budget_feasible_gap_to_bound_max": null,
+        "low_budget_feasible_gap_to_bound_mean": null,
+        "mean_realized_score_high": 62.46258503401361,
+        "mean_realized_score_low": 62.46258503401361,
+        "objective_gain_max": 0.0,
+        "objective_gain_mean": 0.0,
+        "proven_at_both_budgets_folds": 147,
+        "proven_at_both_budgets_squad_changed_folds": 0,
+        "realized_score_change_folds": 0,
+        "realized_score_change_mean": 0.0,
+        "squad_changed_folds": 0,
+        "starting_xi_changed_folds": 0,
+        "status_counts_high": {
+          "OPTIMAL": 147
+        },
+        "status_counts_low": {
+          "OPTIMAL": 147
+        }
+      },
+      "ridge_control": {
+        "captain_changed_folds": 0,
+        "deterministic_time_used_mean_high": 15.524964453239686,
+        "folds": 147,
+        "low_budget_feasible_gap_to_bound_max": 8.553000000000004,
+        "low_budget_feasible_gap_to_bound_mean": 5.920935483870968,
+        "mean_realized_score_high": 58.57823129251701,
+        "mean_realized_score_low": 58.57142857142857,
+        "objective_gain_max": 0.4140000000000015,
+        "objective_gain_mean": 0.007040816326530685,
+        "proven_at_both_budgets_folds": 116,
+        "proven_at_both_budgets_squad_changed_folds": 0,
+        "realized_score_change_folds": 4,
+        "realized_score_change_mean": 0.006802721088435374,
+        "squad_changed_folds": 5,
+        "starting_xi_changed_folds": 4,
+        "status_counts_high": {
+          "FEASIBLE": 7,
+          "OPTIMAL": 140
+        },
+        "status_counts_low": {
+          "FEASIBLE": 31,
+          "OPTIMAL": 116
+        }
+      }
+    },
+    "linear_dec": {
+      "candidate": {
+        "captain_changed_folds": 0,
+        "deterministic_time_used_mean_high": 18.458704590198774,
+        "folds": 147,
+        "low_budget_feasible_gap_to_bound_max": 8.978000000000009,
+        "low_budget_feasible_gap_to_bound_mean": 5.318727272727273,
+        "mean_realized_score_high": 63.197278911564624,
+        "mean_realized_score_low": 63.36054421768708,
+        "objective_gain_max": 0.3049999999999997,
+        "objective_gain_mean": 0.01124489795918376,
+        "proven_at_both_budgets_folds": 103,
+        "proven_at_both_budgets_squad_changed_folds": 0,
+        "realized_score_change_folds": 13,
+        "realized_score_change_mean": -0.16326530612244897,
+        "squad_changed_folds": 16,
+        "starting_xi_changed_folds": 13,
+        "status_counts_high": {
+          "FEASIBLE": 11,
+          "OPTIMAL": 136
+        },
+        "status_counts_low": {
+          "FEASIBLE": 44,
+          "OPTIMAL": 103
+        }
+      },
+      "ridge_control": {
+        "captain_changed_folds": 0,
+        "deterministic_time_used_mean_high": 15.524964453239686,
+        "folds": 147,
+        "low_budget_feasible_gap_to_bound_max": 8.553000000000004,
+        "low_budget_feasible_gap_to_bound_mean": 5.920935483870968,
+        "mean_realized_score_high": 58.57823129251701,
+        "mean_realized_score_low": 58.57142857142857,
+        "objective_gain_max": 0.4140000000000015,
+        "objective_gain_mean": 0.007040816326530685,
+        "proven_at_both_budgets_folds": 116,
+        "proven_at_both_budgets_squad_changed_folds": 0,
+        "realized_score_change_folds": 4,
+        "realized_score_change_mean": 0.006802721088435374,
+        "squad_changed_folds": 5,
+        "starting_xi_changed_folds": 4,
+        "status_counts_high": {
+          "FEASIBLE": 7,
+          "OPTIMAL": 140
+        },
+        "status_counts_low": {
+          "FEASIBLE": 31,
+          "OPTIMAL": 116
+        }
+      }
+    }
+  },
+  "budgets_absent": [],
   "budgets_present": [
-    "5.0"
+    "5.0",
+    "60.0"
   ],
   "card_rule": {
     "gbm_v1_dec_b5.0": {
       "changed": {},
       "folds": 147,
       "folds_changed_by_the_card_rule": 0,
+      "ridge_control": {
+        "changed": {},
+        "folds": 147,
+        "folds_changed_by_the_card_rule": 0,
+        "sum_of_changes": 0
+      },
+      "sum_of_changes": 0
+    },
+    "gbm_v1_dec_b60.0": {
+      "changed": {},
+      "folds": 147,
+      "folds_changed_by_the_card_rule": 0,
+      "ridge_control": {
+        "changed": {},
+        "folds": 147,
+        "folds_changed_by_the_card_rule": 0,
+        "sum_of_changes": 0
+      },
       "sum_of_changes": 0
     },
     "gbm_v2_dec_b5.0": {
       "changed": {},
       "folds": 147,
       "folds_changed_by_the_card_rule": 0,
+      "ridge_control": {
+        "changed": {},
+        "folds": 147,
+        "folds_changed_by_the_card_rule": 0,
+        "sum_of_changes": 0
+      },
+      "sum_of_changes": 0
+    },
+    "gbm_v2_dec_b60.0": {
+      "changed": {},
+      "folds": 147,
+      "folds_changed_by_the_card_rule": 0,
+      "ridge_control": {
+        "changed": {},
+        "folds": 147,
+        "folds_changed_by_the_card_rule": 0,
+        "sum_of_changes": 0
+      },
       "sum_of_changes": 0
     },
     "linear_dec_b5.0": {
       "changed": {},
       "folds": 147,
       "folds_changed_by_the_card_rule": 0,
+      "ridge_control": {
+        "changed": {},
+        "folds": 147,
+        "folds_changed_by_the_card_rule": 0,
+        "sum_of_changes": 0
+      },
+      "sum_of_changes": 0
+    },
+    "linear_dec_b60.0": {
+      "changed": {},
+      "folds": 147,
+      "folds_changed_by_the_card_rule": 0,
+      "ridge_control": {
+        "changed": {},
+        "folds": 147,
+        "folds_changed_by_the_card_rule": 0,
+        "sum_of_changes": 0
+      },
       "sum_of_changes": 0
     }
   },
@@ -112,6 +376,28 @@
       },
       "table_sha256": "96ac55769c894047d2e4f77131f6cd873dc1481bb89cf6334c33b94125831666"
     },
+    "gbm_v1_dec_b60.0": {
+      "elapsed_seconds": 6543.78563,
+      "generated_at_utc": "2026-11-08T22:45:32+00:00",
+      "measurement_options": {
+        "card_participation": true,
+        "is_measurement_configuration": false,
+        "record_decisions": true,
+        "solver_deterministic_budget": 60.0,
+        "solver_wall_cap_seconds": 1800.0
+      },
+      "repository_commit": "5d5e6fbdb5fb2a054fb227920f78f8664bfba67f",
+      "solver": {
+        "binding_limit": "deterministic_time",
+        "solver_deterministic_time_limit": 60.0,
+        "solver_status_counts": {
+          "FEASIBLE": 7,
+          "OPTIMAL": 287
+        },
+        "solver_time_limit_seconds": 1800.0
+      },
+      "table_sha256": "96ac55769c894047d2e4f77131f6cd873dc1481bb89cf6334c33b94125831666"
+    },
     "gbm_v2_dec_b5.0": {
       "elapsed_seconds": 2519.976707,
       "generated_at_utc": "2026-11-08T18:20:14+00:00",
@@ -134,6 +420,28 @@
       },
       "table_sha256": "c15d39d237e909f752cb6d42727ae3729df77320ed8dcfad8528810b0000d0c5"
     },
+    "gbm_v2_dec_b60.0": {
+      "elapsed_seconds": 6545.540376,
+      "generated_at_utc": "2026-11-09T00:34:39+00:00",
+      "measurement_options": {
+        "card_participation": true,
+        "is_measurement_configuration": false,
+        "record_decisions": true,
+        "solver_deterministic_budget": 60.0,
+        "solver_wall_cap_seconds": 1800.0
+      },
+      "repository_commit": "5d5e6fbdb5fb2a054fb227920f78f8664bfba67f",
+      "solver": {
+        "binding_limit": "deterministic_time",
+        "solver_deterministic_time_limit": 60.0,
+        "solver_status_counts": {
+          "FEASIBLE": 7,
+          "OPTIMAL": 287
+        },
+        "solver_time_limit_seconds": 1800.0
+      },
+      "table_sha256": "c15d39d237e909f752cb6d42727ae3729df77320ed8dcfad8528810b0000d0c5"
+    },
     "linear_dec_b5.0": {
       "elapsed_seconds": 3834.577128,
       "generated_at_utc": "2026-11-08T16:33:40+00:00",
@@ -153,6 +461,28 @@
           "OPTIMAL": 219
         },
         "solver_time_limit_seconds": 600.0
+      },
+      "table_sha256": "20eb4776fa6e8f47125e282e4d6e02f2cbcce07454a2212e264761ff73337eb8"
+    },
+    "linear_dec_b60.0": {
+      "elapsed_seconds": 13389.758149,
+      "generated_at_utc": "2026-11-08T19:02:18+00:00",
+      "measurement_options": {
+        "card_participation": true,
+        "is_measurement_configuration": false,
+        "record_decisions": true,
+        "solver_deterministic_budget": 60.0,
+        "solver_wall_cap_seconds": 1800.0
+      },
+      "repository_commit": "5d5e6fbdb5fb2a054fb227920f78f8664bfba67f",
+      "solver": {
+        "binding_limit": "deterministic_time",
+        "solver_deterministic_time_limit": 60.0,
+        "solver_status_counts": {
+          "FEASIBLE": 18,
+          "OPTIMAL": 276
+        },
+        "solver_time_limit_seconds": 1800.0
       },
       "table_sha256": "20eb4776fa6e8f47125e282e4d6e02f2cbcce07454a2212e264761ff73337eb8"
     }
@@ -227,6 +557,71 @@
         "tied_folds": 5,
         "tied_folds_with_identical_squads": 1
       },
+      "budget_60.0_ignoring_cards": {
+        "by_season_mean": {
+          "2021-22": -3.6486486486486487,
+          "2022-23": 0.6111111111111112,
+          "2023-24": 2.918918918918919,
+          "2024-25": -1.972972972972973
+        },
+        "candidate_id": "paper_solver_budget_boosted_pair_vs_linear_60.0_ignoring_cards",
+        "interval_90": [
+          -2.3537414965986394,
+          1.2244897959183674
+        ],
+        "mean": -0.5306122448979592,
+        "median": 1.0,
+        "paired_folds": 147,
+        "wins_ties_losses": [
+          76,
+          5,
+          66
+        ]
+      },
+      "budget_60.0_official_card_rule": {
+        "by_season_mean": {
+          "2021-22": -3.6486486486486487,
+          "2022-23": 0.6111111111111112,
+          "2023-24": 2.918918918918919,
+          "2024-25": -1.972972972972973
+        },
+        "candidate_id": "paper_solver_budget_boosted_pair_vs_linear_60.0_official_card_rule",
+        "interval_90": [
+          -2.3472789115646266,
+          1.2312925170068028
+        ],
+        "mean": -0.5306122448979592,
+        "median": 1.0,
+        "paired_folds": 147,
+        "wins_ties_losses": [
+          76,
+          5,
+          66
+        ]
+      },
+      "budget_60.0_overlap": {
+        "folds": 147,
+        "identical_squad_folds": 1,
+        "mean_shared_squad_members_of_15": 5.843537414965986,
+        "mean_shared_starters_of_11": 4.73469387755102,
+        "same_captain_folds": 56,
+        "shared_squad_members_histogram": {
+          "1": 1,
+          "10": 4,
+          "11": 1,
+          "15": 1,
+          "2": 2,
+          "3": 15,
+          "4": 24,
+          "5": 25,
+          "6": 27,
+          "7": 24,
+          "8": 15,
+          "9": 8
+        },
+        "tied_folds": 5,
+        "tied_folds_with_identical_squads": 1
+      },
       "recorded": {
         "interval_90": [
           -2.6598639455782314,
@@ -279,6 +674,71 @@
         ]
       },
       "budget_5.0_overlap": {
+        "folds": 147,
+        "identical_squad_folds": 2,
+        "mean_shared_squad_members_of_15": 9.299319727891156,
+        "mean_shared_starters_of_11": 7.346938775510204,
+        "same_captain_folds": 100,
+        "shared_squad_members_histogram": {
+          "10": 26,
+          "11": 21,
+          "12": 10,
+          "13": 4,
+          "14": 1,
+          "15": 2,
+          "4": 1,
+          "5": 2,
+          "6": 8,
+          "7": 15,
+          "8": 20,
+          "9": 37
+        },
+        "tied_folds": 10,
+        "tied_folds_with_identical_squads": 1
+      },
+      "budget_60.0_ignoring_cards": {
+        "by_season_mean": {
+          "2021-22": 2.189189189189189,
+          "2022-23": 0.2777777777777778,
+          "2023-24": -1.7837837837837838,
+          "2024-25": -1.4864864864864864
+        },
+        "candidate_id": "paper_solver_budget_wider_contract_vs_boosted_pair_60.0_ignoring_cards",
+        "interval_90": [
+          -1.8095238095238095,
+          1.0476190476190477
+        ],
+        "mean": -0.20408163265306123,
+        "median": 0.0,
+        "paired_folds": 147,
+        "wins_ties_losses": [
+          69,
+          10,
+          68
+        ]
+      },
+      "budget_60.0_official_card_rule": {
+        "by_season_mean": {
+          "2021-22": 2.189189189189189,
+          "2022-23": 0.2777777777777778,
+          "2023-24": -1.7837837837837838,
+          "2024-25": -1.4864864864864864
+        },
+        "candidate_id": "paper_solver_budget_wider_contract_vs_boosted_pair_60.0_official_card_rule",
+        "interval_90": [
+          -1.782312925170068,
+          1.0680272108843538
+        ],
+        "mean": -0.20408163265306123,
+        "median": 0.0,
+        "paired_folds": 147,
+        "wins_ties_losses": [
+          69,
+          10,
+          68
+        ]
+      },
+      "budget_60.0_overlap": {
         "folds": 147,
         "identical_squad_folds": 2,
         "mean_shared_squad_members_of_15": 9.299319727891156,
