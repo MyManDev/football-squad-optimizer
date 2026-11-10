@@ -432,7 +432,7 @@ def decision_fold_differences(rows: Rows) -> str:
         mine = [row for row in rows if row["candidate"] == candidate]
         _y_grid(svg, scale, axis, left, right, labels=index % grid.columns == 0)
         svg.line((left, scale(0.0)), (right, scale(0.0)), MUTED)
-        svg.text((left, top - 22), candidate, 11, bold=True)
+        svg.text((left, top - 22), _shown(CANDIDATE_NAMES, candidate), 11, bold=True)
         svg.text((left, top - 8), f"{len(mine)} paired folds", 10, fill=SECONDARY)
         band = grid.width / len(seasons)
         for position, season in enumerate(seasons):
@@ -507,7 +507,8 @@ def decision_by_season(rows: Rows) -> str:
         f"Drawn from {name} by scripts/paper_figures.py.",
     )
     entries = [
-        (candidate, SERIES[index], MARKERS[index]) for index, candidate in enumerate(candidates)
+        (_shown(CANDIDATE_NAMES, candidate), SERIES[index], MARKERS[index])
+        for index, candidate in enumerate(candidates)
     ]
     top = 24 + _legend(svg, entries, left, 18, width) + 12
     bottom = top + height
@@ -678,7 +679,7 @@ def accuracy_against_decision(rows: Rows, decision_seasons: Sequence[str]) -> st
         (
             x_scale(gain),
             y_scale(mean),
-            row["candidate"],
+            _shown(CANDIDATE_NAMES, row["candidate"]),
             f"{row['candidate']}: MAE gain {gain:.6f}, decision difference "
             f"{row['candidate_minus_reference_decision_mean']}",
         )
@@ -782,6 +783,11 @@ def _bin(name: str, value: float, bins: int) -> int:
 
 
 #: How the paper names the sampler arms a figure labels; anything else is shown as written.
+#: Candidate names as the paper's tables print them.
+CANDIDATE_NAMES = {
+    "Boosted pair, v2 feature contract": "Wider contract",
+    "Boosted pair, v2 feature contract vs boosted pair": "Wider contract vs boosted pair",
+}
 SAMPLER_NAMES = {
     "foundation": "Foundation",
     "team_match_block": "Club block",
@@ -800,6 +806,8 @@ ARM_NAMES = {
     "block_arm": "Club block",
     "candidate": "Joint club-match",
 }
+#: The joint record's two controls, as the calibration table names them.
+JOINT_ARM_NAMES = {"/control_arm": "control A", "/block_arm": "control B"}
 
 
 def _shown(mapping: dict[str, str], key: str) -> str:
@@ -845,7 +853,8 @@ def sampler_pit(rows: Rows, bins: int = PIT_BINS) -> str:
         _y_grid(svg, scale, axis, left, right, labels=index % grid.columns == 0)
         svg.text((left, top - 36), f"{_shown(SAMPLER_NAMES, sampler)}, n = {total}", 11, bold=True)
         svg.text((left, top - 22), _shown(RECORD_NAMES, Path(record).stem), 10, fill=SECONDARY)
-        svg.text((left, top - 8), _shown(ARM_NAMES, arm), 10, fill=SECONDARY)
+        arms = JOINT_ARM_NAMES if Path(record).stem == "moe_sampler" else ARM_NAMES
+        svg.text((left, top - 8), _shown(arms, arm), 10, fill=SECONDARY)
         for position, count in enumerate(counts):
             x0, x1 = x_scale(position / bins), x_scale((position + 1) / bins)
             svg.rect(

@@ -51,7 +51,7 @@
 | R12 | `docs/measurement_instrument.json` | `e9b946d962fe16a082dae0a2d509cca12bd7fe4f` | `da987a13c0d74b164175f5baf1018929f0634c3d7373ef367f336af00ebdc845` |
 | R13 | `docs/research/phase_c_solver_budget_cards.json` | `1fdae790fb59e793541ecf5a9ce70abb7e62b0af` | `5ee5784ead9625f8d8adea26aece65f55f0303a5550eb72cb880780d02ca8814` |
 | C1 | `scripts/paper_record_tables.py` | `30db0603ebb323c347cc113dc44558d368c6871b` | `d9aeba026f665969e4c707af96863b28cf497353fdd3f8f08a784e31f263ab41` |
-| C2 | `scripts/paper_figures.py` | `3b5f158ba6027004471c882a9f1b0d1b6030614d` | `1fa2396de070d002517a028cc0008f49e1f0f25de1980f6fd74b436d73ef7496` |
+| C2 | `scripts/paper_figures.py` | `51fc9c04f7e25d8f7b0d3408e5237ba90d06e3e5` | `761478b2748cc22d8b69e005ac1857ff9cd72e1d8f0d57454c09e02ad0cd3029` |
 
 ## Tables (step 3)
 
@@ -87,8 +87,8 @@
 
 | Output | Step | Inputs | SHA-256 |
 | --- | --- | --- | --- |
-| `figures/fig1_decision_fold_differences.svg` | 4 | `tables/figure_decision_fold_differences.csv`, C2 | `99e8bc75c1d5d88af3223c4b2a1695a6d2ec599dbd9e75e7db9d70d0203171a7` |
-| `figures/fig2_decision_by_season.svg` | 4 | `tables/figure_decision_by_season.csv`, C2 | `fd06c34b2584ddd60ec4fa38329eb62de0de7b776cb9113abc2d7fbcdd726b0c` |
-| `figures/fig3_accuracy_against_decision.svg` | 4 | `tables/figure_accuracy_against_decision.csv`, `tables/figure_decision_by_season.csv`, C2 | `db1c1cce5c165de159893ac02014d9ca0c1bf9ff25996f1f847b770507b37db9` |
-| `figures/fig4_sampler_pit.svg` | 4 | `tables/figure_sampler_pit.csv`, C2 | `d1807837a09c4965ba3330ddc9f797b22dacf5504183370783bf328ab68adc97` |
+| `figures/fig1_decision_fold_differences.svg` | 4 | `tables/figure_decision_fold_differences.csv`, C2 | `85130f4adcc3abfcd6110eb125a8413baffda945d8ccc2beb06a63b4cad516da` |
+| `figures/fig2_decision_by_season.svg` | 4 | `tables/figure_decision_by_season.csv`, C2 | `a2a91e1e3f6685d9923d5b60d50d6ce2357882316718e11d9e67150116952fe1` |
+| `figures/fig3_accuracy_against_decision.svg` | 4 | `tables/figure_accuracy_against_decision.csv`, `tables/figure_decision_by_season.csv`, C2 | `1c04cc6ed23baf3bc7c5472ca9f6b814fb70f78c9018a1ae35eaac945b8a787c` |
+| `figures/fig4_sampler_pit.svg` | 4 | `tables/figure_sampler_pit.csv`, C2 | `b28cda4876428edb9ad9729e94f878a9827c1a8b168e593d14d3838eb94377c3` |
 | `figures/fig5_seed_counts.svg` | 4 | `tables/table_joint_sampler_seeds.csv`, C2 | `7e75e91782cc4baf9ce2a3155a50a5bd68b4b3d0cbe1e76fb283c628cd701bed` |
