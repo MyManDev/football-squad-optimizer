@@ -1,0 +1,30 @@
+# The usage record: a Worker that takes one small event per step of a visit and writes it to
+# Analytics Engine (docs/architecture/decisions/0014-usage-measurement.md). Deployed only by
+# .github/workflows/deploy-usage.yml. The Pages site stays static.
+
+name = "squadopt-usage"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+workers_dev = false
+preview_urls = false
+
+# Every path under /api/v1/usage/ on the site's host reaches this Worker; it answers two of
+# them and gives everything else its JSON 404. The other Workers' prefixes do not overlap it.
+# The zone's /api/v1/ rate-limit rule (50 requests per 10 s per IP) applies in front of it.
+routes = [
+  { pattern = "squadopt.mymandev.com/api/v1/usage/*", zone_name = "mymandev.com" },
+]
+
+# The dataset is created by its first write; there is nothing to create before the deploy.
+[[analytics_engine_datasets]]
+binding = "USAGE_EVENTS"
+dataset = "squadopt_usage"
+
+# Console lines only (a failed write). The per-request invocation logs, which would record
+# every visitor's address, are not kept.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false

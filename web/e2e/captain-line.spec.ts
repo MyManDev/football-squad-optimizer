@@ -3,6 +3,10 @@ import { join } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import {
+  DEVICE_REPLY_GRACE_SECONDS,
+  DEVICE_SOLVE_CEILING_SECONDS,
+} from "../src/features/league/device/solve/ceiling";
 import { PUBLIC_ROOT, shippedTrees } from "../src/testSupport/shippedTrees";
 import { claimMember, shippedClaim } from "./identity";
 
@@ -18,6 +22,12 @@ import { claimMember, shippedClaim } from "./identity";
  */
 
 const WIDTHS = [360, 375, 390] as const;
+
+// This spec is about the line, and the cover is only what stands in front of it. The cover
+// goes when the chip gains have arrived or the page's own watchdog has ended the run, so that
+// is the wait: alone a run takes about 12 s, with sixteen browsers solving at once on a
+// developer's machine a chip stage passed 30 s (9 Nov).
+const COVER_GONE_MS = (DEVICE_SOLVE_CEILING_SECONDS + DEVICE_REPLY_GRACE_SECONDS) * 1000;
 
 type Published = {
   entry: number;
@@ -84,7 +94,7 @@ for (const language of ["tr", "en"] as const) {
     test(`the captain line holds one line on a phone for ${entry} of ${LEAGUE_ID} in ${language}`, async ({
       page,
     }) => {
-      if (pages.some((row) => row.device)) test.setTimeout(90_000);
+      if (pages.some((row) => row.device)) test.setTimeout(60_000 + COVER_GONE_MS + 30_000);
       await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
       const calendar = JSON.parse(
         readFileSync(join(PUBLIC_ROOT, "data", "fixtures.json"), "utf-8"),
@@ -105,7 +115,9 @@ for (const language of ["tr", "en"] as const) {
         if (device) {
           await page.locator("[data-device-compute]").click();
           await expect(page.locator('[data-device-state="done"]')).toBeVisible({ timeout: 60_000 });
-          await expect(page.locator("[data-device-progress]")).toHaveCount(0, { timeout: 30_000 });
+          await expect(page.locator("[data-device-progress]")).toHaveCount(0, {
+            timeout: COVER_GONE_MS,
+          });
         }
         const line = page.locator('[data-mark="decision"] p[class*="_captain_"]');
         await expect(line).toBeVisible();

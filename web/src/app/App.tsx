@@ -14,6 +14,7 @@ import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 import { IdentifiedShell } from "./IdentifiedShell";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
+import { UsagePageOpen } from "./UsagePageOpen";
 
 const LeagueEntryPage = lazy(() =>
   import("../features/league/pages/LeagueEntryPage").then((m) => ({ default: m.LeagueEntryPage })),
@@ -120,6 +121,7 @@ function LocalizedApp({ basename }: { basename: string }) {
       <BrowserRouter basename={basename}>
         {/* The shell reads the visitor's league and member through the identity module. */}
         <RoutePreload />
+        <UsagePageOpen />
         <IdentifiedShell>
           <RouteErrorBoundary>
             <Suspense fallback={<PageLoading label={messages.common.loading} />}>

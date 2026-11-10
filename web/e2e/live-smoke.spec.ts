@@ -16,9 +16,36 @@ const OPTIONAL_DOCUMENTS = new Set(["/data/leagues.json"]);
 // Normal offline smoke discovery skips this file; only the live config runs it.
 test.skip(!process.env.LIVE_BASE_URL || Boolean(process.env.CI), "Manual live release check only.");
 
+// What the browser asked for and what came back, in order, with the time since the attempt
+// began. Printed when an attempt fails, kept with the attempt's results either way.
+let journey: string[] = [];
+let journeyStart = 0;
+
+function logJourney(line: string) {
+  journey.push(`${String(Date.now() - journeyStart).padStart(6)}ms ${line}`);
+}
+
+test.afterEach(async ({ page }, testInfo) => {
+  const log = journey.join("\n");
+  await testInfo.attach("journey.txt", { body: log, contentType: "text/plain" });
+  if (testInfo.status === testInfo.expectedStatus) return;
+  console.log(
+    `LIVE SMOKE ATTEMPT ${testInfo.retry + 1} FAILED (${testInfo.project.name}) at ${page.url()}\n` +
+      `${testInfo.error?.message ?? "no error message"}\n` +
+      `journey of this attempt:\n${log}\n` +
+      `trace: ${testInfo.outputPath("trace.zip")}`,
+  );
+});
+
 test("published league and member journey works without submitting a solve", async ({
   page,
 }, testInfo) => {
+  journey = [];
+  journeyStart = Date.now();
+  if (testInfo.retry > 0)
+    console.log(
+      `LIVE SMOKE RETRY ${testInfo.retry} (${testInfo.project.name}): the attempt before this one failed, see its journey above`,
+    );
   const origin = new URL(process.env.LIVE_BASE_URL!).origin;
   const errors: string[] = [];
   const consoleErrors: { text: string; url: string }[] = [];
@@ -47,16 +74,27 @@ test("published league and member journey works without submitting a solve", asy
       consoleErrors.push({ text: message.text(), url: message.location().url });
   });
   page.on("requestfailed", (request) => {
+    logJourney(`FAILED ${request.failure()?.errorText} ${request.method()} ${request.url()}`);
     const url = new URL(request.url());
-    // Leaving a member cancels its polling and device-input prefetch. Other failures stay red.
+    // Leaving a member cancels its polling, its device-input prefetch and, when the edge is
+    // slow enough that it is still on its way, the history document the next page reads again
+    // (with every response 300 ms later this failed both profiles, 9 Nov). Other failures
+    // stay red.
     const cancelledRead =
       request.method() === "GET" &&
       request.failure()?.errorText === "net::ERR_ABORTED" &&
       (/^\/api\/v1\/fpl\/live\/\d+$/.test(url.pathname) ||
-        /^\/data\/device\/[^/]+\/device-plan\.json$/.test(url.pathname));
-    if (url.origin === origin && !cancelledRead) failures.push(request.url());
+        /^\/data\/device\/[^/]+\/device-plan\.json$/.test(url.pathname) ||
+        /^\/data\/(?:leagues\/\d+|league)\/history\/(?:requested\/)?\d+\.json$/.test(url.pathname));
+    if (url.origin === origin && cancelledRead)
+      console.log(`read cancelled by leaving its page: ${request.url()}`);
+    // A usage beacon may be cut off by the page it left; the record never holds a release back.
+    const usageBeacon = url.pathname === "/api/v1/usage/events";
+    if (url.origin === origin && !cancelledRead && !usageBeacon)
+      failures.push(`${request.failure()?.errorText} ${request.url()}`);
   });
   page.on("response", (response) => {
+    logJourney(`${response.status()} ${response.request().method()} ${response.url()}`);
     if (
       response.status() === 404 &&
       response.request().method() === "GET" &&

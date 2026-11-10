@@ -11,12 +11,17 @@ export default defineConfig({
   testMatch: "live-smoke.spec.ts",
   timeout: 60_000,
   workers: 1,
-  retries: 0,
+  // A second attempt inside the same run, so the first one's trace is still on disk: the
+  // rerun an operator typed by hand emptied test-results and took the failure with it. An
+  // attempt that fails prints its journey and says so, and the summary counts it as flaky.
+  retries: 1,
   reporter: "list",
   use: {
     baseURL,
     storageState: rememberedLeague(new URL(baseURL).origin),
-    trace: "retain-on-failure",
+    // Every attempt, not "on-first-retry": that traces only the retry, which is the attempt
+    // that passes, and the one worth reading is the first.
+    trace: "on",
   },
   projects: [
     { name: "live-desktop", use: { ...devices["Desktop Chrome"] } },

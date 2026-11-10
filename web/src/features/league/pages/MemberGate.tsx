@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useQueryClient } from "@tanstack/react-query";
 import { Navigate, useLocation, useNavigate } from "react-router";
 
+import { recordUsage } from "../../../data/usage";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useShell } from "../../../design/shell/ShellContext";
 import { crossfade } from "../../../design/viewTransition";
@@ -155,6 +156,7 @@ export function MemberGate({ children }: { children: ReactNode }) {
     crossfade(
       () => {
         stepping.current = false;
+        recordUsage({ step: "picker_claimed" });
         claimMember({ leagueId: league.leagueId, leagueName: league.leagueName, ...entry });
         focusAfterClaim.current = true;
         // A new key at the same address, so the shell's scroll to an id in it (#kadro) runs
@@ -175,7 +177,12 @@ export function MemberGate({ children }: { children: ReactNode }) {
     );
   };
 
-  if (status === "claimed" && member) {
+  const picking = !(status === "claimed" && member);
+  useEffect(() => {
+    if (picking) recordUsage({ step: "picker_shown" });
+  }, [picking, league.leagueId]);
+
+  if (!picking) {
     if (asksForOwnPage(location.state)) {
       return (
         <>
