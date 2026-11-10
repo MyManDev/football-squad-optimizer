@@ -1,11 +1,11 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-11-06T08:31:54.156133Z",
+  "generated_at_utc": "2026-11-10T09:31:19.812340Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 2199732,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
+    "as_of_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
     "weeks": [
       {
         "gameweek": 10,
@@ -34,8 +34,8 @@
         "advice_captured_at_utc": "2026-10-30T07:00:58.818398Z",
         "advice_generated_at_utc": "2026-10-30T08:03:14Z",
         "advice_sha256": "c12648dc6e75e03eafe58dcc095fa4c87e72979fb2557f0c1dbc60f3d1159cf1",
-        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
-        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
+        "outcome_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
+        "outcome_captured_at_utc": "2026-11-10T09:31:19.812340Z",
         "expected_own_points": 55.90311555058727,
         "suggested": {
           "gross_points": 67.0,
@@ -1000,8 +1000,8 @@
         "advice_captured_at_utc": "2026-10-23T11:16:47.162538Z",
         "advice_generated_at_utc": "2026-10-23T12:40:33Z",
         "advice_sha256": "4592499fed1a93c0a383ae0a227d75b410e4ad30483540a804a91c78e82d60fc",
-        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
-        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
+        "outcome_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
+        "outcome_captured_at_utc": "2026-11-10T09:31:19.812340Z",
         "expected_own_points": 56.29761652948116,
         "suggested": {
           "gross_points": 33.0,
@@ -1825,8 +1825,8 @@
         "advice_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "advice_generated_at_utc": "2026-10-16T07:13:49Z",
         "advice_sha256": "8ef8a73d97f0f0bfb1bbed45eeccd5f98b9a76597beec55bdce945c979c6eba7",
-        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
-        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
+        "outcome_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
+        "outcome_captured_at_utc": "2026-11-10T09:31:19.812340Z",
         "expected_own_points": 58.482802268551836,
         "suggested": {
           "gross_points": 63.0,
@@ -2952,8 +2952,8 @@
         "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
         "advice_generated_at_utc": "2026-10-10T06:07:04Z",
         "advice_sha256": "a2857140ac5abc2b79c1988c8ce4c4540546cd7b541fe35e36727fc0f8b6e085",
-        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
-        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
+        "outcome_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
+        "outcome_captured_at_utc": "2026-11-10T09:31:19.812340Z",
         "expected_own_points": 56.75799335902773,
         "suggested": {
           "gross_points": 80.0,
@@ -3924,8 +3924,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "36358a8b790f1240a4a24b23887cd7a9ee1827d41ee7968f0febb9bf673f8376",
-        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
-        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
+        "outcome_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
+        "outcome_captured_at_utc": "2026-11-10T09:31:19.812340Z",
         "expected_own_points": 57.113332619233816,
         "suggested": {
           "gross_points": 55.0,
@@ -4175,8 +4175,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "2e69c50665c677452fdbdfc36857e1e45536ad534b65a5e22febe22f8565bed7",
-        "outcome_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
-        "outcome_captured_at_utc": "2026-11-06T08:31:54.156133Z",
+        "outcome_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
+        "outcome_captured_at_utc": "2026-11-10T09:31:19.812340Z",
         "expected_own_points": 58.00754952072998,
         "suggested": {
           "gross_points": 77.0,

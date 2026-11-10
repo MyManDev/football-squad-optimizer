@@ -1,11 +1,11 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-06T14:58:16Z",
+  "generated_at_utc": "2026-11-10T09:33:43Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
     "season": "2026-27",
-    "gameweek": 10,
+    "gameweek": 11,
     "entry_id": 7018833,
     "window": 1,
     "windows": {
@@ -33,24 +33,24 @@
       8548384,
       8883467
     ],
-    "default_rival_entry_id": 5662073,
+    "default_rival_entry_id": 6880255,
     "suggested_strategy": {
       "strategy": "saf-puan",
       "rule_id": "gap_and_weeks_strategy_rule_v1",
       "band": "level",
-      "rival_entry_id": 5662073,
-      "points_ahead_of_rival": -24,
-      "scored_gameweek": 9,
-      "gameweeks_remaining": 29,
-      "band_edge_points": 114.2
+      "rival_entry_id": 6880255,
+      "points_ahead_of_rival": -22,
+      "scored_gameweek": 10,
+      "gameweeks_remaining": 28,
+      "band_edge_points": 112.2
     },
     "computed": [],
     "unavailable": [],
     "menu": "device",
-    "source_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
+    "source_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
     "chip_states": {
       "known": true,
-      "gameweek": 10,
+      "gameweek": 11,
       "states": {
         "wildcard": {
           "first_half": {
