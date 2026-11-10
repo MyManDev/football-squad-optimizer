@@ -456,3 +456,102 @@ def test_the_elite_picks_capture_still_refuses_a_capture_with_a_broken_ordering(
     assert exit_code == 1
     assert fetched == []
     assert [path.name for path in tmp_path.iterdir()] == [cohort_id]
+
+
+# --- standings pages that disagree are read again ----------------------------
+
+_REREAD_DEADLINE = "2026-09-04T17:30:00Z"
+_REREAD_BOOTSTRAP = json.dumps(
+    {"events": [{"id": 3, "deadline_time": _REREAD_DEADLINE, "finished": False}]}
+).encode()
+
+
+def _page_two_repeating_rank_fifty() -> bytes:
+    """Page two as FPL served it on 9 Nov 2026: page one's last entry again at rank 51.
+
+    The Overall standings are not a stable sort among tied totals, so a second page read a
+    moment after the first can start with the entry the first page ended on; the entry
+    that really holds rank 51 is then on neither page.
+    """
+
+    body = json.loads(_standings_page_payload(2))
+    body["standings"]["results"][0]["entry"] = FIRST_SYNTHETIC_ENTRY + 50
+    return json.dumps(body).encode()
+
+
+def _run_top100_capture(
+    monkeypatch: pytest.MonkeyPatch, root: Path, reads: list[bytes]
+) -> tuple[int, list[float], int]:
+    """Run the Top-100 capture on ``reads``; return (exit, waits, reads left unread)."""
+
+    remaining = iter(reads)
+    clocks = iter(["2026-09-01T12:00:00Z", "2026-09-01T12:01:00Z"])
+    monkeypatch.setattr(capture, "fetch", lambda _: next(remaining))
+    monkeypatch.setattr(capture, "_utc_now", lambda: next(clocks))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["capture_top100_cohort", "--target-gameweek", "3", "--snapshot-root", str(root)],
+    )
+    waits: list[float] = []
+    exit_code = capture.main(sleeper=waits.append)
+    return exit_code, waits, len(list(remaining))
+
+
+def test_pages_that_disagree_are_read_again_and_only_the_agreeing_read_is_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    page_one, page_two = _standings_page_payload(1), _standings_page_payload(2)
+
+    exit_code, waits, unread = _run_top100_capture(
+        monkeypatch,
+        tmp_path,
+        [_REREAD_BOOTSTRAP, page_one, _page_two_repeating_rank_fifty(), page_one, page_two],
+    )
+
+    assert exit_code == 0
+    assert unread == 0
+    assert waits == [capture.PAGE_READ_DELAY_SECONDS]
+    output = capsys.readouterr().out
+    assert "the standings pages disagree" in output
+    assert "two different ranks" in output
+    (written,) = list(tmp_path.iterdir())
+    payloads = read_snapshot(tmp_path, written.name).payloads
+    assert payloads[league_standings_page_payload(314, 1)] == page_one
+    assert payloads[league_standings_page_payload(314, 2)] == page_two
+
+
+def test_pages_that_disagree_on_every_read_are_refused_and_nothing_is_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    disagreeing = [_standings_page_payload(1), _page_two_repeating_rank_fifty()]
+
+    exit_code, waits, unread = _run_top100_capture(
+        monkeypatch,
+        tmp_path,
+        [_REREAD_BOOTSTRAP, *disagreeing * capture.PAGE_READ_ATTEMPTS],
+    )
+
+    assert exit_code == 1
+    assert unread == 0
+    assert waits == [capture.PAGE_READ_DELAY_SECONDS] * (capture.PAGE_READ_ATTEMPTS - 1)
+    output = capsys.readouterr().out
+    assert f"disagreed on all {capture.PAGE_READ_ATTEMPTS} reads" in output
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_page_that_cannot_be_parsed_is_refused_without_reading_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only disagreement across pages is retried; a page that is not a standings page is not."""
+
+    exit_code, waits, unread = _run_top100_capture(
+        monkeypatch,
+        tmp_path,
+        [_REREAD_BOOTSTRAP, _standings_page_payload(1), b"{}", *[_standings_page_payload(1)] * 4],
+    )
+
+    assert exit_code == 1
+    assert waits == []
+    assert unread == 4
+    assert list(tmp_path.iterdir()) == []

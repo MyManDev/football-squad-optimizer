@@ -24,12 +24,16 @@ async function controlSizes(page: Page) {
   );
 }
 
+// The gate's shape is on screen before the page behind it and carries no loading word, so
+// the page's own heading is what says there are controls to read.
 async function settled(page: Page) {
+  await expect(page.locator("main h1, main h2").first()).toBeVisible();
   await expect(page.locator("main")).not.toContainText(/Yükleniyor|Loading/);
 }
 
 test("the member picker's team number field is at least 16px on a phone", async ({ page }) => {
   await page.goto("/league/352490/members");
+  await expect(page.getByLabel("Takım ID")).toBeVisible();
   await settled(page);
   const controls = await controlSizes(page);
   expect(controls.map((c) => c.name)).toContain("Takım ID");

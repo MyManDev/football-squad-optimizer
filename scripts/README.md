@@ -73,6 +73,7 @@ column is the author date of the file's last commit when this catalogue was last
 | `run_week.py` | shim | `squadopt.platform.weekly_operations`; `docs/weekly_runbook.md` | 2026-10-12 |
 | `seed_entry_registry.py` | operational | `data/entries/registry.json`; `docs/weekly_runbook.md` | 2026-10-04 |
 | `smoke_backend_local.py` | operational | `docs/backend_free_hosting.md`; standard library only, writes nothing | 2026-09-26 |
+| `usage_report.mjs` | operational | prints counts per page, tool and step for a date range from the usage dataset; writes nothing; [ADR 0014](../docs/architecture/decisions/0014-usage-measurement.md) | 2026-11-09 |
 
 ## Release recipe
 

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { recordUsage } from "../../../data/usage";
 import fixture from "../../../fixtures/device-plan/instances.json";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { stubTree, withLeague } from "../../../testSupport/league";
@@ -38,6 +39,8 @@ import {
   type DeviceTimeline,
   type PageVisibility,
 } from "./useDevicePlan";
+
+vi.mock("../../../data/usage", () => ({ recordUsage: vi.fn() }));
 
 afterEach(cleanup);
 
@@ -478,6 +481,28 @@ describe("a solve on the device", () => {
     expect(payload.expected_own_points).toBeCloseTo(member.reference.expected_own_points, 9);
     expect(latest.envelope.generated_at_utc).toBe("2026-10-03T01:02:03Z");
     expect(latest.envelope.source_kind).toBe("live");
+  });
+
+  it("tells the usage record once for a run, however often it is pressed", async () => {
+    vi.mocked(recordUsage).mockClear();
+    let answer: (value: LeagueViewEnvelope<DevicePlanDocument>) => void = () => {};
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={() => new Promise((resolve) => (answer = resolve))}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
+    );
+    expect(recordUsage).not.toHaveBeenCalled();
+    await act(async () => screen.getByText("run").click());
+    await act(async () => screen.getByText("run").click());
+    expect(vi.mocked(recordUsage).mock.calls).toEqual([[{ step: "device_solve" }]]);
+    await act(async () => answer(envelope(document)));
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
   });
 
   it("refuses inputs from another capture than the page's", async () => {

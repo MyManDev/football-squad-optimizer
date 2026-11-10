@@ -2,7 +2,8 @@
  * The league table in direction D (D-Lig): the top bar, then the league's name and the
  * table as the page's one focal point, with the viewer's chips and their chaser in a
  * quieter column beside it where the page is wide enough, under it where it is not. The
- * table never scrolls sideways: on a phone the gap to the leader goes and the rest narrows.
+ * table never scrolls sideways: on a phone the week's net and the gap to the leader fold out
+ * under their row from a chevron at its end, and the columns that stay keep their figures.
  */
 
 /* The page uses the whole main column from 1180 px, as D-Lig does. */
@@ -275,7 +276,7 @@ td.total {
   }
 }
 
-/* ---- Phone: the gap to the leader goes, the rest narrows ---- */
+/* ---- A narrow column beside the tablet's rail: the gap goes, the rest narrows ---- */
 
 @container league-page (max-width: 559.98px) {
   th.rank {
@@ -311,6 +312,91 @@ td.total {
     height: auto;
     padding-block: var(--space-1);
     vertical-align: bottom;
+  }
+}
+
+/* ---- Phone: rank, movement, team and total, the rest folded under the row ---- */
+
+/* The column at the row's end holds the chevron; its cell has no padding of its own. */
+th.details {
+  width: 44px;
+}
+
+.table th.details,
+.table td.details {
+  padding: 0;
+}
+
+@media (max-width: 599.98px) {
+  .table {
+    --rank-column: 32px;
+    --move-column: 40px;
+    --total-column: 68px;
+  }
+
+  th.rank {
+    width: var(--rank-column);
+  }
+
+  th.move {
+    width: var(--move-column);
+  }
+
+  th.total {
+    width: var(--total-column);
+  }
+
+  .table th:last-child,
+  .table td:last-child {
+    padding-right: 0;
+  }
+
+  /* The whole row opens the member's page, up to the chevron: the link's hit area is stretched
+     from the team's cell over the fixed columns on either side of it. */
+  .teamColumn {
+    position: relative;
+  }
+
+  .teamCell {
+    position: static;
+  }
+
+  .memberLink::after {
+    inset: 0 calc(-1 * var(--total-column)) 0 calc(-1 * (var(--rank-column) + var(--move-column)));
+  }
+
+  /* The link's own box is a thumb's too; the margin takes the padding back from the line. */
+  .memberLink {
+    display: inline-block;
+    padding-block: 14px;
+    margin-block: -14px;
+  }
+
+  /* An open row and its figures read as one row, the figures under the team's name. */
+  .table tbody tr:has(+ .detailRow) {
+    border-bottom: 0;
+  }
+
+  .table .detailRow td {
+    height: auto;
+    padding: 0 var(--space-3) var(--space-3)
+      calc(var(--rank-column) + var(--move-column) + var(--space-2));
+  }
+
+  .viewerRow:has(+ .detailRow) td:first-child {
+    border-bottom-left-radius: 0;
+  }
+
+  .viewerRow:has(+ .detailRow) td:last-child {
+    border-bottom-right-radius: 0;
+  }
+
+  .detailRow.viewerRow td {
+    border-radius: 0 0 var(--radius-s) var(--radius-s);
+  }
+
+  .viewerRow dt {
+    color: var(--color-mark-text);
   }
 }
 

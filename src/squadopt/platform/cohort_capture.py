@@ -8,12 +8,21 @@ standings pages, frozen through ``evaluation.select_as_of_top_100``, and that pa
 produces the primary benchmark cohort. ``--cohort-size 200`` captures four pages in the
 same atomic snapshot and derives the nested Top-50/100/200 from it -- a sensitivity and
 evidence source that does **not** replace the frozen primary Top-100.
+
+The Overall standings are not a stable sort among tied totals: one read of two pages can
+show the same entry at the end of page 1 and again at the start of page 2, with another
+entry on neither. The pages are then read again, all of them, up to ``PAGE_READ_ATTEMPTS``
+times; only a read whose pages agree is checked further and written. The checks
+themselves are unchanged.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -46,6 +55,21 @@ PRIMARY_COHORT_SIZE = 100
 # 7 freezes the primary cohort -- so the two kinds must not be confusable at a glance.
 SNAPSHOT_SOURCES = {100: "fpl-top100", 200: "fpl-top200"}
 REPOSITORY_ROOT = Path.cwd()
+# How many times the standings pages are read when their ranks disagree, and the wait
+# between reads. On 9 Nov 2026 a settled run stopped on one such read; a read a few
+# seconds later agreed.
+PAGE_READ_ATTEMPTS = 4
+PAGE_READ_DELAY_SECONDS = 20.0
+
+
+@dataclass
+class _StandingsRead:
+    """One read of the standings pages a cohort needs, exactly as served."""
+
+    payloads: dict[str, bytes] = field(default_factory=dict)
+    pages: list[LeagueStandingsPage] = field(default_factory=list)
+    rankings: list[RankedManager] = field(default_factory=list)
+    source_updates: set[str] = field(default_factory=set)
 
 
 def _utc_now() -> str:
@@ -73,7 +97,71 @@ def _parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
+def _read_standings(size: int) -> _StandingsRead:
+    read = _StandingsRead()
+    for page_number in pages_for_cohort_size(size):
+        endpoints = league_standings_page_endpoint_path(OVERALL_LEAGUE_ID, page_number)
+        payload_name, path = next(iter(endpoints.items()))
+        content = fetch(f"{BASE_URL}/{path}")
+        page = fpl_league_standings_page(
+            content,
+            league_id=OVERALL_LEAGUE_ID,
+            expected_page=page_number,
+        )
+        read.payloads[payload_name] = content
+        read.pages.append(page)
+        read.source_updates.add(page.last_updated_data)
+        read.rankings.extend(
+            RankedManager(entry_id=member.entry_id, rank=int(member.rank_sort))
+            for member in page.members
+            if member.rank_sort is not None and member.rank_sort <= PRIMARY_COHORT_SIZE
+        )
+    return read
+
+
+def _ordering(read: _StandingsRead, size: int) -> tuple[int, ...]:
+    # The primary path's own check, unchanged: ranks 1..100 exactly, from the pages
+    # that carry them. Kept even at size 200, where the first hundred ranks are the
+    # same hundred and a gap in them would invalidate the nested reading too.
+    if len(read.rankings) != PRIMARY_COHORT_SIZE or {
+        record.rank for record in read.rankings
+    } != set(range(1, PRIMARY_COHORT_SIZE + 1)):
+        raise DataSourceError(
+            "The captured Overall standings pages do not contain exactly the "
+            f"rank_sort values 1 through {PRIMARY_COHORT_SIZE}."
+        )
+    # Refuses on a missing or repeated rank rather than returning a shorter ordering.
+    return ranked_entries_from_pages(read.pages, expected_ranks=size)
+
+
+def _agreeing_standings(
+    size: int, *, sleeper: Callable[[float], None]
+) -> tuple[_StandingsRead, tuple[int, ...]]:
+    """The first read whose pages agree, or a refusal once every attempt disagreed.
+
+    Only the checks across pages are retried. A page that cannot be fetched or parsed is
+    refused as before (``fetch`` already retries the transport), and so is everything
+    checked after the ordering, such as the deadline.
+    """
+
+    for attempt in range(1, PAGE_READ_ATTEMPTS + 1):
+        read = _read_standings(size)
+        try:
+            return read, _ordering(read, size)
+        except DataError as error:
+            if attempt == PAGE_READ_ATTEMPTS:
+                raise DataSourceError(
+                    f"{error} The pages disagreed on all {PAGE_READ_ATTEMPTS} reads."
+                ) from error
+            print(
+                f"  waiting  the standings pages disagree ({error}); reading all "
+                f"{len(read.pages)} again in {PAGE_READ_DELAY_SECONDS:.0f}s"
+            )
+            sleeper(PAGE_READ_DELAY_SECONDS)
+    raise AssertionError("unreachable: the last attempt returns or raises")
+
+
+def main(argv: list[str] | None = None, *, sleeper: Callable[[float], None] = time.sleep) -> int:
     arguments = _parse_arguments(argv)
     if arguments.target_gameweek < 2:
         print("A prospective elite cohort requires target gameweek 2 or later.")
@@ -89,40 +177,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"gameweek {arguments.target_gameweek}."
             )
 
-        payloads: dict[str, bytes] = {BOOTSTRAP_PAYLOAD: bootstrap}
-        rankings: list[RankedManager] = []
-        pages: list[LeagueStandingsPage] = []
-        source_updates: set[str] = set()
-        for page_number in pages_for_cohort_size(size):
-            endpoints = league_standings_page_endpoint_path(OVERALL_LEAGUE_ID, page_number)
-            payload_name, path = next(iter(endpoints.items()))
-            content = fetch(f"{BASE_URL}/{path}")
-            page = fpl_league_standings_page(
-                content,
-                league_id=OVERALL_LEAGUE_ID,
-                expected_page=page_number,
-            )
-            payloads[payload_name] = content
-            pages.append(page)
-            source_updates.add(page.last_updated_data)
-            rankings.extend(
-                RankedManager(entry_id=member.entry_id, rank=int(member.rank_sort))
-                for member in page.members
-                if member.rank_sort is not None and member.rank_sort <= PRIMARY_COHORT_SIZE
-            )
-
-        # The primary path's own check, unchanged: ranks 1..100 exactly, from the pages
-        # that carry them. Kept even at size 200, where the first hundred ranks are the
-        # same hundred and a gap in them would invalidate the nested reading too.
-        if len(rankings) != PRIMARY_COHORT_SIZE or {record.rank for record in rankings} != set(
-            range(1, PRIMARY_COHORT_SIZE + 1)
-        ):
-            raise DataSourceError(
-                "The captured Overall standings pages do not contain exactly the "
-                f"rank_sort values 1 through {PRIMARY_COHORT_SIZE}."
-            )
-        # Refuses on a missing or repeated rank rather than returning a shorter ordering.
-        ordered_entry_ids = ranked_entries_from_pages(pages, expected_ranks=size)
+        read, ordered_entry_ids = _agreeing_standings(size, sleeper=sleeper)
+        payloads: dict[str, bytes] = {BOOTSTRAP_PAYLOAD: bootstrap, **read.payloads}
         captured_at = _utc_now()
         # Validate timing before the identity-bearing payloads reach disk. A late capture
         # is not merely unusable evidence; it must not leave a misleading snapshot record.
@@ -137,7 +193,7 @@ def main(argv: list[str] | None = None) -> int:
             payloads=payloads,
         )
         cohort = select_as_of_top_100(
-            rankings,
+            read.rankings,
             target_gameweek=target.gameweek,
             captured_at_utc=metadata.captured_at_utc,
             deadline_timestamp_utc=target.deadline_utc,
@@ -163,7 +219,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  ranks covered     1..{len(ordered_entry_ids)} complete, no duplicates")
     for cut in sorted(derived):
         print(f"  nested Top-{cut:<7} {len(derived[cut].entry_ids)} members")
-    print(f"  source updates    {len(source_updates)} timestamp(s) across {len(pages)} page(s)")
+    print(
+        f"  source updates    {len(read.source_updates)} timestamp(s) "
+        f"across {len(read.pages)} page(s)"
+    )
     print("  raw identities    local snapshot only; not committed")
     return 0
 

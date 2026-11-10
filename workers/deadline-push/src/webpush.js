@@ -39,6 +39,7 @@ function publicPoint(text, name) {
 /** The P-256 signing key a VAPID private scalar (base64url, 32 bytes) and its public point make. */
 export async function importVapidKey(privateKey, publicKey) {
   const point = publicPoint(publicKey, "VAPID public key");
+  if (typeof privateKey !== "string" || privateKey === "") throw new Error("VAPID private key is missing");
   const d = fromBase64Url(privateKey);
   if (d.length !== 32) throw new Error("VAPID private key is not 32 bytes");
   return crypto.subtle.importKey(
