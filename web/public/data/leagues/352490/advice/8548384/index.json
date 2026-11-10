@@ -1,11 +1,11 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-06T14:58:16Z",
+  "generated_at_utc": "2026-11-10T09:33:43Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
     "season": "2026-27",
-    "gameweek": 10,
+    "gameweek": 11,
     "entry_id": 8548384,
     "window": 1,
     "windows": {
@@ -40,17 +40,17 @@
       "band": "level",
       "rival_entry_id": 2281624,
       "points_ahead_of_rival": -1,
-      "scored_gameweek": 9,
-      "gameweeks_remaining": 29,
-      "band_edge_points": 114.2
+      "scored_gameweek": 10,
+      "gameweeks_remaining": 28,
+      "band_edge_points": 112.2
     },
     "computed": [],
     "unavailable": [],
     "menu": "device",
-    "source_snapshot_id": "fpl-live-20261106T083154Z-8b1a248398c6",
+    "source_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
     "chip_states": {
       "known": true,
-      "gameweek": 10,
+      "gameweek": 11,
       "states": {
         "wildcard": {
           "first_half": {
