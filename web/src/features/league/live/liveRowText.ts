@@ -45,21 +45,27 @@ export function rowLabel(row: LiveRow, copy: Messages, locale: string): string {
   if (row.autosub !== null) {
     roles.push(row.autosub === "in" ? copy.leagueMembers.in : copy.leagueMembers.out);
   }
-  const events = [
-    row.goals > 0 ? `${live.goal} ${wholePoints(row.goals, locale)}` : null,
-    row.assists > 0 ? `${live.assist} ${wholePoints(row.assists, locale)}` : null,
-    row.card ? live.card : null,
-  ];
+  // A pick the scorer does not count brings the member nothing: none of its events or its
+  // state is told (the owner's word of 2026-11-11); under the bench boost the bench counts.
+  const events = row.counted
+    ? [
+        row.goals > 0 ? `${live.goal} ${wholePoints(row.goals, locale)}` : null,
+        row.assists > 0 ? `${live.assist} ${wholePoints(row.assists, locale)}` : null,
+        row.card ? live.card : null,
+      ]
+    : [];
   const state =
     row.fact === "noMatch"
       ? live.noMatch
       : row.fact === "didNotPlay"
         ? live.didNotPlay
-        : row.state === "up"
-          ? live.doingWell
-          : row.state === "down"
-            ? live.struggling
-            : null;
+        : !row.counted
+          ? null
+          : row.state === "up"
+            ? live.doingWell
+            : row.state === "down"
+              ? live.struggling
+              : null;
   return [
     row.name,
     ...roles,

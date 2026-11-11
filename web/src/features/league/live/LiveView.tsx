@@ -342,7 +342,10 @@ function Row({ row }: { row: LiveRow }) {
               </span>
             ) : null}
             {row.phase === "playing" ? <span className={styles.dot} /> : null}
-            <Glyphs goals={row.goals} assists={row.assists} card={row.card} />
+            {/* A pick the scorer does not count shows no event: it brings the member nothing. */}
+            {row.counted ? (
+              <Glyphs goals={row.goals} assists={row.assists} card={row.card} />
+            ) : null}
           </span>
           <span className={styles.subLine}>{subLine(row, copy, locale)}</span>
         </span>
