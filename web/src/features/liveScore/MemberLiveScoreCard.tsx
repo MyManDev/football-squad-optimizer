@@ -149,6 +149,7 @@ export function MemberLiveScoreCard({
           sourceTime={listed.source_time}
           players={below.activity}
           names={names}
+          counted={new Set(listed.counted)}
         />
         <dl className={styles.details}>
           <div>
