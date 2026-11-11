@@ -25,13 +25,23 @@ export function MemberLiveWeek({
 }
 
 /** The card and pitch can share one read and one refresh. */
-export function MemberLiveWeekView({ squad, live }: { squad: EntrySquad; live: MemberLive }) {
+export function MemberLiveWeekView({
+  squad,
+  live,
+  held = 0,
+}: {
+  squad: EntrySquad;
+  live: MemberLive;
+  /** Points the GOL board has still to bring to the score. */
+  held?: number;
+}) {
   const { shown, refreshing, refresh } = live;
   if (shown === null) return null;
   return (
     <MemberLiveScoreCard
       key={`${squad.entry.entry_id}:${squad.season}:${shown.gameweek}`}
       entryId={squad.entry.entry_id}
+      held={held}
       gameweek={shown.gameweek}
       score={shown.score}
       forecast={shown.forecast}

@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { MemberLiveScore } from "./memberLiveScore";
-import { useBoardMoments } from "./useBoardMoments";
+import { useBoardHold, useBoardMoments, type BoardBatch } from "./useBoardMoments";
 import type { MemberLive } from "./useMemberLiveScore";
 
 afterEach(cleanup);
@@ -96,5 +96,42 @@ describe("the GOL board's stream", () => {
       "1:goal",
       "1:Saka>Trossard",
     ]);
+  });
+});
+
+function Holding({ batch, land }: { batch: BoardBatch | null; land?: string }) {
+  const { held, landed } = useBoardHold(batch);
+  return (
+    <button type="button" onClick={() => land && landed(land)}>
+      {held}
+    </button>
+  );
+}
+
+describe("the live score's hold", () => {
+  const goal = (key: string, points: number | null, multiplier: 0 | 1 | 2 = 1) => ({
+    key,
+    kind: "goal" as const,
+    size: "big" as const,
+    elementId: 9,
+    name: "Haaland",
+    team: "Man City",
+    position: "FWD" as const,
+    count: 1,
+    multiplier,
+    base: points,
+    points,
+  });
+
+  it("holds a queued moment's points until its run lands, and nothing for a reserve", () => {
+    const batch = { id: 1, items: [goal("a", 8, 2), goal("b", 4), goal("c", null, 0)] };
+    const { rerender } = render(<Holding batch={batch} land="a" />);
+    expect(screen.getByRole("button")).toHaveTextContent("12");
+    screen.getByRole("button").click();
+    rerender(<Holding batch={batch} land="b" />);
+    expect(screen.getByRole("button")).toHaveTextContent("4");
+    screen.getByRole("button").click();
+    rerender(<Holding batch={batch} />);
+    expect(screen.getByRole("button")).toHaveTextContent("0");
   });
 });

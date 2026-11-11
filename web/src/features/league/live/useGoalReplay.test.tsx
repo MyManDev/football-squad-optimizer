@@ -116,8 +116,9 @@ describe("the GOL replay", () => {
     expect(screen.getByRole("listitem")).toHaveTextContent(`2:goal:${SCORER}`);
     await advance(REPLAY_STEP_MS);
     expect(screen.getByRole("listitem")).toHaveTextContent(`3:assist:${PASSER}`);
+    // Its last step over, the replay hands the board nothing more.
     await advance(REPLAY_STEP_MS * 3);
-    expect(screen.getByRole("listitem")).toHaveTextContent(`3:assist:${PASSER}`);
+    expect(screen.queryAllByRole("listitem")).toEqual([]);
     // One read of the week, nothing more.
     expect(client.liveActivity).toHaveBeenCalledTimes(1);
     expect(client.entryBundle).toHaveBeenCalledTimes(1);

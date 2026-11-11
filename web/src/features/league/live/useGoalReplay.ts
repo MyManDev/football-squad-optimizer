@@ -67,7 +67,12 @@ export function useGoalReplay(
           position: player.position,
         });
       });
-      replayEvents(activity, member.pick_order).forEach((event, index) => {
+      const events = replayEvents(activity, member.pick_order);
+      // The last moment's step over, the replay hands the board nothing more.
+      timers.push(
+        setTimeout(() => setBatch(null), REPLAY_START_MS + events.length * REPLAY_STEP_MS),
+      );
+      events.forEach((event, index) => {
         timers.push(
           setTimeout(
             () => {
@@ -90,6 +95,7 @@ export function useGoalReplay(
     return () => {
       read.abort();
       timers.forEach(clearTimeout);
+      setBatch(null);
     };
   }, [running, entryId, gameweek, capture, fixtures, forwarder, loadTable, tree]);
 

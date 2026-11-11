@@ -29,7 +29,7 @@ import { MemberLiveWeekView } from "../live/MemberLiveWeek";
 import { useMemberLiveScore } from "../live/useMemberLiveScore";
 import { useLiveWindow } from "../live/useLiveWindow";
 import { useGoalReplay } from "../live/useGoalReplay";
-import { useBoardMoments } from "../live/useBoardMoments";
+import { useBoardHold, useBoardMoments } from "../live/useBoardMoments";
 import type { LiveWindowFilter } from "../../liveScore/liveWindow";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
 import { squadWithPlayedWeek } from "../live/memberLineup";
@@ -224,7 +224,17 @@ function LeagueMemberContent({
     replaying && view.league_id === leagueId,
   );
   const board = useBoardMoments(liveWeek, view.entry.entry_id);
-  const goalMoments = <GoalMomentLayer batch={replaying ? replay : board} />;
+  // The live score holds the points of the board's queued moments until each one's run lands;
+  // the replay brings no real points, so it holds nothing.
+  const hold = useBoardHold(replaying ? null : board);
+  const goalBatch = replaying
+    ? replay === null
+      ? null
+      : { id: `replay:${replay.id}`, items: replay.items }
+    : board === null
+      ? null
+      : { id: `live:${board.id}`, items: board.items };
+  const goalMoments = <GoalMomentLayer batch={goalBatch} onLanded={hold.landed} />;
   const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
@@ -539,7 +549,7 @@ function LeagueMemberContent({
             closed week leaves the plan's settings out, so the card adds nothing to the open
             week's page. It needs the calendar for each club's id. */}
           {deadlinePassed !== null && fixtures !== null && view.league_id === leagueId ? (
-            <MemberLiveWeekView squad={view} live={liveWeek} />
+            <MemberLiveWeekView squad={view} live={liveWeek} held={hold.held} />
           ) : null}
 
           {/* What the member's last finished week came to, before what this week decides. */}

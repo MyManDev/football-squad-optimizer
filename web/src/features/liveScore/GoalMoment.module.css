@@ -174,7 +174,11 @@
 .still {
   position: fixed;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
-  left: 50%;
+  /* Centred across the screen at its own width, one line where the screen allows. */
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  width: fit-content;
+  margin-inline: auto;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -191,7 +195,6 @@
   text-transform: uppercase;
   pointer-events: auto;
   cursor: pointer;
-  translate: -50% 0;
 }
 
 .line[data-negative] .tag,
@@ -253,4 +256,9 @@
   letter-spacing: 0.04em;
   line-height: 14px;
   text-transform: uppercase;
+}
+
+/* The close button's focus ring in the mark colour, which reads on the board in both themes. */
+.close:focus-visible {
+  outline-color: var(--color-mark);
 }

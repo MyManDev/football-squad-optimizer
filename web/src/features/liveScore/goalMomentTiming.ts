@@ -5,8 +5,14 @@
 
 import { MOTION_MS } from "../../design/motion";
 
-/** The owner's word of 2026-11-11 for a goal's board, the same in both languages. */
-export const GOAL_SHOUT = "GOOOOOOOOLLLLLL";
+/**
+ * The owner's word of 2026-11-11 for a goal's board, GOOOOOOOOLLLLLL; English stretches the
+ * approved GOAL the same way.
+ */
+export const GOAL_SHOUT: Readonly<Record<"tr" | "en", string>> = {
+  tr: "GOOOOOOOOLLLLLL",
+  en: "GOOOOOOOAAAALLLL",
+};
 
 /**
  * The owner's word for an assist's board ("ASISSSSSSTTTTT", 2026-11-11), in Turkish capitals

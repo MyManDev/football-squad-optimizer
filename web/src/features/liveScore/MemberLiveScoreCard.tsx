@@ -47,6 +47,7 @@ const COPY = {
 /** Display only. The source adapter owns loading; neither score nor refresh is recorded here. */
 export function MemberLiveScoreCard({
   entryId = 0,
+  held = 0,
   gameweek,
   score,
   forecast = null,
@@ -57,6 +58,8 @@ export function MemberLiveScoreCard({
 }: {
   /** Whose score it is: each member's figure counts from its own last value. */
   entryId?: number;
+  /** Points the GOL board has still to bring here: held back until its run lands. */
+  held?: number;
   gameweek: number;
   score: LiveWeekScore | null;
   /** What was forecast for the eleven fielded, on the live score's net basis; null unstated. */
@@ -113,8 +116,8 @@ export function MemberLiveScoreCard({
               <span className={styles.total} data-live-total>
                 <CountingNumber
                   countKey={`live-net:${entryId}:${gameweek}`}
-                  value={score.net}
-                  format={integer}
+                  value={score.net - held}
+                  format={(value) => integer(Math.round(value))}
                 />
               </span>
             }

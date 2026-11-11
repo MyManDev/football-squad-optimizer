@@ -338,7 +338,7 @@ for (const width of [320, 375, 390]) {
       await refresh.click();
       if (reduce) {
         const still = page.locator("[data-goal-still]");
-        await expect(still).toContainText(`${GOAL_SHOUT} · ${SCORER.name} · ${SCORER.goal}`);
+        await expect(still).toContainText(`${GOAL_SHOUT.tr} · ${SCORER.name} · ${SCORER.goal}`);
         await expect(page.locator("[data-goal-board]")).toHaveCount(0);
         await page.screenshot({ path: testInfo.outputPath(`goal-still-${width}.png`) });
         await still.getByRole("button", { name: "Kapat" }).click();
@@ -346,7 +346,7 @@ for (const width of [320, 375, 390]) {
       } else {
         const board = page.locator("[data-goal-board='goal']");
         await expect(board).toBeVisible();
-        await expect(board).toContainText(GOAL_SHOUT);
+        await expect(board).toContainText(GOAL_SHOUT.tr);
         await expect(board).toContainText(SCORER.name);
         await expect(board.locator("[data-goal-points]")).toHaveText(SCORER.goal);
         await expect(page.getByRole("status").filter({ hasText: "Gol:" })).toHaveText(

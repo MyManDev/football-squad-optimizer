@@ -5,7 +5,9 @@
  * for goals.
  */
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+
+import { prefersReducedMotion } from "../../../design/motion";
 
 import { newSubstitutions, type BoardMoment } from "../../liveScore/boardMoments";
 import type { MemberLive } from "./useMemberLiveScore";
@@ -66,4 +68,41 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
     });
   }
   return seen.batch;
+}
+
+/**
+ * The points the board still has to bring to the live score: each queued moment's, from the
+ * read that brought it until its run lands (`landed`). Under reduced motion nothing is held.
+ */
+export function useBoardHold(batch: BoardBatch | null): {
+  held: number;
+  landed: (key: string) => void;
+} {
+  const [state, setState] = useState<{ batch: number | null; pending: Map<string, number> }>({
+    batch: null,
+    pending: new Map(),
+  });
+  if (batch !== null && batch.id !== state.batch) {
+    const pending = new Map(state.pending);
+    if (!prefersReducedMotion()) {
+      for (const moment of batch.items) {
+        if (moment.kind === "substitution" || moment.multiplier === 0) continue;
+        if (moment.points !== null && moment.points !== 0) pending.set(moment.key, moment.points);
+      }
+    }
+    setState({ batch: batch.id, pending });
+  }
+  const landed = useCallback(
+    (key: string) =>
+      setState((current) => {
+        if (!current.pending.has(key)) return current;
+        const pending = new Map(current.pending);
+        pending.delete(key);
+        return { ...current, pending };
+      }),
+    [],
+  );
+  let held = 0;
+  for (const points of state.pending.values()) held += points;
+  return { held, landed };
 }

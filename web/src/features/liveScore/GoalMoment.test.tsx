@@ -48,7 +48,7 @@ const HAALAND = moment({
 function show(items: BoardMoment[], language: "tr" | "en" = "tr", id = 1) {
   const view = (batchId: number) => (
     <LanguageProvider initialLanguage={language}>
-      <GoalMomentLayer batch={{ id: batchId, items }} />
+      <GoalMomentLayer batch={{ id: `live:${batchId}`, items }} />
     </LanguageProvider>
   );
   const result = render(view(id));
@@ -70,7 +70,7 @@ describe("the GOL board", () => {
   it("rises with the shout, the scorer and the points, and says it once", () => {
     show([moment()]);
     expect(board()).toHaveAttribute("data-goal-board", "goal");
-    expect(board()!.textContent).toContain(GOAL_SHOUT);
+    expect(board()!.textContent).toContain(GOAL_SHOUT.tr);
     expect(board()!.textContent).toContain("Palmer");
     expect(board()!.textContent).toContain("Chelsea · Orta saha");
     expect(digits()).toBe("+5");
@@ -78,12 +78,12 @@ describe("the GOL board", () => {
     expect(screen.getByRole("button", { name: "Kapat" })).toBe(board());
   });
 
-  it("speaks English with the same goal shout and its own assist shout", () => {
+  it("speaks English with its own stretched GOAL and ASSIST", () => {
     show(
       [moment(), moment({ key: "1:assist:7", kind: "assist", name: "Wirtz", base: 3, points: 3 })],
       "en",
     );
-    expect(board()!.textContent).toContain(GOAL_SHOUT);
+    expect(board()!.textContent).toContain(GOAL_SHOUT.en);
     expect(board()!.textContent).toContain("Chelsea · Midfielder");
     expect(screen.getByRole("status")).toHaveTextContent("Goal: Palmer, +5 points");
     fireEvent.click(board()!);
@@ -216,7 +216,7 @@ describe("what the review asked of it", () => {
     expect(region).toHaveTextContent("");
     rerender(
       <LanguageProvider initialLanguage="tr">
-        <GoalMomentLayer batch={{ id: 1, items: [moment()] }} />
+        <GoalMomentLayer batch={{ id: "live:1", items: [moment()] }} />
       </LanguageProvider>,
     );
     expect(screen.getByRole("status")).toBe(region);
@@ -269,7 +269,69 @@ describe("what the review asked of it", () => {
   });
 });
 
+describe("what the second review asked of it", () => {
+  it("names a player's two goals of one read as one moment everywhere: board, voice and line", () => {
+    show([moment({ count: 2, base: 10, points: 10 })]);
+    expect(board()!.textContent).toContain("×2");
+    expect(screen.getByRole("status")).toHaveTextContent("Gol ×2: Palmer, +10 puan");
+  });
+
+  it("never takes focus, so nothing is lost when it goes", () => {
+    show([moment()]);
+    expect(board()).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("leaves the small line to the eye: the live region says it", () => {
+    show([
+      moment({
+        key: "4:card:4",
+        kind: "card",
+        size: "small",
+        name: "Rice",
+        base: null,
+        points: null,
+      }),
+    ]);
+    expect(document.querySelector("[data-goal-line]")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("Kart: Rice");
+  });
+
+  it("waits while a modal dialog is open, and plays when it closes", async () => {
+    const dialog = document.createElement("dialog");
+    dialog.setAttribute("open", "");
+    document.body.append(dialog);
+    try {
+      show([moment()]);
+      expect(board()).toBeNull();
+      await act(async () => {
+        dialog.removeAttribute("open");
+      });
+      expect(board()).not.toBeNull();
+    } finally {
+      dialog.remove();
+    }
+  });
+
+  it("tells the page when a moment's points have arrived, or will not run there", () => {
+    const landed = vi.fn();
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <GoalMomentLayer batch={{ id: "live:1", items: [moment()] }} onLanded={landed} />
+      </LanguageProvider>,
+    );
+    fireEvent.click(board()!);
+    expect(landed).toHaveBeenCalledWith(moment().key);
+  });
+});
+
 describe("under reduced motion", () => {
+  it("goes on a tap anywhere on the still line", () => {
+    reduceMotion();
+    show([moment()]);
+    fireEvent.click(document.querySelector("[data-goal-still]")!);
+    expect(document.querySelector("[data-goal-still]")).toBeNull();
+  });
+
   it("names the read's moments on one still line that goes after a while or on its button", () => {
     reduceMotion();
     vi.useFakeTimers();
@@ -286,7 +348,7 @@ describe("under reduced motion", () => {
     ]);
     expect(board()).toBeNull();
     const still = document.querySelector("[data-goal-still]")!;
-    expect(still.textContent).toContain(`${GOAL_SHOUT} · Haaland · +8`);
+    expect(still.textContent).toContain(`${GOAL_SHOUT.tr} · Haaland · +8`);
     expect(still.textContent).toContain("Kart · Rice");
     advance(MOMENT_TIMING.still);
     expect(document.querySelector("[data-goal-still]")).toBeNull();
@@ -315,7 +377,7 @@ describe("its motion", () => {
     } finally {
       delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
     }
-    expect(calls.length).toBeGreaterThan(GOAL_SHOUT.length);
+    expect(calls.length).toBeGreaterThan(GOAL_SHOUT.tr.length);
     const allowed = new Set<number>([
       MOMENT_TIMING.rise,
       MOMENT_TIMING.fall,

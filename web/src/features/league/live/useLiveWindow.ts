@@ -19,6 +19,12 @@ export function useLiveWindow(
   const [now, setNow] = useState(() => Date.now());
   const match = liveWindow(fixtures, now, filter);
   const changesIn = match.changesIn;
+  // A new filter (a read named the member's clubs) is read with the clock of now, not with
+  // the one the last timer left, which can be up to half an hour old.
+  useEffect(() => {
+    const timer = setTimeout(() => setNow(Date.now()), 0);
+    return () => clearTimeout(timer);
+  }, [filter]);
   useEffect(() => {
     if (changesIn === null) return undefined;
     const timer = setTimeout(
