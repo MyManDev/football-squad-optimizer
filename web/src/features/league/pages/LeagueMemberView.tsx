@@ -28,6 +28,7 @@ import { WhatIfPanel } from "../device/WhatIfPanel";
 import { MemberLiveWeekView } from "../live/MemberLiveWeek";
 import { useMemberLiveScore } from "../live/useMemberLiveScore";
 import { useLiveWindow } from "../live/useLiveWindow";
+import { useGoalReplay } from "../live/useGoalReplay";
 import type { LiveWindowFilter } from "../../liveScore/liveWindow";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
 import { squadWithPlayedWeek } from "../live/memberLineup";
@@ -196,6 +197,9 @@ function LeagueMemberContent({
   // What the member's latest live read said (their clubs, the matches still unfinished), kept
   // while no read is made, so the window follows only their matches (the owner's decision 3).
   const [matchFilter, setMatchFilter] = useState<LiveWindowFilter>({});
+  // The GOL replay opens from the address alone (`?replay=1`): it plays the member's live week's
+  // goals and assists one by one, so the moment can be seen when no match is on.
+  const replaying = searchParams.get("replay") === "1";
   const liveMatch = useLiveWindow(fixtures, matchFilter);
   const liveWeek = useMemberLiveScore(
     view,
@@ -204,14 +208,21 @@ function LeagueMemberContent({
     (closed || liveMatch.open) &&
       view.league_id === leagueId &&
       (!tool || tool === "current-squad"),
-    liveMatch.open ? liveMatch.gameweek : null,
+    // The replay stands in for the page's own reads: nothing follows while it plays.
+    replaying || !liveMatch.open ? null : liveMatch.gameweek,
   );
   if (liveWeek.matches !== null && liveWeek.matches !== matchFilter) {
     setMatchFilter(liveWeek.matches);
   }
   // One GOL layer for the page and its tools, which share this mounted page: it stays as the
   // member moves between them, so a moment already played never plays again on the way back.
-  const goalMoments = <GoalMomentLayer batch={liveWeek.moments} />;
+  const replay = useGoalReplay(
+    view,
+    fixtures,
+    liveDependencies,
+    replaying && view.league_id === leagueId,
+  );
+  const goalMoments = <GoalMomentLayer batch={replaying ? replay : liveWeek.moments} />;
   const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.

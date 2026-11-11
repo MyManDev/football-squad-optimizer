@@ -19,6 +19,7 @@ import { createPortal } from "react-dom";
 
 import { MOTION_EASE, MOTION_MS, prefersReducedMotion } from "../../design/motion";
 import { ASSIST_SHOUT, GOAL_SHOUT, MOMENT_TIMING } from "./goalMomentTiming";
+import { useCoverGone } from "./openingCover";
 import { useLanguage } from "../../i18n/context";
 import type { LiveMoment } from "./liveMoments";
 import type { Position } from "./weekLive";
@@ -90,22 +91,6 @@ function animate(
     fill: "both",
     ...extra,
   });
-}
-
-/** Whether the opening cover is up; the moments wait for it to go. */
-function useCoverGone(): boolean {
-  const [gone, setGone] = useState(
-    () => typeof document === "undefined" || !document.querySelector("[data-opening-mark]"),
-  );
-  useEffect(() => {
-    if (gone) return undefined;
-    const observer = new MutationObserver(() => {
-      if (!document.querySelector("[data-opening-mark]")) setGone(true);
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [gone]);
-  return gone;
 }
 
 export function GoalMomentLayer({ batch }: { batch: Batch | null }) {

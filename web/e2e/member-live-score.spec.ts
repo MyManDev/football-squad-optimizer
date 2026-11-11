@@ -5,6 +5,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
 import { ASSIST_SHOUT, GOAL_SHOUT } from "../src/features/liveScore/goalMomentTiming";
+import { REPLAY_START_MS, REPLAY_STEP_MS } from "../src/features/liveScore/liveReplay";
 import {
   exampleBundle,
   exampleCalendar,
@@ -546,4 +547,29 @@ test("a goal of the week being played plays on the next week's open page", async
   await page.clock.fastForward(60_000);
   await expect(page.locator("[data-goal-board='goal']")).toContainText(SCORER.name);
   expect(reads).toBe(2);
+});
+
+test("the address alone replays the week's goals and assists on the GOL board", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.install({ time: Date.parse("2026-11-12T10:00:00Z") });
+  await closedWeek(page);
+  const asked = await forwarder(page, answersBundle, ["in_progress"], [{ goals: 1, assists: 1 }]);
+  await page.addInitScript(() => {
+    localStorage.setItem("squadopt.language", "tr");
+    sessionStorage.setItem("squadopt.openingShown", "1");
+  });
+  await page.goto(`/league/352490/members/${ENTRY}?replay=1`);
+  await expect(page.locator("[data-member-live-score]")).toBeVisible();
+  // Nothing on the page links to the replay or names it.
+  expect(await page.locator('a[href*="replay"]').count()).toBe(0);
+  expect(await page.evaluate(() => /replay/i.test(document.body.innerText))).toBe(false);
+  await page.clock.fastForward(REPLAY_START_MS + 100);
+  await expect(page.locator("[data-goal-board='goal']")).toContainText(SCORER.name);
+  await page.clock.fastForward(REPLAY_STEP_MS);
+  await expect(page.locator("[data-goal-board='assist']")).toContainText(ASSIST_SHOUT.tr);
+  // The replay reads the week once, beside the page's own first read, and nothing follows.
+  await page.clock.fastForward(2 * 60_000);
+  expect(asked.live).toHaveLength(2);
 });
