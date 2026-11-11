@@ -11,6 +11,7 @@ import { jsonResponse, notFound, stubFetchByUrl } from "../../../testSupport/fet
 import { memberAddress, membersAddress } from "../../../lib/leagueAddresses";
 import { claimIn, forgetIdentity } from "../../../testSupport/league";
 import { readMemberClaim } from "../identity/memberClaim";
+import { leagueKeys } from "../queries";
 import { readChosenLeague, writeChosenLeague } from "../identity/useChosenLeague";
 import { LeagueGate } from "./LeagueGate";
 
@@ -58,8 +59,11 @@ function countLeagueChoices() {
   return { heard, stop: () => window.removeEventListener("squadopt:league-changed", heard) };
 }
 
-function open(language: Language, address = `/league/members/${ENTRY}`) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function open(
+  language: Language,
+  address = `/league/members/${ENTRY}`,
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const page = (
     <LeagueGate>
       <h1>Member page</h1>
@@ -271,6 +275,28 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     await userEvent.setup().click(screen.getByRole("button", { name: copy.retry }));
     expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
     expect(asked(fetcher).filter((url) => url === "data/league/members.json")).toHaveLength(2);
+  });
+
+  it("keeps the page drawn when a later read of the directory fails", async () => {
+    let answer = true;
+    claimIn();
+    stubFetchByUrl([
+      ["/data/leagues.json", notFound],
+      [
+        "/data/league/members.json",
+        () => (answer ? jsonResponse(published) : new Response("", { status: 503 })),
+      ],
+    ]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    open(language, memberAddress(LEAGUE, ENTRY), client);
+    expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
+    answer = false;
+    await act(async () => {
+      await client.refetchQueries({ queryKey: leagueKeys.directory() });
+    });
+    expect(client.getQueryState(leagueKeys.directory())?.status).toBe("error");
+    expect(screen.getByRole("heading", { name: "Member page" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: copy.directoryUnreadable })).toBeNull();
   });
 
   it("says when nothing is published rather than asking for another league", async () => {

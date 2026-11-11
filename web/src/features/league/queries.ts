@@ -7,7 +7,8 @@ import { useLeague } from "./useLeague";
 /**
  * How the league feature's own reads behave, written once. Every `useQuery` call inside
  * features/league spreads one of these policies: the provisional league tree's documents
- * use LEAGUE_READ; the compute service's capabilities use CAPABILITIES_READ.
+ * use LEAGUE_READ; the compute service's capabilities use CAPABILITIES_READ; a read that only
+ * joins what is held uses HELD_READ.
  *
  * A published league file is there or it is not. A missing one is a normal state the page
  * says at once. A failed read is not retried: the page offers a read-again control, shows a
@@ -24,6 +25,17 @@ export const CAPABILITIES_READ = {
   retry: LEAGUE_READ.retry,
   staleTime: LEAGUE_READ.staleTime,
   refetchOnWindowFocus: true,
+} as const;
+
+/**
+ * A read that joins what the app holds and never reads it again: a document any page holds is
+ * taken as it is, however old, and one nobody holds is read once. The phone bar's LIVE pill
+ * reads this way, so opening a match window or turning the phone never re-reads (or, on a
+ * failed answer, takes away) a document a gate draws its page from.
+ */
+export const HELD_READ = {
+  retry: LEAGUE_READ.retry,
+  staleTime: Number.POSITIVE_INFINITY,
 } as const;
 
 /**

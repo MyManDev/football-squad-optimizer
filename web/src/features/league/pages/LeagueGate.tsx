@@ -89,8 +89,9 @@ export function LeagueGate({
   }
   if (named === null) return <LeagueEntryPage inPlace />;
   if (directory.isPending) return <EmptyState title={messages.common.loading} />;
-  if (directory.isError) {
-    // A directory that could not be read says so: the league may well be published.
+  // A directory that could not be read says so: the league may well be published. A later
+  // read that fails keeps the directory already held, so it never takes away an open page.
+  if (directory.data === undefined) {
     const missing = directory.error instanceof LeagueDataMissing;
     return (
       <EmptyState

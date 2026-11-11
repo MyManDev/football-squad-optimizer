@@ -6,10 +6,12 @@
  * Nothing is read outside a match window: the calendar alone says whether any match of the
  * live week is on. Only then are the member's clubs read, from the documents the forwarded
  * gate reads under the same keys (the directory, its newest capture table and the member's
- * bundle for that table's week), so a page that holds them reads none of them again. Where
- * they cannot be read, every match of the live week counts, as the live window's own rule
- * for an unknown club has it. The app shell computes this and hands the shell the address:
- * the shell itself reads no league data.
+ * bundle for that table's week). Every one of its reads joins what the app holds
+ * (`HELD_READ`): a document a page holds is taken as it is, however old, so opening a window
+ * or turning the phone never reads it again, and a failed answer can never take away the
+ * copy a gate draws its page from. Where the clubs cannot be read, every match of the live
+ * week counts, as the live window's own rule for an unknown club has it. The app shell
+ * computes this and hands the shell the address: the shell itself reads no league data.
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -21,12 +23,12 @@ import type { DevicePlanDocument } from "../device/types";
 import type { BundleReason, ForwarderResult } from "../forwarder/client";
 import type { FplEntryBundle } from "../forwarder/documents";
 import {
+  captureTableQuery,
+  directoryQuery,
+  entryBundleQuery,
   newestDeviceTable,
-  useCaptureTable,
-  useDirectory,
-  useEntryBundle,
 } from "../forwarded/reads";
-import { LEAGUE_READ } from "../queries";
+import { HELD_READ } from "../queries";
 import { useLiveWindow } from "./useLiveWindow";
 
 export interface LivePillTarget {
@@ -65,15 +67,24 @@ export function memberClubs(
 /** `enabled` is false where the pill cannot be drawn (no phone bar): nothing is read then. */
 export function useLivePill(target: LivePillTarget | null, enabled: boolean): string | null {
   const active = enabled && target !== null;
-  const fixtures = useQuery({ ...FIXTURES_QUERY, ...LEAGUE_READ, enabled: active });
+  const fixtures = useQuery({ ...FIXTURES_QUERY, ...HELD_READ, enabled: active });
   const calendar = active ? (fixtures.data ?? null) : null;
   const any = useLiveWindow(calendar);
   const open = active && any.open;
-  const directory = useDirectory(open);
+  const directory = useQuery({ ...directoryQuery(), ...HELD_READ, enabled: open });
   const tableRef = open && directory.data ? newestDeviceTable(directory.data) : null;
-  const table = useCaptureTable(tableRef);
+  const table = useQuery({
+    ...captureTableQuery(tableRef),
+    ...HELD_READ,
+    enabled: tableRef !== null,
+  });
   const gameweek = open ? (table.data?.payload.gameweek ?? null) : null;
-  const bundle = useEntryBundle(target?.entryId ?? 0, gameweek);
+  const entryId = target?.entryId ?? 0;
+  const bundle = useQuery({
+    ...entryBundleQuery(entryId, gameweek),
+    ...HELD_READ,
+    enabled: gameweek !== null && entryId > 0,
+  });
   const clubs = useMemo(
     () => (open ? memberClubs(bundle.data, table.data?.payload, calendar) : null),
     [open, bundle.data, table.data, calendar],

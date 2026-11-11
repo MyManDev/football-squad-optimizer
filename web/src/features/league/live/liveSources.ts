@@ -26,7 +26,7 @@ import type {
   ForwarderResult,
 } from "../forwarder/client";
 import type { FplEntryBundle, FplEntrySeason } from "../forwarder/documents";
-import { forwardedKeys, ForwarderRefused } from "../forwarded/reads";
+import { entryBundleQuery, ForwarderRefused } from "../forwarded/reads";
 import { LEAGUE_READ } from "../queries";
 import type { LeagueViewEnvelope } from "../types";
 import type { MemberLiveDependencies } from "./useMemberLiveScore";
@@ -96,19 +96,7 @@ export function bundleQuery(
   entryId: number,
   gameweek: number,
 ) {
-  return {
-    queryKey: forwardedKeys.bundle(entryId, gameweek),
-    queryFn: async ({
-      signal,
-    }: {
-      signal: AbortSignal;
-    }): Promise<ForwarderResult<FplEntryBundle, BundleReason>> => {
-      const read = await forwarder.entryBundle(entryId, gameweek, { signal });
-      // A read the page stopped is no answer to keep.
-      if (!read.ok && read.reason === "aborted") throw new ForwarderRefused(read.reason);
-      return read;
-    },
-  };
+  return entryBundleQuery(entryId, gameweek, forwarder.entryBundle.bind(forwarder));
 }
 
 /** One entry's season to date; a team FPL does not have, or a refusal, is null. */

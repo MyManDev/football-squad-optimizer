@@ -6,11 +6,14 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as navModule from "../design/shell/nav";
+import { PHONE_QUERY } from "../design/shell/layout";
 import { readMemberClaim } from "../features/league/identity/memberClaim";
 import { writeChosenLeague } from "../features/league/identity/useChosenLeague";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 import { MESSAGES } from "../i18n/messages";
 import { claimIn, forgetIdentity } from "../testSupport/league";
+import { PILL_ENTRY, pillCalendar, pillSite } from "../testSupport/livePillSite";
 import { IdentifiedShell } from "./IdentifiedShell";
 
 const TR = MESSAGES.tr.shell;
@@ -24,6 +27,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function LocationProbe() {
@@ -121,5 +126,55 @@ describe("the identified shell", () => {
     expect(sidebar().getByRole("link", { name: TR.findLeague })).toHaveAttribute("href", MEMBERS);
     expect(sidebar().queryByRole("link", { name: TR.league })).toBeNull();
     expect(sidebar().queryByRole("link", { name: TR.thisWeek })).toBeNull();
+  });
+});
+
+describe("the phone bar's LIVE pill", () => {
+  /** A phone's viewport: jsdom answers no media query of its own. */
+  function phone() {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      media: query,
+      matches: query === PHONE_QUERY,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+  }
+
+  /** Real time passing, with React's work for it done. */
+  const pause = (ms: number) =>
+    act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    });
+
+  it("opens a team's own LIVE page on /entry, whoever is claimed in a league", async () => {
+    phone();
+    claimIn();
+    pillSite(pillCalendar(3, 4, 30));
+    open(`/entry/${PILL_ENTRY}`);
+    const pill = await within(screen.getByRole("banner")).findByRole("link", { name: TR.live });
+    expect(pill).toHaveAttribute("href", `/entry/${PILL_ENTRY}/live`);
+  });
+
+  it("opens the claimed member's own LIVE page anywhere else", async () => {
+    phone();
+    claimIn();
+    pillSite(pillCalendar(3, 4, 30));
+    open("/fixtures");
+    const pill = await within(screen.getByRole("banner")).findByRole("link", { name: TR.live });
+    expect(pill).toHaveAttribute("href", `${MEMBERS}/35249001/live`);
+  });
+
+  it("draws the shell no more once its documents have answered", async () => {
+    phone();
+    claimIn();
+    pillSite(pillCalendar(3, 4, 30));
+    const draws = vi.spyOn(navModule, "navItems");
+    open("/fixtures");
+    await within(screen.getByRole("banner")).findByRole("link", { name: TR.live });
+    await pause(150);
+    const settled = draws.mock.calls.length;
+    await pause(150);
+    // A loop of the window's clock would draw the shell again every millisecond.
+    expect(draws.mock.calls.length).toBe(settled);
   });
 });
