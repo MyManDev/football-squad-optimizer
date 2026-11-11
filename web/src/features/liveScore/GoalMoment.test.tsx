@@ -466,6 +466,62 @@ describe("what the phone test asked of it", () => {
     }
   });
 
+  it("stands under half its size at LIVE's top on a small phone on its side, clear of the total", () => {
+    // iPhone SE on its side at LIVE's top: the head from 146 to 225, Yenile out of view.
+    vi.stubGlobal("innerHeight", 320);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(146);
+    const bar = document.createElement("header");
+    bar.setAttribute("data-phone-bar", "");
+    bar.getBoundingClientRect = () => rect(0, 56);
+    const head = document.createElement("section");
+    head.setAttribute("data-live-head", "");
+    const total = document.createElement("span");
+    total.setAttribute("data-live-total", "");
+    head.append(total);
+    document.body.append(bar, head);
+    head.getBoundingClientRect = () => rect(146, 300);
+    total.getBoundingClientRect = () => rect(177, 225);
+    try {
+      show([moment()]);
+      // The 71 below the head (237 to 308) holds it at 0.486.
+      expect(top()).toBe("237px");
+      expect(scale()).toBe("scale(0.486)");
+    } finally {
+      bar.remove();
+      head.remove();
+    }
+  });
+
+  it("keeps at least the live card's Yenile clear, smaller, where no room clears the head too", () => {
+    // The member page on a small phone on its side: the card's head from 105 to 236, its
+    // Yenile from 128 to 172; 60 free below the head, under 0.45 of the board's 146.
+    vi.stubGlobal("innerHeight", 320);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(146);
+    const bar = document.createElement("header");
+    bar.setAttribute("data-phone-bar", "");
+    bar.getBoundingClientRect = () => rect(0, 56);
+    const card = document.createElement("div");
+    card.setAttribute("data-member-live-score", "");
+    const button = document.createElement("button");
+    button.setAttribute("data-live-refresh", "");
+    const total = document.createElement("span");
+    total.setAttribute("data-live-total", "");
+    card.append(button, total);
+    document.body.append(bar, card);
+    card.getBoundingClientRect = () => rect(105, 400);
+    button.getBoundingClientRect = () => rect(128, 172);
+    total.getBoundingClientRect = () => rect(212, 236);
+    try {
+      show([moment()]);
+      // Below Yenile, 184 to 308: 0.849 of its size.
+      expect(top()).toBe("184px");
+      expect(scale()).toBe("scale(0.849)");
+    } finally {
+      bar.remove();
+      card.remove();
+    }
+  });
+
   it("fits a name too long for its line, so it breaks only after its hyphen", () => {
     const widths = (name: number) => (element: Element) =>
       element.hasAttribute("data-board-name") ? name : 0;
@@ -487,6 +543,31 @@ describe("what the phone test asked of it", () => {
     expect(name.style.fontSize).toBe("19px");
     // Its line is free to break again once it is fitted.
     expect(name.style.overflowWrap).toBe("");
+  });
+
+  it("fits a captain's name beside the C, which keeps its size", () => {
+    const real = window.getComputedStyle;
+    vi.spyOn(window, "getComputedStyle").mockImplementation((element, pseudo) =>
+      element instanceof HTMLElement && element.hasAttribute("data-board-name")
+        ? ({ fontSize: "26px" } as CSSStyleDeclaration)
+        : real.call(window, element, pseudo),
+    );
+    // A 200 px line; the name's word is 220 wide, and the C is 16 wide with 8 before it.
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockImplementation(function (this: Element) {
+      return this.hasAttribute("data-board-name") ? 200 : 0;
+    });
+    vi.spyOn(Element.prototype, "scrollWidth", "get").mockImplementation(function (this: Element) {
+      return this.hasAttribute("data-board-name") ? 244 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.hasAttribute("data-board-chip") ? 16 : 0;
+    });
+    show([HAALAND]);
+    const name = board()!.querySelector<HTMLElement>("[data-board-name]")!;
+    // The word takes the 176 the C leaves it: 26 × 176 / 220.
+    expect(name.style.fontSize).toBe("20px");
   });
 
   it("stands again inside the screen when the phone turns while it is up", () => {
@@ -854,14 +935,19 @@ describe("what the review of the last round asked of it", () => {
     }
   });
 
-  it("gives focus to the live score's heading when it was nowhere before the line came", () => {
+  it("gives focus to the live score's heading, not the page's title above it, when it was nowhere", () => {
     reduceMotion();
+    // The member page: its h1 comes before the live score's heading in the document.
+    const main = document.createElement("main");
+    const title = document.createElement("h1");
+    title.textContent = "Kepazesaray";
     const card = document.createElement("div");
     card.setAttribute("data-member-live-score", "");
     const heading = document.createElement("h2");
     heading.textContent = "11. hafta puanın";
     card.append(heading);
-    document.body.append(card);
+    main.append(title, card);
+    document.body.append(main);
     try {
       (document.activeElement as HTMLElement | null)?.blur();
       show([moment()]);
@@ -871,7 +957,7 @@ describe("what the review of the last round asked of it", () => {
       expect(still()).toBeNull();
       expect(document.activeElement).toBe(heading);
     } finally {
-      card.remove();
+      main.remove();
     }
   });
 

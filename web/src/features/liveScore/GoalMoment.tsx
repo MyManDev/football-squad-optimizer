@@ -89,16 +89,16 @@ const NAME_MIN = 18;
 
 /** The room a board keeps from the screen's edges, the phone bar and the live score. */
 const EDGE = 12;
-/** The smallest a board stands to fit a short screen: half its size, its words still read. */
-const MIN_SCALE = 0.5;
+/** The smallest a board stands to fit a short screen or a small room, its words still read. */
+const MIN_SCALE = 0.45;
 
 /**
  * Where a board stands: 38% down the screen, wholly inside it and below the phone bar, and
  * clear of the live score's head (its refresh button and total) while that is in view, so a
  * tap meant for the button reaches it and the points have somewhere to run. Where no place
- * holds it whole beside them, it stands smaller in the largest room they leave, down to half its
- * size, and failing that keeps at least the refresh button clear. Beside a sidebar it stands
- * over the page's own column, not the middle of the window.
+ * holds it whole beside them, it stands smaller in the largest room they leave (down to
+ * MIN_SCALE), and failing that keeps at least the refresh button clear, smaller if it must.
+ * Beside a sidebar it stands over the page's own column, not the middle of the window.
  */
 function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void {
   if (place === null || board === null) return;
@@ -155,13 +155,13 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
     }
   }
   // What the board keeps clear while it is in view: the head and every refresh button.
-  const kept: Band[] = head === null ? [] : [head];
+  const buttons: Band[] = [];
   // A refresh button outside the head (LIVE's, under the rival on a phone) is kept clear too,
   // without standing over the head again.
   for (const node of document.querySelectorAll("[data-live-refresh]")) {
     const button = node.getBoundingClientRect();
     if (button.height === 0 || button.bottom < 0 || button.top > view) continue;
-    kept.push({ from: button.top, to: button.bottom });
+    buttons.push({ from: button.top, to: button.bottom });
     if (card?.contains(node)) continue;
     if (!over(top, button.top, button.bottom)) continue;
     const places = [button.bottom + EDGE, button.top - EDGE - height, floor, ceiling];
@@ -174,14 +174,20 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
     );
     if (clear !== undefined) top = clear;
   }
-  // No place holds the board whole beside them (a small phone on its side): it stands smaller
-  // in the largest room they leave, if that room holds it at half its size or more.
-  if (kept.some((band) => over(top, band.from, band.to))) {
-    const free = largestRoom(ceiling, view - EDGE, kept);
-    const fit = free === null ? 0 : Math.min(scale, (free.to - free.from) / natural);
-    if (free !== null && fit >= MIN_SCALE) {
-      place.style.transform = `scale(${fit.toFixed(3)})`;
-      top = free.from;
+  // No place holds the board whole beside them (a small phone on its side): it stands smaller in
+  // the largest room they leave, or failing that in the largest room the refresh buttons alone
+  // leave, if that room holds it at MIN_SCALE of its size or more.
+  const kept = head === null ? buttons : [head, ...buttons];
+  const covers = (bands: readonly Band[]) => bands.some((band) => over(top, band.from, band.to));
+  if (covers(kept)) {
+    for (const bands of covers(buttons) ? [kept, buttons] : [kept]) {
+      const free = largestRoom(ceiling, view - EDGE, bands);
+      const fit = free === null ? 0 : Math.min(scale, (free.to - free.from) / natural);
+      if (free !== null && fit >= MIN_SCALE) {
+        place.style.transform = fit < 1 ? `scale(${fit.toFixed(3)})` : "";
+        top = free.from;
+        break;
+      }
     }
   }
   place.style.top = `${Math.round(top)}px`;
@@ -283,8 +289,11 @@ function fitNames(board: HTMLElement | null): void {
   board?.querySelectorAll<HTMLElement>("[data-board-name]").forEach((name) => {
     name.style.fontSize = "";
     name.style.overflowWrap = "normal";
-    const free = name.clientWidth;
-    const need = name.scrollWidth;
+    // The captain's chip and the gap before it keep their size whatever the name's.
+    const chip = name.querySelector<HTMLElement>("[data-board-chip]");
+    const fixed = chip === null ? 0 : chip.offsetWidth + FIT_GAP;
+    const free = name.clientWidth - fixed;
+    const need = name.scrollWidth - fixed;
     if (free > 0 && need > free) {
       const size = parseFloat(getComputedStyle(name).fontSize);
       name.style.fontSize = `${Math.max(NAME_MIN, Math.floor((size * free) / need))}px`;
@@ -379,7 +388,7 @@ function useReducedMotion(): boolean {
 }
 
 /** Where focus goes when it was nowhere before a board or line came: the live score's heading. */
-const FOCUS_HOME = "[data-member-live-score] h2, [data-live-head] h2, main h1";
+const FOCUS_HOME = ["[data-member-live-score] h2", "[data-live-head] h2", "main h1"];
 
 /**
  * Gives focus back where it was before a board or line rose, when it is on the board as it
@@ -393,7 +402,11 @@ function giveBackFocus(owner: HTMLElement | null, before: Element | null): void 
     before.focus({ preventScroll: true });
     return;
   }
-  const home = document.querySelector<HTMLElement>(FOCUS_HOME);
+  // In that order, not the document's: the page's h1 comes before the live score's heading.
+  const home =
+    FOCUS_HOME.map((selector) => document.querySelector<HTMLElement>(selector)).find(
+      (found) => found !== null,
+    ) ?? null;
   if (home === null) {
     (document.activeElement as HTMLElement | null)?.blur();
     return;
@@ -786,7 +799,11 @@ function Board({
         <span className={styles.panel}>
           <span className={styles.name} data-board-name>
             {moment.name}
-            {moment.multiplier >= 2 ? <span className={styles.captain}>C</span> : null}
+            {moment.multiplier >= 2 ? (
+              <span className={styles.captain} data-board-chip>
+                C
+              </span>
+            ) : null}
           </span>
           <span className={styles.meta}>
             {moment.team} · {copy.positions[moment.position]}
