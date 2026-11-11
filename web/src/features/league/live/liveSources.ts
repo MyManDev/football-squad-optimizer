@@ -8,7 +8,10 @@
  *   nothing keeps the board shown;
  * - reads each bundle under the key the forwarded gate reads it by (`forwardedKeys.bundle`),
  *   so a bundle the gate holds is not read again and the member's is read once;
- * - reads the capture's table once, under a key the page reads it by as well.
+ * - reads the capture's table once, under a key the page reads it by as well, and where the
+ *   league's line names the capture's own table, through the key the phone bar's LIVE pill
+ *   and the forwarded gate read that table by (`sharedTable`), so opening LIVE from the pill
+ *   reads it once.
  *
  * The queries below name a key and a read; whoever runs one gives it the league's read
  * policy (`queries.ts`).
@@ -26,8 +29,9 @@ import type {
   ForwarderResult,
 } from "../forwarder/client";
 import type { FplEntryBundle } from "../forwarder/documents";
-import { entryBundleQuery, refusalOf } from "../forwarded/reads";
-import { LEAGUE_READ } from "../queries";
+import type { LeagueRef } from "../directory";
+import { captureTableQuery, entryBundleQuery, refusalOf } from "../forwarded/reads";
+import { HELD_READ, LEAGUE_READ } from "../queries";
 import type { LeagueViewEnvelope } from "../types";
 import type { MemberLiveDependencies } from "./useMemberLiveScore";
 
@@ -131,6 +135,26 @@ export function bundleQuery(
   gameweek: number,
 ) {
   return entryBundleQuery(entryId, gameweek, forwarder.entryBundle.bind(forwarder));
+}
+
+/**
+ * The capture's table as the page reads it: where the league's line names the capture's own
+ * table, the read the phone bar's LIVE pill and the forwarded gate hold under their key (a
+ * table at one path and digest never changes, so a held one is taken however old); the
+ * league's tree otherwise, or where that read gives no table.
+ */
+export function sharedTable(
+  client: QueryClient,
+  league: LeagueRef,
+  capture: string | null,
+  load: (signal: AbortSignal) => Promise<LeagueViewEnvelope<DevicePlanDocument>>,
+): (signal: AbortSignal) => Promise<LeagueViewEnvelope<DevicePlanDocument>> {
+  const table = league.devicePlan;
+  if (table === undefined || capture === null || table.path.split("/")[1] !== capture) {
+    return load;
+  }
+  return async (signal) =>
+    (await client.fetchQuery({ ...captureTableQuery(table), ...HELD_READ })) ?? load(signal);
 }
 
 /** The capture's table the member's squad names, read once for the page. */

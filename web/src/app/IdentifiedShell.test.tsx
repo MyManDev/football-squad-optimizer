@@ -34,7 +34,11 @@ afterEach(() => {
 function LocationProbe() {
   const location = useLocation();
   return (
-    <output data-testid="location" data-state={JSON.stringify(location.state)}>
+    <output
+      data-testid="location"
+      data-state={JSON.stringify(location.state)}
+      data-search={location.search}
+    >
       {location.pathname}
     </output>
   );
@@ -162,6 +166,23 @@ describe("the phone bar's LIVE pill", () => {
     open("/fixtures");
     const pill = await within(screen.getByRole("banner")).findByRole("link", { name: TR.live });
     expect(pill).toHaveAttribute("href", `${MEMBERS}/35249001/live`);
+  });
+
+  it("keeps LIVE as it is, its rival and all, and brings its top back when tapped there", async () => {
+    phone();
+    claimIn();
+    pillSite(pillCalendar(3, 4, 30));
+    const scroll = vi.fn();
+    vi.stubGlobal("scrollTo", scroll);
+    open(`${MEMBERS}/35249001/live?duel=35249005`);
+    const pill = await within(screen.getByRole("banner")).findByRole("link", { name: TR.live });
+    expect(pill).toHaveAttribute("aria-current", "page");
+    scroll.mockClear();
+    await userEvent.click(pill);
+    const location = screen.getByTestId("location");
+    expect(location).toHaveTextContent(`${MEMBERS}/35249001/live`);
+    expect(location).toHaveAttribute("data-search", "?duel=35249005");
+    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
   });
 
   it("draws the shell no more once its documents have answered", async () => {

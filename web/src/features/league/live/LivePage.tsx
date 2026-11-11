@@ -65,6 +65,7 @@ import {
   liveSources,
   newestReading,
   readingAt,
+  sharedTable,
   tableQuery,
   type LiveForwarder,
 } from "./liveSources";
@@ -163,8 +164,10 @@ function LiveMember({
   const capture = view.source_snapshot_id ?? null;
   const injectedTable = dependencies.loadTable;
   const loadTable = useMemo(
-    () => injectedTable ?? ((signal: AbortSignal) => tree.devicePlan(capture, { signal })),
-    [injectedTable, tree, capture],
+    () =>
+      injectedTable ??
+      sharedTable(client, tree.league, capture, (signal) => tree.devicePlan(capture, { signal })),
+    [injectedTable, client, tree, capture],
   );
   const [record] = useState(createLiveRecord);
   const sources = useMemo(
@@ -324,11 +327,19 @@ function LiveMember({
     [board, rivalBoard, classic, totals],
   );
   // The last duel drawn holds its place, out of sight, while the next rival's bundle is read.
+  // The first rival's, read after the member's board, holds the room of a level duel, so its
+  // arrival moves nothing below it.
   const [kept, setKept] = useState<HeldDuel | null>(null);
   if (duel !== null && rivalBoard !== null && kept?.duel !== duel) {
     setKept({ duel, rivalNet: rivalBoard.net });
   }
-  const pending = duel === null && rivalId !== null && rivalBundle.isFetching ? kept : null;
+  const rivalReading = duel === null && rivalId !== null && rivalBundle.isFetching;
+  const pending = !rivalReading
+    ? null
+    : (kept ??
+      (board === null
+        ? null
+        : { duel: liveDuel(board, board, classic ? totals : null), rivalNet: board.net }));
 
   const claimed = useClaimedEntry(leagueId);
   const gameweek = board?.gameweek ?? week;

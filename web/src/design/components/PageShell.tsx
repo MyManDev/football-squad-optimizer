@@ -12,6 +12,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
 import { LanguageToggle } from "../../i18n/LanguageToggle";
 import { useLanguage } from "../../i18n/context";
+import { prefersReducedMotion } from "../motion";
 import {
   BrandMark,
   CalendarIcon,
@@ -37,6 +38,11 @@ import { arriveWithoutSnapshot, crossfade } from "../viewTransition";
 import { MatchScene } from "./MatchScene";
 import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
+
+/** A click the page answers itself: the main button, with no key that asks for a new tab. */
+function plainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return event.button === 0 && !event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey;
+}
 
 /**
  * Direction D's app shell, around every page.
@@ -270,9 +276,7 @@ export function PageShell({
     landed.current = null;
   }, [location.key]);
   const follow = (event: MouseEvent<HTMLAnchorElement>, item: NavItem) => {
-    const plain =
-      event.button === 0 && !event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey;
-    if (item.active || !plain) {
+    if (item.active || !plainClick(event)) {
       closeDrawer();
       return;
     }
@@ -442,7 +446,19 @@ export function PageShell({
                 className={styles.phoneLive}
                 aria-current={liveHere ? "page" : undefined}
                 data-live-pill
-                onClick={(event) => follow(event, { key: "live", to: live, active: liveHere })}
+                onClick={(event) => {
+                  // On LIVE already, the pill keeps the page as it is (its rival, its address)
+                  // and brings its top back into view.
+                  if (liveHere && plainClick(event)) {
+                    event.preventDefault();
+                    window.scrollTo({
+                      top: 0,
+                      behavior: prefersReducedMotion() ? "instant" : "smooth",
+                    });
+                    return;
+                  }
+                  follow(event, { key: "live", to: live, active: liveHere });
+                }}
               >
                 <span className={styles.phoneLiveFace}>
                   <span className={styles.phoneLiveDot} aria-hidden="true" />

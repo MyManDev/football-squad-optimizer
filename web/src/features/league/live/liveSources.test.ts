@@ -2,7 +2,8 @@
  * The member's bundle as the live week and LIVE read it, through the app's cache under the
  * forwarded gate's key: a refusal is read again, a bundle read in the last minute is served
  * from the cache, and a read that fails never replaces a bundle the gate draws its page from.
- * The live documents LIVE keeps, by the source time the member's live week shows.
+ * The live documents LIVE keeps, by the source time the member's live week shows, and the
+ * capture's table LIVE takes from the phone bar's pill where the league's line names it.
  */
 
 import { QueryClient } from "@tanstack/react-query";
@@ -10,6 +11,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { testActivity, testWeek, TEST_WEEK } from "../../../testSupport/liveWeek";
 import { PILL_BUNDLE, PILL_ENTRY, PILL_TABLE } from "../../../testSupport/livePillSite";
+import type { DevicePlanDocument } from "../device/types";
+import type { DevicePlanTableRef } from "../directory";
 import type { BundleReason, ForwarderResult } from "../forwarder/client";
 import type { FplEntryBundle } from "../forwarder/documents";
 import { forwardedKeys } from "../forwarded/reads";
@@ -18,8 +21,10 @@ import {
   createLiveRecord,
   newestReading,
   readingAt,
+  sharedTable,
   type LiveReading,
 } from "./liveSources";
+import type { LeagueViewEnvelope } from "../types";
 
 afterEach(() => vi.useRealTimers());
 
@@ -114,5 +119,36 @@ describe("the live documents LIVE keeps", () => {
       "2026-11-21T15:33:00Z",
       "2026-11-21T15:34:00Z",
     ]);
+  });
+});
+
+describe("the capture's table LIVE reads", () => {
+  const REF: DevicePlanTableRef = {
+    path: "device/capture-1/device-plan.json",
+    sha256: "0".repeat(64),
+  };
+  const HELD = { payload: { gameweek: TEST_WEEK } } as LeagueViewEnvelope<DevicePlanDocument>;
+  const OWN = { payload: { gameweek: TEST_WEEK } } as LeagueViewEnvelope<DevicePlanDocument>;
+  const signal = new AbortController().signal;
+
+  it("takes the table the phone bar's pill holds where the league's line names it", async () => {
+    const client = new QueryClient();
+    client.setQueryData(forwardedKeys.table(REF), HELD);
+    const load = vi.fn(async () => OWN);
+    const league = { leagueId: 352490, path: "league", devicePlan: REF };
+    await expect(sharedTable(client, league, "capture-1", load)(signal)).resolves.toBe(HELD);
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it("reads the league's tree for another capture, or where the line names no table", async () => {
+    const client = new QueryClient();
+    client.setQueryData(forwardedKeys.table(REF), HELD);
+    const load = vi.fn(async () => OWN);
+    const named = { leagueId: 352490, path: "league", devicePlan: REF };
+    await expect(sharedTable(client, named, "capture-2", load)(signal)).resolves.toBe(OWN);
+    await expect(
+      sharedTable(client, { leagueId: 352490, path: "league" }, "capture-1", load)(signal),
+    ).resolves.toBe(OWN);
+    expect(load).toHaveBeenCalledTimes(2);
   });
 });
