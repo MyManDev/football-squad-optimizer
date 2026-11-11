@@ -4,13 +4,15 @@
  * shout in LED letters, the scorer on the green panel and the points in LED digits; for the
  * captain the digits show the goal's points, then the armband, then what the member receives.
  * The board goes down after a few seconds, or at once on a tap or Escape, and the points run
- * into the live score. An assist rises the same board with its own shout; a card, and an
- * event of a pick who does not count, pass along a single LED line at the top.
+ * into the live score. An assist rises the same board with its own shout, and an automatic
+ * substitution the board as it is meant; a card passes along a single LED line at the foot of
+ * the screen. A pick the official scorer does not count raises nothing.
  *
  * The layer never holds the page: only the board takes taps, focus stays where it is, and a
- * status line says each moment once. Nothing plays while the opening cover is up. Under the
- * reduced-motion preference nothing moves: one still line names the read's moments and goes
- * after a few seconds, or on its close button. Every duration is a `--motion-*` token's
+ * status line says each moment once. The board stands inside the screen, clear of the live
+ * score's head, and nothing plays while the opening cover, a dialog or a modal panel is up.
+ * Under the reduced-motion preference nothing moves: one still line names the read's moments
+ * and goes after a few seconds, or on a tap. Every duration is a `--motion-*` token's
  * (motion.ts) and every animation moves only transform and opacity.
  */
 
@@ -77,6 +79,35 @@ const EASE = `cubic-bezier(${MOTION_EASE.join(", ")})`;
 /** The flex gap beside the order (var(--space-2)), and the smallest LED letters. */
 const FIT_GAP = 8;
 const LED_MIN = 30;
+
+/** The room a board keeps from the screen's edges, the phone bar and the live score. */
+const EDGE = 12;
+
+/**
+ * Where a board stands: 38% down the screen, wholly inside it and below the phone bar, and
+ * clear of the live score's head (its refresh button and total) while that is in view, so a
+ * tap meant for the button reaches it and the points have somewhere to run.
+ */
+function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void {
+  if (place === null || board === null) return;
+  const view = window.innerHeight;
+  // The board's own height, before any turn of its rise.
+  const height = board.offsetHeight;
+  const bar = document.querySelector("[data-phone-bar]")?.getBoundingClientRect();
+  const ceiling = bar !== undefined && bar.height > 0 ? bar.bottom + EDGE : EDGE;
+  const floor = Math.max(ceiling, view - height - EDGE);
+  let top = Math.min(Math.max(Math.round(view * 0.38), ceiling), floor);
+  const total = document.querySelector("[data-live-total]");
+  const card = total?.closest("[data-member-live-score]");
+  if (total && card) {
+    const from = card.getBoundingClientRect().top;
+    const to = total.getBoundingClientRect().bottom;
+    const covers = to > top && from < top + height && to > 0 && from < view;
+    if (covers && to + EDGE <= floor) top = to + EDGE;
+    else if (covers && from - EDGE - height >= ceiling) top = from - EDGE - height;
+  }
+  place.style.top = `${Math.round(top)}px`;
+}
 
 /** One moment on its way: its place among the read's big moments. */
 interface Queued {
@@ -245,6 +276,7 @@ function Board({
   const [digits, setDigits] = useState(() =>
     moment.points === null ? null : signed(doubled ? moment.base! : moment.points, locale),
   );
+  const place = useRef<HTMLDivElement>(null);
   const board = useRef<HTMLButtonElement>(null);
   const shout = useRef<HTMLSpanElement>(null);
   const head = useRef<HTMLSpanElement>(null);
@@ -298,6 +330,7 @@ function Board({
         );
     };
     leaving.current = leave;
+    placeBoard(place.current, board.current);
     animate(
       board.current,
       [
@@ -347,7 +380,7 @@ function Board({
   }, [digits]);
 
   return (
-    <div className={styles.place} data-size={moment.size}>
+    <div ref={place} className={styles.place} data-size={moment.size}>
       <button
         ref={board}
         type="button"
@@ -403,6 +436,7 @@ function SubstitutionBoard({
   copy: Copy;
   onDone: () => void;
 }) {
+  const place = useRef<HTMLDivElement>(null);
   const board = useRef<HTMLButtonElement>(null);
   const word = useRef<HTMLSpanElement>(null);
   const head = useRef<HTMLSpanElement>(null);
@@ -443,6 +477,7 @@ function SubstitutionBoard({
         );
     };
     leaving.current = leave;
+    placeBoard(place.current, board.current);
     animate(
       board.current,
       [
@@ -462,7 +497,7 @@ function SubstitutionBoard({
     };
   }, []);
   return (
-    <div className={styles.place} data-size="big">
+    <div ref={place} className={styles.place} data-size="big">
       <button
         ref={board}
         type="button"

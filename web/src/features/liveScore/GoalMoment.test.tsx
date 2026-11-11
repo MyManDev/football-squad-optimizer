@@ -324,6 +324,69 @@ describe("what the second review asked of it", () => {
   });
 });
 
+describe("what the phone test asked of it", () => {
+  const rect = (top: number, bottom: number) =>
+    ({
+      top,
+      bottom,
+      left: 0,
+      right: 320,
+      width: 320,
+      height: bottom - top,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    }) as DOMRect;
+  const top = () => board()!.parentElement!.style.top;
+
+  it("gives way to a drawer or a sheet that opens, and plays the moment again once it closes", async () => {
+    const drawer = document.createElement("div");
+    document.body.append(drawer);
+    try {
+      show([moment()]);
+      expect(board()).not.toBeNull();
+      await act(async () => {
+        drawer.setAttribute("aria-modal", "true");
+      });
+      expect(board()).toBeNull();
+      await act(async () => {
+        drawer.removeAttribute("aria-modal");
+      });
+      expect(board()).toHaveAttribute("data-goal-board", "goal");
+    } finally {
+      drawer.remove();
+    }
+  });
+
+  it("stands wholly inside a short screen, as a phone on its side", () => {
+    vi.stubGlobal("innerHeight", 320);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(224);
+    show([moment()]);
+    // 320 high: 224 for the board and 12 below it.
+    expect(top()).toBe("84px");
+  });
+
+  it("keeps the live score's refresh button and total clear while they are in view", () => {
+    vi.stubGlobal("innerHeight", 568);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(160);
+    const card = document.createElement("div");
+    card.setAttribute("data-member-live-score", "");
+    const total = document.createElement("span");
+    total.setAttribute("data-live-total", "");
+    card.append(total);
+    document.body.append(card);
+    card.getBoundingClientRect = () => rect(216, 560);
+    total.getBoundingClientRect = () => rect(270, 300);
+    try {
+      show([moment()]);
+      // Below the total, not across the card's head where 38% down the screen (216) would be.
+      expect(top()).toBe("312px");
+    } finally {
+      card.remove();
+    }
+  });
+});
+
 describe("under reduced motion", () => {
   it("goes on a tap anywhere on the still line", () => {
     reduceMotion();

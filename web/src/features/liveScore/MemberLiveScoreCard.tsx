@@ -50,6 +50,7 @@ export function MemberLiveScoreCard({
   held = 0,
   gameweek,
   score,
+  lists,
   forecast = null,
   names,
   onRefresh,
@@ -62,6 +63,11 @@ export function MemberLiveScoreCard({
   held?: number;
   gameweek: number;
   score: LiveWeekScore | null;
+  /**
+   * The read the lists below the figures show (players, captain, substitutions), when it is
+   * not `score`'s: the read before, kept while the GOL board brings this one's moments.
+   */
+  lists?: { score: LiveWeekScore; activity: PlayerActivity[] | null };
   /** What was forecast for the eleven fielded, on the live score's net basis; null unstated. */
   forecast?: number | null;
   /** Names resolved from the same season's element ids. */
@@ -80,7 +86,14 @@ export function MemberLiveScoreCard({
     gameweek > 38
   )
     return null;
-  const shown = [...score.autosubs.flat(), ...(score.captain === null ? [] : [score.captain])];
+  // The lists below the figures: this read's, or the read before while the board plays.
+  const below =
+    lists !== undefined && !lists.score.refused ? lists : { score, activity: activity ?? null };
+  const listed = below.score.refused ? score : below.score;
+  const shown = [score, listed].flatMap((read) => [
+    ...read.autosubs.flat(),
+    ...(read.captain === null ? [] : [read.captain]),
+  ]);
   if (shown.some((id) => !names.get(id)?.trim())) return null;
   const time = new Date(score.source_time);
   if (!Number.isFinite(time.valueOf())) return null;
@@ -132,14 +145,14 @@ export function MemberLiveScoreCard({
         <p className={styles.bonus}>{score.bonus_confirmed ? copy.bonusDone : copy.bonusPending}</p>
         <LivePlayerActivity
           identity={String(gameweek)}
-          sourceTime={score.source_time}
-          players={activity}
+          sourceTime={listed.source_time}
+          players={below.activity}
           names={names}
         />
         <dl className={styles.details}>
           <div>
             <dt>{copy.captain}</dt>
-            <dd>{score.captain === null ? copy.none : names.get(score.captain)}</dd>
+            <dd>{listed.captain === null ? copy.none : names.get(listed.captain)}</dd>
           </div>
           <div>
             <dt>{copy.updated}</dt>
@@ -158,11 +171,11 @@ export function MemberLiveScoreCard({
         </dl>
         <div className={styles.substitutions}>
           <h3>{copy.substitutions}</h3>
-          {score.autosubs.length === 0 ? (
+          {listed.autosubs.length === 0 ? (
             <p>{copy.none}</p>
           ) : (
             <ul>
-              {score.autosubs.map(([out, incoming]) => (
+              {listed.autosubs.map(([out, incoming]) => (
                 <li key={`${out}:${incoming}`}>
                   <span>
                     <small>{copy.out}</small> {names.get(out)}
