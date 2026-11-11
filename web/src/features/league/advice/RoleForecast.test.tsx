@@ -145,6 +145,11 @@ it.each(["tr", "en"] as const)(
     expect(detail).toHaveTextContent(
       language === "tr" ? "Savunma katkısı: 0,20" : "Defensive Contributions: 0.20",
     );
+    // The owner's word of 2026-11-11: the clean sheet is "gol yenmeyen maç" in Turkish.
+    expect(detail).toHaveTextContent(
+      language === "tr" ? "Gol yenmeyen maç: 0,30" : "Clean Sheet: 0.30",
+    );
+    expect(detail.textContent!.toLocaleLowerCase("tr")).not.toContain("kuru kale");
     expect(detail).toHaveTextContent(
       language === "tr" ? "Toplam oyuncu puanı: 2,30" : "Total Player Points: 2.30",
     );

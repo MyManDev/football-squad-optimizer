@@ -176,4 +176,10 @@ describe("the member an address is about", () => {
     );
     expect(navItems(at(`/league/${LEAGUE}`), NO_IDENTITY).some((item) => item.active)).toBe(false);
   });
+
+  it("never carries the GOL replay's switch into a link", () => {
+    expect(memberAt(at(OWN, "?replay=1"))?.search).toBe("");
+    expect(memberAt(at(`${OWN}/chips`, "?window=3&replay=1"))?.search).toBe("?window=3");
+    expect(memberAt(at(OWN, "?window=3"))?.search).toBe("?window=3");
+  });
 });
