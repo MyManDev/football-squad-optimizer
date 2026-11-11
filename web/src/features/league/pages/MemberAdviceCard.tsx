@@ -1,6 +1,5 @@
 import { OfficialInformationCard } from "../advice/OfficialInformationCard";
 import { useEffect, useId, useRef, type CSSProperties, type Ref } from "react";
-import { Link } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
 import { CountingNumber } from "../../../design/CountingNumber";
@@ -47,24 +46,15 @@ export function MissingAdviceCard({
   issue,
   canCompute,
   onRetry,
-  defaultPlan,
 }: {
   issue: AdviceIssue;
   canCompute: boolean;
   onRetry?: () => void;
-  /**
-   * The member's default plan, given only once the week is closed: its settings are gone,
-   * so a selection nobody published is not met with a choice the page no longer offers,
-   * but with the way to the plan the page shows with no selection.
-   */
-  defaultPlan?: string;
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const closedNotListed = issue === "not-listed" && defaultPlan !== undefined;
-  const issueCopy: [string, string | null] = closedNotListed
-    ? [copy.closedNotListed.title, null]
-    : issue === "not-computed"
+  const issueCopy: [string, string | null] =
+    issue === "not-computed"
       ? [copy.adviceNotComputed, null]
       : issue === "unavailable"
         ? [copy.adviceUnreadable, copy.adviceUnreadableBody]
@@ -85,11 +75,6 @@ export function MissingAdviceCard({
         </p>
       ) : null}
       {canCompute ? <p className={styles.muted}>{copy.adviceRequestHint}</p> : null}
-      {closedNotListed ? (
-        <p>
-          <Link to={defaultPlan}>{copy.closedNotListed.link}</Link>
-        </p>
-      ) : null}
     </div>
   );
 }

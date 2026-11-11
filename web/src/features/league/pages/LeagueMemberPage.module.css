@@ -229,7 +229,7 @@
 
 /* Below 1180 px the score bug takes its own line under the team and the week, and LIVE
    ends that line: the bug's basis leaves the tag its room (about 58 px and the gap), so the
-   tag never wraps to a third line, and never climbs to the team's. */
+   tag never climbs to the team's line. On a phone the tag takes a line of its own (below). */
 @media (max-width: 1179.98px) {
   .scoreBug {
     flex: 1 1 calc(100% - 96px);
@@ -316,9 +316,11 @@
 
   /* One row, always: when a narrow phone or a wider font runs out of room, a long label
      breaks inside its own cell (one extra 14 px line) instead of a whole cell falling to a
-     second row (a 25 px jump that pushed the week's gain below the first screen). */
+     second row (a 25 px jump that pushed the week's gain below the first screen). The bug
+     keeps the bar's whole width, so LIVE takes the next line: beside the tag the five cells
+     ran out of room from 340 px down and the last label ran under it. */
   .scoreBug {
-    flex: 1 1 calc(100% - 96px);
+    flex: 1 1 100%;
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: auto;

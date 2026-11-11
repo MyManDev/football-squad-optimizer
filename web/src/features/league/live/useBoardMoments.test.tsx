@@ -374,6 +374,17 @@ describe("the read a page draws", () => {
     expect(screen.getByText("15:40")).toBeInTheDocument();
   });
 
+  it("moves on to the read a board came in when its hold ends over a refused read", () => {
+    const { rerender } = render(<Drawn read={{ gameweek: 11, at: "15:40" }} waiting={false} />);
+    // A read brings a moment; Yenile is refused while its board plays, and the board ends.
+    rerender(<Drawn read={{ gameweek: 11, at: "15:41" }} waiting />);
+    rerender(<Drawn read={null} waiting />);
+    rerender(<Drawn read={null} waiting={false} />);
+    // The next read brings another moment: the board plays over 15:41, whose points had landed.
+    rerender(<Drawn read={{ gameweek: 11, at: "15:43" }} waiting />);
+    expect(screen.getByText("15:41")).toBeInTheDocument();
+  });
+
   it("never draws one member's read on another's page", () => {
     const { rerender } = render(
       <Drawn read={{ gameweek: 11, at: "member 7" }} waiting={false} owner="7" />,

@@ -884,6 +884,30 @@ describe("the week and the rival", () => {
     expect(reserve.querySelector(".arrow")?.childElementCount ?? 0).toBe(0);
   });
 
+  it("reads a refused rival again at the next read, until its duel can be drawn", async () => {
+    const forwarder = fakeForwarder([
+      answered(live("2026-11-21T15:30:00Z")),
+      answered(live("2026-11-21T15:31:00Z")),
+    ]);
+    const read = forwarder.entryBundle.getMockImplementation()!;
+    let rivalReads = 0;
+    forwarder.entryBundle.mockImplementation(async (entryId: number) => {
+      if (entryId !== ENTRY && rivalReads++ === 0) {
+        return { ok: false, reason: "upstream_unavailable" } as unknown as Awaited<
+          ReturnType<typeof read>
+        >;
+      }
+      return read(entryId);
+    });
+    const { user } = renderLive({ forwarder });
+    await rows();
+    await vi.waitFor(() => expect(rivalReads).toBe(1));
+    expect(document.querySelector("[data-live-rival-net]")).toBeNull();
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(document.querySelector("[data-live-rival-net]")).not.toBeNull());
+    expect(rivalReads).toBe(2);
+  });
+
   it("keeps the duel's place, out of sight, while the first rival's bundle is read", async () => {
     const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))]);
     // The rival's bundle is answered after the member's board, when the test lets it go.
@@ -934,6 +958,10 @@ describe("the week and the rival", () => {
       expect(found).not.toBeNull();
       return found!;
     });
+    // A heading of its own, so its two lists are not read as the last group's.
+    expect(
+      within(differentials).getByRole("heading", { level: 2, name: copy.live.differentials }),
+    ).toBeInTheDocument();
     // Closed on a phone, until the member opens it.
     expect(differentials.open).toBe(false);
     await user.click(within(differentials).getByText(copy.live.differentials));

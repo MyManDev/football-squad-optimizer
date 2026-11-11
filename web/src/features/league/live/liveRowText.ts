@@ -14,22 +14,25 @@ import { kickoffShort, wholePoints } from "./liveFormat";
  */
 export function subLine(row: LiveRow, copy: Messages["live"], locale: string): string {
   if (row.fact === "noMatch" || row.fixture === null) return copy.noMatch;
-  const fixture = row.fixture;
-  const minutes = fixture.minutes ?? (row.fixtures.length === 1 ? row.minutes : null);
-  const when =
-    row.fact === "didNotPlay"
-      ? copy.didNotPlay
-      : fixture.phase === "upcoming" && (minutes ?? 0) === 0
-        ? fixture.kickoff === null
-          ? null
-          : kickoffShort(fixture.kickoff, locale)
-        : minutes === null
-          ? null
-          : copy.minutes(wholePoints(minutes, locale));
-  return [fixture.opponent, when].filter((part): part is string => part !== null).join(" · ");
+  const time = row.fact === "didNotPlay" ? copy.didNotPlay : when(row, copy, locale);
+  return [row.fixture.opponent, time].filter((part): part is string => part !== null).join(" · ");
 }
 
-/** What a pick's row says to a screen reader: name, role, group, points, events and state. */
+/** The kickoff before the match, or the minutes once it has started; null where neither is known. */
+function when(row: LiveRow, copy: Messages["live"], locale: string): string | null {
+  const fixture = row.fixture;
+  if (fixture === null) return null;
+  const minutes = fixture.minutes ?? (row.fixtures.length === 1 ? row.minutes : null);
+  if (fixture.phase === "upcoming" && (minutes ?? 0) === 0) {
+    return fixture.kickoff === null ? null : kickoffShort(fixture.kickoff, locale);
+  }
+  return minutes === null ? null : copy.minutes(wholePoints(minutes, locale));
+}
+
+/**
+ * What a pick's row says to a screen reader: name, role, group, its match (the opponent, the
+ * kickoff or the minutes, as the line under the name shows), points, events and state.
+ */
 export function rowLabel(row: LiveRow, copy: Messages, locale: string): string {
   const live = copy.live;
   const roles: string[] = [];
@@ -66,10 +69,16 @@ export function rowLabel(row: LiveRow, copy: Messages, locale: string): string {
             : row.state === "down"
               ? live.struggling
               : null;
+  // Oynamadı and Maç yok are the row's state, said below, not its match.
+  const match =
+    row.fact === "noMatch" || row.fixture === null
+      ? []
+      : [row.fixture.opponent, row.fact === "didNotPlay" ? null : when(row, live, locale)];
   return [
     row.name,
     ...roles,
     live.groups[row.group],
+    ...match,
     row.started ? live.points(wholePoints(rowPoints(row), locale)) : null,
     ...events,
     state,

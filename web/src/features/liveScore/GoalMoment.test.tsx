@@ -852,6 +852,22 @@ describe("what the last review asked of it", () => {
     }
   });
 
+  describe("what the review of the LIVE page asked of it", () => {
+    it("says a live moment whose key a replay's moment had, the replay's board still up", () => {
+      const view = (id: string, source: string) => (
+        <LanguageProvider initialLanguage="tr">
+          <GoalMomentLayer batch={{ id, items: [moment()] }} source={source} />
+        </LanguageProvider>
+      );
+      const { rerender } = render(view("replay:1", "replay"));
+      expect(screen.getByRole("status")).toHaveTextContent("Gol: Palmer, +5 puan");
+      // The page leaves the replay while its board stands; a live read brings the same key.
+      rerender(view("live:1", "live"));
+      expect(board()).not.toBeNull();
+      expect(screen.getByRole("status")).toHaveTextContent("Gol: Palmer, +5 puan");
+    });
+  });
+
   describe("under reduced motion", () => {
     it("adds a new read to the still line, and a read with nothing to show leaves it", () => {
       reduceMotion();
@@ -1154,6 +1170,26 @@ describe("under reduced motion", () => {
     show([moment()]);
     fireEvent.click(document.querySelector("[data-goal-still]")!);
     expect(document.querySelector("[data-goal-still]")).toBeNull();
+  });
+
+  it("says the still line's moments when it shows, not while a panel holds the page", async () => {
+    reduceMotion();
+    const drawer = document.createElement("div");
+    drawer.setAttribute("aria-modal", "true");
+    document.body.append(drawer);
+    try {
+      show([moment()]);
+      // The panel is open: no line, and nothing said that nobody would hear.
+      expect(document.querySelector("[data-goal-still]")).toBeNull();
+      expect(screen.getByRole("status")).toHaveTextContent("");
+      await act(async () => {
+        drawer.removeAttribute("aria-modal");
+      });
+      expect(document.querySelector("[data-goal-still]")).not.toBeNull();
+      expect(screen.getByRole("status")).toHaveTextContent("Gol: Palmer, +5 puan");
+    } finally {
+      drawer.remove();
+    }
   });
 
   it("names the read's moments on one still line that goes after a while or on its button", () => {

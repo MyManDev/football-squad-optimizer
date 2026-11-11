@@ -627,7 +627,8 @@ function Differentials({
     >
       <summary className={styles.summary}>
         <DisclosureIcon className={styles.disclosure} />
-        <span>{copy.differentials}</span>
+        {/* A heading of its own, so its two lists are not read as the last group's. */}
+        <h2 className={styles.summaryTitle}>{copy.differentials}</h2>
         {pending ? null : (
           <span className={styles.groupCount}>
             {wholePoints(duel.yours.length + duel.theirs.length, locale)}

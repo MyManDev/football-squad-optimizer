@@ -143,10 +143,22 @@ describe("the phases at the read's source time", () => {
   });
 
   it("follows FPL's in-play list where the read has detail", () => {
-    const input = testWeek();
+    // The 12:30 match has been played: its keeper has his 90 minutes.
+    const input = testWeek({
+      picks: testPicks().map((pick) =>
+        pick.id === 1 ? { ...pick, minutes: 90, points: 2 } : pick,
+      ),
+    });
     const built = liveBoard({ ...input, activity: testActivity(input, { inPlay: [] }) })!;
     expect(row(built, 4).phase).toBe("upcoming");
     expect(row(built, 1).phase).toBe("finished");
+  });
+
+  it("keeps a match nobody has played still to come past its window, as one put back", () => {
+    const input = testWeek();
+    const built = liveBoard({ ...input, activity: testActivity(input, { inPlay: [] }) })!;
+    // The 12:30 match is past its window at 15:30, but it never started.
+    expect(row(built, 1).phase).toBe("upcoming");
   });
 
   it("calls a match over past its window, though FPL has not finished it", () => {

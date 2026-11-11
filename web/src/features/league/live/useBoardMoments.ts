@@ -148,18 +148,22 @@ export function useSettledRead<T extends { gameweek: number }>(
   waiting: boolean,
   owner: string,
 ): T | null {
-  const [settled, setSettled] = useState<{ owner: string; read: T } | null>(
-    read === null ? null : { owner, read },
-  );
-  if (!waiting && read !== null && (settled?.read !== read || settled.owner !== owner)) {
-    setSettled({ owner, read });
-  }
+  const [state, setState] = useState<{ owner: string; last: T | null; settled: T | null }>({
+    owner,
+    last: read,
+    settled: read,
+  });
+  // Another member's page starts afresh.
+  let next = state.owner === owner ? state : { owner, last: read, settled: read };
+  // The newest read there was, kept through a refused one (null)...
+  if (read !== null && read !== next.last) next = { ...next, last: read };
+  // ...and settled on once nothing waits, so a hold that ended over a refused read still
+  // moves on to the read its moments came in.
+  if (!waiting && next.settled !== next.last) next = { ...next, settled: next.last };
+  if (next !== state) setState(next);
   const held =
-    settled !== null &&
-    settled.owner === owner &&
-    read !== null &&
-    settled.read.gameweek === read.gameweek
-      ? settled.read
+    next.settled !== null && read !== null && next.settled.gameweek === read.gameweek
+      ? next.settled
       : null;
   return waiting && held !== null ? held : read;
 }

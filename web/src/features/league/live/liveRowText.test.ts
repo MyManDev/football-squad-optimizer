@@ -53,6 +53,22 @@ describe("the line under a row's name", () => {
   });
 });
 
+describe("a row's points in English", () => {
+  it("are one point, or more points", () => {
+    expect(MESSAGES.en.live.points("1")).toBe("1 point");
+    expect(MESSAGES.en.live.points("+1")).toBe("+1 point");
+    expect(MESSAGES.en.live.points("2")).toBe("2 points");
+    expect(MESSAGES.en.live.points("11")).toBe("11 points");
+  });
+});
+
+describe("a row's name for a screen reader", () => {
+  it("tells the row's match as the line under the name shows it: the opponent and the minutes", () => {
+    const label = rowLabel(keeper("2026-11-21T13:30:00Z", false), MESSAGES.tr, "tr-TR");
+    expect(label).toContain(`C2, ${copy.minutes("90")}`);
+  });
+});
+
 describe("a row's events", () => {
   /** Every pick played; reserve 14, not brought on, scored. */
   function reserveScored(chip: MemberWeek["active_chip"]) {

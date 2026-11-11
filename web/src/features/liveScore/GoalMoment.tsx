@@ -345,7 +345,10 @@ interface LayerState {
   stillRevision: number;
   /** What the live region says: the moment playing, kept while a panel holds it back. */
   voice: { key: string | null; text: string };
-  /** Every moment said: each is said once, on a board or on the still line. */
+  /**
+   * Every moment said and not yet gone, by its stream and key (`saidKey`): each is said once,
+   * on a board or on the still line, and leaves the set when its board or line goes.
+   */
   said: ReadonlySet<string>;
   /** Moments that will not play (another stream, or turned into the still line), in order. */
   dropped: string[];
@@ -463,10 +466,11 @@ export function GoalMomentLayer({
   let next = state;
   /** The still line's moments not said yet are said, and only they. */
   const sayOnStill = (moments: BoardMoment[]) => {
-    const fresh = moments.filter((moment) => !next.said.has(moment.key));
+    const from = next.source ?? "live";
+    const fresh = moments.filter((moment) => !next.said.has(saidKey(from, moment.key)));
     if (fresh.length === 0) return;
     const said = new Set(next.said);
-    for (const moment of fresh) said.add(moment.key);
+    for (const moment of fresh) said.add(saidKey(from, moment.key));
     next = {
       ...next,
       said,
@@ -508,7 +512,6 @@ export function GoalMomentLayer({
           stillRevision: items.length > 0 ? next.stillRevision + 1 : next.stillRevision,
         }
       : { ...next, taken, queue: [...next.queue, ...queued], still: null };
-    if (reduce) sayOnStill(items);
   }
   // Reduced motion turned on with moments still queued: they join the still line at once.
   if (reduce && next.queue.length > 0) {
@@ -520,18 +523,21 @@ export function GoalMomentLayer({
       stillRevision: next.stillRevision + 1,
       dropped: [...next.dropped, ...moments.map((moment) => moment.key)],
     };
-    sayOnStill(moments);
   }
+  // The still line's moments are said when it shows, not while a panel holds the page, where
+  // nothing would be heard and the line would come later unsaid.
+  if (clear && next.still !== null) sayOnStill(next.still);
   const playing = clear ? next.queue[0] : undefined;
   // Each moment is said once: when it starts, and not again if a panel held it back.
   if (playing !== undefined && next.voice.key !== playing.moment.key) {
     const key = playing.moment.key;
+    const said = saidKey(playing.source, key);
     next = {
       ...next,
-      said: new Set(next.said).add(key),
+      said: new Set(next.said).add(said),
       voice: {
         key,
-        text: next.said.has(key) ? next.voice.text : announcement(playing.moment, copy, locale),
+        text: next.said.has(said) ? next.voice.text : announcement(playing.moment, copy, locale),
       },
     };
   }
@@ -545,10 +551,11 @@ export function GoalMomentLayer({
   }, [state.dropped]);
   // The moment that played goes by its key: a stream change may have put another at the head
   // while its board was still falling.
-  const played = (key: string) =>
+  const played = (key: string, from: string) =>
     setState((current) => ({
       ...current,
       queue: current.queue.filter((queued) => queued.moment.key !== key),
+      said: without(current.said, [saidKey(from, key)]),
       voice: current.voice.key === key ? { key: null, text: "" } : current.voice,
     }));
   const spoken = next.voice.text;
@@ -564,7 +571,7 @@ export function GoalMomentLayer({
           moment={playing.moment}
           copy={copy}
           onLanded={(key) => landed.current?.(key)}
-          onDone={() => played(playing.moment.key)}
+          onDone={() => played(playing.moment.key, playing.source)}
         />
       ) : playing.moment.size === "small" ? (
         <SmallLine
@@ -573,7 +580,7 @@ export function GoalMomentLayer({
           copy={copy}
           locale={locale}
           onLanded={(key) => landed.current?.(key)}
-          onDone={() => played(playing.moment.key)}
+          onDone={() => played(playing.moment.key, playing.source)}
         />
       ) : (
         <Board
@@ -583,7 +590,7 @@ export function GoalMomentLayer({
           locale={locale}
           scoring={scoring}
           onLanded={(key) => landed.current?.(key)}
-          onDone={() => played(playing.moment.key)}
+          onDone={() => played(playing.moment.key, playing.source)}
         />
       )}
       {next.still !== null && clear ? (
@@ -596,6 +603,12 @@ export function GoalMomentLayer({
             setState((current) => ({
               ...current,
               still: null,
+              said: without(
+                current.said,
+                (current.still ?? []).map((moment) =>
+                  saidKey(current.source ?? "live", moment.key),
+                ),
+              ),
               voice: current.voice.key?.startsWith("still:")
                 ? { key: null, text: "" }
                 : current.voice,
@@ -606,6 +619,19 @@ export function GoalMomentLayer({
     </div>,
     document.body,
   );
+}
+
+/** A moment said, by its stream and key: a replay's key and a live read's may be the same. */
+function saidKey(source: string, key: string): string {
+  return `${source}:${key}`;
+}
+
+/** The set without `keys`. */
+function without(set: ReadonlySet<string>, keys: readonly string[]): ReadonlySet<string> {
+  if (!keys.some((key) => set.has(key))) return set;
+  const rest = new Set(set);
+  for (const key of keys) rest.delete(key);
+  return rest;
 }
 
 function word(moment: LiveMoment, copy: Copy): string {

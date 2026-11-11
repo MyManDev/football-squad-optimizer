@@ -190,15 +190,27 @@ export function liveBoard(input: LiveBoardInput): LiveBoard | null {
     appearances.set(`${row.element_id}:${row.fixture_id}`, row);
   }
 
-  /** A fixture's phase at the read's time; a pick's own minutes in it mean it has started. */
+  // The fixtures someone has played minutes in, where the read has detail.
+  const playedIn = new Set<number>();
+  for (const row of activity?.appearances ?? []) if (row.minutes > 0) playedIn.add(row.fixture_id);
+
+  /**
+   * A fixture's phase at the read's time. Where the read has detail, it comes before the
+   * calendar: a match has started once FPL lists it in play or someone has played in it, and
+   * past its window only a match that started is over; one that never did (put back, or moved
+   * within the day) is still to come. A pick's own minutes in it mean it has started.
+   */
   const phaseOf = (fixture: WeekLive["fixtures"][number], minutes: number | null): LivePhase => {
     const kickoff = instant(calendar.byId.get(fixture.id)?.kickoff_utc);
-    if (fixture.finished || (kickoff !== null && time >= kickoff + MATCH_WINDOW_MS)) {
-      return "finished";
-    }
     const started =
-      activity !== null ? inPlay.has(fixture.id) : kickoff !== null && time >= kickoff;
-    return started || (minutes ?? 0) > 0 ? "playing" : "upcoming";
+      (activity !== null
+        ? inPlay.has(fixture.id) || playedIn.has(fixture.id)
+        : kickoff !== null && time >= kickoff) || (minutes ?? 0) > 0;
+    if (fixture.finished) return "finished";
+    if (kickoff !== null && time >= kickoff + MATCH_WINDOW_MS) {
+      return started ? "finished" : "upcoming";
+    }
+    return started ? "playing" : "upcoming";
   };
 
   const counted = new Set(score.counted);

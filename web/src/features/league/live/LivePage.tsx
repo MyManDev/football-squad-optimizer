@@ -294,6 +294,22 @@ function LiveMember({
     enabled: ready && rivalId !== null,
   });
   const rivalWeek = rivalBundle.data?.ok ? rivalBundle.data.document.current_week : null;
+  // A rival read before a deadline names the week before, and a refused read names none: each
+  // new live read (a minute's follow, Yenile) reads the rival again until it names this week.
+  const readTime = reading?.week.source_time ?? null;
+  const rivalAgain = useRef({ behind: false, fetching: false, refetch: rivalBundle.refetch });
+  useEffect(() => {
+    rivalAgain.current = {
+      behind:
+        rivalBundle.isError || (rivalWeek !== null && week !== null && rivalWeek.gameweek !== week),
+      fetching: rivalBundle.isFetching,
+      refetch: rivalBundle.refetch,
+    };
+  });
+  useEffect(() => {
+    const { behind, fetching, refetch } = rivalAgain.current;
+    if (readTime !== null && behind && !fetching) void refetch();
+  }, [readTime]);
   const rivalBoard = useMemo(
     () =>
       reading !== null &&

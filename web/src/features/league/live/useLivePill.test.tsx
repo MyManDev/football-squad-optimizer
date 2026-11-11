@@ -75,6 +75,13 @@ describe("the member's clubs", () => {
       memberClubs({ ok: false, reason: "network" }, PILL_TABLE, pillCalendar(1, 2, 30)),
     ).toBeNull();
   });
+
+  it("are not known from a bundle held from another week than the live one", () => {
+    const read = { ok: true as const, copy: null, document: PILL_BUNDLE };
+    const week = PILL_BUNDLE.current_week!.gameweek;
+    expect(memberClubs(read, PILL_TABLE, pillCalendar(9, 10, 30), week)).not.toBeNull();
+    expect(memberClubs(read, PILL_TABLE, pillCalendar(9, 10, 30), week + 1)).toBeNull();
+  });
 });
 
 describe("the LIVE pill", () => {

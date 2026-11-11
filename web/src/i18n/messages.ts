@@ -159,7 +159,8 @@ const en = {
     shared: "Shared",
     players: (count: number) => `${count} ${count === 1 ? "Player" : "Players"}`,
     minutes: (minutes: string) => `${minutes} min`,
-    points: (points: string) => `${points} points`,
+    // One point, signed or not, is singular: "1 point", "+1 point".
+    points: (points: string) => `${points} ${/^[+−-]?1$/.test(points) ? "point" : "points"}`,
   },
   language: {
     label: "Language",
@@ -373,11 +374,6 @@ const en = {
       "declared-unavailable": {
         title: "No plan could be produced for this selection.",
       },
-    },
-    /** The "not listed" card once the week is closed: its settings are gone, so it links. */
-    closedNotListed: {
-      title: "This selection was not published for the closed gameweek.",
-      link: "Show the Default Plan",
     },
     rivalPlayersTitle: "Shared and Different Players",
     rivalPlayerGroups: {
@@ -1058,10 +1054,6 @@ const tr: MessageSchema<typeof en> = {
       "declared-unavailable": {
         title: "Bu seçim için plan üretilemedi.",
       },
-    },
-    closedNotListed: {
-      title: "Bu seçim, son tarihi geçen hafta için yayımlanmadı.",
-      link: "Varsayılan planı göster",
     },
     rivalPlayersTitle: "Ortak ve farklı oyuncular",
     rivalPlayerGroups: {

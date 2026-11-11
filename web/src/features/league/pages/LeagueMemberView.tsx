@@ -1,9 +1,4 @@
-import {
-  entryAddress,
-  memberAddress,
-  memberHistoryAddress,
-  type MemberTool,
-} from "../../../lib/leagueAddresses";
+import { memberHistoryAddress, type MemberTool } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { QueryClientContext } from "@tanstack/react-query";
@@ -640,8 +635,8 @@ function LeagueMemberContent({
                 closed ? null : (
                   <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
                 )
-              ) : computeOnly && !rejectedContext ? null : closed &&
-                index?.menu === "device" ? null : ( // is to say. The card would only name a publication that never happens. // is no default plan to point at, and the squad and its score say what there // A device menu publishes no plan for any week: once the week is closed there
+              ) : computeOnly && !rejectedContext ? null : closed ? null : (
+                // Under LIVE WEEK no plan is drawn, so no card says one is missing or points at one.
                 <MissingAdviceCard
                   issue={
                     rejectedContext
@@ -665,18 +660,9 @@ function LeagueMemberContent({
                   // press being answered is not offered again.
                   canCompute={
                     computeAvailable &&
-                    !closed &&
                     computeService !== "static" &&
                     job.state.phase !== "requesting" &&
                     job.state.phase !== "waiting"
-                  }
-                  // The address the sidebar's own link lands on with no selection.
-                  defaultPlan={
-                    closed
-                      ? leagueId > 0
-                        ? memberAddress(leagueId, entryId)
-                        : entryAddress(entryId)
-                      : undefined
                   }
                 />
               )}

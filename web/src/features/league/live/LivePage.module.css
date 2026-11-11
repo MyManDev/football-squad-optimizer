@@ -500,10 +500,10 @@
   white-space: nowrap;
 }
 
-/* A row's name, and a name in Farklar, breaks between its words or after a hyphen rather
-   than lose its end (Calvert-Lewin at 320 px). */
-.rowName .name,
-.swing .name {
+/* A row's name breaks between its words or after a hyphen rather than lose its end
+   (Calvert-Lewin at 320 px). Farklar's narrower columns keep one line and an ellipsis, so a
+   name there never breaks inside a word. */
+.rowName .name {
   overflow-wrap: break-word;
   white-space: normal;
 }
@@ -684,6 +684,11 @@
 
 .summary::-webkit-details-marker {
   display: none;
+}
+
+.summaryTitle {
+  margin: 0;
+  font: inherit;
 }
 
 .disclosure {

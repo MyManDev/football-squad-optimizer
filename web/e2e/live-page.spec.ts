@@ -386,7 +386,7 @@ for (const context of CONTEXTS) {
   });
 }
 
-test("the row's name says the player, his role, group, points, events and state", async ({
+test("the row's name says the player, their role, group, match, points, events and state", async ({
   page,
 }) => {
   await page.clock.install({ time: NOW });
@@ -394,10 +394,10 @@ test("the row's name says the player, his role, group, points, events and state"
   await listed(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/league/352490/members/${LISTED_ENTRY}/live`);
-  // Player 4, a defender in the 15:00 match: 45 minutes, 3 points and a goal.
+  // Player 4, a defender in the 15:00 match against C3: 45 minutes, 3 points and a goal.
   await expect(
     page.getByRole("listitem", {
-      name: `Player 4, ${copy.live.groups.playing}, ${copy.live.points("3")}, ${copy.live.goal} 1, ${copy.live.doingWell}`,
+      name: `Player 4, ${copy.live.groups.playing}, C3, ${copy.live.minutes("45")}, ${copy.live.points("3")}, ${copy.live.goal} 1, ${copy.live.doingWell}`,
     }),
   ).toBeVisible();
   // The captain, Player 7, did not play in the finished match: the armband passes to the vice.

@@ -77,9 +77,11 @@ export function MemberGate({ children }: { children: ReactNode }) {
   // A row the finger lands on has its member's documents started before the tap confirms
   // it (prefetch.ts), so the page it opens finds them in the cache or on their way.
   const queryClient = useQueryClient();
+  // In front of LIVE, LIVE's fewer reads: no scoreboard or history it never opens.
+  const page = useLocation().pathname.endsWith("/live") ? "live" : "member";
   const warm = useCallback(
-    (entry: RosterEntry) => prefetchMemberReads(queryClient, tree, entry.entryId),
-    [queryClient, tree],
+    (entry: RosterEntry) => prefetchMemberReads(queryClient, tree, entry.entryId, [], page),
+    [queryClient, tree, page],
   );
   const members = useLeagueMembers();
   // A forwarded league's roster is page 1 of its table; the pages after it are read as a
