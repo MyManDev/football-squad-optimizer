@@ -336,7 +336,11 @@ function LiveMember({
 
   const claimed = useClaimedEntry(leagueId);
   const gameweek = board?.gameweek ?? week;
-  const playing = liveMatch.open;
+  // The heading's light: one of the member's own rows is being played. The follow window
+  // stays open longer, up to three hours from a kickoff FPL has not finished, only to time
+  // the reads; the board ends a match at its bound, as its groups and Maçlar do.
+  const playing =
+    liveMatch.open && board !== null && board.rows.some((row) => row.phase === "playing");
   useEffect(() => onHead({ entryId, gameweek, playing }), [onHead, entryId, gameweek, playing]);
   const loading =
     ready &&

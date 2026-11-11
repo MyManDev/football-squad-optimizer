@@ -366,6 +366,7 @@ describe("the LIVE page's reads", () => {
     renderLive({ forwarder });
     await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
     expect(forwarder.liveActivity).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("img", { name: copy.live.matchInProgress })).toBeInTheDocument();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
@@ -378,6 +379,26 @@ describe("the LIVE page's reads", () => {
     expect(recapRegion()).toBeNull();
     fireEvent.click(board);
     await vi.waitFor(() => expect(recapRegion()).toBeInTheDocument());
+  });
+
+  it("puts the heading's light out at the bound that ends the member's match, though FPL has not finished it", async () => {
+    // The 15:00 match, two hours and sixteen minutes on: FPL still has it unfinished.
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T17:16:00Z"));
+    const forwarder = fakeForwarder([answered(live("2026-11-21T17:16:00Z"))]);
+    renderLive({ forwarder });
+    await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+    // Its rows are in Bitti, and nothing of the member's is being played.
+    expect(screen.queryByRole("heading", { name: copy.live.groups.playing })).toBeNull();
+    expect(screen.getByRole("listitem", { name: /^P4, / })).toHaveAccessibleName(
+      expect.stringContaining(copy.live.groups.finished),
+    );
+    // The reads still follow the match FPL has not finished, but the light is out.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("img", { name: copy.live.matchInProgress })).toBeNull();
   });
 
   it("holds what changed through a quiet followed read, until the visitor looks again", async () => {
