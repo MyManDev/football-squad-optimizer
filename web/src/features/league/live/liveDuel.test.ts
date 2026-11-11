@@ -1,0 +1,264 @@
+import { describe, expect, it } from "vitest";
+
+import { testPicks, testWeek, type TestPick } from "../../../testSupport/liveWeek";
+import { scoreMemberWeek } from "../../liveScore/officialScoring";
+import vectors from "../../liveScore/officialScoring.vectors.json";
+import type { MemberWeek, WeekElement, WeekLive } from "../../liveScore/weekLive";
+import type { FplEntrySeason } from "../forwarder/documents";
+import { liveBoard, type LiveBoard, type LiveRow, type Multiplier } from "./liveBoard";
+import { duelStatus, liveDuel, seasonTotalBefore } from "./liveDuel";
+
+type Vector = (typeof vectors.cases)[number];
+type Week = WeekLive;
+/** A vector's elements, each with its position and club, as the vectors state them. */
+type Resolved = WeekElement & { club: number };
+
+/**
+ * A side of the duel as the official scorer scores it, in the board's shape: each pick's
+ * multiplier and points from the scorer's own verdict.
+ */
+function scoredSide(week: Week, member: MemberWeek): LiveBoard | null {
+  const score = scoreMemberWeek(week, member);
+  if (score.refused) return null;
+  const points = new Map(week.elements.map((element) => [element.element_id, element.points]));
+  const rows = member.pick_order.map((elementId, index) => {
+    const multiplier: Multiplier = !score.counted.includes(elementId)
+      ? 0
+      : elementId === score.captain
+        ? member.active_chip === "3xc"
+          ? 3
+          : 2
+        : 1;
+    return { elementId, pick: index + 1, points: points.get(elementId)!, multiplier };
+  });
+  return {
+    net: score.net,
+    transferCost: score.transfer_cost,
+    left: 0,
+    rows: rows as LiveRow[],
+  } as LiveBoard;
+}
+
+/** Case `b`'s week moved beside case `a`'s: its ids, fixtures and clubs offset so none meet. */
+function disjoint(a: Vector, b: Vector): { week: Week; member: MemberWeek; rival: MemberWeek } {
+  const offset = (id: number) => id + 1000;
+  const moved = b.input.members[0]! as MemberWeek;
+  return {
+    week: {
+      ...(a.input as unknown as Week),
+      fixtures: [
+        ...a.input.fixtures,
+        ...b.input.fixtures.map((fixture) => ({
+          ...fixture,
+          id: offset(fixture.id),
+          home_club: offset(fixture.home_club),
+          away_club: offset(fixture.away_club),
+        })),
+      ],
+      elements: [
+        ...(a.input.elements as Resolved[]),
+        ...(b.input.elements as Resolved[]).map((element) => ({
+          ...element,
+          element_id: offset(element.element_id),
+          club: offset(element.club),
+        })),
+      ],
+    },
+    member: a.input.members[0]! as MemberWeek,
+    rival: {
+      ...moved,
+      pick_order: moved.pick_order.map(offset),
+      captain: offset(moved.captain),
+      vice: offset(moved.vice),
+    },
+  };
+}
+
+const pairs = vectors.cases.flatMap((a) => vectors.cases.map((b) => [a, b] as const));
+
+/** Σ swing − (hit_member − hit_rival), which must be the margin. */
+function swingTotal(member: LiveBoard, rival: LiveBoard): number {
+  const duel = liveDuel(member, rival);
+  const swings = [...duel.yours, ...duel.theirs].reduce((sum, swing) => sum + swing.swing, 0);
+  return swings - (member.transferCost - rival.transferCost);
+}
+
+describe("the duel's invariant over the official scorer's vectors", () => {
+  /** Every pair the scorer scores on both sides, and the pairs where the sums disagree. */
+  function check(sides: (a: Vector, b: Vector) => [Week, MemberWeek, MemberWeek]) {
+    let checked = 0;
+    const broken: string[] = [];
+    for (const [a, b] of pairs) {
+      const [week, member, rival] = sides(a, b);
+      const you = scoredSide(week, member);
+      const them = scoredSide(week, rival);
+      if (you === null || them === null) continue;
+      checked += 1;
+      const margin = you.net - them.net;
+      if (swingTotal(you, them) !== margin || liveDuel(you, them).margin !== margin) {
+        broken.push(`${a.name} against ${b.name}`);
+      }
+    }
+    return { checked, broken };
+  }
+
+  it("holds for every pair with no player in common", () => {
+    const { checked, broken } = check((a, b) => {
+      const { week, member, rival } = disjoint(a, b);
+      return [week, member, rival];
+    });
+    expect(broken).toEqual([]);
+    // Only the vectors the scorer refuses (an unknown chip) sit out.
+    expect(checked).toBe((vectors.cases.length - 1) ** 2);
+  });
+
+  it("holds for every pair on the same players, with the rival's armbands swapped", () => {
+    const { checked, broken } = check((a, b) => {
+      const other = b.input.members[0]! as MemberWeek;
+      return [
+        a.input as unknown as Week,
+        a.input.members[0]! as MemberWeek,
+        { ...other, captain: other.vice, vice: other.captain },
+      ];
+    });
+    expect(broken).toEqual([]);
+    expect(checked).toBe((vectors.cases.length - 1) ** 2);
+  });
+});
+
+/** The member's board and a rival's from the same synthetic read. */
+function sides(
+  changes: Record<number, Partial<TestPick>>,
+  rival: Partial<MemberWeek>,
+  member: Partial<MemberWeek> = {},
+): [LiveBoard, LiveBoard] {
+  const picks = testPicks().map((pick) => ({ ...pick, ...changes[pick.id] }));
+  const fixtures = [
+    { id: 101, home: 1, away: 2, kickoff: "2026-11-21T12:30:00Z", finished: true },
+    { id: 102, home: 3, away: 4, kickoff: "2026-11-21T15:00:00Z", finished: true },
+    { id: 103, home: 5, away: 6, kickoff: "2026-11-21T17:30:00Z", finished: false },
+  ];
+  const input = testWeek({ picks, fixtures, member });
+  const theirs = testWeek({ picks, fixtures, member: { entry_id: 202, ...rival } });
+  return [liveBoard(input)!, liveBoard(theirs)!];
+}
+
+const played = Object.fromEntries(
+  [1, 2, 3, 4, 5, 6, 7, 8, 10, 11].map((id) => [id, { points: 2, minutes: 90 }]),
+);
+
+describe("the duel of two boards of one read", () => {
+  it("is the captain alone where only the armbands differ", () => {
+    const [member, rival] = sides(
+      { ...played, 10: { points: 9, minutes: 90 } },
+      { captain: 7, vice: 10 },
+    );
+    const duel = liveDuel(member, rival);
+    // Double the forward against double the midfielder: 9 against 2.
+    expect(duel.yours.map((swing) => [swing.elementId, swing.swing])).toEqual([[10, 9]]);
+    expect(duel.theirs.map((swing) => [swing.elementId, swing.swing])).toEqual([[7, -2]]);
+    expect(duel).toMatchObject({ margin: 7, status: "ahead", shared: 13 });
+  });
+
+  it("takes three of the triple captain", () => {
+    const [member, rival] = sides(
+      { ...played, 10: { points: 5, minutes: 90 } },
+      {},
+      { active_chip: "3xc" },
+    );
+    const duel = liveDuel(member, rival);
+    expect(duel.yours).toMatchObject([{ elementId: 10, member: 3, rival: 2, swing: 5 }]);
+    expect(duel.margin).toBe(5);
+  });
+
+  it("counts the bench of a bench boost against a bench that does not count", () => {
+    const [member, rival] = sides(
+      { ...played, 12: { points: 1, minutes: 90 }, 13: { points: 3, minutes: 90 } },
+      {},
+      { active_chip: "bboost" },
+    );
+    const duel = liveDuel(member, rival);
+    expect(duel.yours.map((swing) => [swing.elementId, swing.swing])).toEqual([
+      [13, 3],
+      [12, 1],
+      [14, 0],
+      [15, 0],
+    ]);
+    expect(duel.margin).toBe(4);
+  });
+
+  it("follows an automatic substitution that changes a multiplier", () => {
+    // The rival starts the reserve forward over the forward who did not play.
+    const order = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 12, 13, 14, 11];
+    const [member, rival] = sides(
+      { ...played, 11: { points: 0, minutes: 0 }, 13: { points: 6, minutes: 90 } },
+      { pick_order: order },
+    );
+    // The member's defender comes on for the forward; the rival's bench stays out.
+    expect(member.rows.find((row) => row.elementId === 13)?.autosub).toBe("in");
+    const duel = liveDuel(member, rival);
+    expect(duel.yours.map((swing) => swing.elementId)).toContain(13);
+    expect(swingTotal(member, rival)).toBe(member.net - rival.net);
+  });
+
+  it("is level, ahead or behind from the two nets", () => {
+    expect([duelStatus(3), duelStatus(0), duelStatus(-2)]).toEqual(["ahead", "level", "behind"]);
+  });
+
+  it("gives the total gap from the totals before the week and both live nets", () => {
+    const [member, rival] = sides(
+      { ...played, 10: { points: 9, minutes: 90 } },
+      { captain: 7, vice: 10 },
+    );
+    expect(liveDuel(member, rival, { member: 500, rival: 520 }).totalGap).toBe(
+      500 + member.net - (520 + rival.net),
+    );
+    expect(liveDuel(member, rival).totalGap).toBeNull();
+  });
+});
+
+describe("a season total before the live week", () => {
+  const season = (weeks: [number, number][]): FplEntrySeason => ({
+    contract_version: "fpl_entry_season_v1",
+    entry_id: 5001,
+    source_time: "2026-11-21T15:00:00Z",
+    weeks: weeks.map(([event, total]) => ({
+      event,
+      points: 50,
+      total_points: total,
+      rank: null,
+      overall_rank: null,
+      event_transfers: 0,
+      event_transfers_cost: 0,
+      bank: 0,
+      value: 1000,
+    })),
+    chips: [],
+  });
+
+  it("is the total after the week before, even when the document lists the live week", () => {
+    expect(
+      seasonTotalBefore(
+        season([
+          [8, 400],
+          [9, 450],
+          [10, 470],
+        ]),
+        10,
+      ),
+    ).toBe(450);
+    expect(
+      seasonTotalBefore(
+        season([
+          [8, 400],
+          [9, 450],
+        ]),
+        10,
+      ),
+    ).toBe(450);
+  });
+
+  it("is zero for a member whose season starts with the live week", () => {
+    expect(seasonTotalBefore(season([[10, 60]]), 10)).toBe(0);
+  });
+});
