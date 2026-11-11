@@ -602,7 +602,10 @@ function LeagueMemberContent({
               ) : rivalsLoading ? (
                 <EmptyState title={copy.loadingRivals} />
               ) : shown ? (
-                <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
+                // Under LIVE WEEK the closed week's plan is not drawn: the week being played is.
+                closed ? null : (
+                  <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
+                )
               ) : computeOnly && !rejectedContext ? null : closed &&
                 index?.menu === "device" ? null : ( // is to say. The card would only name a publication that never happens. // is no default plan to point at, and the squad and its score say what there // A device menu publishes no plan for any week: once the week is closed there
                 <MissingAdviceCard
@@ -654,7 +657,7 @@ function LeagueMemberContent({
                 </Link>
               </p>
             ) : null}
-            {!adviceLoading && shown ? (
+            {!adviceLoading && shown && !closed ? (
               <>
                 {/* It sends the member to Hesapla, which a closed week does not have. */}
                 <NewInformationNotice
