@@ -193,6 +193,7 @@ function renderLive({
   league = LEAGUE,
   forwardedLeague = null,
   members = membersScored(TEST_WEEK - 1),
+  language = "tr",
 }: {
   forwarder: LiveForwarder;
   path?: string;
@@ -200,6 +201,7 @@ function renderLive({
   league?: PublishedLeague;
   forwardedLeague?: ForwardedLeague | null;
   members?: ReturnType<typeof membersScored>;
+  language?: "tr" | "en";
 }) {
   const loadTable = vi.fn(async () => ({
     contract_version: "provisional_league_ui_v1" as const,
@@ -221,7 +223,7 @@ function renderLive({
   );
   render(
     <QueryClientProvider client={client}>
-      <LanguageProvider initialLanguage="tr">
+      <LanguageProvider initialLanguage={language}>
         <MemoryRouter initialEntries={[path]}>
           <ForwardedLeagueContext.Provider value={forwardedLeague}>
             <LeagueContext.Provider
@@ -601,6 +603,24 @@ describe("the week and the rival", () => {
     const block = document.querySelector("[data-live-rival]")!;
     await vi.waitFor(() => expect(block).toHaveTextContent(copy.live.margin));
     expect(block).not.toHaveTextContent(copy.live.totalGap);
+  });
+
+  it.each([
+    ["the week's head-to-head opponent", "h2h", 35249004, "Opponent", 1],
+    ["a head-to-head league's member in a week without a pairing", "h2h", undefined, "Rival", 0],
+    ["a classic league's member", "classic", undefined, "Rival", 0],
+  ] as const)("names %s so in English", async (_, scoring, opponent, label, badges) => {
+    const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))], { opponent });
+    renderLive({
+      forwarder,
+      forwardedLeague: { leagueId: LEAGUE.leagueId, leagueName: null, scoring },
+      language: "en",
+    });
+    await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+    const select = await screen.findByRole("combobox", { name: label });
+    if (opponent !== undefined)
+      await vi.waitFor(() => expect(select).toHaveValue(String(opponent)));
+    expect(screen.queryAllByText(MESSAGES.en.live.h2h, { exact: true })).toHaveLength(badges);
   });
 
   it("puts the rival ?duel= names first, and a choice writes it to the address", async () => {

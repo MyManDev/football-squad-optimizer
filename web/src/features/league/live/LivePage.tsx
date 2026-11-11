@@ -360,7 +360,6 @@ function LiveMember({
                   board: rivalBoard,
                   duel,
                   pending,
-                  headToHead,
                   opponent: rivalId !== null && rivalId === opponent.data?.entryId,
                   onSelect: (next) =>
                     setSearchParams(

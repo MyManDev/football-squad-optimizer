@@ -47,9 +47,7 @@ export interface LiveRivalView {
   duel: LiveDuel | null;
   /** The previous rival's duel while this one's is read, so nothing below it jumps. */
   pending: HeldDuel | null;
-  /** The league is head-to-head. */
-  headToHead: boolean;
-  /** The rival is the member's opponent of the live week. */
+  /** The rival is the member's head-to-head opponent of the live week. */
   opponent: boolean;
   onSelect: (entryId: number) => void;
 }
@@ -537,7 +535,8 @@ function RivalBlock({
   // The duel reads the member's score as Canlı puan shows it, until the board's points land.
   const margin = duel === null ? 0 : duel.margin - held;
   const totalGap = duel?.totalGap == null ? null : duel.totalGap - held;
-  const label = rival.headToHead ? copy.opponent : copy.rival;
+  // The week's opponent is named so; any other member, in any league, is a rival.
+  const label = rival.opponent ? copy.opponent : copy.rival;
   return (
     <section className={styles.rival} aria-labelledby={`${id}-label`} data-live-rival>
       <div className={styles.rivalHead}>
