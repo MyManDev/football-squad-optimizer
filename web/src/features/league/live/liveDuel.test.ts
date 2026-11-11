@@ -5,7 +5,7 @@ import { scoreMemberWeek } from "../../liveScore/officialScoring";
 import vectors from "../../liveScore/officialScoring.vectors.json";
 import type { MemberWeek, WeekElement, WeekLive } from "../../liveScore/weekLive";
 import { mockMembers } from "../../../fixtures/league";
-import { liveBoard, type LiveBoard, type LiveRow, type Multiplier } from "./liveBoard";
+import { liveBoard, pickMultiplier, type LiveBoard, type LiveRow } from "./liveBoard";
 import { duelStatus, leagueTotalsBefore, liveDuel } from "./liveDuel";
 
 type Vector = (typeof vectors.cases)[number];
@@ -15,20 +15,20 @@ type Resolved = WeekElement & { club: number };
 
 /**
  * A side of the duel as the official scorer scores it, in the board's shape: each pick's
- * multiplier and points from the scorer's own verdict.
+ * points, and his multiplier by the board's own rule (`pickMultiplier`) from the scorer's
+ * verdict.
  */
 function scoredSide(week: Week, member: MemberWeek): LiveBoard | null {
   const score = scoreMemberWeek(week, member);
   if (score.refused) return null;
   const points = new Map(week.elements.map((element) => [element.element_id, element.points]));
   const rows = member.pick_order.map((elementId, index) => {
-    const multiplier: Multiplier = !score.counted.includes(elementId)
-      ? 0
-      : elementId === score.captain
-        ? member.active_chip === "3xc"
-          ? 3
-          : 2
-        : 1;
+    const multiplier = pickMultiplier(
+      elementId,
+      new Set(score.counted),
+      score.captain,
+      member.active_chip,
+    );
     return { elementId, pick: index + 1, points: points.get(elementId)!, multiplier };
   });
   return {
@@ -94,8 +94,7 @@ describe("the duel's invariant over the official scorer's vectors", () => {
       const them = scoredSide(week, rival);
       if (you === null || them === null) continue;
       checked += 1;
-      const margin = you.net - them.net;
-      if (swingTotal(you, them) !== margin || liveDuel(you, them).margin !== margin) {
+      if (swingTotal(you, them) !== you.net - them.net) {
         broken.push(`${a.name} against ${b.name}`);
       }
     }

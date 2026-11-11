@@ -21,6 +21,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import { PHONE_QUERY } from "../../../design/shell/layout";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
+import { claimIn, forgetIdentity } from "../../../testSupport/league";
 import {
   testActivity,
   testFixtures,
@@ -48,6 +49,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   sessionStorage.clear();
+  forgetIdentity();
   delete (window as { matchMedia?: unknown }).matchMedia;
 });
 
@@ -674,6 +676,28 @@ describe("the week and the rival", () => {
     if (opponent !== undefined)
       await vi.waitFor(() => expect(select).toHaveValue(String(opponent)));
     expect(screen.queryAllByText(MESSAGES.en.live.h2h, { exact: true })).toHaveLength(badges);
+  });
+
+  it.each([
+    ["the visitor's own", ENTRY, ["Sen", copy.live.yours, copy.live.theirs]],
+    ["another member's", 35249003, ["North Stand Notes", "Half Space"]],
+  ] as const)("names the sides of %s page", async (_, claimed, names) => {
+    claimIn(claimed, LEAGUE.leagueId);
+    const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))]);
+    renderLive({ forwarder });
+    await rows();
+    const block = await vi.waitFor(() => {
+      const found = document.querySelector("[data-live-rival]");
+      expect(found).toHaveTextContent(copy.live.margin);
+      return found!;
+    });
+    const differentials = document.querySelector("[data-live-differentials]")!;
+    const sides = [
+      ...block.querySelectorAll("p:last-of-type span"),
+      ...differentials.querySelectorAll("h3"),
+    ].map((node) => node.textContent ?? "");
+    for (const name of names) expect(sides.join(" | ")).toContain(name);
+    if (claimed !== ENTRY) expect(sides.join(" | ")).not.toContain(copy.live.yours);
   });
 
   it("puts the rival ?duel= names first, and a choice writes it to the address", async () => {
