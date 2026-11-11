@@ -56,6 +56,26 @@ function LeagueMemberPage() {
   return <module.LeagueMemberPage />;
 }
 
+type LivePageModule = typeof import("../features/league/live/LivePage");
+let livePage: Promise<LivePageModule> | null = null;
+
+/** LIVE's code, its own chunk, loaded once and read with `use` as the member page's is. */
+function loadLivePage(): Promise<LivePageModule> {
+  if (livePage === null) {
+    const loading = import("../features/league/live/LivePage");
+    livePage = loading;
+    void loading.then((module) => {
+      Object.assign(loading, { status: "fulfilled", value: module });
+    });
+  }
+  return livePage;
+}
+
+function LivePage() {
+  const module = use(loadLivePage());
+  return <module.LivePage />;
+}
+
 /**
  * A member page's code starts loading as its address arrives, in the same turn as the gate's,
  * instead of after the gate has read the directory: on a phone that was one round trip of
@@ -63,10 +83,13 @@ function LeagueMemberPage() {
  * step before a member page, so its address starts the same code.
  */
 const MEMBER_PAGE_ADDRESS = /^\/league(?:\/\d+)?\/members(?:\/|$)/;
+/** A LIVE address starts LIVE's code instead, under a league or for one team on its own. */
+const LIVE_ADDRESS = /^\/(?:league(?:\/\d+)?\/members|entry)\/\d+\/live\/?$/;
 function RoutePreload() {
   const { pathname } = useLocation();
   useEffect(() => {
-    if (MEMBER_PAGE_ADDRESS.test(pathname)) void loadLeagueMemberPage();
+    if (LIVE_ADDRESS.test(pathname)) void loadLivePage();
+    else if (MEMBER_PAGE_ADDRESS.test(pathname)) void loadLeagueMemberPage();
   }, [pathname]);
   return null;
 }
@@ -218,6 +241,27 @@ function LocalizedApp({ basename }: { basename: string }) {
                     />
                   ),
                 )}
+                {/* LIVE: the member's live week beside one rival, a fixed segment as the
+                    history's is, behind the same gates. */}
+                {["/league/members/:entryId/live", "/league/:leagueId/members/:entryId/live"].map(
+                  (root) => (
+                    <Route
+                      key={root}
+                      path={root}
+                      element={
+                        <LeagueGate
+                          forwarded={
+                            <ForwardedMemberGate>
+                              <LivePage />
+                            </ForwardedMemberGate>
+                          }
+                        >
+                          <LivePage />
+                        </LeagueGate>
+                      }
+                    />
+                  ),
+                )}
                 {/* How notifications are received: the reminder's page under the member's. It
                     reads no league data, so no gate stands in front of it. */}
                 <Route
@@ -231,6 +275,15 @@ function LocalizedApp({ basename }: { basename: string }) {
                   element={
                     <ForwardedMemberGate standalone>
                       <LeagueMemberPage />
+                    </ForwardedMemberGate>
+                  }
+                />
+                {/* One team's live week on its own: no league, so no rival. */}
+                <Route
+                  path="/entry/:entryId/live"
+                  element={
+                    <ForwardedMemberGate standalone>
+                      <LivePage />
                     </ForwardedMemberGate>
                   }
                 />

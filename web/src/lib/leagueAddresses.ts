@@ -40,6 +40,29 @@ export function memberVsAddress(leagueId: number, entryId: number | string): str
   return `${memberAddress(leagueId, entryId)}/vs`;
 }
 
+/** The member's live week beside one rival: LIVE. */
+export function memberLiveAddress(leagueId: number, entryId: number | string): string {
+  return `${memberAddress(leagueId, entryId)}/live`;
+}
+
+/** One FPL team's live week on its own, with no league and so no rival. */
+export function entryLiveAddress(entryId: number | string): string {
+  return `${entryAddress(entryId)}/live`;
+}
+
+/** A league member's LIVE page, with or without a closing slash. */
+const LIVE_ADDRESS = /\/members\/[^/]+\/live\/?$/;
+
+/** Whether a path is a league member's LIVE page, with or without a closing slash. */
+export function isLiveAddress(pathname: string): boolean {
+  return LIVE_ADDRESS.test(pathname);
+}
+
+/** A team's LIVE page: under its league, or on its own for league 0. */
+export function liveAddress(leagueId: number, entryId: number | string): string {
+  return leagueId > 0 ? memberLiveAddress(leagueId, entryId) : entryLiveAddress(entryId);
+}
+
 /**
  * The member's tools, each a page of its own under the member's page that the sidebar
  * links once the visitor has said who they are: the squad held now, the what-if squad, the duel, the chips and free transfers, and the squad card.

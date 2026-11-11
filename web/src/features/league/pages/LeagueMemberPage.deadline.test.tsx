@@ -115,7 +115,7 @@ describe("a member page whose gameweek has closed", () => {
     },
   );
 
-  it("says what is published for a selection the service would have computed", () => {
+  it("draws no card beside a selection the service would compute, open or under LIVE WEEK", () => {
     const copy = MESSAGES.tr.leagueMembers;
     // A rival strategy over three weeks: the publish solved one week, the service three.
     const search = "?mode=ortak-koru&window=3";
@@ -130,12 +130,31 @@ describe("a member page whose gameweek has closed", () => {
     cleanup();
 
     renderView(DEADLINE, "tr", search, props);
-    expect(screen.getByText(copy.closedNotListed.title)).toBeInTheDocument();
+    // Under LIVE WEEK no plan is drawn, and no card names one.
+    expect(screen.queryByText(copy.publicationStates["not-listed"].title)).toBeNull();
     expect(screen.queryByText(copy.adviceRequestHint)).toBeNull();
   });
 
+  it.each(["index-error", "unavailable"] as const)(
+    "draws no %s card under LIVE WEEK, where no plan is drawn to retry",
+    (issue) => {
+      const copy = MESSAGES.tr.leagueMembers;
+      const props: Partial<LeagueMemberViewProps> = {
+        advice: null,
+        adviceIssue: issue,
+        onRetryAdvice: () => undefined,
+        onRetryIndex: () => undefined,
+      };
+      renderView(null, "tr", "", props);
+      expect(screen.getByRole("button", { name: copy.retryPublishedRead })).toBeInTheDocument();
+      cleanup();
+      renderView(DEADLINE, "tr", "", props);
+      expect(screen.queryByRole("button", { name: copy.retryPublishedRead })).toBeNull();
+    },
+  );
+
   it.each(["tr", "en"] as const)(
-    "asks for no choice it no longer offers, and links to the default plan instead (%s)",
+    "asks for no choice it no longer offers, and under LIVE WEEK names no plan (%s)",
     (language) => {
       const copy = MESSAGES[language].leagueMembers;
       const notListed = copy.publicationStates["not-listed"];
@@ -149,17 +168,12 @@ describe("a member page whose gameweek has closed", () => {
       // While the week is open the settings under the decision are where to choose.
       expect(screen.getByText(notListed.title)).toBeInTheDocument();
       expect(screen.getByText(notListed.body)).toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: copy.closedNotListed.link })).toBeNull();
       cleanup();
 
       renderView(DEADLINE, language, search, props);
-      expect(screen.getByText(copy.closedNotListed.title)).toBeInTheDocument();
+      // The plan is not drawn under LIVE WEEK, so nothing says it is missing or points at one.
+      expect(screen.queryByText(notListed.title)).toBeNull();
       expect(screen.queryByText(notListed.body)).toBeNull();
-      // The same page with no selection, as the sidebar's own link lands on it.
-      expect(screen.getByRole("link", { name: copy.closedNotListed.link })).toHaveAttribute(
-        "href",
-        `/league/352490/members/${ENTRY}`,
-      );
     },
   );
 
@@ -219,9 +233,47 @@ describe("a member page whose gameweek has closed", () => {
   });
 });
 
+describe("the plan under LIVE WEEK", () => {
+  /** The plan's details, drawn under the squad (AdviceDetails' holder, by its class here). */
+  const details = () => [...document.querySelectorAll(".details")];
+
+  it.each(["tr", "en"] as const)(
+    "draws the closed week's plan neither as the decision nor as its details (%s)",
+    async (language) => {
+      const copy = MESSAGES[language].leagueMembers;
+      // The open week draws the plan's board and its details.
+      renderView(null, language);
+      await screen.findByText(copy.squadAfterTitle);
+      expect(details().length).toBeGreaterThan(0);
+      cleanup();
+
+      renderView(DEADLINE, language);
+      await screen.findByRole("heading", { name: copy.liveWeek });
+      expect(screen.getByRole("heading", { name: copy.memberSquad })).toBeInTheDocument();
+      expect(screen.queryByText(copy.squadAfterTitle)).toBeNull();
+      expect(details()).toEqual([]);
+      expect(screen.queryByTestId("new-information-notice")).toBeNull();
+    },
+  );
+
+  it.each(["tr", "en"] as const)(
+    "says nothing is being read for the plan it does not draw (%s)",
+    (language) => {
+      const copy = MESSAGES[language].leagueMembers;
+      renderView(DEADLINE, language, "", { adviceLoading: true });
+      expect(screen.getByRole("heading", { name: copy.liveWeek })).toBeInTheDocument();
+      expect(screen.queryByText(copy.loadingAdvice)).toBeNull();
+      cleanup();
+      // The open week says so while its plan is read.
+      renderView(null, language, "", { adviceLoading: true });
+      expect(screen.getByText(copy.loadingAdvice)).toBeInTheDocument();
+    },
+  );
+});
+
 describe("a closed week on a device menu", () => {
   it.each(["tr", "en"] as const)(
-    "shows no card about a publication that never happens, and no default-plan link (%s)",
+    "shows no card under LIVE WEEK on a device menu either (%s)",
     (language) => {
       const copy = MESSAGES[language].leagueMembers;
       const props: Partial<LeagueMemberViewProps> = {
@@ -238,8 +290,6 @@ describe("a closed week on a device menu", () => {
       };
       renderView(DEADLINE, language, "", props);
       expect(screen.getByTestId("deadline-passed")).toBeInTheDocument();
-      expect(screen.queryByText(copy.closedNotListed.title)).toBeNull();
-      expect(screen.queryByRole("link", { name: copy.closedNotListed.link })).toBeNull();
       expect(screen.queryByText(copy.publicationStates["not-listed"].title)).toBeNull();
     },
   );

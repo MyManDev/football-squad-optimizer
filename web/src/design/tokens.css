@@ -90,9 +90,11 @@
   --color-primary-text: #ffffff;
   --color-good: #1c7a3e;
   --color-bad: #b3261e;
-  /* VS SQUADOPT's two bars: the good green and a blue the palette check pairs with it. */
+  /* VS SQUADOPT's two bars: the good green and a blue the palette check pairs with it. The
+     LIVE page's duel sets the member's blue beside a rival's plum, each a text colour too. */
   --color-chart-squadopt: #1c7a3e;
   --color-chart-you: #2f5fb3;
+  --color-chart-rival: #9b2c7a;
   --color-warn: #8a5a00;
   --color-focus: #10261a;
 
@@ -154,6 +156,7 @@
     --color-bad: #ff7a6e;
     --color-chart-squadopt: #3aa972;
     --color-chart-you: #6192ea;
+    --color-chart-rival: #e48bd9;
     --color-warn: #e9b04f;
     --color-focus: #f2c230;
 
@@ -199,6 +202,7 @@
   --color-bad: #ff7a6e;
   --color-chart-squadopt: #3aa972;
   --color-chart-you: #6192ea;
+  --color-chart-rival: #e48bd9;
   --color-warn: #e9b04f;
   --color-focus: #f2c230;
 

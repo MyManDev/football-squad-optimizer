@@ -6,6 +6,7 @@
  * item is 'Ligini bul': the league-number form with no league, or the "Sen kimsin?" step
  * of the league entered; 'Bu hafta' and 'Lig' are not there at all. Once both steps are
  * taken, 'Bu hafta' always means the claimed member's own page (on a rival's page too),
+ * 'LIVE' right after it their live week (always there, so nothing here reads a clock),
  * 'Lig' is the league's member list, and each of the member's tools (the squad held now,
  * the what-if squad, the duel, the chips and the squad card) is a page of its own under
  * their page, and so is their weekly suggestion history. The rule holds per league, so
@@ -19,6 +20,7 @@ import {
   leagueIdInAddress,
   memberAddress,
   memberHistoryAddress,
+  memberLiveAddress,
   memberVsAddress,
   membersAddress,
   memberToolAddress,
@@ -42,6 +44,7 @@ export type NavKey =
   | "vsSquadopt"
   | "findLeague"
   | "thisWeek"
+  | "live"
   | "league"
   | ToolNavKey
   | "history"
@@ -88,7 +91,7 @@ export interface Place {
 }
 
 const MEMBER_PAGE = /^\/league\/(\d+)\/members\/(\d+)$/;
-const MEMBER_HISTORY = /^\/league\/(\d+)\/members\/(\d+)\/history$/;
+const MEMBER_HISTORY = /^\/league\/(\d+)\/members\/(\d+)\/(?:history|live)$/;
 const MEMBER_TOOL = /^\/league\/(\d+)\/members\/(\d+)\/([a-z-]+)$/;
 
 function path(pathname: string): string {
@@ -116,6 +119,7 @@ export function memberAt(
   if (page) {
     return { leagueId: Number(page[1]), entryId: page[2]!, search: planSearch(place.search) };
   }
+  // The history and the live week carry no plan in their address.
   const history = MEMBER_HISTORY.exec(pathname);
   if (history) return { leagueId: Number(history[1]), entryId: history[2]!, search: null };
   // A tool page carries the plan in its address as the decision page does.
@@ -155,6 +159,7 @@ export function navItems(
         ? lastSeen.search
         : "";
     const own = memberAddress(leagueId, entryId);
+    const live = memberLiveAddress(leagueId, entryId);
     const league = membersAddress(leagueId);
     const history = memberHistoryAddress(leagueId, entryId);
     const vs = memberVsAddress(leagueId, entryId);
@@ -162,6 +167,7 @@ export function navItems(
       // The member against the system, week by week, first: what the site is for.
       { key: "vsSquadopt", to: vs, active: pathname === vs },
       { key: "thisWeek", to: `${own}${plan}`, active: pathname === own },
+      { key: "live", to: live, active: pathname === live },
       { key: "league", to: league, active: pathname === league },
       ...MEMBER_TOOLS.map((tool) => {
         const page = memberToolAddress(leagueId, entryId, tool);

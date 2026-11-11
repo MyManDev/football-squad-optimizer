@@ -240,6 +240,7 @@ describe("the app shell on a desktop", () => {
     expect(navLinks().map((link) => link.textContent)).toEqual([
       TR.vsSquadopt,
       TR.thisWeek,
+      TR.live,
       TR.league,
       TR.currentSquad,
       TR.whatIf,
@@ -583,6 +584,38 @@ describe("the app shell on a phone", () => {
     expect(screen.getByTestId("sheet")).toHaveAttribute("data-open", "false");
     expect(screen.getByRole("main")).not.toHaveAttribute("inert");
     expect(open).toHaveFocus();
+  });
+
+  it("puts the LIVE pill between the wordmark and 'Fikstür' only while it is handed one", async () => {
+    stubLayout("phone");
+    const live = `${OWN}/live`;
+    const plain = renderShell({ identity: CLAIMED, path: OWN });
+    expect(within(screen.getByRole("banner")).queryByRole("link", { name: TR.live })).toBeNull();
+    expect(screen.getByRole("banner")).not.toHaveAttribute("data-live");
+    plain.unmount();
+
+    const user = userEvent.setup();
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[OWN]}>
+          <PageShell identity={CLAIMED} live={live}>
+            <p>page</p>
+          </PageShell>
+          <LocationProbe />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    const bar = within(screen.getByRole("banner"));
+    const pill = bar.getByRole("link", { name: TR.live });
+    expect(pill).toHaveAttribute("href", live);
+    expect(pill).not.toHaveAttribute("aria-current");
+    // In the bar's order: the menu, the wordmark, LIVE, then 'Fikstür', which keeps its name.
+    const fixtures = bar.getByRole("link", { name: TR.fixtures });
+    expect(pill.compareDocumentPosition(fixtures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("banner")).toHaveAttribute("data-live", "true");
+    await user.click(pill);
+    expect(screen.getByTestId("location")).toHaveTextContent(live);
+    expect(bar.getByRole("link", { name: TR.live })).toHaveAttribute("aria-current", "page");
   });
 
   it("turns the phone bar's 'Fikstür' back into a link when the page withdraws its sheet", async () => {

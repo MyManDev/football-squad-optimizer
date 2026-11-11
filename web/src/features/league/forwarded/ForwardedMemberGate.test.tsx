@@ -9,7 +9,7 @@
 import { createHash } from "node:crypto";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -30,6 +30,7 @@ import { LeagueMemberPage } from "../pages/LeagueMemberPage";
 import { useLeague } from "../useLeague";
 import { ForwardedLeagueContext } from "./ForwardedLeagueContext";
 import { ForwardedMemberGate } from "./ForwardedMemberGate";
+import { forwardedKeys } from "./reads";
 import type { ForwardedSources } from "./forwardedTree";
 
 afterEach(() => {
@@ -155,8 +156,11 @@ function Probe() {
   );
 }
 
-function open(address: string, child: ReactNode = <Probe />) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function open(
+  address: string,
+  child: ReactNode = <Probe />,
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider initialLanguage="tr">
@@ -252,6 +256,35 @@ describe("a member of a forwarded league", () => {
       ),
     );
     expect(screen.queryByRole("button", { name: new RegExp(ROW.entry_name) })).toBeNull();
+  });
+
+  it("keeps the page drawn when a later read of the bundle fails", async () => {
+    let answer = true;
+    site({
+      bundle: () => (answer ? marked(BUNDLE) : marked({ error: "upstream_unavailable" }, 503)),
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    open(`/entry/${ENTRY}`, <Probe />, client);
+    await waitFor(() => expect(screen.getByTestId("probe")).toBeInTheDocument());
+    answer = false;
+    await act(async () => {
+      await client.refetchQueries({ queryKey: forwardedKeys.bundle(ENTRY, TABLE.gameweek) });
+    });
+    expect(client.getQueryState(forwardedKeys.bundle(ENTRY, TABLE.gameweek))?.status).toBe("error");
+    expect(screen.getByTestId("probe")).toBeInTheDocument();
+    expect(screen.queryByText(copy.forwarded.teamUnavailable)).toBeNull();
+  });
+
+  it("says a team cannot be read when no bundle is held, and reads it again on request", async () => {
+    let answer = false;
+    site({
+      bundle: () => (answer ? marked(BUNDLE) : marked({ error: "upstream_unavailable" }, 503)),
+    });
+    open(`/entry/${ENTRY}`);
+    expect(await screen.findByText(copy.forwarded.teamUnavailable)).toBeInTheDocument();
+    answer = true;
+    await userEvent.click(screen.getByRole("button", { name: copy.forwarded.retry }));
+    await waitFor(() => expect(screen.getByTestId("probe")).toBeInTheDocument());
   });
 
   it("draws the member page itself with the device's controls and no caveat", async () => {

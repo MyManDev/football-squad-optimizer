@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
@@ -11,6 +11,8 @@ import { jsonResponse, notFound, stubFetchByUrl } from "../../../testSupport/fet
 import { memberAddress, membersAddress } from "../../../lib/leagueAddresses";
 import { claimIn, forgetIdentity } from "../../../testSupport/league";
 import { readMemberClaim } from "../identity/memberClaim";
+import * as prefetchModule from "../prefetch";
+import { leagueKeys } from "../queries";
 import { readChosenLeague, writeChosenLeague } from "../identity/useChosenLeague";
 import { LeagueGate } from "./LeagueGate";
 
@@ -58,8 +60,11 @@ function countLeagueChoices() {
   return { heard, stop: () => window.removeEventListener("squadopt:league-changed", heard) };
 }
 
-function open(language: Language, address = `/league/members/${ENTRY}`) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function open(
+  language: Language,
+  address = `/league/members/${ENTRY}`,
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const page = (
     <LeagueGate>
       <h1>Member page</h1>
@@ -72,6 +77,7 @@ function open(language: Language, address = `/league/members/${ENTRY}`) {
           <Routes>
             <Route path="/league/members/:entryId" element={page} />
             <Route path="/league/:leagueId/members/:entryId" element={page} />
+            <Route path="/league/:leagueId/members/:entryId/live" element={page} />
             <Route path="/league/:leagueId/members" element={<h1>Members list</h1>} />
             <Route path="/league/:leagueId" element={<LeagueGate>{null}</LeagueGate>} />
           </Routes>
@@ -164,6 +170,58 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     ]);
     // The league in the address is the one the visitor is in from here on.
     expect(readChosenLeague()).toBe(LEAGUE);
+  });
+
+  it("starts LIVE's own reads alone under its address, and nothing more when its rival changes", async () => {
+    const fetcher = legacySite();
+    claimIn();
+    const prefetches = vi.spyOn(prefetchModule, "prefetchMemberReads");
+    function Pick() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate("?duel=35249003", { replace: true })}>
+          Pick
+        </button>
+      );
+    }
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <LanguageProvider initialLanguage={language}>
+          <MemoryRouter initialEntries={[`${memberAddress(LEAGUE, ENTRY)}/live?duel=35249002`]}>
+            <Routes>
+              <Route
+                path="/league/:leagueId/members/:entryId/live"
+                element={
+                  <LeagueGate>
+                    <h1>LIVE</h1>
+                    <Pick />
+                  </LeagueGate>
+                }
+              />
+            </Routes>
+            <LocationProbe />
+          </MemoryRouter>
+        </LanguageProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole("heading", { name: "LIVE" })).toBeInTheDocument();
+    // The squad and the advice index come from the example under test; of the network, the
+    // fixtures alone: no scoreboard and no history.
+    await waitFor(() => expect(asked(fetcher)).toEqual([...DIRECTORY_READS, "data/fixtures.json"]));
+    expect(prefetches).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      ENTRY,
+      [null, null],
+      "live",
+    );
+    const started = prefetches.mock.calls.length;
+    await userEvent.setup().click(screen.getByRole("button", { name: "Pick" }));
+    expect(location()).toContain("duel=35249003");
+    expect(prefetches).toHaveBeenCalledTimes(started);
+    expect(asked(fetcher)).toEqual([...DIRECTORY_READS, "data/fixtures.json"]);
   });
 
   it("asks who you are at a published league address, keeping the address, and reads nothing of the member", async () => {
@@ -271,6 +329,28 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     await userEvent.setup().click(screen.getByRole("button", { name: copy.retry }));
     expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
     expect(asked(fetcher).filter((url) => url === "data/league/members.json")).toHaveLength(2);
+  });
+
+  it("keeps the page drawn when a later read of the directory fails", async () => {
+    let answer = true;
+    claimIn();
+    stubFetchByUrl([
+      ["/data/leagues.json", notFound],
+      [
+        "/data/league/members.json",
+        () => (answer ? jsonResponse(published) : new Response("", { status: 503 })),
+      ],
+    ]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    open(language, memberAddress(LEAGUE, ENTRY), client);
+    expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
+    answer = false;
+    await act(async () => {
+      await client.refetchQueries({ queryKey: leagueKeys.directory() });
+    });
+    expect(client.getQueryState(leagueKeys.directory())?.status).toBe("error");
+    expect(screen.getByRole("heading", { name: "Member page" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: copy.directoryUnreadable })).toBeNull();
   });
 
   it("says when nothing is published rather than asking for another league", async () => {

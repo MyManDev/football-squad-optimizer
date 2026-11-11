@@ -32,6 +32,7 @@ export const PAGES = new Set([
   "member",
   "history",
   "vs",
+  "live",
   "reminder",
   "team",
   "fixtures",
@@ -50,6 +51,7 @@ export const TOOLS = new Set([
   "card",
   "history",
   "vs",
+  "live",
   "fixtures",
 ]);
 

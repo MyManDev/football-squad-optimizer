@@ -12,6 +12,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
 import { LanguageToggle } from "../../i18n/LanguageToggle";
 import { useLanguage } from "../../i18n/context";
+import { prefersReducedMotion } from "../motion";
 import {
   BrandMark,
   CalendarIcon,
@@ -38,6 +39,11 @@ import { MatchScene } from "./MatchScene";
 import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
+/** A click the page answers itself: the main button, with no key that asks for a new tab. */
+function plainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return event.button === 0 && !event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey;
+}
+
 /**
  * Direction D's app shell, around every page.
  *
@@ -56,18 +62,25 @@ import { ThemeToggle } from "./ThemeToggle";
  * Değiştir, which calls `onChangeMember`, the one way to say you are someone else. The
  * rail, too narrow for the block, shows it as one icon that opens the sidebar with focus
  * on Değiştir.
+ *
+ * `live` is the LIVE page the phone bar's pill opens, handed in only while one of the
+ * member's matches is in its window; null, the bar has no pill. Below 360 px the pill's
+ * room comes from Fikstür, which then shows its icon alone.
  */
 export function PageShell({
   children,
   identity = NO_IDENTITY,
   onChangeMember,
   whoExtra = null,
+  live = null,
 }: {
   children: ReactNode;
   identity?: ShellIdentity;
   onChangeMember?: () => void;
   /** A control drawn in the identity block after Değiştir; the shell knows nothing of it. */
   whoExtra?: ReactNode;
+  /** The address the phone bar's LIVE pill opens, or null for no pill. */
+  live?: string | null;
 }) {
   const { messages } = useLanguage();
   const copy = messages.shell;
@@ -263,9 +276,7 @@ export function PageShell({
     landed.current = null;
   }, [location.key]);
   const follow = (event: MouseEvent<HTMLAnchorElement>, item: NavItem) => {
-    const plain =
-      event.button === 0 && !event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey;
-    if (item.active || !plain) {
+    if (item.active || !plainClick(event)) {
       closeDrawer();
       return;
     }
@@ -386,9 +397,10 @@ export function PageShell({
   const fixturesFace = (
     <span className={styles.phoneFixturesFace}>
       <CalendarIcon />
-      {copy.fixtures}
+      <span className={styles.phoneFixturesText}>{copy.fixtures}</span>
     </span>
   );
+  const liveHere = live !== null && location.pathname === live;
 
   return (
     <ShellContext.Provider value={shell}>
@@ -403,7 +415,12 @@ export function PageShell({
           {copy.skip}
         </a>
         {layout === "phone" ? (
-          <header className={styles.phoneBar} inert={overlay} data-phone-bar>
+          <header
+            className={styles.phoneBar}
+            inert={overlay}
+            data-phone-bar
+            data-live={live !== null || undefined}
+          >
             <button
               ref={menuRef}
               type="button"
@@ -423,6 +440,32 @@ export function PageShell({
               <BrandMark small className={styles.mark} />
               <span className={styles.phoneWordmark}>SquadOpt</span>
             </span>
+            {live !== null ? (
+              <Link
+                to={live}
+                className={styles.phoneLive}
+                aria-current={liveHere ? "page" : undefined}
+                data-live-pill
+                onClick={(event) => {
+                  // On LIVE already, the pill keeps the page as it is (its rival, its address)
+                  // and brings its top back into view.
+                  if (liveHere && plainClick(event)) {
+                    event.preventDefault();
+                    window.scrollTo({
+                      top: 0,
+                      behavior: prefersReducedMotion() ? "instant" : "smooth",
+                    });
+                    return;
+                  }
+                  follow(event, { key: "live", to: live, active: liveHere });
+                }}
+              >
+                <span className={styles.phoneLiveFace}>
+                  <span className={styles.phoneLiveDot} aria-hidden="true" />
+                  {copy.live}
+                </span>
+              </Link>
+            ) : null}
             {sheets > 0 ? (
               <button
                 type="button"

@@ -34,7 +34,7 @@ describe("an event", () => {
   });
 
   it("names the questions the record has to answer", () => {
-    for (const tool of ["what-if", "duel", "chips", "card", "history", "fixtures"]) assert.ok(TOOLS.has(tool));
+    for (const tool of ["what-if", "duel", "chips", "card", "history", "live", "fixtures"]) assert.ok(TOOLS.has(tool));
     for (const step of ["open", "tool", "picker_shown", "picker_claimed", "device_solve"]) assert.ok(STEPS.has(step));
     assert.deepEqual([...DEVICES].sort(), ["desktop", "phone", "tablet", "unknown"]);
   });

@@ -84,16 +84,21 @@ const EASE = `cubic-bezier(${MOTION_EASE.join(", ")})`;
 /** The flex gap beside the order (var(--space-2)), and the smallest LED letters. */
 const FIT_GAP = 8;
 const LED_MIN = 30;
+/** The smallest a player's name stands on a board, beside its 26 px. */
+const NAME_MIN = 18;
 
 /** The room a board keeps from the screen's edges, the phone bar and the live score. */
 const EDGE = 12;
+/** The smallest a board stands to fit a short screen or a small room, its words still read. */
+const MIN_SCALE = 0.45;
 
 /**
  * Where a board stands: 38% down the screen, wholly inside it and below the phone bar, and
  * clear of the live score's head (its refresh button and total) while that is in view, so a
- * tap meant for the button reaches it and the points have somewhere to run. Where the head
- * leaves no room above or below, the board keeps at least the refresh button clear. Beside a
- * sidebar it stands over the page's own column, not the middle of the window.
+ * tap meant for the button reaches it and the points have somewhere to run. Where no place
+ * holds it whole beside them, it stands smaller in the largest room they leave (down to
+ * MIN_SCALE), and failing that keeps at least the refresh button clear, smaller if it must.
+ * Beside a sidebar it stands over the page's own column, not the middle of the window.
  */
 function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void {
   if (place === null || board === null) return;
@@ -121,32 +126,95 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
   // A board taller than the room below the bars (a phone on its side) stands smaller, whole.
   const natural = board.offsetHeight;
   const room = view - ceiling - EDGE;
-  const scale = natural > room && natural > 0 ? Math.max(0.5, room / natural) : 1;
+  const scale = natural > room && natural > 0 ? Math.max(MIN_SCALE, room / natural) : 1;
   if (scale < 1) place.style.transform = `scale(${scale.toFixed(3)})`;
   // The board's height on the screen, before any turn of its rise.
   const height = natural * scale;
   const floor = Math.max(ceiling, view - height - EDGE);
   let top = Math.min(Math.max(Math.round(view * 0.38), ceiling), floor);
+  const over = (at: number, low: number, high: number) => high > at && low < at + height;
   const total = document.querySelector("[data-live-total]");
-  const card = total?.closest("[data-member-live-score]");
+  const card = total?.closest("[data-live-head], [data-member-live-score]");
+  // The score's head, from its top to the total's foot, while it is in view.
+  let head: { from: number; to: number } | null = null;
   if (total && card) {
     const from = card.getBoundingClientRect().top;
     const to = total.getBoundingClientRect().bottom;
-    const over = (at: number, low: number, high: number) => high > at && low < at + height;
-    if (over(top, from, to) && to > 0 && from < view) {
-      if (to + EDGE <= floor) top = to + EDGE;
-      else if (from - EDGE - height >= ceiling) top = from - EDGE - height;
-      else {
-        // No room for the board beside the head: it keeps the refresh button clear if it can.
-        const button = card.querySelector("[data-live-refresh]")?.getBoundingClientRect();
-        const clear = [floor, ceiling].find(
-          (at) => button === undefined || !over(at, button.top, button.bottom),
-        );
-        if (clear !== undefined) top = clear;
+    if (to > 0 && from < view) head = { from, to };
+  }
+  if (head !== null && over(top, head.from, head.to)) {
+    if (head.to + EDGE <= floor) top = head.to + EDGE;
+    else if (head.from - EDGE - height >= ceiling) top = head.from - EDGE - height;
+    else {
+      // No room for the board beside the head: it keeps the refresh button clear if it can.
+      const button = card?.querySelector("[data-live-refresh]")?.getBoundingClientRect();
+      const clear = [floor, ceiling].find(
+        (at) => button === undefined || !over(at, button.top, button.bottom),
+      );
+      if (clear !== undefined) top = clear;
+    }
+  }
+  // What the board keeps clear while it is in view: the head and every refresh button.
+  const buttons: Band[] = [];
+  // A refresh button outside the head (LIVE's, under the rival on a phone) is kept clear too,
+  // without standing over the head again.
+  for (const node of document.querySelectorAll("[data-live-refresh]")) {
+    const button = node.getBoundingClientRect();
+    if (button.height === 0 || button.bottom < 0 || button.top > view) continue;
+    buttons.push({ from: button.top, to: button.bottom });
+    if (card?.contains(node)) continue;
+    if (!over(top, button.top, button.bottom)) continue;
+    const places = [button.bottom + EDGE, button.top - EDGE - height, floor, ceiling];
+    const clear = places.find(
+      (at) =>
+        at >= ceiling &&
+        at <= floor &&
+        !over(at, button.top, button.bottom) &&
+        (head === null || !over(at, head.from, head.to)),
+    );
+    if (clear !== undefined) top = clear;
+  }
+  // No place holds the board whole beside them (a small phone on its side): it stands smaller in
+  // the largest room they leave, or failing that in the largest room the refresh buttons alone
+  // leave, if that room holds it at MIN_SCALE of its size or more.
+  const kept = head === null ? buttons : [head, ...buttons];
+  const covers = (bands: readonly Band[]) => bands.some((band) => over(top, band.from, band.to));
+  if (covers(kept)) {
+    for (const bands of covers(buttons) ? [kept, buttons] : [kept]) {
+      const free = largestRoom(ceiling, view - EDGE, bands);
+      const fit = free === null ? 0 : Math.min(scale, (free.to - free.from) / natural);
+      if (free !== null && fit >= MIN_SCALE) {
+        place.style.transform = fit < 1 ? `scale(${fit.toFixed(3)})` : "";
+        top = free.from;
+        break;
       }
     }
   }
   place.style.top = `${Math.round(top)}px`;
+}
+
+/** A stretch of the screen from top to bottom. */
+interface Band {
+  from: number;
+  to: number;
+}
+
+/** The tallest stretch between `from` and `to` that none of `kept` (with EDGE round each) covers. */
+function largestRoom(from: number, to: number, kept: readonly Band[]): Band | null {
+  const rooms: Band[] = [];
+  let cursor = from;
+  for (const band of [...kept].sort((a, b) => a.from - b.from)) {
+    rooms.push({ from: cursor, to: Math.min(to, band.from - EDGE) });
+    cursor = Math.max(cursor, band.to + EDGE);
+  }
+  rooms.push({ from: cursor, to });
+  let best: Band | null = null;
+  for (const room of rooms) {
+    if (room.to > room.from && (best === null || room.to - room.from > best.to - best.from)) {
+      best = room;
+    }
+  }
+  return best;
 }
 
 /**
@@ -159,12 +227,21 @@ function keepPlaced(
   board: { current: HTMLElement | null },
   refit: () => void,
 ) {
-  const again = () => {
+  return keepWatching(() => {
     refit();
     placeBoard(place.current, board.current);
-  };
+  });
+}
+
+/**
+ * Runs `again` whenever the screen or the page's column changes: the window or the visual
+ * viewport resized, the column resized, or a transition on the page ended (the sidebar opening or
+ * closing moves the column without resizing it). The returned cleanup stops it.
+ */
+function keepWatching(again: () => void): () => void {
   window.addEventListener("resize", again);
   window.visualViewport?.addEventListener("resize", again);
+  document.addEventListener("transitionend", again);
   const column = document.getElementById("main");
   const watch =
     column !== null && typeof ResizeObserver === "function" ? new ResizeObserver(again) : null;
@@ -172,8 +249,20 @@ function keepPlaced(
   return () => {
     window.removeEventListener("resize", again);
     window.visualViewport?.removeEventListener("resize", again);
+    document.removeEventListener("transitionend", again);
     watch?.disconnect();
   };
+}
+
+/** A line's sides: over the page's own column beside a sidebar, as a board stands. */
+function placeAcross(line: HTMLElement | null): void {
+  if (line === null) return;
+  line.style.left = "";
+  line.style.right = "";
+  const column = document.getElementById("main")?.getBoundingClientRect();
+  if (column === undefined || column.left <= EDGE || column.width <= 0) return;
+  line.style.left = `${Math.round(column.left + EDGE)}px`;
+  line.style.right = `${Math.round(Math.max(EDGE, window.innerWidth - column.right + EDGE))}px`;
 }
 
 /**
@@ -189,6 +278,28 @@ function fitLed(letters: HTMLElement | null, room: HTMLElement | null, beside: b
     const size = parseFloat(getComputedStyle(letters).fontSize);
     letters.style.fontSize = `${Math.max(LED_MIN, Math.floor((size * free) / letters.scrollWidth))}px`;
   }
+}
+
+/**
+ * Fits each player's name on a board (`data-board-name`) so it breaks only between words or
+ * after a hyphen: a name with a word longer than its line stands smaller, never under
+ * NAME_MIN, and only below that breaks inside the word.
+ */
+function fitNames(board: HTMLElement | null): void {
+  board?.querySelectorAll<HTMLElement>("[data-board-name]").forEach((name) => {
+    name.style.fontSize = "";
+    name.style.overflowWrap = "normal";
+    // The captain's chip and the gap before it keep their size whatever the name's.
+    const chip = name.querySelector<HTMLElement>("[data-board-chip]");
+    const fixed = chip === null ? 0 : chip.offsetWidth + FIT_GAP;
+    const free = name.clientWidth - fixed;
+    const need = name.scrollWidth - fixed;
+    if (free > 0 && need > free) {
+      const size = parseFloat(getComputedStyle(name).fontSize);
+      name.style.fontSize = `${Math.max(NAME_MIN, Math.floor((size * free) / need))}px`;
+    }
+    name.style.overflowWrap = "";
+  });
 }
 
 /**
@@ -234,6 +345,11 @@ interface LayerState {
   stillRevision: number;
   /** What the live region says: the moment playing, kept while a panel holds it back. */
   voice: { key: string | null; text: string };
+  /**
+   * Every moment said and not yet gone, by its stream and key (`saidKey`): each is said once,
+   * on a board or on the still line, and leaves the set when its board or line goes.
+   */
+  said: ReadonlySet<string>;
   /** Moments that will not play (another stream, or turned into the still line), in order. */
   dropped: string[];
 }
@@ -274,26 +390,46 @@ function useReducedMotion(): boolean {
   return prefersReducedMotion();
 }
 
+/** Where focus goes when it was nowhere before a board or line came: the live score's heading. */
+const FOCUS_HOME = ["[data-member-live-score] h2", "[data-live-head] h2", "main h1"];
+
 /**
  * Gives focus back where it was before a board or line rose, when it is on the board as it
  * goes (a screen reader's double tap focuses a button even with tabIndex -1), so it never falls
- * to the page's body.
+ * to the page's body: where it was nowhere (a page opened at a replay's address), it goes to the
+ * live score's heading, or the page's.
  */
 function giveBackFocus(owner: HTMLElement | null, before: Element | null): void {
   if (owner === null || !owner.contains(document.activeElement)) return;
   if (before instanceof HTMLElement && before.isConnected && before !== document.body) {
     before.focus({ preventScroll: true });
-  } else {
-    (document.activeElement as HTMLElement | null)?.blur();
+    return;
   }
+  // In that order, not the document's: the page's h1 comes before the live score's heading.
+  const home =
+    FOCUS_HOME.map((selector) => document.querySelector<HTMLElement>(selector)).find(
+      (found) => found !== null,
+    ) ?? null;
+  if (home === null) {
+    (document.activeElement as HTMLElement | null)?.blur();
+    return;
+  }
+  if (!home.hasAttribute("tabindex")) home.setAttribute("tabindex", "-1");
+  home.focus({ preventScroll: true });
 }
 
 export function GoalMomentLayer({
   batch,
   source = batch === null ? "live" : sourceOf(batch.id),
+  scoring = true,
   onLanded,
 }: {
   batch: Batch | null;
+  /**
+   * Whether a moment's points run into the live score: not in the replay, whose finished week's
+   * score already holds them.
+   */
+  scoring?: boolean;
   /**
    * The stream the page shows now (`live` or `replay`): when it changes, the other stream's
    * moments still queued play no more.
@@ -323,18 +459,43 @@ export function GoalMomentLayer({
     still: null,
     stillRevision: 0,
     voice: { key: null, text: "" },
+    said: new Set(),
     dropped: [],
   });
   // One pass over what changed, settled into one state for this render.
   let next = state;
+  /** The still line's moments not said yet are said, and only they. */
+  const sayOnStill = (moments: BoardMoment[]) => {
+    const from = next.source ?? "live";
+    const fresh = moments.filter((moment) => !next.said.has(saidKey(from, moment.key)));
+    if (fresh.length === 0) return;
+    const said = new Set(next.said);
+    for (const moment of fresh) said.add(saidKey(from, moment.key));
+    next = {
+      ...next,
+      said,
+      voice: {
+        key: `still:${next.stillRevision}`,
+        text: fresh.map((moment) => announcement(moment, copy, locale)).join(". "),
+      },
+    };
+  };
   // The page shows another stream: its queued moments go, and the page is told.
   if (source !== next.source) {
     const gone = next.queue.filter((queued) => queued.source !== source);
+    // The still line of the stream left goes too; what was said of either is forgotten, so the
+    // stream's moments are said again if it comes back.
+    const goneStill = next.source === null ? [] : (next.still ?? []);
+    const from = next.source ?? "live";
     next = {
       ...next,
       source,
       queue: next.queue.filter((queued) => queued.source === source),
       still: next.source === null ? next.still : null,
+      said: without(next.said, [
+        ...gone.map((queued) => saidKey(queued.source, queued.moment.key)),
+        ...goneStill.map((moment) => saidKey(from, moment.key)),
+      ]),
       voice: gone.length > 0 ? { key: null, text: "" } : next.voice,
       dropped: [...next.dropped, ...gone.map((queued) => queued.moment.key)],
     };
@@ -368,16 +529,24 @@ export function GoalMomentLayer({
       queue: [],
       still: [...(next.still ?? []), ...moments],
       stillRevision: next.stillRevision + 1,
-      voice: { key: null, text: "" },
       dropped: [...next.dropped, ...moments.map((moment) => moment.key)],
     };
   }
+  // The still line's moments are said when it shows, not while a panel holds the page, where
+  // nothing would be heard and the line would come later unsaid.
+  if (clear && next.still !== null) sayOnStill(next.still);
   const playing = clear ? next.queue[0] : undefined;
   // Each moment is said once: when it starts, and not again if a panel held it back.
   if (playing !== undefined && next.voice.key !== playing.moment.key) {
+    const key = playing.moment.key;
+    const said = saidKey(playing.source, key);
     next = {
       ...next,
-      voice: { key: playing.moment.key, text: announcement(playing.moment, copy, locale) },
+      said: new Set(next.said).add(said),
+      voice: {
+        key,
+        text: next.said.has(said) ? next.voice.text : announcement(playing.moment, copy, locale),
+      },
     };
   }
   if (next !== state) setState(next);
@@ -388,16 +557,16 @@ export function GoalMomentLayer({
     told.current = state.dropped.length;
     for (const key of keys) landed.current?.(key);
   }, [state.dropped]);
-  const played = () =>
+  // The moment that played goes by its key: a stream change may have put another at the head
+  // while its board was still falling.
+  const played = (key: string, from: string) =>
     setState((current) => ({
       ...current,
-      queue: current.queue.slice(1),
-      voice: { key: null, text: "" },
+      queue: current.queue.filter((queued) => queued.moment.key !== key),
+      said: without(current.said, [saidKey(from, key)]),
+      voice: current.voice.key === key ? { key: null, text: "" } : current.voice,
     }));
-  const spoken =
-    next.still !== null && clear
-      ? next.still.map((moment) => announcement(moment, copy, locale)).join(". ")
-      : next.voice.text;
+  const spoken = next.voice.text;
   if (typeof document === "undefined") return null;
   return createPortal(
     <div ref={layer} className={styles.layer} lang={language} data-goal-moments>
@@ -410,7 +579,7 @@ export function GoalMomentLayer({
           moment={playing.moment}
           copy={copy}
           onLanded={(key) => landed.current?.(key)}
-          onDone={played}
+          onDone={() => played(playing.moment.key, playing.source)}
         />
       ) : playing.moment.size === "small" ? (
         <SmallLine
@@ -419,7 +588,7 @@ export function GoalMomentLayer({
           copy={copy}
           locale={locale}
           onLanded={(key) => landed.current?.(key)}
-          onDone={played}
+          onDone={() => played(playing.moment.key, playing.source)}
         />
       ) : (
         <Board
@@ -427,8 +596,9 @@ export function GoalMomentLayer({
           queued={{ moment: playing.moment, order: playing.order }}
           copy={copy}
           locale={locale}
+          scoring={scoring}
           onLanded={(key) => landed.current?.(key)}
-          onDone={played}
+          onDone={() => played(playing.moment.key, playing.source)}
         />
       )}
       {next.still !== null && clear ? (
@@ -437,12 +607,39 @@ export function GoalMomentLayer({
           moments={next.still}
           copy={copy}
           locale={locale}
-          onDone={() => setState((current) => ({ ...current, still: null }))}
+          onDone={() =>
+            setState((current) => ({
+              ...current,
+              still: null,
+              said: without(
+                current.said,
+                (current.still ?? []).map((moment) =>
+                  saidKey(current.source ?? "live", moment.key),
+                ),
+              ),
+              voice: current.voice.key?.startsWith("still:")
+                ? { key: null, text: "" }
+                : current.voice,
+            }))
+          }
         />
       ) : null}
     </div>,
     document.body,
   );
+}
+
+/** A moment said, by its stream and key: a replay's key and a live read's may be the same. */
+function saidKey(source: string, key: string): string {
+  return `${source}:${key}`;
+}
+
+/** The set without `keys`. */
+function without(set: ReadonlySet<string>, keys: readonly string[]): ReadonlySet<string> {
+  if (!keys.some((key) => set.has(key))) return set;
+  const rest = new Set(set);
+  for (const key of keys) rest.delete(key);
+  return rest;
 }
 
 function word(moment: LiveMoment, copy: Copy): string {
@@ -472,12 +669,14 @@ function Board({
   queued,
   copy,
   locale,
+  scoring = true,
   onLanded,
   onDone,
 }: {
   queued: { moment: LiveMoment; order: string };
   copy: Copy;
   locale: string;
+  scoring?: boolean;
   onLanded?: (key: string) => void;
   onDone: () => void;
 }) {
@@ -503,8 +702,15 @@ function Board({
   const leaving = useRef<(() => void) | null>(null);
   const text = shouted(moment, copy) ?? word(moment, copy);
 
-  // The whole shout fits the board at one size before its letters light.
-  useLayoutEffect(() => fitNowAndOnFonts(() => fitLed(shout.current, head.current, true)), [text]);
+  // The whole shout fits the board at one size before its letters light, and the name its line.
+  useLayoutEffect(
+    () =>
+      fitNowAndOnFonts(() => {
+        fitLed(shout.current, head.current, true);
+        fitNames(board.current);
+      }),
+    [text],
+  );
 
   useLayoutEffect(() => {
     // Where focus was when the board rose, to give it back if a tap or a screen reader put it
@@ -522,7 +728,9 @@ function Board({
       const received = moment.points === null ? null : signed(moment.points, locale);
       if (received !== null) setDigits(received);
       const release = () => onLandedRef.current?.(moment.key);
-      if (!run(number.current, moment.points === 0 ? null : received, release)) release();
+      if (!scoring || !run(number.current, moment.points === 0 ? null : received, release)) {
+        release();
+      }
       const fall = animate(
         board.current,
         [
@@ -540,7 +748,10 @@ function Board({
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
-    const unplace = keepPlaced(place, board, () => fitLed(shout.current, head.current, true));
+    const unplace = keepPlaced(place, board, () => {
+      fitLed(shout.current, head.current, true);
+      fitNames(board.current);
+    });
     // Risen, the board and its letters let go of their motion: no 3D turn stays on them.
     animate(
       board.current,
@@ -579,7 +790,7 @@ function Board({
       // Taken down unplayed (a panel opened, the stream changed): focus does not fall with it.
       giveBackFocus(owner, before);
     };
-  }, [big, doubled, locale, moment]);
+  }, [big, doubled, locale, moment, scoring]);
 
   // Each change of the digits pops them once.
   useEffect(() => {
@@ -620,9 +831,13 @@ function Board({
           ) : null}
         </span>
         <span className={styles.panel}>
-          <span className={styles.name}>
+          <span className={styles.name} data-board-name>
             {moment.name}
-            {moment.multiplier >= 2 ? <span className={styles.captain}>C</span> : null}
+            {moment.multiplier >= 2 ? (
+              <span className={styles.captain} data-board-chip>
+                C
+              </span>
+            ) : null}
           </span>
           <span className={styles.meta}>
             {moment.team} · {copy.positions[moment.position]}
@@ -667,7 +882,11 @@ function SubstitutionBoard({
   });
   const leaving = useRef<(() => void) | null>(null);
   useLayoutEffect(
-    () => fitNowAndOnFonts(() => fitLed(word.current, head.current, false)),
+    () =>
+      fitNowAndOnFonts(() => {
+        fitLed(word.current, head.current, false);
+        fitNames(board.current);
+      }),
     [copy.substitution],
   );
   useLayoutEffect(() => {
@@ -696,7 +915,10 @@ function SubstitutionBoard({
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
-    const unplace = keepPlaced(place, board, () => fitLed(word.current, head.current, false));
+    const unplace = keepPlaced(place, board, () => {
+      fitLed(word.current, head.current, false);
+      fitNames(board.current);
+    });
     animate(
       board.current,
       [
@@ -737,11 +959,15 @@ function SubstitutionBoard({
         </span>
         <span className={`${styles.panel} ${styles.off}`}>
           <span className={styles.side}>{copy.out}</span>
-          <span className={styles.name}>{moment.out}</span>
+          <span className={styles.name} data-board-name>
+            {moment.out}
+          </span>
         </span>
         <span className={styles.panel}>
           <span className={styles.side}>{copy.in}</span>
-          <span className={styles.name}>{moment.in}</span>
+          <span className={styles.name} data-board-name>
+            {moment.in}
+          </span>
         </span>
       </button>
     </div>
@@ -830,6 +1056,8 @@ function SmallLine({
     told.current = onLanded;
   });
   useLayoutEffect(() => {
+    placeAcross(line.current);
+    const unplace = keepWatching(() => placeAcross(line.current));
     animate(
       line.current,
       [
@@ -861,6 +1089,7 @@ function SmallLine({
     return () => {
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
+      unplace();
     };
   }, [moment.key]);
   return (
@@ -902,6 +1131,8 @@ function StillLine({
   useLayoutEffect(() => {
     before.current = document.activeElement;
     const owner = line.current;
+    placeAcross(owner);
+    const unplace = keepWatching(() => placeAcross(owner));
     const timer = setTimeout(() => close.current(), MOMENT_TIMING.still);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") close.current();
@@ -910,6 +1141,7 @@ function StillLine({
     return () => {
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
+      unplace();
       giveBackFocus(owner, before.current);
     };
   }, []);

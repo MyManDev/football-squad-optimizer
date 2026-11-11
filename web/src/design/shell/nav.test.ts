@@ -80,6 +80,7 @@ describe("the sidebar's navigation with the member claimed", () => {
     expect(hrefs(at("/fixtures"), CLAIMED)).toEqual([
       ["vsSquadopt", `${OWN}/vs`, false],
       ["thisWeek", OWN, false],
+      ["live", `${OWN}/live`, false],
       ["league", MEMBERS, false],
       ["currentSquad", `${OWN}/current-squad`, false],
       ["whatIf", `${OWN}/what-if`, false],
@@ -103,6 +104,22 @@ describe("the sidebar's navigation with the member claimed", () => {
     expect(active(at(`${OWN}/`))).toEqual(["thisWeek"]);
     expect(active(at(`${OWN}/history`))).toEqual(["history"]);
     expect(active(at(`${OWN}/vs`))).toEqual(["vsSquadopt"]);
+    expect(active(at(`${OWN}/live`))).toEqual(["live"]);
+  });
+
+  it("puts LIVE right after 'Bu hafta', always the claimed member's own live week", () => {
+    const keys = navItems(at(`${MEMBERS}/35249002/live`), CLAIMED).map((item) => item.key);
+    expect(keys.slice(1, 3)).toEqual(["thisWeek", "live"]);
+    expect(navItems(at(`${MEMBERS}/35249002/live`), CLAIMED)[2]).toEqual({
+      key: "live",
+      to: `${OWN}/live`,
+      active: false,
+    });
+    expect(memberAt(at(`${OWN}/live`, "?duel=35249002"))).toEqual({
+      leagueId: LEAGUE,
+      entryId: "35249001",
+      search: null,
+    });
   });
 
   it("keeps 'Bu hafta' on the visitor's own page while they read a rival's", () => {
@@ -145,7 +162,7 @@ describe("the sidebar's navigation with the member claimed", () => {
     // VS SQUADOPT stands first and carries no plan; 'Bu hafta' and the tools follow it.
     expect(navItems(at("/fixtures"), CLAIMED, own)[0]!.to).toBe(`${OWN}/vs`);
     expect(navItems(at("/fixtures"), CLAIMED, own)[1]!.to).toBe(`${OWN}${plan}`);
-    expect(navItems(at("/fixtures"), CLAIMED, own)[3]!.to).toBe(`${OWN}/current-squad${plan}`);
+    expect(navItems(at("/fixtures"), CLAIMED, own)[4]!.to).toBe(`${OWN}/current-squad${plan}`);
     const rival = { leagueId: LEAGUE, entryId: "35249002", search: plan };
     expect(navItems(at("/fixtures"), CLAIMED, rival)[1]!.to).toBe(OWN);
     const elsewhere = { leagueId: 7, entryId: "35249001", search: plan };
