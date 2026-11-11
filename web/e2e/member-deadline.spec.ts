@@ -79,6 +79,35 @@ for (const language of ["tr", "en"] as const) {
   });
 }
 
+// The LIVE tag ends the score bug's line, so the team keeps the first line's room.
+test("an open gameweek keeps the team's name its first line beside the LIVE tag on a phone", async ({
+  page,
+}) => {
+  // Six days and 23 hours before the mocked deadline, so the countdown reads as a week's does.
+  await page.clock.install({
+    time: Date.parse("2999-01-01T00:00:00Z") - (6 * 24 + 23) * 3_600_000,
+  });
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
+  await page.goto(`/league/352490/members/${ENTRY}`);
+  const name = page.getByRole("heading", { level: 1 });
+  const live = page.locator("[data-live-link]");
+  await expect(page.getByTestId("deadline-countdown")).toBeVisible();
+  for (const width of [320, 375, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    const [title, tag] = [(await name.boundingBox())!, (await live.boundingBox())!];
+    // The tag stands below the name's line, inside the screen; the line keeps its 22 px.
+    expect(tag.y, `the tag at ${width} px`).toBeGreaterThanOrEqual(title.y + title.height);
+    expect(tag.x + tag.width).toBeLessThanOrEqual(width);
+    expect(Math.round(title.height)).toBe(22);
+    // "North Stand Notes" printed whole from 375 px before the tag, and still does.
+    if (width >= 375) {
+      const whole = await name.evaluate((element) => element.scrollWidth <= element.clientWidth);
+      expect(whole, `the name at ${width} px`).toBe(true);
+    }
+  }
+});
+
 test("an open gameweek shows no deadline notice, counts down and links to FPL", async ({
   page,
 }) => {

@@ -26,7 +26,7 @@ player codes. The schema and all examples are synthetic.
 The member card shows only that member's picks. Its static match indicator means
 the player has recorded minutes in a match still in progress. FPL's aggregate
 minutes do not establish whether a player has since been substituted, so the
-accessible label is "Match in progress", never "On the pitch".
+accessible label is "Match in Progress", never "On the pitch".
 
 Goals and assists are current realized counts. A first read establishes a
 baseline without animation. A strictly newer source document can trigger one

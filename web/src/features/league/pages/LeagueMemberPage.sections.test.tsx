@@ -3,7 +3,7 @@
  * tabs: the page is one document) that land on the decision's heading and the squad; the
  * tools are pages of their own in the sidebar. Only a phone draws it. A link whose section
  * is not in the page is left out, and a closed week, which drops the plan settings, keeps
- * both. The section
+ * both, the first named LIVE WEEK as its heading is. The section
  * being read is the current location, as the page's IntersectionObservers report it; the
  * strip is drawn once the decision's heading has gone up behind the phone bar.
  */
@@ -200,12 +200,13 @@ describe.each(["tr", "en"] as const)("the phone's section strip (%s)", (language
     expect(document.getElementById("kadro")).not.toBeNull();
   });
 
-  it("keeps both on a closed week", () => {
+  it("keeps both on a closed week, the first named as its heading is: LIVE WEEK", () => {
     phone();
     show(language, { deadlinePassed: "2026-09-18T17:30:00Z" });
     expect(document.getElementById("plan-settings")).toBeNull();
     const links = within(strip(language)).getAllByRole("link");
-    expect(links.map((anchor) => anchor.textContent)).toEqual(names(language));
+    expect(links.map((anchor) => anchor.textContent)).toEqual([copy.liveWeek, copy.sectionSquad]);
+    expect(target(links[0]!)).toHaveTextContent(copy.liveWeek);
   });
 
   it("marks the section being read as the current location as the page scrolls", () => {

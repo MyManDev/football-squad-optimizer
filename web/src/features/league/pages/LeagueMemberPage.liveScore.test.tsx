@@ -134,6 +134,16 @@ describe("the member's live week on their page", () => {
     await checkPoints(playing);
     expect(container.querySelectorAll('#kadro [data-points-kind="actual"]')).toHaveLength(15);
     fireEvent.click(screen.getByRole("button", { name: "Yenile" }));
+    // The finished week brings two automatic substitutions: the page draws the read before
+    // until their boards have gone, and a tap takes each down.
+    for (let shown = 0; shown < 2; shown += 1) {
+      const board = await waitFor(() => {
+        const found = document.querySelector<HTMLElement>("[data-goal-board]");
+        expect(found).not.toBeNull();
+        return found!;
+      });
+      fireEvent.click(board);
+    }
     await screen.findByText("Bonus eklendi");
     await checkPoints(finished);
     expect(live.forwarder.entryBundle).toHaveBeenCalledTimes(1);

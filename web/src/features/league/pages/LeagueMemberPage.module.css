@@ -161,6 +161,37 @@
   margin: 0 0 0 auto;
 }
 
+/* The way to this member's LIVE page: a quiet tag with the light, a thumb's height, at the
+   end of the score bug's line. */
+.liveLink {
+  display: inline-flex;
+  flex: none;
+  align-self: center;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: var(--step-0);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.liveLink:hover {
+  background: var(--color-surface);
+}
+
+.liveLinkDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-good);
+}
+
 .scoreCell {
   display: flex;
   flex-direction: column;
@@ -196,10 +227,12 @@
   white-space: nowrap;
 }
 
-/* Below 1180 px the score bug takes its own line under the team and the week. */
+/* Below 1180 px the score bug takes its own line under the team and the week, and LIVE
+   ends that line: the bug's basis leaves the tag its room (about 58 px and the gap), so the
+   tag never climbs to the team's line. On a phone the tag takes a line of its own (below). */
 @media (max-width: 1179.98px) {
   .scoreBug {
-    flex: 1 1 100%;
+    flex: 1 1 calc(100% - 96px);
     margin-left: 0;
   }
 
@@ -283,7 +316,9 @@
 
   /* One row, always: when a narrow phone or a wider font runs out of room, a long label
      breaks inside its own cell (one extra 14 px line) instead of a whole cell falling to a
-     second row (a 25 px jump that pushed the week's gain below the first screen). */
+     second row (a 25 px jump that pushed the week's gain below the first screen). The bug
+     keeps the bar's whole width, so LIVE takes the next line: beside the tag the five cells
+     ran out of room from 340 px down and the last label ran under it. */
   .scoreBug {
     flex: 1 1 100%;
     display: grid;

@@ -25,6 +25,14 @@ const NAV_PATHS: Record<NavKey, ReactNode> = {
     </>
   ),
   thisWeek: <path d="M5.5 2.5v12M2.5 11.5l3 3 3-3M12.5 15.5v-12M9.5 6.5l3-3 3 3" />,
+  // A dot with two arcs either side: the live broadcast.
+  live: (
+    <>
+      <circle cx="9" cy="9" r="1.8" />
+      <path d="M5.8 5.8a4.5 4.5 0 0 0 0 6.4M12.2 5.8a4.5 4.5 0 0 1 0 6.4" />
+      <path d="M3.4 3.4a7.9 7.9 0 0 0 0 11.2M14.6 3.4a7.9 7.9 0 0 1 0 11.2" />
+    </>
+  ),
   league: <path d="M2 15.5h14M3 15.5v-5h4v5M7 15.5v-9h4v9M11 15.5V12h4v3.5" />,
   currentSquad: (
     <>

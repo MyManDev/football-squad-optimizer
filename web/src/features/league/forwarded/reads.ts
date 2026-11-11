@@ -13,6 +13,7 @@ import {
   h2hMatches,
   h2hStandings,
   standings,
+  type ForwarderClient,
   type ForwarderReason,
   type StandingsReason,
 } from "../forwarder/client";
@@ -147,36 +148,58 @@ export function newestDeviceTable(directory: LeagueDirectory): DevicePlanTableRe
   return newest?.table ?? null;
 }
 
+/*
+ * The three reads below as keys and reads alone, so a reader with another policy (the LIVE
+ * pill's `HELD_READ`) joins the very queries the gates hold.
+ */
+
+/** The published directory's read, under the key the league gate reads it by. */
+export function directoryQuery() {
+  return { queryKey: leagueKeys.directory(), queryFn: () => loadLeagueDirectory() };
+}
+
+/** The read of the capture's own table a directory line names. */
+export function captureTableQuery(table: DevicePlanTableRef | null) {
+  return {
+    queryKey: forwardedKeys.table(table),
+    queryFn: ({ signal }: { signal: AbortSignal }) => loadDevicePlanTable(table!, { signal }),
+  };
+}
+
+/**
+ * The read of one entry's bundle for a table gameweek; the site's forwarder unless given. A
+ * refusal is no document to keep: it is the read's error, so a bundle already held stays the
+ * query's data and a page drawn from it is never taken away by one failed answer.
+ */
+export function entryBundleQuery(
+  entryId: number,
+  gameweek: number | null,
+  read: ForwarderClient["entryBundle"] = entryBundle,
+) {
+  return {
+    queryKey: forwardedKeys.bundle(entryId, gameweek),
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      const answer = await read(entryId, gameweek!, { signal });
+      if (!answer.ok) throw new ForwarderRefused(answer.reason);
+      return answer;
+    },
+  };
+}
+
 /** The published directory, under the key the league gate reads it by. */
 export function useDirectory(enabled = true) {
-  return useQuery({
-    queryKey: leagueKeys.directory(),
-    queryFn: () => loadLeagueDirectory(),
-    enabled,
-    ...LEAGUE_READ,
-  });
+  return useQuery({ ...directoryQuery(), enabled, ...LEAGUE_READ });
 }
 
 /** The capture's own table a directory line names: null where it cannot be read as one. */
 export function useCaptureTable(table: DevicePlanTableRef | null) {
-  return useQuery({
-    queryKey: forwardedKeys.table(table),
-    queryFn: ({ signal }) => loadDevicePlanTable(table!, { signal }),
-    enabled: table !== null,
-    ...LEAGUE_READ,
-  });
+  return useQuery({ ...captureTableQuery(table), enabled: table !== null, ...LEAGUE_READ });
 }
 
 /** One entry's bundle for the table's gameweek, as the forwarder answers it. */
 export function useEntryBundle(entryId: number, gameweek: number | null) {
   return useQuery({
-    queryKey: forwardedKeys.bundle(entryId, gameweek),
-    queryFn: async ({ signal }) => {
-      const read = await entryBundle(entryId, gameweek!, { signal });
-      // A read the page stopped is no answer to keep.
-      if (!read.ok && read.reason === "aborted") throw new ForwarderRefused(read.reason);
-      return read;
-    },
+    ...entryBundleQuery(entryId, gameweek),
     enabled: gameweek !== null && Number.isSafeInteger(entryId) && entryId > 0,
     ...LEAGUE_READ,
   });

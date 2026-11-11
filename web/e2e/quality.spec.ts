@@ -48,8 +48,8 @@ test.describe("a visitor who has said who they are", () => {
   test("a member page's sidebar opens the league part for the claimed member", async ({ page }) => {
     await page.goto("/league/352490/members/35249001");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
-    // The identity block carries Değiştir, a button; the links are the member's week, squad
-    // and league, the member's tools and history, then the open pages.
+    // The identity block carries Değiştir, a button; the links are the member's week, LIVE,
+    // the league, the member's tools and history, then the open pages.
     expect(
       await page
         .locator("#sidebar a")
@@ -57,6 +57,7 @@ test.describe("a visitor who has said who they are", () => {
     ).toEqual([
       "/league/352490/members/35249001/vs",
       "/league/352490/members/35249001",
+      "/league/352490/members/35249001/live",
       "/league/352490/members",
       "/league/352490/members/35249001/current-squad",
       "/league/352490/members/35249001/what-if",
