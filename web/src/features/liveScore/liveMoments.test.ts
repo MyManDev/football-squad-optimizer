@@ -63,10 +63,11 @@ describe("liveMoments", () => {
     );
     expect(moments.map(({ kind, size, points }) => [kind, size, points])).toEqual([
       ["assist", "big", 6],
-      ["goal", "small", 0],
+      ["goal", "small", null],
       ["card", "small", null],
     ]);
-    expect(moments[1]).toMatchObject({ multiplier: 0, base: 4 });
+    // A reserve not counted yet carries no points: an automatic substitution can still count him.
+    expect(moments[1]).toMatchObject({ multiplier: 0, base: 4, points: null });
   });
 
   it("plays goals before assists, whatever the points", () => {

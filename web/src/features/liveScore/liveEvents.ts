@@ -80,6 +80,8 @@ export function advanceLiveMarks(
       const key = `${appearance.element_id}:${appearance.fixture_id}:${kind}`;
       const seen = counts.get(key) ?? 0;
       const value = appearance[field];
+      // A count the read leaves out keeps the mark as it was, never NaN.
+      if (!Number.isFinite(value)) continue;
       if (counting && value > seen) add(kind, appearance.element_id, value - seen);
       counts.set(key, Math.max(seen, value));
     }

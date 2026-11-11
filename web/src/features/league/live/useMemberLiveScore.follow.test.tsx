@@ -301,6 +301,84 @@ describe("a followed live week", () => {
     expect(screen.getByTestId("refreshing")).toHaveTextContent("false");
   });
 
+  it("keeps making the first read again after a refresh lands on one in flight", async () => {
+    let releaseBundle: (answer: BundleAnswer) => void = () => undefined;
+    const client = forwarder([0, 0, 0, 0]);
+    const bundle = client.entryBundle.getMockImplementation()!;
+    client.entryBundle
+      .mockImplementationOnce(bundle)
+      .mockImplementationOnce(
+        () => new Promise<BundleAnswer>((resolve) => (releaseBundle = resolve)),
+      );
+    follow(client, WEEK + 1);
+    await shownNet();
+    await minute();
+    // The member's week is not the one being played: the first read is made again.
+    expect(client.entryBundle).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+    await act(async () => {
+      releaseBundle({ ok: true, document: exampleBundle(ENTRY, WEEK, MEMBER), copy: "miss" });
+    });
+    await minute();
+    expect(client.entryBundle).toHaveBeenCalledTimes(3);
+  });
+
+  it("never ends the member's refresh with a first read made again", async () => {
+    let release: (answer: ActivityAnswer) => void = () => undefined;
+    const client = forwarder([0, 0], {
+      bundles: [
+        { ok: true, document: exampleBundle(ENTRY, WEEK, MEMBER), copy: "miss" },
+        { ok: false, reason: "network" },
+      ],
+    });
+    const answer = client.liveActivity.getMockImplementation()!;
+    client.liveActivity
+      .mockImplementationOnce(answer)
+      .mockImplementationOnce(() => new Promise<ActivityAnswer>((resolve) => (release = resolve)));
+    follow(client, WEEK + 1);
+    await shownNet();
+    fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+    expect(screen.getByTestId("refreshing")).toHaveTextContent("true");
+    // The tick makes the first read again, and it is not answered.
+    await minute();
+    expect(client.entryBundle).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      release(activity(0, 9, SCORER));
+    });
+    expect(screen.getByTestId("refreshing")).toHaveTextContent("false");
+  });
+
+  it("lets a refresh just before a tick stand in for the tick's read", async () => {
+    const client = forwarder([0, 0, 0, 0]);
+    follow(client);
+    await shownNet();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FOLLOW_INTERVAL_MS - 5_000);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(client.liveActivity).toHaveBeenCalledTimes(2);
+    await minute();
+    expect(client.liveActivity).toHaveBeenCalledTimes(3);
+  });
+
+  it("waits longer before each first read made again after a failure", async () => {
+    const client = forwarder([0], { bundles: [{ ok: false, reason: "network" }] });
+    follow(client);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await minute();
+    expect(client.entryBundle).toHaveBeenCalledTimes(2);
+    // Two failures: the next attempt waits two minutes.
+    await minute();
+    expect(client.entryBundle).toHaveBeenCalledTimes(2);
+    await minute();
+    expect(client.entryBundle).toHaveBeenCalledTimes(3);
+  });
+
   it("reads at once when a match starts with a read a minute old", async () => {
     const client = forwarder([0, 1]);
     const { rerender } = follow(client, null);

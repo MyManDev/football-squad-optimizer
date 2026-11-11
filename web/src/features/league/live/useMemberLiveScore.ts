@@ -1,17 +1,19 @@
 /**
  * The member's live week (#1008): read when the page opens, again when the member presses
- * refresh, and, while one of the live week's matches is being played and the page is in view,
+ * refresh, and, while one of the member's matches is being played and the page is in view,
  * once every `FOLLOW_INTERVAL_MS` (the owner's decision of 2026-11-11, so a goal shows by
- * itself). The first read asks the forwarder for the member's bundle (its current week), then
- * for that week's live points and the capture's table together; every later read asks for the
- * live points alone. A first read that gives no document, or a week that cannot be scored,
- * shows nothing: no card, and no sentence in its place. A followed read that is not answered
- * keeps what is shown.
+ * itself; `matches` gives the caller what `liveWindow` needs to tell). The first read asks the
+ * forwarder for the member's bundle (its current week), then for that week's live points and
+ * the capture's table together; every later read asks for the live points alone. A first read
+ * that gives no document, or a week that cannot be scored, shows nothing: no card, and no
+ * sentence in its place. A followed read that is not answered keeps what is shown.
  *
  * Each read after the first is compared with the reads before it (`advanceLiveMarks`): the
  * goals, assists and cards it adds become the read's GOL moments. A followed page whose first
  * read has not been answered, or whose member's week is not the one being played, makes the
- * first read again at the next tick instead.
+ * first read again instead, at the next tick after one failure and then after 2, 4 and at most
+ * 8 minutes. A first read made again never ends the member's refresh, nor a refresh it; no tick
+ * reads within half an interval of the last read.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FixturesPayload } from "../../fixtures/types";
 import { advanceLiveMarks, type LiveMarks } from "../../liveScore/liveEvents";
 import { liveMoments, type LiveMoment } from "../../liveScore/liveMoments";
-import { FOLLOW_INTERVAL_MS } from "../../liveScore/liveWindow";
+import { FOLLOW_INTERVAL_MS, type LiveWindowFilter } from "../../liveScore/liveWindow";
 import type { LiveActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek, Position, WeekLive } from "../../liveScore/weekLive";
 import type { DevicePlanDocument } from "../device/types";
@@ -49,6 +51,8 @@ export interface MemberLive {
   refresh: () => void;
   /** The newest read's goals, assists and cards, or null when no read has brought any. */
   moments: LiveMomentBatch | null;
+  /** The member's clubs and the unfinished fixtures as the shown read names them, for `liveWindow`. */
+  matches: LiveWindowFilter | null;
 }
 
 /** What a later read reads the live points against: the member's week and the table. */
@@ -98,6 +102,19 @@ function scored(
   }
 }
 
+/**
+ * The clubs of the member's fifteen and the week's unfinished fixtures, as one live read names
+ * them. A pick the read gives no club leaves the clubs open (null), so no match is missed.
+ */
+function matchesOf(live: LiveReading, member: MemberWeek): LiveWindowFilter {
+  const clubs = new Map(live.week.elements.map((element) => [element.element_id, element.club]));
+  const picked = member.pick_order.map((elementId) => clubs.get(elementId));
+  return {
+    clubs: picked.every((club) => club !== undefined) ? new Set(picked as number[]) : null,
+    unfinished: new Set(live.week.fixtures.filter((row) => !row.finished).map((row) => row.id)),
+  };
+}
+
 /** Each pick's name, club and position as the scored week holds them, by element id. */
 function picksOf(shown: MemberLiveScore, member: MemberWeek) {
   const fifteen = [...shown.lineup.starting_xi, ...shown.lineup.bench];
@@ -119,7 +136,15 @@ interface State {
   shown: MemberLiveScore | null;
   refreshing: boolean;
   moments: LiveMomentBatch | null;
+  matches: LiveWindowFilter | null;
 }
+
+/** A tick reads only when the last read is at least this old. */
+const TICK_GAP_MS = FOLLOW_INTERVAL_MS / 2;
+
+/** A first read made again after `failures` failures waits this long after the last read. */
+const retryWait = (failures: number) =>
+  FOLLOW_INTERVAL_MS * 2 ** Math.min(Math.max(failures - 1, 0), 3);
 
 /**
  * `squad` is the member's published entry document: its entry, its gameweek (the table
@@ -154,13 +179,18 @@ export function useMemberLiveScore(
     shown: null,
     refreshing: false,
     moments: null,
+    matches: null,
   });
   if (state.identity !== identity) {
-    setState({ identity, shown: null, refreshing: false, moments: null });
+    setState({ identity, shown: null, refreshing: false, moments: null, matches: null });
   }
   const held = useRef<Held | null>(null);
-  // The read in flight, the page's first or a refresh, ended when the page leaves.
+  // The member's refresh in flight, ended when the page leaves.
   const reading = useRef<AbortController | null>(null);
+  // The first read in flight, the page's own or one made again; it never ends a refresh.
+  const firstReading = useRef<AbortController | null>(null);
+  // First reads that ended without a week to show, since the last one that showed it.
+  const firstFailures = useRef(0);
   // A followed read in flight; it never ends a read the member asked for.
   const following = useRef<AbortController | null>(null);
   // The goals, assists and cards counted so far, and the reads numbered for their moments.
@@ -205,18 +235,22 @@ export function useMemberLiveScore(
   const gameweek = squad.gameweek;
   useEffect(() => {
     reading.current?.abort();
+    firstReading.current?.abort();
+    firstReading.current = null;
     following.current?.abort();
     following.current = null;
     held.current = null;
     // Every first read is a starting point: nothing before it plays.
     marks.current = null;
     firstInFlight.current = false;
+    firstFailures.current = 0;
     if (!ready) return;
-    const first = async (read: AbortController) => {
+    /** Whether the read showed a week. */
+    const first = async (read: AbortController): Promise<boolean> => {
       const { forwarder, loadTable } = sources.current;
       lastRead.current = Date.now();
       const bundle = await forwarder.entryBundle(entryId, gameweek, { signal: read.signal });
-      if (read.signal.aborted || !bundle.ok || bundle.document.current_week === null) return;
+      if (read.signal.aborted || !bundle.ok || bundle.document.current_week === null) return false;
       const member = bundle.document.current_week;
       const [live, table] = await Promise.all([
         readLive(forwarder, member.gameweek, read.signal),
@@ -225,30 +259,50 @@ export function useMemberLiveScore(
           () => null,
         ),
       ]);
-      if (read.signal.aborted || live === null || table === null) return;
+      if (read.signal.aborted || live === null || table === null) return false;
       held.current = { identity, member, table };
       const shown = scored(live, held.current, sources.current.fixtures);
-      if (shown === null) return;
-      momentsOf(shown, live, held.current);
-      setState({ identity, shown, refreshing: false, moments: null });
+      if (shown === null) return false;
+      // A first read made again may bring a goal against the marks so far: it plays too.
+      const moments = momentsOf(shown, live, held.current);
+      const matches = matchesOf(live, member);
+      setState((current) => {
+        const kept = current.identity === identity;
+        return {
+          identity,
+          shown,
+          refreshing: kept && current.refreshing,
+          moments: moments ?? (kept ? current.moments : null),
+          matches,
+        };
+      });
+      return true;
     };
     const start = () => {
       if (firstInFlight.current) return;
-      reading.current?.abort();
+      firstReading.current?.abort();
       const read = new AbortController();
-      reading.current = read;
+      firstReading.current = read;
       firstInFlight.current = true;
       // The client answers every failure as a refusal; anything else also shows nothing.
       first(read)
-        .catch(() => undefined)
+        .catch(() => false)
+        .then((shown) => {
+          if (!read.signal.aborted) firstFailures.current = shown ? 0 : firstFailures.current + 1;
+        })
         .finally(() => {
-          if (reading.current === read) firstInFlight.current = false;
+          if (firstReading.current === read) {
+            firstReading.current = null;
+            firstInFlight.current = false;
+          }
         });
     };
     firstRead.current = start;
     start();
     return () => {
       reading.current?.abort();
+      firstReading.current?.abort();
+      firstReading.current = null;
       firstRead.current = null;
       firstInFlight.current = false;
     };
@@ -273,6 +327,7 @@ export function useMemberLiveScore(
           shown,
           refreshing,
           moments: moments ?? (current.identity === identity ? current.moments : null),
+          matches: matchesOf(live, inputs.member),
         };
       });
     },
@@ -304,7 +359,7 @@ export function useMemberLiveScore(
   /**
    * A followed read: the live points alone, quietly; no answer keeps what is shown. With no
    * first read answered yet, or the member's week not the one being played, the first read
-   * is made again instead.
+   * is made again instead, later after each failure (`retryWait`).
    */
   const followRead = useCallback(() => {
     const inputs = held.current;
@@ -313,7 +368,8 @@ export function useMemberLiveScore(
       inputs.identity !== identity ||
       (follow !== null && inputs.member.gameweek !== follow)
     ) {
-      firstRead.current?.();
+      const waited = Date.now() - lastRead.current;
+      if (waited >= retryWait(firstFailures.current) - TICK_GAP_MS) firstRead.current?.();
       return;
     }
     if (following.current !== null) return;
@@ -334,8 +390,10 @@ export function useMemberLiveScore(
     if (!ready || follow === null) return undefined;
     const visible = () => document.visibilityState === "visible";
     const stale = () => Date.now() - lastRead.current >= FOLLOW_INTERVAL_MS;
+    // A read in the last half interval (a refresh, a return to view) stands in for the tick's.
+    const due = () => Date.now() - lastRead.current >= TICK_GAP_MS;
     const timer = setInterval(() => {
-      if (visible()) followRead();
+      if (visible() && due()) followRead();
     }, FOLLOW_INTERVAL_MS);
     // Back in view after a minute or more: one read at once, not at the next tick.
     const onVisibility = () => {
@@ -355,6 +413,7 @@ export function useMemberLiveScore(
   useEffect(
     () => () => {
       reading.current?.abort();
+      firstReading.current?.abort();
       following.current?.abort();
     },
     [],
@@ -366,5 +425,6 @@ export function useMemberLiveScore(
     refreshing: state.identity === identity && state.refreshing,
     refresh,
     moments: current ? state.moments : null,
+    matches: current ? state.matches : null,
   };
 }

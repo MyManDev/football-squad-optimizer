@@ -9,7 +9,7 @@ const GENERAL_WEEKS = 5;
  * The clock the calendar is read by: never earlier than its capture, so a device whose clock
  * is behind does not bring a played week back.
  */
-function calendarClock(payload: FixturesPayload, now: number): number {
+export function calendarClock(payload: FixturesPayload, now: number): number {
   const captured = Date.parse(payload.captured_at_utc);
   return Number.isNaN(captured) ? now : Math.max(now, captured);
 }

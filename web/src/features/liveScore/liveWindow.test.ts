@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { FixturesPayload } from "../fixtures/types";
-import { liveWindow, MATCH_WINDOW_MS } from "./liveWindow";
+import { liveWindow, MATCH_WINDOW_LIMIT_MS, MATCH_WINDOW_MS } from "./liveWindow";
 
 const team = (team_id: number) => ({ team_id, name: `Club ${team_id}`, short_name: `C${team_id}` });
-const fixture = (fixture_id: number, kickoff_utc: string | null) => ({
+const fixture = (fixture_id: number, kickoff_utc: string | null, home = 1, away = 2) => ({
   fixture_id,
   kickoff_utc,
-  home: team(1),
-  away: team(2),
+  home: team(home),
+  away: team(away),
   finished: false,
   home_score: null,
   away_score: null,
@@ -17,7 +17,7 @@ const fixture = (fixture_id: number, kickoff_utc: string | null) => ({
 const CALENDAR: FixturesPayload = {
   season: "2026-27",
   source_snapshot_id: "synthetic",
-  captured_at_utc: "2026-11-20T00:00:00Z",
+  captured_at_utc: "2026-10-30T00:00:00Z",
   current_gameweek: 11,
   unscheduled_count: 0,
   gameweeks: [
@@ -76,5 +76,46 @@ describe("liveWindow", () => {
       gameweek: null,
       open: false,
     });
+  });
+
+  it("never reads the calendar earlier than its capture", () => {
+    const captured = { ...CALENDAR, captured_at_utc: "2026-11-21T12:45:00Z" };
+    // A device clock a week behind still sees the week the calendar was captured in.
+    expect(liveWindow(captured, at("2026-11-14T12:45:00Z"))).toMatchObject({
+      gameweek: 11,
+      open: true,
+    });
+  });
+
+  it("counts only the member's clubs' matches when they are given", () => {
+    const calendar: FixturesPayload = {
+      ...CALENDAR,
+      gameweeks: [
+        {
+          gameweek: 11,
+          deadline_utc: "2026-11-21T11:00:00Z",
+          fixtures: [
+            fixture(101, "2026-11-21T12:30:00Z", 1, 2),
+            fixture(102, "2026-11-21T17:30:00Z", 3, 4),
+          ],
+        },
+      ],
+    };
+    const now = at("2026-11-21T13:00:00Z");
+    expect(liveWindow(calendar, now).open).toBe(true);
+    const mine = liveWindow(calendar, now, { clubs: new Set([4, 9]) });
+    expect(mine).toMatchObject({ open: false, changesIn: at("2026-11-21T17:30:00Z") - now });
+    expect(liveWindow(calendar, at("2026-11-21T17:45:00Z"), { clubs: new Set([4]) }).open).toBe(
+      true,
+    );
+  });
+
+  it("stays open past the usual window while the live read names the match unfinished", () => {
+    const late = at("2026-11-21T15:00:00Z") + MATCH_WINDOW_MS + 10 * 60_000;
+    expect(liveWindow(CALENDAR, late).open).toBe(false);
+    const unfinished = liveWindow(CALENDAR, late, { unfinished: new Set([102]) });
+    expect(unfinished.open).toBe(true);
+    const limit = at("2026-11-21T15:00:00Z") + MATCH_WINDOW_LIMIT_MS;
+    expect(liveWindow(CALENDAR, limit, { unfinished: new Set([102]) }).open).toBe(false);
   });
 });

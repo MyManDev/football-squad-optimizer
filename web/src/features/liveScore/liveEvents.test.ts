@@ -128,6 +128,26 @@ describe("advanceLiveMarks", () => {
     expect(next.events).toEqual([{ kind: "goal", elementId: 11, count: 1 }]);
   });
 
+  it("keeps a mark when a read leaves its count out, so the next goal still plays", () => {
+    const first = advanceLiveMarks(null, read(1, [{ element: 11, goals: 1 }]), PICKS).marks;
+    const partial = read(2, [{ element: 11, goals: 1 }]);
+    const [row] = partial.activity!.appearances;
+    const gap = advanceLiveMarks(
+      first,
+      {
+        ...partial,
+        activity: {
+          ...partial.activity!,
+          appearances: [{ ...row!, goals: undefined as unknown as number }],
+        },
+      },
+      PICKS,
+    );
+    expect(gap.events).toEqual([]);
+    const next = advanceLiveMarks(gap.marks, read(3, [{ element: 11, goals: 2 }]), PICKS);
+    expect(next.events).toEqual([{ kind: "goal", elementId: 11, count: 1 }]);
+  });
+
   it("names a card once", () => {
     const first = advanceLiveMarks(null, read(1, [], []), PICKS).marks;
     const shown = advanceLiveMarks(first, read(2, [], [12]), PICKS);

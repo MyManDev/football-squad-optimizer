@@ -10,10 +10,11 @@
  *   bench boost), is small.
  *
  * The points are the season's own value of the event for the player's position, times the
- * armband: 2 for the captain the official scorer names, 3 under the triple captain, 0 for a
- * pick it does not count. A card's points are not known from the live document (it does not
- * say yellow or red), so a card carries none; nor does an event in a season whose values are
- * not listed here.
+ * armband: 2 for the captain the official scorer names, 3 under the triple captain. A pick it
+ * does not count on this read carries no points (null), not 0: an automatic substitution later
+ * in the week can still count his event. A card's points are not known from the live document
+ * (it does not say yellow or red), so a card carries none; nor does an event in a season whose
+ * values are not listed here.
  */
 
 import type { LiveEvent, LiveEventKind } from "./liveEvents";
@@ -35,7 +36,7 @@ export interface LiveMoment {
   multiplier: 0 | 1 | 2 | 3;
   /** The event's points before the armband, or null where they are not known. */
   base: number | null;
-  /** The points the member receives, or null where they are not known. */
+  /** The points the member receives, or null where they are not known (a pick not counted yet). */
   points: number | null;
 }
 
@@ -105,7 +106,7 @@ export function liveMoments(events: readonly LiveEvent[], context: MomentContext
       count: event.count,
       multiplier,
       base,
-      points: base === null ? null : base * multiplier,
+      points: base === null || multiplier === 0 ? null : base * multiplier,
     });
   }
   moments.sort(order);
