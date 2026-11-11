@@ -172,7 +172,7 @@ for (const width of [375, 1280]) {
       await expect(card.getByLabel("Gol: 1", { exact: true })).toBeVisible();
       await expect(card).toHaveAttribute("data-test-animations", reduce ? "0" : "1");
       await refresh.click();
-      await expect(refresh).toBeEnabled();
+      await expect(refresh).not.toHaveAttribute("aria-disabled", "true");
       await expect(card).toHaveAttribute("data-test-animations", reduce ? "0" : "1");
       await refresh.click();
       await expect(card.getByLabel("Asist: 1", { exact: true })).toBeVisible();
@@ -312,7 +312,7 @@ for (const width of [320, 375, 390]) {
       }
       // The same goal in a later read plays nothing.
       await refresh.click();
-      await expect(refresh).toBeEnabled();
+      await expect(refresh).not.toHaveAttribute("aria-disabled", "true");
       await nothingPlays(page);
       // An assist rises the board with its own long shout, which fits the narrowest screen.
       await refresh.click();

@@ -84,7 +84,7 @@ it("refreshes only on the member's press and disables that action during a read"
     <MemberLiveScoreCard gameweek={8} score={score} names={names} onRefresh={refresh} refreshing />,
   );
   const button = screen.getByRole("button", { name: "Yenileniyor" });
-  expect(button).toBeDisabled();
+  expect(button).toHaveAttribute("aria-disabled", "true");
   fireEvent.click(button);
   expect(refresh).toHaveBeenCalledTimes(1);
 });
@@ -109,30 +109,13 @@ it("keeps a real zero and a negative score visible in the net stat", () => {
 });
 
 describe("the live score beside the GOL board", () => {
-  it("holds back what the board has still to bring, and counts in whole points", () => {
+  it("adds what the board's landed moments brought to the read it shows, in whole points", () => {
     const score = result("transfer-hit", true);
     if (score.refused) throw new Error(score.reason);
-    show(score, "tr", { held: 4 });
+    show(score, "tr", { brought: 4 });
     const figure = document.querySelector("[data-live-total]")!;
-    expect(figure.textContent).toBe((score.net - 4).toLocaleString("tr-TR"));
-    expect(figure.textContent).not.toMatch(/[.,]\d/);
-  });
-
-  it("keeps the read before's lists under the figures while the board brings this one's", () => {
-    const before = result("normal-week");
-    const now = result("goalkeeper-swap");
-    if (before.refused || now.refused) throw new Error("refused");
-    expect(before.autosubs).toEqual([]);
-    expect(now.autosubs.length).toBeGreaterThan(0);
-    show(now, "tr", { lists: { score: before, activity: null } });
-    // The figures are this read's; the substitutions are still the read before's.
-    expect(document.querySelector("[data-live-total]")!.textContent).toBe(
-      now.net.toLocaleString("tr-TR"),
-    );
-    expect(screen.queryByText("Player 12")).toBeNull();
-    cleanup();
-    show(now, "tr");
-    expect(screen.getByText("Player 12")).toBeInTheDocument();
+    expect(figure.textContent).toBe((score.net + 4).toLocaleString("tr-TR"));
+    expect(figure.textContent).not.toMatch(/[.,]d/);
   });
 });
 

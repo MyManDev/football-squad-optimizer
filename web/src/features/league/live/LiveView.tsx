@@ -94,10 +94,10 @@ export interface LiveViewProps {
   /** The member's team. */
   team: string;
   board: LiveBoard;
-  /** Canlı puan as shown: the newest read's net, less what the GOL board still brings. */
+  /** Canlı puan as shown: the board's net plus what the GOL board's landed moments brought. */
   net: number;
-  /** The points the GOL board still has to bring to Canlı puan. */
-  held: number;
+  /** What the GOL board's moments that have landed brought, while the page waits on the read before. */
+  brought: number;
   recap: readonly RecapItem[];
   /** The page is the visitor's own: its side reads "Sen". */
   own: boolean;
@@ -125,7 +125,7 @@ export function LiveView(props: LiveViewProps) {
         rival={rival}
         own={props.own}
         net={props.net}
-        held={props.held}
+        brought={props.brought}
         team={props.team}
       />
     );
@@ -247,8 +247,12 @@ function Freshness({
           <button
             type="button"
             className={styles.refresh}
-            onClick={onRefresh}
-            disabled={refreshing}
+            // Kept focusable while it reads, so keyboard focus and a screen reader keep their
+            // place: a press then does nothing.
+            onClick={() => {
+              if (!refreshing) onRefresh();
+            }}
+            aria-disabled={refreshing || undefined}
             data-live-refresh
           >
             {refreshing ? copy.refreshing : copy.refresh}
@@ -455,14 +459,14 @@ function RivalBlock({
   rival,
   own,
   net,
-  held,
+  brought,
   team,
 }: {
   rival: LiveRivalView;
   own: boolean;
-  /** The member's Canlı puan as shown, and what the GOL board still brings to it. */
+  /** The member's Canlı puan as shown, and what the GOL board's landed moments brought to it. */
   net: number;
-  held: number;
+  brought: number;
   team: string;
 }) {
   const { locale, messages } = useLanguage();
@@ -472,9 +476,9 @@ function RivalBlock({
   const pending = rival.duel === null ? rival.pending : null;
   const duel = rival.duel ?? pending?.duel ?? null;
   const rivalNet = rival.board?.net ?? pending?.rivalNet ?? null;
-  // The duel reads the member's score as Canlı puan shows it, until the board's points land.
-  const margin = duel === null ? 0 : duel.margin - held;
-  const totalGap = duel?.totalGap == null ? null : duel.totalGap - held;
+  // The duel reads the member's score as Canlı puan shows it, landed points and all.
+  const margin = duel === null ? 0 : duel.margin + brought;
+  const totalGap = duel?.totalGap == null ? null : duel.totalGap + brought;
   // The week's opponent is named so; any other member, in any league, is a rival.
   const label = rival.opponent ? copy.opponent : copy.rival;
   return (
@@ -497,9 +501,15 @@ function RivalBlock({
             </option>
           ))}
         </select>
-        {rival.board !== null ? (
-          <span className={styles.rivalPoints} data-live-rival-net>
-            {wholePoints(rival.board.net, locale)}
+        {/* While the next rival is read, the last one's points keep their room, out of sight. */}
+        {rival.board !== null || rivalNet !== null ? (
+          <span
+            className={styles.rivalPoints}
+            data-live-rival-net
+            data-pending={rival.board === null || undefined}
+            aria-hidden={rival.board === null || undefined}
+          >
+            {wholePoints(rival.board?.net ?? rivalNet ?? 0, locale)}
           </span>
         ) : null}
       </div>

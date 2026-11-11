@@ -32,7 +32,7 @@ import { useMemberLiveScore, type MemberLiveDependencies } from "../live/useMemb
 import { forwarder as siteForwarder } from "../forwarder/client";
 import { useLiveWindow } from "../live/useLiveWindow";
 import { useGoalReplay } from "../live/useGoalReplay";
-import { useBoardHold, useBoardMoments } from "../live/useBoardMoments";
+import { useBoardHold, useBoardMoments, useSettledRead } from "../live/useBoardMoments";
 import {
   FOLLOW_INTERVAL_MS,
   SLOW_FOLLOW_MS,
@@ -256,10 +256,14 @@ function LeagueMemberContent({
     <GoalMomentLayer
       batch={goalBatch}
       source={replaying ? "replay" : "live"}
+      scoring={!replaying}
       onLanded={hold.landed}
     />
   );
-  const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
+  // While the board plays, the page draws the read from before its first moment: the card and
+  // the pitch take the newest one together once its last moment has landed.
+  const drawnLive = useSettledRead(liveWeek.shown, hold.waiting);
+  const displayedSquad = closed ? squadWithPlayedWeek(view, drawnLive?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
   // The same holds for a selection the member's device solves, until a run ends without a
@@ -575,9 +579,8 @@ function LeagueMemberContent({
           {deadlinePassed !== null && fixtures !== null && view.league_id === leagueId ? (
             <MemberLiveWeekView
               squad={view}
-              live={liveWeek}
-              held={hold.held}
-              waiting={hold.waiting}
+              live={{ ...liveWeek, shown: drawnLive }}
+              brought={drawnLive === liveWeek.shown ? 0 : hold.brought}
             />
           ) : null}
 

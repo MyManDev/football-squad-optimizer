@@ -807,7 +807,7 @@ describe("what the review of the last round asked of it", () => {
       configurable: true,
       writable: true,
       value(frames: Keyframe[]) {
-        let end = () => undefined;
+        let end: () => void = () => undefined;
         const finished = new Promise<void>((resolve) => {
           end = () => resolve();
         });

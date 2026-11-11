@@ -82,18 +82,20 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
 /**
  * What the board has still to play out: each moment it shows, from the read that brought it
  * until it lands (`landed`: a goal's run reaches the score, a substitution's board or a card's
- * line goes). `held` is the points still on their way to the live score; `waiting` says some
- * moment has still to land. Under reduced motion nothing is held.
+ * line goes). While `waiting`, a page shows the read from before the board's first moment, and
+ * `brought` is what the moments that have landed since then brought to its score; once the last
+ * lands, the page takes the newest read whole. Under reduced motion nothing waits.
  */
 export function useBoardHold(batch: BoardBatch | null): {
-  held: number;
+  brought: number;
   waiting: boolean;
   landed: (key: string) => void;
 } {
-  const [state, setState] = useState<{ batch: number | null; pending: Map<string, number> }>({
-    batch: null,
-    pending: new Map(),
-  });
+  const [state, setState] = useState<{
+    batch: number | null;
+    pending: Map<string, number>;
+    brought: number;
+  }>({ batch: null, pending: new Map(), brought: 0 });
   if (batch !== null && batch.id !== state.batch) {
     // Under reduced motion the layer drops its queue for one still line, so what it held from
     // earlier moments goes with it: nothing is left waiting for a board that will not play.
@@ -106,19 +108,34 @@ export function useBoardHold(batch: BoardBatch | null): {
         pending.set(moment.key, moment.kind === "substitution" ? 0 : (moment.points ?? 0));
       }
     }
-    setState({ batch: batch.id, pending });
+    setState({ batch: batch.id, pending, brought: pending.size === 0 ? 0 : state.brought });
   }
   const landed = useCallback(
     (key: string) =>
       setState((current) => {
         if (!current.pending.has(key)) return current;
         const pending = new Map(current.pending);
+        const points = pending.get(key) ?? 0;
         pending.delete(key);
-        return { ...current, pending };
+        // The last moment landed: the page takes the newest read whole.
+        return { ...current, pending, brought: pending.size === 0 ? 0 : current.brought + points };
       }),
     [],
   );
-  let held = 0;
-  for (const points of state.pending.values()) held += points;
-  return { held, waiting: state.pending.size > 0, landed };
+  return { brought: state.brought, waiting: state.pending.size > 0, landed };
+}
+
+/**
+ * The read a page draws: the newest, or while the board waits (`useBoardHold`) the one from
+ * before its first moment, so the card, the pitch and the rows all wait together.
+ */
+export function useSettledRead<T extends { gameweek: number }>(
+  read: T | null,
+  waiting: boolean,
+): T | null {
+  const [settled, setSettled] = useState(read);
+  if (!waiting && read !== settled) setSettled(read);
+  return waiting && settled !== null && read !== null && settled.gameweek === read.gameweek
+    ? settled
+    : read;
 }

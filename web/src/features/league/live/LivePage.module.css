@@ -357,7 +357,12 @@
   cursor: pointer;
 }
 
-.refresh:disabled {
+.rivalPoints[data-pending] {
+  visibility: hidden;
+}
+
+.refresh:disabled,
+.refresh[aria-disabled="true"] {
   border-color: var(--color-line);
   background: var(--color-surface-2);
   color: var(--color-text-muted);

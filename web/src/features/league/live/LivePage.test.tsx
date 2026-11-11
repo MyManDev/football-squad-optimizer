@@ -324,7 +324,9 @@ describe("the LIVE page's reads", () => {
     const refresh = screen.getByRole("button", { name: copy.live.refresh });
     await user.click(refresh);
     await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("button", { name: copy.live.refresh })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: copy.live.refresh })).not.toHaveAttribute(
+      "aria-disabled",
+    );
     // The older copy changes nothing.
     expect(net()).toBe(before);
     expect(recapRegion()).toBeNull();
@@ -743,10 +745,12 @@ describe("the week and the rival", () => {
     const block = document.querySelector("[data-live-rival]")!;
     const height = block.querySelectorAll("p, dl, [aria-hidden]").length;
     await user.selectOptions(screen.getByRole("combobox", { name: copy.live.rival }), "35249005");
-    // The last duel holds its place out of sight; Farklar stays open, its lists unseen.
+    // The last duel and the last rival's points hold their places out of sight; Farklar stays
+    // open, its lists unseen.
     const held = block.querySelector("[data-pending]");
     expect(held).toHaveAttribute("aria-hidden", "true");
-    expect(block.querySelectorAll("p, dl, [aria-hidden]").length).toBe(height + 1);
+    expect(block.querySelector("[data-live-rival-net]")).toHaveAttribute("data-pending");
+    expect(block.querySelectorAll("p, dl, [aria-hidden]").length).toBe(height + 2);
     expect(document.querySelector("[data-live-differentials]")).toBe(differentials);
     expect(differentials.open).toBe(true);
     expect(differentials.querySelector("[data-pending]")).toHaveAttribute("aria-hidden", "true");

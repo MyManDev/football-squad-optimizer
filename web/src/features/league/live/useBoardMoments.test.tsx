@@ -6,7 +6,7 @@ import type { BoardMoment } from "../../liveScore/boardMoments";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
 import { MOMENT_TIMING } from "../../liveScore/goalMomentTiming";
 import type { MemberLiveScore } from "./memberLiveScore";
-import { useBoardHold, useBoardMoments, type BoardBatch } from "./useBoardMoments";
+import { useBoardHold, useBoardMoments, useSettledRead, type BoardBatch } from "./useBoardMoments";
 import type { MemberLive } from "./useMemberLiveScore";
 
 afterEach(() => {
@@ -145,10 +145,10 @@ describe("the GOL board's stream", () => {
 });
 
 function Holding({ batch, land }: { batch: BoardBatch | null; land?: string }) {
-  const { held, landed } = useBoardHold(batch);
+  const { brought, waiting, landed } = useBoardHold(batch);
   return (
     <button type="button" onClick={() => land && landed(land)}>
-      {held}
+      {`${brought}:${waiting ? "waiting" : "clear"}`}
     </button>
   );
 }
@@ -168,16 +168,18 @@ describe("the live score's hold", () => {
     points,
   });
 
-  it("holds a queued moment's points until its run lands, and nothing for a reserve", () => {
+  it("counts what the landed moments brought while it waits, and starts again once all have landed", () => {
     const batch = { id: 1, items: [goal("a", 8, 2), goal("b", 4), goal("c", null, 0)] };
     const { rerender } = render(<Holding batch={batch} land="a" />);
-    expect(screen.getByRole("button")).toHaveTextContent("12");
+    // The reserve the scorer does not count is not waited for.
+    expect(screen.getByRole("button")).toHaveTextContent("0:waiting");
     screen.getByRole("button").click();
     rerender(<Holding batch={batch} land="b" />);
-    expect(screen.getByRole("button")).toHaveTextContent("4");
+    expect(screen.getByRole("button")).toHaveTextContent("8:waiting");
     screen.getByRole("button").click();
     rerender(<Holding batch={batch} />);
-    expect(screen.getByRole("button")).toHaveTextContent("0");
+    // The last one landed: the page takes the newest read whole.
+    expect(screen.getByRole("button")).toHaveTextContent("0:clear");
   });
 
   it("waits while a moment's points are on their way, and not once the last one lands", () => {
@@ -211,10 +213,10 @@ describe("the live score's hold", () => {
     };
     const batch = { id: 1, items: [swap, card] };
     function Waiting({ land }: { land: string }) {
-      const { held, waiting, landed } = useBoardHold(batch);
+      const { brought, waiting, landed } = useBoardHold(batch);
       return (
         <button type="button" onClick={() => landed(land)}>
-          {`${held}:${waiting ? "waiting" : "clear"}`}
+          {`${brought}:${waiting ? "waiting" : "clear"}`}
         </button>
       );
     }
@@ -258,7 +260,7 @@ describe("the hold played out by the GOL layer", () => {
           batch={{ id: `live:${batch.id}`, items: batch.items }}
           onLanded={hold.landed}
         />
-        <output data-testid="hold">{`${hold.held}:${hold.waiting ? "waiting" : "clear"}`}</output>
+        <output data-testid="hold">{`${hold.brought}:${hold.waiting ? "waiting" : "clear"}`}</output>
       </LanguageProvider>
     );
   }
@@ -274,11 +276,12 @@ describe("the hold played out by the GOL layer", () => {
       items: [counted("a", 4), counted("b", 4), counted("c", 4), counted("d", 4, "small")],
     };
     render(<Page batch={batch} />);
-    expect(hold()).toHaveTextContent("16:waiting");
+    expect(hold()).toHaveTextContent("0:waiting");
     advance(board);
     advance(board);
     advance(board);
-    expect(hold()).toHaveTextContent("4:waiting");
+    // Three goals of 4 have landed; the fourth's line still stands.
+    expect(hold()).toHaveTextContent("12:waiting");
     advance(MOMENT_TIMING.line);
     expect(hold()).toHaveTextContent("0:clear");
   });
@@ -296,7 +299,7 @@ describe("the hold played out by the GOL layer", () => {
     const { rerender } = render(
       <Page batch={{ id: 1, items: [counted("a", 4), counted("b", 5)] }} />,
     );
-    expect(hold()).toHaveTextContent("9:waiting");
+    expect(hold()).toHaveTextContent("0:waiting");
     vi.stubGlobal("matchMedia", (query: string) => ({
       matches: query === "(prefers-reduced-motion: reduce)",
       media: query,
@@ -306,5 +309,35 @@ describe("the hold played out by the GOL layer", () => {
     rerender(<Page batch={{ id: 2, items: [counted("c", 6)] }} />);
     expect(hold()).toHaveTextContent("0:clear");
     expect(document.querySelector("[data-goal-still]")).not.toBeNull();
+  });
+});
+
+describe("the read a page draws", () => {
+  function Drawn({
+    read,
+    waiting,
+  }: {
+    read: { gameweek: number; at: string } | null;
+    waiting: boolean;
+  }) {
+    const drawn = useSettledRead(read, waiting);
+    return <p>{drawn === null ? "none" : drawn.at}</p>;
+  }
+
+  it("is the read from before the board's first moment while it waits, then the newest", () => {
+    const { rerender } = render(<Drawn read={{ gameweek: 11, at: "15:40" }} waiting={false} />);
+    // A read brings a moment: the page keeps drawing the one before until it has landed.
+    rerender(<Drawn read={{ gameweek: 11, at: "15:41" }} waiting />);
+    expect(screen.getByText("15:40")).toBeInTheDocument();
+    rerender(<Drawn read={{ gameweek: 11, at: "15:42" }} waiting />);
+    expect(screen.getByText("15:40")).toBeInTheDocument();
+    rerender(<Drawn read={{ gameweek: 11, at: "15:42" }} waiting={false} />);
+    expect(screen.getByText("15:42")).toBeInTheDocument();
+  });
+
+  it("never draws another week's read for this one", () => {
+    const { rerender } = render(<Drawn read={{ gameweek: 10, at: "10" }} waiting={false} />);
+    rerender(<Drawn read={{ gameweek: 11, at: "11" }} waiting />);
+    expect(screen.getByText("11")).toBeInTheDocument();
   });
 });

@@ -26,6 +26,7 @@ import {
   useState,
   useSyncExternalStore,
   type ReactNode,
+  useRef,
 } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -190,8 +191,9 @@ function LiveMember({
   // The board's batches, numbered as the member page numbers them: the replay and the real
   // reads are two streams, so one never swallows or replays the other's moment.
   const stream = useBoardMoments(live, entryId);
-  // Canlı puan holds the points of the board's queued moments until each one's run lands in
-  // it, as the member page's card does; the replay brings no real points, so it holds nothing.
+  // While the board plays, LIVE stays on the read from before its first moment, the points
+  // that have landed added to Canlı puan, as the member page's card does; the replay brings no
+  // real points, so nothing waits for it.
   const hold = useBoardHold(replaying ? null : stream);
   const goalBatch = replaying
     ? replay === null
@@ -347,6 +349,7 @@ function LiveMember({
       <GoalMomentLayer
         batch={goalBatch}
         source={replaying ? "replay" : "live"}
+        scoring={!replaying}
         onLanded={hold.landed}
       />
       {board === null ? (
@@ -354,7 +357,7 @@ function LiveMember({
       ) : (
         <LiveShown
           board={board}
-          held={hold.held}
+          brought={hold.brought}
           waiting={hold.waiting}
           team={view.entry.team_name ?? unnamed}
           own={!standalone && claimed === entryId}
@@ -393,13 +396,13 @@ function LiveMember({
 /**
  * The board as it is shown. Its own part, so it takes the page's board, the hold and the
  * moments' wait once all three have settled for a read: while the GOL board brings a read's
- * moments, the rows, the counts and the recap stay as the read before left them, so nothing
- * moves under the board, and Canlı puan stands at the new read's total less what the board
- * still brings.
+ * moments, everything (the rows, the counts, the recap, the rival's side and the duel) stays as
+ * the read before left it, so nothing moves or jumps under the board, and Canlı puan stands at
+ * that read's total plus what the moments that have landed brought.
  */
 function LiveShown({
   board,
-  held,
+  brought,
   waiting,
   team,
   own,
@@ -409,7 +412,7 @@ function LiveShown({
   wide,
 }: {
   board: LiveBoard;
-  held: number;
+  brought: number;
   waiting: boolean;
   team: string;
   own: boolean;
@@ -418,9 +421,27 @@ function LiveShown({
   refresh: () => void;
   wide: boolean;
 }) {
-  const [settled, setSettled] = useState(board);
-  if (!waiting && board !== settled) setSettled(board);
-  const drawn = waiting && settled.gameweek === board.gameweek ? settled : board;
+  const rivalBoard = rival?.board ?? null;
+  const rivalDuel = rival?.duel ?? null;
+  const rivalId = rival?.entryId ?? null;
+  const [settled, setSettled] = useState({ board, rivalBoard, rivalDuel, rivalId });
+  if (
+    !waiting &&
+    (board !== settled.board ||
+      rivalBoard !== settled.rivalBoard ||
+      rivalDuel !== settled.rivalDuel ||
+      rivalId !== settled.rivalId)
+  ) {
+    setSettled({ board, rivalBoard, rivalDuel, rivalId });
+  }
+  const holding = waiting && settled.board.gameweek === board.gameweek;
+  const drawn = holding ? settled.board : board;
+  // The rival's side waits with the rest, unless the visitor picked another rival meanwhile.
+  const drawnRival =
+    rival !== null && holding && settled.rivalId === rival.entryId
+      ? { ...rival, board: settled.rivalBoard, duel: settled.rivalDuel }
+      : rival;
+  const gained = holding ? brought : 0;
 
   // What the reads since the visitor last looked brought the member: each newer board adds
   // to it, and Yenile or a return to the page (the visitor looking again) clears it.
@@ -428,11 +449,24 @@ function LiveShown({
     board: null,
     recap: null,
   });
-  if (drawn !== told.board) setTold({ board: drawn, recap: advanceRecap(told.recap, drawn) });
-  const look = useCallback(
-    () => setTold((current) => ({ ...current, recap: lookedAt(current.recap) })),
-    [],
-  );
+  // A look while the board plays (Yenile, a return to the page) clears the recap once the board
+  // has played out, before the read it brought is told, so nothing moves under the board.
+  const holdingNow = useRef(holding);
+  useEffect(() => {
+    holdingNow.current = holding;
+  });
+  const [lookLater, setLookLater] = useState(false);
+  if (!holding && lookLater) {
+    setLookLater(false);
+    setTold((current) => ({ ...current, recap: lookedAt(current.recap) }));
+  }
+  if (drawn !== told.board) {
+    setTold((current) => ({ board: drawn, recap: advanceRecap(current.recap, drawn) }));
+  }
+  const look = useCallback(() => {
+    if (holdingNow.current) setLookLater(true);
+    else setTold((current) => ({ ...current, recap: lookedAt(current.recap) }));
+  }, []);
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible") look();
@@ -460,11 +494,11 @@ function LiveShown({
     <LiveView
       team={team}
       board={drawn}
-      net={board.net - held}
-      held={held}
+      net={drawn.net + gained}
+      brought={gained}
       recap={recapItems(told.recap)}
       own={own}
-      rival={rival}
+      rival={drawnRival}
       refreshing={refreshing}
       onRefresh={onRefresh}
       wide={wide}

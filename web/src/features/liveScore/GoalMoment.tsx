@@ -179,12 +179,21 @@ function keepPlaced(
   board: { current: HTMLElement | null },
   refit: () => void,
 ) {
-  const again = () => {
+  return keepWatching(() => {
     refit();
     placeBoard(place.current, board.current);
-  };
+  });
+}
+
+/**
+ * Runs `again` whenever the screen or the page's column changes: the window or the visual
+ * viewport resized, the column resized, or a transition on the page ended (the sidebar opening or
+ * closing moves the column without resizing it). The returned cleanup stops it.
+ */
+function keepWatching(again: () => void): () => void {
   window.addEventListener("resize", again);
   window.visualViewport?.addEventListener("resize", again);
+  document.addEventListener("transitionend", again);
   const column = document.getElementById("main");
   const watch =
     column !== null && typeof ResizeObserver === "function" ? new ResizeObserver(again) : null;
@@ -192,8 +201,20 @@ function keepPlaced(
   return () => {
     window.removeEventListener("resize", again);
     window.visualViewport?.removeEventListener("resize", again);
+    document.removeEventListener("transitionend", again);
     watch?.disconnect();
   };
+}
+
+/** A line's sides: over the page's own column beside a sidebar, as a board stands. */
+function placeAcross(line: HTMLElement | null): void {
+  if (line === null) return;
+  line.style.left = "";
+  line.style.right = "";
+  const column = document.getElementById("main")?.getBoundingClientRect();
+  if (column === undefined || column.left <= EDGE || column.width <= 0) return;
+  line.style.left = `${Math.round(column.left + EDGE)}px`;
+  line.style.right = `${Math.round(Math.max(EDGE, window.innerWidth - column.right + EDGE))}px`;
 }
 
 /**
@@ -323,9 +344,15 @@ function giveBackFocus(owner: HTMLElement | null, before: Element | null): void 
 export function GoalMomentLayer({
   batch,
   source = batch === null ? "live" : sourceOf(batch.id),
+  scoring = true,
   onLanded,
 }: {
   batch: Batch | null;
+  /**
+   * Whether a moment's points run into the live score: not in the replay, whose finished week's
+   * score already holds them.
+   */
+  scoring?: boolean;
   /**
    * The stream the page shows now (`live` or `replay`): when it changes, the other stream's
    * moments still queued play no more.
@@ -480,6 +507,7 @@ export function GoalMomentLayer({
           queued={{ moment: playing.moment, order: playing.order }}
           copy={copy}
           locale={locale}
+          scoring={scoring}
           onLanded={(key) => landed.current?.(key)}
           onDone={() => played(playing.moment.key)}
         />
@@ -533,12 +561,14 @@ function Board({
   queued,
   copy,
   locale,
+  scoring = true,
   onLanded,
   onDone,
 }: {
   queued: { moment: LiveMoment; order: string };
   copy: Copy;
   locale: string;
+  scoring?: boolean;
   onLanded?: (key: string) => void;
   onDone: () => void;
 }) {
@@ -583,7 +613,9 @@ function Board({
       const received = moment.points === null ? null : signed(moment.points, locale);
       if (received !== null) setDigits(received);
       const release = () => onLandedRef.current?.(moment.key);
-      if (!run(number.current, moment.points === 0 ? null : received, release)) release();
+      if (!scoring || !run(number.current, moment.points === 0 ? null : received, release)) {
+        release();
+      }
       const fall = animate(
         board.current,
         [
@@ -640,7 +672,7 @@ function Board({
       // Taken down unplayed (a panel opened, the stream changed): focus does not fall with it.
       giveBackFocus(owner, before);
     };
-  }, [big, doubled, locale, moment]);
+  }, [big, doubled, locale, moment, scoring]);
 
   // Each change of the digits pops them once.
   useEffect(() => {
@@ -891,6 +923,8 @@ function SmallLine({
     told.current = onLanded;
   });
   useLayoutEffect(() => {
+    placeAcross(line.current);
+    const unplace = keepWatching(() => placeAcross(line.current));
     animate(
       line.current,
       [
@@ -922,6 +956,7 @@ function SmallLine({
     return () => {
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
+      unplace();
     };
   }, [moment.key]);
   return (
@@ -963,6 +998,8 @@ function StillLine({
   useLayoutEffect(() => {
     before.current = document.activeElement;
     const owner = line.current;
+    placeAcross(owner);
+    const unplace = keepWatching(() => placeAcross(owner));
     const timer = setTimeout(() => close.current(), MOMENT_TIMING.still);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") close.current();
@@ -971,6 +1008,7 @@ function StillLine({
     return () => {
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
+      unplace();
       giveBackFocus(owner, before.current);
     };
   }, []);
