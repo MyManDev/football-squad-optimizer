@@ -83,6 +83,10 @@ for (const language of ["tr", "en"] as const) {
 test("an open gameweek keeps the team's name its first line beside the LIVE tag on a phone", async ({
   page,
 }) => {
+  // Six days and 23 hours before the mocked deadline, so the countdown reads as a week's does.
+  await page.clock.install({
+    time: Date.parse("2999-01-01T00:00:00Z") - (6 * 24 + 23) * 3_600_000,
+  });
   await installLeagueMocks(page);
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
   await page.goto(`/league/352490/members/${ENTRY}`);
