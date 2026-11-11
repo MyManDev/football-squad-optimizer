@@ -363,6 +363,12 @@ for (const context of CONTEXTS) {
         `${width}px scrolls sideways`,
       ).toBe(true);
       expect(await smallControls(page), `${width}px`).toEqual([]);
+      if (width === WIDTHS[0]) {
+        // The pill and the page read each bundle once, under the one key they share.
+        const bundles = asked.filter((path) => path.includes("/bundle?gw="));
+        expect(bundles.length).toBeGreaterThan(0);
+        expect(bundles).toEqual([...new Set(bundles)]);
+      }
       const scan = await new AxeBuilder({ page }).analyze();
       expect(
         scan.violations.map((violation) => `${violation.id}: ${violation.nodes[0]?.target}`),
@@ -421,6 +427,79 @@ test("the pill is absent while none of the member's matches is in its window", a
   await expect(page.locator("[data-live-row]")).toHaveCount(15);
   await expect(page.locator("[data-live-pill]")).toHaveCount(0);
   await expect(page.locator("[data-live-page] h1 [role='img']")).toHaveCount(0);
+});
+
+test("the pill and the light stay away, and LIVE reads once, while only another club plays", async ({
+  page,
+}) => {
+  // The member's four matches are past their windows; clubs 9 and 10, none of the member's,
+  // kicked off half an hour ago.
+  const now = KICKOFF + 335 * 60_000;
+  await page.clock.install({ time: now });
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
+  await forwardedSite(page, null, 7);
+  const calendar = forwardedCalendar(7, KICKOFF);
+  calendar.gameweeks[0]!.fixtures.push({
+    fixture_id: 75,
+    kickoff_utc: new Date(now - 30 * 60_000).toISOString(),
+    home: { team_id: 9, name: "Club 9", short_name: "K9" },
+    away: { team_id: 10, name: "Club 10", short_name: "K10" },
+    finished: false,
+    home_score: null,
+    away_score: null,
+  });
+  await serveCalendar(page, calendar);
+  const asked = await forwarder(page, {
+    [`/entry/${CLASSIC_ENTRY}/bundle?gw=7`]: forwardedBundle(CLASSIC_ENTRY, 7, 7, FIFTEEN),
+    "/live/7?view=activity": forwardedActivity(7, KICKOFF, new Date(now - 60_000).toISOString()),
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/entry/${CLASSIC_ENTRY}/live`);
+  await expect(page.locator("[data-live-row]")).toHaveCount(15);
+  await page.clock.fastForward(3 * 60_000);
+  await expect(page.locator("[data-live-pill]")).toHaveCount(0);
+  await expect(page.locator("[data-live-page] h1 [role='img']")).toHaveCount(0);
+  expect(asked.filter((path) => path.startsWith("/live/"))).toEqual(["/live/7?view=activity"]);
+});
+
+test("while the member's match is played LIVE reads by itself, and the goal's points wait on the GOL board", async ({
+  page,
+}) => {
+  await page.clock.install({ time: NOW });
+  await page.addInitScript(() => {
+    localStorage.setItem("squadopt.language", "tr");
+    sessionStorage.setItem("squadopt.openingShown", "1");
+  });
+  await listed(page);
+  // The first read has no goal yet; a minute later Player 4, a defender, has scored: six
+  // points more.
+  const first = exampleActivity(LISTED.gameweek);
+  for (const row of first.activity.appearances) Object.assign(row, { goals: 0, assists: 0 });
+  const second = exampleActivity(LISTED.gameweek);
+  second.week.source_time = new Date(NOW).toISOString();
+  for (const row of second.activity.appearances) if (row.element_id !== 4) row.assists = 0;
+  second.week.elements.find((element) => element.element_id === 4)!.points += 6;
+  const reads: string[] = [];
+  await page.route("**/api/v1/fpl/live/**", (route) => {
+    reads.push(new URL(route.request().url()).pathname);
+    const answer = reads.length === 1 ? first : second;
+    return route.fulfill({ headers: MARKED, body: JSON.stringify(answer) });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/league/352490/members/${LISTED_ENTRY}/live`);
+  await expect(page.locator("[data-live-row]")).toHaveCount(15);
+  const total = page.locator("[data-live-total]");
+  const before = Number(await total.textContent());
+  expect(reads).toHaveLength(1);
+  await expect(page.locator("[data-goal-board]")).toHaveCount(0);
+  await page.clock.fastForward(60_000);
+  const board = page.locator("[data-goal-board='goal']");
+  await expect(board).toContainText("Player 4");
+  expect(reads).toHaveLength(2);
+  // Canlı puan stands where it was until the board brings the goal's points into it.
+  await expect(total).toHaveText(String(before));
+  await board.click();
+  await expect(total).toHaveText(String(before + 6));
 });
 
 test("the member page's top bar and the pill lead to LIVE", async ({ page }) => {

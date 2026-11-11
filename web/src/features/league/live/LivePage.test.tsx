@@ -21,7 +21,13 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import { PHONE_QUERY } from "../../../design/shell/layout";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
-import { testActivity, testPicks, testWeek, TEST_WEEK } from "../../../testSupport/liveWeek";
+import {
+  testActivity,
+  testFixtures,
+  testPicks,
+  testWeek,
+  TEST_WEEK,
+} from "../../../testSupport/liveWeek";
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import type { WeekActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek } from "../../liveScore/weekLive";
@@ -196,6 +202,7 @@ function renderLive({
   members = membersScored(TEST_WEEK - 1),
   language = "tr",
   heldSquad = false,
+  calendar = week.fixtures,
 }: {
   forwarder: LiveForwarder;
   path?: string;
@@ -206,6 +213,7 @@ function renderLive({
   language?: "tr" | "en";
   /** The squad is held from ten minutes ago, and the read of it again fails. */
   heldSquad?: boolean;
+  calendar?: typeof week.fixtures;
 }) {
   const loadTable = vi.fn(async () => ({
     contract_version: "provisional_league_ui_v1" as const,
@@ -223,7 +231,7 @@ function renderLive({
     entryAdviceIndex: vi.fn(async (entryId: number) => mockEntryAdviceIndex(entryId)),
   } as unknown as LeagueTree;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  client.setQueryData(FIXTURES_QUERY.queryKey, week.fixtures);
+  client.setQueryData(FIXTURES_QUERY.queryKey, calendar);
   if (heldSquad) {
     const key = leagueKeys.entrySquad(league.leagueId, page.payload.entry.entry_id);
     client.setQueryData(key, page, { updatedAt: Date.now() - 10 * 60_000 });
@@ -416,6 +424,32 @@ describe("the LIVE page's reads", () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
     await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("img", { name: copy.live.matchInProgress })).toBeNull();
+  });
+
+  it("reads nothing more by itself while only other clubs play", async () => {
+    // The member's three matches are over; clubs 7 and 8, none of the member's, kicked off
+    // half an hour ago.
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T20:00:00Z"));
+    const fixtures = [
+      ...testFixtures().map((fixture) => ({ ...fixture, finished: true })),
+      { id: 104, home: 7, away: 8, kickoff: "2026-11-21T19:30:00Z", finished: false },
+    ];
+    const input = testWeek({ sourceTime: "2026-11-21T20:00:00Z", fixtures });
+    const forwarder = fakeForwarder([
+      answered({
+        contract_version: "week_activity_v1",
+        week: input.live,
+        activity: testActivity(input, { inPlay: [104] }),
+      }),
+    ]);
+    renderLive({ forwarder, calendar: input.fixtures });
+    await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3 * 60_000);
+    });
+    expect(forwarder.liveActivity).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("img", { name: copy.live.matchInProgress })).toBeNull();
   });
 
