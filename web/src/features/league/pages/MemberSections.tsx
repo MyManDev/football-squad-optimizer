@@ -46,8 +46,11 @@ const BEYOND = 100_000;
  * layout while the page scrolls. A section is linked once its observer has reported it, so
  * a section the page does not draw has no link, and where the browser has no observer
  * (jsdom) the strip has no links and stays away.
+ *
+ * Once the week is closed (`closed`) the decision's heading reads LIVE WEEK and holds the
+ * week being played, not a move, so its link is named so too.
  */
-export function MemberSections() {
+export function MemberSections({ closed = false }: { closed?: boolean } = {}) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const [found, setFound] = useState<readonly SectionKey[]>([]);
@@ -101,7 +104,7 @@ export function MemberSections() {
   }, []);
 
   const names: Record<SectionKey, string> = {
-    move: copy.sectionMove,
+    move: closed ? copy.liveWeek : copy.sectionMove,
     squad: copy.sectionSquad,
   };
   // The holder stays when nothing is linked: the page's scroll padding counts the strip.

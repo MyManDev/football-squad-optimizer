@@ -4,7 +4,11 @@ import { Navigate, useLocation, useParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
-import { leagueIdInAddress, legacyLeagueAddress } from "../../../lib/leagueAddresses";
+import {
+  isLiveAddress,
+  leagueIdInAddress,
+  legacyLeagueAddress,
+} from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../data";
 import { createLeagueTree } from "../data";
 import { findLeague, loadLeagueDirectory } from "../directory";
@@ -37,6 +41,7 @@ import { MemberGate } from "./MemberGate";
  * league never asks the forwarder anything, so it opens from the published tree whether
  * the forwarder answers or not.
  */
+
 export function LeagueGate({
   children,
   forwarded,
@@ -72,14 +77,18 @@ export function LeagueGate({
   const queryClient = useQueryClient();
   const claimedEntry = useClaimedEntry(league?.leagueId ?? 0);
   const entryId = claimedEntry !== null ? entryIdInAddress(entryParameter) : null;
+  // LIVE reads fewer of the member's documents, and its rival's FPL bundle rather than his
+  // published squad, so a rival picked there (?duel=) starts nothing here.
+  const live = isLiveAddress(location.pathname);
   const address = new URLSearchParams(location.search);
-  const rival = address.get("rival");
-  const duel = address.get("duel");
+  const rival = live ? null : address.get("rival");
+  const duel = live ? null : address.get("duel");
   useEffect(() => {
     if (league === null) return;
     const rivals = [entryIdInAddress(rival), entryIdInAddress(duel)];
-    prefetchMemberReads(queryClient, createLeagueTree(league), entryId, rivals);
-  }, [league, entryId, rival, duel, queryClient]);
+    const page = live ? "live" : "member";
+    prefetchMemberReads(queryClient, createLeagueTree(league), entryId, rivals, page);
+  }, [league, entryId, rival, duel, live, queryClient]);
   if (parameter === undefined) {
     // The old shape of the address: the current league's version of it, or the form.
     const legacy = current === null ? null : legacyLeagueAddress(location.pathname, current);
@@ -89,8 +98,9 @@ export function LeagueGate({
   }
   if (named === null) return <LeagueEntryPage inPlace />;
   if (directory.isPending) return <EmptyState title={messages.common.loading} />;
-  if (directory.isError) {
-    // A directory that could not be read says so: the league may well be published.
+  // A directory that could not be read says so: the league may well be published. A later
+  // read that fails keeps the directory already held, so it never takes away an open page.
+  if (directory.data === undefined) {
     const missing = directory.error instanceof LeagueDataMissing;
     return (
       <EmptyState

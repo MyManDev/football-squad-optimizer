@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
@@ -15,7 +13,7 @@ import {
   type LiveExample,
 } from "../src/fixtures/forwarder";
 import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../src/fixtures/league";
-import { installLeagueMocks } from "./leagueMocks";
+import { closedWeek, MARKED } from "./liveWeek";
 
 /**
  * The member's live week (#1008, source A) with a mocked FPL forwarder: once the page's
@@ -27,61 +25,6 @@ import { installLeagueMocks } from "./leagueMocks";
 
 const ENTRY = 35249001;
 const { season, gameweek, source_snapshot_id: capture } = mockEntrySquadEnvelopes[ENTRY]!.payload;
-const TABLE_PATH = `device/${capture}/device-plan.json`;
-const MARKED = { "x-squadopt-fpl": "1", "content-type": "application/json; charset=utf-8" };
-
-function sha256(text: string): string {
-  return createHash("sha256").update(text, "utf8").digest("hex");
-}
-
-/** The league with a closed week, the capture's table its directory line names, and the calendar. */
-async function closedWeek(page: Page) {
-  await installLeagueMocks(page);
-  const { league_id, league_name } = mockLeagueMembersEnvelope.payload;
-  const bytes = `${JSON.stringify({
-    contract_version: "provisional_league_ui_v1",
-    generated_at_utc: "2026-08-21T07:00:00Z",
-    source_kind: "live",
-    payload: exampleTable({ season, gameweek, capture: capture! }),
-  })}\n`;
-  await page.route("**/data/leagues.json", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        contract_version: "league_directory_v1",
-        generated_at_utc: mockLeagueMembersEnvelope.generated_at_utc,
-        source_kind: "live",
-        payload: {
-          leagues: [
-            {
-              league_id,
-              league_name,
-              season,
-              gameweek,
-              path: "league",
-              device_plan: TABLE_PATH,
-              device_plan_sha256: sha256(bytes),
-            },
-          ],
-        },
-      }),
-    }),
-  );
-  await page.route(/\/data\/device\//, (route) =>
-    route.fulfill({ contentType: "application/json", body: bytes }),
-  );
-  await page.route("**/data/fixtures.json", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        contract_version: "fixtures_v1",
-        generated_at_utc: mockLeagueMembersEnvelope.generated_at_utc,
-        source_kind: "live",
-        payload: exampleCalendar({ season, gameweek, deadline: "2020-01-01T00:00:00Z" }),
-      }),
-    }),
-  );
-}
 
 /** The forwarder's two routes; the live week answers each of `weeks` in turn. */
 async function forwarder(
@@ -180,9 +123,15 @@ for (const language of ["tr", "en"] as const) {
     };
     await assertPlayerPoints("in_progress");
 
-    // Refresh reads the live points again, and nothing else.
+    // Refresh reads the live points again, and nothing else. The read brings two automatic
+    // substitutions: while their boards stand the card keeps the read before, and it takes the
+    // new one once both have gone.
     await card.getByRole("button", { name: language === "tr" ? "Yenile" : "Refresh" }).click();
-    await expect(card).toContainText(language === "tr" ? "Bonus eklendi" : "Bonus Added");
+    await expect(page.locator("[data-goal-board='substitution']")).toBeVisible();
+    await expect(card).toContainText(language === "tr" ? "Bonus bekleniyor" : "Bonus Pending");
+    await expect(card).toContainText(language === "tr" ? "Bonus eklendi" : "Bonus Added", {
+      timeout: 15_000,
+    });
     await assertPlayerPoints("finished");
     expect(asked.live).toHaveLength(2);
     expect(asked.bundle).toHaveLength(1);
@@ -212,7 +161,10 @@ for (const width of [375, 1280]) {
       await page.goto(`/league/352490/members/${ENTRY}`);
       await expect(page.locator("[data-opening-mark]")).toHaveCount(0, { timeout: 10_000 });
       const card = page.locator("[data-member-live-score]");
-      await expect(card.getByRole("img", { name: "Maç sürüyor" }).first()).toBeVisible();
+      // The light needs the first read: a loaded machine (Firefox, one worker) gets its time.
+      await expect(card.getByRole("img", { name: "Maç sürüyor" }).first()).toBeVisible({
+        timeout: 15_000,
+      });
       await card.evaluate((node) => {
         node.setAttribute("data-test-animations", "0");
         node.addEventListener("animationstart", (event) => {
@@ -229,7 +181,7 @@ for (const width of [375, 1280]) {
       await expect(card.getByLabel("Gol: 1", { exact: true })).toBeVisible();
       await expect(card).toHaveAttribute("data-test-animations", reduce ? "0" : "1");
       await refresh.click();
-      await expect(refresh).toBeEnabled();
+      await expect(refresh).not.toHaveAttribute("aria-disabled", "true");
       await expect(card).toHaveAttribute("data-test-animations", reduce ? "0" : "1");
       await refresh.click();
       await expect(card.getByLabel("Asist: 1", { exact: true })).toBeVisible();
@@ -369,7 +321,7 @@ for (const width of [320, 375, 390]) {
       }
       // The same goal in a later read plays nothing.
       await refresh.click();
-      await expect(refresh).toBeEnabled();
+      await expect(refresh).not.toHaveAttribute("aria-disabled", "true");
       await nothingPlays(page);
       // An assist rises the board with its own long shout, which fits the narrowest screen.
       await refresh.click();

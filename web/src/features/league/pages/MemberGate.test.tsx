@@ -6,7 +6,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from "react-router";
@@ -37,6 +37,7 @@ import type { PublishedLeague } from "../directory";
 import { readMemberClaim, writeMemberClaim } from "../identity/memberClaim";
 import type { EntryView, LeagueMembers, LeagueViewEnvelope } from "../types";
 import { recordUsage } from "../../../data/usage";
+import { leagueKeys } from "../queries";
 import { MemberGate } from "./MemberGate";
 
 vi.mock("../../../data/usage", () => ({ recordUsage: vi.fn() }));
@@ -219,6 +220,40 @@ describe.each(["tr", "en"] as const)("the member step in %s", (language) => {
     open({ language });
     expect(await screen.findByText(copy.empty)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: copy.otherLeague })).toHaveAttribute("href", "/");
+  });
+});
+
+describe("the picker in front of LIVE", () => {
+  it("warms only LIVE's reads for the name a finger lands on, no scoreboard or history", async () => {
+    const made = client();
+    const entryId = humans[0]!.entry_id;
+    render(
+      <QueryClientProvider client={made}>
+        <LanguageProvider initialLanguage="tr">
+          <MemoryRouter initialEntries={[`${memberAddress(LEAGUE, entryId)}/live`]}>
+            <Routes>
+              <Route
+                path="/league/:leagueId/members/:entryId/live"
+                element={withLeague(
+                  <MemberGate>
+                    <h1>LIVE</h1>
+                  </MemberGate>,
+                )}
+              />
+            </Routes>
+          </MemoryRouter>
+        </LanguageProvider>
+      </QueryClientProvider>,
+    );
+    const group = await picker("tr");
+    const name = new RegExp(humans[0]!.manager_name!);
+    fireEvent.pointerDown(within(group).getByRole("button", { name }));
+    const cache = made.getQueryCache();
+    // The tapped member's squad is on its way; the member page's scoreboard is not.
+    expect(
+      cache.findAll({ queryKey: [leagueKeys.entrySquad(LEAGUE, null)[0], LEAGUE] }),
+    ).not.toEqual([]);
+    expect(cache.find({ queryKey: leagueKeys.scoreboard(LEAGUE) })).toBeUndefined();
   });
 });
 

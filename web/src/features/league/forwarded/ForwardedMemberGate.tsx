@@ -13,6 +13,7 @@ import { ForwardedTreeProvider } from "./ForwardedTreeProvider";
 import { forwardedMemberSquad } from "./memberSquad";
 import {
   newestDeviceTable,
+  refusalOf,
   standingsPage,
   useCaptureTable,
   useDirectory,
@@ -96,7 +97,7 @@ export function ForwardedMemberGate({
   // forwarded words rather than as a member whose squad is not published.
   const built = useMemo(
     () =>
-      read?.ok && tableEnvelope !== null
+      read !== undefined && tableEnvelope !== null
         ? forwardedMemberSquad({
             bundle: read.document,
             table: tableEnvelope,
@@ -111,7 +112,7 @@ export function ForwardedMemberGate({
   // What the tree need not read again: the standings page this member was chosen from and
   // the member's own bundle.
   const knownPages = useMemo(() => (standings.data ? [standings.data] : []), [standings.data]);
-  const knownBundles = useMemo(() => (read?.ok ? [read.document] : []), [read]);
+  const knownBundles = useMemo(() => (read !== undefined ? [read.document] : []), [read]);
 
   if (!valid) return <EmptyState title={messages.leagueMembers.invalidEntry} />;
   if (
@@ -134,9 +135,10 @@ export function ForwardedMemberGate({
       </div>
     );
   }
-  if (read === undefined || !read.ok) {
-    const missing =
-      read !== undefined && (read.reason === "entry_not_found" || read.reason === "not_found");
+  // A bundle held stays drawn when a later read of it fails; only none held says why.
+  if (read === undefined) {
+    const reason = refusalOf(bundle.error);
+    const missing = reason === "entry_not_found" || reason === "not_found";
     return (
       <div className={styles.page}>
         <MemberHeading title={fallbackTitle} manager={standing?.player_name} />

@@ -1,8 +1,8 @@
 /**
  * The GOL board's batches for the member page: each read's goals, assists and cards from the
  * live week, and the automatic substitutions a read adds (`newSubstitutions`), numbered as one
- * stream. The first read of a member's week is a starting point for substitutions, as it is
- * for goals, and so is the first read after the week was not shown (a tool's page).
+ * stream. Every first read the live score makes (`MemberLive.start`: the member's week opened,
+ * a tool's page left) is a starting point for substitutions, as it is for its goals.
  */
 
 import { useCallback, useState } from "react";
@@ -18,8 +18,9 @@ export interface BoardBatch {
 }
 
 interface Seen {
-  /** The member and week the substitutions belong to. */
+  /** The member and week the substitutions belong to, and the live score's first read. */
   week: string | null;
+  start: number | null;
   substitutions: ReadonlySet<string> | null;
   /** The last moments batch taken, and the last read's time. */
   moments: number | null;
@@ -31,6 +32,7 @@ interface Seen {
 export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch | null {
   const [seen, setSeen] = useState<Seen>({
     week: null,
+    start: null,
     substitutions: null,
     moments: null,
     read: null,
@@ -41,18 +43,17 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
   const week = shown === null ? null : `${entryId}:${shown.gameweek}`;
   const read = shown === null ? null : shown.score.source_time;
   const momentsId = live.moments?.id ?? null;
-  if (shown === null && seen.substitutions !== null) {
-    // No week shown (a tool's page, a read the source refused): the next read is a first read
-    // again, a starting point for substitutions as the live score's marks are for goals.
-    setSeen({ ...seen, substitutions: null, read: null });
-  } else if (
+  if (
     shown !== null &&
-    (read !== seen.read || momentsId !== seen.moments || week !== seen.week)
+    (read !== seen.read ||
+      momentsId !== seen.moments ||
+      week !== seen.week ||
+      live.start !== seen.start)
   ) {
     const items: BoardMoment[] = [];
     if (live.moments !== null && momentsId !== seen.moments) items.push(...live.moments.items);
     const { seen: substitutions, fresh } = newSubstitutions(
-      week === seen.week ? seen.substitutions : null,
+      week === seen.week && live.start === seen.start ? seen.substitutions : null,
       shown.score.autosubs,
     );
     for (const [out, incoming] of fresh) {
@@ -65,14 +66,19 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
       });
     }
     const count = items.length > 0 ? seen.count + 1 : seen.count;
-    setSeen({
+    const next: Seen = {
       week,
+      start: live.start,
       substitutions,
       moments: momentsId,
       read,
       count,
       batch: items.length > 0 ? { id: count, items } : seen.batch,
-    });
+    };
+    setSeen(next);
+    // The read's batch in this very render, so the hooks after this one (the hold, the read a
+    // page draws) take it with the read that brought it, never the read alone.
+    return next.batch;
   }
   return seen.batch;
 }
@@ -80,18 +86,19 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
 /**
  * What the board has still to play out: each moment it shows, from the read that brought it
  * until it lands (`landed`: a goal's run reaches the score, a substitution's board or a card's
- * line goes). `held` is the points still on their way to the live score; `waiting` says some
- * moment has still to land. Under reduced motion nothing is held.
+ * line goes). While `waiting`, a page shows the read from before the board's first moment, and
+ * `brought` is what the moments that have landed since then brought to its score; once the last
+ * lands, the page takes the newest read whole. Under reduced motion nothing waits.
  */
 export function useBoardHold(batch: BoardBatch | null): {
-  held: number;
+  brought: number;
   waiting: boolean;
   landed: (key: string) => void;
 } {
-  const [state, setState] = useState<{ batch: number | null; pending: Map<string, number> }>({
-    batch: null,
-    pending: new Map(),
-  });
+  const [state, setState] = useState<Hold>({ batch: null, pending: new Map(), brought: 0 });
+  // The hold as this render has it: a new batch's moments wait from the render that brings
+  // them, so a read drawn beside them (`useSettledRead`) is held from its first render.
+  let current = state;
   if (batch !== null && batch.id !== state.batch) {
     // Under reduced motion the layer drops its queue for one still line, so what it held from
     // earlier moments goes with it: nothing is left waiting for a board that will not play.
@@ -104,19 +111,59 @@ export function useBoardHold(batch: BoardBatch | null): {
         pending.set(moment.key, moment.kind === "substitution" ? 0 : (moment.points ?? 0));
       }
     }
-    setState({ batch: batch.id, pending });
+    current = { batch: batch.id, pending, brought: pending.size === 0 ? 0 : state.brought };
+    setState(current);
   }
   const landed = useCallback(
     (key: string) =>
-      setState((current) => {
-        if (!current.pending.has(key)) return current;
-        const pending = new Map(current.pending);
+      setState((held) => {
+        if (!held.pending.has(key)) return held;
+        const pending = new Map(held.pending);
+        const points = pending.get(key) ?? 0;
         pending.delete(key);
-        return { ...current, pending };
+        // The last moment landed: the page takes the newest read whole.
+        return { ...held, pending, brought: pending.size === 0 ? 0 : held.brought + points };
       }),
     [],
   );
-  let held = 0;
-  for (const points of state.pending.values()) held += points;
-  return { held, waiting: state.pending.size > 0, landed };
+  return { brought: current.brought, waiting: current.pending.size > 0, landed };
+}
+
+interface Hold {
+  /** The last batch taken. */
+  batch: number | null;
+  /** Each moment the board has still to play out, with the points it brings. */
+  pending: Map<string, number>;
+  brought: number;
+}
+
+/**
+ * The read a page draws: the newest, or while the board waits (`useBoardHold`) the one from
+ * before its first moment, so the card, the pitch and the rows all wait together. Only a read is
+ * kept: a refused one (null) leaves the last read to hold under the next board. `owner` names
+ * whose reads they are (the member), so one member's read is never drawn on another's page.
+ */
+export function useSettledRead<T extends { gameweek: number }>(
+  read: T | null,
+  waiting: boolean,
+  owner: string,
+): T | null {
+  const [state, setState] = useState<{ owner: string; last: T | null; settled: T | null }>({
+    owner,
+    last: read,
+    settled: read,
+  });
+  // Another member's page starts afresh.
+  let next = state.owner === owner ? state : { owner, last: read, settled: read };
+  // The newest read there was, kept through a refused one (null)...
+  if (read !== null && read !== next.last) next = { ...next, last: read };
+  // ...and settled on once nothing waits, so a hold that ended over a refused read still
+  // moves on to the read its moments came in.
+  if (!waiting && next.settled !== next.last) next = { ...next, settled: next.last };
+  if (next !== state) setState(next);
+  const held =
+    next.settled !== null && read !== null && next.settled.gameweek === read.gameweek
+      ? next.settled
+      : null;
+  return waiting && held !== null ? held : read;
 }

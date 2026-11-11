@@ -156,7 +156,7 @@ jobs:
   device_engines:
     name: device engines (Playwright)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     container:
       image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       # Firefox requires the browser user to own GitHub's mounted home directory.
@@ -196,8 +196,9 @@ jobs:
 
       - name: Device spec on Chromium, WebKit and Firefox
         # The expanded 219-case suite completed in 11m19s; a queue run reached 214 cases
-        # without an assertion failure before the old 12-minute step limit expired.
-        timeout-minutes: 16
+        # without an assertion failure before the old 12-minute step limit expired. LIVE's two
+        # specs took the suite to 324 cases, past 16 minutes.
+        timeout-minutes: 26
         shell: bash
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/device-engines.json

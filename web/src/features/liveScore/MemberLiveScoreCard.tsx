@@ -47,10 +47,9 @@ const COPY = {
 /** Display only. The source adapter owns loading; neither score nor refresh is recorded here. */
 export function MemberLiveScoreCard({
   entryId = 0,
-  held = 0,
+  brought = 0,
   gameweek,
   score,
-  lists,
   forecast = null,
   names,
   onRefresh,
@@ -59,15 +58,10 @@ export function MemberLiveScoreCard({
 }: {
   /** Whose score it is: each member's figure counts from its own last value. */
   entryId?: number;
-  /** Points the GOL board has still to bring here: held back until its run lands. */
-  held?: number;
+  /** What the GOL board's moments that have landed brought to this read's score, while it waits. */
+  brought?: number;
   gameweek: number;
   score: LiveWeekScore | null;
-  /**
-   * The read the lists below the figures show (players, captain, substitutions), when it is
-   * not `score`'s: the read before, kept while the GOL board brings this one's moments.
-   */
-  lists?: { score: LiveWeekScore; activity: PlayerActivity[] | null };
   /** What was forecast for the eleven fielded, on the live score's net basis; null unstated. */
   forecast?: number | null;
   /** Names resolved from the same season's element ids. */
@@ -86,14 +80,7 @@ export function MemberLiveScoreCard({
     gameweek > 38
   )
     return null;
-  // The lists below the figures: this read's, or the read before while the board plays.
-  const below =
-    lists !== undefined && !lists.score.refused ? lists : { score, activity: activity ?? null };
-  const listed = below.score.refused ? score : below.score;
-  const shown = [score, listed].flatMap((read) => [
-    ...read.autosubs.flat(),
-    ...(read.captain === null ? [] : [read.captain]),
-  ]);
+  const shown = [...score.autosubs.flat(), ...(score.captain === null ? [] : [score.captain])];
   if (shown.some((id) => !names.get(id)?.trim())) return null;
   const time = new Date(score.source_time);
   if (!Number.isFinite(time.valueOf())) return null;
@@ -108,8 +95,12 @@ export function MemberLiveScoreCard({
               className={styles.refresh}
               data-live-refresh
               type="button"
-              onClick={onRefresh}
-              disabled={refreshing}
+              // Kept focusable while it reads, so keyboard focus and a screen reader keep their
+              // place: a press then does nothing.
+              onClick={() => {
+                if (!refreshing) onRefresh();
+              }}
+              aria-disabled={refreshing || undefined}
             >
               {refreshing ? copy.refreshing : copy.refresh}
             </button>
@@ -130,7 +121,7 @@ export function MemberLiveScoreCard({
               <span className={styles.total} data-live-total>
                 <CountingNumber
                   countKey={`live-net:${entryId}:${gameweek}`}
-                  value={score.net - held}
+                  value={score.net + brought}
                   format={(value) => integer(Math.round(value))}
                 />
               </span>
@@ -146,15 +137,15 @@ export function MemberLiveScoreCard({
         <p className={styles.bonus}>{score.bonus_confirmed ? copy.bonusDone : copy.bonusPending}</p>
         <LivePlayerActivity
           identity={String(gameweek)}
-          sourceTime={listed.source_time}
-          players={below.activity}
+          sourceTime={score.source_time}
+          players={activity}
           names={names}
-          counted={new Set(listed.counted)}
+          counted={new Set(score.counted)}
         />
         <dl className={styles.details}>
           <div>
             <dt>{copy.captain}</dt>
-            <dd>{listed.captain === null ? copy.none : names.get(listed.captain)}</dd>
+            <dd>{score.captain === null ? copy.none : names.get(score.captain)}</dd>
           </div>
           <div>
             <dt>{copy.updated}</dt>
@@ -173,11 +164,11 @@ export function MemberLiveScoreCard({
         </dl>
         <div className={styles.substitutions}>
           <h3>{copy.substitutions}</h3>
-          {listed.autosubs.length === 0 ? (
+          {score.autosubs.length === 0 ? (
             <p>{copy.none}</p>
           ) : (
             <ul>
-              {listed.autosubs.map(([out, incoming]) => (
+              {score.autosubs.map(([out, incoming]) => (
                 <li key={`${out}:${incoming}`}>
                   <span>
                     <small>{copy.out}</small> {names.get(out)}

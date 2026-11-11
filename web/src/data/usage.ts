@@ -35,13 +35,14 @@ export function usagePlace(pathname: string): UsagePlace {
   if (path === "/fixtures") return { page: "fixtures", tool: "fixtures" };
   if (path === "/contribute") return { page: "contribute", tool: "" };
   if (/^\/entry\/[^/]+$/.test(path)) return { page: "team", tool: "week" };
+  if (/^\/entry\/[^/]+\/live$/.test(path)) return { page: "team", tool: "live" };
   const league = LEAGUE_ADDRESS.exec(path);
   if (league === null) return { page: "other", tool: "" };
   const [, members, entry, last] = league;
   if (members === undefined) return { page: "league", tool: "" };
   if (entry === undefined) return { page: "members", tool: "" };
   if (last === undefined) return { page: "member", tool: "week" };
-  if (last === "history" || last === "vs") return { page: last, tool: last };
+  if (last === "history" || last === "vs" || last === "live") return { page: last, tool: last };
   if (last === "reminder") return { page: "reminder", tool: "" };
   return isMemberTool(last) ? { page: "member", tool: last } : { page: "other", tool: "" };
 }

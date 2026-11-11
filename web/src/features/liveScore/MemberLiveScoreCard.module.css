@@ -9,7 +9,8 @@
   cursor: pointer;
 }
 
-.refresh:disabled {
+.refresh:disabled,
+.refresh[aria-disabled="true"] {
   cursor: wait;
   opacity: 0.65;
 }

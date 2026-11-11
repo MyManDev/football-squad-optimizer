@@ -95,6 +95,7 @@ test.describe("the sidebar before and after the two steps", () => {
     expect(await sidebarLinks(page)).toEqual([
       `${own(EXAMPLE_CLAIM.entryId)}/vs`,
       own(EXAMPLE_CLAIM.entryId),
+      `${own(EXAMPLE_CLAIM.entryId)}/live`,
       MEMBERS,
       `${own(EXAMPLE_CLAIM.entryId)}/current-squad`,
       `${own(EXAMPLE_CLAIM.entryId)}/what-if`,

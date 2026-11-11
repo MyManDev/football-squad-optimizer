@@ -1,8 +1,12 @@
+import { Link } from "react-router";
+
 import { useLanguage } from "../../../i18n/context";
 import { deadlineLong, deadlineShort } from "../../../lib/format";
+import { liveAddress } from "../../../lib/leagueAddresses";
 import type { FixturesPayload } from "../../fixtures/types";
 import { gameweekDeadline, minutesLeft } from "../advice/deadline";
 import type { EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
+import { useLeagueId } from "../useLeague";
 import { scoreBugCells, type ScoreCell } from "./scoreBug";
 import styles from "./LeagueMemberPage.module.css";
 
@@ -17,6 +21,10 @@ import styles from "./LeagueMemberPage.module.css";
  * deadline is the fixture calendar's; once it has passed the bar says so and the page's
  * passed-deadline statement explains, and with no calendar the bar says nothing about it.
  * While it is open, the page's minute clock counts down to it.
+ *
+ * LIVE opens this member's live week, whoever's page it is: the visitor's own, a rival's, a
+ * forwarded league's member or a team on its own. It follows the score bug and shares its
+ * line, so it never takes room from the team's name.
  */
 export function MemberTopBar({
   squad,
@@ -38,6 +46,7 @@ export function MemberTopBar({
   const deadline = deadlinePassed ?? gameweekDeadline(fixtures, view.season, view.gameweek);
   const humans = members.filter((member) => member.member_kind === "human").length;
   const cells = scoreBugCells(entry, humans, view, locale, copy);
+  const leagueId = useLeagueId();
   return (
     <header className={styles.topBar} data-closed={deadlinePassed !== null ? "" : undefined}>
       <h1 className={styles.teamName}>{entry.team_name ?? copy.unknownTeam}</h1>
@@ -48,6 +57,10 @@ export function MemberTopBar({
         now={now}
       />
       <ScoreBug cells={cells} />
+      <Link to={liveAddress(leagueId, entry.entry_id)} className={styles.liveLink} data-live-link>
+        <span className={styles.liveLinkDot} aria-hidden="true" />
+        {messages.shell.live}
+      </Link>
     </header>
   );
 }

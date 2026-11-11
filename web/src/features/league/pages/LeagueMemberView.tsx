@@ -1,12 +1,8 @@
-import {
-  entryAddress,
-  memberAddress,
-  memberHistoryAddress,
-  type MemberTool,
-} from "../../../lib/leagueAddresses";
+import { memberHistoryAddress, type MemberTool } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 
@@ -26,11 +22,17 @@ import { isDevicePlanEntry } from "../device/types";
 import { advisedFifteen } from "../device/whatIf";
 import { WhatIfPanel } from "../device/WhatIfPanel";
 import { MemberLiveWeekView } from "../live/MemberLiveWeek";
-import { useMemberLiveScore } from "../live/useMemberLiveScore";
+import { cachedBundle } from "../live/liveSources";
+import { useMemberLiveScore, type MemberLiveDependencies } from "../live/useMemberLiveScore";
+import { forwarder as siteForwarder } from "../forwarder/client";
 import { useLiveWindow } from "../live/useLiveWindow";
 import { useGoalReplay } from "../live/useGoalReplay";
-import { useBoardHold, useBoardMoments } from "../live/useBoardMoments";
-import type { LiveWindowFilter } from "../../liveScore/liveWindow";
+import { useBoardHold, useBoardMoments, useSettledRead } from "../live/useBoardMoments";
+import {
+  FOLLOW_INTERVAL_MS,
+  SLOW_FOLLOW_MS,
+  type LiveWindowFilter,
+} from "../../liveScore/liveWindow";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
 import { squadWithPlayedWeek } from "../live/memberLineup";
 import { whatIfBasis } from "../device/whatIfDraft";
@@ -202,28 +204,38 @@ function LeagueMemberContent({
   // goals, assists and automatic substitutions one by one, so the board can be seen when no
   // match is on.
   const replaying = searchParams.get("replay") === "1";
+  // The member's bundle is read through the app's cache, under the forwarded gate's key, so
+  // the phone bar's LIVE pill and LIVE itself read it no second time.
+  const queryClient = useContext(QueryClientContext);
+  const liveReads = useMemo<MemberLiveDependencies | undefined>(
+    () =>
+      liveDependencies ??
+      (queryClient === undefined
+        ? undefined
+        : {
+            forwarder: { ...siteForwarder, entryBundle: cachedBundle(siteForwarder, queryClient) },
+          }),
+    [liveDependencies, queryClient],
+  );
   const liveMatch = useLiveWindow(fixtures, matchFilter);
   const liveWeek = useMemberLiveScore(
     view,
     fixtures,
-    liveDependencies,
-    (closed || liveMatch.open) &&
+    liveReads,
+    (closed || liveMatch.open || liveMatch.slow) &&
       view.league_id === leagueId &&
       (!tool || tool === "current-squad"),
-    // The replay stands in for the page's own reads: nothing follows while it plays.
-    replaying || !liveMatch.open ? null : liveMatch.gameweek,
+    // The replay stands in for the page's own reads: nothing follows while it plays. A match
+    // that may still be played (stalled) is read now and then until its limit.
+    replaying || !(liveMatch.open || liveMatch.slow) ? null : liveMatch.gameweek,
+    liveMatch.open ? FOLLOW_INTERVAL_MS : SLOW_FOLLOW_MS,
   );
   if (liveWeek.matches !== null && liveWeek.matches !== matchFilter) {
     setMatchFilter(liveWeek.matches);
   }
   // One GOL layer for the page and its tools, which share this mounted page: it stays as the
   // member moves between them, so a moment already played never plays again on the way back.
-  const replay = useGoalReplay(
-    view,
-    fixtures,
-    liveDependencies,
-    replaying && view.league_id === leagueId,
-  );
+  const replay = useGoalReplay(view, fixtures, liveReads, replaying && view.league_id === leagueId);
   const board = useBoardMoments(liveWeek, view.entry.entry_id);
   // The live score holds the points of the board's queued moments until each one's run lands;
   // the replay brings no real points, so it holds nothing.
@@ -239,10 +251,14 @@ function LeagueMemberContent({
     <GoalMomentLayer
       batch={goalBatch}
       source={replaying ? "replay" : "live"}
+      scoring={!replaying}
       onLanded={hold.landed}
     />
   );
-  const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
+  // While the board plays, the page draws the read from before its first moment: the card and
+  // the pitch take the newest one together once its last moment has landed.
+  const drawnLive = useSettledRead(liveWeek.shown, hold.waiting, String(view.entry.entry_id));
+  const displayedSquad = closed ? squadWithPlayedWeek(view, drawnLive?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
   // The same holds for a selection the member's device solves, until a run ends without a
@@ -545,7 +561,7 @@ function LeagueMemberContent({
           {/* A phone's one column is long: the strip keeps its two parts a tap away, pinned
             under the phone bar once the decision has been read past. Wider layouts pin the
             top bar instead and show more of the page at once. */}
-          {layout === "phone" ? <MemberSections /> : null}
+          {layout === "phone" ? <MemberSections closed={closed} /> : null}
 
           {deadlinePassed !== null ? (
             <p className={styles.deadlineNotice} role="status" data-testid="deadline-passed">
@@ -558,9 +574,8 @@ function LeagueMemberContent({
           {deadlinePassed !== null && fixtures !== null && view.league_id === leagueId ? (
             <MemberLiveWeekView
               squad={view}
-              live={liveWeek}
-              held={hold.held}
-              waiting={hold.waiting}
+              live={{ ...liveWeek, shown: drawnLive }}
+              brought={drawnLive === liveWeek.shown ? 0 : hold.brought}
             />
           ) : null}
 
@@ -610,14 +625,18 @@ function LeagueMemberContent({
                 </div>
                 {layout === "phone" ? null : apply}
               </div>
-              {adviceLoading ? (
-                <EmptyState title={copy.loadingAdvice} />
-              ) : rivalsLoading ? (
-                <EmptyState title={copy.loadingRivals} />
+              {/* Under LIVE WEEK nothing waits on the plan, which is not drawn there. */}
+              {adviceLoading || rivalsLoading ? (
+                closed ? null : (
+                  <EmptyState title={adviceLoading ? copy.loadingAdvice : copy.loadingRivals} />
+                )
               ) : shown ? (
-                <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
-              ) : computeOnly && !rejectedContext ? null : closed &&
-                index?.menu === "device" ? null : ( // is to say. The card would only name a publication that never happens. // is no default plan to point at, and the squad and its score say what there // A device menu publishes no plan for any week: once the week is closed there
+                // Under LIVE WEEK the closed week's plan is not drawn: the week being played is.
+                closed ? null : (
+                  <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
+                )
+              ) : computeOnly && !rejectedContext ? null : closed ? null : (
+                // Under LIVE WEEK no plan is drawn, so no card says one is missing or points at one.
                 <MissingAdviceCard
                   issue={
                     rejectedContext
@@ -641,18 +660,9 @@ function LeagueMemberContent({
                   // press being answered is not offered again.
                   canCompute={
                     computeAvailable &&
-                    !closed &&
                     computeService !== "static" &&
                     job.state.phase !== "requesting" &&
                     job.state.phase !== "waiting"
-                  }
-                  // The address the sidebar's own link lands on with no selection.
-                  defaultPlan={
-                    closed
-                      ? leagueId > 0
-                        ? memberAddress(leagueId, entryId)
-                        : entryAddress(entryId)
-                      : undefined
                   }
                 />
               )}
@@ -667,7 +677,7 @@ function LeagueMemberContent({
                 </Link>
               </p>
             ) : null}
-            {!adviceLoading && shown ? (
+            {!adviceLoading && shown && !closed ? (
               <>
                 {/* It sends the member to Hesapla, which a closed week does not have. */}
                 <NewInformationNotice

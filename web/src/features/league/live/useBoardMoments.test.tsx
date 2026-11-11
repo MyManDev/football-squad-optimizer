@@ -6,7 +6,7 @@ import type { BoardMoment } from "../../liveScore/boardMoments";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
 import { MOMENT_TIMING } from "../../liveScore/goalMomentTiming";
 import type { MemberLiveScore } from "./memberLiveScore";
-import { useBoardHold, useBoardMoments, type BoardBatch } from "./useBoardMoments";
+import { useBoardHold, useBoardMoments, useSettledRead, type BoardBatch } from "./useBoardMoments";
 import type { MemberLive } from "./useMemberLiveScore";
 
 afterEach(() => {
@@ -22,7 +22,12 @@ const NAMES = new Map([
 ]);
 
 /** A live week as the hook hands it on: only what the board reads of it. */
-function live(minute: number, autosubs: [number, number][], moments: MemberLive["moments"] = null) {
+function live(
+  minute: number,
+  autosubs: [number, number][],
+  moments: MemberLive["moments"] = null,
+  start = 1,
+) {
   const shown = {
     gameweek: 11,
     names: NAMES,
@@ -37,6 +42,7 @@ function live(minute: number, autosubs: [number, number][], moments: MemberLive[
     refresh: () => undefined,
     moments,
     matches: null,
+    start,
   } satisfies MemberLive;
 }
 
@@ -106,30 +112,43 @@ describe("the GOL board's stream", () => {
     ]);
   });
 
-  it("takes the first read after the week was not shown (a tool's page) as a starting point", () => {
+  it("takes the live score's new first read (a tool's page left) as a starting point", () => {
     const { rerender } = render(<Harness value={live(1, [])} />);
-    // On a tool's page the live score shows no week; the substitution comes in meanwhile.
+    // On a tool's page the live score shows no week; back on the page it reads afresh.
     rerender(<Harness value={{ ...live(2, []), shown: null }} />);
-    rerender(<Harness value={live(3, [[4, 13]])} />);
+    rerender(<Harness value={live(3, [[4, 13]], null, 2)} />);
     expect(screen.queryAllByRole("listitem")).toEqual([]);
     // From there on a newer read's substitution rises as before.
     rerender(
       <Harness
-        value={live(4, [
-          [4, 13],
-          [9, 13],
-        ])}
+        value={live(
+          4,
+          [
+            [4, 13],
+            [9, 13],
+          ],
+          null,
+          2,
+        )}
       />,
     );
     expect(screen.getByRole("listitem")).toHaveTextContent("1:Haaland>Trossard");
   });
+
+  it("keeps counting over a refresh the source refused, as the live score keeps its goals", () => {
+    const { rerender } = render(<Harness value={live(1, [])} />);
+    // The member's refresh is refused: no week shown for a moment, but no new first read.
+    rerender(<Harness value={{ ...live(2, []), shown: null }} />);
+    rerender(<Harness value={live(3, [[4, 13]])} />);
+    expect(screen.getByRole("listitem")).toHaveTextContent("1:Saka>Trossard");
+  });
 });
 
 function Holding({ batch, land }: { batch: BoardBatch | null; land?: string }) {
-  const { held, landed } = useBoardHold(batch);
+  const { brought, waiting, landed } = useBoardHold(batch);
   return (
     <button type="button" onClick={() => land && landed(land)}>
-      {held}
+      {`${brought}:${waiting ? "waiting" : "clear"}`}
     </button>
   );
 }
@@ -149,16 +168,18 @@ describe("the live score's hold", () => {
     points,
   });
 
-  it("holds a queued moment's points until its run lands, and nothing for a reserve", () => {
+  it("counts what the landed moments brought while it waits, and starts again once all have landed", () => {
     const batch = { id: 1, items: [goal("a", 8, 2), goal("b", 4), goal("c", null, 0)] };
     const { rerender } = render(<Holding batch={batch} land="a" />);
-    expect(screen.getByRole("button")).toHaveTextContent("12");
+    // The reserve the scorer does not count is not waited for.
+    expect(screen.getByRole("button")).toHaveTextContent("0:waiting");
     screen.getByRole("button").click();
     rerender(<Holding batch={batch} land="b" />);
-    expect(screen.getByRole("button")).toHaveTextContent("4");
+    expect(screen.getByRole("button")).toHaveTextContent("8:waiting");
     screen.getByRole("button").click();
     rerender(<Holding batch={batch} />);
-    expect(screen.getByRole("button")).toHaveTextContent("0");
+    // The last one landed: the page takes the newest read whole.
+    expect(screen.getByRole("button")).toHaveTextContent("0:clear");
   });
 
   it("waits while a moment's points are on their way, and not once the last one lands", () => {
@@ -192,10 +213,10 @@ describe("the live score's hold", () => {
     };
     const batch = { id: 1, items: [swap, card] };
     function Waiting({ land }: { land: string }) {
-      const { held, waiting, landed } = useBoardHold(batch);
+      const { brought, waiting, landed } = useBoardHold(batch);
       return (
         <button type="button" onClick={() => landed(land)}>
-          {`${held}:${waiting ? "waiting" : "clear"}`}
+          {`${brought}:${waiting ? "waiting" : "clear"}`}
         </button>
       );
     }
@@ -239,7 +260,7 @@ describe("the hold played out by the GOL layer", () => {
           batch={{ id: `live:${batch.id}`, items: batch.items }}
           onLanded={hold.landed}
         />
-        <output data-testid="hold">{`${hold.held}:${hold.waiting ? "waiting" : "clear"}`}</output>
+        <output data-testid="hold">{`${hold.brought}:${hold.waiting ? "waiting" : "clear"}`}</output>
       </LanguageProvider>
     );
   }
@@ -255,11 +276,12 @@ describe("the hold played out by the GOL layer", () => {
       items: [counted("a", 4), counted("b", 4), counted("c", 4), counted("d", 4, "small")],
     };
     render(<Page batch={batch} />);
-    expect(hold()).toHaveTextContent("16:waiting");
+    expect(hold()).toHaveTextContent("0:waiting");
     advance(board);
     advance(board);
     advance(board);
-    expect(hold()).toHaveTextContent("4:waiting");
+    // Three goals of 4 have landed; the fourth's line still stands.
+    expect(hold()).toHaveTextContent("12:waiting");
     advance(MOMENT_TIMING.line);
     expect(hold()).toHaveTextContent("0:clear");
   });
@@ -277,7 +299,7 @@ describe("the hold played out by the GOL layer", () => {
     const { rerender } = render(
       <Page batch={{ id: 1, items: [counted("a", 4), counted("b", 5)] }} />,
     );
-    expect(hold()).toHaveTextContent("9:waiting");
+    expect(hold()).toHaveTextContent("0:waiting");
     vi.stubGlobal("matchMedia", (query: string) => ({
       matches: query === "(prefers-reduced-motion: reduce)",
       media: query,
@@ -287,5 +309,93 @@ describe("the hold played out by the GOL layer", () => {
     rerender(<Page batch={{ id: 2, items: [counted("c", 6)] }} />);
     expect(hold()).toHaveTextContent("0:clear");
     expect(document.querySelector("[data-goal-still]")).not.toBeNull();
+  });
+});
+
+describe("the read a page draws", () => {
+  function Drawn({
+    read,
+    waiting,
+    owner = "7",
+  }: {
+    read: { gameweek: number; at: string } | null;
+    waiting: boolean;
+    owner?: string;
+  }) {
+    const drawn = useSettledRead(read, waiting, owner);
+    return <p>{drawn === null ? "none" : drawn.at}</p>;
+  }
+
+  it("is the read from before the board's first moment while it waits, then the newest", () => {
+    const { rerender } = render(<Drawn read={{ gameweek: 11, at: "15:40" }} waiting={false} />);
+    // A read brings a moment: the page keeps drawing the one before until it has landed.
+    rerender(<Drawn read={{ gameweek: 11, at: "15:41" }} waiting />);
+    expect(screen.getByText("15:40")).toBeInTheDocument();
+    rerender(<Drawn read={{ gameweek: 11, at: "15:42" }} waiting />);
+    expect(screen.getByText("15:40")).toBeInTheDocument();
+    rerender(<Drawn read={{ gameweek: 11, at: "15:42" }} waiting={false} />);
+    expect(screen.getByText("15:42")).toBeInTheDocument();
+  });
+
+  it("holds the read that brings a moment from its first render, the hooks chained as a page chains them", () => {
+    function Page({ value }: { value: MemberLive }) {
+      const batch = useBoardMoments(value, 7);
+      const hold = useBoardHold(batch);
+      const drawn = useSettledRead(value.shown, hold.waiting, "7");
+      return <p>{drawn === null ? "none" : drawn.score.source_time}</p>;
+    }
+    const before = live(1, []);
+    const { rerender } = render(<Page value={before} />);
+    const goal = {
+      key: "2:goal:9",
+      kind: "goal" as const,
+      size: "big" as const,
+      elementId: 9,
+      name: "Haaland",
+      team: "Man City",
+      position: "FWD" as const,
+      count: 1,
+      multiplier: 1 as const,
+      base: 4,
+      points: 4,
+    };
+    // The read and its moment come in one render, as the live score hands them on.
+    rerender(<Page value={live(2, [], { id: 1, items: [goal] })} />);
+    expect(screen.getByText(before.shown.score.source_time)).toBeInTheDocument();
+  });
+
+  it("keeps the last read through a refused one (null), to hold under the next board", () => {
+    const { rerender } = render(<Drawn read={{ gameweek: 11, at: "15:40" }} waiting={false} />);
+    // Yenile is refused: no card, and the read before is kept.
+    rerender(<Drawn read={null} waiting={false} />);
+    expect(screen.getByText("none")).toBeInTheDocument();
+    // The next read brings a moment: its board plays over the read from before.
+    rerender(<Drawn read={{ gameweek: 11, at: "15:42" }} waiting />);
+    expect(screen.getByText("15:40")).toBeInTheDocument();
+  });
+
+  it("moves on to the read a board came in when its hold ends over a refused read", () => {
+    const { rerender } = render(<Drawn read={{ gameweek: 11, at: "15:40" }} waiting={false} />);
+    // A read brings a moment; Yenile is refused while its board plays, and the board ends.
+    rerender(<Drawn read={{ gameweek: 11, at: "15:41" }} waiting />);
+    rerender(<Drawn read={null} waiting />);
+    rerender(<Drawn read={null} waiting={false} />);
+    // The next read brings another moment: the board plays over 15:41, whose points had landed.
+    rerender(<Drawn read={{ gameweek: 11, at: "15:43" }} waiting />);
+    expect(screen.getByText("15:41")).toBeInTheDocument();
+  });
+
+  it("never draws one member's read on another's page", () => {
+    const { rerender } = render(
+      <Drawn read={{ gameweek: 11, at: "member 7" }} waiting={false} owner="7" />,
+    );
+    rerender(<Drawn read={{ gameweek: 11, at: "member 8" }} waiting owner="8" />);
+    expect(screen.getByText("member 8")).toBeInTheDocument();
+  });
+
+  it("never draws another week's read for this one", () => {
+    const { rerender } = render(<Drawn read={{ gameweek: 10, at: "10" }} waiting={false} />);
+    rerender(<Drawn read={{ gameweek: 11, at: "11" }} waiting />);
+    expect(screen.getByText("11")).toBeInTheDocument();
   });
 });

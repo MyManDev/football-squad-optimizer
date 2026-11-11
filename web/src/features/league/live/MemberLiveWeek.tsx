@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import type { FixturesPayload } from "../../fixtures/types";
 import { MemberLiveScoreCard } from "../../liveScore/MemberLiveScoreCard";
 import type { EntrySquad } from "../types";
@@ -30,35 +28,23 @@ export function MemberLiveWeek({
 export function MemberLiveWeekView({
   squad,
   live,
-  held = 0,
-  waiting = false,
+  brought = 0,
 }: {
   squad: EntrySquad;
+  /** The live week as the page draws it: while the GOL board plays, the read before. */
   live: MemberLive;
-  /** Points the GOL board has still to bring to the score. */
-  held?: number;
-  /** Whether the GOL board has a moment still to land. */
-  waiting?: boolean;
+  /** What the GOL board's moments that have landed brought to that read's score. */
+  brought?: number;
 }) {
   const { shown, refreshing, refresh } = live;
-  // While the board brings a read's moments, the card's lists (the players, the captain, the
-  // substitutions) stay as the read before left them, so nothing moves under the board; they
-  // take the new read once its points have landed.
-  const [settled, setSettled] = useState(shown);
-  if (!waiting && shown !== settled) setSettled(shown);
   if (shown === null) return null;
-  const lists =
-    waiting && settled !== null && settled !== shown && settled.gameweek === shown.gameweek
-      ? { score: settled.score, activity: settled.activity }
-      : undefined;
   return (
     <MemberLiveScoreCard
       key={`${squad.entry.entry_id}:${squad.season}:${shown.gameweek}`}
       entryId={squad.entry.entry_id}
-      held={held}
+      brought={brought}
       gameweek={shown.gameweek}
       score={shown.score}
-      lists={lists}
       forecast={shown.forecast}
       names={shown.names}
       onRefresh={refresh}
