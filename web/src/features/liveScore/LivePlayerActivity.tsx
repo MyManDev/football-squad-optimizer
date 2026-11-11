@@ -10,11 +10,19 @@ export function LivePlayerActivity({
   sourceTime,
   players,
   names,
+  counted = null,
 }: {
   identity: string;
   sourceTime: string;
   players: readonly PlayerActivity[] | null;
   names: ReadonlyMap<number, string>;
+  /**
+   * The picks whose points count (the official scorer's), the only ones listed: a reserve not
+   * brought on is left out, and under the bench boost the bench counts (the owner's word of
+   * 2026-11-11). Every pick's events are still followed, so a reserve brought on later does
+   * not flash an old goal as new. Null lists every pick.
+   */
+  counted?: ReadonlySet<number> | null;
 }) {
   const { language } = useLanguage();
   const [history, setHistory] = useState<ActivityHistory | null>(null);
@@ -37,7 +45,9 @@ export function LivePlayerActivity({
   }, [highlights, identity]);
   if (players === null) return null;
   const shown = players.filter(
-    (player) => player.matchInProgress || player.goals > 0 || player.assists > 0,
+    (player) =>
+      (counted === null || counted.has(player.elementId)) &&
+      (player.matchInProgress || player.goals > 0 || player.assists > 0),
   );
   if (shown.length === 0 || shown.some((player) => !names.get(player.elementId)?.trim()))
     return null;

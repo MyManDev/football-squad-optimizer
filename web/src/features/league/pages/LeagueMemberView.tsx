@@ -246,7 +246,13 @@ function LeagueMemberContent({
     : board === null
       ? null
       : { id: `live:${board.id}`, items: board.items };
-  const goalMoments = <GoalMomentLayer batch={goalBatch} onLanded={hold.landed} />;
+  const goalMoments = (
+    <GoalMomentLayer
+      batch={goalBatch}
+      source={replaying ? "replay" : "live"}
+      onLanded={hold.landed}
+    />
+  );
   const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.

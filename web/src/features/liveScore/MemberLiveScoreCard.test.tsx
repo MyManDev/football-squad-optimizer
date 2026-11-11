@@ -6,6 +6,7 @@ import { AS_A_CAVEAT, AS_A_CHANCE } from "../../testSupport/honesty";
 import { MemberLiveScoreCard } from "./MemberLiveScoreCard";
 import { scoreMemberWeek, type LiveWeekScore } from "./officialScoring";
 import vectors from "./officialScoring.vectors.json";
+import type { PlayerActivity } from "./playerActivity";
 
 afterEach(cleanup);
 const names = new Map(Array.from({ length: 15 }, (_, index) => [index + 1, `Player ${index + 1}`]));
@@ -132,5 +133,38 @@ describe("the live score beside the GOL board", () => {
     cleanup();
     show(now, "tr");
     expect(screen.getByText("Player 12")).toBeInTheDocument();
+  });
+});
+
+describe("the players' strip", () => {
+  /** A starter and a reserve who both scored, the reserve's match still being played. */
+  const scorers = (starter: number, reserve: number): PlayerActivity[] =>
+    [starter, reserve].map((elementId) => ({
+      elementId,
+      matchInProgress: elementId === reserve,
+      goals: 1,
+      assists: 0,
+      appearances: [{ element_id: elementId, fixture_id: 1, minutes: 60, goals: 1, assists: 0 }],
+    }));
+  const strip = () => screen.queryByRole("list", { name: "Oyuncular" });
+
+  it("leaves out a reserve the scorer does not count, goal and all", () => {
+    const score = result("normal-week");
+    if (score.refused) throw new Error(score.reason);
+    const reserve = 12;
+    expect(score.counted).not.toContain(reserve);
+    show(score, "tr", { activity: scorers(1, reserve) });
+    expect(strip()).toHaveTextContent("Player 1");
+    expect(strip()).not.toHaveTextContent(`Player ${reserve}`);
+  });
+
+  it("lists the bench under the bench boost, as the scorer counts it", () => {
+    const score = result("bench-boost");
+    if (score.refused) throw new Error(score.reason);
+    const reserve = 12;
+    expect(score.counted).toContain(reserve);
+    show(score, "tr", { activity: scorers(1, reserve) });
+    expect(strip()).toHaveTextContent("Player 1");
+    expect(strip()).toHaveTextContent(`Player ${reserve}`);
   });
 });

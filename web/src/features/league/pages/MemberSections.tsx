@@ -111,7 +111,7 @@ export function MemberSections({ closed = false }: { closed?: boolean } = {}) {
   return (
     <div className={styles.sections} data-shown={shown || undefined}>
       {found.length > 0 ? (
-        <nav className={styles.sectionsBar} aria-label={copy.sectionsLabel}>
+        <nav className={styles.sectionsBar} aria-label={copy.sectionsLabel} data-pinned-strip>
           {found.map((key) => (
             <a
               key={key}
