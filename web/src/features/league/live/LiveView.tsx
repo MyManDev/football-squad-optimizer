@@ -11,9 +11,8 @@
  * the document as on the screen. Display only: every number comes scored from the page.
  */
 
-import { useId, useState, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
-import { useShellLayout } from "../../../design/shell/layout";
 import { useLanguage } from "../../../i18n/context";
 import { ClubShirt } from "../components/ClubShirt";
 import { BoardArrow, DisclosureIcon } from "../components/memberIcons";
@@ -32,6 +31,12 @@ import styles from "./LivePage.module.css";
 
 type Copy = ReturnType<typeof useLanguage>["messages"];
 
+/** The duel of the rival chosen before, kept out of sight while the next one is read. */
+export interface HeldDuel {
+  duel: LiveDuel;
+  rivalNet: number;
+}
+
 /** The rival side as the page has it: who, the choices, and the duel once both are scored. */
 export interface LiveRivalView {
   choices: readonly RivalChoice[];
@@ -40,6 +45,8 @@ export interface LiveRivalView {
   name: string | null;
   board: LiveBoard | null;
   duel: LiveDuel | null;
+  /** The previous rival's duel while this one's is read, so nothing below it jumps. */
+  pending: HeldDuel | null;
   /** The league is head-to-head. */
   headToHead: boolean;
   /** The rival is the member's opponent of the live week. */
@@ -102,6 +109,8 @@ export interface LiveViewProps {
   onRefresh: () => void;
   /** Two columns, from 1024 px. */
   wide: boolean;
+  differentialsOpen: boolean;
+  onDifferentialsToggle: (open: boolean) => void;
 }
 
 /** The board itself, under the heading. */
@@ -123,14 +132,17 @@ export function LiveView(props: LiveViewProps) {
         team={props.team}
       />
     );
+  const shownDuel = rival?.duel ?? rival?.pending?.duel ?? null;
   const differentials =
-    rival?.duel != null ? (
+    rival !== null && shownDuel !== null ? (
       <Differentials
-        duel={rival.duel}
+        duel={shownDuel}
+        pending={rival.duel === null}
         own={props.own}
         team={props.team}
         rival={rival}
-        wide={wide}
+        open={props.differentialsOpen}
+        onToggle={props.onDifferentialsToggle}
       />
     ) : null;
   return wide ? (
@@ -518,8 +530,10 @@ function RivalBlock({
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   const id = useId();
-  const duel = rival.duel;
-  const rivalNet = rival.board?.net ?? null;
+  // The new rival's duel, or the last one kept out of sight while it is read.
+  const pending = rival.duel === null ? rival.pending : null;
+  const duel = rival.duel ?? pending?.duel ?? null;
+  const rivalNet = rival.board?.net ?? pending?.rivalNet ?? null;
   // The duel reads the member's score as Canlı puan shows it, until the board's points land.
   const margin = duel === null ? 0 : duel.margin - held;
   const totalGap = duel?.totalGap == null ? null : duel.totalGap - held;
@@ -551,7 +565,11 @@ function RivalBlock({
         ) : null}
       </div>
       {duel !== null && rivalNet !== null ? (
-        <>
+        <div
+          className={styles.duel}
+          data-pending={pending !== null || undefined}
+          aria-hidden={pending !== null || undefined}
+        >
           <p className={styles.status}>
             <strong>{copy.status[duelStatus(margin)]}</strong>
             {" · "}
@@ -580,7 +598,7 @@ function RivalBlock({
               </div>
             ) : null}
           </dl>
-        </>
+        </div>
       ) : null}
     </section>
   );
@@ -631,49 +649,65 @@ function SwingList({
   );
 }
 
+/**
+ * Farklar, open or closed as the member last left it (the page keeps that choice across a
+ * rival's change); while the next rival is read, the last one's lists hold their place out
+ * of sight.
+ */
 function Differentials({
   duel,
+  pending,
   own,
   team,
   rival,
-  wide,
+  open,
+  onToggle,
 }: {
   duel: LiveDuel;
+  pending: boolean;
   own: boolean;
   team: string;
   rival: LiveRivalView;
-  wide: boolean;
+  open: boolean;
+  onToggle: (open: boolean) => void;
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
-  // Closed on a phone, open on a tablet and beside the page; the member's own choice then stands.
-  const layout = useShellLayout();
-  const [open, setOpen] = useState(wide || layout !== "phone");
   return (
     <details
       className={styles.differentials}
       open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onToggle={(event) => {
+        if (event.currentTarget.open !== open) onToggle(event.currentTarget.open);
+      }}
       data-live-differentials
     >
       <summary className={styles.summary}>
         <DisclosureIcon className={styles.disclosure} />
         <span>{copy.differentials}</span>
-        <span className={styles.groupCount}>
-          {wholePoints(duel.yours.length + duel.theirs.length, locale)}
-        </span>
+        {pending ? null : (
+          <span className={styles.groupCount}>
+            {wholePoints(duel.yours.length + duel.theirs.length, locale)}
+          </span>
+        )}
       </summary>
-      <div className={styles.swingColumns}>
-        <SwingList title={own ? copy.yours : team} swings={duel.yours} side="member" />
-        <SwingList
-          title={own ? copy.theirs : (rival.name ?? copy.rival)}
-          swings={duel.theirs}
-          side="rival"
-        />
+      <div
+        className={styles.swingBody}
+        data-pending={pending || undefined}
+        aria-hidden={pending || undefined}
+      >
+        <div className={styles.swingColumns}>
+          <SwingList title={own ? copy.yours : team} swings={duel.yours} side="member" />
+          <SwingList
+            title={own ? copy.theirs : (rival.name ?? copy.rival)}
+            swings={duel.theirs}
+            side="rival"
+          />
+        </div>
+        <p className={styles.shared}>
+          {copy.shared} · {copy.players(duel.shared)}
+        </p>
       </div>
-      <p className={styles.shared}>
-        {copy.shared} · {copy.players(duel.shared)}
-      </p>
     </details>
   );
 }

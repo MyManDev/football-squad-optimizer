@@ -30,6 +30,7 @@ import {
 import { useParams, useSearchParams } from "react-router";
 
 import { recordUsage } from "../../../data/usage";
+import { useShellLayout } from "../../../design/shell/layout";
 import { useLanguage } from "../../../i18n/context";
 import { useFixtures } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
@@ -64,7 +65,7 @@ import {
   type LiveForwarder,
 } from "./liveSources";
 import styles from "./LivePage.module.css";
-import { LiveHeader, LiveState, LiveView, type LiveRivalView } from "./LiveView";
+import { LiveHeader, LiveState, LiveView, type HeldDuel, type LiveRivalView } from "./LiveView";
 import { useBoardHold, useBoardMoments } from "./useBoardMoments";
 import { useGoalReplay } from "./useGoalReplay";
 import { useLiveWindow } from "./useLiveWindow";
@@ -326,6 +327,12 @@ function LiveMember({
         : null,
     [board, rivalBoard, classic, totals],
   );
+  // The last duel drawn holds its place, out of sight, while the next rival's bundle is read.
+  const [kept, setKept] = useState<HeldDuel | null>(null);
+  if (duel !== null && rivalBoard !== null && kept?.duel !== duel) {
+    setKept({ duel, rivalNet: rivalBoard.net });
+  }
+  const pending = duel === null && rivalId !== null && rivalBundle.isFetching ? kept : null;
 
   const claimed = useClaimedEntry(leagueId);
   const gameweek = board?.gameweek ?? week;
@@ -359,6 +366,7 @@ function LiveMember({
                   name: choices.find((choice) => choice.entryId === rivalId)?.name ?? null,
                   board: rivalBoard,
                   duel,
+                  pending,
                   headToHead,
                   opponent: rivalId !== null && rivalId === opponent.data?.entryId,
                   onSelect: (next) =>
@@ -443,6 +451,10 @@ function LiveShown({
     refresh();
   }, [look, refresh]);
 
+  // Farklar: closed on a phone, open on a tablet and beside the page, until the member opens
+  // or closes it; that choice then stands, through a change of rival too.
+  const layout = useShellLayout();
+  const [open, setOpen] = useState<boolean | null>(null);
   return (
     <LiveView
       team={team}
@@ -455,6 +467,8 @@ function LiveShown({
       refreshing={refreshing}
       onRefresh={onRefresh}
       wide={wide}
+      differentialsOpen={open ?? (wide || layout !== "phone")}
+      onDifferentialsToggle={setOpen}
     />
   );
 }

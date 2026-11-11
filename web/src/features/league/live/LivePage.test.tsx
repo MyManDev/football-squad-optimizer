@@ -19,6 +19,7 @@ import {
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
+import { PHONE_QUERY } from "../../../design/shell/layout";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import { testActivity, testPicks, testWeek, TEST_WEEK } from "../../../testSupport/liveWeek";
 import { FIXTURES_QUERY } from "../../fixtures/data";
@@ -39,7 +40,22 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   sessionStorage.clear();
+  delete (window as { matchMedia?: unknown }).matchMedia;
 });
+
+/** The screen as media queries answer it: `matching` holds and no other query does. */
+function screenWhere(matching: string) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      media: query,
+      matches: query === matching,
+      addEventListener() {},
+      removeEventListener() {},
+    }),
+  });
+}
 
 const copy = MESSAGES.tr;
 const ENTRY = 35249001;
@@ -486,22 +502,9 @@ describe("the GOL board on LIVE", () => {
 });
 
 describe("the heading", () => {
-  afterEach(() => {
-    delete (window as { matchMedia?: unknown }).matchMedia;
-  });
-
   it("keeps the heading the shell focused while the squad, the read and the board arrive beside the page", async () => {
     // From 1024 px the page stands in two columns.
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      writable: true,
-      value: (query: string) => ({
-        media: query,
-        matches: query === WIDE_QUERY,
-        addEventListener() {},
-        removeEventListener() {},
-      }),
-    });
+    screenWhere(WIDE_QUERY);
     const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))]);
     renderLive({ forwarder });
     // The shell focuses the page's heading on arrival, before anything below it is read.
@@ -574,5 +577,46 @@ describe("the week and the rival", () => {
     await vi.waitFor(() =>
       expect(forwarder.entryBundle.mock.calls.map(([entryId]) => entryId)).toContain(35249005),
     );
+  });
+
+  it("keeps Farklar as the member left it and the duel's place while the next rival is read", async () => {
+    screenWhere(PHONE_QUERY);
+    const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))]);
+    // The next rival's bundle is answered when the test lets it go.
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const read = forwarder.entryBundle.getMockImplementation()!;
+    forwarder.entryBundle.mockImplementation(async (entryId: number) => {
+      if (entryId === 35249005) await gate;
+      return read(entryId);
+    });
+    const { user } = renderLive({ forwarder });
+    await rows();
+    const differentials = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLDetailsElement>("[data-live-differentials]");
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    // Closed on a phone, until the member opens it.
+    expect(differentials.open).toBe(false);
+    await user.click(within(differentials).getByText(copy.live.differentials));
+    expect(differentials.open).toBe(true);
+    const block = document.querySelector("[data-live-rival]")!;
+    const height = block.querySelectorAll("p, dl, [aria-hidden]").length;
+    await user.selectOptions(screen.getByRole("combobox", { name: copy.live.rival }), "35249005");
+    // The last duel holds its place out of sight; Farklar stays open, its lists unseen.
+    const held = block.querySelector("[data-pending]");
+    expect(held).toHaveAttribute("aria-hidden", "true");
+    expect(block.querySelectorAll("p, dl, [aria-hidden]").length).toBe(height + 1);
+    expect(document.querySelector("[data-live-differentials]")).toBe(differentials);
+    expect(differentials.open).toBe(true);
+    expect(differentials.querySelector("[data-pending]")).toHaveAttribute("aria-hidden", "true");
+    release();
+    await vi.waitFor(() => expect(document.querySelector("[data-pending]")).toBeNull());
+    expect(block).toHaveTextContent(copy.live.margin);
+    expect(document.querySelector("[data-live-differentials]")).toBe(differentials);
+    expect(differentials.open).toBe(true);
   });
 });
