@@ -219,6 +219,44 @@ describe("a member page whose gameweek has closed", () => {
   });
 });
 
+describe("the plan under LIVE WEEK", () => {
+  /** The plan's details, drawn under the squad (AdviceDetails' holder, by its class here). */
+  const details = () => [...document.querySelectorAll(".details")];
+
+  it.each(["tr", "en"] as const)(
+    "draws the closed week's plan neither as the decision nor as its details (%s)",
+    async (language) => {
+      const copy = MESSAGES[language].leagueMembers;
+      // The open week draws the plan's board and its details.
+      renderView(null, language);
+      await screen.findByText(copy.squadAfterTitle);
+      expect(details().length).toBeGreaterThan(0);
+      cleanup();
+
+      renderView(DEADLINE, language);
+      await screen.findByRole("heading", { name: copy.liveWeek });
+      expect(screen.getByRole("heading", { name: copy.memberSquad })).toBeInTheDocument();
+      expect(screen.queryByText(copy.squadAfterTitle)).toBeNull();
+      expect(details()).toEqual([]);
+      expect(screen.queryByTestId("new-information-notice")).toBeNull();
+    },
+  );
+
+  it.each(["tr", "en"] as const)(
+    "says nothing is being read for the plan it does not draw (%s)",
+    (language) => {
+      const copy = MESSAGES[language].leagueMembers;
+      renderView(DEADLINE, language, "", { adviceLoading: true });
+      expect(screen.getByRole("heading", { name: copy.liveWeek })).toBeInTheDocument();
+      expect(screen.queryByText(copy.loadingAdvice)).toBeNull();
+      cleanup();
+      // The open week says so while its plan is read.
+      renderView(null, language, "", { adviceLoading: true });
+      expect(screen.getByText(copy.loadingAdvice)).toBeInTheDocument();
+    },
+  );
+});
+
 describe("a closed week on a device menu", () => {
   it.each(["tr", "en"] as const)(
     "shows no card about a publication that never happens, and no default-plan link (%s)",

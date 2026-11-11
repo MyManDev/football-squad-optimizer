@@ -550,7 +550,7 @@ function LeagueMemberContent({
           {/* A phone's one column is long: the strip keeps its two parts a tap away, pinned
             under the phone bar once the decision has been read past. Wider layouts pin the
             top bar instead and show more of the page at once. */}
-          {layout === "phone" ? <MemberSections /> : null}
+          {layout === "phone" ? <MemberSections closed={closed} /> : null}
 
           {deadlinePassed !== null ? (
             <p className={styles.deadlineNotice} role="status" data-testid="deadline-passed">
@@ -615,10 +615,11 @@ function LeagueMemberContent({
                 </div>
                 {layout === "phone" ? null : apply}
               </div>
-              {adviceLoading ? (
-                <EmptyState title={copy.loadingAdvice} />
-              ) : rivalsLoading ? (
-                <EmptyState title={copy.loadingRivals} />
+              {/* Under LIVE WEEK nothing waits on the plan, which is not drawn there. */}
+              {adviceLoading || rivalsLoading ? (
+                closed ? null : (
+                  <EmptyState title={adviceLoading ? copy.loadingAdvice : copy.loadingRivals} />
+                )
               ) : shown ? (
                 // Under LIVE WEEK the closed week's plan is not drawn: the week being played is.
                 closed ? null : (
