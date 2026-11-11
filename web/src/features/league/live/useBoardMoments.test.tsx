@@ -1,11 +1,19 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import type { BoardMoment } from "../../liveScore/boardMoments";
+import { GoalMomentLayer } from "../../liveScore/GoalMoment";
+import { MOMENT_TIMING } from "../../liveScore/goalMomentTiming";
 import type { MemberLiveScore } from "./memberLiveScore";
 import { useBoardHold, useBoardMoments, type BoardBatch } from "./useBoardMoments";
 import type { MemberLive } from "./useMemberLiveScore";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 const NAMES = new Map([
   [4, "Saka"],
@@ -153,5 +161,113 @@ describe("the live score's hold", () => {
     screen.getByRole("button").click();
     rerender(<Waiting land="b" />);
     expect(screen.getByRole("button")).toHaveTextContent("clear");
+  });
+
+  it("waits for a substitution's board and a card's line too, holding no points for them", () => {
+    const card = { ...goal("card", null), kind: "card" as const, size: "small" as const };
+    const swap = {
+      key: "swap",
+      kind: "substitution" as const,
+      size: "big" as const,
+      out: "Rogers",
+      in: "Cherki",
+    };
+    const batch = { id: 1, items: [swap, card] };
+    function Waiting({ land }: { land: string }) {
+      const { held, waiting, landed } = useBoardHold(batch);
+      return (
+        <button type="button" onClick={() => landed(land)}>
+          {`${held}:${waiting ? "waiting" : "clear"}`}
+        </button>
+      );
+    }
+    const { rerender } = render(<Waiting land="swap" />);
+    expect(screen.getByRole("button")).toHaveTextContent("0:waiting");
+    screen.getByRole("button").click();
+    rerender(<Waiting land="card" />);
+    expect(screen.getByRole("button")).toHaveTextContent("0:waiting");
+    screen.getByRole("button").click();
+    rerender(<Waiting land="card" />);
+    expect(screen.getByRole("button")).toHaveTextContent("0:clear");
+  });
+});
+
+describe("the hold played out by the GOL layer", () => {
+  const counted = (key: string, points: number, size: "big" | "small" = "big"): BoardMoment => ({
+    key,
+    kind: "goal",
+    size,
+    elementId: 9,
+    name: "Haaland",
+    team: "Man City",
+    position: "FWD",
+    count: 1,
+    multiplier: 1,
+    base: points,
+    points,
+  });
+  const SWAP: BoardMoment = {
+    key: "swap",
+    kind: "substitution",
+    size: "big",
+    out: "Rogers",
+    in: "Cherki",
+  };
+  function Page({ batch }: { batch: BoardBatch }) {
+    const hold = useBoardHold(batch);
+    return (
+      <LanguageProvider initialLanguage="tr">
+        <GoalMomentLayer
+          batch={{ id: `live:${batch.id}`, items: batch.items }}
+          onLanded={hold.landed}
+        />
+        <output data-testid="hold">{`${hold.held}:${hold.waiting ? "waiting" : "clear"}`}</output>
+      </LanguageProvider>
+    );
+  }
+  const hold = () => screen.getByTestId("hold");
+  const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+  const board = MOMENT_TIMING.rise + MOMENT_TIMING.holdGoal;
+
+  it("lets go of a read's four counted goals once the three boards and the fourth's line have gone", () => {
+    vi.useFakeTimers();
+    // A read's fourth counted moment plays as a small line (liveMoments keeps three boards).
+    const batch = {
+      id: 1,
+      items: [counted("a", 4), counted("b", 4), counted("c", 4), counted("d", 4, "small")],
+    };
+    render(<Page batch={batch} />);
+    expect(hold()).toHaveTextContent("16:waiting");
+    advance(board);
+    advance(board);
+    advance(board);
+    expect(hold()).toHaveTextContent("4:waiting");
+    advance(MOMENT_TIMING.line);
+    expect(hold()).toHaveTextContent("0:clear");
+  });
+
+  it("waits while a substitution's board stands, and not once it has gone", () => {
+    vi.useFakeTimers();
+    render(<Page batch={{ id: 1, items: [SWAP] }} />);
+    expect(hold()).toHaveTextContent("0:waiting");
+    advance(MOMENT_TIMING.rise + MOMENT_TIMING.holdAssist);
+    expect(hold()).toHaveTextContent("0:clear");
+  });
+
+  it("holds nothing once reduced motion is turned on and the next read comes as a still line", () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <Page batch={{ id: 1, items: [counted("a", 4), counted("b", 5)] }} />,
+    );
+    expect(hold()).toHaveTextContent("9:waiting");
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    rerender(<Page batch={{ id: 2, items: [counted("c", 6)] }} />);
+    expect(hold()).toHaveTextContent("0:clear");
+    expect(document.querySelector("[data-goal-still]")).not.toBeNull();
   });
 });

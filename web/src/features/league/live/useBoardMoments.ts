@@ -9,7 +9,7 @@ import { useCallback, useState } from "react";
 
 import { prefersReducedMotion } from "../../../design/motion";
 
-import { newSubstitutions, type BoardMoment } from "../../liveScore/boardMoments";
+import { newSubstitutions, shownOnBoard, type BoardMoment } from "../../liveScore/boardMoments";
 import type { MemberLive } from "./useMemberLiveScore";
 
 export interface BoardBatch {
@@ -71,9 +71,10 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
 }
 
 /**
- * The points the board still has to bring to the live score: each queued moment's, from the
- * read that brought it until its run lands (`landed`). `waiting` says some moment has still to
- * land. Under reduced motion nothing is held.
+ * What the board has still to play out: each moment it shows, from the read that brought it
+ * until it lands (`landed`: a goal's run reaches the score, a substitution's board or a card's
+ * line goes). `held` is the points still on their way to the live score; `waiting` says some
+ * moment has still to land. Under reduced motion nothing is held.
  */
 export function useBoardHold(batch: BoardBatch | null): {
   held: number;
@@ -85,11 +86,15 @@ export function useBoardHold(batch: BoardBatch | null): {
     pending: new Map(),
   });
   if (batch !== null && batch.id !== state.batch) {
-    const pending = new Map(state.pending);
-    if (!prefersReducedMotion()) {
+    // Under reduced motion the layer drops its queue for one still line, so what it held from
+    // earlier moments goes with it: nothing is left waiting for a board that will not play.
+    const still = prefersReducedMotion();
+    const pending = still ? new Map<string, number>() : new Map(state.pending);
+    if (!still) {
+      // The moments the board plays (shownOnBoard), each with the points it brings, if any.
       for (const moment of batch.items) {
-        if (moment.kind === "substitution" || moment.multiplier === 0) continue;
-        if (moment.points !== null && moment.points !== 0) pending.set(moment.key, moment.points);
+        if (!shownOnBoard(moment)) continue;
+        pending.set(moment.key, moment.kind === "substitution" ? 0 : (moment.points ?? 0));
       }
     }
     setState({ batch: batch.id, pending });

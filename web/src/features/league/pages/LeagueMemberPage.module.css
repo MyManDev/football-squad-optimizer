@@ -617,7 +617,10 @@
   letter-spacing: 0.04em;
 }
 
+/* The live light breathes, and a ring grows out of it and fades: both by transform and
+   opacity only, so the light costs the page no style work while the week is played. */
 .liveLight {
+  position: relative;
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -625,21 +628,44 @@
   animation: live-pulse var(--motion-pulse) ease-in-out infinite;
 }
 
+.liveLight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentcolor;
+  animation: live-ring var(--motion-pulse) ease-out infinite;
+}
+
 @keyframes live-pulse {
   0%,
   100% {
     opacity: 1;
-    box-shadow: 0 0 0 0 currentcolor;
   }
   50% {
     opacity: 0.35;
-    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+@keyframes live-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .liveLight {
+  .liveLight,
+  .liveLight::after {
     animation: none;
+  }
+
+  .liveLight::after {
+    display: none;
   }
 }
 

@@ -106,6 +106,7 @@ export function MemberLiveScoreCard({
           onRefresh && (
             <button
               className={styles.refresh}
+              data-live-refresh
               type="button"
               onClick={onRefresh}
               disabled={refreshing}
