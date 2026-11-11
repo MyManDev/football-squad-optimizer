@@ -37,6 +37,9 @@ import { MemberGate } from "./MemberGate";
  * league never asks the forwarder anything, so it opens from the published tree whether
  * the forwarder answers or not.
  */
+/** LIVE's address under a member's. */
+const LIVE_ADDRESS = /\/members\/[^/]+\/live\/?$/;
+
 export function LeagueGate({
   children,
   forwarded,
@@ -72,14 +75,18 @@ export function LeagueGate({
   const queryClient = useQueryClient();
   const claimedEntry = useClaimedEntry(league?.leagueId ?? 0);
   const entryId = claimedEntry !== null ? entryIdInAddress(entryParameter) : null;
+  // LIVE reads fewer of the member's documents, and its rival's FPL bundle rather than his
+  // published squad, so a rival picked there (?duel=) starts nothing here.
+  const live = LIVE_ADDRESS.test(location.pathname);
   const address = new URLSearchParams(location.search);
-  const rival = address.get("rival");
-  const duel = address.get("duel");
+  const rival = live ? null : address.get("rival");
+  const duel = live ? null : address.get("duel");
   useEffect(() => {
     if (league === null) return;
     const rivals = [entryIdInAddress(rival), entryIdInAddress(duel)];
-    prefetchMemberReads(queryClient, createLeagueTree(league), entryId, rivals);
-  }, [league, entryId, rival, duel, queryClient]);
+    const page = live ? "live" : "member";
+    prefetchMemberReads(queryClient, createLeagueTree(league), entryId, rivals, page);
+  }, [league, entryId, rival, duel, live, queryClient]);
   if (parameter === undefined) {
     // The old shape of the address: the current league's version of it, or the form.
     const legacy = current === null ? null : legacyLeagueAddress(location.pathname, current);

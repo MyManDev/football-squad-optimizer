@@ -26,6 +26,7 @@ import { FIXTURES_QUERY } from "../../fixtures/data";
 import type { WeekActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek } from "../../liveScore/weekLive";
 import type { LeagueTree } from "../data";
+import { leagueKeys } from "../queries";
 import type { PublishedLeague } from "../directory";
 import { ForwardedLeagueContext, type ForwardedLeague } from "../forwarded/ForwardedLeagueContext";
 import type { ForwarderResult, LiveReason } from "../forwarder/client";
@@ -194,6 +195,7 @@ function renderLive({
   forwardedLeague = null,
   members = membersScored(TEST_WEEK - 1),
   language = "tr",
+  heldSquad = false,
 }: {
   forwarder: LiveForwarder;
   path?: string;
@@ -202,6 +204,8 @@ function renderLive({
   forwardedLeague?: ForwardedLeague | null;
   members?: ReturnType<typeof membersScored>;
   language?: "tr" | "en";
+  /** The squad is held from ten minutes ago, and the read of it again fails. */
+  heldSquad?: boolean;
 }) {
   const loadTable = vi.fn(async () => ({
     contract_version: "provisional_league_ui_v1" as const,
@@ -211,12 +215,19 @@ function renderLive({
   }));
   const tree = {
     league,
-    entrySquad: vi.fn(async () => page),
+    entrySquad: vi.fn(async () => {
+      if (heldSquad) throw new Error("The squad could not be read.");
+      return page;
+    }),
     members: vi.fn(async () => members),
     entryAdviceIndex: vi.fn(async (entryId: number) => mockEntryAdviceIndex(entryId)),
   } as unknown as LeagueTree;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(FIXTURES_QUERY.queryKey, week.fixtures);
+  if (heldSquad) {
+    const key = leagueKeys.entrySquad(league.leagueId, page.payload.entry.entry_id);
+    client.setQueryData(key, page, { updatedAt: Date.now() - 10 * 60_000 });
+  }
   const element = <LivePage dependencies={{ forwarder, loadTable }} />;
   const user = userEvent.setup(
     vi.isFakeTimers() ? { advanceTimers: vi.advanceTimersByTime.bind(vi) } : {},
@@ -334,6 +345,14 @@ describe("the LIVE page's reads", () => {
     await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(2));
     expect(await rows()).toHaveLength(15);
     expect(screen.getByText(copy.live.updated).querySelector("time")?.dateTime).toBe(time);
+  });
+
+  it("keeps drawing the squad it holds when a later read of it fails", async () => {
+    const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))]);
+    const { tree } = renderLive({ forwarder, heldSquad: true });
+    await vi.waitFor(() => expect(tree.entrySquad).toHaveBeenCalledTimes(1));
+    expect(await rows()).toHaveLength(15);
+    expect(screen.queryByText(copy.leagueMembers.toolEmpty)).toBeNull();
   });
 
   it("says there is nothing here when the first read is not answered", async () => {

@@ -14,6 +14,10 @@
  * address names for both: two more turns for documents whose names the address already gives.
  * They start here too. The one read this adds is a member with no finished week yet, whose
  * history the page does not open; that is the league's first week only.
+ *
+ * LIVE, at the member's address too, reads the member list, the squad and the advice index,
+ * and its rival's FPL bundle, never his published squad: there only those three and the
+ * fixtures start.
  */
 
 import type { QueryClient } from "@tanstack/react-query";
@@ -29,6 +33,8 @@ export function prefetchMemberReads(
   entryId: number | null,
   /** Members the address names beside this one (`?rival=`, `?duel=`); a null names nobody. */
   rivalIds: readonly (number | null)[] = [],
+  /** The page at the address: the member page, or LIVE, which reads fewer documents. */
+  page: "member" | "live" = "member",
 ): void {
   const leagueId = tree.league.leagueId;
   void client.prefetchQuery({
@@ -47,6 +53,10 @@ export function prefetchMemberReads(
     queryFn: () => tree.entryAdviceIndex(entryId),
     ...LEAGUE_READ,
   });
+  if (page === "live") {
+    prefetchFixtures(client);
+    return;
+  }
   void client.prefetchQuery({
     queryKey: leagueKeys.scoreboard(leagueId),
     queryFn: () => tree.scoreboard(),
