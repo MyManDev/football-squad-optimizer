@@ -45,6 +45,9 @@ export interface LiveFixture {
   phase: LivePhase;
   /** His minutes in this fixture, where the read says them. */
   minutes: number | null;
+  /** His goals and assists in this fixture: none where the read has no event detail. */
+  goals: number;
+  assists: number;
 }
 
 export interface LiveRow {
@@ -97,6 +100,8 @@ export interface LiveBoard {
   matchesTotal: number;
   /** Every fixture finished by FPL: the bonus is in, and nothing is left to read. */
   final: boolean;
+  /** The read had event detail: its goals and assists are FPL's, not a read's lack of them. */
+  detailed: boolean;
   /** One of the week's fixtures is being played at the read's source time. */
   inPlay: boolean;
   captain: number | null;
@@ -152,6 +157,22 @@ const byKickoff = (a: LiveFixture, b: LiveFixture) =>
   (instant(a.kickoff) ?? Number.POSITIVE_INFINITY) -
     (instant(b.kickoff) ?? Number.POSITIVE_INFINITY) || a.id - b.id;
 
+/**
+ * What the member's score takes of a pick's points, as the official scorer decides it: none
+ * for a pick it does not count, the armband's two (three under the triple captain) for the
+ * captain it names, else once.
+ */
+export function pickMultiplier(
+  elementId: number,
+  counted: ReadonlySet<number>,
+  captain: number | null,
+  chip: MemberWeek["active_chip"],
+): Multiplier {
+  if (!counted.has(elementId)) return 0;
+  if (elementId !== captain) return 1;
+  return chip === "3xc" ? 3 : 2;
+}
+
 /** The board, or null where the scorer, the table or the calendar cannot score the week. */
 export function liveBoard(input: LiveBoardInput): LiveBoard | null {
   const { live, activity, member, table, fixtures } = input;
@@ -203,12 +224,15 @@ export function liveBoard(input: LiveBoardInput): LiveBoard | null {
             : double
               ? null
               : element.minutes;
+        const detail = appearances.get(`${elementId}:${fixture.id}`);
         return {
           id: fixture.id,
           opponent: calendar.codes.get(opponent) ?? null,
           kickoff: known?.kickoff_utc ?? null,
           phase: phaseOf(fixture, minutes),
           minutes,
+          goals: detail?.goals ?? 0,
+          assists: detail?.assists ?? 0,
         };
       })
       .sort(byKickoff);
@@ -219,20 +243,9 @@ export function liveBoard(input: LiveBoardInput): LiveBoard | null {
       null;
     const started = list.some((fixture) => fixture.phase !== "upcoming");
     const complete = own.length > 0 && own.every((fixture) => fixture.finished);
-    let goals = 0;
-    let assists = 0;
-    for (const fixture of own) {
-      const row = appearances.get(`${elementId}:${fixture.id}`);
-      goals += row?.goals ?? 0;
-      assists += row?.assists ?? 0;
-    }
-    const multiplier: Multiplier = !counted.has(elementId)
-      ? 0
-      : elementId === score.captain
-        ? member.active_chip === "3xc"
-          ? 3
-          : 2
-        : 1;
+    const goals = list.reduce((sum, fixture) => sum + fixture.goals, 0);
+    const assists = list.reduce((sum, fixture) => sum + fixture.assists, 0);
+    const multiplier = pickMultiplier(elementId, counted, score.captain, member.active_chip);
     // A double week's state needs each fixture's minutes; a pick with nothing to show has none.
     const minutesEach = list.map((fixture) => fixture.minutes);
     const quiet = element.minutes === 0 && !element.card_shown && element.points === 0;
@@ -306,6 +319,7 @@ export function liveBoard(input: LiveBoardInput): LiveBoard | null {
     matchesOver: over,
     matchesTotal: live.fixtures.length,
     final: score.bonus_confirmed,
+    detailed: activity !== null,
     inPlay: live.fixtures.some((fixture) => phaseOf(fixture, null) === "playing"),
     captain: score.captain,
     rows,
@@ -318,19 +332,24 @@ export function liveBoard(input: LiveBoardInput): LiveBoard | null {
   };
 }
 
-/** The points a row adds to the member's score, or its own points where it does not count. */
+/** The points a row shows: what the member's score takes, or his own where it takes none. */
 export function rowPoints(row: LiveRow): number {
   return row.points * Math.max(row.multiplier, 1);
 }
 
-/** One row of "Son bakıştan beri": what a newer read added for one pick. */
+/** What a row brings the member's score: his points times its multiplier, none uncounted. */
+export function rowTake(row: LiveRow): number {
+  return row.points * row.multiplier;
+}
+
+/** One row of "Son bakıştan beri": what the reads since the last look brought one pick. */
 export interface RecapItem {
   elementId: number;
   name: string;
   goals: number;
   assists: number;
   card: boolean;
-  /** The change in the row's points, as the row shows them. */
+  /** The change in what the member's score takes of him. */
   change: number;
 }
 
@@ -338,37 +357,116 @@ export interface RecapItem {
 export const RECAP_ROWS = 6;
 
 /**
- * What a newer read of the same member's week changed against the board shown before it:
- * the goals, assists and cards it added and each row's change in points, the biggest first.
- * Nothing for a first read, another member or week, or a read that is not newer.
+ * "Son bakıştan beri" (the owner's word of 2026-11-11: show the players the member gets
+ * points from in that match, a reserve only under the bench boost): what the reads since the
+ * visitor last looked changed in what the member's score takes of each pick, and the goals,
+ * assists and cards of the picks it counts.
+ *
+ * - The change is points times the scorer's multiplier, so a reserve the scorer does not
+ *   count changes nothing, and the read that brings him on adds his points.
+ * - Goals and assists are high-water marks per pick and fixture, as the GOL board keeps
+ *   them: a read without event detail keeps the marks it had, and while no read has had
+ *   detail, the first one that has it is only a starting point.
+ * - Each newer read adds to what is held, pick by pick, until the visitor looks again
+ *   (`lookedAt`); a read that changes nothing leaves it as it was.
  */
-export function liveRecap(previous: LiveBoard | null, next: LiveBoard): RecapItem[] {
-  if (
-    previous === null ||
-    previous.entryId !== next.entryId ||
-    previous.gameweek !== next.gameweek ||
-    !(Date.parse(next.sourceTime) > Date.parse(previous.sourceTime))
-  ) {
-    return [];
-  }
-  const before = new Map(previous.rows.map((row) => [row.elementId, row]));
-  const items: (RecapItem & { pick: number })[] = [];
-  for (const row of next.rows) {
-    const old = before.get(row.elementId);
-    if (old === undefined) continue;
-    const item = {
+export interface LiveRecap {
+  /** The member and week the recap belongs to; another starts afresh. */
+  identity: string;
+  /** The source time of the newest board taken in, in milliseconds. */
+  time: number;
+  /** What the member's score takes of each pick, at the newest board. */
+  takes: ReadonlyMap<number, number>;
+  /** The highest goals and assists seen, keyed `element:fixture:kind`. */
+  counts: ReadonlyMap<string, number>;
+  /** Whether a board taken in had event detail, so `counts` is a starting point. */
+  detailed: boolean;
+  /** The picks a card has been shown to. */
+  cards: ReadonlySet<number>;
+  /** What changed since the last look, by pick. */
+  items: ReadonlyMap<number, RecapItem & { pick: number }>;
+}
+
+/** The recap with `board` taken in: the first board of a member's week is a starting point. */
+export function advanceRecap(recap: LiveRecap | null, board: LiveBoard): LiveRecap {
+  const identity = `${board.entryId}:${board.gameweek}`;
+  const time = Date.parse(board.sourceTime);
+  const same = recap !== null && recap.identity === identity;
+  if (same && !(time > recap.time)) return recap;
+  const takes = new Map<number, number>();
+  const counts = new Map(same ? recap.counts : []);
+  const cards = new Set(same ? recap.cards : []);
+  const items = new Map(same ? recap.items : []);
+  // Goals and assists are counted only against marks a board with detail set.
+  const counting = same && recap.detailed;
+  for (const row of board.rows) {
+    const take = rowTake(row);
+    takes.set(row.elementId, take);
+    let goals = 0;
+    let assists = 0;
+    if (board.detailed) {
+      for (const fixture of row.fixtures) {
+        const goalKey = `${row.elementId}:${fixture.id}:goal`;
+        const assistKey = `${row.elementId}:${fixture.id}:assist`;
+        const seenGoals = counts.get(goalKey) ?? 0;
+        const seenAssists = counts.get(assistKey) ?? 0;
+        if (counting) {
+          goals += Math.max(fixture.goals - seenGoals, 0);
+          assists += Math.max(fixture.assists - seenAssists, 0);
+        }
+        counts.set(goalKey, Math.max(seenGoals, fixture.goals));
+        counts.set(assistKey, Math.max(seenAssists, fixture.assists));
+      }
+    }
+    const card = same && row.card && !cards.has(row.elementId);
+    if (row.card) cards.add(row.elementId);
+    if (!same) continue;
+    const change = take - (recap.takes.get(row.elementId) ?? take);
+    // Only what the member's score takes is told: a pick it does not count tells no event.
+    const told = row.multiplier > 0;
+    if (change === 0 && !(told && (goals > 0 || assists > 0 || card))) continue;
+    const before = items.get(row.elementId);
+    const merged = {
       elementId: row.elementId,
       name: row.name,
-      goals: Math.max(row.goals - old.goals, 0),
-      assists: Math.max(row.assists - old.assists, 0),
-      card: row.card && !old.card,
-      change: rowPoints(row) - rowPoints(old),
       pick: row.pick,
+      goals: (before?.goals ?? 0) + (told ? goals : 0),
+      assists: (before?.assists ?? 0) + (told ? assists : 0),
+      card: (before?.card ?? false) || (told && card),
+      change: (before?.change ?? 0) + change,
     };
-    if (item.goals > 0 || item.assists > 0 || item.card || item.change !== 0) items.push(item);
+    if (merged.change === 0 && merged.goals === 0 && merged.assists === 0 && !merged.card) {
+      items.delete(row.elementId);
+    } else {
+      items.set(row.elementId, merged);
+    }
   }
-  return items
-    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change) || a.pick - b.pick)
+  return {
+    identity,
+    time,
+    takes,
+    counts,
+    detailed: (same && recap.detailed) || board.detailed,
+    cards,
+    items,
+  };
+}
+
+/** The visitor has looked: what the recap holds is told, its marks stay. */
+export function lookedAt(recap: LiveRecap | null): LiveRecap | null {
+  return recap === null || recap.items.size === 0 ? recap : { ...recap, items: new Map() };
+}
+
+/** The recap's rows, the biggest change first, at most `RECAP_ROWS`. */
+export function recapItems(recap: LiveRecap | null): RecapItem[] {
+  if (recap === null) return [];
+  return [...recap.items.values()]
+    .sort(
+      (a, b) =>
+        Math.abs(b.change) - Math.abs(a.change) ||
+        b.goals + b.assists - (a.goals + a.assists) ||
+        a.pick - b.pick,
+    )
     .slice(0, RECAP_ROWS)
     .map(({ pick: _pick, ...item }) => item);
 }

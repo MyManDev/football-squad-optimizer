@@ -341,6 +341,34 @@ describe("the LIVE page's reads", () => {
       expect(screen.getByRole("region", { name: copy.live.sinceLastLook })).toBeInTheDocument(),
     );
   });
+
+  it("holds what changed through a quiet followed read, until the visitor looks again", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
+    const forwarder = fakeForwarder([
+      answered(live("2026-11-21T15:29:00Z")),
+      answered(live("2026-11-21T15:30:00Z", 9, 1)),
+      answered(live("2026-11-21T15:31:00Z", 9, 1)),
+      answered(live("2026-11-21T15:32:00Z", 9, 1)),
+    ]);
+    const { user } = renderLive({ forwarder });
+    await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+    const recap = () => screen.queryByRole("region", { name: copy.live.sinceLastLook });
+    for (const reads of [2, 3]) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(reads));
+    }
+    // The goal stays told after the read that brought nothing.
+    await vi.waitFor(() =>
+      expect(within(recap()!).getByRole("listitem")).toHaveAccessibleName("P4, Gol 1, +6"),
+    );
+    // Yenile is the visitor looking: what was told goes, and the quiet read tells nothing.
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(4));
+    await vi.waitFor(() => expect(recap()).toBeNull());
+  });
 });
 
 describe("the week and the rival", () => {

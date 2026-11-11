@@ -14,7 +14,7 @@
  */
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { recordUsage } from "../../../data/usage";
@@ -31,7 +31,14 @@ import { useClaimedEntry } from "../identity/useLeagueIdentity";
 import { LEAGUE_READ, leagueKeys, useEntrySquad } from "../queries";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { useLeague } from "../useLeague";
-import { liveBoard, liveRecap, type LiveBoard, type RecapItem } from "./liveBoard";
+import {
+  advanceRecap,
+  liveBoard,
+  lookedAt,
+  recapItems,
+  type LiveBoard,
+  type LiveRecap,
+} from "./liveBoard";
 import { liveDuel, seasonTotalBefore } from "./liveDuel";
 import { addressedRival, chooseRival, h2hOpponent, rivalChoices } from "./liveRival";
 import {
@@ -269,17 +276,38 @@ function LiveMember({
       ? liveDuel(board, rivalBoard, classic ? totals : null)
       : null;
 
-  // What the newest read changed against the board shown before it; a board scored again
-  // from the same read keeps the recap it had.
-  const [shown, setShown] = useState<{ board: LiveBoard | null; recap: RecapItem[] }>({
+  // What the reads since the visitor last looked brought the member: each newer board adds
+  // to it, and Yenile or a return to the page (the visitor looking again) clears it.
+  const [told, setTold] = useState<{ board: LiveBoard | null; recap: LiveRecap | null }>({
     board: null,
-    recap: [],
+    recap: null,
   });
-  if (board !== null && board !== shown.board) {
-    const newer =
-      shown.board === null || Date.parse(board.sourceTime) > Date.parse(shown.board.sourceTime);
-    setShown({ board, recap: newer ? liveRecap(shown.board, board) : shown.recap });
+  if (board !== null && board !== told.board) {
+    setTold({ board, recap: advanceRecap(told.recap, board) });
   }
+  const look = useCallback(
+    () => setTold((current) => ({ ...current, recap: lookedAt(current.recap) })),
+    [],
+  );
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") look();
+    };
+    const onShow = (event: PageTransitionEvent) => {
+      if (event.persisted) look();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onShow);
+    };
+  }, [look]);
+  const refresh = live.refresh;
+  const onRefresh = useCallback(() => {
+    look();
+    refresh();
+  }, [look, refresh]);
 
   const claimed = useClaimedEntry(leagueId);
   const team = view.entry.team_name ?? unnamed;
@@ -298,7 +326,7 @@ function LiveMember({
         playing={liveMatch.open}
         state={board !== null ? "board" : loading ? "loading" : "empty"}
         board={board}
-        recap={shown.recap}
+        recap={recapItems(told.recap)}
         own={!standalone && claimed === entryId}
         rival={
           // Drawn once the rival is chosen, so the picker never shows an empty choice first.
@@ -324,7 +352,7 @@ function LiveMember({
               }
         }
         refreshing={live.refreshing}
-        onRefresh={live.refresh}
+        onRefresh={onRefresh}
         wide={wide}
       />
     </>

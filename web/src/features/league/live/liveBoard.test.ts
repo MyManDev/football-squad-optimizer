@@ -9,14 +9,18 @@ import {
   type TestPick,
 } from "../../../testSupport/liveWeek";
 import { MATCH_WINDOW_MS } from "../../liveScore/liveWindow";
+import type { MemberWeek } from "../../liveScore/weekLive";
 import {
+  advanceRecap,
   appearancePoints,
   liveBoard,
-  liveRecap,
+  lookedAt,
   RECAP_ROWS,
+  recapItems,
   rowPoints,
   stateOf,
   type LiveBoard,
+  type LiveRecap,
 } from "./liveBoard";
 
 afterEach(() => vi.useRealTimers());
@@ -255,39 +259,136 @@ describe("what the official scorer counts", () => {
   });
 });
 
-describe("the recap of a newer read", () => {
-  const goal = (sourceTime: string, points: number, goals: number) => {
-    const input = testWeek({ sourceTime, picks: picksWith({ 4: { points, minutes: 40 } }) });
-    return liveBoard({
-      ...input,
-      activity: testActivity(input, { inPlay: [102], goals: { 4: goals } }),
-    })!;
-  };
+describe("Son bakıştan beri", () => {
+  /** A read at `minute` past 15:29 with the picks changed, its goals and assists as given. */
+  function read(
+    minute: number,
+    changes: Record<number, Partial<TestPick>> = {},
+    {
+      member = {},
+      fixtures = testFixtures(),
+      goals = {},
+      assists = {},
+      detail = true,
+    }: {
+      member?: Partial<MemberWeek>;
+      fixtures?: TestFixture[];
+      goals?: Record<number, number>;
+      assists?: Record<number, number>;
+      detail?: boolean;
+    } = {},
+  ): LiveBoard {
+    const sourceTime = new Date(Date.parse("2026-11-21T15:29:00Z") + minute * 60_000).toISOString();
+    const input = testWeek({ sourceTime, picks: picksWith(changes), fixtures, member });
+    const activity = detail ? testActivity(input, { inPlay: [102, 103], goals, assists }) : null;
+    return liveBoard({ ...input, activity })!;
+  }
 
-  it("lists what the newer read added, the biggest change first", () => {
-    const before = goal("2026-11-21T15:30:00Z", 1, 0);
-    const after = goal("2026-11-21T15:31:00Z", 7, 1);
-    expect(liveRecap(before, after)).toEqual([
-      { elementId: 4, name: "P4", goals: 1, assists: 0, card: false, change: 6 },
+  /** The recap after `boards` in turn. */
+  const recapOf = (...boards: LiveBoard[]) =>
+    boards.reduce<LiveRecap | null>((recap, board) => advanceRecap(recap, board), null);
+
+  it("tells what the member's score takes: the captain's goal counts twice", () => {
+    const member = { captain: 4, vice: 7 };
+    const recap = recapOf(
+      read(1, { 4: { points: 1, minutes: 40 } }, { member }),
+      read(2, { 4: { points: 7, minutes: 41 } }, { member, goals: { 4: 1 } }),
+    );
+    expect(recapItems(recap)).toEqual([
+      { elementId: 4, name: "P4", goals: 1, assists: 0, card: false, change: 12 },
     ]);
   });
 
-  it("is empty for a first read, the same read again or an older one", () => {
-    const before = goal("2026-11-21T15:30:00Z", 1, 0);
-    const after = goal("2026-11-21T15:31:00Z", 7, 1);
-    expect(liveRecap(null, after)).toEqual([]);
-    expect(liveRecap(after, after)).toEqual([]);
-    expect(liveRecap(after, before)).toEqual([]);
+  it("tells nothing of a reserve the score does not count, goal or clean sheet", () => {
+    const recap = recapOf(
+      read(1, { 13: { points: 1, minutes: 30 } }),
+      read(2, { 13: { points: 7, minutes: 31 } }, { goals: { 13: 1 } }),
+      read(3, { 13: { points: 11, minutes: 60 } }, { goals: { 13: 1 } }),
+    );
+    expect(recapItems(recap)).toEqual([]);
   });
 
-  it("keeps at most six rows", () => {
+  it("tells a reserve's goal under the bench boost", () => {
+    const member = { active_chip: "bboost" as const };
+    const recap = recapOf(
+      read(1, { 13: { points: 1, minutes: 30 } }, { member }),
+      read(2, { 13: { points: 7, minutes: 31 } }, { member, goals: { 13: 1 } }),
+    );
+    expect(recapItems(recap)).toEqual([
+      { elementId: 13, name: "P13", goals: 1, assists: 0, card: false, change: 6 },
+    ]);
+  });
+
+  it("adds the points of a reserve the read brings on", () => {
+    // Every starter but the forward has played; the defender on the bench scored.
+    const played = Object.fromEntries(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((id) => [id, { points: 2, minutes: 90 }]),
+    );
+    const changes = { ...played, 11: { minutes: 0 }, 13: { points: 7, minutes: 90 } };
+    const over = (finished: boolean) =>
+      testFixtures().map((fixture) => ({
+        ...fixture,
+        finished: fixture.id === 101 || (fixture.id === 102 && finished),
+      }));
+    const before = read(1, changes, { fixtures: over(false), goals: { 13: 1 } });
+    const after = read(2, changes, { fixtures: over(true), goals: { 13: 1 } });
+    expect(after.rows.find((row) => row.elementId === 13)?.autosub).toBe("in");
+    // His goal was not the member's when he scored it; his points are once he comes on.
+    expect(recapItems(recapOf(before, after))).toEqual([
+      { elementId: 13, name: "P13", goals: 0, assists: 0, card: false, change: 7 },
+    ]);
+  });
+
+  it("tells no old goal again after a read without event detail", () => {
+    const scored = { 4: { points: 7, minutes: 40 } };
+    const recap = recapOf(
+      read(1, scored, { goals: { 4: 1 } }),
+      read(2, scored, { detail: false }),
+      read(3, scored, { goals: { 4: 1 } }),
+    );
+    expect(recapItems(recap)).toEqual([]);
+  });
+
+  it("holds what each read brought until the visitor looks again", () => {
+    const first = read(1, { 4: { points: 1, minutes: 40 } });
+    const goal = read(2, { 4: { points: 7, minutes: 41 } }, { goals: { 4: 1 } });
+    const quiet = read(3, { 4: { points: 7, minutes: 42 } }, { goals: { 4: 1 } });
+    const card = read(
+      4,
+      { 4: { points: 7, minutes: 43 }, 6: { points: -1, minutes: 30, card: true } },
+      { goals: { 4: 1 } },
+    );
+    const held = recapOf(first, goal, quiet, card);
+    expect(recapItems(held)).toEqual([
+      { elementId: 4, name: "P4", goals: 1, assists: 0, card: false, change: 6 },
+      { elementId: 6, name: "P6", goals: 0, assists: 0, card: true, change: -1 },
+    ]);
+    // Once looked at, only what a later read brings is told.
+    const assist = read(
+      5,
+      { 4: { points: 10, minutes: 44 }, 6: { points: -1, minutes: 31, card: true } },
+      { goals: { 4: 1 }, assists: { 4: 1 } },
+    );
+    expect(recapItems(advanceRecap(lookedAt(held), assist))).toEqual([
+      { elementId: 4, name: "P4", goals: 0, assists: 1, card: false, change: 3 },
+    ]);
+  });
+
+  it("starts at the first read and takes no read again, nor an older one", () => {
+    const first = read(1, { 4: { points: 1, minutes: 40 } });
+    const later = read(2, { 4: { points: 7, minutes: 41 } }, { goals: { 4: 1 } });
+    expect(recapItems(recapOf(first))).toEqual([]);
+    const recap = recapOf(first, later);
+    expect(advanceRecap(recap, later)).toBe(recap);
+    expect(advanceRecap(recap, first)).toBe(recap);
+  });
+
+  it("shows at most six rows, the biggest change first", () => {
     const changes = Object.fromEntries(
       [1, 2, 3, 4, 5, 6, 7, 8].map((id) => [id, { points: id, minutes: 30 }]),
     );
-    const before = board();
-    const after = board({ picks: picksWith(changes), sourceTime: "2026-11-21T15:31:00Z" });
-    const recap = liveRecap(before, after);
+    const recap = recapItems(recapOf(read(1), read(2, changes)));
     expect(recap).toHaveLength(RECAP_ROWS);
-    expect(recap[0]).toMatchObject({ elementId: 8, change: 8 });
+    expect(recap.map((item) => item.elementId)).toEqual([8, 7, 6, 5, 4, 3]);
   });
 });
