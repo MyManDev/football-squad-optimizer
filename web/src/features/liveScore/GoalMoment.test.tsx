@@ -386,8 +386,8 @@ describe("what the phone test asked of it", () => {
     }
   });
 
-  it("keeps at least the refresh button clear when the head leaves no room above or below", () => {
-    // A phone on its side: 320 high, the phone bar to 56, the card's head from 100 to 200.
+  /** A phone on its side: 320 high, the phone bar to 56, a live card with its Yenile and total. */
+  function sideways(totalTo: number) {
     vi.stubGlobal("innerHeight", 320);
     vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(143);
     const bar = document.createElement("header");
@@ -403,15 +403,90 @@ describe("what the phone test asked of it", () => {
     document.body.append(bar, card);
     card.getBoundingClientRect = () => rect(100, 400);
     button.getBoundingClientRect = () => rect(112, 156);
-    total.getBoundingClientRect = () => rect(170, 200);
+    total.getBoundingClientRect = () => rect(totalTo - 30, totalTo);
+    return () => {
+      bar.remove();
+      card.remove();
+    };
+  }
+  const scale = () => board()!.parentElement!.style.transform;
+
+  it("stands smaller in the largest room the head leaves when no place holds it whole", () => {
+    // The head from 100 to 200: 20 free above it, 96 below it (212 to 308).
+    const remove = sideways(200);
+    try {
+      show([moment()]);
+      expect(top()).toBe("212px");
+      expect(scale()).toBe("scale(0.671)");
+    } finally {
+      remove();
+    }
+  });
+
+  it("keeps at least the refresh button clear when even half its size has no room", () => {
+    // The head from 100 to 250: 46 free below it, under half the board's 143.
+    const remove = sideways(250);
     try {
       show([moment()]);
       // The lowest place on the screen (320 - 143 - 12), below the button.
       expect(top()).toBe("165px");
+      expect(scale()).toBe("");
+    } finally {
+      remove();
+    }
+  });
+
+  it("stands smaller between LIVE's head and its Yenile when neither leaves it room whole", () => {
+    // LIVE on a small phone on its side: the head from 80 to 150, Yenile from 260 to 300.
+    vi.stubGlobal("innerHeight", 320);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(143);
+    const bar = document.createElement("header");
+    bar.setAttribute("data-phone-bar", "");
+    bar.getBoundingClientRect = () => rect(0, 56);
+    const head = document.createElement("section");
+    head.setAttribute("data-live-head", "");
+    const total = document.createElement("span");
+    total.setAttribute("data-live-total", "");
+    head.append(total);
+    const refresh = document.createElement("button");
+    refresh.setAttribute("data-live-refresh", "");
+    document.body.append(bar, head, refresh);
+    head.getBoundingClientRect = () => rect(80, 150);
+    total.getBoundingClientRect = () => rect(110, 150);
+    refresh.getBoundingClientRect = () => rect(260, 300);
+    try {
+      show([moment()]);
+      // The 86 between them (162 to 248) holds the board at 0.601 of its size.
+      expect(top()).toBe("162px");
+      expect(scale()).toBe("scale(0.601)");
     } finally {
       bar.remove();
-      card.remove();
+      head.remove();
+      refresh.remove();
     }
+  });
+
+  it("fits a name too long for its line, so it breaks only after its hyphen", () => {
+    const widths = (name: number) => (element: Element) =>
+      element.hasAttribute("data-board-name") ? name : 0;
+    const real = window.getComputedStyle;
+    vi.spyOn(window, "getComputedStyle").mockImplementation((element, pseudo) =>
+      element instanceof HTMLElement && element.hasAttribute("data-board-name")
+        ? ({ fontSize: "26px" } as CSSStyleDeclaration)
+        : real.call(window, element, pseudo),
+    );
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockImplementation(function (this: Element) {
+      return widths(180)(this);
+    });
+    // "Abdülkerimoğlu-" alone is 240 wide at 26 px.
+    vi.spyOn(Element.prototype, "scrollWidth", "get").mockImplementation(function (this: Element) {
+      return widths(240)(this);
+    });
+    show([moment({ name: "Abdülkerimoğlu-Çağlayangil" })]);
+    const name = board()!.querySelector<HTMLElement>("[data-board-name]")!;
+    expect(name.style.fontSize).toBe("19px");
+    // Its line is free to break again once it is fitted.
+    expect(name.style.overflowWrap).toBe("");
   });
 
   it("stands again inside the screen when the phone turns while it is up", () => {
@@ -882,6 +957,107 @@ describe("what the review of the last round asked of it", () => {
       expect(shout.style.fontSize).toBe("");
     } finally {
       main.remove();
+    }
+  });
+
+  /** A wide screen whose page column starts at `left` (a sidebar beside it), as `move` sets it. */
+  function column(start: number) {
+    vi.stubGlobal("innerWidth", 1280);
+    const main = document.createElement("main");
+    main.id = "main";
+    document.body.append(main);
+    let left = start;
+    main.getBoundingClientRect = () =>
+      ({
+        top: 0,
+        bottom: 800,
+        left,
+        right: 1280,
+        width: 1280 - left,
+        height: 800,
+        x: left,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    return {
+      move: (to: number) => {
+        left = to;
+      },
+      remove: () => main.remove(),
+    };
+  }
+
+  it("stands again when a transition on the page ends, as the sidebar opening moves the column", () => {
+    const page = column(72);
+    try {
+      show([moment()]);
+      const place = board()!.parentElement!;
+      expect(place.style.left).toBe("84px");
+      // The sidebar opens over its transition: no resize, the column moved when it ended.
+      page.move(264);
+      act(() => {
+        document.dispatchEvent(new Event("transitionend"));
+      });
+      expect(place.style.left).toBe("276px");
+    } finally {
+      page.remove();
+    }
+  });
+
+  it("lays a card's line over the page's own column, and again when the column moves", () => {
+    const page = column(240);
+    const card = moment({
+      key: "3:card:4",
+      kind: "card",
+      size: "small",
+      name: "Tavernier",
+      base: null,
+      points: null,
+    });
+    try {
+      render(view({ id: "live:1", items: [card] }, "live"));
+      const line = document.querySelector<HTMLElement>("[data-goal-line]")!;
+      expect(line.style.left).toBe("252px");
+      expect(line.style.right).toBe("12px");
+      page.move(0);
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+      expect(line.style.left).toBe("");
+    } finally {
+      page.remove();
+    }
+  });
+
+  it("runs no points into the total for a stream that brings none, as the replay", () => {
+    const total = document.createElement("span");
+    total.setAttribute("data-live-total", "");
+    document.body.append(total);
+    // Motions that never end: a points chip run into the total would stay on the page.
+    Object.defineProperty(Element.prototype, "animate", {
+      configurable: true,
+      writable: true,
+      value: () =>
+        ({ finished: new Promise(() => undefined), cancel() {} }) as unknown as Animation,
+    });
+    try {
+      const landed = vi.fn();
+      render(
+        <LanguageProvider initialLanguage="tr">
+          <GoalMomentLayer
+            batch={{ id: "replay:1", items: [moment()] }}
+            source="replay"
+            scoring={false}
+            onLanded={landed}
+          />
+        </LanguageProvider>,
+      );
+      fireEvent.click(board()!);
+      expect(landed).toHaveBeenCalledWith(moment().key);
+      expect(document.querySelector("body > span[aria-hidden='true']")).toBeNull();
+    } finally {
+      delete (Element.prototype as { animate?: unknown }).animate;
+      total.remove();
     }
   });
 });

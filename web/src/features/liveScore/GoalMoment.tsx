@@ -84,16 +84,21 @@ const EASE = `cubic-bezier(${MOTION_EASE.join(", ")})`;
 /** The flex gap beside the order (var(--space-2)), and the smallest LED letters. */
 const FIT_GAP = 8;
 const LED_MIN = 30;
+/** The smallest a player's name stands on a board, beside its 26 px. */
+const NAME_MIN = 18;
 
 /** The room a board keeps from the screen's edges, the phone bar and the live score. */
 const EDGE = 12;
+/** The smallest a board stands to fit a short screen: half its size, its words still read. */
+const MIN_SCALE = 0.5;
 
 /**
  * Where a board stands: 38% down the screen, wholly inside it and below the phone bar, and
  * clear of the live score's head (its refresh button and total) while that is in view, so a
- * tap meant for the button reaches it and the points have somewhere to run. Where the head
- * leaves no room above or below, the board keeps at least the refresh button clear. Beside a
- * sidebar it stands over the page's own column, not the middle of the window.
+ * tap meant for the button reaches it and the points have somewhere to run. Where no place
+ * holds it whole beside them, it stands smaller in the largest room they leave, down to half its
+ * size, and failing that keeps at least the refresh button clear. Beside a sidebar it stands
+ * over the page's own column, not the middle of the window.
  */
 function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void {
   if (place === null || board === null) return;
@@ -121,7 +126,7 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
   // A board taller than the room below the bars (a phone on its side) stands smaller, whole.
   const natural = board.offsetHeight;
   const room = view - ceiling - EDGE;
-  const scale = natural > room && natural > 0 ? Math.max(0.5, room / natural) : 1;
+  const scale = natural > room && natural > 0 ? Math.max(MIN_SCALE, room / natural) : 1;
   if (scale < 1) place.style.transform = `scale(${scale.toFixed(3)})`;
   // The board's height on the screen, before any turn of its rise.
   const height = natural * scale;
@@ -149,12 +154,15 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
       if (clear !== undefined) top = clear;
     }
   }
+  // What the board keeps clear while it is in view: the head and every refresh button.
+  const kept: Band[] = head === null ? [] : [head];
   // A refresh button outside the head (LIVE's, under the rival on a phone) is kept clear too,
   // without standing over the head again.
   for (const node of document.querySelectorAll("[data-live-refresh]")) {
-    if (card?.contains(node)) continue;
     const button = node.getBoundingClientRect();
     if (button.height === 0 || button.bottom < 0 || button.top > view) continue;
+    kept.push({ from: button.top, to: button.bottom });
+    if (card?.contains(node)) continue;
     if (!over(top, button.top, button.bottom)) continue;
     const places = [button.bottom + EDGE, button.top - EDGE - height, floor, ceiling];
     const clear = places.find(
@@ -166,7 +174,41 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
     );
     if (clear !== undefined) top = clear;
   }
+  // No place holds the board whole beside them (a small phone on its side): it stands smaller
+  // in the largest room they leave, if that room holds it at half its size or more.
+  if (kept.some((band) => over(top, band.from, band.to))) {
+    const free = largestRoom(ceiling, view - EDGE, kept);
+    const fit = free === null ? 0 : Math.min(scale, (free.to - free.from) / natural);
+    if (free !== null && fit >= MIN_SCALE) {
+      place.style.transform = `scale(${fit.toFixed(3)})`;
+      top = free.from;
+    }
+  }
   place.style.top = `${Math.round(top)}px`;
+}
+
+/** A stretch of the screen from top to bottom. */
+interface Band {
+  from: number;
+  to: number;
+}
+
+/** The tallest stretch between `from` and `to` that none of `kept` (with EDGE round each) covers. */
+function largestRoom(from: number, to: number, kept: readonly Band[]): Band | null {
+  const rooms: Band[] = [];
+  let cursor = from;
+  for (const band of [...kept].sort((a, b) => a.from - b.from)) {
+    rooms.push({ from: cursor, to: Math.min(to, band.from - EDGE) });
+    cursor = Math.max(cursor, band.to + EDGE);
+  }
+  rooms.push({ from: cursor, to });
+  let best: Band | null = null;
+  for (const room of rooms) {
+    if (room.to > room.from && (best === null || room.to - room.from > best.to - best.from)) {
+      best = room;
+    }
+  }
+  return best;
 }
 
 /**
@@ -230,6 +272,25 @@ function fitLed(letters: HTMLElement | null, room: HTMLElement | null, beside: b
     const size = parseFloat(getComputedStyle(letters).fontSize);
     letters.style.fontSize = `${Math.max(LED_MIN, Math.floor((size * free) / letters.scrollWidth))}px`;
   }
+}
+
+/**
+ * Fits each player's name on a board (`data-board-name`) so it breaks only between words or
+ * after a hyphen: a name with a word longer than its line stands smaller, never under
+ * NAME_MIN, and only below that breaks inside the word.
+ */
+function fitNames(board: HTMLElement | null): void {
+  board?.querySelectorAll<HTMLElement>("[data-board-name]").forEach((name) => {
+    name.style.fontSize = "";
+    name.style.overflowWrap = "normal";
+    const free = name.clientWidth;
+    const need = name.scrollWidth;
+    if (free > 0 && need > free) {
+      const size = parseFloat(getComputedStyle(name).fontSize);
+      name.style.fontSize = `${Math.max(NAME_MIN, Math.floor((size * free) / need))}px`;
+    }
+    name.style.overflowWrap = "";
+  });
 }
 
 /**
@@ -594,8 +655,15 @@ function Board({
   const leaving = useRef<(() => void) | null>(null);
   const text = shouted(moment, copy) ?? word(moment, copy);
 
-  // The whole shout fits the board at one size before its letters light.
-  useLayoutEffect(() => fitNowAndOnFonts(() => fitLed(shout.current, head.current, true)), [text]);
+  // The whole shout fits the board at one size before its letters light, and the name its line.
+  useLayoutEffect(
+    () =>
+      fitNowAndOnFonts(() => {
+        fitLed(shout.current, head.current, true);
+        fitNames(board.current);
+      }),
+    [text],
+  );
 
   useLayoutEffect(() => {
     // Where focus was when the board rose, to give it back if a tap or a screen reader put it
@@ -633,7 +701,10 @@ function Board({
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
-    const unplace = keepPlaced(place, board, () => fitLed(shout.current, head.current, true));
+    const unplace = keepPlaced(place, board, () => {
+      fitLed(shout.current, head.current, true);
+      fitNames(board.current);
+    });
     // Risen, the board and its letters let go of their motion: no 3D turn stays on them.
     animate(
       board.current,
@@ -713,7 +784,7 @@ function Board({
           ) : null}
         </span>
         <span className={styles.panel}>
-          <span className={styles.name}>
+          <span className={styles.name} data-board-name>
             {moment.name}
             {moment.multiplier >= 2 ? <span className={styles.captain}>C</span> : null}
           </span>
@@ -760,7 +831,11 @@ function SubstitutionBoard({
   });
   const leaving = useRef<(() => void) | null>(null);
   useLayoutEffect(
-    () => fitNowAndOnFonts(() => fitLed(word.current, head.current, false)),
+    () =>
+      fitNowAndOnFonts(() => {
+        fitLed(word.current, head.current, false);
+        fitNames(board.current);
+      }),
     [copy.substitution],
   );
   useLayoutEffect(() => {
@@ -789,7 +864,10 @@ function SubstitutionBoard({
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
-    const unplace = keepPlaced(place, board, () => fitLed(word.current, head.current, false));
+    const unplace = keepPlaced(place, board, () => {
+      fitLed(word.current, head.current, false);
+      fitNames(board.current);
+    });
     animate(
       board.current,
       [
@@ -830,11 +908,15 @@ function SubstitutionBoard({
         </span>
         <span className={`${styles.panel} ${styles.off}`}>
           <span className={styles.side}>{copy.out}</span>
-          <span className={styles.name}>{moment.out}</span>
+          <span className={styles.name} data-board-name>
+            {moment.out}
+          </span>
         </span>
         <span className={styles.panel}>
           <span className={styles.side}>{copy.in}</span>
-          <span className={styles.name}>{moment.in}</span>
+          <span className={styles.name} data-board-name>
+            {moment.in}
+          </span>
         </span>
       </button>
     </div>
