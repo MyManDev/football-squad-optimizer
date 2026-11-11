@@ -86,10 +86,16 @@ const EDGE = 12;
 /**
  * Where a board stands: 38% down the screen, wholly inside it and below the phone bar, and
  * clear of the live score's head (its refresh button and total) while that is in view, so a
- * tap meant for the button reaches it and the points have somewhere to run.
+ * tap meant for the button reaches it and the points have somewhere to run. Beside a sidebar
+ * it stands over the page's own column, not the middle of the window.
  */
 function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void {
   if (place === null || board === null) return;
+  const column = document.getElementById("main")?.getBoundingClientRect();
+  if (column !== undefined && column.left > EDGE && column.width > 0) {
+    place.style.left = `${Math.round(column.left + EDGE)}px`;
+    place.style.right = `${Math.round(Math.max(EDGE, window.innerWidth - column.right + EDGE))}px`;
+  }
   const view = window.innerHeight;
   // The board's own height, before any turn of its rise.
   const height = board.offsetHeight;
@@ -107,6 +113,40 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
     else if (covers && from - EDGE - height >= ceiling) top = from - EDGE - height;
   }
   place.style.top = `${Math.round(top)}px`;
+}
+
+/**
+ * Fits LED letters to their room at one size, never under the smallest LED size. With
+ * `beside`, the order chip next to the letters keeps its room.
+ */
+function fitLed(letters: HTMLElement | null, room: HTMLElement | null, beside: boolean): void {
+  if (letters === null || room === null) return;
+  letters.style.fontSize = "";
+  const chip = beside ? (letters.nextElementSibling as HTMLElement | null) : null;
+  const free = room.clientWidth - (chip === null ? 0 : chip.offsetWidth + FIT_GAP);
+  if (free > 0 && letters.scrollWidth > free) {
+    const size = parseFloat(getComputedStyle(letters).fontSize);
+    letters.style.fontSize = `${Math.max(LED_MIN, Math.floor((size * free) / letters.scrollWidth))}px`;
+  }
+}
+
+/**
+ * Runs `fit` now and again once the page's fonts have loaded, since a Turkish letter's face
+ * (İ, Ğ, Ş) can arrive after the first fit; the returned cleanup cancels the second run.
+ */
+function fitNowAndOnFonts(fit: () => void): () => void {
+  fit();
+  let mounted = true;
+  // Absent where the page has no font loading (the tests' document).
+  document.fonts?.ready.then(
+    () => {
+      if (mounted) fit();
+    },
+    () => undefined,
+  );
+  return () => {
+    mounted = false;
+  };
 }
 
 /** One moment on its way: its place among the read's big moments. */
@@ -144,7 +184,10 @@ export function GoalMomentLayer({
   onLanded,
 }: {
   batch: Batch | null;
-  /** Told when a moment's points have reached the live score (or will not run there). */
+  /**
+   * Told when a moment has played out: a goal's or assist's points have reached the live score
+   * (or will not run there), a substitution's board or a card's line has gone.
+   */
   onLanded?: (key: string) => void;
 }) {
   const { language, locale } = useLanguage();
@@ -196,6 +239,7 @@ export function GoalMomentLayer({
           key={playing.moment.key}
           moment={playing.moment}
           copy={copy}
+          onLanded={(key) => landed.current?.(key)}
           onDone={next}
         />
       ) : playing.moment.size === "small" ? (
@@ -204,6 +248,7 @@ export function GoalMomentLayer({
           moment={playing.moment}
           copy={copy}
           locale={locale}
+          onLanded={(key) => landed.current?.(key)}
           onDone={next}
         />
       ) : (
@@ -289,18 +334,7 @@ function Board({
   const text = shouted(moment, copy) ?? word(moment, copy);
 
   // The whole shout fits the board at one size before its letters light.
-  useLayoutEffect(() => {
-    const letters = shout.current;
-    const room = head.current;
-    if (letters === null || room === null) return;
-    letters.style.fontSize = "";
-    const beside = letters.nextElementSibling as HTMLElement | null;
-    const free = room.clientWidth - (beside === null ? 0 : beside.offsetWidth + FIT_GAP);
-    if (free > 0 && letters.scrollWidth > free) {
-      const size = parseFloat(getComputedStyle(letters).fontSize);
-      letters.style.fontSize = `${Math.max(LED_MIN, Math.floor((size * free) / letters.scrollWidth))}px`;
-    }
-  }, [text]);
+  useLayoutEffect(() => fitNowAndOnFonts(() => fitLed(shout.current, head.current, true)), [text]);
 
   useLayoutEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -331,6 +365,7 @@ function Board({
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
+    // Risen, the board and its letters let go of their motion: no 3D turn stays on them.
     animate(
       board.current,
       [
@@ -338,11 +373,13 @@ function Board({
         { transform: "perspective(700px) rotateX(0deg)", opacity: 1 },
       ],
       MOMENT_TIMING.rise,
+      { fill: "backwards" },
     );
     shout.current?.querySelectorAll("span").forEach((letter, index) => {
       animate(letter, [{ opacity: 0 }, { opacity: 1 }], MOTION_MS.uiFast, {
         delay: MOMENT_TIMING.rise * 0.75 + index * MOMENT_TIMING.letter,
         easing: "linear",
+        fill: "backwards",
       });
     });
     let hold = moment.kind === "goal" ? MOMENT_TIMING.holdGoal : MOMENT_TIMING.holdAssist;
@@ -425,15 +462,18 @@ function Board({
 /**
  * The fourth official's board as it is meant: DEĞİŞİKLİK in LED letters, the starter going off on
  * the red panel and the reserve coming on on the green one. It rises, stays a step less than a
- * goal's board and goes down by itself, or at once on a tap or Escape.
+ * goal's board and goes down by itself, or at once on a tap or Escape. Once it has gone the
+ * page is told (`onLanded`), so the live card takes the read that brought it.
  */
 function SubstitutionBoard({
   moment,
   copy,
+  onLanded,
   onDone,
 }: {
   moment: SubstitutionMoment;
   copy: Copy;
+  onLanded?: (key: string) => void;
   onDone: () => void;
 }) {
   const place = useRef<HTMLDivElement>(null);
@@ -441,22 +481,22 @@ function SubstitutionBoard({
   const word = useRef<HTMLSpanElement>(null);
   const head = useRef<HTMLSpanElement>(null);
   const done = useRef(onDone);
+  const told = useRef(onLanded);
   useEffect(() => {
     done.current = onDone;
+    told.current = onLanded;
   });
   const leaving = useRef<(() => void) | null>(null);
-  useLayoutEffect(() => {
-    const letters = word.current;
-    const room = head.current;
-    if (letters === null || room === null) return;
-    letters.style.fontSize = "";
-    if (room.clientWidth > 0 && letters.scrollWidth > room.clientWidth) {
-      const size = parseFloat(getComputedStyle(letters).fontSize);
-      letters.style.fontSize = `${Math.max(LED_MIN, Math.floor((size * room.clientWidth) / letters.scrollWidth))}px`;
-    }
-  }, []);
+  useLayoutEffect(
+    () => fitNowAndOnFonts(() => fitLed(word.current, head.current, false)),
+    [copy.substitution],
+  );
   useLayoutEffect(() => {
     let gone = false;
+    const finish = () => {
+      told.current?.(moment.key);
+      done.current();
+    };
     const leave = () => {
       if (gone) return;
       gone = true;
@@ -469,12 +509,8 @@ function SubstitutionBoard({
         ],
         MOMENT_TIMING.fall,
       );
-      if (fall === null) done.current();
-      else
-        fall.finished.then(
-          () => done.current(),
-          () => done.current(),
-        );
+      if (fall === null) finish();
+      else fall.finished.then(finish, finish);
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
@@ -485,6 +521,7 @@ function SubstitutionBoard({
         { transform: "perspective(700px) rotateX(0deg)", opacity: 1 },
       ],
       MOMENT_TIMING.rise,
+      { fill: "backwards" },
     );
     const timer = setTimeout(leave, MOMENT_TIMING.rise + MOMENT_TIMING.holdAssist);
     const onKey = (event: KeyboardEvent) => {
@@ -495,7 +532,7 @@ function SubstitutionBoard({
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
     };
-  }, []);
+  }, [moment.key]);
   return (
     <div ref={place} className={styles.place} data-size="big">
       <button
@@ -585,22 +622,27 @@ function lineText(moment: LiveMoment, copy: Copy, locale: string): string {
   return parts.join(" · ");
 }
 
+/** A card's LED line: it goes after a while, on a tap or on Escape, and then tells the page. */
 function SmallLine({
   moment,
   copy,
   locale,
+  onLanded,
   onDone,
 }: {
   moment: LiveMoment;
   copy: Copy;
   locale: string;
+  onLanded?: (key: string) => void;
   onDone: () => void;
 }) {
   const line = useRef<HTMLDivElement>(null);
   const leaving = useRef<(() => void) | null>(null);
   const done = useRef(onDone);
+  const told = useRef(onLanded);
   useEffect(() => {
     done.current = onDone;
+    told.current = onLanded;
   });
   useLayoutEffect(() => {
     animate(
@@ -610,24 +652,32 @@ function SmallLine({
         { transform: "translateY(0)", opacity: 1 },
       ],
       MOTION_MS.ui,
+      { fill: "backwards" },
     );
     let gone = false;
+    const finish = () => {
+      told.current?.(moment.key);
+      done.current();
+    };
     const leave = () => {
       if (gone) return;
       gone = true;
       clearTimeout(timer);
       const away = animate(line.current, [{ opacity: 1 }, { opacity: 0 }], MOTION_MS.ui);
-      if (away === null) done.current();
-      else
-        away.finished.then(
-          () => done.current(),
-          () => done.current(),
-        );
+      if (away === null) finish();
+      else away.finished.then(finish, finish);
     };
     leaving.current = leave;
     const timer = setTimeout(leave, MOMENT_TIMING.line);
-    return () => clearTimeout(timer);
-  }, []);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") leave();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [moment.key]);
   return (
     <div
       ref={line}
@@ -659,7 +709,14 @@ function StillLine({
   });
   useEffect(() => {
     const timer = setTimeout(() => done.current(), MOMENT_TIMING.still);
-    return () => clearTimeout(timer);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") done.current();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
   return (
     <div className={styles.still} data-goal-still onClick={() => done.current()}>

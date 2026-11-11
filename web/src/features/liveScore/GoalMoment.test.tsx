@@ -387,6 +387,103 @@ describe("what the phone test asked of it", () => {
   });
 });
 
+describe("what the desktop test asked of it", () => {
+  const SWAP: BoardMoment = {
+    key: "2:sub:7:15",
+    kind: "substitution",
+    size: "big",
+    out: "Rogers",
+    in: "Cherki",
+  };
+  const CARD = moment({
+    key: "3:card:4",
+    kind: "card",
+    size: "small",
+    name: "Tavernier",
+    base: null,
+    points: null,
+  });
+
+  it("tells the page when a substitution's board or a card's line has gone", () => {
+    const landed = vi.fn();
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <GoalMomentLayer batch={{ id: "live:1", items: [SWAP, CARD] }} onLanded={landed} />
+      </LanguageProvider>,
+    );
+    fireEvent.click(board()!);
+    expect(landed).toHaveBeenCalledWith(SWAP.key);
+    fireEvent.click(document.querySelector("[data-goal-line]")!);
+    expect(landed).toHaveBeenCalledWith(CARD.key);
+  });
+
+  it("takes a card's line and the still line away on Escape", () => {
+    show([CARD]);
+    expect(document.querySelector("[data-goal-line]")).not.toBeNull();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(document.querySelector("[data-goal-line]")).toBeNull();
+    cleanup();
+    reduceMotion();
+    show([moment()]);
+    expect(document.querySelector("[data-goal-still]")).not.toBeNull();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(document.querySelector("[data-goal-still]")).toBeNull();
+  });
+
+  it("lets go of the rise once it is done, so no 3D turn stays on the board or its letters", () => {
+    const fills: { frames: Keyframe[]; fill: FillMode | undefined }[] = [];
+    Object.defineProperty(HTMLElement.prototype, "animate", {
+      configurable: true,
+      writable: true,
+      value(frames: Keyframe[], options: KeyframeAnimationOptions) {
+        fills.push({ frames, fill: options.fill });
+        return { finished: new Promise(() => undefined) } as unknown as Animation;
+      },
+    });
+    try {
+      show([HAALAND]);
+    } finally {
+      delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
+    }
+    const rise = fills.find(
+      ({ frames }) => frames[0]?.transform === "perspective(700px) rotateX(-90deg)",
+    );
+    expect(rise?.fill).toBe("backwards");
+    const letters = fills.filter(
+      ({ frames }) => frames.length === 2 && frames[0]?.opacity === 0 && !frames[0]?.transform,
+    );
+    expect(letters.length).toBe(GOAL_SHOUT.tr.length);
+    expect(letters.every(({ fill }) => fill === "backwards")).toBe(true);
+  });
+
+  it("stands over the page's own column beside a sidebar, not the middle of the window", () => {
+    vi.stubGlobal("innerWidth", 1280);
+    const main = document.createElement("main");
+    main.id = "main";
+    document.body.append(main);
+    main.getBoundingClientRect = () =>
+      ({
+        top: 0,
+        bottom: 800,
+        left: 240,
+        right: 1280,
+        width: 1040,
+        height: 800,
+        x: 240,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    try {
+      show([moment()]);
+      const place = board()!.parentElement!;
+      expect(place.style.left).toBe("252px");
+      expect(place.style.right).toBe("12px");
+    } finally {
+      main.remove();
+    }
+  });
+});
+
 describe("under reduced motion", () => {
   it("goes on a tap anywhere on the still line", () => {
     reduceMotion();

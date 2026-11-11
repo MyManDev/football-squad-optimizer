@@ -154,4 +154,32 @@ describe("the live score's hold", () => {
     rerender(<Waiting land="b" />);
     expect(screen.getByRole("button")).toHaveTextContent("clear");
   });
+
+  it("waits for a substitution's board and a card's line too, holding no points for them", () => {
+    const card = { ...goal("card", null), kind: "card" as const, size: "small" as const };
+    const swap = {
+      key: "swap",
+      kind: "substitution" as const,
+      size: "big" as const,
+      out: "Rogers",
+      in: "Cherki",
+    };
+    const batch = { id: 1, items: [swap, card] };
+    function Waiting({ land }: { land: string }) {
+      const { held, waiting, landed } = useBoardHold(batch);
+      return (
+        <button type="button" onClick={() => landed(land)}>
+          {`${held}:${waiting ? "waiting" : "clear"}`}
+        </button>
+      );
+    }
+    const { rerender } = render(<Waiting land="swap" />);
+    expect(screen.getByRole("button")).toHaveTextContent("0:waiting");
+    screen.getByRole("button").click();
+    rerender(<Waiting land="card" />);
+    expect(screen.getByRole("button")).toHaveTextContent("0:waiting");
+    screen.getByRole("button").click();
+    rerender(<Waiting land="card" />);
+    expect(screen.getByRole("button")).toHaveTextContent("0:clear");
+  });
 });
