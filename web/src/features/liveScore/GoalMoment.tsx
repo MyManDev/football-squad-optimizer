@@ -254,6 +254,8 @@ interface LayerState {
   stillRevision: number;
   /** What the live region says: the moment playing, kept while a panel holds it back. */
   voice: { key: string | null; text: string };
+  /** Every moment said: each is said once, on a board or on the still line. */
+  said: ReadonlySet<string>;
   /** Moments that will not play (another stream, or turned into the still line), in order. */
   dropped: string[];
 }
@@ -294,18 +296,28 @@ function useReducedMotion(): boolean {
   return prefersReducedMotion();
 }
 
+/** Where focus goes when it was nowhere before a board or line came: the live score's heading. */
+const FOCUS_HOME = "[data-member-live-score] h2, [data-live-head] h2, main h1";
+
 /**
  * Gives focus back where it was before a board or line rose, when it is on the board as it
  * goes (a screen reader's double tap focuses a button even with tabIndex -1), so it never falls
- * to the page's body.
+ * to the page's body: where it was nowhere (a page opened at a replay's address), it goes to the
+ * live score's heading, or the page's.
  */
 function giveBackFocus(owner: HTMLElement | null, before: Element | null): void {
   if (owner === null || !owner.contains(document.activeElement)) return;
   if (before instanceof HTMLElement && before.isConnected && before !== document.body) {
     before.focus({ preventScroll: true });
-  } else {
-    (document.activeElement as HTMLElement | null)?.blur();
+    return;
   }
+  const home = document.querySelector<HTMLElement>(FOCUS_HOME);
+  if (home === null) {
+    (document.activeElement as HTMLElement | null)?.blur();
+    return;
+  }
+  if (!home.hasAttribute("tabindex")) home.setAttribute("tabindex", "-1");
+  home.focus({ preventScroll: true });
 }
 
 export function GoalMomentLayer({
@@ -343,10 +355,26 @@ export function GoalMomentLayer({
     still: null,
     stillRevision: 0,
     voice: { key: null, text: "" },
+    said: new Set(),
     dropped: [],
   });
   // One pass over what changed, settled into one state for this render.
   let next = state;
+  /** The still line's moments not said yet are said, and only they. */
+  const sayOnStill = (moments: BoardMoment[]) => {
+    const fresh = moments.filter((moment) => !next.said.has(moment.key));
+    if (fresh.length === 0) return;
+    const said = new Set(next.said);
+    for (const moment of fresh) said.add(moment.key);
+    next = {
+      ...next,
+      said,
+      voice: {
+        key: `still:${next.stillRevision}`,
+        text: fresh.map((moment) => announcement(moment, copy, locale)).join(". "),
+      },
+    };
+  };
   // The page shows another stream: its queued moments go, and the page is told.
   if (source !== next.source) {
     const gone = next.queue.filter((queued) => queued.source !== source);
@@ -379,6 +407,7 @@ export function GoalMomentLayer({
           stillRevision: items.length > 0 ? next.stillRevision + 1 : next.stillRevision,
         }
       : { ...next, taken, queue: [...next.queue, ...queued], still: null };
+    if (reduce) sayOnStill(items);
   }
   // Reduced motion turned on with moments still queued: they join the still line at once.
   if (reduce && next.queue.length > 0) {
@@ -388,16 +417,21 @@ export function GoalMomentLayer({
       queue: [],
       still: [...(next.still ?? []), ...moments],
       stillRevision: next.stillRevision + 1,
-      voice: { key: null, text: "" },
       dropped: [...next.dropped, ...moments.map((moment) => moment.key)],
     };
+    sayOnStill(moments);
   }
   const playing = clear ? next.queue[0] : undefined;
   // Each moment is said once: when it starts, and not again if a panel held it back.
   if (playing !== undefined && next.voice.key !== playing.moment.key) {
+    const key = playing.moment.key;
     next = {
       ...next,
-      voice: { key: playing.moment.key, text: announcement(playing.moment, copy, locale) },
+      said: new Set(next.said).add(key),
+      voice: {
+        key,
+        text: next.said.has(key) ? next.voice.text : announcement(playing.moment, copy, locale),
+      },
     };
   }
   if (next !== state) setState(next);
@@ -408,16 +442,15 @@ export function GoalMomentLayer({
     told.current = state.dropped.length;
     for (const key of keys) landed.current?.(key);
   }, [state.dropped]);
-  const played = () =>
+  // The moment that played goes by its key: a stream change may have put another at the head
+  // while its board was still falling.
+  const played = (key: string) =>
     setState((current) => ({
       ...current,
-      queue: current.queue.slice(1),
-      voice: { key: null, text: "" },
+      queue: current.queue.filter((queued) => queued.moment.key !== key),
+      voice: current.voice.key === key ? { key: null, text: "" } : current.voice,
     }));
-  const spoken =
-    next.still !== null && clear
-      ? next.still.map((moment) => announcement(moment, copy, locale)).join(". ")
-      : next.voice.text;
+  const spoken = next.voice.text;
   if (typeof document === "undefined") return null;
   return createPortal(
     <div ref={layer} className={styles.layer} lang={language} data-goal-moments>
@@ -430,7 +463,7 @@ export function GoalMomentLayer({
           moment={playing.moment}
           copy={copy}
           onLanded={(key) => landed.current?.(key)}
-          onDone={played}
+          onDone={() => played(playing.moment.key)}
         />
       ) : playing.moment.size === "small" ? (
         <SmallLine
@@ -439,7 +472,7 @@ export function GoalMomentLayer({
           copy={copy}
           locale={locale}
           onLanded={(key) => landed.current?.(key)}
-          onDone={played}
+          onDone={() => played(playing.moment.key)}
         />
       ) : (
         <Board
@@ -448,7 +481,7 @@ export function GoalMomentLayer({
           copy={copy}
           locale={locale}
           onLanded={(key) => landed.current?.(key)}
-          onDone={played}
+          onDone={() => played(playing.moment.key)}
         />
       )}
       {next.still !== null && clear ? (
@@ -457,7 +490,15 @@ export function GoalMomentLayer({
           moments={next.still}
           copy={copy}
           locale={locale}
-          onDone={() => setState((current) => ({ ...current, still: null }))}
+          onDone={() =>
+            setState((current) => ({
+              ...current,
+              still: null,
+              voice: current.voice.key?.startsWith("still:")
+                ? { key: null, text: "" }
+                : current.voice,
+            }))
+          }
         />
       ) : null}
     </div>,

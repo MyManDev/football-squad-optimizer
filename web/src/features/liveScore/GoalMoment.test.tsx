@@ -734,6 +734,158 @@ describe("what the last review asked of it", () => {
   });
 });
 
+describe("what the review of the last round asked of it", () => {
+  type Shown = { id: string; items: BoardMoment[] } | null;
+  const view = (batch: Shown, source: string, landed: (key: string) => void = () => undefined) => (
+    <LanguageProvider initialLanguage="tr">
+      <GoalMomentLayer batch={batch} source={source} onLanded={landed} />
+    </LanguageProvider>
+  );
+  const still = () => document.querySelector("[data-goal-still]");
+  const status = () => screen.getByRole("status");
+
+  it("says only the moments a read adds to the still line, never the ones said before", () => {
+    reduceMotion();
+    const { rerender } = render(
+      view({ id: "live:1", items: [moment({ key: "1:goal:5" })] }, "live"),
+    );
+    expect(status()).toHaveTextContent("Gol: Palmer, +5 puan");
+    rerender(view({ id: "live:2", items: [moment({ key: "2:goal:9", name: "Haaland" })] }, "live"));
+    expect(still()).toHaveTextContent("Palmer");
+    expect(status()).toHaveTextContent("Gol: Haaland, +5 puan");
+    expect(status()).not.toHaveTextContent("Palmer");
+  });
+
+  it("does not say the still line again when a panel over it closes", async () => {
+    reduceMotion();
+    const drawer = document.createElement("div");
+    document.body.append(drawer);
+    try {
+      show([moment()]);
+      const said = "Gol: Palmer, +5 puan";
+      expect(status()).toHaveTextContent(said);
+      await act(async () => {
+        drawer.setAttribute("aria-modal", "true");
+      });
+      expect(still()).toBeNull();
+      expect(status()).toHaveTextContent(said);
+      await act(async () => {
+        drawer.removeAttribute("aria-modal");
+      });
+      expect(still()).not.toBeNull();
+      expect(status()).toHaveTextContent(said);
+    } finally {
+      drawer.remove();
+    }
+  });
+
+  it("gives focus to the live score's heading when it was nowhere before the line came", () => {
+    reduceMotion();
+    const card = document.createElement("div");
+    card.setAttribute("data-member-live-score", "");
+    const heading = document.createElement("h2");
+    heading.textContent = "11. hafta puanın";
+    card.append(heading);
+    document.body.append(card);
+    try {
+      (document.activeElement as HTMLElement | null)?.blur();
+      show([moment()]);
+      const close = still()!.querySelector("button")!;
+      close.focus();
+      fireEvent.click(close);
+      expect(still()).toBeNull();
+      expect(document.activeElement).toBe(heading);
+    } finally {
+      card.remove();
+    }
+  });
+
+  it("lets a board that falls after the page changed stream take away only its own moment", async () => {
+    // Each animation ends only when the test says so.
+    const runs: { frames: Keyframe[]; end: () => void }[] = [];
+    Object.defineProperty(HTMLElement.prototype, "animate", {
+      configurable: true,
+      writable: true,
+      value(frames: Keyframe[]) {
+        let end = () => undefined;
+        const finished = new Promise<void>((resolve) => {
+          end = () => resolve();
+        });
+        runs.push({ frames, end });
+        return { finished } as unknown as Animation;
+      },
+    });
+    try {
+      const { rerender } = render(
+        view({ id: "live:1", items: [moment({ key: "live-a" })] }, "live"),
+      );
+      fireEvent.click(board()!);
+      const fall = runs.find(
+        (run) => run.frames[0]?.transform === "perspective(700px) rotateX(0deg)",
+      );
+      expect(fall).toBeDefined();
+      // While it falls, the page turns to the replay: its first moment is the queue's head now.
+      rerender(
+        view({ id: "replay:1", items: [moment({ key: "replay-a", name: "Saka" })] }, "replay"),
+      );
+      expect(board()).toHaveTextContent("Saka");
+      await act(async () => {
+        fall!.end();
+      });
+      expect(board()).toHaveTextContent("Saka");
+    } finally {
+      delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
+    }
+  });
+
+  it("is fitted and placed again when the page's column changes size (ResizeObserver)", () => {
+    const watchers: (() => void)[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          watchers.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    vi.stubGlobal("innerWidth", 1280);
+    const main = document.createElement("main");
+    main.id = "main";
+    document.body.append(main);
+    let left = 240;
+    main.getBoundingClientRect = () =>
+      ({
+        top: 0,
+        bottom: 800,
+        left,
+        right: 1280,
+        width: 1280 - left,
+        height: 800,
+        x: left,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    try {
+      show([moment()]);
+      const place = board()!.parentElement!;
+      expect(place.style.left).toBe("252px");
+      const shout = board()!.firstElementChild!.firstElementChild as HTMLElement;
+      shout.style.fontSize = "99px";
+      // The sidebar closes: no window resize, only the column's own.
+      left = 0;
+      act(() => {
+        for (const watcher of watchers) watcher();
+      });
+      expect(place.style.left).toBe("");
+      expect(shout.style.fontSize).toBe("");
+    } finally {
+      main.remove();
+    }
+  });
+});
+
 describe("under reduced motion", () => {
   it("goes on a tap anywhere on the still line", () => {
     reduceMotion();
