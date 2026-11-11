@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
@@ -15,7 +13,7 @@ import {
   type LiveExample,
 } from "../src/fixtures/forwarder";
 import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../src/fixtures/league";
-import { installLeagueMocks } from "./leagueMocks";
+import { closedWeek, MARKED } from "./liveWeek";
 
 /**
  * The member's live week (#1008, source A) with a mocked FPL forwarder: once the page's
@@ -27,61 +25,6 @@ import { installLeagueMocks } from "./leagueMocks";
 
 const ENTRY = 35249001;
 const { season, gameweek, source_snapshot_id: capture } = mockEntrySquadEnvelopes[ENTRY]!.payload;
-const TABLE_PATH = `device/${capture}/device-plan.json`;
-const MARKED = { "x-squadopt-fpl": "1", "content-type": "application/json; charset=utf-8" };
-
-function sha256(text: string): string {
-  return createHash("sha256").update(text, "utf8").digest("hex");
-}
-
-/** The league with a closed week, the capture's table its directory line names, and the calendar. */
-async function closedWeek(page: Page) {
-  await installLeagueMocks(page);
-  const { league_id, league_name } = mockLeagueMembersEnvelope.payload;
-  const bytes = `${JSON.stringify({
-    contract_version: "provisional_league_ui_v1",
-    generated_at_utc: "2026-08-21T07:00:00Z",
-    source_kind: "live",
-    payload: exampleTable({ season, gameweek, capture: capture! }),
-  })}\n`;
-  await page.route("**/data/leagues.json", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        contract_version: "league_directory_v1",
-        generated_at_utc: mockLeagueMembersEnvelope.generated_at_utc,
-        source_kind: "live",
-        payload: {
-          leagues: [
-            {
-              league_id,
-              league_name,
-              season,
-              gameweek,
-              path: "league",
-              device_plan: TABLE_PATH,
-              device_plan_sha256: sha256(bytes),
-            },
-          ],
-        },
-      }),
-    }),
-  );
-  await page.route(/\/data\/device\//, (route) =>
-    route.fulfill({ contentType: "application/json", body: bytes }),
-  );
-  await page.route("**/data/fixtures.json", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        contract_version: "fixtures_v1",
-        generated_at_utc: mockLeagueMembersEnvelope.generated_at_utc,
-        source_kind: "live",
-        payload: exampleCalendar({ season, gameweek, deadline: "2020-01-01T00:00:00Z" }),
-      }),
-    }),
-  );
-}
 
 /** The forwarder's two routes; the live week answers each of `weeks` in turn. */
 async function forwarder(
