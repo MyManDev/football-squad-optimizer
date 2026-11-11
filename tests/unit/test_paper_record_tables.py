@@ -59,16 +59,34 @@ S2_BOUNDS = [0.04, 0.16]
 
 
 def _metrics(log_loss: float, minutes: float, points: float) -> dict[str, Any]:
-    # Two seasons of ten rows each around the pooled MAE, so the pooled value is their mean.
+    # Four seasons of ten rows each around the pooled MAE, so the pooled value is their mean;
+    # the two decision seasons of the fixture folds are the first two.
     seasons = {
-        season: {"points": {"mean_absolute_error": points + offset, "observations": 10}}
-        for season, offset in (("2024-25", -0.01), ("2025-26", 0.01))
+        season: {
+            "points": {
+                "mean_absolute_error": points + offset,
+                "observations": 10,
+                "root_mean_squared_error": 2 * (points + offset),
+                "mean_error": offset,
+            }
+        }
+        for season, offset in (
+            ("2021-22", 0.02),
+            ("2022-23", -0.02),
+            ("2024-25", -0.01),
+            ("2025-26", 0.01),
+        )
     }
     return {
         "overall": {
             "appearance": {"log_loss": log_loss},
             "minutes": {"mean_absolute_error": minutes},
-            "points": {"mean_absolute_error": points, "observations": 20},
+            "points": {
+                "mean_absolute_error": points,
+                "observations": 40,
+                "root_mean_squared_error": points * 2,
+                "mean_error": -0.01,
+            },
         },
         "by_season": seasons,
     }
@@ -115,7 +133,17 @@ def _candidate_record(candidate: tables.Candidate, shift: float) -> dict[str, An
     folds = {fold: score + shift for fold, score in CANDIDATE_FOLDS.items()}
     arms = {arm: _arm(folds), linear: _arm(LINEAR_FOLDS)}
     if candidate.mean.endswith("/mean"):
-        decision: dict[str, Any] = {"v2_features_minus_linear": _summary("", folds), "arms": arms}
+        boosted = {fold: score - 0.5 for fold, score in folds.items()}
+        arms["gbm_v1_features"] = _arm(boosted)
+        decision: dict[str, Any] = {
+            "v2_features_minus_linear": _summary("", folds),
+            "v2_minus_v1_features": {
+                **_summary("", folds),
+                "mean": 0.5,
+                "interval_90": [-1.8, 1.0],
+            },
+            "arms": arms,
+        }
     else:
         prefix = candidate.mean.rsplit("/", 1)[1].removesuffix("mean")
         decision = {**_summary(prefix, folds), "arms": arms}
@@ -156,7 +184,16 @@ def _sampler_arm(pits: tuple[float, ...], seasons: bool = True) -> dict[str, Any
             "s2_bounds": S2_BOUNDS,
             "mean_pit_within_s1_bounds": S1_BOUNDS[0] <= mean <= S1_BOUNDS[1],
             "tail_rate_within_s2_bounds": S2_BOUNDS[0] <= rate <= S2_BOUNDS[1],
-            "seasons": {"2021-22": {"fold_count": 2, "realized_below_lower_quantile_count": below}},
+            "seasons": {
+                "2021-22": {
+                    "fold_count": 2,
+                    "mean_probability_integral_transform": mean,
+                    "mean_pit_within_s1_bounds": True,
+                    "realized_below_lower_quantile_count": below,
+                    "realized_below_lower_quantile_rate": rate,
+                    "tail_rate_within_s2_bounds": False,
+                }
+            },
         }
     return block
 
@@ -207,6 +244,64 @@ def _records() -> dict[str, Any]:
     v2["decision_level_reading"] |= {"added_after_result": True, "descriptive_only": True}
     boosted = records["docs/research/phase_c_gradient_boosting_comparison.json"]
     boosted["decision_level_reading"]["note"] = "reported beside the rule; not part of it"
+    points = records[tables.GBM_POINTS]["decision_level_reading"]
+    points["arms"]["linear"] |= {
+        "component_solver_status_counts": {"OPTIMAL": 2, "FEASIBLE": 1},
+        "ridge_control_solver_status_counts": {"OPTIMAL": 3},
+    }
+    points["arms"]["gradient_boosting_points"]["component_solver_status_counts"] = {"OPTIMAL": 3}
+    points["added_after_the_result"] = {
+        "by_linear_solver_status": {
+            "FEASIBLE": {
+                "folds": 1,
+                "candidate_minus_linear_mean": -5.0,
+                "wins_ties_losses": [0, 0, 1],
+            },
+            "OPTIMAL": {
+                "folds": 2,
+                "candidate_minus_linear_mean": 2.0,
+                "wins_ties_losses": [1, 1, 0],
+            },
+        }
+    }
+    mixture_reading = records[tables.MIXTURE]["decision_level_reading"]
+    mixture_reading["interval_method"] = {"candidate_id": "fixture_mixture_id"}
+    mixture_reading["candidate_minus_linear_interval_90"] = list(
+        tables.block_interval(
+            [(fold[:7], CANDIDATE_FOLDS[fold] + 4.0 - LINEAR_FOLDS[fold]) for fold in LINEAR_FOLDS],
+            4,
+            "fixture_mixture_id",
+        )
+    )
+    v2_reading = records[tables.FEATURES_V2]["decision_level_reading"]
+    v2_reading["policy"] = {"candidate_ids": {"v2_minus_v1_features": "fixture_v2_vs_v1_id"}}
+    v2_reading["v2_minus_v1_features"]["interval_90"] = list(
+        tables.block_interval([(fold[:7], 0.5) for fold in LINEAR_FOLDS], 4, "fixture_v2_vs_v1_id")
+    )
+    regime = records[tables.REGIME]["decision_level_reading"]
+    regime["interval_candidate_id"] = "fixture_regime_id"
+    regime["candidate_minus_linear_interval_90"] = list(
+        tables.block_interval(
+            [(fold[:7], CANDIDATE_FOLDS[fold] + 3.0 - LINEAR_FOLDS[fold]) for fold in LINEAR_FOLDS],
+            4,
+            "fixture_regime_id",
+        )
+    )
+    records[tables.INSTRUMENT] = {
+        "precision": {
+            "covariates": [
+                {
+                    "unconditional_mean_precision": {
+                        "folds": 4,
+                        "mean": 1.0,
+                        "standard_deviation": 2.0,
+                        "iid_90_interval_half_width": tables.Z_90,
+                        "iid_mde_alpha_0_05_power_0_8": tables.Z_MDE,
+                    }
+                }
+            ]
+        }
+    }
     for record in (FOUNDATION, BLOCK, JOINT):
         records[record] = _sampler_record(record)
     records[FOUNDATION]["verdict"].update({"s1_passes": True, "s2_passes": False})
@@ -246,11 +341,20 @@ def _records() -> dict[str, Any]:
             }
         }
     }
+    records[tables.SOLVER_BUDGET] = _solver_budget_record()
     records[tables.FROZEN_EVALUATION] = {
         "decision_comparison": {
             "diagnostics": {"comparable_folds": 3, "mean_difference": 4.5},
             "control": {"mean_realized_squad_points": 45.0},
             "component_base": {"mean_realized_squad_points": 49.5},
+            "folds": [
+                {"fold_id": fold, "component_solver_status": mine, "control_solver_status": theirs}
+                for fold, mine, theirs in (
+                    ("2021-22-gw02", "OPTIMAL", "OPTIMAL"),
+                    ("2021-22-gw03", "FEASIBLE", "OPTIMAL"),
+                    ("2022-23-gw02", "OPTIMAL", "FEASIBLE"),
+                )
+            ],
         }
     }
     comparison = {
@@ -278,6 +382,118 @@ def _records() -> dict[str, Any]:
         "verdict": {"noise_floor_points_per_gameweek": 1.5, "status": "measured, not certified"},
     }
     return records
+
+
+def _solver_budget_record() -> dict[str, Any]:
+    def reproduction(differing: dict[str, Any], statuses: dict[str, int]) -> dict[str, Any]:
+        return {
+            "folds_compared": 3,
+            "folds_reproduced": 3 - len(differing),
+            "folds_differing": differing,
+            "differing_rerun_statuses": {"FEASIBLE": len(differing)} if differing else {},
+            "rerun_statuses": statuses,
+        }
+
+    def paired(mean: float) -> dict[str, Any]:
+        return {
+            "paired_folds": 3,
+            "mean": mean,
+            "interval_90": [mean - 1.0, mean + 1.0],
+            "wins_ties_losses": [1, 1, 1],
+        }
+
+    overlap = {
+        "mean_shared_squad_members_of_15": 6.0,
+        "mean_shared_starters_of_11": 5.0,
+        "same_captain_folds": 2,
+        "identical_squad_folds": 1,
+        "tied_folds": 1,
+        "tied_folds_with_identical_squads": 1,
+    }
+    differing = {"2021-22-gw03": {"recorded": 50.0, "rerun_ignoring_cards": 48.0}}
+    names = ("linear_dec", "gbm_v1_dec", "gbm_v2_dec")
+
+    def arm(statuses: dict[str, int], mean: float) -> dict[str, Any]:
+        return {
+            "folds": 3,
+            "statuses": statuses,
+            "mean_realized_score": mean,
+            "mean_realized_score_ignoring_cards": mean,
+        }
+
+    def budget(squads: int, change: float, gap: float | None) -> dict[str, Any]:
+        return {
+            "folds": 3,
+            "status_counts_low": {"OPTIMAL": 2, "FEASIBLE": 1},
+            "status_counts_high": {"OPTIMAL": 3},
+            "proven_at_both_budgets_folds": 2,
+            "proven_at_both_budgets_squad_changed_folds": 0,
+            "squad_changed_folds": squads,
+            "starting_xi_changed_folds": squads,
+            "captain_changed_folds": 0,
+            "objective_gain_mean": 0.01,
+            "objective_gain_max": 0.3,
+            "low_budget_feasible_gap_to_bound_mean": gap,
+            "low_budget_feasible_gap_to_bound_max": gap,
+            "realized_score_change_folds": squads,
+            "realized_score_change_mean": change,
+            "mean_realized_score_low": 50.0,
+            "mean_realized_score_high": 50.0 + change,
+        }
+
+    control_low = arm({"OPTIMAL": 2, "FEASIBLE": 1}, 50.0)
+    return {
+        "budgets_present": ["5.0", "60.0"],
+        "budgets_absent": [],
+        "arms": {
+            **{
+                f"{name}_b5.0": {"candidate": control_low, "ridge_control": control_low}
+                for name in names
+            },
+            **{
+                f"{name}_b60.0": {
+                    "candidate": arm({"OPTIMAL": 3}, 49.0),
+                    "ridge_control": arm({"OPTIMAL": 3}, 50.0),
+                }
+                for name in names
+            },
+        },
+        "budget": {
+            name: {"candidate": budget(1, -1.0, 5.0), "ridge_control": budget(0, 0.0, None)}
+            for name in names
+        },
+        "reproduction_at_5_0": {
+            "linear_dec": reproduction(differing, {"OPTIMAL": 2, "FEASIBLE": 1}),
+            "gbm_v1_dec": reproduction({}, {"OPTIMAL": 3}),
+            "gbm_v2_dec": reproduction({}, {"OPTIMAL": 3}),
+        },
+        "card_rule": {
+            f"{name}_b{budget}": {
+                "folds_changed_by_the_card_rule": 0,
+                "ridge_control": {"folds_changed_by_the_card_rule": 0},
+            }
+            for name in names
+            for budget in ("5.0", "60.0")
+        },
+        "pairs": {
+            "boosted_pair_vs_linear": {
+                "budget_5.0_official_card_rule": paired(-0.5),
+                "budget_5.0_ignoring_cards": paired(-0.5),
+                "budget_5.0_overlap": overlap,
+                "budget_60.0_official_card_rule": paired(-0.25),
+                "budget_60.0_ignoring_cards": paired(-0.25),
+                "budget_60.0_overlap": overlap,
+            },
+            "wider_contract_vs_boosted_pair": {
+                "budget_5.0_official_card_rule": paired(0.25),
+                "budget_5.0_ignoring_cards": paired(0.25),
+                "budget_5.0_overlap": overlap,
+                "budget_60.0_official_card_rule": paired(0.25),
+                "budget_60.0_ignoring_cards": paired(0.25),
+                "budget_60.0_overlap": overlap,
+            },
+        },
+    }
 
 
 def _write(root: Path, records: dict[str, Any]) -> None:
@@ -318,10 +534,21 @@ def test_every_table_number_resolves_to_its_record_and_pointer(root: Path) -> No
         "table_mixture_distribution",
         "table_mixture_log_score_folds",
         "table_planning_measurements",
+        "table_candidates_same_period",
+        "table_candidates_precision",
+        "table_solver_status",
+        "table_sampler_calibration_by_season",
+        "table_candidates_block_sensitivity",
+        "table_solver_budget_cards",
     }
+    derived = 0
     for row in provenance:
+        if row["pointer"].startswith(tables.DERIVED):
+            derived += 1
+            continue
         document = json.loads((root / row["record"]).read_text(encoding="utf-8"))
         assert tables._text(resolve(document, row["pointer"])) == row["value"], row
+    assert derived > 0
 
 
 def test_every_figure_value_resolves_to_its_pointer(root: Path) -> None:
@@ -329,10 +556,9 @@ def test_every_figure_value_resolves_to_its_pointer(root: Path) -> None:
 
     figures = sorted(output.glob("figure_*.csv"))
     assert [path.stem for path in figures] == [
+        "figure_accuracy_against_decision",
         "figure_decision_by_season",
         "figure_decision_fold_differences",
-        "figure_points_mae_against_squad_points",
-        "figure_s2_counts",
         "figure_sampler_pit",
     ]
     for path in figures:
@@ -376,7 +602,7 @@ def test_each_candidate_label_reads_its_own_record(root: Path) -> None:
     for name, label in (
         ("figure_decision_fold_differences", "candidate"),
         ("figure_decision_by_season", "candidate"),
-        ("figure_points_mae_against_squad_points", "arm"),
+        ("figure_accuracy_against_decision", "candidate"),
     ):
         for row in _read_csv(output / f"{name}.csv"):
             expected = CANDIDATE_RECORDS.get(row[label], (CANDIDATE_RECORDS["Boosted pair"][0],))
@@ -478,16 +704,434 @@ def test_the_reading_status_is_shown_as_each_record_states_it(root: Path) -> Non
     assert "| reading 4; how it was scored |" in status_section
 
 
-def test_the_mae_figure_carries_each_season_beside_the_pooled_value(root: Path) -> None:
+def test_the_accuracy_figure_carries_both_arms_by_season_and_the_same_reference(
+    root: Path,
+) -> None:
     _, output = _run(root)
 
-    rows = _read_csv(output / "figure_points_mae_against_squad_points.csv")
-    mixture = next(row for row in rows if row["arm"] == "Gated mixture")
-    assert float(mixture["points_mae_2025-26"]) == 1.05 + 4.0 / 100 + 0.01
-    assert mixture["points_observations_2025-26"] == "10"
-    assert mixture["points_mae_2025-26_pointer"] == (
+    rows = {
+        row["candidate"]: row for row in _read_csv(output / "figure_accuracy_against_decision.csv")
+    }
+    mixture = rows["Gated mixture"]
+    assert float(mixture["candidate_points_mae_2025-26"]) == 1.05 + 4.0 / 100 + 0.01
+    assert mixture["candidate_points_observations_2025-26"] == "10"
+    assert mixture["reference_points_mae_2025-26"] == "1.08"
+    assert mixture["candidate_points_mae_2025-26_pointer"] == (
         "/comparison/metrics/candidate/by_season/2025-26/points/mean_absolute_error"
     )
+    assert float(mixture["candidate_minus_reference_decision_mean"]) == 4.0 - 1.0
+    # The wider contract is paired with the boosted pair at both levels, the others with the
+    # linear arm.
+    wider = rows["Boosted pair, v2 feature contract"]
+    assert wider["candidate_minus_reference_decision_mean"] == "0.5"
+    assert wider["candidate_minus_reference_decision_mean_pointer"] == (
+        "/decision_level_reading/v2_minus_v1_features/mean"
+    )
+
+
+def test_the_same_period_table_weights_each_season_by_its_observations(root: Path) -> None:
+    _, output = _run(root)
+
+    rows = {row["candidate"]: row for row in _read_csv(output / "table_candidates_same_period.csv")}
+    mixture = rows["Gated mixture"]
+    # The decision seasons are 2021-22 and 2022-23: offsets +0.02 and -0.02 at ten rows each.
+    assert mixture["decision_seasons"] == "2021-22 to 2022-23"
+    assert float(mixture["reference_decision_season_points_mae"]) == pytest.approx(1.07)
+    assert float(mixture["candidate_decision_season_points_mae"]) == pytest.approx(1.09)
+    assert float(mixture["decision_season_paired_difference"]) == pytest.approx(-0.02)
+    assert float(mixture["candidate_pooled_points_rmse"]) == pytest.approx(2.18)
+    # Decision-season RMSE: the root of the mean of (2 x 1.11)^2 and (2 x 1.07)^2.
+    assert float(mixture["candidate_decision_season_points_rmse"]) == pytest.approx(
+        ((2.22**2 + 2.14**2) / 2) ** 0.5
+    )
+    assert float(mixture["reference_decision_season_points_mean_error"]) == pytest.approx(0.0)
+
+
+def test_the_precision_table_applies_the_instrument_formulas_to_each_candidate(
+    root: Path,
+) -> None:
+    _, output = _run(root)
+
+    rows = {row["comparison"]: row for row in _read_csv(output / "table_candidates_precision.csv")}
+    boosted = rows["Boosted pair vs linear components"]
+    differences = [CANDIDATE_FOLDS[fold] - LINEAR_FOLDS[fold] for fold in LINEAR_FOLDS]
+    deviation = statistics.stdev(differences)
+    assert float(boosted["standard_deviation"]) == pytest.approx(deviation)
+    assert float(boosted["iid_90_interval_half_width"]) == pytest.approx(
+        tables.Z_90 * deviation / 3**0.5
+    )
+    assert float(boosted["iid_mde_alpha_0_05_power_0_8"]) == pytest.approx(
+        tables.Z_MDE * deviation / 3**0.5
+    )
+    assert float(boosted["leave_out_2022-23_mean"]) == pytest.approx(
+        statistics.fmean(differences[:2])
+    )
+    instrument = rows["Linear components vs ridge control (instrument record)"]
+    assert instrument["iid_90_interval_half_width"] == str(tables.Z_90)
+    checks = _read_csv(output / "checks.csv")
+    assert all(check["holds"] == "true" for check in checks if "instrument" in check["check"])
+    assert any("instrument" in check["check"] for check in checks)
+
+
+def test_the_block_sensitivity_table_reproduces_a_recorded_interval_with_its_own_id(
+    root: Path,
+) -> None:
+    _, output = _run(root)
+
+    rows = {
+        row["comparison"]: row
+        for row in _read_csv(output / "table_candidates_block_sensitivity.csv")
+    }
+    regime = rows["Regime-gated experts"]
+    assert regime["bootstrap_id"] == "fixture_regime_id"
+    assert float(regime["block_4_low"]) == float(regime["recorded_interval_low"])
+    assert float(regime["block_4_high"]) == float(regime["recorded_interval_high"])
+    boosted = rows["Boosted pair"]
+    assert boosted["bootstrap_id"] == tables.PAPER_BOOTSTRAP_ID
+    assert float(boosted["block_2_low"]) <= float(boosted["mean"]) <= float(boosted["block_2_high"])
+    wider = rows["Boosted pair, v2 feature contract vs boosted pair"]
+    assert float(wider["mean"]) == pytest.approx(0.5)
+    assert rows["Gated mixture"]["bootstrap_id"] == "fixture_mixture_id"
+    assert wider["bootstrap_id"] == "fixture_v2_vs_v1_id"
+    assert rows["Boosted pair, v2 feature contract"]["bootstrap_id"] == tables.PAPER_BOOTSTRAP_ID
+    checks = _read_csv(output / "checks.csv")
+    reproduced = [check for check in checks if "reproduced at blocks of 4" in check["check"]]
+    assert [check["holds"] for check in reproduced] == ["true"] * 3
+    precision = {row["comparison"] for row in _read_csv(output / "table_candidates_precision.csv")}
+    assert "Boosted pair, v2 feature contract vs boosted pair" in precision
+
+
+def test_the_solver_status_table_counts_the_frozen_statuses_and_reads_the_split(
+    root: Path,
+) -> None:
+    _, output = _run(root)
+
+    rows = _read_csv(output / "table_solver_status.csv")
+    frozen = {row["arm"]: row for row in rows if row["record"] == tables.FROZEN_EVALUATION}
+    assert (frozen["component base"]["optimal"], frozen["component base"]["feasible"]) == (
+        "2",
+        "1",
+    )
+    assert (frozen["ridge control"]["optimal"], frozen["ridge control"]["feasible"]) == ("2", "1")
+    points = {row["arm"]: row for row in rows if row["scope"].startswith("decision folds")}
+    assert points["points-only boosting"]["feasible"] == "0"
+    assert points["ridge control"]["optimal"] == "3"
+    split = [row for row in rows if "added after the result" in row["scope"]]
+    assert [(row["folds"], row["candidate_minus_linear_mean"]) for row in split] == [
+        ("1", "-5.0"),
+        ("2", "2.0"),
+    ]
+
+
+def test_the_solver_budget_table_reads_each_rerun_and_pair_and_checks_them(
+    root: Path,
+) -> None:
+    code, output = _run(root)
+
+    assert code == 0
+    rows = {
+        (row["comparison"], row["scope"]): row
+        for row in _read_csv(output / "table_solver_budget_cards.csv")
+    }
+    linear = rows[("linear components", "rerun at deterministic budget 5.0 against its record")]
+    assert (linear["folds"], linear["reproduced"], linear["differing_feasible"]) == ("3", "2", "1")
+    assert (linear["optimal"], linear["feasible"]) == ("2", "1")
+    at_5 = rows[("linear components", "rerun at deterministic budget 5.0")]
+    assert (at_5["optimal"], at_5["feasible"], at_5["card_rule_folds_changed"], at_5["mean"]) == (
+        "2",
+        "1",
+        "0",
+        "50.0",
+    )
+    at_60 = rows[("linear components", "rerun at deterministic budget 60.0")]
+    assert (at_60["optimal"], at_60["feasible"], at_60["mean"]) == ("3", "0", "49.0")
+    boosted = rows[
+        ("boosted pair (v1 features)", "rerun at deterministic budget 5.0 against its record")
+    ]
+    assert (boosted["reproduced"], boosted["differing_feasible"], boosted["feasible"]) == (
+        "3",
+        "0",
+        "0",
+    )
+    control = rows[
+        ("ridge control beside the linear components", "rerun at deterministic budget 5.0")
+    ]
+    assert (control["optimal"], control["feasible"], control["mean"]) == ("2", "1", "50.0")
+    moved = rows[("linear components", "from deterministic budget 5.0 to 60.0")]
+    assert (moved["squad_changed"], moved["score_change_mean"], moved["gap_to_bound_mean"]) == (
+        "1",
+        "-1.0",
+        "5.0",
+    )
+    assert (moved["proven_both"], moved["proven_both_squad_changed"]) == ("2", "0")
+    still = rows[
+        ("ridge control beside the linear components", "from deterministic budget 5.0 to 60.0")
+    ]
+    assert (still["squad_changed"], still["gap_to_bound_mean"]) == ("0", "")
+    pair = rows[
+        (
+            "wider contract minus boosted pair",
+            "paired at deterministic budget 5.0, official card rule",
+        )
+    ]
+    assert (pair["mean"], pair["wins"], pair["ties"], pair["losses"]) == ("0.25", "1", "1", "1")
+    assert (pair["shared_squad_of_15"], pair["tied_folds"], pair["tied_identical_squads"]) == (
+        "6.0",
+        "1",
+        "1",
+    )
+    later = rows[
+        (
+            "boosted pair minus linear components",
+            "paired at deterministic budget 60.0, official card rule",
+        )
+    ]
+    assert later["mean"] == "-0.25"
+    checks = [
+        row for row in _read_csv(output / "checks.csv") if row["record"] == tables.SOLVER_BUDGET
+    ]
+    assert len(checks) == 19
+    assert all(check["holds"] == "true" for check in checks)
+
+
+def test_a_card_rule_that_moved_a_fold_but_not_the_mean_still_holds_and_a_moved_mean_fails(
+    root: Path,
+) -> None:
+    path = root / tables.SOLVER_BUDGET
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["pairs"]["boosted_pair_vs_linear"]["budget_5.0_ignoring_cards"]["mean"] = -0.75
+    path.write_text(json.dumps(document), encoding="utf-8", newline="\n")
+
+    code, output = _run(root)
+
+    assert code == 1
+    failing = [
+        row
+        for row in _read_csv(output / "checks.csv")
+        if row["record"] == tables.SOLVER_BUDGET and row["holds"] == "false"
+    ]
+    assert [row["check"] for row in failing] == [
+        "boosted_pair_vs_linear at budget 5.0: with no fold moved by the card rule the paired "
+        "mean is the same under both scoring conventions"
+    ]
+
+
+#: Where the summarizer reads each table's recorded fold scores for its reproduction block.
+REPRODUCTION_POINTERS = {
+    "linear_dec": (tables.GBM, "/decision_level_reading/arms/linear/folds"),
+    "gbm_v1_dec": (tables.GBM, "/decision_level_reading/arms/gradient_boosting/folds"),
+    "gbm_v2_dec": (tables.FEATURES_V2, "/decision_level_reading/arms/gbm_v2_features/folds"),
+}
+
+
+def _decisions_record(root: Path, records: dict[str, Any]) -> dict[str, Any]:
+    """The solver-budget record with a decisions block its summaries are the arithmetic of,
+    and the summarizer file the record names written into the checkout at `root`.
+
+    The summary blocks are built with the extractor's own helpers and then held against
+    hand-computed values, so a helper that drifted from the summarizer's arithmetic fails here.
+    """
+
+    record = _solver_budget_record()
+    names = ("linear_dec", "gbm_v1_dec", "gbm_v2_dec")
+    folds = ("2021-22-gw02", "2021-22-gw03", "2022-23-gw02")
+    players = list(range(1, 16))
+
+    def decision(
+        status: str, score: float, objective: float, bound: float, shift: int = 0
+    ) -> dict[str, Any]:
+        squad = [player + (shift if player == 15 else 0) for player in players]
+        return {
+            "solver_status": status,
+            "objective_value": objective,
+            "best_objective_bound": bound,
+            "deterministic_time_used": 1.0,
+            "realized_score": score,
+            "realized_score_ignoring_cards": score,
+            "captain_id": 1,
+            "vice_captain_id": 2,
+            "squad": " ".join(str(player) for player in squad),
+            "starting_xi": " ".join(str(player) for player in squad[:11]),
+            "bench_order": " ".join(str(player) for player in squad[11:]),
+        }
+
+    scores = {
+        "linear_dec": (50.0, 60.0, 40.0),
+        "gbm_v1_dec": (52.0, 60.0, 35.0),
+        "gbm_v2_dec": (52.0, 61.0, 35.0),
+    }
+    decisions: dict[str, Any] = {}
+    for name in names:
+        for budget in ("5.0", "60.0"):
+            high = budget == "60.0"
+            decisions[f"{name}_b{budget}"] = {
+                "candidate": {
+                    fold: decision(
+                        "OPTIMAL" if high or index else "FEASIBLE",
+                        scores[name][index] - (1.0 if high and not index else 0.0),
+                        80.0 + (0.01 if high and not index else 0.0),
+                        85.0,
+                        shift=1 if high and not index else 0,
+                    )
+                    for index, fold in enumerate(folds)
+                },
+                "ridge_control": {fold: decision("OPTIMAL", 45.0, 70.0, 70.0) for fold in folds},
+            }
+    record["decisions"] = decisions
+    for name in names:
+        for budget in ("5.0", "60.0"):
+            record["card_rule"][f"{name}_b{budget}"]["sum_of_changes"] = 0.0
+            record["card_rule"][f"{name}_b{budget}"]["ridge_control"]["sum_of_changes"] = 0.0
+            for arm in ("candidate", "ridge_control"):
+                arm_folds = decisions[f"{name}_b{budget}"][arm]
+                record["arms"][f"{name}_b{budget}"][arm] = {
+                    "folds": len(arm_folds),
+                    "statuses": tables._statuses(arm_folds),
+                    "mean_realized_score": tables._fold_mean(arm_folds, "realized_score"),
+                    "mean_realized_score_ignoring_cards": tables._fold_mean(
+                        arm_folds, "realized_score_ignoring_cards"
+                    ),
+                }
+        for arm in ("candidate", "ridge_control"):
+            record["budget"][name][arm] = tables._budget_block(
+                decisions[f"{name}_b5.0"][arm], decisions[f"{name}_b60.0"][arm]
+            )
+        source, pointer = REPRODUCTION_POINTERS[name]
+        recorded_scores = resolve(records[source], pointer)
+        rerun = decisions[f"{name}_b5.0"]["candidate"]
+        differing = {
+            fold: {
+                "recorded": recorded_scores[fold],
+                "rerun_ignoring_cards": rerun[fold]["realized_score_ignoring_cards"],
+                "rerun_solver_status": rerun[fold]["solver_status"],
+            }
+            for fold in folds
+            if float(recorded_scores[fold]) != float(rerun[fold]["realized_score_ignoring_cards"])
+        }
+        record["reproduction_at_5_0"][name] = {
+            "record": source,
+            "pointer": pointer,
+            "folds_compared": len(folds),
+            "folds_missing_from_rerun": sorted(set(recorded_scores) - set(rerun)),
+            "folds_reproduced": len(folds) - len(differing),
+            "folds_differing": differing,
+            "differing_rerun_statuses": {
+                status: sum(item["rerun_solver_status"] == status for item in differing.values())
+                for status in sorted({item["rerun_solver_status"] for item in differing.values()})
+            },
+            "differing_sum_rerun_minus_recorded": sum(
+                float(item["rerun_ignoring_cards"]) - float(item["recorded"])
+                for item in differing.values()
+            ),
+            "rerun_statuses": {"FEASIBLE": 1, "OPTIMAL": 2},
+        }
+    pairs = {
+        "boosted_pair_vs_linear": ("gbm_v1_dec", "linear_dec"),
+        "wider_contract_vs_boosted_pair": ("gbm_v2_dec", "gbm_v1_dec"),
+    }
+    for pair, (mine, theirs) in pairs.items():
+        for budget in ("5.0", "60.0"):
+            own = decisions[f"{mine}_b{budget}"]["candidate"]
+            other = decisions[f"{theirs}_b{budget}"]["candidate"]
+            for key, suffix in (
+                ("realized_score", "official_card_rule"),
+                ("realized_score_ignoring_cards", "ignoring_cards"),
+            ):
+                record["pairs"][pair][f"budget_{budget}_{suffix}"] = tables._paired_block(
+                    own, other, key, f"paper_solver_budget_{pair}_{budget}_{suffix}"
+                )
+            record["pairs"][pair][f"budget_{budget}_overlap"] = tables._overlap_block(own, other)
+
+    # The helpers against hand arithmetic on the decisions above.
+    linear = record["budget"]["linear_dec"]["candidate"]
+    assert (linear["squad_changed_folds"], linear["captain_changed_folds"]) == (1, 0)
+    assert (linear["proven_at_both_budgets_folds"], linear["status_counts_low"]) == (
+        2,
+        {"FEASIBLE": 1, "OPTIMAL": 2},
+    )
+    assert round(linear["objective_gain_mean"], 9) == round(0.01 / 3, 9)
+    assert linear["low_budget_feasible_gap_to_bound_mean"] == 5.0
+    assert round(linear["realized_score_change_mean"], 9) == round(-1.0 / 3, 9)
+    assert record["budget"]["gbm_v1_dec"]["ridge_control"]["objective_gain_mean"] == 0.0
+    assert (
+        record["budget"]["gbm_v1_dec"]["ridge_control"]["low_budget_feasible_gap_to_bound_mean"]
+        is None
+    )
+    paired = record["pairs"]["boosted_pair_vs_linear"]["budget_5.0_official_card_rule"]
+    assert (paired["mean"], paired["wins_ties_losses"]) == (-1.0, [1, 1, 1])
+    assert paired["by_season_mean"] == {"2021-22": 1.0, "2022-23": -5.0}
+    overlap = record["pairs"]["boosted_pair_vs_linear"]["budget_60.0_overlap"]
+    assert (overlap["mean_shared_squad_members_of_15"], overlap["identical_squad_folds"]) == (
+        15.0,
+        3,
+    )
+    assert (overlap["tied_folds"], overlap["tied_folds_with_identical_squads"]) == (1, 1)
+    summarizer = root / tables.SUMMARIZER
+    summarizer.parent.mkdir(parents=True, exist_ok=True)
+    summarizer.write_bytes(b"print('the summarizer')\n")
+    record["produced_by"] = {
+        "summarizer": tables.SUMMARIZER,
+        "summarizer_sha256": tables.Digest.of(summarizer.read_bytes()).sha256_lf,
+    }
+    return record
+
+
+def test_the_fold_decisions_are_written_out_and_reproduce_every_summary_of_the_record(
+    tmp_path: Path,
+) -> None:
+    records = _records()
+    records[tables.SOLVER_BUDGET] = _decisions_record(tmp_path, records)
+    _write(tmp_path, records)
+
+    code, output = _run(tmp_path)
+
+    assert code == 0
+    rows = _read_csv(output / "decisions_solver_budget_cards.csv")
+    assert len(rows) == 3 * 2 * 2 * 3
+    assert list(rows[0]) == list(tables.DECISION_COLUMNS)
+    first = rows[0]
+    assert (first["table"], first["budget"], first["arm"], first["fold"]) == (
+        "linear_dec",
+        "5.0",
+        "candidate",
+        "2021-22-gw02",
+    )
+    assert (first["season"], first["gameweek"], first["solver_status"]) == (
+        "2021-22",
+        "2",
+        "FEASIBLE",
+    )
+    assert first["squad"].split() == [str(player) for player in range(1, 16)]
+    assert first["bench_order"] == "12 13 14 15"
+    checks = [
+        row for row in _read_csv(output / "checks.csv") if row["record"] == tables.SOLVER_BUDGET
+    ]
+    assert len(checks) == 19 + 1 + 3 + 12 + 6 + 8 + 4 + 1
+    assert all(check["holds"] == "true" for check in checks)
+    interval_checks = [row for row in checks if "the interval drawn under it" in row["check"]]
+    assert len(interval_checks) == 8
+    reproduction = [row for row in checks if "reproduction block" in row["check"]]
+    assert len(reproduction) == 3
+
+    path = tmp_path / tables.SOLVER_BUDGET
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["pairs"]["wider_contract_vs_boosted_pair"]["budget_60.0_overlap"][
+        "same_captain_folds"
+    ] = 0
+    path.write_text(json.dumps(document), encoding="utf-8", newline="\n")
+
+    code, output = _run(tmp_path, "tables_moved")
+
+    assert code == 1
+    failing = [
+        row["check"]
+        for row in _read_csv(output / "checks.csv")
+        if row["record"] == tables.SOLVER_BUDGET and row["holds"] == "false"
+    ]
+    assert failing == [
+        "wider_contract_vs_boosted_pair at budget 60.0: the fold decisions give the recorded "
+        "squad overlap"
+    ]
 
 
 def _extractor_lf() -> bytes:
@@ -507,7 +1151,7 @@ def test_outside_a_git_checkout_the_records_name_no_commit(root: Path) -> None:
 
     assert code == 0
     rows = _read_csv(output / "records.csv")
-    assert len(rows) == 12
+    assert len(rows) == 14
     assert [row["record"] for row in rows] == [*sorted(_records()), tables.EXTRACTOR]
     assert rows[-1]["sha256_lf"] == hashlib.sha256(_extractor_lf()).hexdigest()
     assert {(row["commit"], row["matches_commit"]) for row in rows} == {("", "")}
@@ -546,7 +1190,7 @@ def test_each_record_is_compared_with_the_committed_one_line_endings_aside(root:
     first = {row["record"]: row for row in _read_csv(output / "records.csv")}
 
     assert code == 0
-    assert len(first) == 12
+    assert len(first) == 14
     assert {row["matches_commit"] for row in first.values()} == {"true"}
     assert {row["commit"] for row in first.values()} == {head}
     assert all(row["blob_at_commit"] == row["git_blob_lf"] for row in first.values())
@@ -596,7 +1240,7 @@ def test_an_extractor_edited_after_the_commit_fails_like_an_edited_record(
 
     assert code == 1
     rows = _read_csv(output / "records.csv")
-    assert [row["matches_commit"] for row in rows] == ["true"] * 11 + ["false"]
+    assert [row["matches_commit"] for row in rows] == ["true"] * 13 + ["false"]
     extractor = rows[-1]
     assert extractor["record"] == tables.EXTRACTOR
     assert extractor["commit"] == head

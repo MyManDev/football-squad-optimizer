@@ -57,3 +57,8 @@
 .substitutions span {
   overflow-wrap: anywhere;
 }
+
+/* The live score takes the GOL moment's points; it pops as a block when they arrive. */
+.total {
+  display: inline-block;
+}

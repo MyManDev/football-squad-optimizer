@@ -4,7 +4,10 @@ Refs #1008. `GET /api/v1/fpl/live/{gw}?view=activity` returns
 `week_activity_v1`: the unchanged `week_live_v1` document in `week`, plus
 `activity`. The original route without a query still returns `week_live_v1`.
 Both views use the same two FPL inputs and separate fresh and last-good cache
-keys. Neither polls on a timer or writes a result to the ledger.
+keys. Neither writes a result to the ledger. A page reads them on its own only
+while one of the member's players' matches is being played (`week_live_v1.md`);
+a read that adds goals, assists or cards against the reads before it plays the
+GOL moment once (`web/src/features/liveScore/liveEvents.ts`).
 
 `activity.in_play_fixtures` contains fixture ids whose captured `started` is
 true and `finished` is false. Each appearance identifies an element and fixture,

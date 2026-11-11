@@ -6,6 +6,7 @@ import { AS_A_CAVEAT, AS_A_CHANCE } from "../../testSupport/honesty";
 import { MemberLiveScoreCard } from "./MemberLiveScoreCard";
 import { scoreMemberWeek, type LiveWeekScore } from "./officialScoring";
 import vectors from "./officialScoring.vectors.json";
+import type { PlayerActivity } from "./playerActivity";
 
 afterEach(cleanup);
 const names = new Map(Array.from({ length: 15 }, (_, index) => [index + 1, `Player ${index + 1}`]));
@@ -105,4 +106,65 @@ it("keeps a real zero and a negative score visible in the net stat", () => {
   expect(net()).toHaveTextContent(/^0$/);
   rerender(<MemberLiveScoreCard gameweek={8} score={{ ...score, net: -4 }} names={names} />);
   expect(net()).toHaveTextContent(/^-4$/);
+});
+
+describe("the live score beside the GOL board", () => {
+  it("holds back what the board has still to bring, and counts in whole points", () => {
+    const score = result("transfer-hit", true);
+    if (score.refused) throw new Error(score.reason);
+    show(score, "tr", { held: 4 });
+    const figure = document.querySelector("[data-live-total]")!;
+    expect(figure.textContent).toBe((score.net - 4).toLocaleString("tr-TR"));
+    expect(figure.textContent).not.toMatch(/[.,]\d/);
+  });
+
+  it("keeps the read before's lists under the figures while the board brings this one's", () => {
+    const before = result("normal-week");
+    const now = result("goalkeeper-swap");
+    if (before.refused || now.refused) throw new Error("refused");
+    expect(before.autosubs).toEqual([]);
+    expect(now.autosubs.length).toBeGreaterThan(0);
+    show(now, "tr", { lists: { score: before, activity: null } });
+    // The figures are this read's; the substitutions are still the read before's.
+    expect(document.querySelector("[data-live-total]")!.textContent).toBe(
+      now.net.toLocaleString("tr-TR"),
+    );
+    expect(screen.queryByText("Player 12")).toBeNull();
+    cleanup();
+    show(now, "tr");
+    expect(screen.getByText("Player 12")).toBeInTheDocument();
+  });
+});
+
+describe("the players' strip", () => {
+  /** A starter and a reserve who both scored, the reserve's match still being played. */
+  const scorers = (starter: number, reserve: number): PlayerActivity[] =>
+    [starter, reserve].map((elementId) => ({
+      elementId,
+      matchInProgress: elementId === reserve,
+      goals: 1,
+      assists: 0,
+      appearances: [{ element_id: elementId, fixture_id: 1, minutes: 60, goals: 1, assists: 0 }],
+    }));
+  const strip = () => screen.queryByRole("list", { name: "Oyuncular" });
+
+  it("leaves out a reserve the scorer does not count, goal and all", () => {
+    const score = result("normal-week");
+    if (score.refused) throw new Error(score.reason);
+    const reserve = 12;
+    expect(score.counted).not.toContain(reserve);
+    show(score, "tr", { activity: scorers(1, reserve) });
+    expect(strip()).toHaveTextContent("Player 1");
+    expect(strip()).not.toHaveTextContent(`Player ${reserve}`);
+  });
+
+  it("lists the bench under the bench boost, as the scorer counts it", () => {
+    const score = result("bench-boost");
+    if (score.refused) throw new Error(score.reason);
+    const reserve = 12;
+    expect(score.counted).toContain(reserve);
+    show(score, "tr", { activity: scorers(1, reserve) });
+    expect(strip()).toHaveTextContent("Player 1");
+    expect(strip()).toHaveTextContent(`Player ${reserve}`);
+  });
 });

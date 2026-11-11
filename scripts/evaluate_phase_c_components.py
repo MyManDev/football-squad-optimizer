@@ -19,7 +19,7 @@ import json
 import sys
 import warnings
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -41,10 +41,18 @@ from squadopt.backtest import (
     make_ridge_projection_builder,
 )
 from squadopt.data import DataError
-from squadopt.data.sources.vaastav import build_panel
+from squadopt.data.sources.vaastav import (
+    GAMEWEEK_FILE,
+    ROSTER_FILE,
+    attach_player_code,
+    build_panel,
+    drop_non_player_rows,
+    season_directory,
+)
 from squadopt.evaluation import (
     EvaluationConfig,
     EvaluationError,
+    EvaluationFold,
     ScoringPolicy,
     evaluate_component_oof,
     evaluate_phase_c_component_decisions,
@@ -56,6 +64,7 @@ from squadopt.experiments.phase_c_reporting import (
 )
 from squadopt.experiments.shadow_report import ShadowReportError, write_document_once
 from squadopt.features import CrossSeasonConfig
+from squadopt.optimization import OptimizationConfig
 
 REPORT_VERSION: Final = "phase_c_component_evaluation_v1"
 HISTORY_SEASONS: Final = (
@@ -82,7 +91,91 @@ def _parse_arguments() -> argparse.Namespace:
     # same development seasons. The output then names the contract it was read under and
     # is not the frozen v1 evaluation; a default output path is refused for it.
     parser.add_argument("--development-contract", default=None)
+    # Measurement options (docs/research/phase_c_solver_budget_cards_method.md). The defaults
+    # are the measurement configuration every committed record ran under; a different
+    # deterministic budget, the official card-participation rule or the recorded squads make
+    # the output a development reading that must name its own --json-output.
+    parser.add_argument("--solver-deterministic-budget", type=float, default=None)
+    parser.add_argument("--solver-wall-cap-seconds", type=float, default=None)
+    parser.add_argument("--card-participation", action="store_true")
+    parser.add_argument("--record-decisions", action="store_true")
     return parser.parse_args()
+
+
+def load_card_participation(archive_root: Path, seasons: Sequence[str]) -> pd.DataFrame:
+    """Which players were booked in each gameweek, read from the archive's gameweek files.
+
+    The canonical panel carries no card columns, so this reads `merged_gw.csv` directly:
+    non-player rows are dropped and the per-season `element` is mapped to the persistent
+    player code as the adapter does, then a player-gameweek is booked when any of its
+    fixture rows carries a yellow or red card. Nothing else is read from the files.
+    """
+
+    frames = []
+    for season in seasons:
+        directory = season_directory(archive_root, season)
+        gameweeks = pd.read_csv(
+            directory / GAMEWEEK_FILE,
+            usecols=["element", "round", "position", "yellow_cards", "red_cards"],
+            dtype=str,
+            encoding="utf-8",
+            encoding_errors="replace",
+        )
+        roster = pd.read_csv(directory / ROSTER_FILE, usecols=["id", "code"], dtype=str)
+        players = attach_player_code(drop_non_player_rows(gameweeks), roster)
+        booked = pd.to_numeric(players["yellow_cards"], errors="coerce").fillna(0).gt(0) | (
+            pd.to_numeric(players["red_cards"], errors="coerce").fillna(0).gt(0)
+        )
+        frame = cast(
+            pd.DataFrame,
+            players.assign(card_participation=booked)
+            .groupby(["player_code", "round"], as_index=False)["card_participation"]
+            .any(),
+        )
+        frames.append(
+            pd.DataFrame(
+                {
+                    "season": season,
+                    "gameweek": pd.to_numeric(frame["round"], errors="raise").astype("int64"),
+                    "player_id": pd.to_numeric(frame["player_code"], errors="raise").astype(
+                        "int64"
+                    ),
+                    "card_participation": frame["card_participation"].astype(bool),
+                }
+            )
+        )
+    return pd.concat(frames, ignore_index=True)
+
+
+def _with_card_participation(
+    folds: tuple[EvaluationFold, ...], cards: pd.DataFrame
+) -> tuple[EvaluationFold, ...]:
+    """Each control fold's outcomes with the archive's card participation beside them.
+
+    A player with a yellow or red card in the gameweek participated under the official
+    automatic-substitution rule even without a minute.
+    """
+
+    rebuilt = []
+    for fold in folds:
+        season, gameweek = fold.fold_id[:7], int(fold.fold_id.rsplit("gw", 1)[1])
+        booked = cards.loc[
+            cards["season"].eq(season) & cards["gameweek"].eq(gameweek),
+            ["player_id", "card_participation"],
+        ]
+        realized = fold.realized_points.merge(
+            booked, on="player_id", how="left", validate="one_to_one"
+        )
+        realized["card_participation"] = realized["card_participation"].fillna(False).astype(bool)
+        rebuilt.append(
+            EvaluationFold(
+                fold_id=fold.fold_id,
+                projections=fold.projections,
+                realized_points=realized,
+                metadata=fold.metadata,
+            )
+        )
+    return tuple(rebuilt)
 
 
 def _producer_environment(
@@ -148,20 +241,51 @@ def _measure(arguments: argparse.Namespace) -> dict[str, object]:
         seasons=DECISION_SEASONS,
         projection_builder=make_ridge_projection_builder(cross_season=CrossSeasonConfig()),
     )
+    optimization_config = measurement_optimization_config()
+    if arguments.solver_deterministic_budget is not None or arguments.solver_wall_cap_seconds:
+        optimization_config = OptimizationConfig(
+            solver_time_limit_seconds=(
+                arguments.solver_wall_cap_seconds
+                if arguments.solver_wall_cap_seconds is not None
+                else optimization_config.solver_time_limit_seconds
+            ),
+            solver_deterministic_time_limit=(
+                arguments.solver_deterministic_budget
+                if arguments.solver_deterministic_budget is not None
+                else optimization_config.solver_deterministic_time_limit
+            ),
+        )
+    if arguments.card_participation:
+        controls = _with_card_participation(
+            controls, load_card_participation(arguments.archive_root, DECISION_SEASONS)
+        )
     config = EvaluationConfig(
         # Both arms solve under the measurement budget rather than the dataclass default,
         # so which arm wins cannot depend on how busy the machine was (#590).
-        optimization_config=measurement_optimization_config(),
+        optimization_config=optimization_config,
         scoring_policy=ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2,
         run_metadata={"study": REPORT_VERSION},
     )
     player_metrics = evaluate_component_oof(handoff.rows)
     decisions = evaluate_phase_c_component_decisions(
-        handoff, controls, config, development_contract=development_contract
+        handoff,
+        controls,
+        config,
+        development_contract=development_contract,
+        record_decisions=arguments.record_decisions,
     )
+    measurement_options = {
+        "solver_deterministic_budget": optimization_config.solver_deterministic_time_limit,
+        "solver_wall_cap_seconds": optimization_config.solver_time_limit_seconds,
+        "card_participation": bool(arguments.card_participation),
+        "record_decisions": bool(arguments.record_decisions),
+        "is_measurement_configuration": optimization_config == measurement_optimization_config()
+        and not arguments.card_participation,
+    }
     return {
         "development_contract": development_contract,
         "development_only": development_contract is not None,
+        "measurement_options": measurement_options,
         "source": {
             "table_sha256": handoff.table_sha256,
             "roster_sha256": handoff.roster_sha256,
@@ -188,6 +312,17 @@ def main() -> int:
         print(
             "A development-contract evaluation is not the frozen Phase C record; name a "
             "separate --json-output."
+        )
+        return 1
+    if arguments.json_output == DEFAULT_OUTPUT and (
+        arguments.solver_deterministic_budget is not None
+        or arguments.solver_wall_cap_seconds is not None
+        or arguments.card_participation
+        or arguments.record_decisions
+    ):
+        print(
+            "A measurement under other solver limits, the card rule or recorded squads is not "
+            "the frozen Phase C record; name a separate --json-output."
         )
         return 1
     started = datetime.now(UTC)

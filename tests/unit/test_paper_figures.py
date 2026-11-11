@@ -44,11 +44,32 @@ SEASON_MEANS = [
     ("Arm B, with a comma", "2022-23", -2.5),
 ]
 
-#: Arm, squad points, pooled MAE, and (MAE, observations) for 2021-22, 2022-23 and 2025-26.
-MAE_ROWS = [
-    ("Linear components", 60.0, 1.066667, (1.2, 10), (1.0, 30), (1.1, 20)),
-    ("Arm A", 62.0, 1.03, (1.1, 10), (0.98, 30), (1.05, 20)),
-    ("Arm B, with a comma", 58.0, 1.08, (1.25, 20), (1.02, 20), (1.0, 20)),
+#: Candidate, reference arm, the reference's and the candidate's (MAE, observations) for
+#: 2021-22, 2022-23 and 2025-26, then the decision mean and its 90% interval.
+REFERENCE_MAE = ((1.2, 10), (1.0, 30), (1.1, 20))
+ACCURACY_ROWS = [
+    ("Arm A", "linear", REFERENCE_MAE, ((1.1, 10), (0.98, 30), (1.05, 20)), 1.5, -1.0, 4.0),
+    (
+        "Arm B, with a comma",
+        "linear",
+        REFERENCE_MAE,
+        ((1.25, 20), (1.02, 20), (1.0, 20)),
+        -2.0,
+        -4.5,
+        0.5,
+    ),
+]
+#: Over the two decision seasons the reference's weighted MAE is 1.05; Arm A's 1.01, Arm B's
+#: 1.135.
+ACCURACY_GAINS = {"Arm A": 0.04, "Arm B, with a comma": -0.085}
+
+#: Arm, seed, lower-tail count and the band ceiling as a count: the joint sampler's seed table.
+SEED_ROWS = [
+    ("block_arm", 0, 3, 3),
+    ("block_arm", 1, 4, 3),
+    ("candidate", 0, 1, 1),
+    ("candidate", 1, 2, 1),
+    ("candidate", 2, 1, 1),
 ]
 
 #: Sampler, record, arm and the fold PITs of each sampler arm.
@@ -69,24 +90,25 @@ def _write_tables(folder: Path, change: Callable[[dict[str, list[list[Any]]]], N
     rows: dict[str, list[list[Any]]] = {
         "folds": [[c, f, s, 50.0 + d, 50.0, d, "docs/x.json"] for c, f, s, d in FOLDS],
         "means": [[c, s, m, "docs/x.json"] for c, s, m in SEASON_MEANS],
-        "mae": [
-            [arm, squad, pooled, *first, *second, *third, "docs/x.json"]
-            for arm, squad, pooled, first, second, third in MAE_ROWS
+        "accuracy": [
+            [
+                candidate,
+                reference,
+                *(value for pair in reference_mae for value in pair),
+                *(value for pair in candidate_mae for value in pair),
+                mean,
+                low,
+                high,
+                "docs/x.json",
+            ]
+            for candidate, reference, reference_mae, candidate_mae, mean, low, high in ACCURACY_ROWS
         ],
         "pit": [
             [sampler, arm, f"2021-22-gw{index + 11:02d}", "2021-22", pit, pit < 0.1, record]
             for sampler, record, arm, pits in PITS
             for index, pit in enumerate(pits)
         ],
-        "s2": [
-            ["foundation", "/verdict", "pooled", 5, 1, REC_1],
-            ["team_match_joint", "/candidate_arm", "pooled", 4, 2, REC_2],
-            ["team_match_joint", "/candidate_arm", "2021-22", 2, 1, REC_2],
-        ],
-        "calibration": [
-            ["foundation", REC_1, "/verdict", "", ""],
-            ["team_match_joint", REC_2, "/candidate_arm", 0.04, 0.16],
-        ],
+        "seeds": [list(row) for row in SEED_ROWS],
     }
     change(rows)
     folder.mkdir(parents=True, exist_ok=True)
@@ -110,19 +132,22 @@ def _write_tables(folder: Path, change: Callable[[dict[str, list[list[Any]]]], N
     )
     seasons = ("2021-22", "2022-23", "2025-26")
     _write_csv(
-        folder / "figure_points_mae_against_squad_points.csv",
+        folder / "figure_accuracy_against_decision.csv",
         [
-            "arm",
-            "squad_points_decision_folds",
-            "points_mae_pooled_all_seasons",
+            "candidate",
+            "reference_arm",
             *(
-                f"{kind}_{season}"
+                f"{side}_{kind}_{season}"
+                for side in ("reference", "candidate")
                 for season in seasons
                 for kind in ("points_mae", "points_observations")
             ),
+            "candidate_minus_reference_decision_mean",
+            "interval_90_low",
+            "interval_90_high",
             "record",
         ],
-        rows["mae"],
+        rows["accuracy"],
     )
     _write_csv(
         folder / "figure_sampler_pit.csv",
@@ -130,14 +155,9 @@ def _write_tables(folder: Path, change: Callable[[dict[str, list[list[Any]]]], N
         rows["pit"],
     )
     _write_csv(
-        folder / "figure_s2_counts.csv",
-        ["sampler", "arm", "scope", "fold_count", "below_q10_count", "record"],
-        rows["s2"],
-    )
-    _write_csv(
-        folder / "table_sampler_calibration.csv",
-        ["sampler", "record", "arm", "s2_bounds_low", "s2_bounds_high"],
-        rows["calibration"],
+        folder / "table_joint_sampler_seeds.csv",
+        ["arm", "seed", "below_q10_count", "band_ceiling_count"],
+        rows["seeds"],
     )
     return folder
 
@@ -210,13 +230,17 @@ def test_every_figure_renders_from_a_small_fixture_table(tmp_path: Path) -> None
     assert sorted(folds) == sorted(f"{c}, {f}" for c, f, _, _ in FOLDS)
     assert sum("mean of" in key for key in marks[FIG1]) == 4
     assert sorted(marks[FIG2]) == sorted(f"{c}, {s}" for c, s, _ in SEASON_MEANS)
-    assert sorted(marks[FIG3]) == sorted(arm for arm, *_ in MAE_ROWS)
+    assert sorted(marks[FIG3]) == sorted(
+        [*(row[0] for row in ACCURACY_ROWS), *(f"{row[0]} 90% interval" for row in ACCURACY_ROWS)]
+    )
     assert len(marks[FIG4]) == 2 * figures.PIT_BINS
-    assert sorted(marks[FIG5]) == [
-        "S2 bounds of moe_sampler /candidate_arm",
-        "moe_sampler /candidate_arm",
-        "phase_d_component_squad_calibration /verdict",
-    ]
+    assert sorted(marks[FIG5]) == sorted(
+        [
+            "S2 ceiling 1 folds",
+            "S2 ceiling 3 folds",
+            *(f"{arm}, seed {seed}" for arm, seed, _, _ in SEED_ROWS),
+        ]
+    )
 
 
 def test_the_histogram_counts_every_fold_once_and_a_pit_on_an_edge_in_the_upper_bin(
@@ -238,25 +262,40 @@ def test_the_histogram_counts_every_fold_once_and_a_pit_on_an_edge_in_the_upper_
         figures._bin("x", 1.01, 10)
 
 
-def test_the_mae_figure_plots_each_arm_at_its_recorded_pooled_mae_and_squad_points(
+def test_the_accuracy_figure_weights_each_arm_by_its_observations_over_the_decision_seasons(
     tmp_path: Path,
 ) -> None:
     output = _draw(tmp_path, "base")
 
     titles = sorted(title for _, _, title in _elements(output / FIG3) if title)
-    # The values as the table holds them, one point per arm; nothing is computed from seasons.
+    # The gain is the observation-weighted MAE over 2021-22 and 2022-23 (the seasons of
+    # figure_decision_by_season.csv), reference minus candidate; 2025-26 is not read.
     assert titles == sorted(
-        f"{arm}: points MAE {pooled}, squad points {squad}" for arm, squad, pooled, *_ in MAE_ROWS
+        [
+            *(
+                f"{candidate}: MAE gain {ACCURACY_GAINS[candidate]:.6f}, decision difference {mean}"
+                for candidate, _, _, _, mean, _, _ in ACCURACY_ROWS
+            ),
+            *(
+                f"{candidate} 90% interval: {low} to {high}"
+                for candidate, _, _, _, _, low, high in ACCURACY_ROWS
+            ),
+        ]
     )
     marks = _marks(output / FIG3)
-    x = {arm: float(marks[arm]["cx"]) for arm, *_ in MAE_ROWS}
-    # Linear components sits between Arm A and Arm B where its pooled MAE does.
-    position = (x["Linear components"] - x["Arm A"]) / (x["Arm B, with a comma"] - x["Arm A"])
-    assert position == pytest.approx((1.066667 - 1.03) / (1.08 - 1.03), abs=0.005)
+    x = {candidate: float(marks[candidate]["cx"]) for candidate, *_ in ACCURACY_ROWS}
+    y = {candidate: float(marks[candidate]["cy"]) for candidate, *_ in ACCURACY_ROWS}
+    assert x["Arm A"] > x["Arm B, with a comma"]
+    assert y["Arm A"] < y["Arm B, with a comma"]
+    bar = marks["Arm A 90% interval"]
+    assert float(bar["x1"]) == float(bar["x2"]) == x["Arm A"]
+    assert float(bar["y1"]) > y["Arm A"] > float(bar["y2"])
     labels = [element.text or "" for element in _parse(output / FIG3).iter(f"{SVG}text")]
-    assert "points MAE pooled over 2021-22 to 2025-26, as recorded" in labels
+    assert (
+        "reference minus candidate points MAE over 2021-22 to 2022-23, observation-weighted"
+        in labels
+    )
     assert "decision folds 2021-22 to 2022-23" in labels
-    assert not [label for label in labels if "weighted" in label]
 
 
 def test_the_output_is_byte_stable_across_two_runs(tmp_path: Path) -> None:
@@ -281,8 +320,8 @@ def _set_mean(rows: dict[str, list[list[Any]]]) -> None:
     rows["means"][0][2] = -2.0
 
 
-def _set_squad_points(rows: dict[str, list[list[Any]]]) -> None:
-    rows["mae"][0][1] = 59.0
+def _set_decision_mean(rows: dict[str, list[list[Any]]]) -> None:
+    rows["accuracy"][0][14] = 0.5
 
 
 def _move_pit(rows: dict[str, list[list[Any]]]) -> None:
@@ -290,7 +329,7 @@ def _move_pit(rows: dict[str, list[list[Any]]]) -> None:
 
 
 def _set_count(rows: dict[str, list[list[Any]]]) -> None:
-    rows["s2"][0][4] = 0
+    rows["seeds"][0][2] = 2
 
 
 @pytest.mark.parametrize(
@@ -303,12 +342,7 @@ def _set_count(rows: dict[str, list[list[Any]]]) -> None:
             set(),
         ),
         (FIG2, _set_mean, {"Arm A, 2021-22"}, {"polyline"}),
-        (
-            FIG3,
-            _set_squad_points,
-            {"Linear components"},
-            {"text", "line"},
-        ),
+        (FIG3, _set_decision_mean, {"Arm A"}, {"text", "line", "rect"}),
         (
             FIG4,
             _move_pit,
@@ -318,7 +352,7 @@ def _set_count(rows: dict[str, list[list[Any]]]) -> None:
             },
             set(),
         ),
-        (FIG5, _set_count, {"phase_d_component_squad_calibration /verdict"}, {"text"}),
+        (FIG5, _set_count, {"block_arm, seed 0"}, {"polyline"}),
     ],
 )
 def test_a_changed_value_moves_its_own_mark_and_no_other(
@@ -346,10 +380,10 @@ def test_a_mark_moves_the_way_its_value_moves(tmp_path: Path) -> None:
 
     assert float(higher["cy"]) < float(base["cy"]) < float(lower["cy"])
     assert higher["cx"] == base["cx"] == lower["cx"]
-    bar = "phase_d_component_squad_calibration /verdict"
-    wide = _marks(_draw(tmp_path, "wide") / FIG5)[bar]
-    narrow = _marks(_draw(tmp_path, "narrow", _set_count) / FIG5)[bar]
-    assert float(narrow["width"]) < float(wide["width"])
+    seed = "block_arm, seed 0"
+    three = _marks(_draw(tmp_path, "three") / FIG5)[seed]
+    two = _marks(_draw(tmp_path, "two", _set_count) / FIG5)[seed]
+    assert float(two["cy"]) > float(three["cy"])
 
 
 def test_a_missing_column_or_table_is_refused_and_nothing_is_written(
@@ -516,12 +550,20 @@ def test_the_committed_manifest_names_every_output_and_input_once() -> None:
                 "mixture_distribution",
                 "mixture_log_score_folds",
                 "planning_measurements",
+                "candidates_same_period",
+                "candidates_precision",
+                "solver_status",
+                "sampler_calibration_by_season",
+                "candidates_block_sensitivity",
+                "solver_budget_cards",
             )
         ),
         *(f"tables/{table}" for figure in figures.FIGURES for table in figure.tables),
         "tables/provenance.csv",
         "tables/records.csv",
         "tables/checks.csv",
+        "tables/decisions_solver_budget_cards.csv",
+        "tables/table_linear_vs_ridge_rerun.csv",
         "tables/tables.md",
         *(f"figures/{figure.file}" for figure in figures.FIGURES),
     }
@@ -540,5 +582,7 @@ def test_the_committed_manifest_names_every_output_and_input_once() -> None:
         tables.JOINT,
         tables.RANK_SHRINKAGE,
         tables.MEAN_REVERSION,
+        tables.INSTRUMENT,
+        tables.SOLVER_BUDGET,
     }
     assert set(manifest.inputs) == records | {tables.EXTRACTOR, figures.SCRIPT}

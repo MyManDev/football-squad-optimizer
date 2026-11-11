@@ -1,16 +1,29 @@
 /**
- * The member's live week as #1008 decides it: read when the page opens and again when the
- * member presses refresh, never on a timer. The first read asks the forwarder for the
- * member's bundle (its current week), then for that week's live points and the capture's
- * table together; a refresh asks for the live points alone. A read that gives no document,
- * or a week that cannot be scored, shows nothing: no card, and no sentence in its place.
+ * The member's live week (#1008): read when the page opens, again when the member presses
+ * refresh, and, while one of the member's matches is being played and the page is in view,
+ * once every `FOLLOW_INTERVAL_MS` (the owner's decision of 2026-11-11, so a goal shows by
+ * itself; `matches` gives the caller what `liveWindow` needs to tell). The first read asks the
+ * forwarder for the member's bundle (its current week), then for that week's live points and
+ * the capture's table together; every later read asks for the live points alone. A first read
+ * that gives no document, or a week that cannot be scored, shows nothing: no card, and no
+ * sentence in its place. A followed read that is not answered keeps what is shown.
+ *
+ * Each read after the first is compared with the reads before it (`advanceLiveMarks`): the
+ * goals, assists and cards it adds become the read's GOL moments. A followed page whose first
+ * read has not been answered, or whose member's week is not the one being played, makes the
+ * first read again instead, at the next tick after one failure and then after 2, 4 and at most
+ * 8 minutes. A first read made again never ends the member's refresh, nor a refresh it; no tick
+ * reads within half an interval of the last read.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FixturesPayload } from "../../fixtures/types";
+import { advanceLiveMarks, type LiveMarks } from "../../liveScore/liveEvents";
+import { liveMoments, type LiveMoment } from "../../liveScore/liveMoments";
+import { FOLLOW_INTERVAL_MS, type LiveWindowFilter } from "../../liveScore/liveWindow";
 import type { LiveActivity } from "../../liveScore/weekActivity";
-import type { MemberWeek, WeekLive } from "../../liveScore/weekLive";
+import type { MemberWeek, Position, WeekLive } from "../../liveScore/weekLive";
 import type { DevicePlanDocument } from "../device/types";
 import { forwarder as siteForwarder, type ForwarderClient } from "../forwarder/client";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
@@ -24,15 +37,25 @@ export interface MemberLiveDependencies {
   loadTable?: (signal: AbortSignal) => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
 }
 
+/** The moments one read brought, numbered so a new read is a new batch. */
+export interface LiveMomentBatch {
+  id: number;
+  items: LiveMoment[];
+}
+
 export interface MemberLive {
   /** The week to show, or null while it is read and whenever there is none. */
   shown: MemberLiveScore | null;
   /** Whether a refresh is being read; the shown week stays until it answers. */
   refreshing: boolean;
   refresh: () => void;
+  /** The newest read's goals, assists and cards, or null when no read has brought any. */
+  moments: LiveMomentBatch | null;
+  /** The member's clubs and the unfinished fixtures as the shown read names them, for `liveWindow`. */
+  matches: LiveWindowFilter | null;
 }
 
-/** What a refresh reads the live points against: the member's week and the table. */
+/** What a later read reads the live points against: the member's week and the table. */
 interface Held {
   identity: string;
   member: MemberWeek;
@@ -79,16 +102,110 @@ function scored(
   }
 }
 
+/** A match whose players' minutes went up this recently is still being played. */
+const IN_PLAY_GRACE_MS = 5 * 60_000;
+
+/** Each match's minutes as last seen going up, and when, by fixture id. */
+type PlayedMinutes = Map<number, { minutes: number; at: number }>;
+
+/**
+ * The week's matches still being played. FPL calls a match finished only once its bonus is
+ * confirmed, about an hour after the final whistle, so a match counts as played only while its
+ * players' minutes go up (within `IN_PLAY_GRACE_MS`). Without the activity view the read cannot
+ * tell, and every match not finished counts. `seen` is updated with this read's minutes.
+ */
+function stillPlayed(live: LiveReading, seen: PlayedMinutes, now: number): Set<number> {
+  const open = live.week.fixtures.filter((row) => !row.finished).map((row) => row.id);
+  if (live.activity === null) return new Set(open);
+  const minutes = new Map<number, number>();
+  for (const row of live.activity.appearances) {
+    minutes.set(row.fixture_id, (minutes.get(row.fixture_id) ?? 0) + row.minutes);
+  }
+  const played = new Set<number>();
+  for (const id of open) {
+    const total = minutes.get(id) ?? 0;
+    const before = seen.get(id);
+    if (before === undefined || total > before.minutes) seen.set(id, { minutes: total, at: now });
+    if (total > 0 && now - seen.get(id)!.at < IN_PLAY_GRACE_MS) played.add(id);
+  }
+  return played;
+}
+
+/**
+ * The clubs (the calendar's team ids) of the member's fifteen and the week's matches still
+ * being played (`stillPlayed`). The clubs come from the scored week's lineup, which names each
+ * pick's club as the capture's table does: the forwarder's live elements carry no club. A club
+ * the calendar does not name leaves the clubs open (null), so no match is missed.
+ */
+function matchesOf(
+  live: LiveReading,
+  shown: MemberLiveScore,
+  fixtures: FixturesPayload | null,
+  seen: PlayedMinutes,
+  now: number,
+): LiveWindowFilter {
+  const ids = new Map<string, number>();
+  for (const week of fixtures?.gameweeks ?? []) {
+    for (const fixture of week.fixtures) {
+      ids.set(fixture.home.name, fixture.home.team_id);
+      ids.set(fixture.away.name, fixture.away.team_id);
+    }
+  }
+  const picked = [...shown.lineup.starting_xi, ...shown.lineup.bench].map((player) =>
+    ids.get(player.team),
+  );
+  return {
+    clubs:
+      picked.length > 0 && picked.every((club) => club !== undefined)
+        ? new Set(picked as number[])
+        : null,
+    unfinished: stillPlayed(live, seen, now),
+  };
+}
+
+/** Each pick's name, club and position as the scored week holds them, by element id. */
+function picksOf(shown: MemberLiveScore, member: MemberWeek) {
+  const fifteen = [...shown.lineup.starting_xi, ...shown.lineup.bench];
+  const players = new Map<number, { name: string; team: string; position: Position }>();
+  member.pick_order.forEach((elementId, index) => {
+    const player = fifteen[index];
+    if (player === undefined || player.position === "UNK") return;
+    players.set(elementId, {
+      name: shown.names.get(elementId) ?? player.short_name,
+      team: player.team,
+      position: player.position,
+    });
+  });
+  return players;
+}
+
+interface State {
+  identity: string;
+  shown: MemberLiveScore | null;
+  refreshing: boolean;
+  moments: LiveMomentBatch | null;
+  matches: LiveWindowFilter | null;
+}
+
+/** A tick reads only when the last read is at least this old. */
+const TICK_GAP_MS = FOLLOW_INTERVAL_MS / 2;
+
+/** A first read made again after `failures` failures waits this long after the last read. */
+const retryWait = (failures: number) =>
+  FOLLOW_INTERVAL_MS * 2 ** Math.min(Math.max(failures - 1, 0), 3);
+
 /**
  * `squad` is the member's published entry document: its entry, its gameweek (the table
  * gameweek the bundle is asked for) and its capture (whose table names the element ids).
- * `fixtures` is the site's calendar, for each club's id.
+ * `fixtures` is the site's calendar, for each club's id. `follow` is the gameweek whose match
+ * is being played (`liveWindow`), or null: only while it is set do reads repeat on their own.
  */
 export function useMemberLiveScore(
   squad: EntrySquad,
   fixtures: FixturesPayload | null,
   dependencies: MemberLiveDependencies = {},
   enabled = true,
+  follow: number | null = null,
 ): MemberLive {
   const { tree } = useLeague();
   const ready = enabled && fixtures !== null;
@@ -105,34 +222,86 @@ export function useMemberLiveScore(
   useEffect(() => {
     sources.current = latest;
   });
-  const [state, setState] = useState<{
-    identity: string;
-    shown: MemberLiveScore | null;
-    refreshing: boolean;
-  }>({
+  const [state, setState] = useState<State>({
     identity,
     shown: null,
     refreshing: false,
+    moments: null,
+    matches: null,
   });
   if (state.identity !== identity) {
-    setState({ identity, shown: null, refreshing: false });
+    setState({ identity, shown: null, refreshing: false, moments: null, matches: null });
   }
   const held = useRef<Held | null>(null);
-  // The read in flight, the page's first or a refresh, ended when the page leaves.
+  // The member's refresh in flight, ended when the page leaves.
   const reading = useRef<AbortController | null>(null);
+  // The first read in flight, the page's own or one made again; it never ends a refresh.
+  const firstReading = useRef<AbortController | null>(null);
+  // First reads that ended without a week to show, since the last one that showed it.
+  const firstFailures = useRef(0);
+  // A followed read in flight; it never ends a read the member asked for.
+  const following = useRef<AbortController | null>(null);
+  // The goals, assists and cards counted so far, and the reads numbered for their moments.
+  const marks = useRef<LiveMarks | null>(null);
+  // Each match's minutes as last seen going up, for the matches still being played.
+  const played = useRef<PlayedMinutes>(new Map());
+  const reads = useRef(0);
+  const lastRead = useRef(0);
+  // The first read, to make again; and whether one is on its way.
+  const firstRead = useRef<(() => void) | null>(null);
+  const firstInFlight = useRef(false);
+
+  /** The read's moments against the marks so far; the first read only sets the marks. */
+  const momentsOf = useCallback(
+    (shown: MemberLiveScore, live: LiveReading, inputs: Held): LiveMomentBatch | null => {
+      const member = inputs.member;
+      const { marks: next, events } = advanceLiveMarks(
+        marks.current,
+        {
+          identity: `${inputs.identity}:${member.gameweek}`,
+          sourceTime: shown.score.source_time,
+          elements: live.week.elements,
+          activity: live.activity,
+        },
+        member.pick_order,
+      );
+      marks.current = next;
+      if (events.length === 0) return null;
+      reads.current += 1;
+      const items = liveMoments(events, {
+        read: reads.current,
+        season: live.week.season,
+        counted: shown.score.counted,
+        captain: shown.score.captain,
+        tripleCaptain: member.active_chip === "3xc",
+        players: picksOf(shown, member),
+      });
+      return items.length === 0 ? null : { id: reads.current, items };
+    },
+    [],
+  );
 
   const entryId = squad.entry.entry_id;
   const gameweek = squad.gameweek;
   useEffect(() => {
     reading.current?.abort();
+    firstReading.current?.abort();
+    firstReading.current = null;
+    following.current?.abort();
+    following.current = null;
     held.current = null;
+    // Every first read is a starting point: nothing before it plays.
+    marks.current = null;
+    played.current = new Map();
+    firstInFlight.current = false;
+    firstFailures.current = 0;
     if (!ready) return;
-    const read = new AbortController();
-    reading.current = read;
-    const { forwarder, loadTable } = sources.current;
-    const first = async () => {
+    /** Whether the read showed a week. */
+    const first = async (read: AbortController): Promise<boolean> => {
+      const { forwarder, loadTable } = sources.current;
+      lastRead.current = Date.now();
       const bundle = await forwarder.entryBundle(entryId, gameweek, { signal: read.signal });
-      if (read.signal.aborted || !bundle.ok || bundle.document.current_week === null) return;
+      if (read.signal.aborted || !bundle.ok || bundle.document.current_week === null) return false;
       const member = bundle.document.current_week;
       const [live, table] = await Promise.all([
         readLive(forwarder, member.gameweek, read.signal),
@@ -141,15 +310,84 @@ export function useMemberLiveScore(
           () => null,
         ),
       ]);
-      if (read.signal.aborted || live === null || table === null) return;
-      held.current = { identity, member, table };
-      const shown = scored(live, held.current, sources.current.fixtures);
-      if (shown !== null) setState({ identity, shown, refreshing: false });
+      if (read.signal.aborted || live === null || table === null) return false;
+      const inputs = { identity, member, table };
+      const shown = scored(live, inputs, sources.current.fixtures);
+      // A week the scorer refuses is a failed first read: it is made again later (retryWait),
+      // and no followed read stands on it.
+      if (shown === null) return false;
+      held.current = inputs;
+      // A first read made again may bring a goal against the marks so far: it plays too.
+      const moments = momentsOf(shown, live, held.current);
+      const matches = matchesOf(live, shown, sources.current.fixtures, played.current, Date.now());
+      setState((current) => {
+        const kept = current.identity === identity;
+        return {
+          identity,
+          shown,
+          refreshing: kept && current.refreshing,
+          moments: moments ?? (kept ? current.moments : null),
+          matches,
+        };
+      });
+      return true;
     };
-    // The client answers every failure as a refusal; anything else also shows nothing.
-    first().catch(() => undefined);
-    return () => read.abort();
-  }, [entryId, gameweek, capture, identity, ready]);
+    const start = () => {
+      if (firstInFlight.current) return;
+      firstReading.current?.abort();
+      const read = new AbortController();
+      firstReading.current = read;
+      firstInFlight.current = true;
+      // The client answers every failure as a refusal; anything else also shows nothing.
+      first(read)
+        .catch(() => false)
+        .then((shown) => {
+          if (!read.signal.aborted) firstFailures.current = shown ? 0 : firstFailures.current + 1;
+        })
+        .finally(() => {
+          if (firstReading.current === read) {
+            firstReading.current = null;
+            firstInFlight.current = false;
+          }
+        });
+    };
+    firstRead.current = start;
+    start();
+    return () => {
+      reading.current?.abort();
+      firstReading.current?.abort();
+      firstReading.current = null;
+      firstRead.current = null;
+      firstInFlight.current = false;
+    };
+  }, [entryId, gameweek, capture, identity, ready, momentsOf]);
+
+  /**
+   * A newer week replaces the shown one with the moments it brings; an older one is kept. Only
+   * the member's own refresh ends the refreshing state: a followed read leaves it as it is.
+   */
+  const accept = useCallback(
+    (shown: MemberLiveScore, live: LiveReading, inputs: Held, refreshed: boolean) => {
+      const moments = momentsOf(shown, live, inputs);
+      const matches = matchesOf(live, shown, sources.current.fixtures, played.current, Date.now());
+      setState((current) => {
+        const refreshing = !refreshed && current.identity === identity && current.refreshing;
+        const older =
+          current.identity === identity &&
+          current.shown !== null &&
+          Date.parse(shown.score.source_time) < Date.parse(current.shown.score.source_time);
+        if (older) return { ...current, refreshing };
+        return {
+          identity,
+          shown,
+          refreshing,
+          moments: moments ?? (current.identity === identity ? current.moments : null),
+          matches,
+        };
+      });
+    },
+    [identity, momentsOf],
+  );
 
   const refresh = useCallback(() => {
     const inputs = held.current;
@@ -157,29 +395,91 @@ export function useMemberLiveScore(
     reading.current?.abort();
     const read = new AbortController();
     reading.current = read;
+    lastRead.current = Date.now();
     setState((current) => ({ ...current, refreshing: true }));
     void readLive(sources.current.forwarder, inputs.member.gameweek, read.signal)
       .catch(() => null)
       .then((live) => {
         if (read.signal.aborted) return;
-        // A refresh the source does not answer leaves no card, as the first read does.
         const shown = live === null ? null : scored(live, inputs, sources.current.fixtures);
-        setState((current) => {
-          const older =
-            current.identity === identity &&
-            current.shown !== null &&
-            shown !== null &&
-            Date.parse(shown.score.source_time) < Date.parse(current.shown.score.source_time);
-          return { identity, shown: older ? current.shown : shown, refreshing: false };
-        });
+        // A refresh the source does not answer leaves no card, as the first read does.
+        if (live === null || shown === null) {
+          setState((current) => ({ ...current, identity, shown: null, refreshing: false }));
+          return;
+        }
+        accept(shown, live, inputs, true);
       });
-  }, [identity]);
+  }, [identity, accept]);
 
-  useEffect(() => () => reading.current?.abort(), []);
+  /**
+   * A followed read: the live points alone, quietly; no answer keeps what is shown. With no
+   * first read answered yet, or the member's week not the one being played, the first read
+   * is made again instead, later after each failure (`retryWait`).
+   */
+  const followRead = useCallback(() => {
+    const inputs = held.current;
+    if (
+      inputs === null ||
+      inputs.identity !== identity ||
+      (follow !== null && inputs.member.gameweek !== follow)
+    ) {
+      const waited = Date.now() - lastRead.current;
+      if (waited >= retryWait(firstFailures.current) - TICK_GAP_MS) firstRead.current?.();
+      return;
+    }
+    if (following.current !== null) return;
+    const read = new AbortController();
+    following.current = read;
+    lastRead.current = Date.now();
+    void readLive(sources.current.forwarder, inputs.member.gameweek, read.signal)
+      .catch(() => null)
+      .then((live) => {
+        if (following.current === read) following.current = null;
+        if (read.signal.aborted || live === null) return;
+        const shown = scored(live, inputs, sources.current.fixtures);
+        if (shown !== null) accept(shown, live, inputs, false);
+      });
+  }, [identity, accept, follow]);
 
+  useEffect(() => {
+    if (!ready || follow === null) return undefined;
+    const visible = () => document.visibilityState === "visible";
+    const stale = () => Date.now() - lastRead.current >= FOLLOW_INTERVAL_MS;
+    // A read in the last half interval (a refresh, a return to view) stands in for the tick's.
+    const due = () => Date.now() - lastRead.current >= TICK_GAP_MS;
+    const timer = setInterval(() => {
+      if (visible() && due()) followRead();
+    }, FOLLOW_INTERVAL_MS);
+    // Back in view after a minute or more: one read at once, not at the next tick.
+    const onVisibility = () => {
+      if (visible() && stale()) followRead();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    // A match that starts, or a page that comes back, with a read a minute old reads at once.
+    if (visible() && stale() && held.current !== null) followRead();
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      following.current?.abort();
+      following.current = null;
+    };
+  }, [ready, follow, followRead]);
+
+  useEffect(
+    () => () => {
+      reading.current?.abort();
+      firstReading.current?.abort();
+      following.current?.abort();
+    },
+    [],
+  );
+
+  const current = ready && state.identity === identity;
   return {
-    shown: ready && state.identity === identity ? state.shown : null,
+    shown: current ? state.shown : null,
     refreshing: state.identity === identity && state.refreshing,
     refresh,
+    moments: current ? state.moments : null,
+    matches: current ? state.matches : null,
   };
 }
