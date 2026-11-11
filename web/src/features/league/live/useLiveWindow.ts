@@ -16,7 +16,7 @@ const LONGEST_WAIT_MS = 30 * 60_000;
  * the same filter, so it takes no new reading of the clock (and no render after it).
  */
 function filterKey(filter: LiveWindowFilter): string {
-  return [filter.clubs, filter.unfinished]
+  return [filter.clubs, filter.unfinished, filter.stalled]
     .map((ids) => (ids == null ? "-" : [...ids].sort((a, b) => a - b).join(",")))
     .join("|");
 }

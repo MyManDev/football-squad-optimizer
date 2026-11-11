@@ -1,8 +1,8 @@
 /**
  * The GOL board's batches for the member page: each read's goals, assists and cards from the
  * live week, and the automatic substitutions a read adds (`newSubstitutions`), numbered as one
- * stream. The first read of a member's week is a starting point for substitutions, as it is
- * for goals, and so is the first read after the week was not shown (a tool's page).
+ * stream. Every first read the live score makes (`MemberLive.start`: the member's week opened,
+ * a tool's page left) is a starting point for substitutions, as it is for its goals.
  */
 
 import { useCallback, useState } from "react";
@@ -18,8 +18,9 @@ export interface BoardBatch {
 }
 
 interface Seen {
-  /** The member and week the substitutions belong to. */
+  /** The member and week the substitutions belong to, and the live score's first read. */
   week: string | null;
+  start: number | null;
   substitutions: ReadonlySet<string> | null;
   /** The last moments batch taken, and the last read's time. */
   moments: number | null;
@@ -31,6 +32,7 @@ interface Seen {
 export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch | null {
   const [seen, setSeen] = useState<Seen>({
     week: null,
+    start: null,
     substitutions: null,
     moments: null,
     read: null,
@@ -41,18 +43,17 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
   const week = shown === null ? null : `${entryId}:${shown.gameweek}`;
   const read = shown === null ? null : shown.score.source_time;
   const momentsId = live.moments?.id ?? null;
-  if (shown === null && seen.substitutions !== null) {
-    // No week shown (a tool's page, a read the source refused): the next read is a first read
-    // again, a starting point for substitutions as the live score's marks are for goals.
-    setSeen({ ...seen, substitutions: null, read: null });
-  } else if (
+  if (
     shown !== null &&
-    (read !== seen.read || momentsId !== seen.moments || week !== seen.week)
+    (read !== seen.read ||
+      momentsId !== seen.moments ||
+      week !== seen.week ||
+      live.start !== seen.start)
   ) {
     const items: BoardMoment[] = [];
     if (live.moments !== null && momentsId !== seen.moments) items.push(...live.moments.items);
     const { seen: substitutions, fresh } = newSubstitutions(
-      week === seen.week ? seen.substitutions : null,
+      week === seen.week && live.start === seen.start ? seen.substitutions : null,
       shown.score.autosubs,
     );
     for (const [out, incoming] of fresh) {
@@ -67,6 +68,7 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
     const count = items.length > 0 ? seen.count + 1 : seen.count;
     setSeen({
       week,
+      start: live.start,
       substitutions,
       moments: momentsId,
       read,

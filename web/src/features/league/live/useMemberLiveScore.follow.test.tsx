@@ -11,7 +11,7 @@ import {
 } from "../../../fixtures/forwarder";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { SEASON_EVENT_POINTS } from "../../liveScore/liveMoments";
-import { FOLLOW_INTERVAL_MS } from "../../liveScore/liveWindow";
+import { FOLLOW_INTERVAL_MS, SLOW_FOLLOW_MS } from "../../liveScore/liveWindow";
 import type { MemberWeek } from "../../liveScore/weekLive";
 import { withLeague } from "../../../testSupport/league";
 import type { ForwarderClient } from "../forwarder/client";
@@ -125,17 +125,21 @@ const loadTable = () =>
 function Harness({
   dependencies,
   follow,
+  pace,
 }: {
   dependencies: MemberLiveDependencies;
   follow: number | null;
+  pace?: number;
 }) {
-  const live = useMemberLiveScore(SQUAD, CALENDAR, dependencies, true, follow);
+  const live = useMemberLiveScore(SQUAD, CALENDAR, dependencies, true, follow, pace);
   return (
     <div>
       <p data-testid="net">{live.shown ? String(live.shown.score.net) : "none"}</p>
       <p data-testid="batch">{live.moments ? String(live.moments.id) : "none"}</p>
       <p data-testid="refreshing">{String(live.refreshing)}</p>
       <p data-testid="unfinished">{[...(live.matches?.unfinished ?? [])].join(",") || "none"}</p>
+      <p data-testid="stalled">{[...(live.matches?.stalled ?? [])].join(",") || "none"}</p>
+      <p data-testid="start">{String(live.start)}</p>
       <button type="button" onClick={live.refresh}>
         refresh
       </button>
@@ -150,14 +154,18 @@ function Harness({
 
 const TABLES = new WeakMap<object, ReturnType<typeof loadTable>>();
 
-function view(client: ReturnType<typeof forwarder>, follow: number | null) {
+function view(client: ReturnType<typeof forwarder>, follow: number | null, pace?: number) {
   // One table loader per client, so a rerender keeps the hook's dependencies.
   const table = TABLES.get(client) ?? loadTable();
   TABLES.set(client, table);
   return (
     <LanguageProvider initialLanguage="tr">
       {withLeague(
-        <Harness dependencies={{ forwarder: client, loadTable: table }} follow={follow} />,
+        <Harness
+          dependencies={{ forwarder: client, loadTable: table }}
+          follow={follow}
+          pace={pace}
+        />,
       )}
     </LanguageProvider>
   );
@@ -169,9 +177,13 @@ const shownNet = () =>
       element?.getAttribute("data-testid") === "net" && element.textContent !== "none",
   );
 
-function follow(client: ReturnType<typeof forwarder>, following: number | null = WEEK) {
+function follow(
+  client: ReturnType<typeof forwarder>,
+  following: number | null = WEEK,
+  pace?: number,
+) {
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  return render(view(client, following));
+  return render(view(client, following, pace));
 }
 
 const minute = () =>
@@ -441,6 +453,8 @@ describe("a followed live week, as the owner's last review asked", () => {
     for (let tick = 0; tick < 5; tick += 1) await minute();
     expect(still.liveActivity).toHaveBeenCalledTimes(6);
     expect(unfinished()).toBe("none");
+    // Not finished by FPL, its minutes still: stalled, to be read now and then (liveWindow).
+    expect(screen.getByTestId("stalled")).toHaveTextContent(String(FIXTURE.id));
     cleanup();
     vi.useRealTimers();
     // A match still going: its minutes go up at every read.
@@ -468,5 +482,26 @@ describe("a followed live week, as the owner's last review asked", () => {
     // After a second failure it waits two minutes: nothing is read at the next tick.
     await minute();
     expect(client.liveActivity).toHaveBeenCalledTimes(2);
+  });
+
+  it("reads at the pace it is given: a stalled match's page once in five minutes", async () => {
+    const client = minutesForwarder(() => 0);
+    follow(client, WEEK, SLOW_FOLLOW_MS);
+    await shownNet();
+    expect(client.liveActivity).toHaveBeenCalledTimes(1);
+    for (let tick = 0; tick < 4; tick += 1) await minute();
+    expect(client.liveActivity).toHaveBeenCalledTimes(1);
+    await minute();
+    expect(client.liveActivity).toHaveBeenCalledTimes(2);
+  });
+
+  it("counts its first reads: one for the week shown, none for later reads", async () => {
+    const client = forwarder([0, 0]);
+    follow(client);
+    await shownNet();
+    expect(screen.getByTestId("start")).toHaveTextContent("1");
+    await minute();
+    expect(client.liveActivity).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("start")).toHaveTextContent("1");
   });
 });

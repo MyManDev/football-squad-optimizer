@@ -46,13 +46,14 @@ describe("liveWindow", () => {
     expect(liveWindow(null, at("2026-11-21T13:00:00Z"))).toEqual({
       gameweek: null,
       open: false,
+      slow: false,
       changesIn: null,
     });
   });
 
   it("follows the latest week whose deadline has passed, shut until its first kickoff", () => {
     const window = liveWindow(CALENDAR, at("2026-11-21T11:30:00Z"));
-    expect(window).toEqual({ gameweek: 11, open: false, changesIn: 60 * 60_000 });
+    expect(window).toEqual({ gameweek: 11, open: false, slow: false, changesIn: 60 * 60_000 });
   });
 
   it("opens at a kickoff and stays open for the match's window", () => {
@@ -117,5 +118,20 @@ describe("liveWindow", () => {
     expect(unfinished.open).toBe(true);
     const limit = at("2026-11-21T15:00:00Z") + MATCH_WINDOW_LIMIT_MS;
     expect(liveWindow(CALENDAR, limit, { unfinished: new Set([102]) }).open).toBe(false);
+  });
+
+  it("reads now and then, until the limit, a match whose minutes stood still past its window", () => {
+    const late = at("2026-11-21T15:00:00Z") + MATCH_WINDOW_MS + 10 * 60_000;
+    const stalled = liveWindow(CALENDAR, late, { stalled: new Set([102]) });
+    expect(stalled).toMatchObject({ gameweek: 11, open: false, slow: true });
+    // Its limit is the next change.
+    expect(stalled.changesIn).toBe(MATCH_WINDOW_LIMIT_MS - MATCH_WINDOW_MS - 10 * 60_000);
+    const limit = at("2026-11-21T15:00:00Z") + MATCH_WINDOW_LIMIT_MS;
+    expect(liveWindow(CALENDAR, limit, { stalled: new Set([102]) }).slow).toBe(false);
+    // Another club's stalled match, or one still within its window, reads at the usual pace.
+    const others = liveWindow(CALENDAR, late, { clubs: new Set([7]), stalled: new Set([102]) });
+    expect(others.slow).toBe(false);
+    const inside = liveWindow(CALENDAR, at("2026-11-21T15:30:00Z"), { stalled: new Set([102]) });
+    expect(inside).toMatchObject({ open: true, slow: false });
   });
 });

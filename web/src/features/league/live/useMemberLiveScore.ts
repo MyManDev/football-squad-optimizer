@@ -53,6 +53,12 @@ export interface MemberLive {
   moments: LiveMomentBatch | null;
   /** The member's clubs and the unfinished fixtures as the shown read names them, for `liveWindow`. */
   matches: LiveWindowFilter | null;
+  /**
+   * How many first reads have shown a week: a new number is a new starting point, for the
+   * goals and cards a read adds (the marks) and for whatever a page counts from reads (its
+   * substitutions).
+   */
+  start: number;
 }
 
 /** What a later read reads the live points against: the member's week and the table. */
@@ -109,31 +115,40 @@ const IN_PLAY_GRACE_MS = 5 * 60_000;
 type PlayedMinutes = Map<number, { minutes: number; at: number }>;
 
 /**
- * The week's matches still being played. FPL calls a match finished only once its bonus is
- * confirmed, about an hour after the final whistle, so a match counts as played only while its
- * players' minutes go up (within `IN_PLAY_GRACE_MS`). Without the activity view the read cannot
- * tell, and every match not finished counts. `seen` is updated with this read's minutes.
+ * The week's matches still being played, and those that may be. FPL calls a match finished only
+ * once its bonus is confirmed, about an hour after the final whistle, so a match counts as played
+ * only while its players' minutes go up (within `IN_PLAY_GRACE_MS`); one FPL has not finished
+ * whose minutes stand still (a whistle, a long stoppage, a stalled feed) is `stalled`, to be read
+ * now and then until its window's limit. Without the activity view the read cannot tell, and
+ * every match not finished counts as played. `seen` is updated with this read's minutes.
  */
-function stillPlayed(live: LiveReading, seen: PlayedMinutes, now: number): Set<number> {
+function matchesPlayed(
+  live: LiveReading,
+  seen: PlayedMinutes,
+  now: number,
+): { played: Set<number>; stalled: Set<number> } {
   const open = live.week.fixtures.filter((row) => !row.finished).map((row) => row.id);
-  if (live.activity === null) return new Set(open);
+  if (live.activity === null) return { played: new Set(open), stalled: new Set() };
   const minutes = new Map<number, number>();
   for (const row of live.activity.appearances) {
     minutes.set(row.fixture_id, (minutes.get(row.fixture_id) ?? 0) + row.minutes);
   }
   const played = new Set<number>();
+  const stalled = new Set<number>();
   for (const id of open) {
     const total = minutes.get(id) ?? 0;
     const before = seen.get(id);
     if (before === undefined || total > before.minutes) seen.set(id, { minutes: total, at: now });
-    if (total > 0 && now - seen.get(id)!.at < IN_PLAY_GRACE_MS) played.add(id);
+    if (total === 0) continue;
+    if (now - seen.get(id)!.at < IN_PLAY_GRACE_MS) played.add(id);
+    else stalled.add(id);
   }
-  return played;
+  return { played, stalled };
 }
 
 /**
  * The clubs (the calendar's team ids) of the member's fifteen and the week's matches still
- * being played (`stillPlayed`). The clubs come from the scored week's lineup, which names each
+ * being played or stalled (`matchesPlayed`). The clubs come from the scored week's lineup, which names each
  * pick's club as the capture's table does: the forwarder's live elements carry no club. A club
  * the calendar does not name leaves the clubs open (null), so no match is missed.
  */
@@ -154,12 +169,14 @@ function matchesOf(
   const picked = [...shown.lineup.starting_xi, ...shown.lineup.bench].map((player) =>
     ids.get(player.team),
   );
+  const { played, stalled } = matchesPlayed(live, seen, now);
   return {
     clubs:
       picked.length > 0 && picked.every((club) => club !== undefined)
         ? new Set(picked as number[])
         : null,
-    unfinished: stillPlayed(live, seen, now),
+    unfinished: played,
+    stalled,
   };
 }
 
@@ -185,6 +202,7 @@ interface State {
   refreshing: boolean;
   moments: LiveMomentBatch | null;
   matches: LiveWindowFilter | null;
+  start: number;
 }
 
 /** A tick reads only when the last read is at least this old. */
@@ -198,7 +216,8 @@ const retryWait = (failures: number) =>
  * `squad` is the member's published entry document: its entry, its gameweek (the table
  * gameweek the bundle is asked for) and its capture (whose table names the element ids).
  * `fixtures` is the site's calendar, for each club's id. `follow` is the gameweek whose match
- * is being played (`liveWindow`), or null: only while it is set do reads repeat on their own.
+ * is being played (`liveWindow`), or null: only while it is set do reads repeat on their own,
+ * `pace` apart (once a minute while a match is played, less often while one may be).
  */
 export function useMemberLiveScore(
   squad: EntrySquad,
@@ -206,6 +225,7 @@ export function useMemberLiveScore(
   dependencies: MemberLiveDependencies = {},
   enabled = true,
   follow: number | null = null,
+  pace: number = FOLLOW_INTERVAL_MS,
 ): MemberLive {
   const { tree } = useLeague();
   const ready = enabled && fixtures !== null;
@@ -228,10 +248,20 @@ export function useMemberLiveScore(
     refreshing: false,
     moments: null,
     matches: null,
+    start: 0,
   });
   if (state.identity !== identity) {
-    setState({ identity, shown: null, refreshing: false, moments: null, matches: null });
+    setState({
+      identity,
+      shown: null,
+      refreshing: false,
+      moments: null,
+      matches: null,
+      start: state.start,
+    });
   }
+  // Whether the next week shown is a first read's after the marks were set afresh.
+  const fresh = useRef(true);
   const held = useRef<Held | null>(null);
   // The member's refresh in flight, ended when the page leaves.
   const reading = useRef<AbortController | null>(null);
@@ -292,6 +322,7 @@ export function useMemberLiveScore(
     held.current = null;
     // Every first read is a starting point: nothing before it plays.
     marks.current = null;
+    fresh.current = true;
     played.current = new Map();
     firstInFlight.current = false;
     firstFailures.current = 0;
@@ -320,6 +351,8 @@ export function useMemberLiveScore(
       // A first read made again may bring a goal against the marks so far: it plays too.
       const moments = momentsOf(shown, live, held.current);
       const matches = matchesOf(live, shown, sources.current.fixtures, played.current, Date.now());
+      const begins = fresh.current;
+      fresh.current = false;
       setState((current) => {
         const kept = current.identity === identity;
         return {
@@ -328,6 +361,7 @@ export function useMemberLiveScore(
           refreshing: kept && current.refreshing,
           moments: moments ?? (kept ? current.moments : null),
           matches,
+          start: current.start + (begins ? 1 : 0),
         };
       });
       return true;
@@ -383,6 +417,7 @@ export function useMemberLiveScore(
           refreshing,
           moments: moments ?? (current.identity === identity ? current.moments : null),
           matches,
+          start: current.start,
         };
       });
     },
@@ -444,12 +479,12 @@ export function useMemberLiveScore(
   useEffect(() => {
     if (!ready || follow === null) return undefined;
     const visible = () => document.visibilityState === "visible";
-    const stale = () => Date.now() - lastRead.current >= FOLLOW_INTERVAL_MS;
+    const stale = () => Date.now() - lastRead.current >= pace;
     // A read in the last half interval (a refresh, a return to view) stands in for the tick's.
-    const due = () => Date.now() - lastRead.current >= TICK_GAP_MS;
+    const due = () => Date.now() - lastRead.current >= pace / 2;
     const timer = setInterval(() => {
       if (visible() && due()) followRead();
-    }, FOLLOW_INTERVAL_MS);
+    }, pace);
     // Back in view after a minute or more: one read at once, not at the next tick.
     const onVisibility = () => {
       if (visible() && stale()) followRead();
@@ -463,7 +498,7 @@ export function useMemberLiveScore(
       following.current?.abort();
       following.current = null;
     };
-  }, [ready, follow, followRead]);
+  }, [ready, follow, followRead, pace]);
 
   useEffect(
     () => () => {
@@ -481,5 +516,6 @@ export function useMemberLiveScore(
     refresh,
     moments: current ? state.moments : null,
     matches: current ? state.matches : null,
+    start: state.start,
   };
 }

@@ -358,6 +358,7 @@ describe("beside the GOL board", () => {
       refresh: () => undefined,
       moments: null,
       matches: null,
+      start: 1,
     };
     return (
       <LanguageProvider initialLanguage="tr">

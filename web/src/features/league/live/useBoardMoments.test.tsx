@@ -22,7 +22,12 @@ const NAMES = new Map([
 ]);
 
 /** A live week as the hook hands it on: only what the board reads of it. */
-function live(minute: number, autosubs: [number, number][], moments: MemberLive["moments"] = null) {
+function live(
+  minute: number,
+  autosubs: [number, number][],
+  moments: MemberLive["moments"] = null,
+  start = 1,
+) {
   const shown = {
     gameweek: 11,
     names: NAMES,
@@ -37,6 +42,7 @@ function live(minute: number, autosubs: [number, number][], moments: MemberLive[
     refresh: () => undefined,
     moments,
     matches: null,
+    start,
   } satisfies MemberLive;
 }
 
@@ -106,22 +112,35 @@ describe("the GOL board's stream", () => {
     ]);
   });
 
-  it("takes the first read after the week was not shown (a tool's page) as a starting point", () => {
+  it("takes the live score's new first read (a tool's page left) as a starting point", () => {
     const { rerender } = render(<Harness value={live(1, [])} />);
-    // On a tool's page the live score shows no week; the substitution comes in meanwhile.
+    // On a tool's page the live score shows no week; back on the page it reads afresh.
     rerender(<Harness value={{ ...live(2, []), shown: null }} />);
-    rerender(<Harness value={live(3, [[4, 13]])} />);
+    rerender(<Harness value={live(3, [[4, 13]], null, 2)} />);
     expect(screen.queryAllByRole("listitem")).toEqual([]);
     // From there on a newer read's substitution rises as before.
     rerender(
       <Harness
-        value={live(4, [
-          [4, 13],
-          [9, 13],
-        ])}
+        value={live(
+          4,
+          [
+            [4, 13],
+            [9, 13],
+          ],
+          null,
+          2,
+        )}
       />,
     );
     expect(screen.getByRole("listitem")).toHaveTextContent("1:Haaland>Trossard");
+  });
+
+  it("keeps counting over a refresh the source refused, as the live score keeps its goals", () => {
+    const { rerender } = render(<Harness value={live(1, [])} />);
+    // The member's refresh is refused: no week shown for a moment, but no new first read.
+    rerender(<Harness value={{ ...live(2, []), shown: null }} />);
+    rerender(<Harness value={live(3, [[4, 13]])} />);
+    expect(screen.getByRole("listitem")).toHaveTextContent("1:Saka>Trossard");
   });
 });
 

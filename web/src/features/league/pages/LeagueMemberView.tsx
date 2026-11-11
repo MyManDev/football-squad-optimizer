@@ -33,7 +33,11 @@ import { forwarder as siteForwarder } from "../forwarder/client";
 import { useLiveWindow } from "../live/useLiveWindow";
 import { useGoalReplay } from "../live/useGoalReplay";
 import { useBoardHold, useBoardMoments } from "../live/useBoardMoments";
-import type { LiveWindowFilter } from "../../liveScore/liveWindow";
+import {
+  FOLLOW_INTERVAL_MS,
+  SLOW_FOLLOW_MS,
+  type LiveWindowFilter,
+} from "../../liveScore/liveWindow";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
 import { squadWithPlayedWeek } from "../live/memberLineup";
 import { whatIfBasis } from "../device/whatIfDraft";
@@ -223,11 +227,13 @@ function LeagueMemberContent({
     view,
     fixtures,
     liveReads,
-    (closed || liveMatch.open) &&
+    (closed || liveMatch.open || liveMatch.slow) &&
       view.league_id === leagueId &&
       (!tool || tool === "current-squad"),
-    // The replay stands in for the page's own reads: nothing follows while it plays.
-    replaying || !liveMatch.open ? null : liveMatch.gameweek,
+    // The replay stands in for the page's own reads: nothing follows while it plays. A match
+    // that may still be played (stalled) is read now and then until its limit.
+    replaying || !(liveMatch.open || liveMatch.slow) ? null : liveMatch.gameweek,
+    liveMatch.open ? FOLLOW_INTERVAL_MS : SLOW_FOLLOW_MS,
   );
   if (liveWeek.matches !== null && liveWeek.matches !== matchFilter) {
     setMatchFilter(liveWeek.matches);

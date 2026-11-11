@@ -35,7 +35,11 @@ import { useLanguage } from "../../../i18n/context";
 import { useFixtures } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
-import type { LiveWindowFilter } from "../../liveScore/liveWindow";
+import {
+  FOLLOW_INTERVAL_MS,
+  SLOW_FOLLOW_MS,
+  type LiveWindowFilter,
+} from "../../liveScore/liveWindow";
 import type { DevicePlanDocument } from "../device/types";
 import { useForwardedLeague } from "../forwarded/ForwardedLeagueContext";
 import { defaultRivalOf } from "../forwarded/forwardedTree";
@@ -178,7 +182,8 @@ function LiveMember({
     fixtures,
     sources,
     ready,
-    replaying || !liveMatch.open ? null : liveMatch.gameweek,
+    replaying || !(liveMatch.open || liveMatch.slow) ? null : liveMatch.gameweek,
+    liveMatch.open ? FOLLOW_INTERVAL_MS : SLOW_FOLLOW_MS,
   );
   if (live.matches !== null && live.matches !== matchFilter) setMatchFilter(live.matches);
   const replay = useGoalReplay(view, fixtures, sources, replaying && ready);
