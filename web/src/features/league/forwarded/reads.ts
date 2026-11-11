@@ -166,7 +166,11 @@ export function captureTableQuery(table: DevicePlanTableRef | null) {
   };
 }
 
-/** The read of one entry's bundle for a table gameweek; the site's forwarder unless given. */
+/**
+ * The read of one entry's bundle for a table gameweek; the site's forwarder unless given. A
+ * refusal is no document to keep: it is the read's error, so a bundle already held stays the
+ * query's data and a page drawn from it is never taken away by one failed answer.
+ */
 export function entryBundleQuery(
   entryId: number,
   gameweek: number | null,
@@ -176,8 +180,7 @@ export function entryBundleQuery(
     queryKey: forwardedKeys.bundle(entryId, gameweek),
     queryFn: async ({ signal }: { signal: AbortSignal }) => {
       const answer = await read(entryId, gameweek!, { signal });
-      // A read the page stopped is no answer to keep.
-      if (!answer.ok && answer.reason === "aborted") throw new ForwarderRefused(answer.reason);
+      if (!answer.ok) throw new ForwarderRefused(answer.reason);
       return answer;
     },
   };

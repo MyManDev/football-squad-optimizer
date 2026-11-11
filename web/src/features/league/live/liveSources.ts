@@ -26,7 +26,7 @@ import type {
   ForwarderResult,
 } from "../forwarder/client";
 import type { FplEntryBundle, FplEntrySeason } from "../forwarder/documents";
-import { entryBundleQuery, ForwarderRefused } from "../forwarded/reads";
+import { entryBundleQuery, ForwarderRefused, refusalOf } from "../forwarded/reads";
 import { LEAGUE_READ } from "../queries";
 import type { LeagueViewEnvelope } from "../types";
 import type { MemberLiveDependencies } from "./useMemberLiveScore";
@@ -126,7 +126,9 @@ export function tableQuery(
 /**
  * A bundle read into the page's cache, or found there, under the league's read policy and
  * the forwarded gate's key: the gate, the phone bar's LIVE pill and the live week share one
- * read. A refusal is never kept for the next ask: that ask reads again.
+ * read. A bundle held under a minute is taken as it is; an older one, or none, is read. A
+ * refusal is never kept (the read throws it), so the next ask reads again, and a read that
+ * fails leaves a bundle already held in place for the pages drawn from it.
  */
 export function cachedBundle(
   forwarder: Pick<ForwarderClient, "entryBundle">,
@@ -134,21 +136,11 @@ export function cachedBundle(
 ): ForwarderClient["entryBundle"] {
   return async (entryId, gameweek) => {
     const query = bundleQuery(forwarder, entryId, gameweek);
-    const kept = client.getQueryData<ForwarderResult<FplEntryBundle, BundleReason>>(query.queryKey);
-    if (kept !== undefined && !kept.ok) {
-      await client.invalidateQueries({
-        queryKey: query.queryKey,
-        exact: true,
-        refetchType: "none",
-      });
-    }
     await client.prefetchQuery({ ...query, ...LEAGUE_READ });
-    return (
-      client.getQueryData<ForwarderResult<FplEntryBundle, BundleReason>>(query.queryKey) ?? {
-        ok: false,
-        reason: "network",
-      }
-    );
+    const held = client.getQueryData<ForwarderResult<FplEntryBundle, BundleReason>>(query.queryKey);
+    if (held !== undefined) return held;
+    const error = client.getQueryState(query.queryKey)?.error;
+    return { ok: false, reason: refusalOf(error) as BundleReason };
   };
 }
 
