@@ -32,6 +32,7 @@ import { useMemberLiveScore, type MemberLiveDependencies } from "../live/useMemb
 import { forwarder as siteForwarder } from "../forwarder/client";
 import { useLiveWindow } from "../live/useLiveWindow";
 import { useGoalReplay } from "../live/useGoalReplay";
+import { useBoardHold, useBoardMoments } from "../live/useBoardMoments";
 import type { LiveWindowFilter } from "../../liveScore/liveWindow";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
 import { squadWithPlayedWeek } from "../live/memberLineup";
@@ -201,7 +202,8 @@ function LeagueMemberContent({
   // while no read is made, so the window follows only their matches (the owner's decision 3).
   const [matchFilter, setMatchFilter] = useState<LiveWindowFilter>({});
   // The GOL replay opens from the address alone (`?replay=1`): it plays the member's live week's
-  // goals and assists one by one, so the moment can be seen when no match is on.
+  // goals, assists and automatic substitutions one by one, so the board can be seen when no
+  // match is on.
   const replaying = searchParams.get("replay") === "1";
   // The member's bundle is read through the app's cache, under the forwarded gate's key, so
   // the phone bar's LIVE pill and LIVE itself read it no second time.
@@ -233,7 +235,18 @@ function LeagueMemberContent({
   // One GOL layer for the page and its tools, which share this mounted page: it stays as the
   // member moves between them, so a moment already played never plays again on the way back.
   const replay = useGoalReplay(view, fixtures, liveReads, replaying && view.league_id === leagueId);
-  const goalMoments = <GoalMomentLayer batch={replaying ? replay : liveWeek.moments} />;
+  const board = useBoardMoments(liveWeek, view.entry.entry_id);
+  // The live score holds the points of the board's queued moments until each one's run lands;
+  // the replay brings no real points, so it holds nothing.
+  const hold = useBoardHold(replaying ? null : board);
+  const goalBatch = replaying
+    ? replay === null
+      ? null
+      : { id: `replay:${replay.id}`, items: replay.items }
+    : board === null
+      ? null
+      : { id: `live:${board.id}`, items: board.items };
+  const goalMoments = <GoalMomentLayer batch={goalBatch} onLanded={hold.landed} />;
   const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
@@ -548,7 +561,7 @@ function LeagueMemberContent({
             closed week leaves the plan's settings out, so the card adds nothing to the open
             week's page. It needs the calendar for each club's id. */}
           {deadlinePassed !== null && fixtures !== null && view.league_id === leagueId ? (
-            <MemberLiveWeekView squad={view} live={liveWeek} />
+            <MemberLiveWeekView squad={view} live={liveWeek} held={hold.held} />
           ) : null}
 
           {/* What the member's last finished week came to, before what this week decides. */}

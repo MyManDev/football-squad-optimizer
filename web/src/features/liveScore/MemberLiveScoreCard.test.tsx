@@ -106,3 +106,14 @@ it("keeps a real zero and a negative score visible in the net stat", () => {
   rerender(<MemberLiveScoreCard gameweek={8} score={{ ...score, net: -4 }} names={names} />);
   expect(net()).toHaveTextContent(/^-4$/);
 });
+
+describe("the live score beside the GOL board", () => {
+  it("holds back what the board has still to bring, and counts in whole points", () => {
+    const score = result("transfer-hit", true);
+    if (score.refused) throw new Error(score.reason);
+    show(score, "tr", { held: 4 });
+    const figure = document.querySelector("[data-live-total]")!;
+    expect(figure.textContent).toBe((score.net - 4).toLocaleString("tr-TR"));
+    expect(figure.textContent).not.toMatch(/[.,]\d/);
+  });
+});

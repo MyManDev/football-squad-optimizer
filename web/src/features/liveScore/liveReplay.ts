@@ -1,7 +1,8 @@
 /**
  * The GOL replay (`?replay=1` on the member page, the owner's way to see the moment on the live
  * site before a match is played): one live read's goals and assists for the member's picks,
- * one at a time, as if each had come in a read of its own.
+ * one at a time, as if each had come in a read of its own. The member page's replay
+ * (`useGoalReplay`) plays the week's automatic substitutions after them.
  */
 
 import { MOTION_MS } from "../../design/motion";

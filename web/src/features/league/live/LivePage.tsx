@@ -43,6 +43,7 @@ import {
   type LiveForwarder,
 } from "./liveSources";
 import { LiveView } from "./LiveView";
+import { useBoardMoments } from "./useBoardMoments";
 import { useGoalReplay } from "./useGoalReplay";
 import { useLiveWindow } from "./useLiveWindow";
 import { useMemberLiveScore } from "./useMemberLiveScore";
@@ -145,6 +146,16 @@ function LiveMember({
   );
   if (live.matches !== null && live.matches !== matchFilter) setMatchFilter(live.matches);
   const replay = useGoalReplay(view, fixtures, sources, replaying && ready);
+  // The board's batches, numbered as the member page numbers them: the replay and the real
+  // reads are two streams, so one never swallows or replays the other's moment.
+  const stream = useBoardMoments(live, entryId);
+  const goalBatch = replaying
+    ? replay === null
+      ? null
+      : { id: `replay:${replay.id}`, items: replay.items }
+    : stream === null
+      ? null
+      : { id: `live:${stream.id}`, items: stream.items };
 
   const snapshot = useSyncExternalStore(record.subscribe, record.snapshot, record.snapshot);
   const memberBundle = useQuery({
@@ -280,7 +291,7 @@ function LiveMember({
         (table.isPending || (reading === null && !snapshot.settled.has(memberWeek.gameweek)))));
   return (
     <>
-      <GoalMomentLayer batch={replaying ? replay : live.moments} />
+      <GoalMomentLayer batch={goalBatch} />
       <LiveView
         team={team}
         gameweek={board?.gameweek ?? week}

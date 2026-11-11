@@ -19,28 +19,35 @@ import { createPortal } from "react-dom";
 
 import { MOTION_EASE, MOTION_MS, prefersReducedMotion } from "../../design/motion";
 import { ASSIST_SHOUT, GOAL_SHOUT, MOMENT_TIMING } from "./goalMomentTiming";
-import { useCoverGone } from "./openingCover";
+import { usePageClear } from "./openingCover";
 import { useLanguage } from "../../i18n/context";
+import { shownOnBoard, type BoardMoment, type SubstitutionMoment } from "./boardMoments";
 import type { LiveMoment } from "./liveMoments";
 import type { Position } from "./weekLive";
 import styles from "./GoalMoment.module.css";
 
 const COPY = {
   tr: {
-    shout: { goal: GOAL_SHOUT, assist: ASSIST_SHOUT.tr },
+    shout: { goal: GOAL_SHOUT.tr, assist: ASSIST_SHOUT.tr },
     goal: "Gol",
     assist: "Asist",
     card: "Kart",
+    substitution: "Değişiklik",
+    out: "Çıkan",
+    in: "Giren",
     bench: "Yedekte",
     close: "Kapat",
     positions: { GK: "Kaleci", DEF: "Defans", MID: "Orta saha", FWD: "Forvet" },
     points: (value: string) => `${value} puan`,
   },
   en: {
-    shout: { goal: GOAL_SHOUT, assist: ASSIST_SHOUT.en },
+    shout: { goal: GOAL_SHOUT.en, assist: ASSIST_SHOUT.en },
     goal: "Goal",
     assist: "Assist",
     card: "Card",
+    substitution: "Substitution",
+    out: "Out",
+    in: "In",
     bench: "On Bench",
     close: "Close",
     positions: { GK: "Goalkeeper", DEF: "Defender", MID: "Midfielder", FWD: "Forward" },
@@ -53,6 +60,9 @@ const COPY = {
     goal: string;
     assist: string;
     card: string;
+    substitution: string;
+    out: string;
+    in: string;
     bench: string;
     close: string;
     positions: Record<Position, string>;
@@ -64,15 +74,20 @@ type Copy = (typeof COPY)["tr"];
 
 const EASE = `cubic-bezier(${MOTION_EASE.join(", ")})`;
 
+/** The flex gap beside the order (var(--space-2)), and the smallest LED letters. */
+const FIT_GAP = 8;
+const LED_MIN = 30;
+
 /** One moment on its way: its place among the read's big moments. */
 interface Queued {
-  moment: LiveMoment;
+  moment: BoardMoment;
   order: string;
 }
 
 interface Batch {
-  id: number;
-  items: LiveMoment[];
+  /** One stream per source (`live:`, `replay:`), so the two never stand for each other. */
+  id: string;
+  items: BoardMoment[];
 }
 
 const signed = (value: number, locale: string) =>
@@ -93,44 +108,66 @@ function animate(
   });
 }
 
-export function GoalMomentLayer({ batch }: { batch: Batch | null }) {
+export function GoalMomentLayer({
+  batch,
+  onLanded,
+}: {
+  batch: Batch | null;
+  /** Told when a moment's points have reached the live score (or will not run there). */
+  onLanded?: (key: string) => void;
+}) {
   const { language, locale } = useLanguage();
   const copy = COPY[language];
-  const coverGone = useCoverGone();
+  const layer = useRef<HTMLDivElement>(null);
+  // Nothing plays under the opening cover, a modal dialog or a cover over the page.
+  const clear = usePageClear(layer);
+  const landed = useRef(onLanded);
+  useEffect(() => {
+    landed.current = onLanded;
+  });
   const [state, setState] = useState<{
-    batch: number | null;
+    batch: string | null;
     queue: Queued[];
-    still: LiveMoment[] | null;
+    still: BoardMoment[] | null;
   }>({ batch: null, queue: [], still: null });
   // A new read's moments join the queue once; under reduced motion they become the still line.
   if (batch !== null && batch.id !== state.batch) {
-    const bigs = batch.items.filter((moment) => moment.size === "big").length;
+    // Only what brings the member points: a reserve the scorer does not count raises nothing.
+    const items = batch.items.filter(shownOnBoard);
+    const bigs = items.filter((moment) => moment.size === "big").length;
     let big = 0;
-    const queued = batch.items.map((moment) => ({
+    const queued = items.map((moment) => ({
       moment,
       order: moment.size === "big" && bigs > 1 ? `${++big}/${bigs}` : "",
     }));
     setState((current) =>
       prefersReducedMotion()
-        ? { batch: batch.id, queue: [], still: batch.items }
+        ? { batch: batch.id, queue: [], still: items.length > 0 ? items : null }
         : { batch: batch.id, queue: [...current.queue, ...queued], still: null },
     );
   }
   const next = () => setState((current) => ({ ...current, queue: current.queue.slice(1) }));
-  const playing = coverGone ? state.queue[0] : undefined;
+  const playing = clear ? state.queue[0] : undefined;
   const spoken =
     playing !== undefined
       ? announcement(playing.moment, copy, locale)
-      : state.still !== null && coverGone
+      : state.still !== null && clear
         ? state.still.map((moment) => announcement(moment, copy, locale)).join(". ")
         : "";
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className={styles.layer} lang={language} data-goal-moments>
+    <div ref={layer} className={styles.layer} lang={language} data-goal-moments>
       <p className="visually-hidden" role="status" aria-live="polite">
         {spoken}
       </p>
-      {playing === undefined ? null : playing.moment.size === "small" ? (
+      {playing === undefined ? null : playing.moment.kind === "substitution" ? (
+        <SubstitutionBoard
+          key={playing.moment.key}
+          moment={playing.moment}
+          copy={copy}
+          onDone={next}
+        />
+      ) : playing.moment.size === "small" ? (
         <SmallLine
           key={playing.moment.key}
           moment={playing.moment}
@@ -141,13 +178,14 @@ export function GoalMomentLayer({ batch }: { batch: Batch | null }) {
       ) : (
         <Board
           key={playing.moment.key}
-          queued={playing}
+          queued={{ moment: playing.moment, order: playing.order }}
           copy={copy}
           locale={locale}
+          onLanded={(key) => landed.current?.(key)}
           onDone={next}
         />
       )}
-      {state.still !== null && coverGone ? (
+      {state.still !== null && clear ? (
         <StillLine
           key={state.batch ?? 0}
           moments={state.still}
@@ -162,7 +200,10 @@ export function GoalMomentLayer({ batch }: { batch: Batch | null }) {
 }
 
 function word(moment: LiveMoment, copy: Copy): string {
-  return moment.kind === "goal" ? copy.goal : moment.kind === "assist" ? copy.assist : copy.card;
+  const name =
+    moment.kind === "goal" ? copy.goal : moment.kind === "assist" ? copy.assist : copy.card;
+  // Two goals of one player in one read are one moment: "Gol ×2".
+  return moment.count > 1 ? `${name} ×${moment.count}` : name;
 }
 
 /** A big goal's or assist's shout; nothing for any other moment. */
@@ -171,7 +212,10 @@ function shouted(moment: LiveMoment, copy: Copy): string | null {
   return copy.shout[moment.kind];
 }
 
-function announcement(moment: LiveMoment, copy: Copy, locale: string): string {
+function announcement(moment: BoardMoment, copy: Copy, locale: string): string {
+  if (moment.kind === "substitution") {
+    return `${copy.substitution}: ${copy.out} ${moment.out}, ${copy.in} ${moment.in}`;
+  }
   const parts = [`${word(moment, copy)}: ${moment.name}`];
   if (moment.multiplier === 0) parts.push(copy.bench);
   else if (moment.points !== null) parts.push(copy.points(signed(moment.points, locale)));
@@ -182,13 +226,19 @@ function Board({
   queued,
   copy,
   locale,
+  onLanded,
   onDone,
 }: {
-  queued: Queued;
+  queued: { moment: LiveMoment; order: string };
   copy: Copy;
   locale: string;
+  onLanded?: (key: string) => void;
   onDone: () => void;
 }) {
+  const onLandedRef = useRef(onLanded);
+  useEffect(() => {
+    onLandedRef.current = onLanded;
+  });
   const { moment, order } = queued;
   const big = moment.size === "big";
   const doubled = big && moment.multiplier > 1 && moment.base !== null && moment.points !== null;
@@ -212,14 +262,15 @@ function Board({
     const room = head.current;
     if (letters === null || room === null) return;
     letters.style.fontSize = "";
-    const free = room.clientWidth - (letters.nextElementSibling?.clientWidth ?? 0);
+    const beside = letters.nextElementSibling as HTMLElement | null;
+    const free = room.clientWidth - (beside === null ? 0 : beside.offsetWidth + FIT_GAP);
     if (free > 0 && letters.scrollWidth > free) {
       const size = parseFloat(getComputedStyle(letters).fontSize);
-      letters.style.fontSize = `${Math.floor((size * free) / letters.scrollWidth)}px`;
+      letters.style.fontSize = `${Math.max(LED_MIN, Math.floor((size * free) / letters.scrollWidth))}px`;
     }
   }, [text]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
     const later = (ms: number, step: () => void) => timers.push(setTimeout(step, ms));
     let gone = false;
@@ -229,7 +280,8 @@ function Board({
       timers.forEach(clearTimeout);
       const received = moment.points === null ? null : signed(moment.points, locale);
       if (received !== null) setDigits(received);
-      run(number.current, moment.points === 0 ? null : received);
+      const release = () => onLandedRef.current?.(moment.key);
+      if (!run(number.current, moment.points === 0 ? null : received, release)) release();
       const fall = animate(
         board.current,
         [
@@ -300,6 +352,8 @@ function Board({
         ref={board}
         type="button"
         className={styles.board}
+        tabIndex={-1}
+        onMouseDown={(event) => event.preventDefault()}
         aria-label={copy.close}
         data-goal-board={moment.kind}
         onClick={() => leaving.current?.()}
@@ -335,22 +389,130 @@ function Board({
   );
 }
 
+/**
+ * The fourth official's board as it is meant: DEĞİŞİKLİK in LED letters, the starter going off on
+ * the red panel and the reserve coming on on the green one. It rises, stays a step less than a
+ * goal's board and goes down by itself, or at once on a tap or Escape.
+ */
+function SubstitutionBoard({
+  moment,
+  copy,
+  onDone,
+}: {
+  moment: SubstitutionMoment;
+  copy: Copy;
+  onDone: () => void;
+}) {
+  const board = useRef<HTMLButtonElement>(null);
+  const word = useRef<HTMLSpanElement>(null);
+  const head = useRef<HTMLSpanElement>(null);
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
+  const leaving = useRef<(() => void) | null>(null);
+  useLayoutEffect(() => {
+    const letters = word.current;
+    const room = head.current;
+    if (letters === null || room === null) return;
+    letters.style.fontSize = "";
+    if (room.clientWidth > 0 && letters.scrollWidth > room.clientWidth) {
+      const size = parseFloat(getComputedStyle(letters).fontSize);
+      letters.style.fontSize = `${Math.max(LED_MIN, Math.floor((size * room.clientWidth) / letters.scrollWidth))}px`;
+    }
+  }, []);
+  useLayoutEffect(() => {
+    let gone = false;
+    const leave = () => {
+      if (gone) return;
+      gone = true;
+      clearTimeout(timer);
+      const fall = animate(
+        board.current,
+        [
+          { transform: "perspective(700px) rotateX(0deg)", opacity: 1 },
+          { transform: "perspective(700px) rotateX(-90deg)", opacity: 0 },
+        ],
+        MOMENT_TIMING.fall,
+      );
+      if (fall === null) done.current();
+      else
+        fall.finished.then(
+          () => done.current(),
+          () => done.current(),
+        );
+    };
+    leaving.current = leave;
+    animate(
+      board.current,
+      [
+        { transform: "perspective(700px) rotateX(-90deg)", opacity: 0 },
+        { transform: "perspective(700px) rotateX(0deg)", opacity: 1 },
+      ],
+      MOMENT_TIMING.rise,
+    );
+    const timer = setTimeout(leave, MOMENT_TIMING.rise + MOMENT_TIMING.holdAssist);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") leave();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+  return (
+    <div className={styles.place} data-size="big">
+      <button
+        ref={board}
+        type="button"
+        className={`${styles.board} ${styles.swap}`}
+        tabIndex={-1}
+        onMouseDown={(event) => event.preventDefault()}
+        aria-label={copy.close}
+        data-goal-board="substitution"
+        onClick={() => leaving.current?.()}
+      >
+        <span ref={head} className={styles.head}>
+          <span ref={word} className={styles.shout} data-long="">
+            {copy.substitution}
+          </span>
+        </span>
+        <span className={`${styles.panel} ${styles.off}`}>
+          <span className={styles.side}>{copy.out}</span>
+          <span className={styles.name}>{moment.out}</span>
+        </span>
+        <span className={styles.panel}>
+          <span className={styles.side}>{copy.in}</span>
+          <span className={styles.name}>{moment.in}</span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
 /** The points run from the board's digits into the live score, which then pops once. */
-function run(from: HTMLElement | null, points: string | null) {
+function run(from: HTMLElement | null, points: string | null, onLanded: () => void): boolean {
   const target = document.querySelector<HTMLElement>("[data-live-total]");
-  if (from === null || target === null || points === null) return;
+  if (from === null || target === null || points === null) return false;
   const start = from.getBoundingClientRect();
   const end = target.getBoundingClientRect();
-  if (end.bottom < 0 || end.top > window.innerHeight || typeof from.animate !== "function") return;
+  if (end.bottom < 0 || end.top > window.innerHeight || typeof from.animate !== "function") {
+    return false;
+  }
   const chip = document.createElement("span");
   chip.className = styles.runner!;
   chip.textContent = points;
   chip.setAttribute("aria-hidden", "true");
-  chip.style.left = `${start.left}px`;
-  chip.style.top = `${start.top}px`;
   document.body.append(chip);
-  const dx = end.left + end.width / 2 - (start.left + start.width / 2);
-  const dy = end.top + end.height / 2 - (start.top + start.height / 2);
+  // The chip starts centred on the digits and ends centred on the score.
+  const size = chip.getBoundingClientRect();
+  const fromX = start.left + start.width / 2;
+  const fromY = start.top + start.height / 2;
+  chip.style.left = `${fromX - size.width / 2}px`;
+  chip.style.top = `${fromY - size.height / 2}px`;
+  const dx = end.left + end.width / 2 - fromX;
+  const dy = end.top + end.height / 2 - fromY;
   chip
     .animate(
       [
@@ -362,6 +524,7 @@ function run(from: HTMLElement | null, points: string | null) {
     .finished.then(
       () => {
         chip.remove();
+        onLanded();
         animate(
           target,
           [
@@ -373,8 +536,12 @@ function run(from: HTMLElement | null, points: string | null) {
           { fill: "none" },
         );
       },
-      () => chip.remove(),
+      () => {
+        chip.remove();
+        onLanded();
+      },
     );
+  return true;
 }
 
 function lineText(moment: LiveMoment, copy: Copy, locale: string): string {
@@ -400,7 +567,7 @@ function SmallLine({
   useEffect(() => {
     done.current = onDone;
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
     animate(
       line.current,
       [
@@ -432,10 +599,10 @@ function SmallLine({
       className={styles.line}
       data-goal-line={moment.kind}
       data-negative={moment.kind === "card" || undefined}
+      aria-hidden="true"
       onClick={() => leaving.current?.()}
     >
-      {moment.multiplier === 0 ? <span className={styles.tag}>{copy.bench}</span> : null}
-      <span aria-hidden="true">{lineText(moment, copy, locale)}</span>
+      <span>{lineText(moment, copy, locale)}</span>
     </div>
   );
 }
@@ -446,7 +613,7 @@ function StillLine({
   locale,
   onDone,
 }: {
-  moments: LiveMoment[];
+  moments: BoardMoment[];
   copy: Copy;
   locale: string;
   onDone: () => void;
@@ -460,16 +627,19 @@ function StillLine({
     return () => clearTimeout(timer);
   }, []);
   return (
-    <div className={styles.still} data-goal-still>
+    <div className={styles.still} data-goal-still onClick={() => done.current()}>
       <p className={styles.stillText}>
         {moments.map((moment) => (
           <span key={moment.key} data-negative={moment.kind === "card" || undefined}>
-            {shouted(moment, copy) ?? word(moment, copy)} · {moment.name}
-            {moment.multiplier === 0
-              ? ` · ${copy.bench}`
-              : moment.points === null
-                ? ""
-                : ` · ${signed(moment.points, locale)}`}
+            {moment.kind === "substitution"
+              ? `${copy.substitution} · ${copy.out} ${moment.out} · ${copy.in} ${moment.in}`
+              : `${shouted(moment, copy) === null ? word(moment, copy) : `${shouted(moment, copy)}${moment.count > 1 ? ` ×${moment.count}` : ""}`} · ${moment.name}${
+                  moment.multiplier === 0
+                    ? ` · ${copy.bench}`
+                    : moment.points === null
+                      ? ""
+                      : ` · ${signed(moment.points, locale)}`
+                }`}
           </span>
         ))}
       </p>

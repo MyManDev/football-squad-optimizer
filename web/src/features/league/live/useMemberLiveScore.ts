@@ -103,14 +103,31 @@ function scored(
 }
 
 /**
- * The clubs of the member's fifteen and the week's unfinished fixtures, as one live read names
- * them. A pick the read gives no club leaves the clubs open (null), so no match is missed.
+ * The clubs (the calendar's team ids) of the member's fifteen and the week's unfinished
+ * fixtures. The clubs come from the scored week's lineup, which names each pick's club as the
+ * capture's table does: the forwarder's live elements carry no club. A club the calendar does
+ * not name leaves the clubs open (null), so no match is missed.
  */
-function matchesOf(live: LiveReading, member: MemberWeek): LiveWindowFilter {
-  const clubs = new Map(live.week.elements.map((element) => [element.element_id, element.club]));
-  const picked = member.pick_order.map((elementId) => clubs.get(elementId));
+function matchesOf(
+  live: LiveReading,
+  shown: MemberLiveScore,
+  fixtures: FixturesPayload | null,
+): LiveWindowFilter {
+  const ids = new Map<string, number>();
+  for (const week of fixtures?.gameweeks ?? []) {
+    for (const fixture of week.fixtures) {
+      ids.set(fixture.home.name, fixture.home.team_id);
+      ids.set(fixture.away.name, fixture.away.team_id);
+    }
+  }
+  const picked = [...shown.lineup.starting_xi, ...shown.lineup.bench].map((player) =>
+    ids.get(player.team),
+  );
   return {
-    clubs: picked.every((club) => club !== undefined) ? new Set(picked as number[]) : null,
+    clubs:
+      picked.length > 0 && picked.every((club) => club !== undefined)
+        ? new Set(picked as number[])
+        : null,
     unfinished: new Set(live.week.fixtures.filter((row) => !row.finished).map((row) => row.id)),
   };
 }
@@ -265,7 +282,7 @@ export function useMemberLiveScore(
       if (shown === null) return false;
       // A first read made again may bring a goal against the marks so far: it plays too.
       const moments = momentsOf(shown, live, held.current);
-      const matches = matchesOf(live, member);
+      const matches = matchesOf(live, shown, sources.current.fixtures);
       setState((current) => {
         const kept = current.identity === identity;
         return {
@@ -327,7 +344,7 @@ export function useMemberLiveScore(
           shown,
           refreshing,
           moments: moments ?? (current.identity === identity ? current.moments : null),
-          matches: matchesOf(live, inputs.member),
+          matches: matchesOf(live, shown, sources.current.fixtures),
         };
       });
     },

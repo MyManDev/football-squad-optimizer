@@ -174,7 +174,11 @@
 .still {
   position: fixed;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
-  left: 50%;
+  /* Centred across the screen at its own width, one line where the screen allows. */
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  width: fit-content;
+  margin-inline: auto;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -191,7 +195,6 @@
   text-transform: uppercase;
   pointer-events: auto;
   cursor: pointer;
-  translate: -50% 0;
 }
 
 .line[data-negative] .tag,
@@ -228,4 +231,34 @@
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
+}
+
+/* The substitution board: the word across the top, the player going off on the red panel and
+   the one coming on on the green one below it, as the decision card's boards stand. */
+.swap {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: none;
+}
+
+.swap .head,
+.swap .panel {
+  grid-area: auto;
+}
+
+.off {
+  background: var(--color-out-panel);
+}
+
+.side {
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+  text-transform: uppercase;
+}
+
+/* The close button's focus ring in the mark colour, which reads on the board in both themes. */
+.close:focus-visible {
+  outline-color: var(--color-mark);
 }
