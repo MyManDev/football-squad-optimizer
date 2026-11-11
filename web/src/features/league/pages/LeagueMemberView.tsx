@@ -6,7 +6,8 @@ import {
 } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 
@@ -26,7 +27,9 @@ import { isDevicePlanEntry } from "../device/types";
 import { advisedFifteen } from "../device/whatIf";
 import { WhatIfPanel } from "../device/WhatIfPanel";
 import { MemberLiveWeekView } from "../live/MemberLiveWeek";
-import { useMemberLiveScore } from "../live/useMemberLiveScore";
+import { cachedBundle } from "../live/liveSources";
+import { useMemberLiveScore, type MemberLiveDependencies } from "../live/useMemberLiveScore";
+import { forwarder as siteForwarder } from "../forwarder/client";
 import { useLiveWindow } from "../live/useLiveWindow";
 import { useGoalReplay } from "../live/useGoalReplay";
 import type { LiveWindowFilter } from "../../liveScore/liveWindow";
@@ -200,11 +203,24 @@ function LeagueMemberContent({
   // The GOL replay opens from the address alone (`?replay=1`): it plays the member's live week's
   // goals and assists one by one, so the moment can be seen when no match is on.
   const replaying = searchParams.get("replay") === "1";
+  // The member's bundle is read through the app's cache, under the forwarded gate's key, so
+  // the phone bar's LIVE pill and LIVE itself read it no second time.
+  const queryClient = useContext(QueryClientContext);
+  const liveReads = useMemo<MemberLiveDependencies | undefined>(
+    () =>
+      liveDependencies ??
+      (queryClient === undefined
+        ? undefined
+        : {
+            forwarder: { ...siteForwarder, entryBundle: cachedBundle(siteForwarder, queryClient) },
+          }),
+    [liveDependencies, queryClient],
+  );
   const liveMatch = useLiveWindow(fixtures, matchFilter);
   const liveWeek = useMemberLiveScore(
     view,
     fixtures,
-    liveDependencies,
+    liveReads,
     (closed || liveMatch.open) &&
       view.league_id === leagueId &&
       (!tool || tool === "current-squad"),
@@ -216,12 +232,7 @@ function LeagueMemberContent({
   }
   // One GOL layer for the page and its tools, which share this mounted page: it stays as the
   // member moves between them, so a moment already played never plays again on the way back.
-  const replay = useGoalReplay(
-    view,
-    fixtures,
-    liveDependencies,
-    replaying && view.league_id === leagueId,
-  );
+  const replay = useGoalReplay(view, fixtures, liveReads, replaying && view.league_id === leagueId);
   const goalMoments = <GoalMomentLayer batch={replaying ? replay : liveWeek.moments} />;
   const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
