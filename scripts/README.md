@@ -191,6 +191,7 @@ do not move.
 | `run_terminal_value_study.py` | measurement runner | `docs/terminal_value_study.json` | 2026-08-20 |
 | `run_transfer_discipline_seasons.py` | measurement runner | `docs/transfer_discipline.json` (+ rolling variants) | 2026-09-19 |
 | `score_planner_policy_chain.py` | measurement runner | `docs/research/planner_policy_chain_gw20.json` and `planner_policy_chain_gw38.json` with their markdown twins, each once, from the chain runner's evidence, the receipts posted on the tracking issue (`--receipts`, `--producer-changes`) and the season's outcome captures; needs a clean, non-shallow clone that reaches origin; protocol `docs/research/planner_policy_chain_prereg.md`, rules 2, 3, 6, 13, 14 and 20 to 37 | 2026-10-11 |
+| `summarize_solver_budget_cards.py` | measurement runner | `docs/research/phase_c_solver_budget_cards.json`, summarized from the evaluation documents `evaluate_phase_c_components.py` writes with `--card-participation --record-decisions` at two solver budgets; fits and measures nothing; declaration `docs/research/phase_c_solver_budget_cards_method.md` | 2026-11-09 |
 
 ## Artifact-only runners
 
