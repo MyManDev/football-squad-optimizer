@@ -8,6 +8,7 @@ import { MOTION_MS } from "../../design/motion";
 import { LanguageProvider } from "../../i18n/LanguageProvider";
 import { GoalMomentLayer } from "./GoalMoment";
 import { ASSIST_SHOUT, GOAL_SHOUT, MOMENT_TIMING } from "./goalMomentTiming";
+import type { BoardMoment } from "./boardMoments";
 import type { LiveMoment } from "./liveMoments";
 
 afterEach(() => {
@@ -44,7 +45,7 @@ const HAALAND = moment({
   points: 8,
 });
 
-function show(items: LiveMoment[], language: "tr" | "en" = "tr", id = 1) {
+function show(items: BoardMoment[], language: "tr" | "en" = "tr", id = 1) {
   const view = (batchId: number) => (
     <LanguageProvider initialLanguage={language}>
       <GoalMomentLayer batch={{ id: batchId, items }} />
@@ -156,12 +157,30 @@ describe("the GOL board", () => {
     expect(document.querySelector("[data-goal-line]")).toBeNull();
   });
 
-  it("names a reserve's goal on the line, without points", () => {
-    show([moment({ size: "small", multiplier: 0, points: 0, name: "N.Jackson" })]);
-    const line = document.querySelector("[data-goal-line]")!;
-    expect(line.textContent).toContain("Yedekte");
-    expect(line.textContent).toContain("Gol · N.Jackson");
-    expect(line.textContent).not.toContain("+");
+  it("raises nothing for a reserve the scorer does not count, and the reserve under the bench boost", () => {
+    vi.useFakeTimers();
+    show([moment({ size: "small", multiplier: 0, points: null, name: "N.Jackson" })]);
+    expect(board()).toBeNull();
+    expect(document.querySelector("[data-goal-line]")).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("");
+    cleanup();
+    // Under the bench boost the scorer counts the bench: his goal rises the board.
+    show([moment({ multiplier: 1, name: "N.Jackson" })]);
+    expect(board()!.textContent).toContain("N.Jackson");
+  });
+
+  it("raises the substitution board: the starter off on red, the reserve on on green", () => {
+    vi.useFakeTimers();
+    show([{ key: "sub:1:4:13", kind: "substitution", size: "big", out: "Saka", in: "Trossard" }]);
+    const swap = document.querySelector("[data-goal-board='substitution']")!;
+    expect(swap.textContent).toContain("Değişiklik");
+    expect(swap.textContent).toContain("Çıkan");
+    expect(swap.textContent).toContain("Saka");
+    expect(swap.textContent).toContain("Giren");
+    expect(swap.textContent).toContain("Trossard");
+    expect(screen.getByRole("status")).toHaveTextContent("Değişiklik: Çıkan Saka, Giren Trossard");
+    advance(MOMENT_TIMING.rise + MOMENT_TIMING.holdAssist);
+    expect(document.querySelector("[data-goal-board='substitution']")).toBeNull();
   });
 
   it("plays a read once: the same batch again starts nothing", () => {

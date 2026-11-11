@@ -21,6 +21,7 @@ import { MOTION_EASE, MOTION_MS, prefersReducedMotion } from "../../design/motio
 import { ASSIST_SHOUT, GOAL_SHOUT, MOMENT_TIMING } from "./goalMomentTiming";
 import { useCoverGone } from "./openingCover";
 import { useLanguage } from "../../i18n/context";
+import { shownOnBoard, type BoardMoment, type SubstitutionMoment } from "./boardMoments";
 import type { LiveMoment } from "./liveMoments";
 import type { Position } from "./weekLive";
 import styles from "./GoalMoment.module.css";
@@ -31,6 +32,9 @@ const COPY = {
     goal: "Gol",
     assist: "Asist",
     card: "Kart",
+    substitution: "Değişiklik",
+    out: "Çıkan",
+    in: "Giren",
     bench: "Yedekte",
     close: "Kapat",
     positions: { GK: "Kaleci", DEF: "Defans", MID: "Orta saha", FWD: "Forvet" },
@@ -41,6 +45,9 @@ const COPY = {
     goal: "Goal",
     assist: "Assist",
     card: "Card",
+    substitution: "Substitution",
+    out: "Out",
+    in: "In",
     bench: "On Bench",
     close: "Close",
     positions: { GK: "Goalkeeper", DEF: "Defender", MID: "Midfielder", FWD: "Forward" },
@@ -53,6 +60,9 @@ const COPY = {
     goal: string;
     assist: string;
     card: string;
+    substitution: string;
+    out: string;
+    in: string;
     bench: string;
     close: string;
     positions: Record<Position, string>;
@@ -66,13 +76,13 @@ const EASE = `cubic-bezier(${MOTION_EASE.join(", ")})`;
 
 /** One moment on its way: its place among the read's big moments. */
 interface Queued {
-  moment: LiveMoment;
+  moment: BoardMoment;
   order: string;
 }
 
 interface Batch {
   id: number;
-  items: LiveMoment[];
+  items: BoardMoment[];
 }
 
 const signed = (value: number, locale: string) =>
@@ -100,19 +110,21 @@ export function GoalMomentLayer({ batch }: { batch: Batch | null }) {
   const [state, setState] = useState<{
     batch: number | null;
     queue: Queued[];
-    still: LiveMoment[] | null;
+    still: BoardMoment[] | null;
   }>({ batch: null, queue: [], still: null });
   // A new read's moments join the queue once; under reduced motion they become the still line.
   if (batch !== null && batch.id !== state.batch) {
-    const bigs = batch.items.filter((moment) => moment.size === "big").length;
+    // Only what brings the member points: a reserve the scorer does not count raises nothing.
+    const items = batch.items.filter(shownOnBoard);
+    const bigs = items.filter((moment) => moment.size === "big").length;
     let big = 0;
-    const queued = batch.items.map((moment) => ({
+    const queued = items.map((moment) => ({
       moment,
       order: moment.size === "big" && bigs > 1 ? `${++big}/${bigs}` : "",
     }));
     setState((current) =>
       prefersReducedMotion()
-        ? { batch: batch.id, queue: [], still: batch.items }
+        ? { batch: batch.id, queue: [], still: items.length > 0 ? items : null }
         : { batch: batch.id, queue: [...current.queue, ...queued], still: null },
     );
   }
@@ -130,7 +142,14 @@ export function GoalMomentLayer({ batch }: { batch: Batch | null }) {
       <p className="visually-hidden" role="status" aria-live="polite">
         {spoken}
       </p>
-      {playing === undefined ? null : playing.moment.size === "small" ? (
+      {playing === undefined ? null : playing.moment.kind === "substitution" ? (
+        <SubstitutionBoard
+          key={playing.moment.key}
+          moment={playing.moment}
+          copy={copy}
+          onDone={next}
+        />
+      ) : playing.moment.size === "small" ? (
         <SmallLine
           key={playing.moment.key}
           moment={playing.moment}
@@ -141,7 +160,7 @@ export function GoalMomentLayer({ batch }: { batch: Batch | null }) {
       ) : (
         <Board
           key={playing.moment.key}
-          queued={playing}
+          queued={{ moment: playing.moment, order: playing.order }}
           copy={copy}
           locale={locale}
           onDone={next}
@@ -171,7 +190,10 @@ function shouted(moment: LiveMoment, copy: Copy): string | null {
   return copy.shout[moment.kind];
 }
 
-function announcement(moment: LiveMoment, copy: Copy, locale: string): string {
+function announcement(moment: BoardMoment, copy: Copy, locale: string): string {
+  if (moment.kind === "substitution") {
+    return `${copy.substitution}: ${copy.out} ${moment.out}, ${copy.in} ${moment.in}`;
+  }
   const parts = [`${word(moment, copy)}: ${moment.name}`];
   if (moment.multiplier === 0) parts.push(copy.bench);
   else if (moment.points !== null) parts.push(copy.points(signed(moment.points, locale)));
@@ -184,7 +206,7 @@ function Board({
   locale,
   onDone,
 }: {
-  queued: Queued;
+  queued: { moment: LiveMoment; order: string };
   copy: Copy;
   locale: string;
   onDone: () => void;
@@ -335,6 +357,106 @@ function Board({
   );
 }
 
+/**
+ * The fourth official's board as it is meant: DEĞİŞİKLİK in LED letters, the starter going off on
+ * the red panel and the reserve coming on on the green one. It rises, stays a step less than a
+ * goal's board and goes down by itself, or at once on a tap or Escape.
+ */
+function SubstitutionBoard({
+  moment,
+  copy,
+  onDone,
+}: {
+  moment: SubstitutionMoment;
+  copy: Copy;
+  onDone: () => void;
+}) {
+  const board = useRef<HTMLButtonElement>(null);
+  const word = useRef<HTMLSpanElement>(null);
+  const head = useRef<HTMLSpanElement>(null);
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
+  const leaving = useRef<(() => void) | null>(null);
+  useLayoutEffect(() => {
+    const letters = word.current;
+    const room = head.current;
+    if (letters === null || room === null) return;
+    letters.style.fontSize = "";
+    if (room.clientWidth > 0 && letters.scrollWidth > room.clientWidth) {
+      const size = parseFloat(getComputedStyle(letters).fontSize);
+      letters.style.fontSize = `${Math.floor((size * room.clientWidth) / letters.scrollWidth)}px`;
+    }
+  }, []);
+  useEffect(() => {
+    let gone = false;
+    const leave = () => {
+      if (gone) return;
+      gone = true;
+      clearTimeout(timer);
+      const fall = animate(
+        board.current,
+        [
+          { transform: "perspective(700px) rotateX(0deg)", opacity: 1 },
+          { transform: "perspective(700px) rotateX(-90deg)", opacity: 0 },
+        ],
+        MOMENT_TIMING.fall,
+      );
+      if (fall === null) done.current();
+      else
+        fall.finished.then(
+          () => done.current(),
+          () => done.current(),
+        );
+    };
+    leaving.current = leave;
+    animate(
+      board.current,
+      [
+        { transform: "perspective(700px) rotateX(-90deg)", opacity: 0 },
+        { transform: "perspective(700px) rotateX(0deg)", opacity: 1 },
+      ],
+      MOMENT_TIMING.rise,
+    );
+    const timer = setTimeout(leave, MOMENT_TIMING.rise + MOMENT_TIMING.holdAssist);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") leave();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+  return (
+    <div className={styles.place} data-size="big">
+      <button
+        ref={board}
+        type="button"
+        className={`${styles.board} ${styles.swap}`}
+        aria-label={copy.close}
+        data-goal-board="substitution"
+        onClick={() => leaving.current?.()}
+      >
+        <span ref={head} className={styles.head}>
+          <span ref={word} className={styles.shout} data-long="">
+            {copy.substitution}
+          </span>
+        </span>
+        <span className={`${styles.panel} ${styles.off}`}>
+          <span className={styles.side}>{copy.out}</span>
+          <span className={styles.name}>{moment.out}</span>
+        </span>
+        <span className={styles.panel}>
+          <span className={styles.side}>{copy.in}</span>
+          <span className={styles.name}>{moment.in}</span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
 /** The points run from the board's digits into the live score, which then pops once. */
 function run(from: HTMLElement | null, points: string | null) {
   const target = document.querySelector<HTMLElement>("[data-live-total]");
@@ -446,7 +568,7 @@ function StillLine({
   locale,
   onDone,
 }: {
-  moments: LiveMoment[];
+  moments: BoardMoment[];
   copy: Copy;
   locale: string;
   onDone: () => void;
@@ -464,12 +586,15 @@ function StillLine({
       <p className={styles.stillText}>
         {moments.map((moment) => (
           <span key={moment.key} data-negative={moment.kind === "card" || undefined}>
-            {shouted(moment, copy) ?? word(moment, copy)} · {moment.name}
-            {moment.multiplier === 0
-              ? ` · ${copy.bench}`
-              : moment.points === null
-                ? ""
-                : ` · ${signed(moment.points, locale)}`}
+            {moment.kind === "substitution"
+              ? `${copy.substitution} · ${copy.out} ${moment.out} · ${copy.in} ${moment.in}`
+              : `${shouted(moment, copy) ?? word(moment, copy)} · ${moment.name}${
+                  moment.multiplier === 0
+                    ? ` · ${copy.bench}`
+                    : moment.points === null
+                      ? ""
+                      : ` · ${signed(moment.points, locale)}`
+                }`}
           </span>
         ))}
       </p>

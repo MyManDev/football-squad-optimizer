@@ -29,6 +29,7 @@ import { MemberLiveWeekView } from "../live/MemberLiveWeek";
 import { useMemberLiveScore } from "../live/useMemberLiveScore";
 import { useLiveWindow } from "../live/useLiveWindow";
 import { useGoalReplay } from "../live/useGoalReplay";
+import { useBoardMoments } from "../live/useBoardMoments";
 import type { LiveWindowFilter } from "../../liveScore/liveWindow";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
 import { squadWithPlayedWeek } from "../live/memberLineup";
@@ -222,7 +223,8 @@ function LeagueMemberContent({
     liveDependencies,
     replaying && view.league_id === leagueId,
   );
-  const goalMoments = <GoalMomentLayer batch={replaying ? replay : liveWeek.moments} />;
+  const board = useBoardMoments(liveWeek, view.entry.entry_id);
+  const goalMoments = <GoalMomentLayer batch={replaying ? replay : board} />;
   const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
