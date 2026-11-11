@@ -335,6 +335,33 @@ describe("the read a page draws", () => {
     expect(screen.getByText("15:42")).toBeInTheDocument();
   });
 
+  it("holds the read that brings a moment from its first render, the hooks chained as a page chains them", () => {
+    function Page({ value }: { value: MemberLive }) {
+      const batch = useBoardMoments(value, 7);
+      const hold = useBoardHold(batch);
+      const drawn = useSettledRead(value.shown, hold.waiting);
+      return <p>{drawn === null ? "none" : drawn.score.source_time}</p>;
+    }
+    const before = live(1, []);
+    const { rerender } = render(<Page value={before} />);
+    const goal = {
+      key: "2:goal:9",
+      kind: "goal" as const,
+      size: "big" as const,
+      elementId: 9,
+      name: "Haaland",
+      team: "Man City",
+      position: "FWD" as const,
+      count: 1,
+      multiplier: 1 as const,
+      base: 4,
+      points: 4,
+    };
+    // The read and its moment come in one render, as the live score hands them on.
+    rerender(<Page value={live(2, [], { id: 1, items: [goal] })} />);
+    expect(screen.getByText(before.shown.score.source_time)).toBeInTheDocument();
+  });
+
   it("never draws another week's read for this one", () => {
     const { rerender } = render(<Drawn read={{ gameweek: 10, at: "10" }} waiting={false} />);
     rerender(<Drawn read={{ gameweek: 11, at: "11" }} waiting />);

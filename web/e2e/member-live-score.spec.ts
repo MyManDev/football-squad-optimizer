@@ -123,9 +123,15 @@ for (const language of ["tr", "en"] as const) {
     };
     await assertPlayerPoints("in_progress");
 
-    // Refresh reads the live points again, and nothing else.
+    // Refresh reads the live points again, and nothing else. The read brings two automatic
+    // substitutions: while their boards stand the card keeps the read before, and it takes the
+    // new one once both have gone.
     await card.getByRole("button", { name: language === "tr" ? "Yenile" : "Refresh" }).click();
-    await expect(card).toContainText(language === "tr" ? "Bonus eklendi" : "Bonus Added");
+    await expect(page.locator("[data-goal-board='substitution']")).toBeVisible();
+    await expect(card).toContainText(language === "tr" ? "Bonus bekleniyor" : "Bonus Pending");
+    await expect(card).toContainText(language === "tr" ? "Bonus eklendi" : "Bonus Added", {
+      timeout: 15_000,
+    });
     await assertPlayerPoints("finished");
     expect(asked.live).toHaveLength(2);
     expect(asked.bundle).toHaveLength(1);

@@ -66,7 +66,7 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
       });
     }
     const count = items.length > 0 ? seen.count + 1 : seen.count;
-    setSeen({
+    const next: Seen = {
       week,
       start: live.start,
       substitutions,
@@ -74,7 +74,11 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
       read,
       count,
       batch: items.length > 0 ? { id: count, items } : seen.batch,
-    });
+    };
+    setSeen(next);
+    // The read's batch in this very render, so the hooks after this one (the hold, the read a
+    // page draws) take it with the read that brought it, never the read alone.
+    return next.batch;
   }
   return seen.batch;
 }
@@ -91,11 +95,10 @@ export function useBoardHold(batch: BoardBatch | null): {
   waiting: boolean;
   landed: (key: string) => void;
 } {
-  const [state, setState] = useState<{
-    batch: number | null;
-    pending: Map<string, number>;
-    brought: number;
-  }>({ batch: null, pending: new Map(), brought: 0 });
+  const [state, setState] = useState<Hold>({ batch: null, pending: new Map(), brought: 0 });
+  // The hold as this render has it: a new batch's moments wait from the render that brings
+  // them, so a read drawn beside them (`useSettledRead`) is held from its first render.
+  let current = state;
   if (batch !== null && batch.id !== state.batch) {
     // Under reduced motion the layer drops its queue for one still line, so what it held from
     // earlier moments goes with it: nothing is left waiting for a board that will not play.
@@ -108,21 +111,30 @@ export function useBoardHold(batch: BoardBatch | null): {
         pending.set(moment.key, moment.kind === "substitution" ? 0 : (moment.points ?? 0));
       }
     }
-    setState({ batch: batch.id, pending, brought: pending.size === 0 ? 0 : state.brought });
+    current = { batch: batch.id, pending, brought: pending.size === 0 ? 0 : state.brought };
+    setState(current);
   }
   const landed = useCallback(
     (key: string) =>
-      setState((current) => {
-        if (!current.pending.has(key)) return current;
-        const pending = new Map(current.pending);
+      setState((held) => {
+        if (!held.pending.has(key)) return held;
+        const pending = new Map(held.pending);
         const points = pending.get(key) ?? 0;
         pending.delete(key);
         // The last moment landed: the page takes the newest read whole.
-        return { ...current, pending, brought: pending.size === 0 ? 0 : current.brought + points };
+        return { ...held, pending, brought: pending.size === 0 ? 0 : held.brought + points };
       }),
     [],
   );
-  return { brought: state.brought, waiting: state.pending.size > 0, landed };
+  return { brought: current.brought, waiting: current.pending.size > 0, landed };
+}
+
+interface Hold {
+  /** The last batch taken. */
+  batch: number | null;
+  /** Each moment the board has still to play out, with the points it brings. */
+  pending: Map<string, number>;
+  brought: number;
 }
 
 /**
