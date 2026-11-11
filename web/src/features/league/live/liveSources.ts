@@ -141,7 +141,7 @@ export function bundleQuery(
  * The capture's table as the page reads it: where the league's line names the capture's own
  * table, the read the phone bar's LIVE pill and the forwarded gate hold under their key (a
  * table at one path and digest never changes, so a held one is taken however old); the
- * league's tree otherwise, or where that read gives no table.
+ * league's tree otherwise, or where that read fails or gives no table.
  */
 export function sharedTable(
   client: QueryClient,
@@ -153,8 +153,14 @@ export function sharedTable(
   if (table === undefined || capture === null || table.path.split("/")[1] !== capture) {
     return load;
   }
-  return async (signal) =>
-    (await client.fetchQuery({ ...captureTableQuery(table), ...HELD_READ })) ?? load(signal);
+  return async (signal) => {
+    const query = captureTableQuery(table);
+    await client.prefetchQuery({ ...query, ...HELD_READ });
+    return (
+      client.getQueryData<LeagueViewEnvelope<DevicePlanDocument> | null>(query.queryKey) ??
+      load(signal)
+    );
+  };
 }
 
 /** The capture's table the member's squad names, read once for the page. */
