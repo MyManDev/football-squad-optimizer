@@ -96,8 +96,6 @@ export interface LiveViewProps {
   board: LiveBoard;
   /** Canlı puan as shown: the board's net plus what the GOL board's landed moments brought. */
   net: number;
-  /** What the GOL board's moments that have landed brought, while the page waits on the read before. */
-  brought: number;
   recap: readonly RecapItem[];
   /** The page is the visitor's own: its side reads "Sen". */
   own: boolean;
@@ -121,13 +119,7 @@ export function LiveView(props: LiveViewProps) {
   const groups = <Groups board={board} />;
   const sides =
     rival === null ? null : (
-      <RivalBlock
-        rival={rival}
-        own={props.own}
-        net={props.net}
-        brought={props.brought}
-        team={props.team}
-      />
+      <RivalBlock rival={rival} own={props.own} net={board.net} team={props.team} />
     );
   const shownDuel = rival?.duel ?? rival?.pending?.duel ?? null;
   const differentials =
@@ -306,13 +298,16 @@ function BallIcon({ className = styles.ball }: { className?: string }) {
 function Row({ row }: { row: LiveRow }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
-  const arrow = row.state === "up" ? "up" : row.state === "down" ? "down" : null;
+  // A pick the scorer does not count brings the member nothing: its row tells no event and no
+  // state, neither in words nor in its edge and arrow.
+  const state = row.counted ? row.state : null;
+  const arrow = state === "up" ? "up" : state === "down" ? "down" : null;
   return (
     <li
       className={styles.row}
       aria-label={rowLabel(row, messages, locale)}
       data-live-row={row.elementId}
-      data-state={row.state ?? undefined}
+      data-state={state ?? undefined}
       data-counted={row.counted ? "" : undefined}
     >
       <span className={styles.rowBody} aria-hidden="true">
@@ -342,7 +337,6 @@ function Row({ row }: { row: LiveRow }) {
               </span>
             ) : null}
             {row.phase === "playing" ? <span className={styles.dot} /> : null}
-            {/* A pick the scorer does not count shows no event: it brings the member nothing. */}
             {row.counted ? (
               <Glyphs goals={row.goals} assists={row.assists} card={row.card} />
             ) : null}
@@ -462,14 +456,12 @@ function RivalBlock({
   rival,
   own,
   net,
-  brought,
   team,
 }: {
   rival: LiveRivalView;
   own: boolean;
-  /** The member's Canlı puan as shown, and what the GOL board's landed moments brought to it. */
+  /** The member's net in the read the duel comes from. */
   net: number;
-  brought: number;
   team: string;
 }) {
   const { locale, messages } = useLanguage();
@@ -479,9 +471,8 @@ function RivalBlock({
   const pending = rival.duel === null ? rival.pending : null;
   const duel = rival.duel ?? pending?.duel ?? null;
   const rivalNet = rival.board?.net ?? pending?.rivalNet ?? null;
-  // The duel reads the member's score as Canlı puan shows it, landed points and all.
-  const margin = duel === null ? 0 : duel.margin + brought;
-  const totalGap = duel?.totalGap == null ? null : duel.totalGap + brought;
+  const margin = duel?.margin ?? 0;
+  const totalGap = duel?.totalGap ?? null;
   // The week's opponent is named so; any other member, in any league, is a rival.
   const label = rival.opponent ? copy.opponent : copy.rival;
   return (

@@ -121,6 +121,25 @@ function live(sourceTime: string, points = 3, goals = 0): WeekActivity {
   };
 }
 
+/** The live document at `sourceTime`: Players 4 and 8, both picked by the member and the rival, score. */
+function liveTwoGoals(sourceTime: string): WeekActivity {
+  const input = testWeek({
+    sourceTime,
+    picks: testPicks().map((pick) =>
+      pick.id === 4
+        ? { ...pick, points: 9, minutes: 40 }
+        : pick.id === 8
+          ? { ...pick, points: 6, minutes: 40 }
+          : pick,
+    ),
+  });
+  return {
+    contract_version: "week_activity_v1",
+    week: input.live,
+    activity: testActivity(input, { inPlay: [102], goals: { 4: 1, 8: 1 } }),
+  };
+}
+
 type LiveAnswer = ForwarderResult<WeekActivity, LiveReason>;
 const answered = (document: WeekActivity): LiveAnswer => ({ ok: true, copy: null, document });
 
@@ -549,6 +568,102 @@ describe("the GOL board on LIVE", () => {
     await vi.waitFor(() => expect(rivalNet()).toBe(before.rival + 6));
   });
 
+  it("keeps the whole duel on the read before between the landings of a read's two goals", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
+    const forwarder = fakeForwarder([
+      answered(live("2026-11-21T15:29:00Z")),
+      answered(liveTwoGoals("2026-11-21T15:30:00Z")),
+    ]);
+    renderLive({ forwarder });
+    await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+    const rivalNet = () => Number(document.querySelector("[data-live-rival-net]")?.textContent);
+    const status = () => document.querySelector("[data-live-rival] p")?.textContent;
+    await vi.waitFor(() => expect(rivalNet()).toBeGreaterThan(0));
+    const before = { net: Number(net()), rival: rivalNet(), status: status() };
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    fireEvent.click(await raised("goal"));
+    // The first goal has landed in Canlı puan; the duel, its ends and the rival wait for the second.
+    await vi.waitFor(() => expect(Number(net())).toBeGreaterThan(before.net));
+    expect(rivalNet()).toBe(before.rival);
+    expect(status()).toBe(before.status);
+    expect(document.querySelector("[data-live-rival]")).toHaveTextContent(
+      `North Stand Notes ${before.net}`,
+    );
+    fireEvent.click(await raised("goal"));
+    // Both sides field both scorers: the duel takes the read whole, its Fark where it was.
+    await vi.waitFor(() => expect(rivalNet()).toBeGreaterThan(before.rival));
+    expect(status()).toBe(before.status);
+  });
+
+  it("keeps a rival picked while the board plays out of sight until the board has played", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
+    const forwarder = fakeForwarder([
+      answered(live("2026-11-21T15:29:00Z")),
+      answered(live("2026-11-21T15:30:00Z", 9, 1)),
+    ]);
+    const { user } = renderLive({ forwarder });
+    await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+    await vi.waitFor(() => expect(document.querySelector("[data-live-rival-net]")).not.toBeNull());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    const board = await raised("goal");
+    await user.selectOptions(screen.getByRole("combobox", { name: copy.live.rival }), "35249005");
+    await vi.waitFor(() =>
+      expect(forwarder.entryBundle.mock.calls.map(([entryId]) => entryId)).toContain(35249005),
+    );
+    // The new rival's duel would mix the read before with the newest: it keeps its room, unseen.
+    const block = document.querySelector("[data-live-rival]")!;
+    await vi.waitFor(() =>
+      expect(block.querySelector(":scope > [data-pending]")).toHaveAttribute("aria-hidden", "true"),
+    );
+    expect(block.querySelector("[data-live-rival-net]")).toHaveAttribute("data-pending");
+    fireEvent.click(board);
+    await vi.waitFor(() => expect(block.querySelector("[data-pending]")).toBeNull());
+    expect(block).toHaveTextContent(copy.live.margin);
+  });
+
+  it("keeps the duel's room while the first rival's bundle answers under the board", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
+    const forwarder = fakeForwarder([
+      answered(live("2026-11-21T15:29:00Z")),
+      answered(live("2026-11-21T15:30:00Z", 9, 1)),
+    ]);
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const read = forwarder.entryBundle.getMockImplementation()!;
+    forwarder.entryBundle.mockImplementation(async (entryId: number) => {
+      if (entryId !== ENTRY) await gate;
+      return read(entryId);
+    });
+    renderLive({ forwarder });
+    await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+    const block = document.querySelector("[data-live-rival]")!;
+    expect(block.querySelector(":scope > [data-pending]")).not.toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    const board = await raised("goal");
+    // The rival answers while the board plays: the room stays, unseen, until it has played.
+    await act(async () => {
+      release();
+      await gate;
+      // The answer is taken and drawn.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(block.querySelector(":scope > [data-pending]")).toHaveAttribute("aria-hidden", "true");
+    fireEvent.click(board);
+    await vi.waitFor(() => expect(block.querySelector("[data-pending]")).toBeNull());
+    expect(block).toHaveTextContent(copy.live.margin);
+  });
+
   it("runs the board's points into Canlı puan, which pops as they land", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
@@ -741,6 +856,32 @@ describe("the week and the rival", () => {
     await vi.waitFor(() =>
       expect(forwarder.entryBundle.mock.calls.map(([entryId]) => entryId)).toContain(35249005),
     );
+  });
+
+  it("draws no state, edge or arrow, for a reserve the scorer does not count", async () => {
+    // Everyone has played, so no reserve comes on; Player 4 and reserve 14 have scored.
+    const input = testWeek({
+      sourceTime: "2026-11-21T15:30:00Z",
+      picks: testPicks().map((pick) => ({
+        ...pick,
+        minutes: 90,
+        points: pick.id === 14 || pick.id === 4 ? 9 : 2,
+      })),
+    });
+    const document_: WeekActivity = {
+      contract_version: "week_activity_v1",
+      week: input.live,
+      activity: testActivity(input, { inPlay: [102], goals: { 4: 1, 14: 1 } }),
+    };
+    renderLive({ forwarder: fakeForwarder([answered(document_)]) });
+    await rows();
+    const counted = document.querySelector("[data-live-row='4']")!;
+    expect(counted).toHaveAttribute("data-state", "up");
+    expect(counted.querySelector(".arrow")?.childElementCount).toBe(1);
+    const reserve = document.querySelector("[data-live-row='14']")!;
+    expect(reserve).not.toHaveAttribute("data-counted");
+    expect(reserve).not.toHaveAttribute("data-state");
+    expect(reserve.querySelector(".arrow")?.childElementCount ?? 0).toBe(0);
   });
 
   it("keeps the duel's place, out of sight, while the first rival's bundle is read", async () => {

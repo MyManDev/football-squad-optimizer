@@ -57,7 +57,7 @@ import {
   type LiveBoard,
   type LiveRecap,
 } from "./liveBoard";
-import { leagueTotalsBefore, liveDuel } from "./liveDuel";
+import { leagueTotalsBefore, liveDuel, type LiveDuel } from "./liveDuel";
 import { addressedRival, chooseRival, h2hOpponent, rivalChoices } from "./liveRival";
 import {
   bundleQuery,
@@ -405,11 +405,31 @@ function LiveMember({
 }
 
 /**
+ * The rival's side while the board holds the read before: the duel that read drew, or, for a
+ * rival whose duel it did not draw (picked, or first read, while the board plays), its room out
+ * of sight until the board has played out, so the duel never mixes two reads.
+ */
+function heldRival(
+  rival: LiveRivalView,
+  settled: { rivalId: number | null; rivalBoard: LiveBoard | null; rivalDuel: LiveDuel | null },
+): LiveRivalView {
+  if (settled.rivalId === rival.entryId && settled.rivalDuel !== null) {
+    return { ...rival, board: settled.rivalBoard, duel: settled.rivalDuel, pending: null };
+  }
+  const room =
+    rival.duel !== null && rival.board !== null
+      ? { duel: rival.duel, rivalNet: rival.board.net }
+      : rival.pending;
+  return { ...rival, board: null, duel: null, pending: room };
+}
+
+/**
  * The board as it is shown. Its own part, so it takes the page's board, the hold and the
  * moments' wait once all three have settled for a read: while the GOL board brings a read's
  * moments, everything (the rows, the counts, the recap, the rival's side and the duel) stays as
  * the read before left it, so nothing moves or jumps under the board, and Canlı puan stands at
- * that read's total plus what the moments that have landed brought.
+ * that read's total plus what the moments that have landed brought. The duel is drawn from that
+ * one read whole (its Fark, its ends, Toplam fark and Farklar), so nothing in it disagrees.
  */
 function LiveShown({
   board,
@@ -447,11 +467,7 @@ function LiveShown({
   }
   const holding = waiting && settled.board.gameweek === board.gameweek;
   const drawn = holding ? settled.board : board;
-  // The rival's side waits with the rest, unless the visitor picked another rival meanwhile.
-  const drawnRival =
-    rival !== null && holding && settled.rivalId === rival.entryId
-      ? { ...rival, board: settled.rivalBoard, duel: settled.rivalDuel }
-      : rival;
+  const drawnRival = rival === null || !holding ? rival : heldRival(rival, settled);
   const gained = holding ? brought : 0;
 
   // What the reads since the visitor last looked brought the member: each newer board adds
@@ -506,7 +522,6 @@ function LiveShown({
       team={team}
       board={drawn}
       net={drawn.net + gained}
-      brought={gained}
       recap={recapItems(told.recap)}
       own={own}
       rival={drawnRival}
