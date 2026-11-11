@@ -6,7 +6,9 @@
  * only a starting point, a read that is not newer than the last one adds nothing, and a count
  * that falls (a correction, or an older copy of the document) is kept at its highest, so the
  * same goal never plays twice. A read without event detail (`activity` null) adds no goal or
- * assist and keeps the marks it had, so detail that returns later does not replay old goals.
+ * assist and keeps the marks it had, so detail that returns later does not replay old goals;
+ * and while no read of the week has had detail yet, the first one that has it is only a
+ * starting point for goals and assists, so a week first read without detail never replays.
  */
 
 import type { LiveActivity } from "./weekActivity";
@@ -28,6 +30,8 @@ export interface LiveMarks {
   time: number;
   /** The highest goals and assists seen, keyed `element:fixture:kind`. */
   counts: ReadonlyMap<string, number>;
+  /** Whether any read counted so far had event detail, so `counts` is a starting point. */
+  detailed: boolean;
   /** The picks a card has been shown to. */
   cards: ReadonlySet<number>;
 }
@@ -60,6 +64,8 @@ export function advanceLiveMarks(
   if (same && time <= previous.time) return { marks: previous, events: [] };
   const counts = new Map(same ? previous.counts : []);
   const cards = new Set(same ? previous.cards : []);
+  // Goals and assists count against marks that came from a read with detail.
+  const counting = same && previous.detailed;
   const found = new Map<string, LiveEvent>();
   const add = (kind: LiveEventKind, elementId: number, count: number) => {
     const key = `${kind}:${elementId}`;
@@ -74,7 +80,7 @@ export function advanceLiveMarks(
       const key = `${appearance.element_id}:${appearance.fixture_id}:${kind}`;
       const seen = counts.get(key) ?? 0;
       const value = appearance[field];
-      if (same && value > seen) add(kind, appearance.element_id, value - seen);
+      if (counting && value > seen) add(kind, appearance.element_id, value - seen);
       counts.set(key, Math.max(seen, value));
     }
   }
@@ -84,7 +90,13 @@ export function advanceLiveMarks(
     cards.add(element.element_id);
   }
   return {
-    marks: { identity: read.identity, time, counts, cards },
+    marks: {
+      identity: read.identity,
+      time,
+      counts,
+      cards,
+      detailed: (same && previous.detailed) || read.activity !== null,
+    },
     events: picks.flatMap((elementId) =>
       (["goal", "assist", "card"] as const)
         .map((kind) => found.get(`${kind}:${elementId}`))
@@ -94,5 +106,11 @@ export function advanceLiveMarks(
 }
 
 function empty(identity: string): LiveMarks {
-  return { identity, time: Number.NEGATIVE_INFINITY, counts: new Map(), cards: new Set() };
+  return {
+    identity,
+    time: Number.NEGATIVE_INFINITY,
+    counts: new Map(),
+    cards: new Set(),
+    detailed: false,
+  };
 }

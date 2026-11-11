@@ -110,6 +110,24 @@ describe("advanceLiveMarks", () => {
     expect(back.events).toEqual([]);
   });
 
+  it("takes the first read with detail as a starting point when the week was first read without it", () => {
+    const blind = advanceLiveMarks(null, { ...read(1, []), activity: null }, PICKS);
+    expect(blind.marks.detailed).toBe(false);
+    const first = advanceLiveMarks(
+      blind.marks,
+      read(2, [{ element: 11, goals: 2, assists: 1 }]),
+      PICKS,
+    );
+    expect(first.events).toEqual([]);
+    expect(first.marks.detailed).toBe(true);
+    const next = advanceLiveMarks(
+      first.marks,
+      read(3, [{ element: 11, goals: 3, assists: 1 }]),
+      PICKS,
+    );
+    expect(next.events).toEqual([{ kind: "goal", elementId: 11, count: 1 }]);
+  });
+
   it("names a card once", () => {
     const first = advanceLiveMarks(null, read(1, [], []), PICKS).marks;
     const shown = advanceLiveMarks(first, read(2, [], [12]), PICKS);

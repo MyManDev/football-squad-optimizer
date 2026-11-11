@@ -9,7 +9,9 @@
  * keeps what is shown.
  *
  * Each read after the first is compared with the reads before it (`advanceLiveMarks`): the
- * goals, assists and cards it adds become the read's GOL moments.
+ * goals, assists and cards it adds become the read's GOL moments. A followed page whose first
+ * read has not been answered, or whose member's week is not the one being played, makes the
+ * first read again at the next tick instead.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -122,15 +124,15 @@ interface State {
 /**
  * `squad` is the member's published entry document: its entry, its gameweek (the table
  * gameweek the bundle is asked for) and its capture (whose table names the element ids).
- * `fixtures` is the site's calendar, for each club's id. `follow` says one of the live week's
- * matches is being played (`liveWindow`): only then do reads repeat on their own.
+ * `fixtures` is the site's calendar, for each club's id. `follow` is the gameweek whose match
+ * is being played (`liveWindow`), or null: only while it is set do reads repeat on their own.
  */
 export function useMemberLiveScore(
   squad: EntrySquad,
   fixtures: FixturesPayload | null,
   dependencies: MemberLiveDependencies = {},
   enabled = true,
-  follow = false,
+  follow: number | null = null,
 ): MemberLive {
   const { tree } = useLeague();
   const ready = enabled && fixtures !== null;
@@ -165,6 +167,9 @@ export function useMemberLiveScore(
   const marks = useRef<LiveMarks | null>(null);
   const reads = useRef(0);
   const lastRead = useRef(0);
+  // The first read, to make again; and whether one is on its way.
+  const firstRead = useRef<(() => void) | null>(null);
+  const firstInFlight = useRef(false);
 
   /** The read's moments against the marks so far; the first read only sets the marks. */
   const momentsOf = useCallback(
@@ -201,14 +206,14 @@ export function useMemberLiveScore(
   useEffect(() => {
     reading.current?.abort();
     following.current?.abort();
+    following.current = null;
     held.current = null;
     // Every first read is a starting point: nothing before it plays.
     marks.current = null;
+    firstInFlight.current = false;
     if (!ready) return;
-    const read = new AbortController();
-    reading.current = read;
-    const { forwarder, loadTable } = sources.current;
-    const first = async () => {
+    const first = async (read: AbortController) => {
+      const { forwarder, loadTable } = sources.current;
       lastRead.current = Date.now();
       const bundle = await forwarder.entryBundle(entryId, gameweek, { signal: read.signal });
       if (read.signal.aborted || !bundle.ok || bundle.document.current_week === null) return;
@@ -227,25 +232,46 @@ export function useMemberLiveScore(
       momentsOf(shown, live, held.current);
       setState({ identity, shown, refreshing: false, moments: null });
     };
-    // The client answers every failure as a refusal; anything else also shows nothing.
-    first().catch(() => undefined);
-    return () => read.abort();
+    const start = () => {
+      if (firstInFlight.current) return;
+      reading.current?.abort();
+      const read = new AbortController();
+      reading.current = read;
+      firstInFlight.current = true;
+      // The client answers every failure as a refusal; anything else also shows nothing.
+      first(read)
+        .catch(() => undefined)
+        .finally(() => {
+          if (reading.current === read) firstInFlight.current = false;
+        });
+    };
+    firstRead.current = start;
+    start();
+    return () => {
+      reading.current?.abort();
+      firstRead.current = null;
+      firstInFlight.current = false;
+    };
   }, [entryId, gameweek, capture, identity, ready, momentsOf]);
 
-  /** A newer week replaces the shown one with the moments it brings; an older one is kept. */
+  /**
+   * A newer week replaces the shown one with the moments it brings; an older one is kept. Only
+   * the member's own refresh ends the refreshing state: a followed read leaves it as it is.
+   */
   const accept = useCallback(
-    (shown: MemberLiveScore, live: LiveReading, inputs: Held) => {
+    (shown: MemberLiveScore, live: LiveReading, inputs: Held, refreshed: boolean) => {
       const moments = momentsOf(shown, live, inputs);
       setState((current) => {
+        const refreshing = !refreshed && current.identity === identity && current.refreshing;
         const older =
           current.identity === identity &&
           current.shown !== null &&
           Date.parse(shown.score.source_time) < Date.parse(current.shown.score.source_time);
-        if (older) return { ...current, refreshing: false };
+        if (older) return { ...current, refreshing };
         return {
           identity,
           shown,
-          refreshing: false,
+          refreshing,
           moments: moments ?? (current.identity === identity ? current.moments : null),
         };
       });
@@ -271,14 +297,26 @@ export function useMemberLiveScore(
           setState((current) => ({ ...current, identity, shown: null, refreshing: false }));
           return;
         }
-        accept(shown, live, inputs);
+        accept(shown, live, inputs, true);
       });
   }, [identity, accept]);
 
-  /** A followed read: the live points alone, quietly; no answer keeps what is shown. */
+  /**
+   * A followed read: the live points alone, quietly; no answer keeps what is shown. With no
+   * first read answered yet, or the member's week not the one being played, the first read
+   * is made again instead.
+   */
   const followRead = useCallback(() => {
     const inputs = held.current;
-    if (inputs === null || inputs.identity !== identity || following.current !== null) return;
+    if (
+      inputs === null ||
+      inputs.identity !== identity ||
+      (follow !== null && inputs.member.gameweek !== follow)
+    ) {
+      firstRead.current?.();
+      return;
+    }
+    if (following.current !== null) return;
     const read = new AbortController();
     following.current = read;
     lastRead.current = Date.now();
@@ -288,21 +326,24 @@ export function useMemberLiveScore(
         if (following.current === read) following.current = null;
         if (read.signal.aborted || live === null) return;
         const shown = scored(live, inputs, sources.current.fixtures);
-        if (shown !== null) accept(shown, live, inputs);
+        if (shown !== null) accept(shown, live, inputs, false);
       });
-  }, [identity, accept]);
+  }, [identity, accept, follow]);
 
   useEffect(() => {
-    if (!ready || !follow) return undefined;
+    if (!ready || follow === null) return undefined;
     const visible = () => document.visibilityState === "visible";
+    const stale = () => Date.now() - lastRead.current >= FOLLOW_INTERVAL_MS;
     const timer = setInterval(() => {
       if (visible()) followRead();
     }, FOLLOW_INTERVAL_MS);
     // Back in view after a minute or more: one read at once, not at the next tick.
     const onVisibility = () => {
-      if (visible() && Date.now() - lastRead.current >= FOLLOW_INTERVAL_MS) followRead();
+      if (visible() && stale()) followRead();
     };
     document.addEventListener("visibilitychange", onVisibility);
+    // A match that starts, or a page that comes back, with a read a minute old reads at once.
+    if (visible() && stale() && held.current !== null) followRead();
     return () => {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibility);
