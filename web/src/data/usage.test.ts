@@ -164,6 +164,7 @@ const member = `/league/${LEAGUE}/members/${ENTRY}`;
 const PLACES: [string, UsagePlace][] = [
   ["/", { page: "entry", tool: "" }],
   [`/entry/${ENTRY}`, { page: "team", tool: "week" }],
+  [`/entry/${ENTRY}/live`, { page: "team", tool: "live" }],
   ["/fixtures", { page: "fixtures", tool: "fixtures" }],
   ["/contribute", { page: "contribute", tool: "" }],
   ["/league", { page: "league", tool: "" }],
@@ -179,6 +180,8 @@ const PLACES: [string, UsagePlace][] = [
   ]),
   [`${member}/history`, { page: "history", tool: "history" }],
   [`${member}/vs`, { page: "vs", tool: "vs" }],
+  [`${member}/live`, { page: "live", tool: "live" }],
+  [`/league/members/${ENTRY}/live`, { page: "live", tool: "live" }],
   [`${member}/reminder`, { page: "reminder", tool: "" }],
   [`${member}/nothing`, { page: "other", tool: "" }],
   [`/nothing/${ENTRY}`, { page: "other", tool: "" }],

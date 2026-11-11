@@ -67,7 +67,7 @@ export function LivePlayerActivity({
               <span
                 className={styles.playing}
                 role="img"
-                aria-label={tr ? "Maç sürüyor" : "Match in progress"}
+                aria-label={tr ? "Maç sürüyor" : "Match in Progress"}
               />
             ) : null}
             {player.goals > 0 ? (

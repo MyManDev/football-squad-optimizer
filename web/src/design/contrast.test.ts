@@ -73,6 +73,12 @@ const READABLE: readonly (readonly [string, string])[] = [
   ["--color-bad", "--color-bg"],
   ["--color-bad", "--color-surface"],
   ["--color-bad", "--color-surface-2"],
+  // The LIVE page's duel names each side and its points in the side's own colour.
+  ...["--color-chart-you", "--color-chart-rival"].flatMap((side) =>
+    ["--color-bg", "--color-surface", "--color-surface-2"].map(
+      (surface) => [side, surface] as const,
+    ),
+  ),
   ["--color-chip-text", "--color-chip"],
   ["--color-chip-muted", "--color-chip"],
   ["--color-board-text", "--color-out-panel"],
@@ -198,6 +204,12 @@ describe("the colour tokens", () => {
     expect(contrast(hex("--color-primary"), hex("--color-line"))).toBeGreaterThanOrEqual(3);
   });
 
+  it("draws the duel's lead in either side's colour over its track, at 3:1 for a graphic", () => {
+    for (const side of ["--color-chart-you", "--color-chart-rival"]) {
+      expect(contrast(hex(side), hex("--color-line"))).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it.each(BESIDE_THE_CHOSEN)("a chosen option's fill stands apart from %s", (beside) => {
     expect(contrast(hex("--color-primary"), hex(beside))).toBeGreaterThanOrEqual(STATE_APART);
   });
@@ -244,6 +256,12 @@ describe("the night palette", () => {
 
   it("draws a job's bar so its fill reads over its track, at 3:1 for a graphic", () => {
     expect(contrast(night("--color-primary"), night("--color-line"))).toBeGreaterThanOrEqual(3);
+  });
+
+  it("draws the duel's lead in either side's colour over its track, at 3:1 for a graphic", () => {
+    for (const side of ["--color-chart-you", "--color-chart-rival"]) {
+      expect(contrast(night(side), night("--color-line"))).toBeGreaterThanOrEqual(3);
+    }
   });
 
   it.each(BESIDE_THE_CHOSEN)("a chosen option's fill stands apart from %s", (beside) => {

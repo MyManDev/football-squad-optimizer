@@ -51,8 +51,8 @@ cookie or fingerprint.
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `page` | `entry`, `league`, `members`, `member`, `history`, `vs`, `reminder`, `team`, `fixtures`, `contribute`, `other` | The kind of page, never its address |
-| `tool` | `week`, `current-squad`, `what-if`, `duel`, `chips`, `card`, `history`, `vs`, `fixtures`, or empty | What the address names on a member's page |
+| `page` | `entry`, `league`, `members`, `member`, `history`, `vs`, `live`, `reminder`, `team`, `fixtures`, `contribute`, `other` | The kind of page, never its address |
+| `tool` | `week`, `current-squad`, `what-if`, `duel`, `chips`, `card`, `history`, `vs`, `live`, `fixtures`, or empty | What the address names on a member's page |
 | `step` | `open`, `tool`, `picker_shown`, `picker_claimed`, `device_solve` | See below |
 | `lang` | `tr`, `en` | The site's language |
 | `device` | `phone`, `tablet`, `desktop`, `unknown` | A class from the pointer type and the screen's short side; those measurements are not sent |

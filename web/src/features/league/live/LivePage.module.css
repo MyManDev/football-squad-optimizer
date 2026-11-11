@@ -1,0 +1,717 @@
+/* The LIVE page (the synthesis of 2026-11-11, section 3.2). Phone first: one column, 358 px
+   of a 390 px phone inside the shell's 16 px gutters, every row at least 52 px with a 4 px
+   edge in its state's colour. From 1024 px the rival and Farklar stand in a 360 px column
+   beside a 640 px one; both give way to the room the shell leaves. Colours are the tokens'
+   only: the states are good and bad, the member is --color-chart-you and the rival
+   --color-chart-rival. Nothing here moves: the page is drawn in its final state. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 640px) minmax(0, 360px);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.column,
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* ---- Heading ---- */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--step-3);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+/* While one of the member's matches is played; it stands still. */
+.light {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-good);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step-0);
+  overflow-wrap: anywhere;
+}
+
+.state {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* ---- The score ---- */
+
+.score,
+.rival,
+.differentials {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+
+.score {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.scoreGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+}
+
+.scoreGrid dt {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.scoreGrid dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.total {
+  grid-row: span 3;
+  align-self: start;
+}
+
+.total dd {
+  color: var(--color-chart-you);
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 48px;
+}
+
+.cell {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.count[data-state="up"] svg {
+  color: var(--color-good);
+}
+
+.count[data-state="down"] svg {
+  color: var(--color-bad);
+}
+
+/* ---- The rival ---- */
+
+.rival {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.rivalHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rivalLabel {
+  font-weight: 600;
+}
+
+.badge {
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  line-height: 18px;
+}
+
+/* Native, at 16 px so a phone never zooms into it. */
+.select {
+  flex: 1 1 8rem;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-s);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 16px;
+}
+
+.rivalPoints {
+  margin-left: auto;
+  color: var(--color-chart-rival);
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  font-weight: 800;
+  line-height: 32px;
+}
+
+.status {
+  margin: 0;
+}
+
+.figure {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* The duel drawn: the track, the middle, the leader's fill from the middle, the ball. */
+.bar {
+  position: relative;
+  height: 28px;
+}
+
+.track,
+.lead {
+  position: absolute;
+  top: 10px;
+  height: 8px;
+  border-radius: var(--radius-s);
+}
+
+.track {
+  right: 0;
+  left: 0;
+  background: var(--color-line);
+}
+
+.bar[data-lead="member"] .lead {
+  background: var(--color-chart-you);
+}
+
+.bar[data-lead="rival"] .lead {
+  background: var(--color-chart-rival);
+}
+
+.centre {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: var(--color-text-faint);
+}
+
+.barBall {
+  position: absolute;
+  top: 2px;
+  width: 24px;
+  height: 24px;
+  margin-left: -12px;
+}
+
+.barBallIcon {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+
+.endMember {
+  min-width: 0;
+  color: var(--color-chart-you);
+  overflow-wrap: anywhere;
+}
+
+.endRival {
+  min-width: 0;
+  color: var(--color-chart-rival);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.duelCells {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.duelCells div {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.duelCells dt {
+  color: var(--color-text-muted);
+}
+
+.duelCells dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* ---- The read ---- */
+
+.fresh {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.bonus,
+.updated {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+/* The time and Yenile keep together at the end of the line, or on a line of their own. */
+.freshEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+
+.refresh {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-board);
+  border-radius: var(--radius-s);
+  background: var(--color-board);
+  color: var(--color-board-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.refresh:disabled {
+  border-color: var(--color-line);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+/* ---- What the newest read changed ---- */
+
+.recap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--step-1);
+}
+
+.recapList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recapBody {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.change {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.change[data-sign="up"] {
+  color: var(--color-good);
+}
+
+.change[data-sign="down"] {
+  color: var(--color-bad);
+}
+
+/* ---- The fifteen ---- */
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.groupTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--step-1);
+}
+
+.groupCount {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--step-0);
+  font-weight: 600;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  min-height: 52px;
+  border: 1px solid var(--color-line);
+  border-left: 4px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-bg);
+}
+
+.row[data-state="up"] {
+  border-left-color: var(--color-good);
+}
+
+.row[data-state="down"] {
+  border-left-color: var(--color-bad);
+}
+
+.rowBody {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 50px;
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+}
+
+.shirt {
+  flex: none;
+}
+
+.rowText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rowName {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subLine {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.points {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.pointsValue {
+  min-width: 2ch;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 24px;
+  text-align: right;
+}
+
+.arrow {
+  display: inline-flex;
+  width: 14px;
+}
+
+.row[data-state="up"] .arrow {
+  color: var(--color-good);
+}
+
+.row[data-state="down"] .arrow {
+  color: var(--color-bad);
+}
+
+/* A pick the score does not count: the faint ink, which still reads at 6:1. */
+.row:not([data-counted]) .name,
+.row:not([data-counted]) .pointsValue {
+  color: var(--color-text-faint);
+}
+
+.row:not([data-counted]) .shirt {
+  opacity: 0.55;
+}
+
+/* The armband: C on the mark with its two or three, V outlined. */
+.armband {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 0 4px;
+  border-radius: var(--radius-s);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  line-height: 16px;
+}
+
+.vice {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 0 3px;
+  border: 1.5px solid var(--color-text);
+  border-radius: var(--radius-s);
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  line-height: 13px;
+}
+
+.autosub {
+  flex: none;
+  padding: 0 4px;
+  border-radius: var(--radius-s);
+  color: var(--color-board-text);
+  font-size: var(--step--2);
+  font-weight: 600;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.autosub[data-autosub="in"] {
+  background: var(--color-in-panel);
+}
+
+.autosub[data-autosub="out"] {
+  background: var(--color-out-panel);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-good);
+}
+
+.glyphs {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.ball {
+  width: 16px;
+  height: 16px;
+}
+
+.ball circle,
+.barBallIcon circle {
+  fill: var(--color-bg);
+  stroke: var(--color-text);
+  stroke-width: 1.2;
+}
+
+.ball .patch,
+.barBallIcon .patch {
+  fill: var(--color-text);
+}
+
+.ball .seams,
+.barBallIcon .seams {
+  fill: none;
+  stroke: var(--color-text);
+  stroke-width: 1;
+}
+
+.assist {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-text);
+  border-radius: 3px;
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* The game's live data says a card was shown, not which. */
+.card {
+  width: 10px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--color-text-muted);
+}
+
+.times {
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+}
+
+/* ---- Farklar ---- */
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure {
+  flex: none;
+}
+
+.differentials[open] .disclosure {
+  transform: rotate(90deg);
+}
+
+.swingColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-2);
+}
+
+.swings {
+  min-width: 0;
+}
+
+.swingsTitle {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.none {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.swingList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  min-width: 0;
+}
+
+.swingValue {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.shared {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  color: var(--color-text-muted);
+}
