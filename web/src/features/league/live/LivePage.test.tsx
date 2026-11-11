@@ -7,7 +7,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -33,6 +33,7 @@ import { LeagueContext } from "../LeagueContext";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { LivePage } from "./LivePage";
 import type { LiveForwarder } from "./liveSources";
+import { WIDE_QUERY } from "./useWide";
 
 afterEach(() => {
   cleanup();
@@ -235,7 +236,16 @@ function renderLive({
 
 const rows = () =>
   screen.findAllByRole("listitem", { name: /, (Oynuyor|Oynayacak|Bitti|Yedekler)/ });
-const net = () => document.querySelector("[data-live-net]")?.textContent;
+const net = () => document.querySelector("[data-live-total]")?.textContent;
+const recapRegion = () => screen.queryByRole("region", { name: copy.live.sinceLastLook });
+
+/** The GOL board raised for `kind`, once it is up. */
+const raised = (kind: "goal" | "assist") =>
+  vi.waitFor(() => {
+    const board = document.querySelector<HTMLElement>(`[data-goal-board='${kind}']`);
+    expect(board).not.toBeNull();
+    return board!;
+  });
 
 describe("the LIVE page's reads", () => {
   it("opens with one read of each document and the week the bundle names", async () => {
@@ -272,6 +282,8 @@ describe("the LIVE page's reads", () => {
     ]);
     const { user } = renderLive({ forwarder });
     await rows();
+    // The first read is a starting point: no board.
+    expect(document.querySelector("[data-goal-board]")).toBeNull();
     const before = net();
     const refresh = screen.getByRole("button", { name: copy.live.refresh });
     await user.click(refresh);
@@ -279,8 +291,15 @@ describe("the LIVE page's reads", () => {
     expect(await screen.findByRole("button", { name: copy.live.refresh })).toBeEnabled();
     // The older copy changes nothing.
     expect(net()).toBe(before);
-    expect(screen.queryByRole("heading", { name: copy.live.sinceLastLook })).toBeNull();
+    expect(recapRegion()).toBeNull();
+    expect(document.querySelector("[data-goal-board]")).toBeNull();
     await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    // The newer read raises the board for P4's goal; what it changed is told once it lands.
+    const board = await raised("goal");
+    expect(board).toHaveTextContent("P4");
+    expect(net()).toBe(before);
+    expect(recapRegion()).toBeNull();
+    fireEvent.click(board);
     const recap = await screen.findByRole("region", { name: copy.live.sinceLastLook });
     expect(within(recap).getByRole("listitem")).toHaveAccessibleName("P4, Gol 1, +6");
     expect(net()).not.toBe(before);
@@ -337,9 +356,12 @@ describe("the LIVE page's reads", () => {
     await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(2));
     // The followed read is the live document alone, scored for both sides.
     expect(forwarder.entryBundle).toHaveBeenCalledTimes(2);
-    await vi.waitFor(() =>
-      expect(screen.getByRole("region", { name: copy.live.sinceLastLook })).toBeInTheDocument(),
-    );
+    // Its goal raises the board, and the recap tells it once the board lands.
+    const board = await raised("goal");
+    expect(board).toHaveTextContent("P4");
+    expect(recapRegion()).toBeNull();
+    fireEvent.click(board);
+    await vi.waitFor(() => expect(recapRegion()).toBeInTheDocument());
   });
 
   it("holds what changed through a quiet followed read, until the visitor looks again", async () => {
@@ -353,21 +375,143 @@ describe("the LIVE page's reads", () => {
     ]);
     const { user } = renderLive({ forwarder });
     await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
-    const recap = () => screen.queryByRole("region", { name: copy.live.sinceLastLook });
     for (const reads of [2, 3]) {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(60_000);
       });
       await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(reads));
+      // The goal's read raises the board; the quiet read after it raises none.
+      if (reads === 2) fireEvent.click(await raised("goal"));
     }
+    expect(document.querySelector("[data-goal-board]")).toBeNull();
     // The goal stays told after the read that brought nothing.
     await vi.waitFor(() =>
-      expect(within(recap()!).getByRole("listitem")).toHaveAccessibleName("P4, Gol 1, +6"),
+      expect(within(recapRegion()!).getByRole("listitem")).toHaveAccessibleName("P4, Gol 1, +6"),
     );
     // Yenile is the visitor looking: what was told goes, and the quiet read tells nothing.
     await user.click(screen.getByRole("button", { name: copy.live.refresh }));
     await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(4));
-    await vi.waitFor(() => expect(recap()).toBeNull());
+    await vi.waitFor(() => expect(recapRegion()).toBeNull());
+  });
+});
+
+describe("the GOL board on LIVE", () => {
+  it("rises for the member's goal, and Canlı puan takes its points when they land", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
+    const forwarder = fakeForwarder([
+      answered(live("2026-11-21T15:29:00Z")),
+      answered(live("2026-11-21T15:30:00Z", 9, 1)),
+    ]);
+    renderLive({ forwarder });
+    await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+    // The first read is a starting point: no board.
+    expect(document.querySelector("[data-goal-board]")).toBeNull();
+    const before = Number(net());
+    const scorer = () => document.querySelector("[data-live-row='4']")!;
+    const duel = () => document.querySelector("[data-live-rival]")!;
+    await vi.waitFor(() => expect(duel()).toHaveTextContent(`North Stand Notes ${before}`));
+    expect(scorer()).toHaveAccessibleName(expect.stringContaining(copy.live.points("3")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    const board = await raised("goal");
+    expect(board).toHaveTextContent("P4");
+    // The defender's six points wait on the board: Canlı puan, the duel, the rows and the
+    // recap stand as the read before left them.
+    expect(Number(net())).toBe(before);
+    expect(duel()).toHaveTextContent(`North Stand Notes ${before}`);
+    expect(scorer()).toHaveAccessibleName(expect.stringContaining(copy.live.points("3")));
+    expect(recapRegion()).toBeNull();
+    fireEvent.click(board);
+    await vi.waitFor(() => expect(Number(net())).toBe(before + 6));
+    expect(duel()).toHaveTextContent(`North Stand Notes ${before + 6}`);
+    expect(scorer()).toHaveAccessibleName(expect.stringContaining(copy.live.points("9")));
+    expect(scorer()).toHaveAccessibleName(expect.stringContaining(`${copy.live.goal} 1`));
+    expect(within(recapRegion()!).getByRole("listitem")).toHaveAccessibleName("P4, Gol 1, +6");
+  });
+
+  it("runs the board's points into Canlı puan, which pops as they land", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
+    // jsdom has no Web Animations: each one here finishes at once, and the totals it moves
+    // are noted.
+    const popped: Element[] = [];
+    Object.defineProperty(Element.prototype, "animate", {
+      configurable: true,
+      writable: true,
+      value(this: Element) {
+        if (this.matches("[data-live-total]")) popped.push(this);
+        return { finished: Promise.resolve(), cancel() {} } as unknown as Animation;
+      },
+    });
+    try {
+      const forwarder = fakeForwarder([
+        answered(live("2026-11-21T15:29:00Z")),
+        answered(live("2026-11-21T15:30:00Z", 9, 1)),
+      ]);
+      renderLive({ forwarder });
+      await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+      const before = Number(net());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      fireEvent.click(await raised("goal"));
+      await vi.waitFor(() => expect(Number(net())).toBe(before + 6));
+      // The run found LIVE's own total, in its score's head, and popped it once it landed.
+      const total = document.querySelector("[data-live-total]")!;
+      expect(total.closest("[data-live-head]")).not.toBeNull();
+      expect(popped).toEqual([total]);
+    } finally {
+      delete (Element.prototype as { animate?: unknown }).animate;
+    }
+  });
+
+  it("follows nothing while ?replay=1 plays, though a match is on", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
+    const forwarder = fakeForwarder([answered(live("2026-11-21T15:29:00Z", 9, 1))]);
+    renderLive({
+      forwarder,
+      path: `/league/${LEAGUE.leagueId}/members/${ENTRY}/live?replay=1`,
+    });
+    await vi.waitFor(() => expect(document.querySelectorAll("[data-live-row]")).toHaveLength(15));
+    // The page's first read and the replay's own read, then nothing for two minutes.
+    await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2 * 60_000);
+    });
+    expect(forwarder.liveActivity).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("the heading", () => {
+  afterEach(() => {
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
+  it("keeps the heading the shell focused while the squad, the read and the board arrive beside the page", async () => {
+    // From 1024 px the page stands in two columns.
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        media: query,
+        matches: query === WIDE_QUERY,
+        addEventListener() {},
+        removeEventListener() {},
+      }),
+    });
+    const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))]);
+    renderLive({ forwarder });
+    // The shell focuses the page's heading on arrival, before anything below it is read.
+    const heading = screen.getByRole("heading", { level: 1, name: copy.live.title });
+    heading.setAttribute("tabindex", "-1");
+    heading.focus();
+    expect(await rows()).toHaveLength(15);
+    expect(document.querySelector("[data-live-page]")).toHaveAttribute("data-wide");
+    expect(screen.getByRole("heading", { level: 1 })).toBe(heading);
+    expect(document.activeElement).toBe(heading);
   });
 });
 

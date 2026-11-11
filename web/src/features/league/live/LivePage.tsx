@@ -9,12 +9,24 @@
  * played. Its reads are the member's live week's (`useMemberLiveScore`): on open, on Yenile,
  * and once a minute while one of the member's matches is played and the page is in view,
  * wired as the member page wires them, with the GOL board and `?replay=1` of its own. The
- * member and the rival are scored from the same live document; the rival's bundle, the two
- * seasons (a classic league's total gap) and a head-to-head league's pairings are read once.
+ * member and the rival are scored from the read the live week shows; the rival's bundle, the
+ * two seasons (a classic league's total gap) and a head-to-head league's pairings are read
+ * once.
+ *
+ * The heading stands first in every state, so the one the shell focuses on arrival stays.
+ * Canlı puan takes the GOL board's points as each moment lands, as the member page's card
+ * does, and the rows and the recap take a read once its moments have landed.
  */
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { recordUsage } from "../../../data/usage";
@@ -45,12 +57,15 @@ import {
   bundleQuery,
   createLiveRecord,
   liveSources,
+  newestReading,
+  readingAt,
   seasonQuery,
   tableQuery,
   type LiveForwarder,
 } from "./liveSources";
-import { LiveView } from "./LiveView";
-import { useBoardMoments } from "./useBoardMoments";
+import styles from "./LivePage.module.css";
+import { LiveHeader, LiveState, LiveView, type LiveRivalView } from "./LiveView";
+import { useBoardHold, useBoardMoments } from "./useBoardMoments";
 import { useGoalReplay } from "./useGoalReplay";
 import { useLiveWindow } from "./useLiveWindow";
 import { useMemberLiveScore } from "./useMemberLiveScore";
@@ -62,6 +77,13 @@ export interface LiveDependencies {
   loadTable?: (signal: AbortSignal) => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
 }
 
+/** What the heading says of a member's week, once the page below it knows. */
+interface LiveHead {
+  entryId: number;
+  gameweek: number | null;
+  playing: boolean;
+}
+
 export function LivePage({ dependencies }: { dependencies?: LiveDependencies } = {}) {
   useEffect(() => recordUsage({ step: "tool" }), []);
   const { messages } = useLanguage();
@@ -71,33 +93,38 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
   const squad = useEntrySquad(entryId, valid);
   const fixtures = useFixtures();
   const wide = useWide();
-  const frame = (state: "loading" | "empty", team = "") => (
-    <LiveView
-      team={team}
-      gameweek={null}
-      playing={false}
-      state={state}
-      board={null}
-      recap={[]}
-      own={false}
-      rival={null}
-      refreshing={false}
-      onRefresh={() => undefined}
-      wide={wide}
-    />
-  );
-  if (!valid) return frame("empty");
-  if (squad.isPending || fixtures.isPending) return frame("loading");
-  if (squad.isError) return frame("empty");
+  const [head, setHead] = useState<LiveHead | null>(null);
+  const known = head !== null && head.entryId === entryId ? head : null;
+  const unnamed = messages.leagueMembers.unknownTeam;
+  // A squad held is drawn from, though a later read of it fails.
+  const entry = squad.data;
+  let body: ReactNode;
+  if (entry === undefined) {
+    body = <LiveState kind={valid && !squad.isError ? "loading" : "empty"} />;
+  } else if (fixtures.isPending) {
+    body = <LiveState kind="loading" />;
+  } else {
+    body = (
+      <LiveMember
+        key={entryId}
+        squad={entry}
+        fixtures={fixtures.data ?? null}
+        dependencies={dependencies}
+        wide={wide}
+        unnamed={unnamed}
+        onHead={setHead}
+      />
+    );
+  }
   return (
-    <LiveMember
-      key={entryId}
-      squad={squad.data}
-      fixtures={fixtures.data ?? null}
-      dependencies={dependencies}
-      wide={wide}
-      unnamed={messages.leagueMembers.unknownTeam}
-    />
+    <div className={styles.page} data-live-page data-wide={wide || undefined}>
+      <LiveHeader
+        team={entry === undefined ? "" : (entry.payload.entry.team_name ?? unnamed)}
+        gameweek={known?.gameweek ?? null}
+        playing={known?.playing ?? false}
+      />
+      {body}
+    </div>
   );
 }
 
@@ -107,12 +134,14 @@ function LiveMember({
   dependencies = {},
   wide,
   unnamed,
+  onHead,
 }: {
   squad: LeagueViewEnvelope<EntrySquad>;
   fixtures: FixturesPayload | null;
   dependencies?: LiveDependencies;
   wide: boolean;
   unnamed: string;
+  onHead: (head: LiveHead) => void;
 }) {
   const view = squad.payload;
   const entryId = view.entry.entry_id;
@@ -156,6 +185,9 @@ function LiveMember({
   // The board's batches, numbered as the member page numbers them: the replay and the real
   // reads are two streams, so one never swallows or replays the other's moment.
   const stream = useBoardMoments(live, entryId);
+  // Canlı puan holds the points of the board's queued moments until each one's run lands in
+  // it, as the member page's card does; the replay brings no real points, so it holds nothing.
+  const hold = useBoardHold(replaying ? null : stream);
   const goalBatch = replaying
     ? replay === null
       ? null
@@ -177,7 +209,17 @@ function LiveMember({
     enabled: ready,
   });
   const week = memberWeek?.gameweek ?? null;
-  const reading = week === null ? null : (snapshot.readings.get(week) ?? null);
+  // The board is scored from the read the live week shows, so its total changes in the same
+  // render as the moments that read brought and the hold on them. Until the live week shows
+  // one (a first read brings no moments), the newest read is drawn.
+  const shownTime = live.shown?.score.source_time ?? null;
+  const [lastShown, setLastShown] = useState<string | null>(null);
+  if (shownTime !== null && shownTime !== lastShown) setLastShown(shownTime);
+  const time = shownTime ?? lastShown;
+  const reading =
+    week === null
+      ? null
+      : ((time === null ? null : readingAt(snapshot, week, time)) ?? newestReading(snapshot, week));
   const board = useMemo(
     () =>
       reading !== null && memberWeek !== null && table.data !== undefined && fixtures !== null
@@ -267,14 +309,109 @@ function LiveMember({
     })),
   });
   const [ownSeason, rivalSeason] = seasons.map((season) => season.data ?? null);
-  const totals =
-    week !== null && ownSeason && rivalSeason
-      ? { member: seasonTotalBefore(ownSeason, week), rival: seasonTotalBefore(rivalSeason, week) }
-      : null;
-  const duel =
-    board !== null && rivalBoard !== null
-      ? liveDuel(board, rivalBoard, classic ? totals : null)
-      : null;
+  const totals = useMemo(
+    () =>
+      week !== null && ownSeason && rivalSeason
+        ? {
+            member: seasonTotalBefore(ownSeason, week),
+            rival: seasonTotalBefore(rivalSeason, week),
+          }
+        : null,
+    [week, ownSeason, rivalSeason],
+  );
+  const duel = useMemo(
+    () =>
+      board !== null && rivalBoard !== null
+        ? liveDuel(board, rivalBoard, classic ? totals : null)
+        : null,
+    [board, rivalBoard, classic, totals],
+  );
+
+  const claimed = useClaimedEntry(leagueId);
+  const gameweek = board?.gameweek ?? week;
+  const playing = liveMatch.open;
+  useEffect(() => onHead({ entryId, gameweek, playing }), [onHead, entryId, gameweek, playing]);
+  const loading =
+    ready &&
+    board === null &&
+    (memberBundle.isPending ||
+      (memberWeek !== null &&
+        (table.isPending || (reading === null && !snapshot.settled.has(memberWeek.gameweek)))));
+  return (
+    <>
+      <GoalMomentLayer batch={goalBatch} onLanded={hold.landed} />
+      {board === null ? (
+        <LiveState kind={loading ? "loading" : "empty"} />
+      ) : (
+        <LiveShown
+          board={board}
+          held={hold.held}
+          waiting={hold.waiting}
+          team={view.entry.team_name ?? unnamed}
+          own={!standalone && claimed === entryId}
+          rival={
+            // Drawn once the rival is chosen, so the picker never shows an empty choice first.
+            standalone || waiting || choices.length === 0
+              ? null
+              : {
+                  choices,
+                  entryId: rivalId,
+                  name: choices.find((choice) => choice.entryId === rivalId)?.name ?? null,
+                  board: rivalBoard,
+                  duel,
+                  headToHead,
+                  opponent: rivalId !== null && rivalId === opponent.data?.entryId,
+                  onSelect: (next) =>
+                    setSearchParams(
+                      (current) => {
+                        const params = new URLSearchParams(current);
+                        params.set("duel", String(next));
+                        return params;
+                      },
+                      { replace: true },
+                    ),
+                }
+          }
+          refreshing={live.refreshing}
+          refresh={live.refresh}
+          wide={wide}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * The board as it is shown. Its own part, so it takes the page's board, the hold and the
+ * moments' wait once all three have settled for a read: while the GOL board brings a read's
+ * moments, the rows, the counts and the recap stay as the read before left them, so nothing
+ * moves under the board, and Canlı puan stands at the new read's total less what the board
+ * still brings.
+ */
+function LiveShown({
+  board,
+  held,
+  waiting,
+  team,
+  own,
+  rival,
+  refreshing,
+  refresh,
+  wide,
+}: {
+  board: LiveBoard;
+  held: number;
+  waiting: boolean;
+  team: string;
+  own: boolean;
+  rival: LiveRivalView | null;
+  refreshing: boolean;
+  refresh: () => void;
+  wide: boolean;
+}) {
+  const [settled, setSettled] = useState(board);
+  if (!waiting && board !== settled) setSettled(board);
+  const drawn = waiting && settled.gameweek === board.gameweek ? settled : board;
 
   // What the reads since the visitor last looked brought the member: each newer board adds
   // to it, and Yenile or a return to the page (the visitor looking again) clears it.
@@ -282,9 +419,7 @@ function LiveMember({
     board: null,
     recap: null,
   });
-  if (board !== null && board !== told.board) {
-    setTold({ board, recap: advanceRecap(told.recap, board) });
-  }
+  if (drawn !== told.board) setTold({ board: drawn, recap: advanceRecap(told.recap, drawn) });
   const look = useCallback(
     () => setTold((current) => ({ ...current, recap: lookedAt(current.recap) })),
     [],
@@ -303,58 +438,23 @@ function LiveMember({
       window.removeEventListener("pageshow", onShow);
     };
   }, [look]);
-  const refresh = live.refresh;
   const onRefresh = useCallback(() => {
     look();
     refresh();
   }, [look, refresh]);
 
-  const claimed = useClaimedEntry(leagueId);
-  const team = view.entry.team_name ?? unnamed;
-  const loading =
-    ready &&
-    board === null &&
-    (memberBundle.isPending ||
-      (memberWeek !== null &&
-        (table.isPending || (reading === null && !snapshot.settled.has(memberWeek.gameweek)))));
   return (
-    <>
-      <GoalMomentLayer batch={goalBatch} />
-      <LiveView
-        team={team}
-        gameweek={board?.gameweek ?? week}
-        playing={liveMatch.open}
-        state={board !== null ? "board" : loading ? "loading" : "empty"}
-        board={board}
-        recap={recapItems(told.recap)}
-        own={!standalone && claimed === entryId}
-        rival={
-          // Drawn once the rival is chosen, so the picker never shows an empty choice first.
-          standalone || waiting || choices.length === 0
-            ? null
-            : {
-                choices,
-                entryId: rivalId,
-                name: choices.find((choice) => choice.entryId === rivalId)?.name ?? null,
-                board: rivalBoard,
-                duel,
-                headToHead,
-                opponent: rivalId !== null && rivalId === opponent.data?.entryId,
-                onSelect: (next) =>
-                  setSearchParams(
-                    (current) => {
-                      const params = new URLSearchParams(current);
-                      params.set("duel", String(next));
-                      return params;
-                    },
-                    { replace: true },
-                  ),
-              }
-        }
-        refreshing={live.refreshing}
-        onRefresh={onRefresh}
-        wide={wide}
-      />
-    </>
+    <LiveView
+      team={team}
+      board={drawn}
+      net={board.net - held}
+      held={held}
+      recap={recapItems(told.recap)}
+      own={own}
+      rival={rival}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      wide={wide}
+    />
   );
 }

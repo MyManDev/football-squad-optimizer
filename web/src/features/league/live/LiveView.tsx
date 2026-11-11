@@ -1,12 +1,14 @@
 /**
- * The LIVE page as it is drawn (the synthesis of 2026-11-11, section 3.2): the member's live
- * score and counts, one rival beside it, when the week was read, what the newest read
- * changed, the fifteen grouped by their match, and the players the duel turns on.
+ * The LIVE page as it is drawn (the synthesis of 2026-11-11, section 3.2): the heading, then
+ * the member's live score and counts, one rival beside it, when the week was read, what the
+ * reads since the last look changed, the fifteen grouped by their match, and the players the
+ * duel turns on.
  *
- * A phone reads one column: the header, the score, the rival, the read, the recap, the
- * groups and Farklar, closed. From 1024 px the rival and Farklar, open, stand in a column of
- * their own beside the rest, in that order in the document as on the screen. Display only:
- * every number comes scored from the page.
+ * The heading stands above everything in every state, so the one the shell focuses after a
+ * move to the page is never taken away when the board arrives. A phone reads one column: the
+ * score, the rival, the read, the recap, the groups and Farklar, closed. From 1024 px the
+ * rival and Farklar, open, stand in a column of their own beside the rest, in that order in
+ * the document as on the screen. Display only: every number comes scored from the page.
  */
 
 import { useId, useState, type ReactNode } from "react";
@@ -23,7 +25,7 @@ import {
   type LiveRow,
   type RecapItem,
 } from "./liveBoard";
-import type { DuelSwing, LiveDuel } from "./liveDuel";
+import { duelStatus, type DuelSwing, type LiveDuel } from "./liveDuel";
 import { clockTime, kickoffShort, signedWhole, wholePoints } from "./liveFormat";
 import type { RivalChoice } from "./liveRival";
 import styles from "./LivePage.module.css";
@@ -38,22 +40,60 @@ export interface LiveRivalView {
   name: string | null;
   board: LiveBoard | null;
   duel: LiveDuel | null;
-  /** The league is head-to-head: the rival is named the opponent there. */
+  /** The league is head-to-head. */
   headToHead: boolean;
   /** The rival is the member's opponent of the live week. */
   opponent: boolean;
   onSelect: (entryId: number) => void;
 }
 
-export interface LiveViewProps {
-  /** The member's team, named under the heading. */
+/** LIVE's heading: the page's one h1, its light while one of the member's matches is on. */
+export function LiveHeader({
+  team,
+  gameweek,
+  playing,
+}: {
   team: string;
-  /** The gameweek the board is for, once known. */
   gameweek: number | null;
-  /** One of the member's matches is being played: the heading's light is on. */
   playing: boolean;
-  state: "loading" | "empty" | "board";
-  board: LiveBoard | null;
+}) {
+  const { messages } = useLanguage();
+  const copy = messages.live;
+  return (
+    <header className={styles.header}>
+      <h1 className={styles.title}>
+        {copy.title}
+        {playing ? (
+          <span className={styles.light} role="img" aria-label={copy.matchInProgress} />
+        ) : null}
+      </h1>
+      {team === "" ? null : (
+        <p className={styles.subtitle}>
+          {gameweek === null ? team : `${team} · ${messages.suggestionHistory.gameweek(gameweek)}`}
+        </p>
+      )}
+    </header>
+  );
+}
+
+/** The page before its board: while it is read, or when there is none. */
+export function LiveState({ kind }: { kind: "loading" | "empty" }) {
+  const { messages } = useLanguage();
+  return (
+    <p className={styles.state} role="status">
+      {kind === "loading" ? messages.common.loading : messages.leagueMembers.toolEmpty}
+    </p>
+  );
+}
+
+export interface LiveViewProps {
+  /** The member's team. */
+  team: string;
+  board: LiveBoard;
+  /** Canlı puan as shown: the newest read's net, less what the GOL board still brings. */
+  net: number;
+  /** The points the GOL board still has to bring to Canlı puan. */
+  held: number;
   recap: readonly RecapItem[];
   /** The page is the visitor's own: its side reads "Sen". */
   own: boolean;
@@ -64,38 +104,10 @@ export interface LiveViewProps {
   wide: boolean;
 }
 
+/** The board itself, under the heading. */
 export function LiveView(props: LiveViewProps) {
-  const { messages } = useLanguage();
-  const copy = messages.live;
-  const { board, rival, wide, state } = props;
-  const header = (
-    <header className={styles.header}>
-      <h1 className={styles.title}>
-        {copy.title}
-        {props.playing ? (
-          <span className={styles.light} role="img" aria-label={copy.matchInProgress} />
-        ) : null}
-      </h1>
-      {props.team === "" ? null : (
-        <p className={styles.subtitle}>
-          {props.gameweek === null
-            ? props.team
-            : `${props.team} · ${messages.suggestionHistory.gameweek(props.gameweek)}`}
-        </p>
-      )}
-    </header>
-  );
-  if (state !== "board" || board === null) {
-    return (
-      <div className={styles.page}>
-        {header}
-        <p className={styles.state} role="status">
-          {state === "loading" ? messages.common.loading : messages.leagueMembers.toolEmpty}
-        </p>
-      </div>
-    );
-  }
-  const score = <ScoreCard board={board} />;
+  const { board, rival, wide } = props;
+  const score = <ScoreCard board={board} net={props.net} />;
   const fresh = (
     <Freshness board={board} refreshing={props.refreshing} onRefresh={props.onRefresh} />
   );
@@ -103,7 +115,13 @@ export function LiveView(props: LiveViewProps) {
   const groups = <Groups board={board} />;
   const sides =
     rival === null ? null : (
-      <RivalBlock rival={rival} own={props.own} board={board} team={props.team} />
+      <RivalBlock
+        rival={rival}
+        own={props.own}
+        net={props.net}
+        held={props.held}
+        team={props.team}
+      />
     );
   const differentials =
     rival?.duel != null ? (
@@ -115,49 +133,51 @@ export function LiveView(props: LiveViewProps) {
         wide={wide}
       />
     ) : null;
-  return (
-    <div className={styles.page} data-live-page data-wide={wide || undefined}>
-      {wide ? (
-        <div className={styles.columns}>
-          <div className={styles.column}>
-            {header}
-            {score}
-            {fresh}
-            {recap}
-            {groups}
-          </div>
-          {sides || differentials ? (
-            <div className={styles.side}>
-              {sides}
-              {differentials}
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <>
-          {header}
-          {score}
+  return wide ? (
+    <div className={styles.columns}>
+      <div className={styles.column}>
+        {score}
+        {fresh}
+        {recap}
+        {groups}
+      </div>
+      {sides || differentials ? (
+        <div className={styles.side}>
           {sides}
-          {fresh}
-          {recap}
-          {groups}
           {differentials}
-        </>
-      )}
+        </div>
+      ) : null}
     </div>
+  ) : (
+    <>
+      {score}
+      {sides}
+      {fresh}
+      {recap}
+      {groups}
+      {differentials}
+    </>
   );
 }
 
-function ScoreCard({ board }: { board: LiveBoard }) {
+/**
+ * The score's head, from its top to Canlı puan: the GOL board stands clear of it while it is
+ * in view, and its points run into the total (`data-live-total`).
+ */
+function ScoreCard({ board, net }: { board: LiveBoard; net: number }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   const chip = board.chip === null ? null : (messages.leagueMembers.chipNames[board.chip] ?? null);
   return (
-    <section className={styles.score} aria-label={copy.livePoints}>
+    <section className={styles.score} aria-label={copy.livePoints} data-live-head>
       <dl className={styles.scoreGrid}>
         <div className={styles.total}>
           <dt>{copy.livePoints}</dt>
-          <dd data-live-net>{wholePoints(board.net, locale)}</dd>
+          <dd>
+            <span className={styles.totalFigure} data-live-total>
+              {wholePoints(net, locale)}
+            </span>
+          </dd>
         </div>
         <div className={styles.cell}>
           <dt>{copy.matches}</dt>
@@ -484,18 +504,25 @@ function DuelBar({ margin }: { margin: number }) {
 function RivalBlock({
   rival,
   own,
-  board,
+  net,
+  held,
   team,
 }: {
   rival: LiveRivalView;
   own: boolean;
-  board: LiveBoard;
+  /** The member's Canlı puan as shown, and what the GOL board still brings to it. */
+  net: number;
+  held: number;
   team: string;
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   const id = useId();
   const duel = rival.duel;
+  const rivalNet = rival.board?.net ?? null;
+  // The duel reads the member's score as Canlı puan shows it, until the board's points land.
+  const margin = duel === null ? 0 : duel.margin - held;
+  const totalGap = duel?.totalGap == null ? null : duel.totalGap - held;
   const label = rival.headToHead ? copy.opponent : copy.rival;
   return (
     <section className={styles.rival} aria-labelledby={`${id}-label`} data-live-rival>
@@ -523,20 +550,20 @@ function RivalBlock({
           </span>
         ) : null}
       </div>
-      {duel !== null ? (
+      {duel !== null && rivalNet !== null ? (
         <>
           <p className={styles.status}>
-            <strong>{copy.status[duel.status]}</strong>
+            <strong>{copy.status[duelStatus(margin)]}</strong>
             {" · "}
-            {copy.margin} <span className={styles.figure}>{signedWhole(duel.margin, locale)}</span>
+            {copy.margin} <span className={styles.figure}>{signedWhole(margin, locale)}</span>
           </p>
-          <DuelBar margin={duel.margin} />
+          <DuelBar margin={margin} />
           <p className={styles.ends}>
             <span className={styles.endMember}>
-              {own ? copy.you : team} {wholePoints(board.net, locale)}
+              {own ? copy.you : team} {wholePoints(net, locale)}
             </span>
             <span className={styles.endRival}>
-              {wholePoints(rival.board!.net, locale)} {rival.name}
+              {wholePoints(rivalNet, locale)} {rival.name}
             </span>
           </p>
           <dl className={styles.duelCells}>
@@ -546,10 +573,10 @@ function RivalBlock({
                 {wholePoints(duel.left.member, locale)} · {wholePoints(duel.left.rival, locale)}
               </dd>
             </div>
-            {duel.totalGap !== null ? (
+            {totalGap !== null ? (
               <div>
                 <dt>{copy.totalGap}</dt>
-                <dd>{signedWhole(duel.totalGap, locale)}</dd>
+                <dd>{signedWhole(totalGap, locale)}</dd>
               </div>
             ) : null}
           </dl>

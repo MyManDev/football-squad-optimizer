@@ -4,8 +4,8 @@
  * played). The page hands that hook the forwarder through `liveSources`, which:
  *
  * - keeps each live document a read brings (`LiveRecord`), so the page scores the member
- *   and the rival from one read, and a refresh that brings nothing keeps the board shown;
- *   an older document never replaces a newer one;
+ *   and the rival from the read the member's live week shows, and a refresh that brings
+ *   nothing keeps the board shown;
  * - reads each bundle under the key the forwarded gate reads it by (`forwardedKeys.bundle`),
  *   so a bundle the gate holds is not read again and the member's is read once;
  * - reads the capture's table once, under a key the page reads it by as well.
@@ -43,7 +43,11 @@ export interface LiveReading {
   activity: LiveActivity | null;
 }
 
-/** The live documents read so far, the newest of each gameweek. */
+/**
+ * The live documents read so far, the newest few of each gameweek by source time. The page
+ * draws the one the member's live week shows (`readingAt` its source time), so the board, the
+ * GOL moments that read brought and Canlı puan's hold all change in the same render.
+ */
 export interface LiveRecord {
   record(reading: LiveReading): void;
   /** A read of `gameweek` was answered, with a document or without one. */
@@ -53,17 +57,39 @@ export interface LiveRecord {
 }
 
 export interface LiveSnapshot {
-  readings: ReadonlyMap<number, LiveReading>;
+  /** Keyed `gameweek|source time`. */
+  readings: ReadonlyMap<string, LiveReading>;
   settled: ReadonlySet<number>;
 }
 
-const newer = (reading: LiveReading, kept: LiveReading | undefined) => {
-  if (kept === undefined) return true;
-  const time = Date.parse(reading.week.source_time);
-  const before = Date.parse(kept.week.source_time);
-  // The same read with its event detail is kept over a copy without it.
-  return time > before || (time === before && kept.activity === null && reading.activity !== null);
-};
+/** At most this many documents of one gameweek are kept: the newest. */
+const KEPT_READS = 4;
+
+const readingKey = (gameweek: number, sourceTime: string) => `${gameweek}|${sourceTime}`;
+
+/** The document of `gameweek` read at `sourceTime`, where it is kept. */
+export function readingAt(
+  snapshot: LiveSnapshot,
+  gameweek: number,
+  sourceTime: string,
+): LiveReading | null {
+  return snapshot.readings.get(readingKey(gameweek, sourceTime)) ?? null;
+}
+
+/** The newest document of `gameweek` read so far, or null. */
+export function newestReading(snapshot: LiveSnapshot, gameweek: number): LiveReading | null {
+  let newest: LiveReading | null = null;
+  for (const reading of snapshot.readings.values()) {
+    if (reading.week.gameweek !== gameweek) continue;
+    if (
+      newest === null ||
+      Date.parse(reading.week.source_time) > Date.parse(newest.week.source_time)
+    ) {
+      newest = reading;
+    }
+  }
+  return newest;
+}
 
 export function createLiveRecord(): LiveRecord {
   let snapshot: LiveSnapshot = { readings: new Map(), settled: new Set() };
@@ -75,8 +101,16 @@ export function createLiveRecord(): LiveRecord {
   return {
     record(reading) {
       const gameweek = reading.week.gameweek;
-      if (!newer(reading, snapshot.readings.get(gameweek))) return;
-      change({ ...snapshot, readings: new Map(snapshot.readings).set(gameweek, reading) });
+      const key = readingKey(gameweek, reading.week.source_time);
+      const kept = snapshot.readings.get(key);
+      // The same read with its event detail is kept over a copy without it, never the reverse.
+      if (kept !== undefined && !(kept.activity === null && reading.activity !== null)) return;
+      const readings = new Map(snapshot.readings).set(key, reading);
+      const week = [...readings.entries()]
+        .filter(([, held]) => held.week.gameweek === gameweek)
+        .sort(([, a], [, b]) => Date.parse(b.week.source_time) - Date.parse(a.week.source_time));
+      for (const [old] of week.slice(KEPT_READS)) readings.delete(old);
+      change({ ...snapshot, readings });
     },
     settle(gameweek) {
       if (snapshot.settled.has(gameweek)) return;

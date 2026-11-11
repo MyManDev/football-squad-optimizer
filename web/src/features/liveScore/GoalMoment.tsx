@@ -98,7 +98,7 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
   const floor = Math.max(ceiling, view - height - EDGE);
   let top = Math.min(Math.max(Math.round(view * 0.38), ceiling), floor);
   const total = document.querySelector("[data-live-total]");
-  const card = total?.closest("[data-member-live-score]");
+  const card = total?.closest("[data-live-head], [data-member-live-score]");
   if (total && card) {
     const from = card.getBoundingClientRect().top;
     const to = total.getBoundingClientRect().bottom;

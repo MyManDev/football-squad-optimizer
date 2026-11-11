@@ -109,6 +109,11 @@
   align-self: start;
 }
 
+/* The figure the GOL board's points run into, and which pops when they land. */
+.totalFigure {
+  display: inline-block;
+}
+
 .total dd {
   color: var(--color-chart-you);
   font-family: var(--font-display);
