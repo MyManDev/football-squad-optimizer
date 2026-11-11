@@ -86,8 +86,11 @@ export function useBoardHold(batch: BoardBatch | null): {
     pending: new Map(),
   });
   if (batch !== null && batch.id !== state.batch) {
-    const pending = new Map(state.pending);
-    if (!prefersReducedMotion()) {
+    // Under reduced motion the layer drops its queue for one still line, so what it held from
+    // earlier moments goes with it: nothing is left waiting for a board that will not play.
+    const still = prefersReducedMotion();
+    const pending = still ? new Map<string, number>() : new Map(state.pending);
+    if (!still) {
       // The moments the board plays (shownOnBoard), each with the points it brings, if any.
       for (const moment of batch.items) {
         if (!shownOnBoard(moment)) continue;

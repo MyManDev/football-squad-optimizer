@@ -385,6 +385,48 @@ describe("what the phone test asked of it", () => {
       card.remove();
     }
   });
+
+  it("keeps at least the refresh button clear when the head leaves no room above or below", () => {
+    // A phone on its side: 320 high, the phone bar to 56, the card's head from 100 to 200.
+    vi.stubGlobal("innerHeight", 320);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(143);
+    const bar = document.createElement("header");
+    bar.setAttribute("data-phone-bar", "");
+    bar.getBoundingClientRect = () => rect(0, 56);
+    const card = document.createElement("div");
+    card.setAttribute("data-member-live-score", "");
+    const button = document.createElement("button");
+    button.setAttribute("data-live-refresh", "");
+    const total = document.createElement("span");
+    total.setAttribute("data-live-total", "");
+    card.append(button, total);
+    document.body.append(bar, card);
+    card.getBoundingClientRect = () => rect(100, 400);
+    button.getBoundingClientRect = () => rect(112, 156);
+    total.getBoundingClientRect = () => rect(170, 200);
+    try {
+      show([moment()]);
+      // The lowest place on the screen (320 - 143 - 12), below the button.
+      expect(top()).toBe("165px");
+    } finally {
+      bar.remove();
+      card.remove();
+    }
+  });
+
+  it("stands again inside the screen when the phone turns while it is up", () => {
+    vi.stubGlobal("innerHeight", 800);
+    const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(224);
+    show([moment()]);
+    expect(top()).toBe("304px");
+    vi.stubGlobal("innerHeight", 360);
+    height.mockReturnValue(224);
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    // 360 high: 224 for the board and 12 below it.
+    expect(top()).toBe("124px");
+  });
 });
 
 describe("what the desktop test asked of it", () => {

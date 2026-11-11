@@ -86,8 +86,9 @@ const EDGE = 12;
 /**
  * Where a board stands: 38% down the screen, wholly inside it and below the phone bar, and
  * clear of the live score's head (its refresh button and total) while that is in view, so a
- * tap meant for the button reaches it and the points have somewhere to run. Beside a sidebar
- * it stands over the page's own column, not the middle of the window.
+ * tap meant for the button reaches it and the points have somewhere to run. Where the head
+ * leaves no room above or below, the board keeps at least the refresh button clear. Beside a
+ * sidebar it stands over the page's own column, not the middle of the window.
  */
 function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void {
   if (place === null || board === null) return;
@@ -108,11 +109,38 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
   if (total && card) {
     const from = card.getBoundingClientRect().top;
     const to = total.getBoundingClientRect().bottom;
-    const covers = to > top && from < top + height && to > 0 && from < view;
-    if (covers && to + EDGE <= floor) top = to + EDGE;
-    else if (covers && from - EDGE - height >= ceiling) top = from - EDGE - height;
+    const over = (at: number, low: number, high: number) => high > at && low < at + height;
+    if (over(top, from, to) && to > 0 && from < view) {
+      if (to + EDGE <= floor) top = to + EDGE;
+      else if (from - EDGE - height >= ceiling) top = from - EDGE - height;
+      else {
+        // No room for the board beside the head: it keeps the refresh button clear if it can.
+        const button = card.querySelector("[data-live-refresh]")?.getBoundingClientRect();
+        const clear = [floor, ceiling].find(
+          (at) => button === undefined || !over(at, button.top, button.bottom),
+        );
+        if (clear !== undefined) top = clear;
+      }
+    }
   }
   place.style.top = `${Math.round(top)}px`;
+}
+
+/**
+ * Places a standing board again whenever the screen changes (a phone turned, the iOS bars
+ * shown or hidden), so it never stays outside the screen; the returned cleanup stops it.
+ */
+function keepPlaced(
+  place: { current: HTMLElement | null },
+  board: { current: HTMLElement | null },
+) {
+  const again = () => placeBoard(place.current, board.current);
+  window.addEventListener("resize", again);
+  window.visualViewport?.addEventListener("resize", again);
+  return () => {
+    window.removeEventListener("resize", again);
+    window.visualViewport?.removeEventListener("resize", again);
+  };
 }
 
 /**
@@ -365,6 +393,7 @@ function Board({
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
+    const unplace = keepPlaced(place, board);
     // Risen, the board and its letters let go of their motion: no 3D turn stays on them.
     animate(
       board.current,
@@ -399,6 +428,7 @@ function Board({
     return () => {
       timers.forEach(clearTimeout);
       document.removeEventListener("keydown", onKey);
+      unplace();
     };
   }, [big, doubled, locale, moment]);
 
@@ -514,6 +544,7 @@ function SubstitutionBoard({
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
+    const unplace = keepPlaced(place, board);
     animate(
       board.current,
       [
@@ -531,6 +562,7 @@ function SubstitutionBoard({
     return () => {
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
+      unplace();
     };
   }, [moment.key]);
   return (
