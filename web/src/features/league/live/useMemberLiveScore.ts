@@ -16,7 +16,8 @@
  * reads within half an interval of the last read.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import type { FixturesPayload } from "../../fixtures/types";
 import { advanceLiveMarks, type LiveMarks } from "../../liveScore/liveEvents";
@@ -28,6 +29,7 @@ import type { DevicePlanDocument } from "../device/types";
 import { forwarder as siteForwarder, type ForwarderClient } from "../forwarder/client";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { useLeague } from "../useLeague";
+import { sharedTable } from "./liveSources";
 import { memberLiveScore, type MemberLiveScore } from "./memberLiveScore";
 
 export interface MemberLiveDependencies {
@@ -228,6 +230,9 @@ export function useMemberLiveScore(
   pace: number = FOLLOW_INTERVAL_MS,
 ): MemberLive {
   const { tree } = useLeague();
+  // Read through the page's cache where it has one: the capture's table the phone bar's LIVE
+  // pill holds is taken, not read a second time.
+  const client = useContext(QueryClientContext);
   const ready = enabled && fixtures !== null;
   const capture = squad.source_snapshot_id ?? null;
   const identity = JSON.stringify([squad.entry.entry_id, squad.season, squad.gameweek, capture]);
@@ -235,7 +240,12 @@ export function useMemberLiveScore(
   const latest = {
     forwarder: dependencies.forwarder ?? siteForwarder,
     loadTable:
-      dependencies.loadTable ?? ((signal: AbortSignal) => tree.devicePlan(capture, { signal })),
+      dependencies.loadTable ??
+      (client === undefined
+        ? (signal: AbortSignal) => tree.devicePlan(capture, { signal })
+        : sharedTable(client, tree.league, capture, (signal) =>
+            tree.devicePlan(capture, { signal }),
+          )),
     fixtures,
   };
   const sources = useRef(latest);
@@ -495,10 +505,19 @@ export function useMemberLiveScore(
     return () => {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [ready, follow, followRead, pace]);
+
+  // A followed read in flight goes when the week it reads is no longer followed, or is another
+  // member's, not when the pace changes (a match that stalls): it still lands, so the page is
+  // never left five minutes on the read before.
+  useEffect(() => {
+    if (!ready || follow === null) return undefined;
+    return () => {
       following.current?.abort();
       following.current = null;
     };
-  }, [ready, follow, followRead, pace]);
+  }, [ready, follow, identity]);
 
   useEffect(
     () => () => {

@@ -316,11 +316,13 @@ describe("the read a page draws", () => {
   function Drawn({
     read,
     waiting,
+    owner = "7",
   }: {
     read: { gameweek: number; at: string } | null;
     waiting: boolean;
+    owner?: string;
   }) {
-    const drawn = useSettledRead(read, waiting);
+    const drawn = useSettledRead(read, waiting, owner);
     return <p>{drawn === null ? "none" : drawn.at}</p>;
   }
 
@@ -339,7 +341,7 @@ describe("the read a page draws", () => {
     function Page({ value }: { value: MemberLive }) {
       const batch = useBoardMoments(value, 7);
       const hold = useBoardHold(batch);
-      const drawn = useSettledRead(value.shown, hold.waiting);
+      const drawn = useSettledRead(value.shown, hold.waiting, "7");
       return <p>{drawn === null ? "none" : drawn.score.source_time}</p>;
     }
     const before = live(1, []);
@@ -360,6 +362,24 @@ describe("the read a page draws", () => {
     // The read and its moment come in one render, as the live score hands them on.
     rerender(<Page value={live(2, [], { id: 1, items: [goal] })} />);
     expect(screen.getByText(before.shown.score.source_time)).toBeInTheDocument();
+  });
+
+  it("keeps the last read through a refused one (null), to hold under the next board", () => {
+    const { rerender } = render(<Drawn read={{ gameweek: 11, at: "15:40" }} waiting={false} />);
+    // Yenile is refused: no card, and the read before is kept.
+    rerender(<Drawn read={null} waiting={false} />);
+    expect(screen.getByText("none")).toBeInTheDocument();
+    // The next read brings a moment: its board plays over the read from before.
+    rerender(<Drawn read={{ gameweek: 11, at: "15:42" }} waiting />);
+    expect(screen.getByText("15:40")).toBeInTheDocument();
+  });
+
+  it("never draws one member's read on another's page", () => {
+    const { rerender } = render(
+      <Drawn read={{ gameweek: 11, at: "member 7" }} waiting={false} owner="7" />,
+    );
+    rerender(<Drawn read={{ gameweek: 11, at: "member 8" }} waiting owner="8" />);
+    expect(screen.getByText("member 8")).toBeInTheDocument();
   });
 
   it("never draws another week's read for this one", () => {

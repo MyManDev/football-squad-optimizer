@@ -139,15 +139,27 @@ interface Hold {
 
 /**
  * The read a page draws: the newest, or while the board waits (`useBoardHold`) the one from
- * before its first moment, so the card, the pitch and the rows all wait together.
+ * before its first moment, so the card, the pitch and the rows all wait together. Only a read is
+ * kept: a refused one (null) leaves the last read to hold under the next board. `owner` names
+ * whose reads they are (the member), so one member's read is never drawn on another's page.
  */
 export function useSettledRead<T extends { gameweek: number }>(
   read: T | null,
   waiting: boolean,
+  owner: string,
 ): T | null {
-  const [settled, setSettled] = useState(read);
-  if (!waiting && read !== settled) setSettled(read);
-  return waiting && settled !== null && read !== null && settled.gameweek === read.gameweek
-    ? settled
-    : read;
+  const [settled, setSettled] = useState<{ owner: string; read: T } | null>(
+    read === null ? null : { owner, read },
+  );
+  if (!waiting && read !== null && (settled?.read !== read || settled.owner !== owner)) {
+    setSettled({ owner, read });
+  }
+  const held =
+    settled !== null &&
+    settled.owner === owner &&
+    read !== null &&
+    settled.read.gameweek === read.gameweek
+      ? settled.read
+      : null;
+  return waiting && held !== null ? held : read;
 }

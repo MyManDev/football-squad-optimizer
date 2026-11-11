@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,7 +14,9 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { SEASON_EVENT_POINTS } from "../../liveScore/liveMoments";
 import { FOLLOW_INTERVAL_MS, SLOW_FOLLOW_MS } from "../../liveScore/liveWindow";
 import type { MemberWeek } from "../../liveScore/weekLive";
-import { withLeague } from "../../../testSupport/league";
+import { stubTree, withLeague } from "../../../testSupport/league";
+import type { DevicePlanTableRef } from "../directory";
+import { forwardedKeys } from "../forwarded/reads";
 import type { ForwarderClient } from "../forwarder/client";
 import { useMemberLiveScore, type MemberLiveDependencies } from "./useMemberLiveScore";
 
@@ -495,6 +498,34 @@ describe("a followed live week, as the owner's last review asked", () => {
     expect(client.liveActivity).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps a followed read in flight when the pace changes, and takes what it brings", async () => {
+    // The second read is answered when the test lets it go.
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const client = forwarder([0, 1]);
+    const answer = client.liveActivity.getMockImplementation()!;
+    let reads = 0;
+    client.liveActivity.mockImplementation(async () => {
+      reads += 1;
+      if (reads === 2) await gate;
+      return answer();
+    });
+    const { rerender } = follow(client);
+    await shownNet();
+    await minute();
+    expect(client.liveActivity).toHaveBeenCalledTimes(2);
+    // The match stalls while the read is on its way: the page now reads once in five minutes.
+    rerender(view(client, WEEK, SLOW_FOLLOW_MS));
+    await act(async () => {
+      release();
+      await gate;
+    });
+    // The read still lands, with the goal it brings.
+    await vi.waitFor(() => expect(screen.getByTestId("batch")).not.toHaveTextContent("none"));
+  });
+
   it("counts its first reads: one for the week shown, none for later reads", async () => {
     const client = forwarder([0, 0]);
     follow(client);
@@ -503,5 +534,34 @@ describe("a followed live week, as the owner's last review asked", () => {
     await minute();
     expect(client.liveActivity).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId("start")).toHaveTextContent("1");
+  });
+});
+
+describe("the capture's table", () => {
+  it("is the one the phone bar's pill holds, where the league names the capture's own", async () => {
+    const envelope = await loadTable()(new AbortController().signal);
+    const devicePlan = vi.fn(async () => envelope);
+    const tree = stubTree({ devicePlan });
+    const ref: DevicePlanTableRef = {
+      path: `device/${SQUAD.source_snapshot_id}/device-plan.json`,
+      sha256: "0".repeat(64),
+    };
+    Object.assign(tree, { league: { ...tree.league, devicePlan: ref } });
+    const queries = new QueryClient();
+    queries.setQueryData(forwardedKeys.table(ref), envelope);
+    try {
+      render(
+        <QueryClientProvider client={queries}>
+          <LanguageProvider initialLanguage="tr">
+            {withLeague(<Harness dependencies={{ forwarder: forwarder([0]) }} follow={null} />)}
+          </LanguageProvider>
+        </QueryClientProvider>,
+      );
+      await shownNet();
+      expect(devicePlan).not.toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+      queries.clear();
+    }
   });
 });

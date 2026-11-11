@@ -262,7 +262,7 @@ function LeagueMemberContent({
   );
   // While the board plays, the page draws the read from before its first moment: the card and
   // the pitch take the newest one together once its last moment has landed.
-  const drawnLive = useSettledRead(liveWeek.shown, hold.waiting);
+  const drawnLive = useSettledRead(liveWeek.shown, hold.waiting, String(view.entry.entry_id));
   const displayedSquad = closed ? squadWithPlayedWeek(view, drawnLive?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
