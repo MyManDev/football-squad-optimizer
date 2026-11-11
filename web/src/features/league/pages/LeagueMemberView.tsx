@@ -199,7 +199,8 @@ function LeagueMemberContent({
   // while no read is made, so the window follows only their matches (the owner's decision 3).
   const [matchFilter, setMatchFilter] = useState<LiveWindowFilter>({});
   // The GOL replay opens from the address alone (`?replay=1`): it plays the member's live week's
-  // goals and assists one by one, so the moment can be seen when no match is on.
+  // goals, assists and automatic substitutions one by one, so the board can be seen when no
+  // match is on.
   const replaying = searchParams.get("replay") === "1";
   const liveMatch = useLiveWindow(fixtures, matchFilter);
   const liveWeek = useMemberLiveScore(

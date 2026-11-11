@@ -1,13 +1,15 @@
 /**
- * The GOL replay on the member page: the member's live week read once, then its goals and
- * assists handed to the GOL board one by one, `REPLAY_STEP_MS` apart, once the opening cover has
- * gone. Only the address opens it (`?replay=1`); the page shows no word of it. While it plays
- * the page shows no moment of its own reads, so the two never mix.
+ * The GOL replay on the member page: the member's live week read once, then what the board shows
+ * of it handed to the board one by one, `REPLAY_STEP_MS` apart, once the opening cover has gone:
+ * the goals and assists of the picks the official scorer counts, then the automatic
+ * substitutions it made. Only the address opens it (`?replay=1`); the page shows no word of it.
+ * While it plays the page shows no moment of its own reads, so the two never mix.
  */
 
 import { useEffect, useState } from "react";
 
 import type { FixturesPayload } from "../../fixtures/types";
+import { shownOnBoard, type BoardMoment } from "../../liveScore/boardMoments";
 import { liveMoments } from "../../liveScore/liveMoments";
 import { REPLAY_START_MS, REPLAY_STEP_MS, replayEvents } from "../../liveScore/liveReplay";
 import { useCoverGone } from "../../liveScore/openingCover";
@@ -16,17 +18,18 @@ import { forwarder as siteForwarder } from "../forwarder/client";
 import type { EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
 import { memberLiveScore } from "./memberLiveScore";
-import type { LiveMomentBatch, MemberLiveDependencies } from "./useMemberLiveScore";
+import type { BoardBatch } from "./useBoardMoments";
+import type { MemberLiveDependencies } from "./useMemberLiveScore";
 
 export function useGoalReplay(
   squad: EntrySquad,
   fixtures: FixturesPayload | null,
   dependencies: MemberLiveDependencies = {},
   enabled = false,
-): LiveMomentBatch | null {
+): BoardBatch | null {
   const { tree } = useLeague();
   const coverGone = useCoverGone();
-  const [batch, setBatch] = useState<LiveMomentBatch | null>(null);
+  const [batch, setBatch] = useState<BoardBatch | null>(null);
   const entryId = squad.entry.entry_id;
   const gameweek = squad.gameweek;
   const capture = squad.source_snapshot_id ?? null;
@@ -67,29 +70,45 @@ export function useGoalReplay(
           position: player.position,
         });
       });
-      const events = replayEvents(activity, member.pick_order);
-      // The last moment's step over, the replay hands the board nothing more.
-      timers.push(
-        setTimeout(() => setBatch(null), REPLAY_START_MS + events.length * REPLAY_STEP_MS),
+      const nameOf = (elementId: number) =>
+        players.get(elementId)?.name ?? shown.names.get(elementId) ?? "";
+      // One step for each moment the board shows: a pick the scorer does not count raises
+      // nothing, so it takes no step of its own.
+      const steps: BoardMoment[][] = replayEvents(activity, member.pick_order).map((event, index) =>
+        liveMoments([event], {
+          read: index + 1,
+          season: week.season,
+          counted: shown.score.counted,
+          captain: shown.score.captain,
+          tripleCaptain: member.active_chip === "3xc",
+          players,
+        }).filter(shownOnBoard),
       );
-      events.forEach((event, index) => {
+      // The week's automatic substitutions come after its goals and assists, one board each.
+      for (const [out, incoming] of shown.score.autosubs) {
+        steps.push([
+          {
+            key: `sub:replay:${out}:${incoming}`,
+            kind: "substitution",
+            size: "big",
+            out: nameOf(out),
+            in: nameOf(incoming),
+          },
+        ]);
+      }
+      const shownSteps = steps.filter((items) => items.length > 0);
+      shownSteps.forEach((items, index) => {
         timers.push(
           setTimeout(
-            () => {
-              const items = liveMoments([event], {
-                read: index + 1,
-                season: week.season,
-                counted: shown.score.counted,
-                captain: shown.score.captain,
-                tripleCaptain: member.active_chip === "3xc",
-                players,
-              });
-              if (items.length > 0) setBatch({ id: index + 1, items });
-            },
+            () => setBatch({ id: index + 1, items }),
             REPLAY_START_MS + index * REPLAY_STEP_MS,
           ),
         );
       });
+      // The last moment's step over, the replay hands the board nothing more.
+      timers.push(
+        setTimeout(() => setBatch(null), REPLAY_START_MS + shownSteps.length * REPLAY_STEP_MS),
+      );
     };
     play().catch(() => undefined);
     return () => {
