@@ -12,7 +12,7 @@
  */
 
 /* Above the shell's scrim (30), its drawer and fixture sheet (40), below the opening
-   cover (1000): a goal is seen whatever panel is open. */
+   cover (1000). A board waits while a modal panel is open (openingCover.ts). */
 .layer {
   position: fixed;
   inset: 0;
@@ -20,6 +20,7 @@
   pointer-events: none;
 }
 
+/* The script sets the top from the screen and the live score (placeBoard). */
 .place {
   position: fixed;
   top: 38%;
@@ -44,16 +45,21 @@
   border-radius: var(--radius-m);
   background: var(--color-board);
   color: var(--color-board-text);
-  box-shadow: var(--shadow-drawer);
+  /* The edge keeps the board apart from the night page, which is nearly its colour. */
+  box-shadow:
+    var(--shadow-drawer),
+    0 0 0 1px var(--color-board-edge);
   text-align: left;
   cursor: pointer;
   /* The board rises and falls about its top edge, as the substitution boards turn. */
   transform-origin: 50% 0;
 }
 
+/* The order goes under the shout when both do not fit at the smallest LED size. */
 .head {
   grid-area: head;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-2);
@@ -187,7 +193,9 @@
   border-radius: var(--radius-s);
   background: var(--color-board);
   color: var(--color-mark);
-  box-shadow: var(--shadow-drawer);
+  box-shadow:
+    var(--shadow-drawer),
+    0 0 0 1px var(--color-board-edge);
   font-family: var(--font-mono);
   font-size: var(--step--1);
   font-weight: 600;

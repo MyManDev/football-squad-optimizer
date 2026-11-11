@@ -1,8 +1,9 @@
 /**
  * Whether the page is clear for the GOL board: the opening cover (OpeningMark, the owner's
- * four-second brand opening) has gone, no modal dialog is open (a player's details), and the
- * board's own layer is not made inert by a cover over the page (the device solve's progress).
- * The board waits while any of these is up, so no moment is spent unseen.
+ * four-second brand opening) has gone, no modal dialog is open (a player's details), no modal
+ * panel is open (the menu drawer, the fixture sheet), and the board's own layer is not made
+ * inert by a cover over the page (the device solve's progress). The board waits while any of
+ * these is up, so no moment is spent unseen, and a board already up gives way when one opens.
  */
 
 import { useEffect, useState, type RefObject } from "react";
@@ -13,6 +14,7 @@ function clear(layer: HTMLElement | null): boolean {
   if (typeof document === "undefined") return true;
   if (document.querySelector(COVER) !== null) return false;
   if (document.querySelector("dialog[open]") !== null) return false;
+  if (document.querySelector('[aria-modal="true"]') !== null) return false;
   return layer === null || !layer.closest("[inert]");
 }
 
@@ -43,7 +45,7 @@ export function usePageClear(layer: RefObject<HTMLElement | null>): boolean {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["open", "inert"],
+      attributeFilter: ["open", "inert", "aria-modal"],
     });
     return () => observer.disconnect();
   }, [layer]);

@@ -108,6 +108,8 @@
   --color-board: #10261a;
   --color-board-muted: #ebe4d3;
   --color-board-text: #ffffff;
+  /* The board's edge: by day the board's own colour, at night 3:1 apart from the page. */
+  --color-board-edge: #10261a;
   --color-out-panel: #c62828;
   --color-in-panel: #1e7b45;
   --color-mark: #c6ff3d;
@@ -168,6 +170,7 @@
     --color-board: #060a12;
     --color-board-muted: #c3cddc;
     --color-board-text: #ffffff;
+    --color-board-edge: #5b6b8c;
     --color-out-panel: #c62828;
     --color-in-panel: #1e7b45;
     --color-mark: #f2c230;
@@ -213,6 +216,7 @@
   --color-board: #060a12;
   --color-board-muted: #c3cddc;
   --color-board-text: #ffffff;
+  --color-board-edge: #5b6b8c;
   --color-out-panel: #c62828;
   --color-in-panel: #1e7b45;
   --color-mark: #f2c230;

@@ -561,7 +561,12 @@ function LeagueMemberContent({
             closed week leaves the plan's settings out, so the card adds nothing to the open
             week's page. It needs the calendar for each club's id. */}
           {deadlinePassed !== null && fixtures !== null && view.league_id === leagueId ? (
-            <MemberLiveWeekView squad={view} live={liveWeek} held={hold.held} />
+            <MemberLiveWeekView
+              squad={view}
+              live={liveWeek}
+              held={hold.held}
+              waiting={hold.waiting}
+            />
           ) : null}
 
           {/* What the member's last finished week came to, before what this week decides. */}

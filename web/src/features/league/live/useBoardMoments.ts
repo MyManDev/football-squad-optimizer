@@ -72,10 +72,12 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
 
 /**
  * The points the board still has to bring to the live score: each queued moment's, from the
- * read that brought it until its run lands (`landed`). Under reduced motion nothing is held.
+ * read that brought it until its run lands (`landed`). `waiting` says some moment has still to
+ * land. Under reduced motion nothing is held.
  */
 export function useBoardHold(batch: BoardBatch | null): {
   held: number;
+  waiting: boolean;
   landed: (key: string) => void;
 } {
   const [state, setState] = useState<{ batch: number | null; pending: Map<string, number> }>({
@@ -104,5 +106,5 @@ export function useBoardHold(batch: BoardBatch | null): {
   );
   let held = 0;
   for (const points of state.pending.values()) held += points;
-  return { held, landed };
+  return { held, waiting: state.pending.size > 0, landed };
 }

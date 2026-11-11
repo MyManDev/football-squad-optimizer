@@ -116,4 +116,21 @@ describe("the live score beside the GOL board", () => {
     expect(figure.textContent).toBe((score.net - 4).toLocaleString("tr-TR"));
     expect(figure.textContent).not.toMatch(/[.,]\d/);
   });
+
+  it("keeps the read before's lists under the figures while the board brings this one's", () => {
+    const before = result("normal-week");
+    const now = result("goalkeeper-swap");
+    if (before.refused || now.refused) throw new Error("refused");
+    expect(before.autosubs).toEqual([]);
+    expect(now.autosubs.length).toBeGreaterThan(0);
+    show(now, "tr", { lists: { score: before, activity: null } });
+    // The figures are this read's; the substitutions are still the read before's.
+    expect(document.querySelector("[data-live-total]")!.textContent).toBe(
+      now.net.toLocaleString("tr-TR"),
+    );
+    expect(screen.queryByText("Player 12")).toBeNull();
+    cleanup();
+    show(now, "tr");
+    expect(screen.getByText("Player 12")).toBeInTheDocument();
+  });
 });

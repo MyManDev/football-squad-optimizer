@@ -134,4 +134,24 @@ describe("the live score's hold", () => {
     rerender(<Holding batch={batch} />);
     expect(screen.getByRole("button")).toHaveTextContent("0");
   });
+
+  it("waits while a moment's points are on their way, and not once the last one lands", () => {
+    const batch = { id: 1, items: [goal("a", 5), goal("b", 3)] };
+    function Waiting({ land }: { land: string }) {
+      const { waiting, landed } = useBoardHold(batch);
+      return (
+        <button type="button" onClick={() => landed(land)}>
+          {waiting ? "waiting" : "clear"}
+        </button>
+      );
+    }
+    const { rerender } = render(<Waiting land="a" />);
+    expect(screen.getByRole("button")).toHaveTextContent("waiting");
+    screen.getByRole("button").click();
+    rerender(<Waiting land="b" />);
+    expect(screen.getByRole("button")).toHaveTextContent("waiting");
+    screen.getByRole("button").click();
+    rerender(<Waiting land="b" />);
+    expect(screen.getByRole("button")).toHaveTextContent("clear");
+  });
 });

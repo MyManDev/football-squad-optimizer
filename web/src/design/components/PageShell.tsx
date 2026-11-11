@@ -414,6 +414,7 @@ export function PageShell({
           <header
             className={styles.phoneBar}
             inert={overlay}
+            data-phone-bar
             data-live={live !== null || undefined}
           >
             <button

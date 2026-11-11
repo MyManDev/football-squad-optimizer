@@ -268,6 +268,14 @@ describe("the night palette", () => {
     expect(contrast(night("--color-primary"), night(beside))).toBeGreaterThanOrEqual(STATE_APART);
   });
 
+  // The GOL board is nearly the night page's colour: its edge marks where it ends.
+  it.each(["--color-bg", "--color-surface", "--color-board"])(
+    "draws the GOL board's edge 3:1 apart from %s",
+    (beside) => {
+      expect(contrast(night("--color-board-edge"), night(beside))).toBeGreaterThanOrEqual(3);
+    },
+  );
+
   it("computes the ratios the header quotes", () => {
     expect(contrast(night("--color-text"), night("--color-bg"))).toBeCloseTo(15.7, 1);
     expect(contrast(night("--color-text-faint"), night("--color-surface"))).toBeCloseTo(5.7, 1);
