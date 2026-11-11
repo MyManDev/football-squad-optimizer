@@ -853,6 +853,23 @@ describe("what the last review asked of it", () => {
   });
 
   describe("what the review of the LIVE page asked of it", () => {
+    it("says a replay's moments again when the replay is opened again after the page left it", () => {
+      const view = (batch: { id: string; items: BoardMoment[] } | null, source: string) => (
+        <LanguageProvider initialLanguage="tr">
+          <GoalMomentLayer batch={batch} source={source} />
+        </LanguageProvider>
+      );
+      const { rerender } = render(view({ id: "replay:1", items: [moment()] }, "replay"));
+      expect(screen.getByRole("status")).toHaveTextContent("Gol: Palmer, +5 puan");
+      // The page goes back to its live reads while the replay's board stands...
+      rerender(view(null, "live"));
+      expect(board()).toBeNull();
+      // ...and the replay is opened again: its moment plays, and is said, again.
+      rerender(view({ id: "replay:2", items: [moment()] }, "replay"));
+      expect(board()).not.toBeNull();
+      expect(screen.getByRole("status")).toHaveTextContent("Gol: Palmer, +5 puan");
+    });
+
     it("says a live moment whose key a replay's moment had, the replay's board still up", () => {
       const view = (id: string, source: string) => (
         <LanguageProvider initialLanguage="tr">

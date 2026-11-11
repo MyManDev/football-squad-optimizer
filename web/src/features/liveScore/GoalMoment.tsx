@@ -483,11 +483,19 @@ export function GoalMomentLayer({
   // The page shows another stream: its queued moments go, and the page is told.
   if (source !== next.source) {
     const gone = next.queue.filter((queued) => queued.source !== source);
+    // The still line of the stream left goes too; what was said of either is forgotten, so the
+    // stream's moments are said again if it comes back.
+    const goneStill = next.source === null ? [] : (next.still ?? []);
+    const from = next.source ?? "live";
     next = {
       ...next,
       source,
       queue: next.queue.filter((queued) => queued.source === source),
       still: next.source === null ? next.still : null,
+      said: without(next.said, [
+        ...gone.map((queued) => saidKey(queued.source, queued.moment.key)),
+        ...goneStill.map((moment) => saidKey(from, moment.key)),
+      ]),
       voice: gone.length > 0 ? { key: null, text: "" } : next.voice,
       dropped: [...next.dropped, ...gone.map((queued) => queued.moment.key)],
     };

@@ -86,6 +86,19 @@ describe("prefetchMemberReads", () => {
     expect(client.getQueryState(FIXTURES_QUERY.queryKey)).toBeDefined();
   });
 
+  it("starts no index for LIVE in a league read through the forwarder, whose rival comes from its table", () => {
+    const tree = stubTree({
+      members: vi.fn(async () => ({ payload: { members: [] } }) as never),
+      entrySquad: vi.fn(async () => ({ payload: {} }) as never),
+      entryAdviceIndex: vi.fn(async () => ({ payload: {} }) as never),
+    });
+    const client = new QueryClient();
+    prefetchMemberReads(client, tree, 35249001, [], "live", true);
+    expect(tree.entrySquad).toHaveBeenCalledWith(35249001);
+    expect(tree.entryAdviceIndex).not.toHaveBeenCalled();
+    client.clear();
+  });
+
   it("reads the member list alone on a league address without a member", () => {
     const tree = stubTree({
       members: vi.fn(async () => ({ payload: { members: [] } }) as never),

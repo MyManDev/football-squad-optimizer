@@ -4,7 +4,11 @@ import { Navigate, useLocation, useParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
-import { leagueIdInAddress, legacyLeagueAddress } from "../../../lib/leagueAddresses";
+import {
+  isLiveAddress,
+  leagueIdInAddress,
+  legacyLeagueAddress,
+} from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../data";
 import { createLeagueTree } from "../data";
 import { findLeague, loadLeagueDirectory } from "../directory";
@@ -37,8 +41,6 @@ import { MemberGate } from "./MemberGate";
  * league never asks the forwarder anything, so it opens from the published tree whether
  * the forwarder answers or not.
  */
-/** LIVE's address under a member's. */
-const LIVE_ADDRESS = /\/members\/[^/]+\/live\/?$/;
 
 export function LeagueGate({
   children,
@@ -77,7 +79,7 @@ export function LeagueGate({
   const entryId = claimedEntry !== null ? entryIdInAddress(entryParameter) : null;
   // LIVE reads fewer of the member's documents, and its rival's FPL bundle rather than his
   // published squad, so a rival picked there (?duel=) starts nothing here.
-  const live = LIVE_ADDRESS.test(location.pathname);
+  const live = isLiveAddress(location.pathname);
   const address = new URLSearchParams(location.search);
   const rival = live ? null : address.get("rival");
   const duel = live ? null : address.get("duel");

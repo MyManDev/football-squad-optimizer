@@ -50,6 +50,14 @@ export function entryLiveAddress(entryId: number | string): string {
   return `${entryAddress(entryId)}/live`;
 }
 
+/** A league member's LIVE page, with or without a closing slash. */
+const LIVE_ADDRESS = /\/members\/[^/]+\/live\/?$/;
+
+/** Whether a path is a league member's LIVE page, with or without a closing slash. */
+export function isLiveAddress(pathname: string): boolean {
+  return LIVE_ADDRESS.test(pathname);
+}
+
 /** A team's LIVE page: under its league, or on its own for league 0. */
 export function liveAddress(leagueId: number, entryId: number | string): string {
   return leagueId > 0 ? memberLiveAddress(leagueId, entryId) : entryLiveAddress(entryId);

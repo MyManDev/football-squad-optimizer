@@ -329,7 +329,7 @@ describe("the LIVE page's reads", () => {
     expect(text).not.toMatch(AS_A_CAVEAT);
   });
 
-  it("reads the live document alone on Yenile, keeps a newer board over an older copy, and says what changed", async () => {
+  it("reads the live document and the rival on Yenile, keeps a newer board over an older copy, and says what changed", async () => {
     const forwarder = fakeForwarder([
       answered(live("2026-11-21T15:30:00Z", 3)),
       answered(live("2026-11-21T15:20:00Z", 9)),
@@ -361,7 +361,10 @@ describe("the LIVE page's reads", () => {
     expect(within(recap).getByRole("listitem")).toHaveAccessibleName("P4, Gol 1, +6");
     expect(net()).not.toBe(before);
     expect(forwarder.liveActivity).toHaveBeenCalledTimes(3);
-    expect(forwarder.entryBundle).toHaveBeenCalledTimes(2);
+    // The member's bundle once; the rival's at first and again on each Yenile.
+    const bundles = forwarder.entryBundle.mock.calls.map(([entryId]) => entryId);
+    expect(bundles.filter((entryId) => entryId === ENTRY)).toHaveLength(1);
+    expect(bundles.filter((entryId) => entryId !== ENTRY)).toHaveLength(3);
   });
 
   it("keeps the board and its time when a refresh is not answered", async () => {
@@ -891,8 +894,18 @@ describe("the week and the rival", () => {
     ]);
     const read = forwarder.entryBundle.getMockImplementation()!;
     let rivalReads = 0;
+    // The second read of the rival is answered when the test lets it go.
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     forwarder.entryBundle.mockImplementation(async (entryId: number) => {
-      if (entryId !== ENTRY && rivalReads++ === 0) {
+      if (entryId === RIVAL && rivalReads === 1) {
+        rivalReads += 1;
+        await gate;
+        return read(entryId);
+      }
+      if (entryId === RIVAL && rivalReads++ === 0) {
         return { ok: false, reason: "upstream_unavailable" } as unknown as Awaited<
           ReturnType<typeof read>
         >;
@@ -902,10 +915,17 @@ describe("the week and the rival", () => {
     const { user } = renderLive({ forwarder });
     await rows();
     await vi.waitFor(() => expect(rivalReads).toBe(1));
+    // The refusal taken, the first read's room goes, and no duel is drawn.
+    await vi.waitFor(() =>
+      expect(document.querySelector("[data-live-rival] [data-pending]")).toBeNull(),
+    );
     expect(document.querySelector("[data-live-rival-net]")).toBeNull();
     await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(rivalReads).toBe(2));
+    // A read made again holds no room: an empty one would come and go with each try.
+    expect(document.querySelector("[data-live-rival] [data-pending]")).toBeNull();
+    release();
     await vi.waitFor(() => expect(document.querySelector("[data-live-rival-net]")).not.toBeNull());
-    expect(rivalReads).toBe(2);
   });
 
   it("keeps the duel's place, out of sight, while the first rival's bundle is read", async () => {

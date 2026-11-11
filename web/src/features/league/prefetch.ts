@@ -35,6 +35,11 @@ export function prefetchMemberReads(
   rivalIds: readonly (number | null)[] = [],
   /** The page at the address: the member page, or LIVE, which reads fewer documents. */
   page: "member" | "live" = "member",
+  /**
+   * A league read through the forwarder: there LIVE takes its rival from the table, so its
+   * index (a head-to-head league's pairings among its reads) is not started.
+   */
+  forwarded = false,
 ): void {
   const leagueId = tree.league.leagueId;
   void client.prefetchQuery({
@@ -48,11 +53,13 @@ export function prefetchMemberReads(
     queryFn: () => tree.entrySquad(entryId),
     ...LEAGUE_READ,
   });
-  void client.prefetchQuery({
-    queryKey: leagueKeys.adviceIndex(leagueId, entryId),
-    queryFn: () => tree.entryAdviceIndex(entryId),
-    ...LEAGUE_READ,
-  });
+  if (page !== "live" || !forwarded) {
+    void client.prefetchQuery({
+      queryKey: leagueKeys.adviceIndex(leagueId, entryId),
+      queryFn: () => tree.entryAdviceIndex(entryId),
+      ...LEAGUE_READ,
+    });
+  }
   if (page === "live") {
     prefetchFixtures(client);
     return;

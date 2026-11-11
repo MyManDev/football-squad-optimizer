@@ -190,22 +190,36 @@ export function liveBoard(input: LiveBoardInput): LiveBoard | null {
     appearances.set(`${row.element_id}:${row.fixture_id}`, row);
   }
 
-  // The fixtures someone has played minutes in, where the read has detail.
+  // The fixtures someone has played minutes in, where the read has detail; where it has none,
+  // the clubs someone has played for in the week.
   const playedIn = new Set<number>();
   for (const row of activity?.appearances ?? []) if (row.minutes > 0) playedIn.add(row.fixture_id);
+  const clubsPlayed = new Set<number>();
+  if (activity === null) {
+    for (const element of live.elements) {
+      const team = element.minutes > 0 ? players.get(element.element_id)?.team : undefined;
+      const club = team === undefined ? undefined : clubIds.get(team);
+      if (club !== undefined) clubsPlayed.add(club);
+    }
+  }
 
   /**
-   * A fixture's phase at the read's time. Where the read has detail, it comes before the
-   * calendar: a match has started once FPL lists it in play or someone has played in it, and
-   * past its window only a match that started is over; one that never did (put back, or moved
-   * within the day) is still to come. A pick's own minutes in it mean it has started.
+   * A fixture's phase at the read's time. A match has started once FPL lists it in play or
+   * someone has played in it (with no detail: its kickoff has passed and someone has played for
+   * one of its clubs), and past its window only a match that started is over; one that never did
+   * (put back, or moved within the day) is still to come. A pick's own minutes in it mean it has
+   * started. The window still ends a started match: FPL lists a match in play until its bonus is
+   * checked, an hour or more after the final whistle.
    */
   const phaseOf = (fixture: WeekLive["fixtures"][number], minutes: number | null): LivePhase => {
     const kickoff = instant(calendar.byId.get(fixture.id)?.kickoff_utc);
     const started =
       (activity !== null
         ? inPlay.has(fixture.id) || playedIn.has(fixture.id)
-        : kickoff !== null && time >= kickoff) || (minutes ?? 0) > 0;
+        : kickoff !== null &&
+          time >= kickoff &&
+          (clubsPlayed.has(fixture.home_club) || clubsPlayed.has(fixture.away_club))) ||
+      (minutes ?? 0) > 0;
     if (fixture.finished) return "finished";
     if (kickoff !== null && time >= kickoff + MATCH_WINDOW_MS) {
       return started ? "finished" : "upcoming";

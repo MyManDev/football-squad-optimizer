@@ -9,8 +9,10 @@
  * played. Its reads are the member's live week's (`useMemberLiveScore`): on open, on Yenile,
  * and once a minute while one of the member's matches is played and the page is in view,
  * wired as the member page wires them, with the GOL board and `?replay=1` of its own. The
- * member and the rival are scored from the read the live week shows; the rival's bundle and
- * a head-to-head league's pairings are read once, and a published classic league's total gap
+ * member and the rival are scored from the read the live week shows. The rival's bundle is read
+ * when the rival is chosen, again on Yenile, and again by itself while it is refused or names
+ * another week (`useReadAgain`: after 1, 2, 4 and 8 minutes, then no more until Yenile); a
+ * head-to-head league's pairings are read once, and a published classic league's total gap
  * comes from the members table the page holds.
  *
  * The heading stands first in every state, so the one the shell focuses on arrival stays.
@@ -72,6 +74,7 @@ import {
 import styles from "./LivePage.module.css";
 import { LiveHeader, LiveState, LiveView, type HeldDuel, type LiveRivalView } from "./LiveView";
 import { useBoardHold, useBoardMoments } from "./useBoardMoments";
+import { useReadAgain } from "./useReadAgain";
 import { useGoalReplay } from "./useGoalReplay";
 import { useLiveWindow } from "./useLiveWindow";
 import { useMemberLiveScore } from "./useMemberLiveScore";
@@ -294,22 +297,20 @@ function LiveMember({
     enabled: ready && rivalId !== null,
   });
   const rivalWeek = rivalBundle.data?.ok ? rivalBundle.data.document.current_week : null;
-  // A rival read before a deadline names the week before, and a refused read names none: each
-  // new live read (a minute's follow, Yenile) reads the rival again until it names this week.
-  const readTime = reading?.week.source_time ?? null;
-  const rivalAgain = useRef({ behind: false, fetching: false, refetch: rivalBundle.refetch });
-  useEffect(() => {
-    rivalAgain.current = {
-      behind:
-        rivalBundle.isError || (rivalWeek !== null && week !== null && rivalWeek.gameweek !== week),
-      fetching: rivalBundle.isFetching,
-      refetch: rivalBundle.refetch,
-    };
-  });
-  useEffect(() => {
-    const { behind, fetching, refetch } = rivalAgain.current;
-    if (readTime !== null && behind && !fetching) void refetch();
-  }, [readTime]);
+  // A rival read before a deadline names the week before, and a refused read names none: it is
+  // read again by itself, less and less often, and on Yenile.
+  const rivalBehind =
+    rivalId !== null &&
+    (rivalBundle.isError || (rivalWeek !== null && week !== null && rivalWeek.gameweek !== week));
+  const readRival = rivalBundle.refetch;
+  const countRivalAfresh = useReadAgain(rivalBehind, readRival, rivalBundle.isFetching, rivalId);
+  const memberRefresh = live.refresh;
+  const refreshBoth = useCallback(() => {
+    memberRefresh();
+    if (rivalId === null) return;
+    countRivalAfresh();
+    void readRival();
+  }, [memberRefresh, rivalId, countRivalAfresh, readRival]);
   const rivalBoard = useMemo(
     () =>
       reading !== null &&
@@ -342,14 +343,22 @@ function LiveMember({
         : null,
     [board, rivalBoard, classic, totals],
   );
-  // The last duel drawn holds its place, out of sight, while the next rival's bundle is read.
-  // The first rival's, read after the member's board, holds the room of a level duel, so its
-  // arrival moves nothing below it.
+  // The last duel drawn holds its place, out of sight, while the next rival's bundle is read
+  // for the first time. The first rival's, read after the member's board, holds the room of a
+  // level duel, so its arrival moves nothing below it. A read made again (Yenile, a refused or
+  // late rival) holds no room: an empty room would come and go with each try.
   const [kept, setKept] = useState<HeldDuel | null>(null);
   if (duel !== null && rivalBoard !== null && kept?.duel !== duel) {
     setKept({ duel, rivalNet: rivalBoard.net });
   }
-  const rivalReading = duel === null && rivalId !== null && rivalBundle.isFetching;
+  // The first read of this rival: nothing answered yet, neither a bundle nor a refusal (a read
+  // made again after a refusal is pending once more, but has been answered before).
+  const rivalReading =
+    duel === null &&
+    rivalId !== null &&
+    rivalBundle.isPending &&
+    rivalBundle.dataUpdatedAt === 0 &&
+    rivalBundle.errorUpdateCount === 0;
   const pending = !rivalReading
     ? null
     : (kept ??
@@ -412,7 +421,7 @@ function LiveMember({
                 }
           }
           refreshing={live.refreshing}
-          refresh={live.refresh}
+          refresh={refreshBoth}
           wide={wide}
         />
       )}

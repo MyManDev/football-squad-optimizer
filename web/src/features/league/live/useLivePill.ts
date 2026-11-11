@@ -15,7 +15,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
@@ -30,6 +30,7 @@ import {
 } from "../forwarded/reads";
 import { HELD_READ } from "../queries";
 import { useLiveWindow } from "./useLiveWindow";
+import { useReadAgain } from "./useReadAgain";
 
 export interface LivePillTarget {
   entryId: number;
@@ -37,20 +38,15 @@ export interface LivePillTarget {
   to: string;
 }
 
-/**
- * The clubs of the member's live-week picks, or null where a document does not say them, or
- * the bundle names another week than `week` (one held from before a deadline).
- */
+/** The clubs of the member's live-week picks, or null where a document does not say them. */
 export function memberClubs(
   bundle: ForwarderResult<FplEntryBundle, BundleReason> | undefined,
   table: DevicePlanDocument | undefined,
   calendar: FixturesPayload | null,
-  week: number | null = null,
 ): ReadonlySet<number> | null {
   if (!bundle?.ok || bundle.document.current_week === null || !table || calendar === null) {
     return null;
   }
-  if (week !== null && bundle.document.current_week.gameweek !== week) return null;
   const teams = new Map(table.players.map((player) => [player.element_id, player.team]));
   const ids = new Map<string, number>();
   for (const week of calendar.gameweeks) {
@@ -90,16 +86,17 @@ export function useLivePill(target: LivePillTarget | null, enabled: boolean): st
     ...HELD_READ,
     enabled: gameweek !== null && entryId > 0,
   });
-  // A bundle held from before a deadline names the week before: it is read again, once.
+  // A bundle held from before a deadline names the week before: its clubs stand until the live
+  // week's come, and it is read again by itself, less and less often, while it is behind or
+  // refused (a refused read keeps the bundle held).
   const heldWeek = bundle.data?.ok ? (bundle.data.document.current_week?.gameweek ?? null) : null;
-  const behind = open && heldWeek !== null && any.gameweek !== null && heldWeek !== any.gameweek;
-  const readAgain = bundle.refetch;
-  useEffect(() => {
-    if (behind) void readAgain();
-  }, [behind, readAgain]);
+  const behind =
+    open &&
+    (bundle.isError || (heldWeek !== null && any.gameweek !== null && heldWeek !== any.gameweek));
+  useReadAgain(behind, bundle.refetch, bundle.isFetching, entryId);
   const clubs = useMemo(
-    () => (open ? memberClubs(bundle.data, table.data?.payload, calendar, any.gameweek) : null),
-    [open, bundle.data, table.data, calendar, any.gameweek],
+    () => (open ? memberClubs(bundle.data, table.data?.payload, calendar) : null),
+    [open, bundle.data, table.data, calendar],
   );
   const mine = useLiveWindow(calendar, { clubs });
   if (!open || target === null) return null;

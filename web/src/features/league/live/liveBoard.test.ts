@@ -135,11 +135,18 @@ describe("the phases at the read's source time", () => {
     expect(built).toMatchObject({ matchesOver: 1, matchesTotal: 3, inPlay: true });
   });
 
-  it("calls a match played from its kickoff where the read has no detail", () => {
-    const built = board();
+  it("calls a match played from its kickoff where the read has no detail and someone has played", () => {
+    const built = board({ picks: picksWith({ 4: { minutes: 40 }, 1: { minutes: 90 } }) });
     expect(built.groups.playing.map((pick) => pick.elementId)).toEqual([4, 5, 8, 11]);
     expect(row(built, 1).phase).toBe("finished");
     expect(built.matchesOver).toBe(1);
+  });
+
+  it("keeps a match nobody has played to come where the read has no detail, as one put back", () => {
+    // 15:30: the 15:00 match's kickoff has passed, but nobody of either club has played.
+    const built = board();
+    expect(row(built, 4).phase).toBe("upcoming");
+    expect(row(built, 1).phase).toBe("upcoming");
   });
 
   it("follows FPL's in-play list where the read has detail", () => {
@@ -165,8 +172,9 @@ describe("the phases at the read's source time", () => {
     const kickoff = Date.parse("2026-11-21T15:00:00Z");
     const before = new Date(kickoff + MATCH_WINDOW_MS - 60_000).toISOString();
     const after = new Date(kickoff + MATCH_WINDOW_MS).toISOString();
-    expect(row(board({ sourceTime: before }), 4).phase).toBe("playing");
-    const past = board({ sourceTime: after });
+    const picks = picksWith({ 4: { minutes: 40 } });
+    expect(row(board({ picks, sourceTime: before }), 4).phase).toBe("playing");
+    const past = board({ picks, sourceTime: after });
     expect(row(past, 4).phase).toBe("finished");
     expect(past.inPlay).toBe(false);
     expect(past.final).toBe(false);
@@ -252,7 +260,7 @@ describe("what the official scorer counts", () => {
     const picks = picksWith({
       1: { points: 8, minutes: 90 },
       3: { points: 0, minutes: 90 },
-      14: { club: 3, points: -1, card: true },
+      14: { club: 3, points: -1, minutes: 30, card: true },
     });
     const built = board({ picks, fixtures: fixturesWith({ 101: { finished: true } }) });
     // The keeper is up and the defender down; the reserve's card is his own, not the team's.

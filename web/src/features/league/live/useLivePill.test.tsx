@@ -76,11 +76,21 @@ describe("the member's clubs", () => {
     ).toBeNull();
   });
 
-  it("are not known from a bundle held from another week than the live one", () => {
+  it("stand from a bundle held from the week before, until the live week's comes", () => {
     const read = { ok: true as const, copy: null, document: PILL_BUNDLE };
-    const week = PILL_BUNDLE.current_week!.gameweek;
-    expect(memberClubs(read, PILL_TABLE, pillCalendar(9, 10, 30), week)).not.toBeNull();
-    expect(memberClubs(read, PILL_TABLE, pillCalendar(9, 10, 30), week + 1)).toBeNull();
+    const before = {
+      ...read,
+      document: {
+        ...PILL_BUNDLE,
+        current_week: {
+          ...PILL_BUNDLE.current_week!,
+          gameweek: PILL_BUNDLE.current_week!.gameweek - 1,
+        },
+      },
+    };
+    expect(memberClubs(before, PILL_TABLE, pillCalendar(9, 10, 30))).toEqual(
+      memberClubs(read, PILL_TABLE, pillCalendar(9, 10, 30)),
+    );
   });
 });
 

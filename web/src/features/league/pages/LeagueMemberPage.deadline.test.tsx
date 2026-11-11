@@ -115,7 +115,7 @@ describe("a member page whose gameweek has closed", () => {
     },
   );
 
-  it("says what is published for a selection the service would have computed", () => {
+  it("draws no card beside a selection the service would compute, open or under LIVE WEEK", () => {
     const copy = MESSAGES.tr.leagueMembers;
     // A rival strategy over three weeks: the publish solved one week, the service three.
     const search = "?mode=ortak-koru&window=3";
@@ -273,7 +273,7 @@ describe("the plan under LIVE WEEK", () => {
 
 describe("a closed week on a device menu", () => {
   it.each(["tr", "en"] as const)(
-    "shows no card about a publication that never happens, and no default-plan link (%s)",
+    "shows no card under LIVE WEEK on a device menu either (%s)",
     (language) => {
       const copy = MESSAGES[language].leagueMembers;
       const props: Partial<LeagueMemberViewProps> = {
