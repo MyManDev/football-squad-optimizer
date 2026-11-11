@@ -25,11 +25,10 @@ import {
   type RecapItem,
 } from "./liveBoard";
 import { duelStatus, type DuelSwing, type LiveDuel } from "./liveDuel";
-import { clockTime, kickoffShort, signedWhole, wholePoints } from "./liveFormat";
+import { clockTime, signedWhole, wholePoints } from "./liveFormat";
 import type { RivalChoice } from "./liveRival";
+import { rowLabel, subLine } from "./liveRowText";
 import styles from "./LivePage.module.css";
-
-type Copy = ReturnType<typeof useLanguage>["messages"];
 
 /** The duel of the rival chosen before, kept out of sight while the next one is read. */
 export interface HeldDuel {
@@ -298,65 +297,6 @@ function BallIcon({ className = styles.ball }: { className?: string }) {
       />
     </svg>
   );
-}
-
-/** What a pick's row says to a screen reader: name, role, group, points, events and state. */
-function rowLabel(row: LiveRow, copy: Copy, locale: string): string {
-  const live = copy.live;
-  const roles: string[] = [];
-  if (row.armband === "captain") {
-    roles.push(
-      row.multiplier >= 2
-        ? `${copy.leagueMembers.captainLabel} ×${row.multiplier}`
-        : copy.leagueMembers.captainLabel,
-    );
-  } else if (row.armband === "vice") {
-    roles.push(copy.leagueMembers.viceCaptainLabel);
-  }
-  if (row.autosub !== null) {
-    roles.push(row.autosub === "in" ? copy.leagueMembers.in : copy.leagueMembers.out);
-  }
-  const events = [
-    row.goals > 0 ? `${live.goal} ${wholePoints(row.goals, locale)}` : null,
-    row.assists > 0 ? `${live.assist} ${wholePoints(row.assists, locale)}` : null,
-    row.card ? live.card : null,
-  ];
-  const state =
-    row.fact === "noMatch"
-      ? live.noMatch
-      : row.fact === "didNotPlay"
-        ? live.didNotPlay
-        : row.state === "up"
-          ? live.doingWell
-          : row.state === "down"
-            ? live.struggling
-            : null;
-  return [
-    row.name,
-    ...roles,
-    live.groups[row.group],
-    row.started ? live.points(wholePoints(rowPoints(row), locale)) : null,
-    ...events,
-    state,
-  ]
-    .filter((part): part is string => part !== null)
-    .join(", ");
-}
-
-/** The opponent, then the kickoff before the match or the minutes once it has started. */
-function subLine(row: LiveRow, copy: Copy["live"], locale: string): string {
-  if (row.fact === "noMatch" || row.fixture === null) return copy.noMatch;
-  const fixture = row.fixture;
-  const minutes = fixture.minutes ?? row.minutes;
-  const when =
-    row.fact === "didNotPlay"
-      ? copy.didNotPlay
-      : fixture.phase === "upcoming" && minutes === 0
-        ? fixture.kickoff === null
-          ? null
-          : kickoffShort(fixture.kickoff, locale)
-        : copy.minutes(wholePoints(minutes, locale));
-  return [fixture.opponent, when].filter((part): part is string => part !== null).join(" · ");
 }
 
 function Row({ row }: { row: LiveRow }) {
