@@ -10,11 +10,13 @@
  *   the two transfer costs make the margin exactly:
  *   Σ swing − (hit_member − hit_rival) = net_member − net_rival.
  * - Players both sides own at the same multiplier make no difference and are only counted.
- * - The total gap is each side's season total after the week before (FPL's own, net of its
- *   hits) plus its live net. A head-to-head league plays for match points, so it has none.
+ * - The total gap is each side's total in the league's own table before the week plus its
+ *   live net. A league counts its totals from its own first week, which need not be the
+ *   season's, so the totals come from the table the league publishes, never from FPL's
+ *   season totals. A head-to-head league plays for match points, so it has none.
  */
 
-import type { FplEntrySeason } from "../forwarder/documents";
+import type { LeagueMembers } from "../types";
 import type { LiveBoard, LiveRow, Multiplier } from "./liveBoard";
 
 export type DuelStatus = "ahead" | "level" | "behind";
@@ -54,8 +56,8 @@ const bySwing = (a: DuelSwing, b: DuelSwing) =>
   Math.abs(b.swing) - Math.abs(a.swing) || b.points - a.points || a.row.pick - b.row.pick;
 
 /**
- * The duel of two boards of the same week and read. `totals` are both sides' season totals
- * before the week (`seasonTotalBefore`), or null for a league that keeps no such table.
+ * The duel of two boards of the same week and read. `totals` are both sides' league totals
+ * before the week (`leagueTotalsBefore`), or null where there are none to give.
  */
 export function liveDuel(
   member: LiveBoard,
@@ -98,18 +100,30 @@ export function liveDuel(
 }
 
 /**
- * A member's season total before `gameweek`: FPL's total after the latest week before it,
- * net of the hits, or 0 for a member whose season starts with it. A season document that
- * already lists the week itself is read before it, so its live points never count twice.
+ * Two members' totals in the league's own table before `gameweek`, from the members document
+ * the league publishes: its totals where it was scored through the week before, or its totals
+ * less the week's own net (its points less its hit) where it was scored through `gameweek`
+ * itself, so the live net never counts twice. A table scored through any other week, a member
+ * it has no total or week for, or a league that publishes none (a forwarded league, whose
+ * table FPL updates while the week is played) gives none.
  */
-export function seasonTotalBefore(season: FplEntrySeason, gameweek: number): number {
-  let total = 0;
-  let latest = 0;
-  for (const week of season.weeks) {
-    if (week.event < gameweek && week.event > latest) {
-      latest = week.event;
-      total = week.total_points;
-    }
-  }
-  return total;
+export function leagueTotalsBefore(
+  table: Pick<LeagueMembers, "scored_gameweek" | "members"> | null,
+  gameweek: number,
+  memberId: number,
+  rivalId: number,
+): { member: number; rival: number } | null {
+  if (table === null || table.scored_gameweek === null) return null;
+  const through = table.scored_gameweek;
+  if (through !== gameweek - 1 && through !== gameweek) return null;
+  const before = (entryId: number): number | null => {
+    const row = table.members.find((member) => member.entry_id === entryId);
+    if (row === undefined || row.total_points === null) return null;
+    if (through === gameweek - 1) return row.total_points;
+    if (row.gameweek_points === null || row.transfer_cost === null) return null;
+    return row.total_points - (row.gameweek_points - row.transfer_cost);
+  };
+  const member = before(memberId);
+  const rival = before(rivalId);
+  return member === null || rival === null ? null : { member, rival };
 }

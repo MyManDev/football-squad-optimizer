@@ -4,9 +4,9 @@ import { testPicks, testWeek, type TestPick } from "../../../testSupport/liveWee
 import { scoreMemberWeek } from "../../liveScore/officialScoring";
 import vectors from "../../liveScore/officialScoring.vectors.json";
 import type { MemberWeek, WeekElement, WeekLive } from "../../liveScore/weekLive";
-import type { FplEntrySeason } from "../forwarder/documents";
+import { mockMembers } from "../../../fixtures/league";
 import { liveBoard, type LiveBoard, type LiveRow, type Multiplier } from "./liveBoard";
-import { duelStatus, liveDuel, seasonTotalBefore } from "./liveDuel";
+import { duelStatus, leagueTotalsBefore, liveDuel } from "./liveDuel";
 
 type Vector = (typeof vectors.cases)[number];
 type Week = WeekLive;
@@ -217,48 +217,42 @@ describe("the duel of two boards of one read", () => {
   });
 });
 
-describe("a season total before the live week", () => {
-  const season = (weeks: [number, number][]): FplEntrySeason => ({
-    contract_version: "fpl_entry_season_v1",
-    entry_id: 5001,
-    source_time: "2026-11-21T15:00:00Z",
-    weeks: weeks.map(([event, total]) => ({
-      event,
-      points: 50,
-      total_points: total,
-      rank: null,
-      overall_rank: null,
-      event_transfers: 0,
-      event_transfers_cost: 0,
-      bank: 0,
-      value: 1000,
-    })),
-    chips: [],
+describe("two members' league totals before the live week", () => {
+  // North Stand Notes: 132 in all, 74 that week with no hit; Half Space: 127, 68 and a hit of 4.
+  const table = (scored: number | null) => ({
+    scored_gameweek: scored,
+    members: mockMembers.map((member) =>
+      member.entry_id === 35249002 ? { ...member, transfer_cost: 4 } : member,
+    ),
   });
 
-  it("is the total after the week before, even when the document lists the live week", () => {
-    expect(
-      seasonTotalBefore(
-        season([
-          [8, 400],
-          [9, 450],
-          [10, 470],
-        ]),
-        10,
-      ),
-    ).toBe(450);
-    expect(
-      seasonTotalBefore(
-        season([
-          [8, 400],
-          [9, 450],
-        ]),
-        10,
-      ),
-    ).toBe(450);
+  it("are the table's totals where it was scored through the week before", () => {
+    expect(leagueTotalsBefore(table(9), 10, 35249001, 35249002)).toEqual({
+      member: 132,
+      rival: 127,
+    });
   });
 
-  it("is zero for a member whose season starts with the live week", () => {
-    expect(seasonTotalBefore(season([[10, 60]]), 10)).toBe(0);
+  it("are the table's totals less the week's own net where it was scored through the week", () => {
+    expect(leagueTotalsBefore(table(10), 10, 35249001, 35249002)).toEqual({
+      member: 132 - 74,
+      rival: 127 - (68 - 4),
+    });
+  });
+
+  it("are none from a table scored through another week, or from none at all", () => {
+    expect(leagueTotalsBefore(table(8), 10, 35249001, 35249002)).toBeNull();
+    // A forwarded league's table: FPL updates it while the week is played.
+    expect(leagueTotalsBefore(table(null), 10, 35249001, 35249002)).toBeNull();
+    expect(leagueTotalsBefore(null, 10, 35249001, 35249002)).toBeNull();
+  });
+
+  it("are none for a member the table has no total or week for", () => {
+    expect(leagueTotalsBefore(table(9), 10, 35249001, 99)).toBeNull();
+    const unscored = {
+      scored_gameweek: 10,
+      members: mockMembers.map((member) => ({ ...member, gameweek_points: null })),
+    };
+    expect(leagueTotalsBefore(unscored, 10, 35249001, 35249002)).toBeNull();
   });
 });

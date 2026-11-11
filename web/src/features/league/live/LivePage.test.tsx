@@ -33,6 +33,7 @@ import type { FplEntryBundle, FplH2hMatches } from "../forwarder/documents";
 import { LeagueContext } from "../LeagueContext";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { LivePage } from "./LivePage";
+import { signedWhole } from "./liveFormat";
 import type { LiveForwarder } from "./liveSources";
 import { WIDE_QUERY } from "./useWide";
 
@@ -129,29 +130,6 @@ function fakeForwarder(answers: LiveAnswer[], { opponent }: { opponent?: number 
     })),
     liveActivity: vi.fn(async () => answers[Math.min(reads++, answers.length - 1)]!),
     liveWeek: vi.fn(async () => ({ ok: false as const, reason: "not_found" as const })),
-    entrySeason: vi.fn(async (entryId: number) => ({
-      ok: true as const,
-      copy: null,
-      document: {
-        contract_version: "fpl_entry_season_v1" as const,
-        entry_id: entryId,
-        source_time: "2026-11-21T15:00:00Z",
-        weeks: [
-          {
-            event: TEST_WEEK - 1,
-            points: 50,
-            total_points: entryId === ENTRY ? 500 : 510,
-            rank: null,
-            overall_rank: null,
-            event_transfers: 0,
-            event_transfers_cost: 0,
-            bank: 0,
-            value: 1000,
-          },
-        ],
-        chips: [],
-      },
-    })),
     h2hMatches: vi.fn(
       async (league: number, gameweek: number, page: number) =>
         ({
@@ -191,18 +169,37 @@ function LocationProbe() {
   return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
 }
 
+/**
+ * The league's members document, scored through `gameweek`: North Stand Notes on 132 in all
+ * (74 that week), Half Space on 127 (68 that week).
+ */
+const membersScored = (gameweek: number | null) => ({
+  ...mockLeagueMembersEnvelope,
+  payload: { ...mockLeagueMembersEnvelope.payload, scored_gameweek: gameweek },
+});
+
+/** Toplam fark as the duel shows it, or null where it shows none. */
+function shownGap(): string | null {
+  return screen.queryByText(copy.live.totalGap)?.nextElementSibling?.textContent ?? null;
+}
+
+/** A figure the page shows, as a number. */
+const figure = (text: string | null | undefined) => Number((text ?? "").replace("−", "-"));
+
 function renderLive({
   forwarder,
   path = `/league/${LEAGUE.leagueId}/members/${ENTRY}/live`,
   page = squad(TEST_WEEK),
   league = LEAGUE,
   forwardedLeague = null,
+  members = membersScored(TEST_WEEK - 1),
 }: {
   forwarder: LiveForwarder;
   path?: string;
   page?: LeagueViewEnvelope<EntrySquad>;
   league?: PublishedLeague;
   forwardedLeague?: ForwardedLeague | null;
+  members?: ReturnType<typeof membersScored>;
 }) {
   const loadTable = vi.fn(async () => ({
     contract_version: "provisional_league_ui_v1" as const,
@@ -213,7 +210,7 @@ function renderLive({
   const tree = {
     league,
     entrySquad: vi.fn(async () => page),
-    members: vi.fn(async () => mockLeagueMembersEnvelope),
+    members: vi.fn(async () => members),
     entryAdviceIndex: vi.fn(async (entryId: number) => mockEntryAdviceIndex(entryId)),
   } as unknown as LeagueTree;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -273,16 +270,16 @@ describe("the LIVE page's reads", () => {
       screen.getByText(`North Stand Notes · ${copy.suggestionHistory.gameweek(TEST_WEEK)}`),
     ).toBeInTheDocument();
     await screen.findByText(copy.live.totalGap);
+    // The league's totals after the week before, 132 and 127, each with its live net.
+    const net = figure(document.querySelector("[data-live-total]")?.textContent);
+    const rivalNet = figure(document.querySelector("[data-live-rival-net]")?.textContent);
+    expect(shownGap()).toBe(signedWhole(132 + net - (127 + rivalNet), "tr-TR"));
     expect(forwarder.entryBundle.mock.calls.map(([entryId]) => entryId).sort()).toEqual([
       ENTRY,
       RIVAL,
     ]);
     expect(forwarder.liveActivity).toHaveBeenCalledTimes(1);
     expect(loadTable).toHaveBeenCalledTimes(1);
-    expect(forwarder.entrySeason.mock.calls.map(([entryId]) => entryId).sort()).toEqual([
-      ENTRY,
-      RIVAL,
-    ]);
     expect(forwarder.h2hMatches).not.toHaveBeenCalled();
     // Labels and values only.
     const text = document.body.textContent ?? "";
@@ -542,12 +539,36 @@ describe("the heading", () => {
 describe("the week and the rival", () => {
   it("shows the live week when the squad's own week is the next one", async () => {
     const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))]);
-    renderLive({ forwarder, page: squad(TEST_WEEK + 1) });
+    // The next week's table was scored through the live week.
+    renderLive({ forwarder, page: squad(TEST_WEEK + 1), members: membersScored(TEST_WEEK) });
     await rows();
     expect(
       screen.getByText(`North Stand Notes · ${copy.suggestionHistory.gameweek(TEST_WEEK)}`),
     ).toBeInTheDocument();
     expect(forwarder.entryBundle).toHaveBeenCalledWith(ENTRY, TEST_WEEK + 1, expect.anything());
+    // The totals before the live week are the table's less that week's own: 132 − 74 and
+    // 127 − 68, each with its live net, so the week is never counted twice.
+    await screen.findByText(copy.live.totalGap);
+    const net = figure(document.querySelector("[data-live-total]")?.textContent);
+    const rivalNet = figure(document.querySelector("[data-live-rival-net]")?.textContent);
+    expect(shownGap()).toBe(signedWhole(132 - 74 + net - (127 - 68 + rivalNet), "tr-TR"));
+  });
+
+  it("gives no total gap where the league's table is not the week's", async () => {
+    const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))]);
+    // A forwarded classic league: FPL's table moves while the week is played.
+    renderLive({
+      forwarder,
+      forwardedLeague: { leagueId: LEAGUE.leagueId, leagueName: null, scoring: "classic" },
+      members: membersScored(null),
+    });
+    await rows();
+    const block = await vi.waitFor(() => {
+      const found = document.querySelector("[data-live-rival]");
+      expect(found).toHaveTextContent(copy.live.margin);
+      return found!;
+    });
+    expect(block).not.toHaveTextContent(copy.live.totalGap);
   });
 
   it("sets no rival beside a team on its own", async () => {
@@ -561,7 +582,6 @@ describe("the week and the rival", () => {
     expect(await rows()).toHaveLength(15);
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(forwarder.entryBundle).toHaveBeenCalledTimes(1);
-    expect(forwarder.entrySeason).not.toHaveBeenCalled();
   });
 
   it("sets the live week's head-to-head opponent, not the next week's, with no total gap", async () => {
@@ -581,7 +601,6 @@ describe("the week and the rival", () => {
     const block = document.querySelector("[data-live-rival]")!;
     await vi.waitFor(() => expect(block).toHaveTextContent(copy.live.margin));
     expect(block).not.toHaveTextContent(copy.live.totalGap);
-    expect(forwarder.entrySeason).not.toHaveBeenCalled();
   });
 
   it("puts the rival ?duel= names first, and a choice writes it to the address", async () => {

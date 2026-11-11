@@ -29,7 +29,6 @@ import {
   LISTED_ENTRY,
   MARKED,
   rivalFifteen,
-  seasonOf,
   serveCalendar,
 } from "./liveWeek";
 
@@ -126,8 +125,6 @@ async function listed(page: Page, { nextPublished = false } = {}) {
       { ...exampleMember(LISTED_RIVAL, live), captain: 8, vice: 7, active_chip: "bboost" },
     ),
     [`/live/${live}?view=activity`]: exampleActivity(live),
-    [`/entry/${LISTED_ENTRY}/season`]: seasonOf(LISTED_ENTRY, live, 52),
-    [`/entry/${LISTED_RIVAL}/season`]: seasonOf(LISTED_RIVAL, live, 50),
   });
 }
 
@@ -155,8 +152,6 @@ async function forwardedClassic(page: Page) {
     [`/entry/${CLASSIC_ENTRY}/bundle?gw=7`]: forwardedBundle(CLASSIC_ENTRY, 7, 7, FIFTEEN),
     [`/entry/${CLASSIC_RIVAL}/bundle?gw=7`]: forwardedBundle(CLASSIC_RIVAL, 7, 7, rivalFifteen()),
     "/live/7?view=activity": forwardedActivity(7, KICKOFF, READ_AT),
-    [`/entry/${CLASSIC_ENTRY}/season`]: seasonOf(CLASSIC_ENTRY, 7, 60),
-    [`/entry/${CLASSIC_RIVAL}/season`]: seasonOf(CLASSIC_RIVAL, 7, 61),
   });
 }
 
@@ -253,7 +248,8 @@ const CONTEXTS: LiveContext[] = [
     gameweek: 7,
     rival: CLASSIC.results[1]!.entry_name,
     headToHead: false,
-    totalGap: true,
+    // FPL's table moves while the week is played, so a forwarded league shows no total gap.
+    totalGap: false,
   },
   {
     name: "forwarded-h2h",

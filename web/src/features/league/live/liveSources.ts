@@ -25,8 +25,8 @@ import type {
   ForwarderReason,
   ForwarderResult,
 } from "../forwarder/client";
-import type { FplEntryBundle, FplEntrySeason } from "../forwarder/documents";
-import { entryBundleQuery, ForwarderRefused, refusalOf } from "../forwarded/reads";
+import type { FplEntryBundle } from "../forwarder/documents";
+import { entryBundleQuery, refusalOf } from "../forwarded/reads";
 import { LEAGUE_READ } from "../queries";
 import type { LeagueViewEnvelope } from "../types";
 import type { MemberLiveDependencies } from "./useMemberLiveScore";
@@ -34,7 +34,7 @@ import type { MemberLiveDependencies } from "./useMemberLiveScore";
 /** The forwarder routes the LIVE page reads. */
 export type LiveForwarder = Pick<
   ForwarderClient,
-  "entryBundle" | "liveWeek" | "liveActivity" | "entrySeason" | "h2hMatches"
+  "entryBundle" | "liveWeek" | "liveActivity" | "h2hMatches"
 >;
 
 /** One live document as the page scores it. */
@@ -131,18 +131,6 @@ export function bundleQuery(
   gameweek: number,
 ) {
   return entryBundleQuery(entryId, gameweek, forwarder.entryBundle.bind(forwarder));
-}
-
-/** One entry's season to date; a team FPL does not have, or a refusal, is null. */
-export function seasonQuery(forwarder: LiveForwarder, entryId: number) {
-  return {
-    queryKey: ["fpl-entry-season", entryId] as const,
-    queryFn: async ({ signal }: { signal: AbortSignal }): Promise<FplEntrySeason | null> => {
-      const read = await forwarder.entrySeason(entryId, { signal });
-      if (!read.ok && read.reason === "aborted") throw new ForwarderRefused(read.reason);
-      return read.ok ? read.document : null;
-    },
-  };
 }
 
 /** The capture's table the member's squad names, read once for the page. */

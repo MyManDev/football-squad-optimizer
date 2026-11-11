@@ -9,16 +9,16 @@
  * played. Its reads are the member's live week's (`useMemberLiveScore`): on open, on Yenile,
  * and once a minute while one of the member's matches is played and the page is in view,
  * wired as the member page wires them, with the GOL board and `?replay=1` of its own. The
- * member and the rival are scored from the read the live week shows; the rival's bundle, the
- * two seasons (a classic league's total gap) and a head-to-head league's pairings are read
- * once.
+ * member and the rival are scored from the read the live week shows; the rival's bundle and
+ * a head-to-head league's pairings are read once, and a published classic league's total gap
+ * comes from the members table the page holds.
  *
  * The heading stands first in every state, so the one the shell focuses on arrival stays.
  * Canlı puan takes the GOL board's points as each moment lands, as the member page's card
  * does, and the rows and the recap take a read once its moments have landed.
  */
 
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
   useEffect,
@@ -52,7 +52,7 @@ import {
   type LiveBoard,
   type LiveRecap,
 } from "./liveBoard";
-import { liveDuel, seasonTotalBefore } from "./liveDuel";
+import { leagueTotalsBefore, liveDuel } from "./liveDuel";
 import { addressedRival, chooseRival, h2hOpponent, rivalChoices } from "./liveRival";
 import {
   bundleQuery,
@@ -60,7 +60,6 @@ import {
   liveSources,
   newestReading,
   readingAt,
-  seasonQuery,
   tableQuery,
   type LiveForwarder,
 } from "./liveSources";
@@ -302,23 +301,13 @@ function LiveMember({
         : null,
     [reading, rivalWeek, table.data, fixtures],
   );
-  const seasons = useQueries({
-    queries: [entryId, rivalId ?? 0].map((id) => ({
-      ...seasonQuery(forwarder, id),
-      ...LEAGUE_READ,
-      enabled: ready && classic && rivalId !== null,
-    })),
-  });
-  const [ownSeason, rivalSeason] = seasons.map((season) => season.data ?? null);
+  // A classic league's totals before the week, from its own published table.
   const totals = useMemo(
     () =>
-      week !== null && ownSeason && rivalSeason
-        ? {
-            member: seasonTotalBefore(ownSeason, week),
-            rival: seasonTotalBefore(rivalSeason, week),
-          }
+      classic && week !== null && rivalId !== null
+        ? leagueTotalsBefore(members.data?.payload ?? null, week, entryId, rivalId)
         : null,
-    [week, ownSeason, rivalSeason],
+    [classic, week, rivalId, members.data, entryId],
   );
   const duel = useMemo(
     () =>

@@ -10,7 +10,7 @@ import {
 } from "../src/fixtures/forwarder";
 import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import type { FixturesPayload } from "../src/features/fixtures/types";
-import type { FplEntryBundle, FplEntrySeason } from "../src/features/league/forwarder/documents";
+import type { FplEntryBundle } from "../src/features/league/forwarder/documents";
 import type { WeekActivity } from "../src/features/liveScore/weekActivity";
 import type { MemberWeek } from "../src/features/liveScore/weekLive";
 import { installLeagueMocks } from "./leagueMocks";
@@ -114,27 +114,6 @@ export function exampleWeek(
     })),
   );
   return calendar;
-}
-
-/** One entry's season to date: `total` points after each played week before `gameweek`. */
-export function seasonOf(entryId: number, gameweek: number, perWeek: number): FplEntrySeason {
-  return {
-    contract_version: "fpl_entry_season_v1",
-    entry_id: entryId,
-    source_time: "2026-11-21T12:00:00Z",
-    weeks: Array.from({ length: gameweek - 1 }, (_, index) => ({
-      event: index + 1,
-      points: perWeek,
-      total_points: perWeek * (index + 1),
-      rank: null,
-      overall_rank: null,
-      event_transfers: 0,
-      event_transfers_cost: 0,
-      bank: 0,
-      value: 1000,
-    })),
-    chips: [],
-  };
 }
 
 /* ---- A forwarded week: the parity table's sixty players in eight clubs ---- */
