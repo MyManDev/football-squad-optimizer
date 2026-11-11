@@ -1,0 +1,231 @@
+/*
+ * The GOL moment's board: the fourth official's board of the decision card (the one dark
+ * object on the page besides the grass), raised for a goal. LED letters and digits are the
+ * mark colour seen through a grid of dots; the scorer stands on the green "in" panel.
+ *
+ * Contrast (WCAG formula, as MemberDecision.module.css states it): the mark is 13.5:1 on the
+ * board by day and 11.3:1 at night; white is 5.3:1 on the green panel. The dot grid thins the
+ * glyphs, so LED text is never smaller than 30px.
+ *
+ * Nothing here animates: the board's motion is the script's (GoalMoment.tsx), timed by the
+ * --motion-* tokens through motion.ts and moving only transform and opacity.
+ */
+
+/* Above the shell's scrim (30), its drawer and fixture sheet (40), below the opening
+   cover (1000): a goal is seen whatever panel is open. */
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+}
+
+.place {
+  position: fixed;
+  top: 38%;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  display: flex;
+  justify-content: center;
+}
+
+.board {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "head head"
+    "panel digits";
+  gap: var(--space-2) var(--space-3);
+  width: min(100%, 460px);
+  margin: 0;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-m);
+  background: var(--color-board);
+  color: var(--color-board-text);
+  box-shadow: var(--shadow-drawer);
+  text-align: left;
+  cursor: pointer;
+  /* The board rises and falls about its top edge, as the substitution boards turn. */
+  transform-origin: 50% 0;
+}
+
+.head {
+  grid-area: head;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* LED: the mark colour behind a 5px grid of round dots. */
+.shout,
+.digits {
+  color: var(--color-mark);
+  -webkit-mask: radial-gradient(circle, currentColor 60%, transparent 64%) 0 0 / 5px 5px;
+  mask: radial-gradient(circle, currentColor 60%, transparent 64%) 0 0 / 5px 5px;
+}
+
+.shout {
+  font-family: var(--font-mono);
+  font-size: 64px;
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The long shout takes the condensed face so it stays large across the board's width. */
+.shout[data-long] {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  -webkit-mask-size: 4px 4px;
+  mask-size: 4px 4px;
+}
+
+.shout span {
+  display: inline-block;
+}
+
+.order {
+  flex: none;
+  color: var(--color-board-muted);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.panel {
+  grid-area: panel;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-s);
+  background: var(--color-in-panel);
+  color: var(--color-board-text);
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 30px;
+}
+
+.captain {
+  flex: none;
+  padding: 0 4px;
+  border-radius: var(--radius-s);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.meta {
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.digits {
+  grid-area: digits;
+  align-self: center;
+  min-width: 84px;
+  font-family: var(--font-mono);
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  -webkit-mask-size: 4px 4px;
+  mask-size: 4px 4px;
+}
+
+/* The points on their way to the live score. */
+.runner {
+  position: fixed;
+  z-index: 46;
+  padding: 2px 8px;
+  border-radius: var(--radius-s);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+/* A card, and anything from a pick who does not count: one LED line at the foot of the
+   screen, clear of the phone bar and the pinned section strip; a tap takes it away. */
+.line,
+.still {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100vw - 24px);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-s);
+  background: var(--color-board);
+  color: var(--color-mark);
+  box-shadow: var(--shadow-drawer);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: auto;
+  cursor: pointer;
+  translate: -50% 0;
+}
+
+.line[data-negative] .tag,
+.tag {
+  padding: 1px 6px;
+  border-radius: var(--radius-s);
+  background: var(--color-out-panel);
+  color: var(--color-board-text);
+}
+
+.still {
+  pointer-events: auto;
+  width: min(460px, calc(100vw - 24px));
+  padding-right: var(--space-1);
+}
+
+.stillText {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  min-width: 0;
+}
+
+.close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-board-text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}

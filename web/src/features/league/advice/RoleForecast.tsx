@@ -12,7 +12,7 @@ const COPY = {
       appearance: "Süre puanı",
       goals: "Gol",
       assists: "Asist",
-      clean_sheet: "Gol yememe",
+      clean_sheet: "Gol yenmeyen maç",
       defcon: "Savunma katkısı",
       other: "Diğer katkılar",
     },

@@ -1,4 +1,5 @@
 import { Card } from "../../design/components/Card";
+import { CountingNumber } from "../../design/CountingNumber";
 import { Stat, StatRow } from "../../design/components/Stat";
 import { useLanguage } from "../../i18n/context";
 import type { LiveWeekScore } from "./officialScoring";
@@ -45,6 +46,7 @@ const COPY = {
 
 /** Display only. The source adapter owns loading; neither score nor refresh is recorded here. */
 export function MemberLiveScoreCard({
+  entryId = 0,
   gameweek,
   score,
   forecast = null,
@@ -53,6 +55,8 @@ export function MemberLiveScoreCard({
   refreshing = false,
   activity = null,
 }: {
+  /** Whose score it is: each member's figure counts from its own last value. */
+  entryId?: number;
   gameweek: number;
   score: LiveWeekScore | null;
   /** What was forecast for the eleven fielded, on the live score's net basis; null unstated. */
@@ -102,7 +106,20 @@ export function MemberLiveScoreCard({
               value={forecast.toLocaleString(locale, { maximumFractionDigits: 1 })}
             />
           )}
-          <Stat label={copy.net} value={integer(score.net)} tone="accent" />
+          <Stat
+            label={copy.net}
+            value={
+              // The GOL moment's points run here; the figure counts to each new score.
+              <span className={styles.total} data-live-total>
+                <CountingNumber
+                  countKey={`live-net:${entryId}:${gameweek}`}
+                  value={score.net}
+                  format={integer}
+                />
+              </span>
+            }
+            tone="accent"
+          />
           <Stat label={copy.hit} value={integer(score.transfer_cost)} />
           <Stat
             label={copy.matches}

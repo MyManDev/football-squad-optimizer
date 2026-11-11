@@ -31,6 +31,7 @@ export function MemberLiveWeekView({ squad, live }: { squad: EntrySquad; live: M
   return (
     <MemberLiveScoreCard
       key={`${squad.entry.entry_id}:${squad.season}:${shown.gameweek}`}
+      entryId={squad.entry.entry_id}
       gameweek={shown.gameweek}
       score={shown.score}
       forecast={shown.forecast}
