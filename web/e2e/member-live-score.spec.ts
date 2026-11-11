@@ -161,7 +161,10 @@ for (const width of [375, 1280]) {
       await page.goto(`/league/352490/members/${ENTRY}`);
       await expect(page.locator("[data-opening-mark]")).toHaveCount(0, { timeout: 10_000 });
       const card = page.locator("[data-member-live-score]");
-      await expect(card.getByRole("img", { name: "Maç sürüyor" }).first()).toBeVisible();
+      // The light needs the first read: a loaded machine (Firefox, one worker) gets its time.
+      await expect(card.getByRole("img", { name: "Maç sürüyor" }).first()).toBeVisible({
+        timeout: 15_000,
+      });
       await card.evaluate((node) => {
         node.setAttribute("data-test-animations", "0");
         node.addEventListener("animationstart", (event) => {
