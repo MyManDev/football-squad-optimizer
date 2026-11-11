@@ -2,7 +2,7 @@
  * The GOL board's batches for the member page: each read's goals, assists and cards from the
  * live week, and the automatic substitutions a read adds (`newSubstitutions`), numbered as one
  * stream. The first read of a member's week is a starting point for substitutions, as it is
- * for goals.
+ * for goals, and so is the first read after the week was not shown (a tool's page).
  */
 
 import { useCallback, useState } from "react";
@@ -41,7 +41,14 @@ export function useBoardMoments(live: MemberLive, entryId: number): BoardBatch |
   const week = shown === null ? null : `${entryId}:${shown.gameweek}`;
   const read = shown === null ? null : shown.score.source_time;
   const momentsId = live.moments?.id ?? null;
-  if (shown !== null && (read !== seen.read || momentsId !== seen.moments || week !== seen.week)) {
+  if (shown === null && seen.substitutions !== null) {
+    // No week shown (a tool's page, a read the source refused): the next read is a first read
+    // again, a starting point for substitutions as the live score's marks are for goals.
+    setSeen({ ...seen, substitutions: null, read: null });
+  } else if (
+    shown !== null &&
+    (read !== seen.read || momentsId !== seen.moments || week !== seen.week)
+  ) {
     const items: BoardMoment[] = [];
     if (live.moments !== null && momentsId !== seen.moments) items.push(...live.moments.items);
     const { seen: substitutions, fresh } = newSubstitutions(

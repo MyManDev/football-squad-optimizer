@@ -526,6 +526,190 @@ describe("what the desktop test asked of it", () => {
   });
 });
 
+describe("what the last review asked of it", () => {
+  type Shown = { id: string; items: BoardMoment[] } | null;
+  const view = (batch: Shown, source: string, landed: (key: string) => void = () => undefined) => (
+    <LanguageProvider initialLanguage="tr">
+      <GoalMomentLayer batch={batch} source={source} onLanded={landed} />
+    </LanguageProvider>
+  );
+  const still = () => document.querySelector("[data-goal-still]");
+  const rect = (top: number, bottom: number, left = 0, right = 320) =>
+    ({
+      top,
+      bottom,
+      left,
+      right,
+      width: right - left,
+      height: bottom - top,
+      x: left,
+      y: top,
+      toJSON: () => ({}),
+    }) as DOMRect;
+
+  it("plays a batch once, whichever stream the page shows in between", () => {
+    const live = { id: "live:1", items: [moment({ key: "1:goal:5" })] };
+    const { rerender } = render(view(live, "live"));
+    fireEvent.click(board()!);
+    expect(board()).toBeNull();
+    rerender(view({ id: "replay:1", items: [moment({ key: "r1:goal:5" })] }, "replay"));
+    expect(board()).not.toBeNull();
+    fireEvent.click(board()!);
+    // Back to the real reads: their last batch has played and does not play again.
+    rerender(view(live, "live"));
+    expect(board()).toBeNull();
+  });
+
+  it("drops the replay's queued moments once the page leaves the replay, and says so", () => {
+    const landed = vi.fn();
+    const replay = {
+      id: "replay:1",
+      items: [moment({ key: "r:a" }), moment({ key: "r:b", name: "Saka" })],
+    };
+    const { rerender } = render(view(replay, "replay", landed));
+    expect(board()).not.toBeNull();
+    rerender(view(null, "live", landed));
+    expect(board()).toBeNull();
+    expect(landed).toHaveBeenCalledWith("r:a");
+    expect(landed).toHaveBeenCalledWith("r:b");
+  });
+
+  it("gives focus back where it was when a tap or a screen reader put it on the board", () => {
+    const input = document.createElement("input");
+    document.body.append(input);
+    try {
+      input.focus();
+      show([moment()]);
+      board()!.focus();
+      expect(document.activeElement).toBe(board());
+      fireEvent.click(board()!);
+      expect(document.activeElement).toBe(input);
+      cleanup();
+      reduceMotion();
+      input.focus();
+      show([moment()]);
+      const close = still()!.querySelector("button")!;
+      close.focus();
+      fireEvent.click(close);
+      expect(still()).toBeNull();
+      expect(document.activeElement).toBe(input);
+    } finally {
+      input.remove();
+    }
+  });
+
+  it("fits its words and stands again when the column changes, keeping nothing of before", () => {
+    vi.stubGlobal("innerWidth", 1280);
+    const main = document.createElement("main");
+    main.id = "main";
+    document.body.append(main);
+    let left = 240;
+    main.getBoundingClientRect = () => rect(0, 800, left, 1280);
+    try {
+      show([moment()]);
+      const place = board()!.parentElement!;
+      expect(place.style.left).toBe("252px");
+      const shout = board()!.firstElementChild!.firstElementChild as HTMLElement;
+      shout.style.fontSize = "99px";
+      // The sidebar closes, or the phone turns: the board is fitted and placed afresh.
+      left = 0;
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+      expect(place.style.left).toBe("");
+      expect(shout.style.fontSize).toBe("");
+    } finally {
+      main.remove();
+    }
+  });
+
+  it("stands smaller below the bar and the pinned strip on a screen too short for it", () => {
+    vi.stubGlobal("innerHeight", 320);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(260);
+    const bar = document.createElement("header");
+    bar.setAttribute("data-phone-bar", "");
+    bar.getBoundingClientRect = () => rect(0, 56);
+    const sections = document.createElement("div");
+    sections.setAttribute("data-shown", "");
+    const strip = document.createElement("nav");
+    strip.setAttribute("data-pinned-strip", "");
+    strip.getBoundingClientRect = () => rect(56, 96);
+    sections.append(strip);
+    document.body.append(bar, sections);
+    try {
+      show([moment()]);
+      const place = board()!.parentElement!;
+      // 320 high: 108 under the bar and the strip, 12 below; 200 of room for 260.
+      expect(place.style.top).toBe("108px");
+      expect(place.style.transform).toBe("scale(0.769)");
+    } finally {
+      bar.remove();
+      sections.remove();
+    }
+  });
+
+  it("says a moment once, though a panel holds it back and it plays again", async () => {
+    const drawer = document.createElement("div");
+    document.body.append(drawer);
+    try {
+      show([moment()]);
+      const status = screen.getByRole("status");
+      const said = "Gol: Palmer, +5 puan";
+      expect(status).toHaveTextContent(said);
+      await act(async () => {
+        drawer.setAttribute("aria-modal", "true");
+      });
+      expect(board()).toBeNull();
+      // The region keeps its words: nothing new to say, so nothing is said again.
+      expect(status).toHaveTextContent(said);
+      await act(async () => {
+        drawer.removeAttribute("aria-modal");
+      });
+      expect(board()).not.toBeNull();
+      expect(status).toHaveTextContent(said);
+    } finally {
+      drawer.remove();
+    }
+  });
+
+  describe("under reduced motion", () => {
+    it("adds a new read to the still line, and a read with nothing to show leaves it", () => {
+      reduceMotion();
+      const first = { id: "live:1", items: [moment({ key: "1:goal:5" })] };
+      const { rerender } = render(view(first, "live"));
+      expect(still()).toHaveTextContent("Palmer");
+      // A reserve the scorer does not count: nothing to show.
+      const reserve = moment({ key: "2:goal:9", name: "Cherki", multiplier: 0, points: null });
+      rerender(view({ id: "live:2", items: [reserve] }, "live"));
+      expect(still()).toHaveTextContent("Palmer");
+      expect(still()).not.toHaveTextContent("Cherki");
+      rerender(
+        view({ id: "live:3", items: [moment({ key: "3:goal:9", name: "Haaland" })] }, "live"),
+      );
+      expect(still()).toHaveTextContent("Palmer");
+      expect(still()).toHaveTextContent("Haaland");
+    });
+
+    it("turns the queued moments into the still line when it is turned on, and says so", () => {
+      const landed = vi.fn();
+      const batch = {
+        id: "live:1",
+        items: [moment({ key: "a" }), moment({ key: "b", name: "Saka" })],
+      };
+      const { rerender } = render(view(batch, "live", landed));
+      expect(board()).not.toBeNull();
+      reduceMotion();
+      // The page draws again when the setting changes.
+      rerender(view(batch, "live", landed));
+      expect(board()).toBeNull();
+      expect(still()).toHaveTextContent("Palmer");
+      expect(still()).toHaveTextContent("Saka");
+      expect(landed).toHaveBeenCalledWith("a");
+      expect(landed).toHaveBeenCalledWith("b");
+    });
+  });
+});
+
 describe("under reduced motion", () => {
   it("goes on a tap anywhere on the still line", () => {
     reduceMotion();

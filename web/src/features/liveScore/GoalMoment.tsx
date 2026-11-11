@@ -19,7 +19,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { MOTION_EASE, MOTION_MS, prefersReducedMotion } from "../../design/motion";
+import {
+  MOTION_EASE,
+  MOTION_MS,
+  prefersReducedMotion,
+  REDUCED_MOTION_QUERY,
+} from "../../design/motion";
 import { ASSIST_SHOUT, GOAL_SHOUT, MOMENT_TIMING } from "./goalMomentTiming";
 import { usePageClear } from "./openingCover";
 import { useLanguage } from "../../i18n/context";
@@ -92,16 +97,34 @@ const EDGE = 12;
  */
 function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void {
   if (place === null || board === null) return;
+  // Each placing starts from the stylesheet's, so a turned phone or a closed sidebar leaves
+  // nothing of the place before.
+  place.style.left = "";
+  place.style.right = "";
+  place.style.transform = "";
   const column = document.getElementById("main")?.getBoundingClientRect();
   if (column !== undefined && column.left > EDGE && column.width > 0) {
     place.style.left = `${Math.round(column.left + EDGE)}px`;
     place.style.right = `${Math.round(Math.max(EDGE, window.innerWidth - column.right + EDGE))}px`;
   }
   const view = window.innerHeight;
-  // The board's own height, before any turn of its rise.
-  const height = board.offsetHeight;
+  // Below the phone bar, and below the section strip pinned under it while that is shown.
+  let cover = 0;
   const bar = document.querySelector("[data-phone-bar]")?.getBoundingClientRect();
-  const ceiling = bar !== undefined && bar.height > 0 ? bar.bottom + EDGE : EDGE;
+  if (bar !== undefined && bar.height > 0) cover = bar.bottom;
+  const strip = document.querySelector("[data-pinned-strip]");
+  if (strip !== null && strip.closest("[data-shown]") !== null) {
+    const pinned = strip.getBoundingClientRect();
+    if (pinned.height > 0) cover = Math.max(cover, pinned.bottom);
+  }
+  const ceiling = cover + EDGE;
+  // A board taller than the room below the bars (a phone on its side) stands smaller, whole.
+  const natural = board.offsetHeight;
+  const room = view - ceiling - EDGE;
+  const scale = natural > room && natural > 0 ? Math.max(0.5, room / natural) : 1;
+  if (scale < 1) place.style.transform = `scale(${scale.toFixed(3)})`;
+  // The board's height on the screen, before any turn of its rise.
+  const height = natural * scale;
   const floor = Math.max(ceiling, view - height - EDGE);
   let top = Math.min(Math.max(Math.round(view * 0.38), ceiling), floor);
   const total = document.querySelector("[data-live-total]");
@@ -127,19 +150,29 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
 }
 
 /**
- * Places a standing board again whenever the screen changes (a phone turned, the iOS bars
- * shown or hidden), so it never stays outside the screen; the returned cleanup stops it.
+ * Fits a standing board's LED words and places it again whenever the screen or the page's
+ * column changes (a phone turned, the iOS bars shown or hidden, the sidebar opened or closed),
+ * so it never stays outside the screen or wider than it; the returned cleanup stops it.
  */
 function keepPlaced(
   place: { current: HTMLElement | null },
   board: { current: HTMLElement | null },
+  refit: () => void,
 ) {
-  const again = () => placeBoard(place.current, board.current);
+  const again = () => {
+    refit();
+    placeBoard(place.current, board.current);
+  };
   window.addEventListener("resize", again);
   window.visualViewport?.addEventListener("resize", again);
+  const column = document.getElementById("main");
+  const watch =
+    column !== null && typeof ResizeObserver === "function" ? new ResizeObserver(again) : null;
+  if (column !== null) watch?.observe(column);
   return () => {
     window.removeEventListener("resize", again);
     window.visualViewport?.removeEventListener("resize", again);
+    watch?.disconnect();
   };
 }
 
@@ -177,10 +210,11 @@ function fitNowAndOnFonts(fit: () => void): () => void {
   };
 }
 
-/** One moment on its way: its place among the read's big moments. */
+/** One moment on its way: its place among the read's big moments, and the stream it came in. */
 interface Queued {
   moment: BoardMoment;
   order: string;
+  source: string;
 }
 
 interface Batch {
@@ -188,6 +222,23 @@ interface Batch {
   id: string;
   items: BoardMoment[];
 }
+
+interface LayerState {
+  /** Every batch taken: a batch plays once, whichever stream the page shows in between. */
+  taken: ReadonlySet<string>;
+  /** The stream the page shows; a queued moment of another plays no more. */
+  source: string | null;
+  queue: Queued[];
+  still: BoardMoment[] | null;
+  /** The still line's revision: each read added to it gives it its full time again. */
+  stillRevision: number;
+  /** What the live region says: the moment playing, kept while a panel holds it back. */
+  voice: { key: string | null; text: string };
+  /** Moments that will not play (another stream, or turned into the still line), in order. */
+  dropped: string[];
+}
+
+const sourceOf = (id: string) => id.split(":")[0] ?? "";
 
 const signed = (value: number, locale: string) =>
   `${value > 0 ? "+" : ""}${value.toLocaleString(locale)}`;
@@ -207,33 +258,89 @@ function animate(
   });
 }
 
+/**
+ * The reduced-motion preference as it is now, read again whenever the visitor changes it, so a
+ * page left open follows the setting.
+ */
+function useReducedMotion(): boolean {
+  const [, changed] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia(REDUCED_MOTION_QUERY);
+    const update = () => changed((count) => count + 1);
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
+  return prefersReducedMotion();
+}
+
+/**
+ * Gives focus back where it was before a board or line rose, when it is on the board as it
+ * goes (a screen reader's double tap focuses a button even with tabIndex -1), so it never falls
+ * to the page's body.
+ */
+function giveBackFocus(owner: HTMLElement | null, before: Element | null): void {
+  if (owner === null || !owner.contains(document.activeElement)) return;
+  if (before instanceof HTMLElement && before.isConnected && before !== document.body) {
+    before.focus({ preventScroll: true });
+  } else {
+    (document.activeElement as HTMLElement | null)?.blur();
+  }
+}
+
 export function GoalMomentLayer({
   batch,
+  source = batch === null ? "live" : sourceOf(batch.id),
   onLanded,
 }: {
   batch: Batch | null;
   /**
+   * The stream the page shows now (`live` or `replay`): when it changes, the other stream's
+   * moments still queued play no more.
+   */
+  source?: string;
+  /**
    * Told when a moment has played out: a goal's or assist's points have reached the live score
-   * (or will not run there), a substitution's board or a card's line has gone.
+   * (or will not run there), a substitution's board or a card's line has gone, or the moment
+   * will not play (another stream, or reduced motion turned on with it still queued).
    */
   onLanded?: (key: string) => void;
 }) {
   const { language, locale } = useLanguage();
   const copy = COPY[language];
   const layer = useRef<HTMLDivElement>(null);
-  // Nothing plays under the opening cover, a modal dialog or a cover over the page.
+  // Nothing plays under the opening cover, a modal dialog or panel, or a cover over the page.
   const clear = usePageClear(layer);
+  const reduce = useReducedMotion();
   const landed = useRef(onLanded);
   useEffect(() => {
     landed.current = onLanded;
   });
-  const [state, setState] = useState<{
-    batch: string | null;
-    queue: Queued[];
-    still: BoardMoment[] | null;
-  }>({ batch: null, queue: [], still: null });
-  // A new read's moments join the queue once; under reduced motion they become the still line.
-  if (batch !== null && batch.id !== state.batch) {
+  const [state, setState] = useState<LayerState>({
+    taken: new Set(),
+    source: null,
+    queue: [],
+    still: null,
+    stillRevision: 0,
+    voice: { key: null, text: "" },
+    dropped: [],
+  });
+  // One pass over what changed, settled into one state for this render.
+  let next = state;
+  // The page shows another stream: its queued moments go, and the page is told.
+  if (source !== next.source) {
+    const gone = next.queue.filter((queued) => queued.source !== source);
+    next = {
+      ...next,
+      source,
+      queue: next.queue.filter((queued) => queued.source === source),
+      still: next.source === null ? next.still : null,
+      voice: gone.length > 0 ? { key: null, text: "" } : next.voice,
+      dropped: [...next.dropped, ...gone.map((queued) => queued.moment.key)],
+    };
+  }
+  // A new read's moments join the queue once; under reduced motion they join the still line.
+  if (batch !== null && !next.taken.has(batch.id)) {
     // Only what brings the member points: a reserve the scorer does not count raises nothing.
     const items = batch.items.filter(shownOnBoard);
     const bigs = items.filter((moment) => moment.size === "big").length;
@@ -241,21 +348,56 @@ export function GoalMomentLayer({
     const queued = items.map((moment) => ({
       moment,
       order: moment.size === "big" && bigs > 1 ? `${++big}/${bigs}` : "",
+      source: sourceOf(batch.id),
     }));
-    setState((current) =>
-      prefersReducedMotion()
-        ? { batch: batch.id, queue: [], still: items.length > 0 ? items : null }
-        : { batch: batch.id, queue: [...current.queue, ...queued], still: null },
-    );
+    const taken = new Set(next.taken).add(batch.id);
+    next = reduce
+      ? {
+          ...next,
+          taken,
+          still: items.length > 0 ? [...(next.still ?? []), ...items] : next.still,
+          stillRevision: items.length > 0 ? next.stillRevision + 1 : next.stillRevision,
+        }
+      : { ...next, taken, queue: [...next.queue, ...queued], still: null };
   }
-  const next = () => setState((current) => ({ ...current, queue: current.queue.slice(1) }));
-  const playing = clear ? state.queue[0] : undefined;
+  // Reduced motion turned on with moments still queued: they join the still line at once.
+  if (reduce && next.queue.length > 0) {
+    const moments = next.queue.map((queued) => queued.moment);
+    next = {
+      ...next,
+      queue: [],
+      still: [...(next.still ?? []), ...moments],
+      stillRevision: next.stillRevision + 1,
+      voice: { key: null, text: "" },
+      dropped: [...next.dropped, ...moments.map((moment) => moment.key)],
+    };
+  }
+  const playing = clear ? next.queue[0] : undefined;
+  // Each moment is said once: when it starts, and not again if a panel held it back.
+  if (playing !== undefined && next.voice.key !== playing.moment.key) {
+    next = {
+      ...next,
+      voice: { key: playing.moment.key, text: announcement(playing.moment, copy, locale) },
+    };
+  }
+  if (next !== state) setState(next);
+  // The page hears about the moments that will not play after this render, not during it.
+  const told = useRef(0);
+  useEffect(() => {
+    const keys = state.dropped.slice(told.current);
+    told.current = state.dropped.length;
+    for (const key of keys) landed.current?.(key);
+  }, [state.dropped]);
+  const played = () =>
+    setState((current) => ({
+      ...current,
+      queue: current.queue.slice(1),
+      voice: { key: null, text: "" },
+    }));
   const spoken =
-    playing !== undefined
-      ? announcement(playing.moment, copy, locale)
-      : state.still !== null && clear
-        ? state.still.map((moment) => announcement(moment, copy, locale)).join(". ")
-        : "";
+    next.still !== null && clear
+      ? next.still.map((moment) => announcement(moment, copy, locale)).join(". ")
+      : next.voice.text;
   if (typeof document === "undefined") return null;
   return createPortal(
     <div ref={layer} className={styles.layer} lang={language} data-goal-moments>
@@ -268,7 +410,7 @@ export function GoalMomentLayer({
           moment={playing.moment}
           copy={copy}
           onLanded={(key) => landed.current?.(key)}
-          onDone={next}
+          onDone={played}
         />
       ) : playing.moment.size === "small" ? (
         <SmallLine
@@ -277,7 +419,7 @@ export function GoalMomentLayer({
           copy={copy}
           locale={locale}
           onLanded={(key) => landed.current?.(key)}
-          onDone={next}
+          onDone={played}
         />
       ) : (
         <Board
@@ -286,13 +428,13 @@ export function GoalMomentLayer({
           copy={copy}
           locale={locale}
           onLanded={(key) => landed.current?.(key)}
-          onDone={next}
+          onDone={played}
         />
       )}
-      {state.still !== null && clear ? (
+      {next.still !== null && clear ? (
         <StillLine
-          key={state.batch ?? 0}
-          moments={state.still}
+          key={next.stillRevision}
+          moments={next.still}
           copy={copy}
           locale={locale}
           onDone={() => setState((current) => ({ ...current, still: null }))}
@@ -365,6 +507,10 @@ function Board({
   useLayoutEffect(() => fitNowAndOnFonts(() => fitLed(shout.current, head.current, true)), [text]);
 
   useLayoutEffect(() => {
+    // Where focus was when the board rose, to give it back if a tap or a screen reader put it
+    // on the board.
+    const before = document.activeElement;
+    const owner = board.current;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const later = (ms: number, step: () => void) => timers.push(setTimeout(step, ms));
     let gone = false;
@@ -372,6 +518,7 @@ function Board({
       if (gone) return;
       gone = true;
       timers.forEach(clearTimeout);
+      giveBackFocus(board.current, before);
       const received = moment.points === null ? null : signed(moment.points, locale);
       if (received !== null) setDigits(received);
       const release = () => onLandedRef.current?.(moment.key);
@@ -393,7 +540,7 @@ function Board({
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
-    const unplace = keepPlaced(place, board);
+    const unplace = keepPlaced(place, board, () => fitLed(shout.current, head.current, true));
     // Risen, the board and its letters let go of their motion: no 3D turn stays on them.
     animate(
       board.current,
@@ -429,6 +576,8 @@ function Board({
       timers.forEach(clearTimeout);
       document.removeEventListener("keydown", onKey);
       unplace();
+      // Taken down unplayed (a panel opened, the stream changed): focus does not fall with it.
+      giveBackFocus(owner, before);
     };
   }, [big, doubled, locale, moment]);
 
@@ -522,6 +671,8 @@ function SubstitutionBoard({
     [copy.substitution],
   );
   useLayoutEffect(() => {
+    const before = document.activeElement;
+    const owner = board.current;
     let gone = false;
     const finish = () => {
       told.current?.(moment.key);
@@ -531,6 +682,7 @@ function SubstitutionBoard({
       if (gone) return;
       gone = true;
       clearTimeout(timer);
+      giveBackFocus(board.current, before);
       const fall = animate(
         board.current,
         [
@@ -544,7 +696,7 @@ function SubstitutionBoard({
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);
-    const unplace = keepPlaced(place, board);
+    const unplace = keepPlaced(place, board, () => fitLed(word.current, head.current, false));
     animate(
       board.current,
       [
@@ -563,6 +715,7 @@ function SubstitutionBoard({
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
       unplace();
+      giveBackFocus(owner, before);
     };
   }, [moment.key]);
   return (
@@ -739,19 +892,29 @@ function StillLine({
   useEffect(() => {
     done.current = onDone;
   });
-  useEffect(() => {
-    const timer = setTimeout(() => done.current(), MOMENT_TIMING.still);
+  const line = useRef<HTMLDivElement>(null);
+  // Where focus was when the line came: its close button gives it back as the line goes.
+  const before = useRef<Element | null>(null);
+  const close = useRef(() => {
+    giveBackFocus(line.current, before.current);
+    done.current();
+  });
+  useLayoutEffect(() => {
+    before.current = document.activeElement;
+    const owner = line.current;
+    const timer = setTimeout(() => close.current(), MOMENT_TIMING.still);
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") done.current();
+      if (event.key === "Escape") close.current();
     };
     document.addEventListener("keydown", onKey);
     return () => {
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
+      giveBackFocus(owner, before.current);
     };
   }, []);
   return (
-    <div className={styles.still} data-goal-still onClick={() => done.current()}>
+    <div ref={line} className={styles.still} data-goal-still onClick={() => close.current()}>
       <p className={styles.stillText}>
         {moments.map((moment) => (
           <span key={moment.key} data-negative={moment.kind === "card" || undefined}>
@@ -771,7 +934,11 @@ function StillLine({
         type="button"
         className={styles.close}
         aria-label={copy.close}
-        onClick={() => done.current()}
+        onClick={(event) => {
+          // The line's own tap closes it once.
+          event.stopPropagation();
+          close.current();
+        }}
       >
         <span aria-hidden="true">×</span>
       </button>

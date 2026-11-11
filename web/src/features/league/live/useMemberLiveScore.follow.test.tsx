@@ -135,6 +135,7 @@ function Harness({
       <p data-testid="net">{live.shown ? String(live.shown.score.net) : "none"}</p>
       <p data-testid="batch">{live.moments ? String(live.moments.id) : "none"}</p>
       <p data-testid="refreshing">{String(live.refreshing)}</p>
+      <p data-testid="unfinished">{[...(live.matches?.unfinished ?? [])].join(",") || "none"}</p>
       <button type="button" onClick={live.refresh}>
         refresh
       </button>
@@ -399,5 +400,73 @@ describe("a followed live week", () => {
     for (let tick = 0; tick < 10; tick += 1) await minute();
     expect(client.liveActivity).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("batch")).toHaveTextContent("none");
+  });
+});
+
+describe("a followed live week, as the owner's last review asked", () => {
+  /** The live week with every player's minutes moved on by `step(read)` at each read. */
+  function minutesForwarder(step: (read: number) => number) {
+    let read = 0;
+    return {
+      entryBundle: vi.fn<ForwarderClient["entryBundle"]>(async () => ({
+        ok: true,
+        document: exampleBundle(ENTRY, WEEK, MEMBER),
+        copy: "miss",
+      })),
+      liveWeek: vi.fn<ForwarderClient["liveWeek"]>(async () => ({ ok: false, reason: "network" })),
+      liveActivity: vi.fn(async (): Promise<ActivityAnswer> => {
+        read += 1;
+        const answer = activity(0, read, SCORER);
+        if (!answer.ok) return answer;
+        const bump = step(read);
+        const appearances = answer.document.activity!.appearances.map((row) => ({
+          ...row,
+          minutes: row.minutes > 0 ? row.minutes + bump : row.minutes,
+        }));
+        return {
+          ...answer,
+          document: { ...answer.document, activity: { ...answer.document.activity!, appearances } },
+        };
+      }),
+    };
+  }
+  const unfinished = () => screen.getByTestId("unfinished").textContent;
+
+  it("counts a match as still played only while its players' minutes go up", async () => {
+    // The final whistle has gone: the minutes stand still, though FPL has not finished the match.
+    const still = minutesForwarder(() => 0);
+    follow(still);
+    await shownNet();
+    expect(unfinished()).toBe(String(FIXTURE.id));
+    for (let tick = 0; tick < 5; tick += 1) await minute();
+    expect(still.liveActivity).toHaveBeenCalledTimes(6);
+    expect(unfinished()).toBe("none");
+    cleanup();
+    vi.useRealTimers();
+    // A match still going: its minutes go up at every read.
+    const going = minutesForwarder((read) => read);
+    follow(going);
+    await shownNet();
+    for (let tick = 0; tick < 5; tick += 1) await minute();
+    expect(unfinished()).toBe(String(FIXTURE.id));
+  });
+
+  it("takes a week the scorer refuses as a failed first read: made again later, never followed", async () => {
+    // A pick the live week does not have: the official scorer refuses the week.
+    const member = { ...MEMBER, pick_order: [999_999, ...MEMBER.pick_order.slice(1)] };
+    const client = forwarder([0], { member });
+    follow(client);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(client.entryBundle).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("net")).toHaveTextContent("none");
+    // A minute on, the first read is made again (bundle and all), not a followed read.
+    await minute();
+    expect(client.entryBundle).toHaveBeenCalledTimes(2);
+    expect(client.liveActivity).toHaveBeenCalledTimes(2);
+    // After a second failure it waits two minutes: nothing is read at the next tick.
+    await minute();
+    expect(client.liveActivity).toHaveBeenCalledTimes(2);
   });
 });

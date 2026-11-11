@@ -6,7 +6,7 @@
  * While it plays the page shows no moment of its own reads, so the two never mix.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { FixturesPayload } from "../../fixtures/types";
 import { shownOnBoard, type BoardMoment } from "../../liveScore/boardMoments";
@@ -30,6 +30,8 @@ export function useGoalReplay(
   const { tree } = useLeague();
   const coverGone = useCoverGone();
   const [batch, setBatch] = useState<BoardBatch | null>(null);
+  // Every step handed to the board, over every run while the page stays.
+  const handed = useRef(0);
   const entryId = squad.entry.entry_id;
   const gameweek = squad.gameweek;
   const capture = squad.source_snapshot_id ?? null;
@@ -100,7 +102,12 @@ export function useGoalReplay(
       shownSteps.forEach((items, index) => {
         timers.push(
           setTimeout(
-            () => setBatch({ id: index + 1, items }),
+            () => {
+              // Numbered on from the runs before, so a replay started again is never taken for
+              // one the board has played.
+              handed.current += 1;
+              setBatch({ id: handed.current, items });
+            },
             REPLAY_START_MS + index * REPLAY_STEP_MS,
           ),
         );

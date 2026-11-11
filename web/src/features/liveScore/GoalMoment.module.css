@@ -20,10 +20,12 @@
   pointer-events: none;
 }
 
-/* The script sets the top from the screen and the live score (placeBoard). */
+/* The script sets the top from the screen and the live score (placeBoard), and scales a board
+   the screen is too short for from its top edge. */
 .place {
   position: fixed;
   top: 38%;
+  transform-origin: 50% 0;
   left: max(12px, env(safe-area-inset-left, 0px));
   right: max(12px, env(safe-area-inset-right, 0px));
   display: flex;

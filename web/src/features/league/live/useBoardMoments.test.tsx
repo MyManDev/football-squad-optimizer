@@ -105,6 +105,24 @@ describe("the GOL board's stream", () => {
       "1:Saka>Trossard",
     ]);
   });
+
+  it("takes the first read after the week was not shown (a tool's page) as a starting point", () => {
+    const { rerender } = render(<Harness value={live(1, [])} />);
+    // On a tool's page the live score shows no week; the substitution comes in meanwhile.
+    rerender(<Harness value={{ ...live(2, []), shown: null }} />);
+    rerender(<Harness value={live(3, [[4, 13]])} />);
+    expect(screen.queryAllByRole("listitem")).toEqual([]);
+    // From there on a newer read's substitution rises as before.
+    rerender(
+      <Harness
+        value={live(4, [
+          [4, 13],
+          [9, 13],
+        ])}
+      />,
+    );
+    expect(screen.getByRole("listitem")).toHaveTextContent("1:Haaland>Trossard");
+  });
 });
 
 function Holding({ batch, land }: { batch: BoardBatch | null; land?: string }) {

@@ -102,16 +102,47 @@ function scored(
   }
 }
 
+/** A match whose players' minutes went up this recently is still being played. */
+const IN_PLAY_GRACE_MS = 5 * 60_000;
+
+/** Each match's minutes as last seen going up, and when, by fixture id. */
+type PlayedMinutes = Map<number, { minutes: number; at: number }>;
+
 /**
- * The clubs (the calendar's team ids) of the member's fifteen and the week's unfinished
- * fixtures. The clubs come from the scored week's lineup, which names each pick's club as the
- * capture's table does: the forwarder's live elements carry no club. A club the calendar does
- * not name leaves the clubs open (null), so no match is missed.
+ * The week's matches still being played. FPL calls a match finished only once its bonus is
+ * confirmed, about an hour after the final whistle, so a match counts as played only while its
+ * players' minutes go up (within `IN_PLAY_GRACE_MS`). Without the activity view the read cannot
+ * tell, and every match not finished counts. `seen` is updated with this read's minutes.
+ */
+function stillPlayed(live: LiveReading, seen: PlayedMinutes, now: number): Set<number> {
+  const open = live.week.fixtures.filter((row) => !row.finished).map((row) => row.id);
+  if (live.activity === null) return new Set(open);
+  const minutes = new Map<number, number>();
+  for (const row of live.activity.appearances) {
+    minutes.set(row.fixture_id, (minutes.get(row.fixture_id) ?? 0) + row.minutes);
+  }
+  const played = new Set<number>();
+  for (const id of open) {
+    const total = minutes.get(id) ?? 0;
+    const before = seen.get(id);
+    if (before === undefined || total > before.minutes) seen.set(id, { minutes: total, at: now });
+    if (total > 0 && now - seen.get(id)!.at < IN_PLAY_GRACE_MS) played.add(id);
+  }
+  return played;
+}
+
+/**
+ * The clubs (the calendar's team ids) of the member's fifteen and the week's matches still
+ * being played (`stillPlayed`). The clubs come from the scored week's lineup, which names each
+ * pick's club as the capture's table does: the forwarder's live elements carry no club. A club
+ * the calendar does not name leaves the clubs open (null), so no match is missed.
  */
 function matchesOf(
   live: LiveReading,
   shown: MemberLiveScore,
   fixtures: FixturesPayload | null,
+  seen: PlayedMinutes,
+  now: number,
 ): LiveWindowFilter {
   const ids = new Map<string, number>();
   for (const week of fixtures?.gameweeks ?? []) {
@@ -128,7 +159,7 @@ function matchesOf(
       picked.length > 0 && picked.every((club) => club !== undefined)
         ? new Set(picked as number[])
         : null,
-    unfinished: new Set(live.week.fixtures.filter((row) => !row.finished).map((row) => row.id)),
+    unfinished: stillPlayed(live, seen, now),
   };
 }
 
@@ -212,6 +243,8 @@ export function useMemberLiveScore(
   const following = useRef<AbortController | null>(null);
   // The goals, assists and cards counted so far, and the reads numbered for their moments.
   const marks = useRef<LiveMarks | null>(null);
+  // Each match's minutes as last seen going up, for the matches still being played.
+  const played = useRef<PlayedMinutes>(new Map());
   const reads = useRef(0);
   const lastRead = useRef(0);
   // The first read, to make again; and whether one is on its way.
@@ -259,6 +292,7 @@ export function useMemberLiveScore(
     held.current = null;
     // Every first read is a starting point: nothing before it plays.
     marks.current = null;
+    played.current = new Map();
     firstInFlight.current = false;
     firstFailures.current = 0;
     if (!ready) return;
@@ -277,12 +311,15 @@ export function useMemberLiveScore(
         ),
       ]);
       if (read.signal.aborted || live === null || table === null) return false;
-      held.current = { identity, member, table };
-      const shown = scored(live, held.current, sources.current.fixtures);
+      const inputs = { identity, member, table };
+      const shown = scored(live, inputs, sources.current.fixtures);
+      // A week the scorer refuses is a failed first read: it is made again later (retryWait),
+      // and no followed read stands on it.
       if (shown === null) return false;
+      held.current = inputs;
       // A first read made again may bring a goal against the marks so far: it plays too.
       const moments = momentsOf(shown, live, held.current);
-      const matches = matchesOf(live, shown, sources.current.fixtures);
+      const matches = matchesOf(live, shown, sources.current.fixtures, played.current, Date.now());
       setState((current) => {
         const kept = current.identity === identity;
         return {
@@ -332,6 +369,7 @@ export function useMemberLiveScore(
   const accept = useCallback(
     (shown: MemberLiveScore, live: LiveReading, inputs: Held, refreshed: boolean) => {
       const moments = momentsOf(shown, live, inputs);
+      const matches = matchesOf(live, shown, sources.current.fixtures, played.current, Date.now());
       setState((current) => {
         const refreshing = !refreshed && current.identity === identity && current.refreshing;
         const older =
@@ -344,7 +382,7 @@ export function useMemberLiveScore(
           shown,
           refreshing,
           moments: moments ?? (current.identity === identity ? current.moments : null),
-          matches: matchesOf(live, shown, sources.current.fixtures),
+          matches,
         };
       });
     },
