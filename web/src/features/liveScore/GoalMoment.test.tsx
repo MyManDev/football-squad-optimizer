@@ -672,6 +672,30 @@ describe("what the last review asked of it", () => {
     }
   });
 
+  it("keeps a refresh button outside the score's head clear too, as LIVE's under the rival", () => {
+    vi.stubGlobal("innerHeight", 844);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(160);
+    const headBox = document.createElement("section");
+    headBox.setAttribute("data-live-head", "");
+    const total = document.createElement("span");
+    total.setAttribute("data-live-total", "");
+    headBox.append(total);
+    const refresh = document.createElement("button");
+    refresh.setAttribute("data-live-refresh", "");
+    document.body.append(headBox, refresh);
+    headBox.getBoundingClientRect = () => rect(80, 220);
+    total.getBoundingClientRect = () => rect(150, 200);
+    refresh.getBoundingClientRect = () => rect(330, 374);
+    try {
+      show([moment()]);
+      // 38% down (321) would stand over the button: the board goes below it.
+      expect(board()!.parentElement!.style.top).toBe("386px");
+    } finally {
+      headBox.remove();
+      refresh.remove();
+    }
+  });
+
   describe("under reduced motion", () => {
     it("adds a new read to the still line, and a read with nothing to show leaves it", () => {
       reduceMotion();

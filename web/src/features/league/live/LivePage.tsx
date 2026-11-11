@@ -339,7 +339,11 @@ function LiveMember({
         (table.isPending || (reading === null && !snapshot.settled.has(memberWeek.gameweek)))));
   return (
     <>
-      <GoalMomentLayer batch={goalBatch} onLanded={hold.landed} />
+      <GoalMomentLayer
+        batch={goalBatch}
+        source={replaying ? "replay" : "live"}
+        onLanded={hold.landed}
+      />
       {board === null ? (
         <LiveState kind={loading ? "loading" : "empty"} />
       ) : (

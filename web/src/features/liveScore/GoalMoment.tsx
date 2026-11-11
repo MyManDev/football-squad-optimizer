@@ -127,24 +127,44 @@ function placeBoard(place: HTMLElement | null, board: HTMLElement | null): void 
   const height = natural * scale;
   const floor = Math.max(ceiling, view - height - EDGE);
   let top = Math.min(Math.max(Math.round(view * 0.38), ceiling), floor);
+  const over = (at: number, low: number, high: number) => high > at && low < at + height;
   const total = document.querySelector("[data-live-total]");
   const card = total?.closest("[data-live-head], [data-member-live-score]");
+  // The score's head, from its top to the total's foot, while it is in view.
+  let head: { from: number; to: number } | null = null;
   if (total && card) {
     const from = card.getBoundingClientRect().top;
     const to = total.getBoundingClientRect().bottom;
-    const over = (at: number, low: number, high: number) => high > at && low < at + height;
-    if (over(top, from, to) && to > 0 && from < view) {
-      if (to + EDGE <= floor) top = to + EDGE;
-      else if (from - EDGE - height >= ceiling) top = from - EDGE - height;
-      else {
-        // No room for the board beside the head: it keeps the refresh button clear if it can.
-        const button = card.querySelector("[data-live-refresh]")?.getBoundingClientRect();
-        const clear = [floor, ceiling].find(
-          (at) => button === undefined || !over(at, button.top, button.bottom),
-        );
-        if (clear !== undefined) top = clear;
-      }
+    if (to > 0 && from < view) head = { from, to };
+  }
+  if (head !== null && over(top, head.from, head.to)) {
+    if (head.to + EDGE <= floor) top = head.to + EDGE;
+    else if (head.from - EDGE - height >= ceiling) top = head.from - EDGE - height;
+    else {
+      // No room for the board beside the head: it keeps the refresh button clear if it can.
+      const button = card?.querySelector("[data-live-refresh]")?.getBoundingClientRect();
+      const clear = [floor, ceiling].find(
+        (at) => button === undefined || !over(at, button.top, button.bottom),
+      );
+      if (clear !== undefined) top = clear;
     }
+  }
+  // A refresh button outside the head (LIVE's, under the rival on a phone) is kept clear too,
+  // without standing over the head again.
+  for (const node of document.querySelectorAll("[data-live-refresh]")) {
+    if (card?.contains(node)) continue;
+    const button = node.getBoundingClientRect();
+    if (button.height === 0 || button.bottom < 0 || button.top > view) continue;
+    if (!over(top, button.top, button.bottom)) continue;
+    const places = [button.bottom + EDGE, button.top - EDGE - height, floor, ceiling];
+    const clear = places.find(
+      (at) =>
+        at >= ceiling &&
+        at <= floor &&
+        !over(at, button.top, button.bottom) &&
+        (head === null || !over(at, head.from, head.to)),
+    );
+    if (clear !== undefined) top = clear;
   }
   place.style.top = `${Math.round(top)}px`;
 }
