@@ -95,19 +95,33 @@ function path(pathname: string): string {
   return pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
 }
 
+/**
+ * The plan's query as the sidebar carries it: the GOL replay's switch (`replay`) stays on the
+ * page it was typed on, so no link of the site ever leads to the replay.
+ */
+function planSearch(search: string): string {
+  const params = new URLSearchParams(search);
+  if (!params.has("replay")) return search;
+  params.delete("replay");
+  const rest = params.toString();
+  return rest === "" ? "" : `?${rest}`;
+}
+
 /** The member an address is about. Only a published member's number counts. */
 export function memberAt(
   place: Place,
 ): { leagueId: number; entryId: string; search: string | null } | null {
   const pathname = path(place.pathname);
   const page = MEMBER_PAGE.exec(pathname);
-  if (page) return { leagueId: Number(page[1]), entryId: page[2]!, search: place.search };
+  if (page) {
+    return { leagueId: Number(page[1]), entryId: page[2]!, search: planSearch(place.search) };
+  }
   const history = MEMBER_HISTORY.exec(pathname);
   if (history) return { leagueId: Number(history[1]), entryId: history[2]!, search: null };
   // A tool page carries the plan in its address as the decision page does.
   const tool = MEMBER_TOOL.exec(pathname);
   if (tool && isMemberTool(tool[3])) {
-    return { leagueId: Number(tool[1]), entryId: tool[2]!, search: place.search };
+    return { leagueId: Number(tool[1]), entryId: tool[2]!, search: planSearch(place.search) };
   }
   return null;
 }

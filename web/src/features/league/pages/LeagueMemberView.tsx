@@ -6,7 +6,7 @@ import {
 } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 
@@ -27,6 +27,11 @@ import { advisedFifteen } from "../device/whatIf";
 import { WhatIfPanel } from "../device/WhatIfPanel";
 import { MemberLiveWeekView } from "../live/MemberLiveWeek";
 import { useMemberLiveScore } from "../live/useMemberLiveScore";
+import { useLiveWindow } from "../live/useLiveWindow";
+import { useGoalReplay } from "../live/useGoalReplay";
+import { useBoardHold, useBoardMoments } from "../live/useBoardMoments";
+import type { LiveWindowFilter } from "../../liveScore/liveWindow";
+import { GoalMomentLayer } from "../../liveScore/GoalMoment";
 import { squadWithPlayedWeek } from "../live/memberLineup";
 import { whatIfBasis } from "../device/whatIfDraft";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
@@ -188,11 +193,54 @@ function LeagueMemberContent({
   // Past its deadline the week is closed: nothing is computed for it and none of its plans
   // can be applied, so the page leaves out what only changes or recomputes the plan.
   const closed = deadlinePassed !== null;
+  // While one of the live week's matches is played the page follows it, whichever week it
+  // shows: a goal by the member's players plays its moment on an open week's page too.
+  // What the member's latest live read said (their clubs, the matches still unfinished), kept
+  // while no read is made, so the window follows only their matches (the owner's decision 3).
+  const [matchFilter, setMatchFilter] = useState<LiveWindowFilter>({});
+  // The GOL replay opens from the address alone (`?replay=1`): it plays the member's live week's
+  // goals, assists and automatic substitutions one by one, so the board can be seen when no
+  // match is on.
+  const replaying = searchParams.get("replay") === "1";
+  const liveMatch = useLiveWindow(fixtures, matchFilter);
   const liveWeek = useMemberLiveScore(
     view,
     fixtures,
     liveDependencies,
-    closed && view.league_id === leagueId && (!tool || tool === "current-squad"),
+    (closed || liveMatch.open) &&
+      view.league_id === leagueId &&
+      (!tool || tool === "current-squad"),
+    // The replay stands in for the page's own reads: nothing follows while it plays.
+    replaying || !liveMatch.open ? null : liveMatch.gameweek,
+  );
+  if (liveWeek.matches !== null && liveWeek.matches !== matchFilter) {
+    setMatchFilter(liveWeek.matches);
+  }
+  // One GOL layer for the page and its tools, which share this mounted page: it stays as the
+  // member moves between them, so a moment already played never plays again on the way back.
+  const replay = useGoalReplay(
+    view,
+    fixtures,
+    liveDependencies,
+    replaying && view.league_id === leagueId,
+  );
+  const board = useBoardMoments(liveWeek, view.entry.entry_id);
+  // The live score holds the points of the board's queued moments until each one's run lands;
+  // the replay brings no real points, so it holds nothing.
+  const hold = useBoardHold(replaying ? null : board);
+  const goalBatch = replaying
+    ? replay === null
+      ? null
+      : { id: `replay:${replay.id}`, items: replay.items }
+    : board === null
+      ? null
+      : { id: `live:${board.id}`, items: board.items };
+  const goalMoments = (
+    <GoalMomentLayer
+      batch={goalBatch}
+      source={replaying ? "replay" : "live"}
+      onLanded={hold.landed}
+    />
   );
   const displayedSquad = closed ? squadWithPlayedWeek(view, liveWeek.shown?.lineup ?? null) : view;
   // With the service answering, a selection it computes and nobody published is not a
@@ -459,7 +507,33 @@ function LeagueMemberContent({
   if (tool !== undefined) {
     const page = tools[tool];
     return (
-      <div className={styles.layout}>
+      <>
+        {goalMoments}
+        <div className={styles.layout}>
+          <div className={styles.page}>
+            <MemberTopBar
+              squad={squad}
+              members={members}
+              fixtures={fixtures}
+              deadlinePassed={deadlinePassed}
+              now={now}
+            />
+            <section aria-labelledby="member-tool-title" className={styles.toolBody}>
+              <h2 className={styles.decisionTitle} id="member-tool-title">
+                {page.title}
+              </h2>
+              {page.body ?? <EmptyState title={copy.toolEmpty} />}
+            </section>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {goalMoments}
+      <div ref={arrival} className={styles.layout} data-rail={railPlacement}>
         <div className={styles.page}>
           <MemberTopBar
             squad={squad}
@@ -468,169 +542,154 @@ function LeagueMemberContent({
             deadlinePassed={deadlinePassed}
             now={now}
           />
-          <section aria-labelledby="member-tool-title" className={styles.toolBody}>
-            <h2 className={styles.decisionTitle} id="member-tool-title">
-              {page.title}
-            </h2>
-            {page.body ?? <EmptyState title={copy.toolEmpty} />}
-          </section>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div ref={arrival} className={styles.layout} data-rail={railPlacement}>
-      <div className={styles.page}>
-        <MemberTopBar
-          squad={squad}
-          members={members}
-          fixtures={fixtures}
-          deadlinePassed={deadlinePassed}
-          now={now}
-        />
-        {/* A phone's one column is long: the strip keeps its two parts a tap away, pinned
+          {/* A phone's one column is long: the strip keeps its two parts a tap away, pinned
             under the phone bar once the decision has been read past. Wider layouts pin the
             top bar instead and show more of the page at once. */}
-        {layout === "phone" ? <MemberSections /> : null}
+          {layout === "phone" ? <MemberSections /> : null}
 
-        {deadlinePassed !== null ? (
-          <p className={styles.deadlineNotice} role="status" data-testid="deadline-passed">
-            {COMPUTE_COPY[language].deadlinePassedTitle}
-          </p>
-        ) : null}
-        {/* The week being played (#1008), beside the notice that its deadline has passed. A
-            closed week leaves the plan's settings out, so the card adds nothing to the open
-            week's page. It needs the calendar for each club's id. */}
-        {deadlinePassed !== null && fixtures !== null && view.league_id === leagueId ? (
-          <MemberLiveWeekView squad={view} live={liveWeek} />
-        ) : null}
-
-        {/* What the member's last finished week came to, before what this week decides. */}
-        {lastWeek ? (
-          <LastWeekCard
-            result={lastWeek}
-            historyHref={
-              lastWeek.suggested !== null && view.league_id === leagueId && leagueId > 0
-                ? memberHistoryAddress(leagueId, entryId)
-                : null
-            }
-          />
-        ) : null}
-
-        <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
-          <div className={styles.decision} data-mark="decision">
-            <div className={styles.headingRow}>
-              <div className={styles.headingText}>
-                {/* Once the deadline has passed the page is the week being played, not a
-                    plan: the heading says so as a green mark with a pulsing light, and the
-                    settings' summary goes with the plan. */}
-                <h2
-                  className={styles.decisionTitle}
-                  id="entry-advice-title"
-                  data-live={closed || undefined}
-                >
-                  {closed ? <span className={styles.liveLight} aria-hidden="true" /> : null}
-                  {closed ? copy.liveWeek : copy.decisionTitle}
-                </h2>
-                {closed ? null : (
-                  <p className={styles.selectionSummary} data-testid="member-selection-summary">
-                    {selectionSummary}
-                  </p>
-                )}
-                {/* The settings now sit under the decision, so the way to them is named
-                    where the decision says which settings it was made under. A closed
-                    week has no settings to go to. */}
-                {closed ? null : (
-                  <a href="#plan-settings" className={styles.changePlan}>
-                    {copy.changePlan}
-                  </a>
-                )}
-                <p className={styles.echo} aria-live="polite">
-                  {echo}
-                </p>
-              </div>
-              {layout === "phone" ? null : apply}
-            </div>
-            {adviceLoading ? (
-              <EmptyState title={copy.loadingAdvice} />
-            ) : rivalsLoading ? (
-              <EmptyState title={copy.loadingRivals} />
-            ) : shown ? (
-              <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
-            ) : computeOnly && !rejectedContext ? null : closed &&
-              index?.menu === "device" ? null : ( // is to say. The card would only name a publication that never happens. // is no default plan to point at, and the squad and its score say what there // A device menu publishes no plan for any week: once the week is closed there
-              <MissingAdviceCard
-                issue={
-                  rejectedContext
-                    ? "context-mismatch"
-                    : rejectedUnreadable
-                      ? "unavailable"
-                      : (adviceIssue ??
-                        (selection.status !== "ready" ? selection.status : "not-computed"))
-                }
-                onRetry={
-                  adviceIssue === "index-error"
-                    ? onRetryIndex
-                    : rejectedContext ||
-                        rejectedUnreadable ||
-                        adviceIssue === "published-missing" ||
-                        adviceIssue === "unavailable"
-                      ? onRetryAdvice
-                      : undefined
-                }
-                // With no service to ask, Hesapla only reads this same document again, and a
-                // press being answered is not offered again.
-                canCompute={
-                  computeAvailable &&
-                  !closed &&
-                  computeService !== "static" &&
-                  job.state.phase !== "requesting" &&
-                  job.state.phase !== "waiting"
-                }
-                // The address the sidebar's own link lands on with no selection.
-                defaultPlan={
-                  closed
-                    ? leagueId > 0
-                      ? memberAddress(leagueId, entryId)
-                      : entryAddress(entryId)
-                    : undefined
-                }
-              />
-            )}
-            {layout === "phone" ? apply : null}
-          </div>
-          {squadArea}
-          {/* One team on its own (league 0) has no league address for its history. */}
-          {view.league_id === leagueId && leagueId > 0 ? (
-            <p className={styles.historyLink}>
-              <Link to={memberHistoryAddress(leagueId, entryId)}>
-                {messages.suggestionHistory.title}
-              </Link>
+          {deadlinePassed !== null ? (
+            <p className={styles.deadlineNotice} role="status" data-testid="deadline-passed">
+              {COMPUTE_COPY[language].deadlinePassedTitle}
             </p>
           ) : null}
-          {!adviceLoading && shown ? (
-            <>
-              {/* It sends the member to Hesapla, which a closed week does not have. */}
-              <NewInformationNotice
-                view={shown.envelope.payload}
-                latest={closed ? undefined : capabilities?.decisionInformation}
-              />
-              <AdviceDetails
-                shown={shown}
-                squad={squad}
-                rivalSquad={rivalSquad}
-                windowControl={windowControl}
-              />
-            </>
+          {/* The week being played (#1008), beside the notice that its deadline has passed. A
+            closed week leaves the plan's settings out, so the card adds nothing to the open
+            week's page. It needs the calendar for each club's id. */}
+          {deadlinePassed !== null && fixtures !== null && view.league_id === leagueId ? (
+            <MemberLiveWeekView
+              squad={view}
+              live={liveWeek}
+              held={hold.held}
+              waiting={hold.waiting}
+            />
           ) : null}
-        </section>
 
-        {/* Every setting in it changes or recomputes a plan the closed week cannot apply. */}
-        {closed ? null : planSettings}
+          {/* What the member's last finished week came to, before what this week decides. */}
+          {lastWeek ? (
+            <LastWeekCard
+              result={lastWeek}
+              historyHref={
+                lastWeek.suggested !== null && view.league_id === leagueId && leagueId > 0
+                  ? memberHistoryAddress(leagueId, entryId)
+                  : null
+              }
+            />
+          ) : null}
+
+          <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
+            <div className={styles.decision} data-mark="decision">
+              <div className={styles.headingRow}>
+                <div className={styles.headingText}>
+                  {/* Once the deadline has passed the page is the week being played, not a
+                    plan: the heading says so as a green mark with a pulsing light, and the
+                    settings' summary goes with the plan. */}
+                  <h2
+                    className={styles.decisionTitle}
+                    id="entry-advice-title"
+                    data-live={closed || undefined}
+                  >
+                    {closed ? <span className={styles.liveLight} aria-hidden="true" /> : null}
+                    {closed ? copy.liveWeek : copy.decisionTitle}
+                  </h2>
+                  {closed ? null : (
+                    <p className={styles.selectionSummary} data-testid="member-selection-summary">
+                      {selectionSummary}
+                    </p>
+                  )}
+                  {/* The settings now sit under the decision, so the way to them is named
+                    where the decision says which settings it was made under. A closed
+                    week has no settings to go to. */}
+                  {closed ? null : (
+                    <a href="#plan-settings" className={styles.changePlan}>
+                      {copy.changePlan}
+                    </a>
+                  )}
+                  <p className={styles.echo} aria-live="polite">
+                    {echo}
+                  </p>
+                </div>
+                {layout === "phone" ? null : apply}
+              </div>
+              {adviceLoading ? (
+                <EmptyState title={copy.loadingAdvice} />
+              ) : rivalsLoading ? (
+                <EmptyState title={copy.loadingRivals} />
+              ) : shown ? (
+                <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
+              ) : computeOnly && !rejectedContext ? null : closed &&
+                index?.menu === "device" ? null : ( // is to say. The card would only name a publication that never happens. // is no default plan to point at, and the squad and its score say what there // A device menu publishes no plan for any week: once the week is closed there
+                <MissingAdviceCard
+                  issue={
+                    rejectedContext
+                      ? "context-mismatch"
+                      : rejectedUnreadable
+                        ? "unavailable"
+                        : (adviceIssue ??
+                          (selection.status !== "ready" ? selection.status : "not-computed"))
+                  }
+                  onRetry={
+                    adviceIssue === "index-error"
+                      ? onRetryIndex
+                      : rejectedContext ||
+                          rejectedUnreadable ||
+                          adviceIssue === "published-missing" ||
+                          adviceIssue === "unavailable"
+                        ? onRetryAdvice
+                        : undefined
+                  }
+                  // With no service to ask, Hesapla only reads this same document again, and a
+                  // press being answered is not offered again.
+                  canCompute={
+                    computeAvailable &&
+                    !closed &&
+                    computeService !== "static" &&
+                    job.state.phase !== "requesting" &&
+                    job.state.phase !== "waiting"
+                  }
+                  // The address the sidebar's own link lands on with no selection.
+                  defaultPlan={
+                    closed
+                      ? leagueId > 0
+                        ? memberAddress(leagueId, entryId)
+                        : entryAddress(entryId)
+                      : undefined
+                  }
+                />
+              )}
+              {layout === "phone" ? apply : null}
+            </div>
+            {squadArea}
+            {/* One team on its own (league 0) has no league address for its history. */}
+            {view.league_id === leagueId && leagueId > 0 ? (
+              <p className={styles.historyLink}>
+                <Link to={memberHistoryAddress(leagueId, entryId)}>
+                  {messages.suggestionHistory.title}
+                </Link>
+              </p>
+            ) : null}
+            {!adviceLoading && shown ? (
+              <>
+                {/* It sends the member to Hesapla, which a closed week does not have. */}
+                <NewInformationNotice
+                  view={shown.envelope.payload}
+                  latest={closed ? undefined : capabilities?.decisionInformation}
+                />
+                <AdviceDetails
+                  shown={shown}
+                  squad={squad}
+                  rivalSquad={rivalSquad}
+                  windowControl={windowControl}
+                />
+              </>
+            ) : null}
+          </section>
+
+          {/* Every setting in it changes or recomputes a plan the closed week cannot apply. */}
+          {closed ? null : planSettings}
+        </div>
+        {railPlacement === "column" ? rail : null}
+        {railPlacement === "sheet" ? createPortal(rail, document.body) : null}
       </div>
-      {railPlacement === "column" ? rail : null}
-      {railPlacement === "sheet" ? createPortal(rail, document.body) : null}
-    </div>
+    </>
   );
 }

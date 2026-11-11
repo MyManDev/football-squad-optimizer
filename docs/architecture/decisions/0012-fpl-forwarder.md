@@ -185,6 +185,12 @@ starts refusing the forwarder's requests in a way the last good copy cannot cove
 to redistribute is obtained or refused; or if the device needs a field the contracts do not
 carry, which is a new contract version, not an edit.
 
+From 2026-11-11 a member page in view reads the live week once a minute while one of its
+member's players' matches is played (`week_live_v1`, "Read on page open"), so the request count
+grows with viewers and match minutes: about 60 requests an hour for each followed page, each
+counted by the Worker even when its cache answers. That is the growth to watch against the
+first trigger above.
+
 ## 2026-11-06: country leagues
 
 The owner requested Turkey (league 239) live this week. The forwarded standings limit is

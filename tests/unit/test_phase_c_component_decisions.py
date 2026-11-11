@@ -1,5 +1,6 @@
 """Tests for exact-key Phase C decision-level comparison."""
 
+import json
 from dataclasses import replace
 
 import pandas as pd
@@ -224,3 +225,56 @@ def test_a_development_handoff_is_admitted_only_under_its_named_contract() -> No
         development_contract=DEVELOPMENT_OOF_CONTRACT_VERSION,
     )
     assert phase_c_decision_comparison_to_dict(comparison)["component_base"]
+
+
+def test_card_participation_is_carried_and_both_scores_are_recorded() -> None:
+    control = _control()
+    # Player 15 is a starter candidate who played no minutes but was booked; under the
+    # official rule he participated, so no automatic substitution replaces him.
+    realized = control.realized_points.assign(
+        card_participation=[False] * 14 + [True],
+    )
+    booked = EvaluationFold(
+        fold_id=control.fold_id,
+        projections=control.projections,
+        realized_points=realized,
+        metadata=control.metadata,
+    )
+    rows = _handoff().rows.copy()
+    rows.loc[rows["player_id"].eq(15), ["appearance_target", "minutes_target"]] = [0, pd.NA]
+    rows.loc[rows["player_id"].eq(15), "points_target"] = pd.NA
+    handoff = replace(_handoff(), rows=rows)
+    outcomes = realized.copy()
+    outcomes.loc[outcomes["player_id"].eq(15), ["total_points", "minutes"]] = [-1.0, 0]
+    booked = EvaluationFold(
+        fold_id=booked.fold_id,
+        projections=booked.projections,
+        realized_points=outcomes,
+        metadata=booked.metadata,
+    )
+
+    comparison = evaluate_phase_c_component_decisions(
+        handoff, [booked], _config(), record_decisions=True
+    )
+
+    detail = comparison.decisions["2022-23-gw02"]
+    for arm in ("control", "component_base"):
+        decision = detail[arm]
+        assert len(decision["squad"]) == 15
+        assert len(decision["starting_xi"]) == 11
+        assert len(decision["bench_order"]) == 4
+        assert decision["solver_status"] in {"OPTIMAL", "FEASIBLE"}
+        assert decision["objective_value"] is not None
+        assert isinstance(decision["realized_score"], float)
+        assert isinstance(decision["realized_score_ignoring_cards"], float)
+    document = phase_c_decision_comparison_to_dict(comparison)
+    assert set(document["decisions"]) == {"2022-23-gw02"}
+    # Every recorded value is a plain Python scalar, so the document can be written as JSON.
+    assert json.loads(json.dumps(document["decisions"])) == document["decisions"]
+
+
+def test_without_the_card_column_the_decisions_block_is_absent() -> None:
+    comparison = evaluate_phase_c_component_decisions(_handoff(), [_control()], _config())
+
+    assert comparison.decisions == {}
+    assert "decisions" not in phase_c_decision_comparison_to_dict(comparison)

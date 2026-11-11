@@ -105,7 +105,11 @@ the vice is the named pending holder with zero extra points while his club remai
 incomplete, provided he is in the counted eleven. The holder is null only when
 that vice is outside the counted eleven or his club is complete with zero minutes.
 
-Read on page open or an explicit refresh only, without a timer. Source A's cache
+Read on page open, on an explicit refresh and, by the owner's decision of
+2026-11-11 (so a goal shows by itself), once a minute while the page is in view and
+one of the member's players' matches is being played (`liveWindow`); no other
+timer. No timed read comes within half a minute of the last read, and a first read
+that fails is made again after 1, 2, 4 and at most 8 minutes. Source A's cache
 is 60 seconds for the current unfinished week and until the next deadline for a
 finished week. When no valid source answers, show no card. Member labels in both
 languages carry the values and states without explanatory sentences.

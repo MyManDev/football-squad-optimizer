@@ -5,8 +5,13 @@ section of the paper is drafted here. This runner reads JSON records under `docs
 checked out (the Phase C candidate comparisons, the S1 and S2 calibration records of the
 component samplers and the two planning measurements the paper sits beside), fits nothing,
 measures nothing and opens no network connection. Every number in a table or figure file is a
-value of one record, or the difference of two values of one record, and the file names the
-record and the JSON pointer (RFC 6901) of each, so any cell can be checked against its record.
+value of one record, the difference of two values of one record, or an arithmetic summary of
+values of one record (an observation-weighted mean over seasons, a count of statuses, the
+sample standard deviation of per-fold differences, the two IID precision formulas of the
+instrument record and the repository's season-aware block bootstrap of per-fold differences
+at three block lengths); the file names the record and the JSON pointer (RFC 6901) of each, a
+derived cell's pointer starting with `derived:` and naming the pointers it combines, so any
+cell can be checked against its record.
 
     python -m scripts.paper_record_tables
     python -m scripts.paper_record_tables --output-dir /some/folder/outside/the/checkout
@@ -26,9 +31,13 @@ checkout only a folder under `artifacts/` is accepted) receives:
   the record's value unchanged;
 - `provenance.csv`: one row per table cell read from a record, with its record and pointer;
 - `figure_*.csv`: one row per plotted point, with the record and pointers on the row;
+- `decisions_solver_budget_cards.csv`: the re-evaluation record's fold-level decisions, one
+  row per table, budget, arm and fold (squad, starting eleven, bench order, captaincy, solver
+  status and work, objective and bound, the realized score under both scoring conventions);
 - `checks.csv`: arithmetic checks of each record against its own detail (a recorded mean
   against the mean of its folds or seeds, a recorded count against the count of its flags, a
-  gate flag against its recorded bounds, a pooled error against its seasons) and, in a git
+  gate flag against its recorded bounds, a pooled error against its seasons, every summary of
+  the re-evaluation record against its fold decisions, its intervals included) and, in a git
   checkout, of each record and of the extractor against the one committed at the checked-out
   commit, with the recomputed value beside the recorded one.
 
@@ -44,6 +53,7 @@ import csv
 import hashlib
 import io
 import json
+import random
 import statistics
 import subprocess
 import sys
@@ -73,6 +83,7 @@ BLOCK = "docs/research/team_match_block_sampler.json"
 JOINT = "docs/research/moe_sampler.json"
 RANK_SHRINKAGE = "docs/research/rank_conditional_shrinkage.json"
 MEAN_REVERSION = "docs/research/mean_reversion_discount.json"
+SOLVER_BUDGET = "docs/research/phase_c_solver_budget_cards.json"
 
 
 class RecordError(ValueError):
@@ -129,6 +140,7 @@ def _candidate(key: str, label: str, record: str, arm: str, prefix: str) -> Cand
 
 
 _V2 = "/decision_level_reading/v2_features_minus_linear"
+_V2B = "/decision_level_reading/v2_minus_v1_features"
 
 #: The five Phase C candidate records committed under docs/research, in the order they ran.
 CANDIDATES: tuple[Candidate, ...] = (
@@ -935,55 +947,6 @@ def sampler_folds(records: Records) -> tuple[list[dict[str, Cell]], list[Check]]
     return points, checks
 
 
-def _points_mae(records: Records, record: str, arm: str) -> dict[str, Cell]:
-    """An arm's points MAE pooled over every season of its comparison, then season by season
-    with the observations of each, so a plot can match the seasons of the decision folds."""
-
-    metrics = f"/comparison/metrics/{arm}"
-    cells = {
-        "points_mae_pooled_all_seasons": records.cell(
-            record, f"{metrics}/overall/points/mean_absolute_error"
-        )
-    }
-    for season in records.keys(record, f"{metrics}/by_season"):
-        at = f"{metrics}/by_season/{_escape(season)}/points"
-        cells[f"points_mae_{season}"] = records.cell(record, f"{at}/mean_absolute_error")
-        cells[f"points_observations_{season}"] = records.cell(record, f"{at}/observations")
-    return cells
-
-
-def mae_against_decision(records: Records) -> list[dict[str, Cell]]:
-    """One point per arm: points MAE against squad points on the decision folds, as recorded.
-
-    The pooled MAE covers every season of the comparison (2021-22 to 2025-26) and the squad
-    points only the decision seasons (2021-22 to 2024-25), so each season's MAE and
-    observations are on the row as well: their observation-weighted mean over the decision
-    seasons is the matched value (`checks.csv` shows that the pooled MAE is that mean over
-    every season)."""
-
-    first = CANDIDATES[0]
-    points = [
-        {
-            "arm": _label("Linear components"),
-            "squad_points_decision_folds": records.cell(
-                first.record, f"{first.linear_arm}/component_mean"
-            ),
-            **_points_mae(records, first.record, "control"),
-        }
-    ]
-    for candidate in CANDIDATES:
-        points.append(
-            {
-                "arm": _label(candidate.label),
-                "squad_points_decision_folds": records.cell(
-                    candidate.record, f"{candidate.candidate_arm}/component_mean"
-                ),
-                **_points_mae(records, candidate.record, "candidate"),
-            }
-        )
-    return points
-
-
 def pooled_mae_checks(records: Records) -> list[Check]:
     """Each arm's pooled points MAE and observations against its seasons."""
 
@@ -1041,27 +1004,636 @@ def decision_by_season(records: Records) -> list[dict[str, Cell]]:
     return rows
 
 
-def s2_counts(records: Records) -> list[dict[str, Cell]]:
+INSTRUMENT = "docs/measurement_instrument.json"
+#: The precision block of the instrument record: the component arm against the ridge control.
+INSTRUMENT_PRECISION = "/precision/covariates/0/unconditional_mean_precision"
+#: Standard normal quantiles of the instrument record's IID formulas: a 90% half-width is
+#: z(0.95) standard errors, a two-sided MDE at alpha 0.05 and power 0.8 is z(0.975) + z(0.8).
+Z_90 = 1.6448536269514722
+Z_MDE = 1.959963984540054 + 0.8416212335729143
+#: A derived cell's pointer starts with this and then says which pointers it combines.
+DERIVED = "derived: "
+
+#: Where a record pairs the candidate at the decision level against the same reference its
+#: player-level comparison uses, when that reference is not the linear arm: the wider feature
+#: contract's reference is the boosted pair on v1 features at both levels.
+SAME_REFERENCE_DECISION: dict[str, str] = {
+    "feature_contract_v2": "/decision_level_reading/v2_minus_v1_features",
+}
+
+
+def _decision_reference(records: Records, candidate: Candidate) -> tuple[Cell, Cell, Cell]:
+    """The decision mean and 90% interval against the candidate's player-level reference."""
+
+    prefix = SAME_REFERENCE_DECISION.get(candidate.key)
+    if prefix is None:
+        mean, interval = candidate.mean, candidate.interval
+    else:
+        mean, interval = f"{prefix}/mean", f"{prefix}/interval_90"
+    at = partial(records.cell, candidate.record)
+    return at(mean), at(f"{interval}/0"), at(f"{interval}/1")
+
+
+def _weighted_points_mae(records: Records, record: str, arm: str, seasons: Sequence[str]) -> Cell:
+    """An arm's points MAE over `seasons`, each season weighted by its observations."""
+
+    metrics = f"/comparison/metrics/{arm}/by_season"
+    weighted = 0.0
+    observations = 0
+    for season in seasons:
+        at = f"{metrics}/{_escape(season)}/points"
+        count = int(records.cell(record, f"{at}/observations").value)
+        weighted += float(records.cell(record, f"{at}/mean_absolute_error").value) * count
+        observations += count
+    if not observations:
+        raise RecordError(f"{record}: no points observations over {', '.join(seasons)}")
+    return Cell(
+        weighted / observations,
+        record,
+        f"{DERIVED}observation-weighted mean over {','.join(seasons)} of "
+        f"{metrics}/<season>/points/mean_absolute_error",
+    )
+
+
+def _season_points(
+    records: Records, record: str, arm: str, seasons: Sequence[str]
+) -> list[tuple[str, int, dict[str, float]]]:
+    """Each season's points block: its pointer, observations and the three error metrics."""
+
+    blocks = []
+    for season in seasons:
+        at = f"/comparison/metrics/{arm}/by_season/{_escape(season)}/points"
+        count = int(records.cell(record, f"{at}/observations").value)
+        values = {
+            name: float(records.cell(record, f"{at}/{name}").value)
+            for name in ("mean_absolute_error", "root_mean_squared_error", "mean_error")
+        }
+        blocks.append((at, count, values))
+    if not sum(count for _, count, _ in blocks):
+        raise RecordError(f"{record}: no points observations over {', '.join(seasons)}")
+    return blocks
+
+
+def _weighted_points_rmse(records: Records, record: str, arm: str, seasons: Sequence[str]) -> Cell:
+    """An arm's points RMSE over `seasons`: the root of the observation-weighted mean of
+    each season's squared RMSE, which is the RMSE over the seasons' rows together."""
+
+    blocks = _season_points(records, record, arm, seasons)
+    total = sum(count for _, count, _ in blocks)
+    mean_square = sum(v["root_mean_squared_error"] ** 2 * n for _, n, v in blocks) / total
+    return Cell(
+        mean_square**0.5,
+        record,
+        f"{DERIVED}root of the observation-weighted mean of the squared "
+        f"/comparison/metrics/{arm}/by_season/<season>/points/root_mean_squared_error over "
+        f"{','.join(seasons)}",
+    )
+
+
+def _weighted_points_mean_error(
+    records: Records, record: str, arm: str, seasons: Sequence[str]
+) -> Cell:
+    blocks = _season_points(records, record, arm, seasons)
+    total = sum(count for _, count, _ in blocks)
+    return Cell(
+        sum(v["mean_error"] * n for _, n, v in blocks) / total,
+        record,
+        f"{DERIVED}observation-weighted mean over {','.join(seasons)} of "
+        f"/comparison/metrics/{arm}/by_season/<season>/points/mean_error",
+    )
+
+
+def same_period_table(records: Records) -> Table:
+    """Each candidate's accuracy and decision readings over the same seasons and reference."""
+
+    columns = (
+        "candidate",
+        "reference_arm",
+        "decision_seasons",
+        "reference_decision_season_points_mae",
+        "candidate_decision_season_points_mae",
+        "decision_season_paired_difference",
+        "reference_decision_season_points_rmse",
+        "candidate_decision_season_points_rmse",
+        "reference_decision_season_points_mean_error",
+        "candidate_decision_season_points_mean_error",
+        "reference_pooled_points_rmse",
+        "candidate_pooled_points_rmse",
+        "candidate_minus_reference_decision_mean",
+        "interval_90_low",
+        "interval_90_high",
+    )
+    rows = []
+    for candidate in CANDIDATES:
+        at = partial(records.cell, candidate.record)
+        seasons = records.keys(candidate.record, candidate.by_season)
+        reference, low, high = _decision_reference(records, candidate)
+        control = _weighted_points_mae(records, candidate.record, "control", seasons)
+        mine = _weighted_points_mae(records, candidate.record, "candidate", seasons)
+        row = {
+            "candidate": _label(candidate.label),
+            "reference_arm": at("/comparison/arms/control/name"),
+            "decision_seasons": _label(f"{seasons[0]} to {seasons[-1]}"),
+            "reference_decision_season_points_mae": control,
+            "candidate_decision_season_points_mae": mine,
+            "decision_season_paired_difference": Cell(
+                float(control.value) - float(mine.value),
+                candidate.record,
+                f"{DERIVED}reference minus candidate of the two weighted means",
+            ),
+            "candidate_minus_reference_decision_mean": reference,
+            "interval_90_low": low,
+            "interval_90_high": high,
+        }
+        for side, arm in (("reference", "control"), ("candidate", "candidate")):
+            overall = f"/comparison/metrics/{arm}/overall/points"
+            row[f"{side}_pooled_points_rmse"] = at(f"{overall}/root_mean_squared_error")
+            row[f"{side}_decision_season_points_rmse"] = _weighted_points_rmse(
+                records, candidate.record, arm, seasons
+            )
+            row[f"{side}_decision_season_points_mean_error"] = _weighted_points_mean_error(
+                records, candidate.record, arm, seasons
+            )
+        rows.append(row)
+    return Table(
+        "table_candidates_same_period",
+        "Each candidate against the reference arm of its own record on the seasons of the "
+        "decision folds: the points MAE of both arms over those seasons (each recorded season "
+        "weighted by its observations), the paired difference as reference minus candidate, "
+        "both arms' points RMSE and mean error (prediction minus realized) over the same "
+        "seasons, their pooled RMSE over every recorded season, and the decision reading "
+        "against the same reference (the wider contract against the boosted pair at both "
+        "levels)",
+        columns,
+        rows,
+    )
+
+
+def _fold_differences(records: Records, candidate: Candidate) -> list[tuple[str, float]]:
+    candidate_folds = f"{candidate.candidate_arm}/folds"
+    linear_folds = f"{candidate.linear_arm}/folds"
+    return [
+        (
+            fold,
+            float(records.cell(candidate.record, f"{candidate_folds}/{_escape(fold)}").value)
+            - float(records.cell(candidate.record, f"{linear_folds}/{_escape(fold)}").value),
+        )
+        for fold in records.keys(candidate.record, candidate_folds)
+    ]
+
+
+def precision_table(records: Records) -> Table:
+    """The IID precision diagnostics of each candidate's paired decision reading.
+
+    The instrument record measured a 90% half-width and a minimal detectable effect for one
+    comparison, the component arm against the ridge control, treating folds as independent.
+    The same two formulas are applied here to each candidate's recorded per-fold differences,
+    with the sample standard deviation, and the instrument row is read from its record so the
+    formulas can be checked against it. Leave-one-season-out means are the mean of the other
+    seasons' folds. All of it is descriptive: folds overlap in squads and weeks.
+    """
+
+    seasons = sorted(
+        {
+            fold[:7]
+            for candidate in (*CANDIDATES, WIDER_VS_BOOSTED)
+            for fold in records.keys(candidate.record, f"{candidate.candidate_arm}/folds")
+        }
+    )
+    columns = (
+        "comparison",
+        "paired_folds",
+        "mean",
+        "standard_deviation",
+        "iid_90_interval_half_width",
+        "iid_mde_alpha_0_05_power_0_8",
+        *(f"leave_out_{season}_mean" for season in seasons),
+    )
+    rows = []
+    for candidate in (*CANDIDATES, WIDER_VS_BOOSTED):
+        differences = _fold_differences(records, candidate)
+        values = [value for _, value in differences]
+        count = len(values)
+        deviation = statistics.stdev(values) if count > 1 else float("nan")
+        error = deviation / count**0.5
+        folds = f"{candidate.candidate_arm}/folds/<fold> - {candidate.linear_arm}/folds/<fold>"
+        label = (
+            candidate.label
+            if " vs " in candidate.label
+            else f"{candidate.label} vs linear components"
+        )
+        row = {
+            "comparison": _label(label),
+            "paired_folds": records.cell(candidate.record, candidate.paired_folds),
+            "mean": Cell(statistics.fmean(values), candidate.record, f"{DERIVED}mean of {folds}"),
+            "standard_deviation": Cell(
+                deviation, candidate.record, f"{DERIVED}sample standard deviation of {folds}"
+            ),
+            "iid_90_interval_half_width": Cell(
+                Z_90 * error,
+                candidate.record,
+                f"{DERIVED}{Z_90:.6f} x standard deviation / sqrt(folds) of {folds}",
+            ),
+            "iid_mde_alpha_0_05_power_0_8": Cell(
+                Z_MDE * error,
+                candidate.record,
+                f"{DERIVED}{Z_MDE:.6f} x standard deviation / sqrt(folds) of {folds}",
+            ),
+        }
+        for season in seasons:
+            rest = [value for fold, value in differences if fold[:7] != season]
+            if rest:
+                row[f"leave_out_{season}_mean"] = Cell(
+                    statistics.fmean(rest),
+                    candidate.record,
+                    f"{DERIVED}mean of {folds} over the folds not in {season}",
+                )
+        rows.append(row)
+    at = partial(records.cell, INSTRUMENT)
+    rows.append(
+        {
+            "comparison": _label("Linear components vs ridge control (instrument record)"),
+            "paired_folds": at(f"{INSTRUMENT_PRECISION}/folds"),
+            "mean": at(f"{INSTRUMENT_PRECISION}/mean"),
+            "standard_deviation": at(f"{INSTRUMENT_PRECISION}/standard_deviation"),
+            "iid_90_interval_half_width": at(f"{INSTRUMENT_PRECISION}/iid_90_interval_half_width"),
+            "iid_mde_alpha_0_05_power_0_8": at(
+                f"{INSTRUMENT_PRECISION}/iid_mde_alpha_0_05_power_0_8"
+            ),
+        }
+    )
+    return Table(
+        "table_candidates_precision",
+        "IID precision diagnostics of each paired decision reading, by the two formulas of the "
+        "instrument record (90% half-width z(0.95) x sd / sqrt(folds); two-sided MDE at alpha "
+        "0.05 and power 0.8, (z(0.975) + z(0.8)) x sd / sqrt(folds)), with the sample standard "
+        "deviation of the recorded per-fold differences, and the mean over the folds of the "
+        "other seasons when one season is left out; the last row is the instrument record's "
+        "own reading of the linear components against the ridge control. Folds overlap in "
+        "squads and weeks, so these are descriptive approximations that ignore dependence, "
+        "not bounds and not gates",
+        columns,
+        rows,
+    )
+
+
+def precision_checks(records: Records) -> list[Check]:
+    """The instrument record's half-width and MDE against the formulas applied here."""
+
+    at = partial(records.cell, INSTRUMENT)
+    folds = int(at(f"{INSTRUMENT_PRECISION}/folds").value)
+    deviation = float(at(f"{INSTRUMENT_PRECISION}/standard_deviation").value)
+    error = deviation / folds**0.5
+    checks = []
+    for name, factor, column in (
+        ("90% half-width", Z_90, "iid_90_interval_half_width"),
+        ("MDE", Z_MDE, "iid_mde_alpha_0_05_power_0_8"),
+    ):
+        recorded = at(f"{INSTRUMENT_PRECISION}/{column}")
+        checks.append(
+            Check(
+                f"instrument record: the {name} equals its IID formula on the recorded "
+                "standard deviation and folds",
+                INSTRUMENT,
+                recorded.pointer,
+                recorded.value,
+                factor * error,
+                abs(float(recorded.value) - factor * error) <= 1e-6,
+            )
+        )
+    return checks
+
+
+#: The wider contract against the boosted pair on v1 features: the same reference as its
+#: player-level comparison, at the decision level.
+WIDER_VS_BOOSTED = Candidate(
+    key="feature_contract_v2_vs_boosted",
+    label="Boosted pair, v2 feature contract vs boosted pair",
+    record=FEATURES_V2,
+    paired_folds=f"{_V2B}/paired_folds",
+    mean=f"{_V2B}/mean",
+    median=f"{_V2B}/median",
+    interval=f"{_V2B}/interval_90",
+    wins_ties_losses=f"{_V2B}/wins_ties_losses",
+    by_season=f"{_V2B}/by_season_mean",
+    candidate_arm="/decision_level_reading/arms/gbm_v2_features",
+    linear_arm="/decision_level_reading/arms/gbm_v1_features",
+)
+
+#: The bootstrap of `squadopt.evaluation.statistics`, as the records describe it: moving blocks
+#: within a season, a seed derived from a candidate id, percentile interval.
+BOOTSTRAP_RESAMPLES = 5000
+BOOTSTRAP_SEED = 0
+BOOTSTRAP_CONFIDENCE = 0.9
+BLOCK_LENGTHS = (2, 4, 8)
+#: The id this extractor seeds its own resamples with; a record's own id reproduces its
+#: interval exactly where the record names one.
+PAPER_BOOTSTRAP_ID = "paper_block_sensitivity"
+
+
+def _bootstrap_seed(base_seed: int, candidate_id: str) -> int:
+    digest = hashlib.sha256(candidate_id.encode("utf-8")).hexdigest()
+    return base_seed + int(digest[:8], 16)
+
+
+def _percentile(values: list[float], probability: float) -> float:
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * probability
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] + fraction * (ordered[upper] - ordered[lower])
+
+
+def block_interval(
+    differences: Sequence[tuple[str, float]], block_length: int, candidate_id: str
+) -> tuple[float, float]:
+    """The season-aware moving-block percentile interval of the repository's helper.
+
+    `differences` pairs each fold's season with its paired difference, in fold order. Blocks
+    are resampled within a season and never across one; the generator is seeded from the
+    candidate id as the helper seeds it, so a record's own id reproduces its interval.
+    """
+
+    grouped: dict[str, list[int]] = {}
+    for index, (season, _) in enumerate(differences):
+        grouped.setdefault(season, []).append(index)
+    generator = random.Random(_bootstrap_seed(BOOTSTRAP_SEED, candidate_id))
+    means = []
+    for _ in range(BOOTSTRAP_RESAMPLES):
+        sample: list[int] = []
+        for season in sorted(grouped):
+            indices = grouped[season]
+            length = min(block_length, len(indices))
+            starts = len(indices) - length + 1
+            season_sample: list[int] = []
+            while len(season_sample) < len(indices):
+                start = generator.randrange(starts)
+                season_sample.extend(indices[start : start + length])
+            sample.extend(season_sample[: len(indices)])
+        means.append(statistics.fmean(differences[index][1] for index in sample))
+    alpha = (1.0 - BOOTSTRAP_CONFIDENCE) / 2.0
+    return _percentile(means, alpha), _percentile(means, 1.0 - alpha)
+
+
+def _recorded_bootstrap_id(records: Records, candidate: Candidate) -> Cell | None:
+    """The bootstrap id a record names for this comparison, at whichever key it uses.
+
+    The regime record keeps `interval_candidate_id` at the top of the reading, the mixture
+    record `interval_method/candidate_id`, and the wider-contract record one id per
+    comparison under `policy/candidate_ids`; the boosted-pair and points-only records name
+    none.
+    """
+
+    block = candidate.mean.rsplit("/", 1)[0]
+    for pointer in (
+        f"{DECISION}/interval_candidate_id",
+        f"{DECISION}/interval_method/candidate_id",
+        f"{DECISION}/policy/candidate_ids/{_escape(block.rsplit('/', 1)[1])}",
+    ):
+        cell = records.optional(candidate.record, pointer)
+        if cell is not None and isinstance(cell.value, str):
+            return cell
+    return None
+
+
+def block_sensitivity_table(records: Records) -> tuple[Table, list[Check]]:
+    """Each paired decision reading's interval at three block lengths, beside the recorded one."""
+
+    columns = (
+        "comparison",
+        "paired_folds",
+        "mean",
+        "recorded_interval_low",
+        "recorded_interval_high",
+        "recorded_block_length",
+        *(f"block_{length}_{side}" for length in BLOCK_LENGTHS for side in ("low", "high")),
+        "bootstrap_id",
+    )
+    rows = []
+    checks = []
+    for candidate in (*CANDIDATES, WIDER_VS_BOOSTED):
+        record = candidate.record
+        differences = [(fold[:7], value) for fold, value in _fold_differences(records, candidate)]
+        folds = f"{candidate.candidate_arm}/folds/<fold> - {candidate.linear_arm}/folds/<fold>"
+        recorded_id = _recorded_bootstrap_id(records, candidate)
+        bootstrap_id = str(recorded_id.value) if recorded_id is not None else PAPER_BOOTSTRAP_ID
+        row = {
+            "comparison": _label(candidate.label),
+            "paired_folds": records.cell(record, candidate.paired_folds),
+            "mean": Cell(
+                statistics.fmean(value for _, value in differences),
+                record,
+                f"{DERIVED}mean of {folds}",
+            ),
+            "recorded_interval_low": records.cell(record, f"{candidate.interval}/0"),
+            "recorded_interval_high": records.cell(record, f"{candidate.interval}/1"),
+            "recorded_block_length": _label("4"),
+        }
+        for length in BLOCK_LENGTHS:
+            low, high = block_interval(differences, length, bootstrap_id)
+            pointer = (
+                f"{DERIVED}season-aware moving-block bootstrap of {folds}: blocks of {length}, "
+                f"{BOOTSTRAP_RESAMPLES} resamples, seed {BOOTSTRAP_SEED} with id {bootstrap_id}, "
+                f"{BOOTSTRAP_CONFIDENCE:.0%} percentile interval"
+            )
+            row[f"block_{length}_low"] = Cell(low, record, pointer)
+            row[f"block_{length}_high"] = Cell(high, record, pointer)
+            if length == 4 and recorded_id is not None:
+                recorded = (
+                    float(row["recorded_interval_low"].value),
+                    float(row["recorded_interval_high"].value),
+                )
+                checks.append(
+                    Check(
+                        f"{candidate.key}: the recorded interval is reproduced at blocks of 4 "
+                        "with the record's bootstrap id",
+                        record,
+                        candidate.interval,
+                        list(recorded),
+                        [low, high],
+                        abs(recorded[0] - low) <= FOLD_TOLERANCE
+                        and abs(recorded[1] - high) <= FOLD_TOLERANCE,
+                    )
+                )
+        row["bootstrap_id"] = recorded_id if recorded_id is not None else _label(PAPER_BOOTSTRAP_ID)
+        rows.append(row)
+    table = Table(
+        "table_candidates_block_sensitivity",
+        "Sensitivity of each paired decision reading's 90% interval to the bootstrap block "
+        "length: the recorded interval (blocks of 4) beside intervals recomputed here from the "
+        "recorded per-fold differences at blocks of 2, 4 and 8 with the repository's "
+        "season-aware moving-block procedure (5,000 resamples, seed 0). Where a record names "
+        "its bootstrap id (the regime, mixture and wider-contract records) the block-4 interval "
+        "reproduces the recorded one exactly and checks.csv says so; the boosted-pair and "
+        "points-only records name none, so there the id is this extractor's own and the "
+        "block-4 interval differs from the recorded one by the random stream alone",
+        columns,
+        rows,
+    )
+    return table, checks
+
+
+def solver_status_table(records: Records) -> Table:
+    """Solver status counts where a record holds them, and the split of one reading by status."""
+
+    columns = (
+        "record",
+        "arm",
+        "scope",
+        "folds",
+        "optimal",
+        "feasible",
+        "candidate_minus_linear_mean",
+        "wins",
+        "ties",
+        "losses",
+    )
+    rows: list[dict[str, Cell]] = []
+    frozen_folds = "/decision_comparison/folds"
+    count = records.length(FROZEN_EVALUATION, frozen_folds)
+    for arm, column in (
+        ("component base", "component_solver_status"),
+        ("ridge control", "control_solver_status"),
+    ):
+        statuses = [
+            str(records.cell(FROZEN_EVALUATION, f"{frozen_folds}/{index}/{column}").value)
+            for index in range(count)
+        ]
+        row = {
+            "record": _label(FROZEN_EVALUATION),
+            "arm": _label(arm),
+            "scope": _label("frozen v1 evaluation, ten-second limit"),
+            "folds": Cell(count, FROZEN_EVALUATION, f"{DERIVED}length of {frozen_folds}"),
+        }
+        for status in ("OPTIMAL", "FEASIBLE"):
+            row[status.lower()] = Cell(
+                statuses.count(status),
+                FROZEN_EVALUATION,
+                f"{DERIVED}count of {frozen_folds}/<fold>/{column} equal to {status}",
+            )
+        rows.append(row)
+    arms = f"{DECISION}/arms"
+    for arm, block in (
+        ("linear components", f"{arms}/linear/component_solver_status_counts"),
+        ("ridge control", f"{arms}/linear/ridge_control_solver_status_counts"),
+        (
+            "points-only boosting",
+            f"{arms}/gradient_boosting_points/component_solver_status_counts",
+        ),
+    ):
+        row = {
+            "record": _label(GBM_POINTS),
+            "arm": _label(arm),
+            "scope": _label("decision folds, deterministic budget 5.0"),
+            "folds": records.cell(GBM_POINTS, f"{DECISION}/paired_folds"),
+        }
+        for status in ("OPTIMAL", "FEASIBLE"):
+            cell = records.optional(GBM_POINTS, f"{block}/{status}")
+            row[status.lower()] = (
+                cell
+                if cell is not None
+                else Cell(0, GBM_POINTS, f"{DERIVED}no {status} key under {block}")
+            )
+        rows.append(row)
+    split = f"{DECISION}/added_after_the_result/by_linear_solver_status"
+    for status in records.keys(GBM_POINTS, split):
+        at = f"{split}/{_escape(status)}"
+        rows.append(
+            {
+                "record": _label(GBM_POINTS),
+                "arm": _label("points-only boosting minus linear components"),
+                "scope": _label(f"folds the linear arm ended {status}, added after the result"),
+                "folds": records.cell(GBM_POINTS, f"{at}/folds"),
+                "candidate_minus_linear_mean": records.cell(
+                    GBM_POINTS, f"{at}/candidate_minus_linear_mean"
+                ),
+                "wins": records.cell(GBM_POINTS, f"{at}/wins_ties_losses/0"),
+                "ties": records.cell(GBM_POINTS, f"{at}/wins_ties_losses/1"),
+                "losses": records.cell(GBM_POINTS, f"{at}/wins_ties_losses/2"),
+            }
+        )
+    return Table(
+        "table_solver_status",
+        "Solver status of the decision solves where a record holds it: the frozen v1 evaluation "
+        "(counted over its per-fold statuses) and the points-only boosting record (its per-arm "
+        "counts, and its paired reading split by the linear arm's status). The boosted pair, "
+        "wider contract, regime and mixture records hold no per-arm status counts",
+        columns,
+        rows,
+    )
+
+
+def sampler_season_table(records: Records) -> Table:
+    columns = (
+        "sampler",
+        "record",
+        "arm",
+        "season",
+        "fold_count",
+        "mean_pit",
+        "mean_pit_within_s1_bounds",
+        "below_q10_count",
+        "below_q10_rate",
+        "tail_rate_within_s2_bounds",
+    )
     rows = []
     for sampler, record, arm, _ in SAMPLER_ARMS:
-        scopes: list[tuple[str, str]] = [("pooled", arm)]
-        if arm != "/verdict":
-            scopes += [
-                (season, f"{arm}/seasons/{_escape(season)}")
-                for season in records.keys(record, f"{arm}/seasons")
-            ]
-        for scope, at in scopes:
+        if arm == "/verdict":
+            continue
+        for season in records.keys(record, f"{arm}/seasons"):
+            at = partial(records.cell, record)
+            season_at = f"{arm}/seasons/{_escape(season)}"
             rows.append(
                 {
                     "sampler": _label(sampler),
+                    "record": _label(record),
                     "arm": _label(arm),
-                    "scope": _label(scope),
-                    "fold_count": records.cell(record, f"{at}/fold_count"),
-                    "below_q10_count": records.cell(
-                        record, f"{at}/realized_below_lower_quantile_count"
-                    ),
+                    "season": _label(season),
+                    "fold_count": at(f"{season_at}/fold_count"),
+                    "mean_pit": at(f"{season_at}/mean_probability_integral_transform"),
+                    "mean_pit_within_s1_bounds": at(f"{season_at}/mean_pit_within_s1_bounds"),
+                    "below_q10_count": at(f"{season_at}/realized_below_lower_quantile_count"),
+                    "below_q10_rate": at(f"{season_at}/realized_below_lower_quantile_rate"),
+                    "tail_rate_within_s2_bounds": at(f"{season_at}/tail_rate_within_s2_bounds"),
                 }
             )
+    return Table(
+        "table_sampler_calibration_by_season",
+        "Season readings of every sampler arm whose record holds them (the binding foundation "
+        "record holds pooled readings only): mean PIT and lower-tail count by season, with the "
+        "record's own flags against the S1 and S2 bands, descriptive",
+        columns,
+        rows,
+    )
+
+
+def accuracy_against_decision(records: Records) -> list[dict[str, Cell]]:
+    """One row per candidate: both arms' points MAE and observations by season, as recorded,
+    and the decision reading against the same reference arm.
+
+    The figure weights each season's MAE by its observations over the decision seasons (read
+    from `figure_decision_by_season.csv`), so the accuracy and the decision axes cover the same
+    folds and the same pair of arms."""
+
+    rows = []
+    for candidate in CANDIDATES:
+        at = partial(records.cell, candidate.record)
+        reference, low, high = _decision_reference(records, candidate)
+        row = {
+            "candidate": _label(candidate.label),
+            "reference_arm": at("/comparison/arms/control/name"),
+        }
+        for side, arm in (("reference", "control"), ("candidate", "candidate")):
+            metrics = f"/comparison/metrics/{arm}/by_season"
+            for season in records.keys(candidate.record, metrics):
+                season_at = f"{metrics}/{_escape(season)}/points"
+                row[f"{side}_points_mae_{season}"] = at(f"{season_at}/mean_absolute_error")
+                row[f"{side}_points_observations_{season}"] = at(f"{season_at}/observations")
+        row["candidate_minus_reference_decision_mean"] = reference
+        row["interval_90_low"] = low
+        row["interval_90_high"] = high
+        rows.append(row)
     return rows
 
 
@@ -1169,6 +1741,731 @@ def extractor_digest() -> Digest:
         raise RecordError(f"{EXTRACTOR}: the extractor run cannot be read ({error})") from error
 
 
+#: The re-evaluated tables of the solver-budget record, with the label each row carries.
+BUDGET_TABLES = (
+    ("linear_dec", "linear components"),
+    ("gbm_v1_dec", "boosted pair (v1 features)"),
+    ("gbm_v2_dec", "wider contract (v2 features)"),
+)
+#: Its two paired readings, with the label each row carries.
+BUDGET_PAIRS = (
+    ("boosted_pair_vs_linear", "boosted pair minus linear components"),
+    ("wider_contract_vs_boosted_pair", "wider contract minus boosted pair"),
+)
+
+
+def solver_budget_table(records: Records) -> tuple[Table, list[Check]]:
+    """The solver-budget record: per re-evaluated table, how many of the recorded fold scores the
+    rerun at the measurement budget reproduced when cards are ignored, the solver statuses of the
+    folds that differ and of each rerun at each budget present, how many folds the official card
+    rule moved; per table and arm, what the second budget changed against the first (squads,
+    starting elevens, captains, objective, the gap to the bound the first budget left, realized
+    score); per pair, the paired reading under the official rule and the squad overlap at each
+    budget.
+
+    Checks: the reproduced and differing folds of each table add up to the folds compared; at
+    the second budget each arm's proven count in the budget block equals the one in its arm
+    summary, and the budget block's mean score change times its folds equals the difference of
+    the two arm means; a pair whose two tables the card rule left untouched has the same paired
+    mean under both scoring conventions at each budget.
+    """
+
+    columns = (
+        "comparison",
+        "scope",
+        "folds",
+        "reproduced",
+        "differing_feasible",
+        "optimal",
+        "feasible",
+        "card_rule_folds_changed",
+        "mean",
+        "interval_low",
+        "interval_high",
+        "wins",
+        "ties",
+        "losses",
+        "shared_squad_of_15",
+        "shared_starters_of_11",
+        "same_captain_folds",
+        "identical_squad_folds",
+        "tied_folds",
+        "tied_identical_squads",
+        "squad_changed",
+        "xi_changed",
+        "captain_changed",
+        "objective_gain_mean",
+        "objective_gain_max",
+        "gap_to_bound_mean",
+        "gap_to_bound_max",
+        "score_change_folds",
+        "score_change_mean",
+        "proven_both",
+        "proven_both_squad_changed",
+    )
+    at = partial(records.cell, SOLVER_BUDGET)
+    budgets = [str(value) for value in at("/budgets_present").value]
+    base = budgets[0]
+    second = budgets[1] if len(budgets) > 1 else None
+
+    def count(pointer: str, status: str) -> Cell:
+        cell = records.optional(SOLVER_BUDGET, f"{pointer}/{status}")
+        return cell or Cell(0, SOLVER_BUDGET, f"{DERIVED}no {status} key under {pointer}")
+
+    def maybe(pointer: str, absent: str) -> Cell:
+        cell = records.optional(SOLVER_BUDGET, pointer)
+        if cell is None or cell.value is None:
+            return Cell("", SOLVER_BUDGET, f"{DERIVED}{absent}")
+        return cell
+
+    rows: list[dict[str, Cell]] = []
+    checks: list[Check] = []
+    changed: dict[tuple[str, str], int] = {}
+    arms = (("candidate", "{label}"), ("ridge_control", "ridge control beside the {label}"))
+    for name, label in BUDGET_TABLES:
+        block = f"/reproduction_at_5_0/{name}"
+        compared = int(at(f"{block}/folds_compared").value)
+        reproduced = int(at(f"{block}/folds_reproduced").value)
+        differing = len(records.keys(SOLVER_BUDGET, f"{block}/folds_differing"))
+        rows.append(
+            {
+                "comparison": _label(label),
+                "scope": _label(f"rerun at deterministic budget {base} against its record"),
+                "folds": at(f"{block}/folds_compared"),
+                "reproduced": at(f"{block}/folds_reproduced"),
+                "differing_feasible": count(f"{block}/differing_rerun_statuses", "FEASIBLE"),
+                "optimal": at(f"{block}/rerun_statuses/OPTIMAL"),
+                "feasible": count(f"{block}/rerun_statuses", "FEASIBLE"),
+            }
+        )
+        checks.append(
+            Check(
+                f"{name}: the reproduced and differing folds add up to the folds compared",
+                SOLVER_BUDGET,
+                f"{block}/folds_compared",
+                compared,
+                reproduced + differing,
+                compared == reproduced + differing,
+            )
+        )
+        for budget in budgets:
+            cards = at(f"/card_rule/{name}_b{budget}/folds_changed_by_the_card_rule")
+            changed[(name, budget)] = int(cards.value)
+            for arm, pattern in arms:
+                summary = f"/arms/{name}_b{budget}/{arm}"
+                rows.append(
+                    {
+                        "comparison": _label(pattern.format(label=label)),
+                        "scope": _label(f"rerun at deterministic budget {budget}"),
+                        "folds": at(f"{summary}/folds"),
+                        "optimal": at(f"{summary}/statuses/OPTIMAL"),
+                        "feasible": count(f"{summary}/statuses", "FEASIBLE"),
+                        "card_rule_folds_changed": cards
+                        if arm == "candidate"
+                        else at(
+                            f"/card_rule/{name}_b{budget}/ridge_control"
+                            "/folds_changed_by_the_card_rule"
+                        ),
+                        "mean": at(f"{summary}/mean_realized_score"),
+                    }
+                )
+        if second is None:
+            continue
+        for arm, pattern in arms:
+            budget_block = f"/budget/{name}/{arm}"
+            summary_low = f"/arms/{name}_b{base}/{arm}"
+            summary_high = f"/arms/{name}_b{second}/{arm}"
+            folds = int(at(f"{budget_block}/folds").value)
+            rows.append(
+                {
+                    "comparison": _label(pattern.format(label=label)),
+                    "scope": _label(f"from deterministic budget {base} to {second}"),
+                    "folds": at(f"{budget_block}/folds"),
+                    "optimal": at(f"{budget_block}/status_counts_high/OPTIMAL"),
+                    "feasible": count(f"{budget_block}/status_counts_high", "FEASIBLE"),
+                    "squad_changed": at(f"{budget_block}/squad_changed_folds"),
+                    "xi_changed": at(f"{budget_block}/starting_xi_changed_folds"),
+                    "captain_changed": at(f"{budget_block}/captain_changed_folds"),
+                    "objective_gain_mean": maybe(
+                        f"{budget_block}/objective_gain_mean", "no fold with both objectives"
+                    ),
+                    "objective_gain_max": maybe(
+                        f"{budget_block}/objective_gain_max", "no fold with both objectives"
+                    ),
+                    "gap_to_bound_mean": maybe(
+                        f"{budget_block}/low_budget_feasible_gap_to_bound_mean",
+                        f"no unproven fold at budget {base}",
+                    ),
+                    "gap_to_bound_max": maybe(
+                        f"{budget_block}/low_budget_feasible_gap_to_bound_max",
+                        f"no unproven fold at budget {base}",
+                    ),
+                    "score_change_folds": at(f"{budget_block}/realized_score_change_folds"),
+                    "score_change_mean": at(f"{budget_block}/realized_score_change_mean"),
+                    "proven_both": at(f"{budget_block}/proven_at_both_budgets_folds"),
+                    "proven_both_squad_changed": at(
+                        f"{budget_block}/proven_at_both_budgets_squad_changed_folds"
+                    ),
+                }
+            )
+            proven_block = int(at(f"{budget_block}/status_counts_high/OPTIMAL").value)
+            proven_summary = int(at(f"{summary_high}/statuses/OPTIMAL").value)
+            checks.append(
+                Check(
+                    f"{name}/{arm}: the proven count at budget {second} is the same in the budget "
+                    "block and the arm summary",
+                    SOLVER_BUDGET,
+                    f"{budget_block}/status_counts_high/OPTIMAL",
+                    proven_block,
+                    proven_summary,
+                    proven_block == proven_summary,
+                )
+            )
+            change_sum = float(at(f"{budget_block}/realized_score_change_mean").value) * folds
+            mean_difference = (
+                float(at(f"{summary_high}/mean_realized_score").value)
+                - float(at(f"{summary_low}/mean_realized_score").value)
+            ) * folds
+            checks.append(
+                Check(
+                    f"{name}/{arm}: the mean score change from budget {base} to {second} times "
+                    "the folds equals the difference of the two arm means times the folds",
+                    SOLVER_BUDGET,
+                    f"{budget_block}/realized_score_change_mean",
+                    round(change_sum, 6),
+                    round(mean_difference, 6),
+                    abs(change_sum - mean_difference) < 1e-6,
+                )
+            )
+    tables_of = {
+        "boosted_pair_vs_linear": ("gbm_v1_dec", "linear_dec"),
+        "wider_contract_vs_boosted_pair": ("gbm_v2_dec", "gbm_v1_dec"),
+    }
+    for pair, label in BUDGET_PAIRS:
+        for budget in budgets:
+            official = f"/pairs/{pair}/budget_{budget}_official_card_rule"
+            ignoring = f"/pairs/{pair}/budget_{budget}_ignoring_cards"
+            overlap = f"/pairs/{pair}/budget_{budget}_overlap"
+            rows.append(
+                {
+                    "comparison": _label(label),
+                    "scope": _label(f"paired at deterministic budget {budget}, official card rule"),
+                    "folds": at(f"{official}/paired_folds"),
+                    "mean": at(f"{official}/mean"),
+                    "interval_low": at(f"{official}/interval_90/0"),
+                    "interval_high": at(f"{official}/interval_90/1"),
+                    "wins": at(f"{official}/wins_ties_losses/0"),
+                    "ties": at(f"{official}/wins_ties_losses/1"),
+                    "losses": at(f"{official}/wins_ties_losses/2"),
+                    "shared_squad_of_15": at(f"{overlap}/mean_shared_squad_members_of_15"),
+                    "shared_starters_of_11": at(f"{overlap}/mean_shared_starters_of_11"),
+                    "same_captain_folds": at(f"{overlap}/same_captain_folds"),
+                    "identical_squad_folds": at(f"{overlap}/identical_squad_folds"),
+                    "tied_folds": at(f"{overlap}/tied_folds"),
+                    "tied_identical_squads": at(f"{overlap}/tied_folds_with_identical_squads"),
+                }
+            )
+            untouched = all(changed[(name, budget)] == 0 for name in tables_of[pair])
+            same_mean = float(at(f"{official}/mean").value) == float(at(f"{ignoring}/mean").value)
+            checks.append(
+                Check(
+                    f"{pair} at budget {budget}: with no fold moved by the card rule the paired "
+                    "mean is the same under both scoring conventions",
+                    SOLVER_BUDGET,
+                    f"{official}/mean",
+                    at(f"{official}/mean").value,
+                    at(f"{ignoring}/mean").value,
+                    same_mean if untouched else True,
+                )
+            )
+    table = Table(
+        "table_solver_budget_cards",
+        "The solver-budget record: each re-evaluated table against its record (fold scores "
+        "reproduced with cards ignored, the solver statuses of the differing folds), each arm's "
+        "statuses, mean score and folds the official card rule moved at each budget, what the "
+        "second budget changed against the first per arm, and each paired reading under the "
+        "official rule with its squad overlap at each budget",
+        columns,
+        rows,
+    )
+    return table, checks
+
+
+#: The re-evaluation record's fold-level decisions, written out as one CSV.
+DECISIONS_CSV = "decisions_solver_budget_cards"
+DECISION_COLUMNS = (
+    "table",
+    "budget",
+    "arm",
+    "fold",
+    "season",
+    "gameweek",
+    "solver_status",
+    "objective_value",
+    "best_objective_bound",
+    "deterministic_time_used",
+    "realized_score",
+    "realized_score_ignoring_cards",
+    "captain_id",
+    "vice_captain_id",
+    "starting_xi",
+    "bench_order",
+    "squad",
+)
+#: The script whose digest the re-evaluation record names as the one that summarized it.
+SUMMARIZER = "scripts/summarize_solver_budget_cards.py"
+#: The keys of a budget block, recomputed from the two budgets' decisions in this order.
+BUDGET_BLOCK_KEYS = (
+    "folds",
+    "status_counts_low",
+    "status_counts_high",
+    "proven_at_both_budgets_folds",
+    "proven_at_both_budgets_squad_changed_folds",
+    "mean_realized_score_low",
+    "mean_realized_score_high",
+    "squad_changed_folds",
+    "starting_xi_changed_folds",
+    "captain_changed_folds",
+    "objective_gain_mean",
+    "objective_gain_max",
+    "low_budget_feasible_gap_to_bound_mean",
+    "low_budget_feasible_gap_to_bound_max",
+    "realized_score_change_mean",
+    "realized_score_change_folds",
+    "deterministic_time_used_mean_high",
+)
+
+Decisions = dict[str, dict[str, Any]]
+
+
+def _players(text: Any) -> frozenset[int]:
+    """A decision's player list, kept in the record as space-separated identifiers."""
+
+    return frozenset(int(item) for item in str(text).split())
+
+
+def _rounded(value: Any, places: int = 9) -> Any:
+    """`value` with every float rounded, so two routes to one mean compare equal."""
+
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        return round(value, places)
+    if isinstance(value, dict):
+        return {key: _rounded(item, places) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_rounded(item, places) for item in value]
+    return value
+
+
+def _statuses(folds: Decisions) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for decision in folds.values():
+        status = str(decision["solver_status"])
+        counts[status] = counts.get(status, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _fold_mean(folds: Decisions, key: str) -> float:
+    return statistics.fmean(float(decision[key]) for decision in folds.values())
+
+
+def _budget_block(low: Decisions, high: Decisions) -> dict[str, Any]:
+    """What the second budget changed against the first, as the summarizer computes it."""
+
+    folds = sorted(set(low) & set(high))
+    squad_changed = [f for f in folds if _players(low[f]["squad"]) != _players(high[f]["squad"])]
+    xi_changed = [
+        f for f in folds if _players(low[f]["starting_xi"]) != _players(high[f]["starting_xi"])
+    ]
+    captain_changed = [f for f in folds if low[f]["captain_id"] != high[f]["captain_id"]]
+    objective_gain = [
+        float(high[f]["objective_value"]) - float(low[f]["objective_value"])
+        for f in folds
+        if high[f]["objective_value"] is not None and low[f]["objective_value"] is not None
+    ]
+    gaps = []
+    for f in folds:
+        bound, value = low[f].get("best_objective_bound"), low[f].get("objective_value")
+        if low[f]["solver_status"] == "FEASIBLE" and bound is not None and value is not None:
+            gaps.append(float(bound) - float(value))
+    score_change = [
+        float(high[f]["realized_score"]) - float(low[f]["realized_score"]) for f in folds
+    ]
+    proven_both = [
+        f for f in folds if low[f]["solver_status"] == high[f]["solver_status"] == "OPTIMAL"
+    ]
+    times = [
+        float(high[f]["deterministic_time_used"])
+        for f in folds
+        if high[f].get("deterministic_time_used") is not None
+    ]
+    return {
+        "folds": len(folds),
+        "status_counts_low": _statuses(low),
+        "status_counts_high": _statuses(high),
+        "proven_at_both_budgets_folds": len(proven_both),
+        "proven_at_both_budgets_squad_changed_folds": sum(
+            _players(low[f]["squad"]) != _players(high[f]["squad"]) for f in proven_both
+        ),
+        "mean_realized_score_low": statistics.fmean(float(low[f]["realized_score"]) for f in folds),
+        "mean_realized_score_high": statistics.fmean(
+            float(high[f]["realized_score"]) for f in folds
+        ),
+        "squad_changed_folds": len(squad_changed),
+        "starting_xi_changed_folds": len(xi_changed),
+        "captain_changed_folds": len(captain_changed),
+        "objective_gain_mean": statistics.fmean(objective_gain) if objective_gain else None,
+        "objective_gain_max": max(objective_gain) if objective_gain else None,
+        "low_budget_feasible_gap_to_bound_mean": statistics.fmean(gaps) if gaps else None,
+        "low_budget_feasible_gap_to_bound_max": max(gaps) if gaps else None,
+        "realized_score_change_mean": statistics.fmean(score_change),
+        "realized_score_change_folds": sum(v != 0 for v in score_change),
+        "deterministic_time_used_mean_high": statistics.fmean(times) if times else None,
+    }
+
+
+def _paired_block(
+    mine: Decisions, theirs: Decisions, key: str, candidate_id: str
+) -> dict[str, Any]:
+    """A pair's paired reading on one score key, its interval under the record's own id."""
+
+    folds = sorted(set(mine) & set(theirs))
+    differences = [(fold[:7], float(mine[fold][key]) - float(theirs[fold][key])) for fold in folds]
+    values = [value for _, value in differences]
+    seasons: dict[str, list[float]] = {}
+    for season, value in differences:
+        seasons.setdefault(season, []).append(value)
+    low, high = block_interval(differences, 4, candidate_id)
+    return {
+        "paired_folds": len(values),
+        "mean": statistics.fmean(values),
+        "median": statistics.median(values),
+        "interval_90": [low, high],
+        "candidate_id": candidate_id,
+        "wins_ties_losses": [
+            sum(v > 0 for v in values),
+            sum(v == 0 for v in values),
+            sum(v < 0 for v in values),
+        ],
+        "by_season_mean": {
+            season: statistics.fmean(items) for season, items in sorted(seasons.items())
+        },
+    }
+
+
+def _overlap_block(mine: Decisions, theirs: Decisions) -> dict[str, Any]:
+    """Two arms' squad overlap on their common folds, as the summarizer computes it."""
+
+    folds = sorted(set(mine) & set(theirs))
+    shared_squad = [len(_players(mine[f]["squad"]) & _players(theirs[f]["squad"])) for f in folds]
+    shared_xi = [
+        len(_players(mine[f]["starting_xi"]) & _players(theirs[f]["starting_xi"])) for f in folds
+    ]
+    identical = [_players(mine[f]["squad"]) == _players(theirs[f]["squad"]) for f in folds]
+    tied = [f for f in folds if mine[f]["realized_score"] == theirs[f]["realized_score"]]
+    return {
+        "folds": len(folds),
+        "mean_shared_squad_members_of_15": statistics.fmean(shared_squad),
+        "mean_shared_starters_of_11": statistics.fmean(shared_xi),
+        "same_captain_folds": sum(mine[f]["captain_id"] == theirs[f]["captain_id"] for f in folds),
+        "identical_squad_folds": sum(identical),
+        "tied_folds": len(tied),
+        "tied_folds_with_identical_squads": sum(
+            _players(mine[f]["squad"]) == _players(theirs[f]["squad"]) for f in tied
+        ),
+        "shared_squad_members_histogram": {
+            str(k): shared_squad.count(k) for k in sorted(set(shared_squad))
+        },
+    }
+
+
+def solver_budget_decisions(records: Records) -> tuple[str | None, list[Check]]:
+    """The re-evaluation record's fold-level decisions as one CSV row per table, budget, arm
+    and fold, and the checks that the record's summary blocks are the arithmetic of those
+    decisions: the budgets the record says it holds are the ones the decisions hold; each
+    table's reproduction block against the fold scores of the record it names; each arm's
+    status counts, means, and the folds and sum the card rule moved; each budget block (changed
+    squads, elevens and captains, folds proven at both budgets, objective gains, the gap to the
+    bound, score changes); each pair's paired reading on both scoring conventions, with the
+    bootstrap id the summarizer derives and the 90% interval recomputed under it, and its
+    squad overlap; and that the summarizer the record names is the one in this checkout. The
+    copies of recorded means under `pairs/<pair>/recorded` are not re-read. A record without
+    the decisions block yields no file and no check.
+    """
+
+    block = records.optional(SOLVER_BUDGET, "/decisions")
+    if block is None or not isinstance(block.value, dict):
+        return None, []
+    decisions: dict[str, Any] = block.value
+    at = partial(records.cell, SOLVER_BUDGET)
+    budgets = [str(value) for value in at("/budgets_present").value]
+
+    def arm_folds(name: str, budget: str, arm: str) -> Decisions:
+        key = f"{name}_b{budget}"
+        if key not in decisions or arm not in decisions[key]:
+            raise RecordError(f"{SOLVER_BUDGET}: no decisions under /decisions/{key}/{arm}")
+        return dict(sorted(decisions[key][arm].items()))
+
+    def compare(name: str, pointer: str, recorded: Any, recomputed: Any) -> Check:
+        recorded, recomputed = _rounded(recorded), _rounded(recomputed)
+        return Check(name, SOLVER_BUDGET, pointer, recorded, recomputed, recorded == recomputed)
+
+    rows: list[list[str]] = []
+    checks: list[Check] = []
+    arms = ("candidate", "ridge_control")
+    held = sorted({str(key).rsplit("_b", 1)[1] for key in decisions}, key=float)
+    checks.append(
+        compare(
+            "budgets_present names every budget the fold decisions hold",
+            "/budgets_present",
+            sorted(budgets, key=float),
+            held,
+        )
+    )
+    for name, _label in BUDGET_TABLES:
+        block_pointer = f"/reproduction_at_5_0/{name}"
+        reproduction = at(block_pointer).value
+        if not isinstance(reproduction, dict):
+            raise RecordError(f"{SOLVER_BUDGET}: {block_pointer} is not an object")
+        recorded_scores = records.cell(
+            str(reproduction["record"]), str(reproduction["pointer"])
+        ).value
+        if not isinstance(recorded_scores, dict):
+            raise RecordError(
+                f"{reproduction['record']}: {reproduction['pointer']} is not an object"
+            )
+        rerun = arm_folds(name, budgets[0], "candidate")
+        common = sorted(set(rerun) & set(recorded_scores))
+        differing = {
+            fold: {
+                "recorded": recorded_scores[fold],
+                "rerun_ignoring_cards": rerun[fold]["realized_score_ignoring_cards"],
+                "rerun_solver_status": rerun[fold]["solver_status"],
+            }
+            for fold in common
+            if float(recorded_scores[fold]) != float(rerun[fold]["realized_score_ignoring_cards"])
+        }
+        statuses: dict[str, int] = {}
+        for item in differing.values():
+            status = str(item["rerun_solver_status"])
+            statuses[status] = statuses.get(status, 0) + 1
+        recomputed_reproduction = {
+            "folds_compared": len(common),
+            "folds_missing_from_rerun": sorted(set(recorded_scores) - set(rerun)),
+            "folds_reproduced": len(common) - len(differing),
+            "folds_differing": differing,
+            "differing_rerun_statuses": dict(sorted(statuses.items())),
+            "differing_sum_rerun_minus_recorded": sum(
+                float(item["rerun_ignoring_cards"]) - float(item["recorded"])
+                for item in differing.values()
+            ),
+            "rerun_statuses": _statuses(rerun),
+        }
+        checks.append(
+            compare(
+                f"{name}: the reproduction block is the arithmetic of the fold decisions at "
+                f"budget {budgets[0]} and the fold scores of {reproduction['record']}",
+                block_pointer,
+                {key: reproduction.get(key) for key in recomputed_reproduction},
+                recomputed_reproduction,
+            )
+        )
+    for name, _label in BUDGET_TABLES:
+        for budget in budgets:
+            for arm in arms:
+                folds = arm_folds(name, budget, arm)
+                for fold, decision in folds.items():
+                    rows.append(
+                        [
+                            name,
+                            budget,
+                            arm,
+                            fold,
+                            fold[:7],
+                            str(int(fold.rsplit("gw", 1)[1])),
+                            *(_text(decision[column]) for column in DECISION_COLUMNS[6:14]),
+                            str(decision["starting_xi"]),
+                            str(decision["bench_order"]),
+                            str(decision["squad"]),
+                        ]
+                    )
+                summary = f"/arms/{name}_b{budget}/{arm}"
+                cards = f"/card_rule/{name}_b{budget}" + (
+                    "" if arm == "candidate" else "/ridge_control"
+                )
+                recorded = {
+                    "folds": at(f"{summary}/folds").value,
+                    "statuses": at(f"{summary}/statuses").value,
+                    "mean_realized_score": at(f"{summary}/mean_realized_score").value,
+                    "mean_realized_score_ignoring_cards": at(
+                        f"{summary}/mean_realized_score_ignoring_cards"
+                    ).value,
+                    "folds_changed_by_the_card_rule": at(
+                        f"{cards}/folds_changed_by_the_card_rule"
+                    ).value,
+                    "sum_of_changes": at(f"{cards}/sum_of_changes").value,
+                }
+                moved = {
+                    fold: decision
+                    for fold, decision in folds.items()
+                    if decision["realized_score"] != decision["realized_score_ignoring_cards"]
+                }
+                recomputed = {
+                    "folds": len(folds),
+                    "statuses": _statuses(folds),
+                    "mean_realized_score": _fold_mean(folds, "realized_score"),
+                    "mean_realized_score_ignoring_cards": _fold_mean(
+                        folds, "realized_score_ignoring_cards"
+                    ),
+                    "folds_changed_by_the_card_rule": len(moved),
+                    "sum_of_changes": sum(
+                        float(decision["realized_score"])
+                        - float(decision["realized_score_ignoring_cards"])
+                        for decision in moved.values()
+                    ),
+                }
+                checks.append(
+                    compare(
+                        f"{name}_b{budget}/{arm}: the fold decisions give the recorded statuses, "
+                        "means, and the folds and sum the card rule moved",
+                        summary,
+                        recorded,
+                        recomputed,
+                    )
+                )
+        if len(budgets) < 2:
+            continue
+        for arm in arms:
+            pointer = f"/budget/{name}/{arm}"
+            recorded_block = at(pointer).value
+            if not isinstance(recorded_block, dict):
+                raise RecordError(f"{SOLVER_BUDGET}: {pointer} is not an object")
+            recomputed = _budget_block(
+                arm_folds(name, budgets[0], arm), arm_folds(name, budgets[1], arm)
+            )
+            checks.append(
+                compare(
+                    f"{name}/{arm}: the fold decisions at budgets {budgets[0]} and {budgets[1]} "
+                    "give the recorded budget block",
+                    pointer,
+                    {key: recorded_block.get(key) for key in BUDGET_BLOCK_KEYS},
+                    recomputed,
+                )
+            )
+    tables_of = {
+        "boosted_pair_vs_linear": ("gbm_v1_dec", "linear_dec"),
+        "wider_contract_vs_boosted_pair": ("gbm_v2_dec", "gbm_v1_dec"),
+    }
+    for pair, _label in BUDGET_PAIRS:
+        mine_name, theirs_name = tables_of[pair]
+        for budget in budgets:
+            mine = arm_folds(mine_name, budget, "candidate")
+            theirs = arm_folds(theirs_name, budget, "candidate")
+            for key, suffix in (
+                ("realized_score", "official_card_rule"),
+                ("realized_score_ignoring_cards", "ignoring_cards"),
+            ):
+                pointer = f"/pairs/{pair}/budget_{budget}_{suffix}"
+                recorded_block = at(pointer).value
+                if not isinstance(recorded_block, dict):
+                    raise RecordError(f"{SOLVER_BUDGET}: {pointer} is not an object")
+                recomputed = _paired_block(
+                    mine, theirs, key, f"paper_solver_budget_{pair}_{budget}_{suffix}"
+                )
+                checks.append(
+                    compare(
+                        f"{pair} at budget {budget}, {suffix.replace('_', ' ')}: the fold "
+                        "decisions give the recorded paired reading, with the bootstrap id the "
+                        "summarizer derives and the interval drawn under it",
+                        pointer,
+                        {key: recorded_block.get(key) for key in recomputed},
+                        recomputed,
+                    )
+                )
+            pointer = f"/pairs/{pair}/budget_{budget}_overlap"
+            recorded_block = at(pointer).value
+            if not isinstance(recorded_block, dict):
+                raise RecordError(f"{SOLVER_BUDGET}: {pointer} is not an object")
+            recomputed = _overlap_block(mine, theirs)
+            checks.append(
+                compare(
+                    f"{pair} at budget {budget}: the fold decisions give the recorded squad "
+                    "overlap",
+                    pointer,
+                    {key: recorded_block.get(key) for key in recomputed},
+                    recomputed,
+                )
+            )
+    named = records.optional(SOLVER_BUDGET, "/produced_by/summarizer_sha256")
+    if named is not None:
+        path = records.root / SUMMARIZER
+        digest = Digest.of(path.read_bytes()).sha256_lf if path.is_file() else "absent"
+        checks.append(
+            Check(
+                "the re-evaluation record names the summarizer whose source is in this checkout",
+                SOLVER_BUDGET,
+                "/produced_by/summarizer_sha256",
+                named.value,
+                digest,
+                named.value == digest,
+            )
+        )
+    return _csv(DECISION_COLUMNS, rows), checks
+
+
+LINEAR_VS_RIDGE = "table_linear_vs_ridge_rerun"
+LINEAR_VS_RIDGE_COLUMNS = (
+    "budget",
+    "folds",
+    "mean",
+    "median",
+    "interval_low",
+    "interval_high",
+    "wins",
+    "ties",
+    "losses",
+    "bootstrap_id",
+)
+
+
+def linear_vs_ridge_table(records: Records) -> str | None:
+    """The linear arm against the ridge control at each budget of the re-evaluation record,
+    as arithmetic on its fold decisions: the paired mean and median of realized points, the
+    90% season-aware block-bootstrap interval under this extractor's id, and wins, ties and
+    losses. No record holds this pair, so there is nothing to check it against; the table
+    exists because the paper quotes the linear arm's advantage over the ridge control without
+    an interval anywhere else. None when the record holds no decisions."""
+
+    block = records.optional(SOLVER_BUDGET, "/decisions")
+    if block is None or not isinstance(block.value, dict):
+        return None
+    decisions: dict[str, Any] = block.value
+    budgets = [str(value) for value in records.cell(SOLVER_BUDGET, "/budgets_present").value]
+    rows: list[list[str]] = []
+    for budget in budgets:
+        key = f"linear_dec_b{budget}"
+        if key not in decisions:
+            raise RecordError(f"{SOLVER_BUDGET}: no decisions under /decisions/{key}")
+        linear = dict(sorted(decisions[key]["candidate"].items()))
+        ridge = dict(sorted(decisions[key]["ridge_control"].items()))
+        bootstrap_id = f"paper_linear_vs_ridge_{budget}"
+        paired = _paired_block(linear, ridge, "realized_score", bootstrap_id)
+        rows.append(
+            [
+                budget,
+                str(paired["paired_folds"]),
+                _text(paired["mean"]),
+                _text(paired["median"]),
+                _text(paired["interval_90"][0]),
+                _text(paired["interval_90"][1]),
+                *(str(count) for count in paired["wins_ties_losses"]),
+                bootstrap_id,
+            ]
+        )
+    return _csv(LINEAR_VS_RIDGE_COLUMNS, rows)
+
+
 def commit_rows(
     records: Records, extractor: Digest, commit: str | None
 ) -> tuple[list[list[str]], list[Check]]:
@@ -1221,15 +2518,23 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         distribution_table(records),
         distribution_fold_table(records),
         planning_table(records),
+        same_period_table(records),
+        precision_table(records),
+        solver_status_table(records),
+        sampler_season_table(records),
     ]
+    block_table, block_checks = block_sensitivity_table(records)
+    tables.append(block_table)
+    budget_table, budget_checks = solver_budget_table(records)
+    tables.append(budget_table)
+    decisions_csv, decision_checks = solver_budget_decisions(records)
     fold_points, fold_checks = fold_differences(records)
     pit_points, pit_checks = sampler_folds(records)
     figures = {
         "figure_decision_fold_differences": fold_points,
         "figure_decision_by_season": decision_by_season(records),
-        "figure_points_mae_against_squad_points": mae_against_decision(records),
+        "figure_accuracy_against_decision": accuracy_against_decision(records),
         "figure_sampler_pit": pit_points,
-        "figure_s2_counts": s2_counts(records),
     }
     checks = [
         *fold_checks,
@@ -1237,6 +2542,10 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         *sampler_gate_checks(records),
         *seed_checks(records),
         *pooled_mae_checks(records),
+        *precision_checks(records),
+        *block_checks,
+        *budget_checks,
+        *decision_checks,
     ]
     commit = checked_out_commit(records.root)
     digests, commit_checks = commit_rows(records, extractor_digest(), commit)
@@ -1261,6 +2570,11 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         provenance, ("table", "row", "column", "value", "record", "pointer")
     )
     files |= {f"{name}.csv": _figure_csv(name, rows) for name, rows in figures.items()}
+    if decisions_csv is not None:
+        files[f"{DECISIONS_CSV}.csv"] = decisions_csv
+    linear_vs_ridge = linear_vs_ridge_table(records)
+    if linear_vs_ridge is not None:
+        files[f"{LINEAR_VS_RIDGE}.csv"] = linear_vs_ridge
     files["tables.md"] = _markdown(tables, _commit_line(commit, commit_checks))
     files["records.csv"] = _csv(
         ("record", "sha256_lf", "git_blob_lf", "commit", "blob_at_commit", "matches_commit"),

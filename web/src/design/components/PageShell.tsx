@@ -403,7 +403,7 @@ export function PageShell({
           {copy.skip}
         </a>
         {layout === "phone" ? (
-          <header className={styles.phoneBar} inert={overlay}>
+          <header className={styles.phoneBar} inert={overlay} data-phone-bar>
             <button
               ref={menuRef}
               type="button"

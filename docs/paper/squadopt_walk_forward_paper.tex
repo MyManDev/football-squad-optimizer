@@ -1,0 +1,610 @@
+% From player forecasts to squad decisions. Compile with Tectonic (XeTeX); the figures are the
+% PDF conversions of the supplementary package's SVG files.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[a4paper,margin=27mm]{geometry}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\usepackage[section]{placeins}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.6}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.75}
+
+\graphicspath{{../../artifacts/paper/figures-pdf/}}
+\captionsetup{font=small,labelfont=bf}
+\setlist{nosep}
+\newcolumntype{R}{>{\raggedleft\arraybackslash}X}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcommand{\gw}{\textsc{gw}}
+\newcommand{\ci}[2]{$[#1,\,#2]$}
+
+\title{From Player Forecasts to Squad Decisions:\\
+A Walk-Forward Evaluation of Component Models,\\
+Decision Value and Scenario Calibration in Fantasy Premier League}
+
+\author{Ertuğrul Soydal\thanks{Both authors contributed equally to this work. Corresponding author: Ertuğrul Soydal, Sabancı University, \texttt{ertugrul.soydal@sabanciuniv.edu}.}\\
+Sabancı University, Istanbul
+\and İbrahim Ersan Özdemir\footnotemark[1]}
+\date{Draft of 9 November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+In Fantasy Premier League a forecast reaches the squad only through the expected points a solver reads, so a lower player-level error need not buy a better squad. We test that link on five public seasons of player-gameweek data under one walk-forward protocol. A component model, appearance probability times conditional points, is fitted with linear estimators on nine as-of features, and five declared candidates replace its estimators or its features. Each candidate is judged twice: by a pre-declared points-MAE rule, and by the realized points of the squad that an exact 0--1 programme selects afresh each week on 147 frozen decision folds under the official scoring rules. Two candidates lower MAE under the rule and over the decision seasons, yet neither shows a squad-point gain: their paired means are $-0.75$ and $-0.20$ points a gameweek with 90\% intervals that cover zero, as do the intervals of the other three candidates. A gated mixture improves the conditional predictive distribution on every fold scored without a demonstrated gain in point accuracy or squad points. Three scenario samplers under-cover the lower tail; the one that passes the tail gate passes at one seed of ten. On this history, under weekly selection, lower MAE did not buy higher squad points.
+\end{abstract}
+
+\section{Introduction}
+
+A manager in Fantasy Premier League (FPL) chooses, before each of 38 deadlines, a squad of fifteen Premier League players whose real-match events score points under published rules and constraints (Section~\ref{sec:game}).
+
+The problem has two halves that are usually studied apart. One is forecasting: how many points will each player score next week? The other is decision: given a forecast, which legal squad, lineup and captain maximise it? The two meet at one interface, the column of expected points a solver reads. The literature on decision-focused learning has long noted that a lower forecast error need not mean a better decision \cite{elmachtoub2022}. This paper measures how far that holds for one forecasting line on FPL's constrained selection, with the same solver on both sides of every comparison.
+
+The system we describe, SquadOpt, publishes weekly squad advice to the members of a private league and measures each candidate model on stored walk-forward records, under frozen folds and declared comparison rules, before anything is served. In October 2026 we read five candidates both ways and the two readings disagreed.
+
+\paragraph{Contributions:}
+\begin{enumerate}
+\item A component forecasting model for FPL, appearance $\times$ conditional points, with a leakage-controlled feature contract on public data and a decision layer of exact 0--1 programmes solved deterministically under a declared budget (Sections~\ref{sec:data} to~\ref{sec:opt}).
+\item A paired reading of five pre-declared estimator and feature candidates at two levels: a points-MAE rule on 184 walk-forward folds, and the realized points of a squad selected afresh each week on 147 frozen decision folds. Both readings are reported over the same seasons and against the same reference arm (Section~\ref{sec:results}).
+\item A separation of three axes that one number usually conflates, point accuracy, distribution quality and decision value, with a candidate that improved the second without a demonstrated improvement in the other two (Section~\ref{sec:dist}).
+\item A calibration study of three scenario samplers on two frozen gates, with a seed reading that turned a one-fold pass into a non-robust one, and per-candidate precision diagnostics of the decision reading (Sections~\ref{sec:calib} and~\ref{sec:precision}).
+\end{enumerate}
+
+Two planning-side measurements, a rank-conditional debiasing of expected points before the solve and a mean-reversion discount for the later weeks of a multi-week plan, are reported in the discussion because they test the same interface from the decision side.
+
+The claim is narrow: we do not claim that the component model is the best FPL forecast available, that the candidates tried exhaust what the archive can support, or that a season managed with carried squads, transfers and chips would read them the same way (Section~\ref{sec:game}). Records of an earlier programme built on a deterministic form baseline are not used, since they were measured under a solver budget, a sampler and a control the study has since replaced. The one exception is the frozen evaluation of the component model against the ridge control, the comparator every later record is paired to.
+
+\paragraph{Terms:} An \emph{arm} is one model configuration in a comparison. The \emph{linear arm} is the served component model with its linear estimators; the \emph{ridge control} is the earlier programme's frozen baseline against which the linear arm was first measured. Each candidate is paired with the linear arm, except the wider feature contract, which is paired with the boosted pair it extends. A \emph{fold} is one decision point, a season and gameweek. A \emph{reading} is one analysis of a candidate: the player-level reading scores its forecasts by MAE, the decision reading scores the squads solved from them. A \emph{record} is a stored result file; the thirteen the paper reads are numbered R1 to R13 and named in Section~\ref{sec:repro}.
+
+\section{Related Work}
+\label{sec:related}
+
+Published work on fantasy football splits along the same seam as the problem. On the forecasting side, OpenFPL \cite{groos2025} combines position-specific random forests and gradient boosting on FPL and Understat histories, with a prospective window of seven gameweeks and development folds split by club rather than by time. It reports one-week RMSE of 1.517 against 2.136 for a last-five-games average on players returning 3 to 4 points, a player-level error and not a squad result. Gupta \cite{gupta2019} ensembles ARIMA and LSTM forecasts to pick one fifteen by linear programming without transfers. Bonello et al.\ \cite{bonello2019} blend statistics, betting and social signals and report about 11 points a week over their statistical comparator with a fresh lineup each week and no transfer penalty, a system result under relaxed rules. On the decision side, Matthews, Ramchurn and Chalkiadakis \cite{matthews2012} built a Bayesian sequential manager that reached roughly the top percentile of 2.5 million managers in 2010-11, and Bonomo, Dur\'an and Marenco \cite{bonomo2014} formulate the manager's season, transfers included, as a mathematical programme. Venter and van Vuuren \cite{venter2024} combine forecasts with an optimisation model and evaluate it over a season with transfer constraints; Ramezani and Dinh \cite{ramezani2026} compare forecasters and select lineups by deterministic and robust mixed-integer programmes. None of these pairs a forecasting change with a squad reading on the same folds under one frozen protocol, which is the measurement this paper adds; several of them score policies this paper does not (season management, robust selection).
+
+The general observation behind our result is not new. The predict-then-optimize literature shows that the loss a forecast is trained and judged on and the decision loss it induces can rank forecasts differently, and proposes training on the decision loss itself \cite{elmachtoub2022}. Gneiting \cite{gneiting2011} shows that a point forecast is evaluable only relative to the functional it targets; Section~\ref{sec:rule} says where that bears on the rule used here.
+
+The hierarchical Bayesian line on player and team performance is better developed for football than for the fantasy game. Examples are Italian fantasy ratings with player, team and position nesting and explicit missing appearances \cite{egidi2018}, player abilities from touch data added to the Baio and Blangiardo \cite{baio2010} team goal model \cite{whitaker2020}, bookmakers' odds \cite{egidi2018b}, player and position corrections of expected goals \cite{scholtes2024}, adaptive shrinkage across periods \cite{macridemartino2025} and injury forecasts from GPS training load \cite{rossi2018}. None reports a decision gain under FPL rules, and most need event, tracking or private data the public archive does not carry.
+
+On evaluation, Gneiting and Raftery \cite{gneiting2007} set out proper scoring rules; our distribution reading uses the logarithmic score. Gneiting and Ranjan \cite{gneitingranjan2013} give the randomized probability integral transform for discrete and mixed outcomes, which bears on how the PIT of an integer points score should be read (Section~\ref{sec:dist}). For inference on paired per-fold differences we use a moving-block bootstrap \cite{kunsch1989} confined to seasons, and for the precision reading the covariate-adjustment logic of Deng et al.\ \cite{deng2013}.
+
+\section{The Game and the Decision Problem}
+\label{sec:game}
+
+A gameweek is a set of fixtures; most clubs play once, a club may play twice (a double gameweek) or not at all (a blank). A player's gameweek points are the sum over the club's fixtures of the official scoring rules: points for appearing, goals, assists, clean sheets, saves and bonus, and deductions for cards, own goals and goals conceded. From 2025-26 the rules add two points for a defensive-contribution threshold \cite{plglossary}, so 2025-26 points include a component earlier seasons could not have.
+
+A squad is fifteen players, two goalkeepers, five defenders, five midfielders and three forwards, at most three from one club, bought within a budget of 100.0 million at the start. Before each deadline the manager names eleven starters in a legal formation, orders the four on the bench and names a captain and vice-captain. The captain's points count twice; if the captain does not play, the vice-captain's do. If a starter plays no minutes, the first bench player who keeps the formation legal replaces him (automatic substitution); a starter shown a card without playing a minute counts as having played, so he is not replaced and his deduction stands. Between deadlines one free transfer accrues per week, up to five may be banked, and each transfer beyond the free ones costs four points; four chips, each once per half-season, lift a rule for one week.
+
+\paragraph{Scope of the Decision Reading:} The season as a manager plays it is a sequential problem with a carried squad, banked transfers, hits and chips. The decision reading of this paper is a weekly independent selection: on each decision fold a squad is selected \emph{afresh} from the whole pool under the budget, quota and club rules of Section~\ref{sec:opt}, with no carried squad and no transfer accounting. Its realized points are scored under the official automatic-substitution and captain rules. A different selection policy could read a forecasting change differently; the multi-week planner the served system uses enters only through the planning-side measurements of Section~\ref{sec:discussion}.
+
+\section{Data}
+\label{sec:data}
+
+\subsection{The Archive and the Canonical Panel}
+
+The historical data are the public FPL archive maintained by Vaastav Anand \cite{vaastav}, pinned at one revision and verified by checksum. The supported range is six seasons, 2020-21 to 2025-26, because the two earlier seasons omit position and club; it holds 156{,}075 player-gameweek rows for 1{,}960 players. Every row carries season, gameweek, player, club, position, price, minutes and total points, and the panel is keyed on (season, gameweek, player).
+
+The source's properties, each established by inspection, shaped the adapter. Player identity is the archive's \texttt{code}: of the 479 players present in two consecutive seasons it matched all 479 across the boundary, where the per-season \texttt{id} matched 1. Club identity is the persistent club code, which matched all 85 consecutive-season pairings where the per-season integer matched 53. Duplicate rows arise from two unlike causes and are treated unalike: a repeated fixture record is dropped, a genuine double gameweek is summed. The archive's price column is recorded at an undocumented time and differs from the roster's current cost for 537 of 692 players in 2025-26, so prices are shifted back one gameweek before use. Two corrections are recorded: 101 goalkeeper rows restored by accepting the spelling \texttt{GKP} beside \texttt{GK} in one gameweek of 2021-22, and the twenty manager entries per season introduced in 2024-25 excluded as not squad-eligible.
+
+Fixtures are stored at their own grain, one row per club per fixture, because a club with two fixtures in a gameweek has no single opponent or venue; 189 club-gameweeks hold more than one fixture. A fixture without a gameweek (a postponement awaiting a date) is excluded and counted, so postponement history is unrecoverable rather than invented.
+
+\subsection{Time of Knowledge, and What the Tests Can and Cannot Establish}
+
+Every canonical column carries a time-of-knowledge class. Pre-match columns (price, club, position, fixture counts) may be read from the target row; outcome columns (minutes, points) may be read only from rows strictly before the target gameweek. All aggregation of outcome columns passes through one primitive that groups by (season, player), confirms ascending gameweek order, and applies a shift of one before a rolling window; it refuses to roll a pre-match or an unclassified column. Rate features are ratios of shifted sums, undefined rather than zero when the window holds no minutes, and insufficient history yields a missing value that is never back-filled.
+
+Five test families enforce the structure: mutating outcomes in rows at or after $t$ leaves every feature of rows before $t$ bit-identical; features computed on a panel truncated at $t$ equal those from the full panel; a season's opening gameweeks are unaffected by the previous season's close; row order does not change output; hand-computed rolling values are asserted literally. The same checks are made at fold level. These tests establish that the code honours the declared contract. They cannot establish that the archive's pre-match columns were in fact known before each historical deadline, because the archive publishes no deadline timestamps; Table~\ref{tab:timeclass} separates what is verified from what is assumed and what is unrecoverable.
+
+\begin{table}[!htb]
+\centering\small
+\caption{What the data contract verifies, assumes and cannot recover. ``Verified'' means a test or an inspection on the archive establishes it; ``structural assumption'' means the contract declares it and the tests enforce the declaration, not the fact.}
+\label{tab:timeclass}
+\begin{tabularx}{\linewidth}{L L}
+\toprule
+Status & Columns and facts \\
+\midrule
+Verified on the archive & player and club identity across seasons; duplicate and double-gameweek handling; outcome columns read only from earlier gameweeks; features bit-identical under later mutation or truncation \\
+Structural assumption & price, club, position and fixture counts were known at the deadline; the archive carries no deadline timestamp, and prices are shifted back one gameweek \\
+Unrecoverable & deadline timestamps; postponement history; availability status, chance of playing and news at the deadline (recorded after the fact); ownership snapshot timing; start labels across the supported seasons \\
+Excluded by rule & the archive's own expected-points column (scraped after the match); ownership share; fixture-difficulty rating (ingested for provenance, never consumed) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Walk-Forward Folds}
+
+A decision point is a season and gameweek. Rows strictly before it fit the model; rows through it, with the target gameweek's pre-match columns, build the projection; the target gameweek's realized points are read only after the decision is frozen. No function in the splitting layer accepts a seed, shuffle or fraction. Each season's opening gameweek is skipped as a decision because a season-scoped rolling feature has no history there, and 2022-23 gameweek 7, which the archive holds without fixtures (the round was postponed), is absent. The five seasons from 2021-22, with 2020-21 as history only, therefore give $5\times 37 - 1 = 184$ folds, and the four decision seasons $4\times 37 - 1 = 147$. One further fold, 2021-22 gameweek 2, is refused by the component estimators for thin history and scored entirely on the fallback route.
+
+Three fold populations are used. The \emph{player-level} population is all 184 folds, 130{,}095 rows of which the component estimators scored 128{,}627 (the component route) and refused 1{,}468, handed to the fallback projection of Section~\ref{sec:model}; the metrics are pooled over the component route. The \emph{decision} population is the 147 folds of 2021-22 to 2024-25, frozen with its own 101{,}447-row table when the component model was first evaluated against the ridge control. The \emph{calibration} population is 137 of those 147: the first nine folds of 2021-22 are burn-in for the sampler's residual history, and 2021-22 gameweek 15 is abstained because its frozen decision selected a direct-control player without a component prediction. These populations were fixed before the candidates of Section~\ref{sec:candidates} existed.
+
+
+\subsection{The Status of 2025-26}
+
+The season 2025-26 was locked as a final holdout in August 2026 and spent once, under a pre-registered plan, on an earlier candidate that this paper does not report. Every record here that reads 2025-26 does so under a separately declared development scope, states so in its manifest, and is presented as development evidence, never as an unseen test. 2025-26 enters only the player-level rule; the decision and calibration readings end at 2024-25.
+
+\section{The Forecasting Model}
+\label{sec:model}
+
+\subsection{Component Decomposition}
+
+For player $i$ at decision gameweek $t$ with $k_i$ scheduled fixtures, let $A_i \in \{0,1\}$ be whether he plays at least one minute, $M_i$ his minutes and $Y_i$ his points. The model estimates
+\begin{equation}
+p_i = \Pr(A_i = 1 \mid x_i),\qquad
+\mu_i = \mathbb{E}[M_i \mid A_i = 1, x_i],\qquad
+g_i = \mathbb{E}[Y_i \mid A_i = 1, x_i],
+\end{equation}
+and hands the solver
+\begin{equation}
+\hat y_i = p_i \, g_i, \qquad \hat m_i = p_i\,\mu_i,
+\label{eq:compose}
+\end{equation}
+with the bounds $p_i \in [0,1]$, $\mu_i \in [0, 90k_i]$, $\hat y_i \ge 0$ applied after estimation. A blank gameweek ($k_i = 0$) sets all three to zero. The model treats non-appearance as an atom at exactly zero points, separate from the conditional scoring rate. This is an approximation. In general $\mathbb{E}[Y_i \mid x_i] = p_i\,\mathbb{E}[Y_i \mid A_i=1, x_i] + (1-p_i)\,\mathbb{E}[Y_i \mid A_i=0, x_i]$, and the second term is small but nonzero, because a player booked from the bench without a minute is deducted a point. The pinned archive holds nine such player-gameweeks in the four decision seasons (and one in 2025-26), all with negative points, among about 100{,}000 rows; the model drops the term. Section~\ref{sec:reeval} rescores recorded squads under the official rule. The pre-registration also defines a start component; the archive carries no verified start label across the supported seasons, so that component is recorded as unavailable and no proxy is substituted.
+
+The decomposition exists because the two quantities fail differently. A first-choice striker who is injured and a fringe striker who is fit can carry the same recent points-per-ninety while having nothing in common as a selection. It also matches the uncertainty layer (Section~\ref{sec:sampler}), where a player whose variance comes from rotation is a different object from one whose variance comes from finishing.
+
+\subsection{Feature Contract}
+
+The served contract (\texttt{v1}) has nine columns, all as-of the deadline: the shifted rolling means over the player's own season of minutes, points and appearance rate, each over windows of three and five gameweeks, plus the price in tenths, the club's fixture count in the target gameweek and its home-fixture count. Windows are over gameweeks and use a minimum period of one, so a player's second gameweek already carries one prior observation; his first takes the fallback route. The wider contract measured as a candidate (\texttt{v2}) adds the one- and ten-gameweek windows for minutes and appearance rate (thirteen columns).
+
+\subsection{Estimators}
+
+The served model fits, inside each fold on rows strictly before its gameweek, three pipelines, scaler included, on standardized features: a logistic regression ($C = 1$, L-BFGS, 1{,}000 iterations) for appearance on all complete-feature rows, and two ridge regressions ($\alpha = 1$, Cholesky) for conditional minutes and conditional points on the rows that appeared. A fold needs at least 200 training rows for each fit; a thinner fold is refused and its rows take the fallback. The fallback (\emph{direct control}) is the frozen ridge control projection of the earlier programme, fitted walk-forward on the same panel with cross-season carry-over.
+
+\subsection{Declared Candidates}
+\label{sec:candidates}
+
+Six candidates were declared under the same comparison rule (Section~\ref{sec:rule}), each in a method note or pre-registration committed before its measurement. The first, a season-age weighting of training rows by $0.5^{\text{age}}$, lost on the rule in September 2026 and its numbers were not recorded; it is counted as a comparison made but not reported. The five with stored records are:
+
+\begin{description}
+\item[Boosted Pair:] Histogram gradient-boosted trees replace all three estimators: a classifier for appearance, squared-error regressors for minutes and points, each with learning rate 0.05, 300 iterations, 31 leaves, 100 minimum samples per leaf, L2 regularization 1.0, no early stopping, fixed seed. The constants were declared and not searched.
+\item[Wider Feature Contract:] The boosted pair on \texttt{v2} features, compared against the boosted pair on \texttt{v1} at both levels; the windows are the only difference.
+\item[Points-Only Boosting:] The linear appearance and minutes estimators kept, the points regressor boosted. Declared after the boosted pair's decision reading, when a recomposition probe (the boosted points estimate combined with the served appearance and minutes estimates) had already given its decision outcome; the record says so.
+\item[Regime-Gated Experts:] One expert set per regime, the cross of fixture regime (single or double gameweek) and rule era (before or from the 2025-26 defensive-contribution rules), mixed by a multinomial logistic gate on the nine features plus three regime terms. Each expert refits all three served estimators, appearance included, on its regime's rows only, so this candidate does not share the linear arm's appearance estimator. A regime with fewer than 200 rows is absent and the gate renormalizes.
+\item[Gated Mixture:] The appearance estimator kept; each conditional ridge replaced by a gated mixture of two ridge experts with a supervised regime label read from the realized training target: for minutes, a \emph{full} expert on rows with at least 60 minutes per fixture and a \emph{short} expert on the rest; for points, a \emph{return} expert on rows with at least four points and a \emph{no-return} expert on the rest. The gate is the served logistic estimator on the nine features. This candidate also publishes a predictive distribution, the gate-weighted mixture of the experts' Gaussian residual distributions with each scale the expert's own residual standard deviation (floored at one minute and half a point); the linear arm's comparator is the single Gaussian around the ridge mean.
+\end{description}
+
+
+\section{Optimization}
+\label{sec:opt}
+
+\subsection{The Single-Week Squad Programme}
+
+Let $I$ be the player pool, $I_p$ the players in position $p$, $I_c$ those of club $c$, $\pi_i$ the price in tenths and $\hat y_i$ the expected points. Binary variables $x_i$ (in the squad), $s_i$ (starts) and $c_i$ (captain); the bench is $x_i - s_i$. With squad quotas $Q_p$, formation bounds $[\ell_p, u_p]$, budget $B$, club cap 3 and bench weight $w_b$:
+\begin{align}
+\max\quad & \sum_i \hat y_i s_i + \sum_i \hat y_i c_i + w_b \sum_i \hat y_i (x_i - s_i) \label{eq:obj}\\
+\text{s.t.}\quad & \sum_i x_i = 15,\qquad \sum_i s_i = 11,\qquad \sum_i c_i = 1, \nonumber\\
+& \sum_{i \in I_p} x_i = Q_p,\qquad \ell_p \le \sum_{i \in I_p} s_i \le u_p \quad \forall p, \nonumber\\
+& \sum_i \pi_i x_i \le B,\qquad \sum_{i\in I_c} x_i \le 3 \quad \forall c, \nonumber\\
+& s_i \le x_i,\qquad c_i \le s_i \quad \forall i. \nonumber
+\end{align}
+The captain term adds his expectation a second time. The bench weight ($w_b = 0.1$ throughout) values squad depth without modelling automatic substitution; a starter receives no bench term. Bench order and the vice-captain are set after the solve by expected points and are not variables. The objective is therefore a surrogate for the expected realized score, not that score itself.
+
+The programme is solved with CP-SAT \cite{ortools} on integers. Expected points are scaled by $10^3$ and rounded half-up through decimal arithmetic (the maximum rounding error is 0.0005 points a player); prices are already integers. Players are ordered by identifier before variables are created, the solver runs one search worker under a fixed seed, and the measurement configuration stops the search on a \emph{deterministic} budget of 5.0 work units rather than on elapsed time. A work-unit budget makes the incumbent reproducible across machines under the pinned solver version, which an elapsed-time limit does not; it does not make the incumbent optimal. When the primary solve proves optimality, a second solve fixes the objective at its optimum and breaks ties by preferring lower stable ranks; when it returns only a feasible incumbent, the tie-break is skipped. The result records the status, the best bound and the gap, and extracted solutions are rechecked against every constraint.
+
+\paragraph{Solver Status:} The formulation is exact, but under the 5.0 budget not every solve is proven (Table~\ref{tab:status}). A feasible-but-unproven incumbent carries search noise of unknown direction in its realized score, since realized points are not the solver's objective and the same budget does not give the same optimality gap on two expected-points vectors. A paired difference between two arms is therefore the joint effect of the forecast change and of the search where either arm stopped unproven.
+
+\section{Scenario Sampler and Squad-Level Risk}
+\label{sec:sampler}
+
+The solver reads a mean. A member also wants to know how a squad's week can go, and the system's risk layer answers with scenarios: joint draws of every player's minutes and points for the coming gameweek, scored under the official rules into a distribution of squad scores. The sampler's inputs are the component model's out-of-fold table: for each history row, the predicted $p_i, \mu_i, g_i$ and the realized appearance, minutes and points.
+
+\paragraph{Foundation Sampler:} For scenario $j$ and player $i$: draw $A_i^{(j)} \sim \text{Bernoulli}(p_i)$; if $A_i^{(j)} = 0$, minutes and points are exactly zero; if $A_i^{(j)} = 1$, take one historical row that appeared and add its paired residuals, $M_i^{(j)} = \text{clip}(\mu_i + \varepsilon^M, 1, 90k_i)$ and $Y_i^{(j)} = g_i + \varepsilon^Y$. Points are not clipped at zero. One source fold is chosen per scenario, so every player's residual in a scenario comes from the same historical week; the residual rows within the fold are drawn independently per player. Residual history is strictly earlier than the target fold and needs at least eight such folds.
+
+\paragraph{Club-Block Sampler:} The same appearance draw, then for every club in the target squad one source club-week block inside the scenario's source fold, chosen among that fold's clubs with the same fixture count. Each player's residual row is drawn within his club's block, among rows of his position where the block has any.
+
+\paragraph{Joint Club-Match Sampler:} The appearance is drawn from the block too. With the source row's observed appearance $a_s$ and predicted probability $p_s$, its latent uniform is $u = v p_s$ if $a_s = 1$ and $u = p_s + v(1-p_s)$ if $a_s = 0$, for $v \sim U(0,1)$; the target appears iff $u < p_i$. Marginally $\Pr(A_i = 1) = p_i$ exactly when the source rows' appearance model is calibrated on the block; a target that appears from a source row that appeared takes that row's paired residual, otherwise a residual is re-drawn among the block's appeared rows.
+
+\paragraph{Calibration Gates:} For fold $t$ with frozen decision $d_t$, scenario scores $S_t^{(j)}$ under the official automatic-substitution and captain rules and realized score $R_t$:
+\begin{equation}
+\mathrm{PIT}_t = \tfrac{1}{1000}\sum_j \mathbf{1}[S_t^{(j)} \le R_t],\qquad q^{10}_t = \text{linear tenth percentile of } S_t,\qquad L_t = \mathbf{1}[R_t < q^{10}_t].
+\end{equation}
+Gate S1 (location): the mean PIT over the 137 folds lies in $[0.43, 0.57]$. Gate S2 (lower tail): the mean of $L_t$ lies in $[0.04, 0.16]$, at most 21 folds. Both gates were frozen before the first sampler was measured, with 1{,}000 scenarios a fold and seed 0. The PIT here is the empirical one on a squad score that takes integer values. A mean near 0.5 is a statement about location pooled over folds and not a statement that the distribution is calibrated conditionally or season by season, which Section~\ref{sec:calib} reads separately.
+
+\section{Evaluation Protocol}
+\label{sec:protocol}
+
+\subsection{The Player-Level Rule}
+\label{sec:rule}
+
+Every candidate is exported as an out-of-fold table from the same code version as its control, with the same rows, targets, routes and folds. Per fold, the metric is the mean absolute error of the composed expected points $\hat y_i$ against realized gameweek points over all scored rows; the paired statistic is reference MAE minus candidate MAE, so a positive value favours the candidate. The rule, declared on 7 September 2026 and unchanged since: the candidate is preferred only if (i) its 2025-26 points MAE is lower, (ii) the 90\% season-aware moving-block bootstrap interval of the paired per-fold differences on 2025-26 lies entirely above zero, and (iii) the same interval on 2024-25 does not lie entirely below zero. No minimum effect size is imposed. The rule is a development rule, and ``better forecast'' in this paper means lower MAE under it; appearance Brier and log loss, minutes MAE, points RMSE and mean error are reported beside the rule and do not enter it. The rule was declared before any decision reading existed and scores point forecasts alone; the mismatch between the median that MAE rewards \cite{gneiting2011} and the conditional mean the solver consumes was not part of the declaration. The estimators themselves minimise squared error and log loss, so only the selection rule is mismatched to the solver.
+
+\subsection{The Decision-Level Reading}
+
+For each of the 147 decision folds, each arm's expected points go through the programme of Section~\ref{sec:opt} under the measurement configuration (one worker, seed 0, deterministic budget 5.0). The squad is completed (bench order and vice-captain by expected points) and scored against the fold's realized outcomes under the official automatic-substitution and captain rules.\footnote{The recorded scores read participation from minutes alone; the rescoring with card participation and its scope are reported in Section~\ref{sec:reeval}.} Roster, prices, positions, outcomes, solver limits and scorer are identical between arms; only the expected-points column differs. The reading reports each arm's mean realized score, the paired candidate-minus-reference mean and median, wins, ties and losses, and a 90\% interval.
+
+\subsection{Same Seasons, Same Reference}
+\label{sec:sameperiod}
+
+The rule reads 2025-26, which the decision folds do not contain and whose points are scored under different rules. To compare the two levels on the same evidence we also report, for each candidate, both arms' points MAE over the four decision seasons, each recorded season weighted by its observations. The decision reading is taken against the same reference arm the player-level comparison uses: the linear arm for four candidates, the boosted pair on \texttt{v1} for the wider contract. This reading was added after all results were known; it is arithmetic on recorded season summaries and does not replace the declared rule.
+
+\subsection{Inference and Precision}
+
+Intervals on paired per-fold differences come from a moving-block bootstrap \cite{kunsch1989} that resamples blocks of four consecutive folds within a season and never across a season boundary, 5{,}000 resamples, seed 0, percentile 90\% interval. The 90\% level is the one the declared rule uses, and every interval in the paper is reported at it. The project's threshold for \emph{certifying} a points effect is a mean of at least 1.5 points a gameweek with an interval excluding zero and at most one losing season. The bar was set in advance and was not derived from the observed noise, which Section~\ref{sec:precision} measures. Section~\ref{sec:precision} adds IID precision diagnostics per candidate and the sensitivity of each interval to the block length and to leaving one season out; none was pre-declared, and all are arithmetic on the recorded per-fold differences.
+
+\subsection{Pre-Registration Status}
+\label{sec:prereg}
+
+The study is not one confirmatory pre-registration, and we report each analysis as it fell. The component model, the foundation sampler's two gates, the points-MAE rule and the season-age weighting were declared in September 2026 before anything on these folds had been read. The boosted pair, the wider contract and the points-only candidate were declared in method notes before their measurement, the points-only one after a recomposition probe that already gave its decision outcome. The regime-gated experts, the gated mixture, the club-block and joint club-match samplers, the rank-conditional shrinkage and the mean-reversion discount were pre-registered in October 2026 after the boosted-pair and points-only records had been read, the two samplers before their code was written. The regime gate read twelve inputs where eleven were declared. The re-evaluation of Section~\ref{sec:reeval} was declared on 8 November 2026, before its run and after every reading above. Several readings were added after a result: the decision readings of the boosted pair and the wider contract, the joint sampler's seed reading, the status split and the probe reproduction of the points-only record, and the same-period and per-candidate precision readings of this paper.
+
+\subsection{Multiple Comparisons}
+
+Six candidates were measured under one rule, and no correction is applied. The study is exploratory. The prospective 2026-27 benchmark, read from gameweek 7, evaluates the deployed system against an ownership template and strong real managers under its own pre-registration; it does not re-test these five model comparisons, and a confirmatory study of them would need its own declared hypotheses and arms. For the decision reading the question is moot in one direction: no interval excluded zero before any correction. Intervals that cover zero do not establish that an effect is absent or negligible; taken together they reach from a loss of 3.2 to a gain of 2.2 points a gameweek, and no equivalence bound was declared.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Player Level Under the Rule}
+
+Table~\ref{tab:player} gives the pooled player-level metrics over the 184 folds and the rule's two seasons. Two candidates were preferred. The boosted pair's 2025-26 and 2024-25 intervals both lie above zero, and it was better pooled on all three components (the conditional minutes MAE on appeared rows, not in the table, is 20.49 for the linear arm); the wider contract was preferred against the boosted pair on the same terms. Points-only boosting was worse on 2025-26 points MAE with an interval below zero; the regime experts were worse on appearance and points. The mixture was equal on appearance, better on minutes, worse on points in 2024-25 with an interval below zero, and indistinguishable on points in 2025-26 with an interval covering zero.
+
+\begin{table}[!htb]
+\centering\small
+\caption{Player-level metrics on the 184 walk-forward folds (pooled over 128{,}627 component-route rows) and the pre-declared rule on 2025-26 and 2024-25 points MAE. Minutes MAE is the unconditional one, over all rows with the composed $\hat m_i$. Differences are reference minus candidate per fold, with the 90\% season-aware block-bootstrap intervals on the line below each difference, the 2025-26 interval first; positive favours the candidate. The wider contract's reference is the boosted pair; every other reference is the linear arm.}
+\label{tab:player}
+\setlength{\tabcolsep}{2.5pt}
+\footnotesize
+\begin{tabular}{l rrr r r r l}
+\toprule
+& \multicolumn{3}{c}{Pooled} & \multicolumn{2}{c}{2025-26 points MAE} & 2024-25 & \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}\cmidrule(lr){7-7}
+Arm & App.\ LL & Min.\ MAE & Pts MAE & MAE & diff. & diff. & Verdict \\
+\midrule
+Linear arm & 0.3462 & 16.160 & 1.0716 & 1.0058 & & & reference \\
+Boosted pair & 0.3308 & 15.406 & 1.0550 & 0.9872 & $+0.0185$ & $+0.0118$ & preferred \\
+ & & & & \multicolumn{3}{r}{\ci{+0.0143}{+0.0212}\quad \ci{+0.0068}{+0.0169}} & \\
+Wider contract$^{b}$ & 0.3154 & 14.386 & 1.0400 & 0.9679 & $+0.0194$ & $+0.0103$ & preferred \\
+ & & & & \multicolumn{3}{r}{\ci{+0.0150}{+0.0240}\quad \ci{+0.0079}{+0.0127}} & \\
+Points-only boosting & 0.3462 & 16.160 & 1.0714 & 1.0079 & $-0.0021$ & $-0.0030$ & no selection \\
+ & & & & \multicolumn{3}{r}{\ci{-0.0041}{-0.0005}\quad \ci{-0.0055}{+0.0014}} & \\
+Regime-gated experts & 0.3464 & 16.104 & 1.0729 & 1.0179 & $-0.0122$ & $-0.0017$ & no selection \\
+ & & & & \multicolumn{3}{r}{\ci{-0.0162}{-0.0080}\quad \ci{-0.0028}{-0.0001}} & \\
+Gated mixture & 0.3462 & 16.038 & 1.0733 & 1.0061 & $-0.0004$ & $-0.0020$ & no selection \\
+ & & & & \multicolumn{3}{r}{\ci{-0.0012}{+0.0004}\quad \ci{-0.0029}{-0.0009}} & \\
+\bottomrule
+\end{tabular}
+\par\smallskip\footnotesize $^{b}$Compared against the boosted pair rather than the linear arm.
+\end{table}
+
+\subsection{Accuracy and Decision on the Same Seasons}
+\label{sec:sameperiodresults}
+
+Table~\ref{tab:sameperiod} and Figure~\ref{fig:scatter} put both readings on the four decision seasons and against the same reference. The two candidates with a clear MAE gain, the boosted pair and the wider contract, read below zero at the squad level; the three whose MAE moved by about 0.002 or less read on the same side at both levels. The conclusion the table supports is narrow: on this history a lower MAE did not come with higher squad points for the two candidates where MAE moved, and no candidate's squad reading separated from zero.
+
+The table also shows why MAE alone is a thin description of the forecast the solver reads. The boosted pair lowers MAE while raising RMSE and moving the mean error further under the realized mean, pooled over all five seasons as well (RMSE 2.0398 to 2.0484). The solver consumes a conditional mean and MAE is minimised by a conditional median \cite{gneiting2011}; on a target that is zero for most rows the two can move apart. The wider contract lowers both MAE and RMSE; points-only boosting leaves MAE almost unchanged and raises RMSE.
+
+\begin{table}[!htb]
+\centering\small
+\caption{Both readings over the four decision seasons (2021-22 to 2024-25, 100{,}130 rows) against the same reference arm, the linear arm for four candidates and the boosted pair for the wider contract. MAE and mean error (prediction minus realized) are each arm's recorded season values weighted by their observations; RMSE is the root of the observation-weighted mean of the recorded season squared errors. The decision column is candidate minus reference realized squad points a gameweek on the 147 folds, with its recorded 90\% interval on the line below.}
+\label{tab:sameperiod}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{l rrr rr rr r}
+\toprule
+& \multicolumn{3}{c}{Points MAE} & \multicolumn{2}{c}{Points RMSE} & \multicolumn{2}{c}{Mean error} & Decision \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}\cmidrule(lr){9-9}
+Candidate & ref. & cand. & gain & ref. & cand. & ref. & cand. & mean \\
+\midrule
+Boosted pair & 1.0903 & 1.0743 & $+0.0159$ & 2.0601 & 2.0732 & $-0.003$ & $-0.016$ & $-0.75$ \\
+ & & & & & & & \multicolumn{2}{r}{\ci{-2.66}{+1.05}} \\
+Wider contract$^{b}$ & 1.0743 & 1.0605 & $+0.0139$ & 2.0732 & 2.0566 & $-0.016$ & $-0.015$ & $-0.20$ \\
+ & & & & & & & \multicolumn{2}{r}{\ci{-1.80}{+1.06}} \\
+Points-only boosting & 1.0903 & 1.0895 & $+0.0008$ & 2.0601 & 2.0755 & $-0.003$ & $-0.014$ & $+0.47$ \\
+ & & & & & & & \multicolumn{2}{r}{\ci{-1.19}{+2.22}} \\
+Regime-gated experts & 1.0903 & 1.0885 & $+0.0018$ & 2.0601 & 2.0615 & $-0.003$ & $-0.008$ & $+0.54$ \\
+ & & & & & & & \multicolumn{2}{r}{\ci{-0.63}{+1.67}} \\
+Gated mixture & 1.0903 & 1.0924 & $-0.0021$ & 2.0601 & 2.0608 & $-0.003$ & $+0.001$ & $-0.36$ \\
+ & & & & & & & \multicolumn{2}{r}{\ci{-1.07}{+0.73}} \\
+\bottomrule
+\end{tabular}
+\par\smallskip\footnotesize $^{b}$Compared against the boosted pair rather than the linear arm.
+\end{table}
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=0.7\linewidth]{fig3_accuracy_against_decision}
+\caption{Each candidate's points-MAE gain over the four decision seasons (horizontal; reference minus candidate, observation-weighted; positive favours the candidate) against its paired decision difference on the same 147 folds and against the same reference arm (vertical), with the recorded 90\% interval as a bar. The two candidates with a clear MAE gain sit below zero on the squad axis; every interval covers zero.}
+\label{fig:scatter}
+\end{figure}
+
+\subsection{Decision Level}
+\label{sec:decisionresults}
+
+Table~\ref{tab:decision} and Figure~\ref{fig:seasons} give the decision reading against the linear arm, as the records state it. Before the re-evaluation, two exports of the linear arm existed, the frozen first evaluation (R1) under a ten-second wall clock and the candidate records' export under the 5.0 budget, and every candidate is paired with the second. The linear arm's advantage over the ridge control holds in both, and the re-evaluation puts on it a 90\% interval that excludes zero (Section~\ref{sec:reeval}). Against the linear arm no candidate separates: the paired means run from $-0.95$ to $+0.54$ and every interval covers zero. The regime and mixture candidates tie the linear arm on 86 and 78 of 147 folds. A tie means equal realized points; these two records did not store the squads, so whether the tied squads were identical is unknown (where squads were recorded, Table~\ref{tab:budget}, 2 of 15 tied folds had identical squads, on pairs that tie on 5 and 10 folds, and that finding need not carry over to these ties). The per-fold spread within a season is of the order of ten points either way, and no candidate is above the linear arm in every season (Figure~\ref{fig:seasons}).
+
+\begin{table}[!htb]
+\centering\small
+\caption{Realized squad points a gameweek on the 147 frozen decision folds, each arm's squads solved by the same programme and scored under the official rules, with participation read from minutes alone. Paired differences are candidate minus the linear arm with 90\% season-aware block-bootstrap intervals and wins/ties/losses. In the last column, ``with rule'' marks a decision reading that is part of the candidate's declared rule, ``pre-registered'' one declared as a description without a gate, and ``after'' one added after the player-level result.}
+\label{tab:decision}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{l rr r l r l}
+\toprule
+Arm & Mean & vs ridge & vs linear & 90\% interval & W/T/L & Declared \\
+\midrule
+Ridge control & 58.52 & & & & & \\
+Linear arm & 63.42 & $+4.89$ & & & & reference \\
+Boosted pair & 62.67 & $+4.14$ & $-0.75$ & \ci{-2.66}{+1.05} & 75/5/67 & after \\
+Wider contract & 62.46 & $+3.94$ & $-0.95$ & \ci{-3.24}{+1.01} & 67/8/72 & after \\
+Points-only boosting & 63.88 & $+5.36$ & $+0.47$ & \ci{-1.19}{+2.22} & 73/6/68 & with rule$^{a}$ \\
+Regime-gated experts & 63.96 & $+5.44$ & $+0.54$ & \ci{-0.63}{+1.67} & 39/86/22 & with rule \\
+Gated mixture & 63.05 & $+4.53$ & $-0.36$ & \ci{-1.07}{+0.73} & 33/78/36 & pre-registered \\
+\midrule
+\multicolumn{7}{l}{\footnotesize Frozen first evaluation, ten-second limit: ridge 58.54, linear arm 63.16, paired $+4.62$, 84/8/55.} \\
+\bottomrule
+\end{tabular}
+\par\smallskip\footnotesize $^{a}$Declared with the rule, but its value reproduces a recomposition probe known before the declaration.
+\end{table}
+
+\paragraph{Solver Status:} Table~\ref{tab:status} gives every status count the records hold. Under the ten-second wall clock of the frozen first evaluation and under the deterministic 5.0 budget of the candidate records, between 21 and 41 of the 147 solves of the linear arm and of the ridge control ended feasible without proof; the points-only candidate was proven on every fold. The points-only record's split by the linear arm's status (Table~\ref{tab:status}) does not change the verdict, but the four other records did not record their candidate arm's status and no candidate was re-solved to proof; Section~\ref{sec:reeval} reads the sensitivity to a larger budget.
+
+\begin{table}[!htb]
+\centering\small
+\caption{Solver status of the decision solves where a record holds it. The frozen first evaluation ran under a ten-second wall clock; the candidate records and the re-evaluation under the deterministic 5.0 budget, and the re-evaluation again at 60.0 units. Of the candidate records only the points-only one holds its candidate arm's counts; the re-evaluation holds every arm it re-solved.}
+\label{tab:status}
+\begin{tabular}{l l rrr}
+\toprule
+Record & Arm & Folds & Proven optimal & Feasible, unproven \\
+\midrule
+Frozen first evaluation (R1) & linear arm & 147 & 114 & 33 \\
+ & ridge control & 147 & 126 & 21 \\
+Points-only record (R9) & linear arm & 147 & 106 & 41 \\
+ & ridge control & 147 & 117 & 30 \\
+ & points-only boosting & 147 & 147 & 0 \\
+Re-evaluation at 5.0 (R13) & linear arm & 147 & 103 & 44 \\
+ & ridge control & 147 & 116 & 31 \\
+ & boosted pair & 147 & 147 & 0 \\
+ & wider contract & 147 & 147 & 0 \\
+Re-evaluation at 60.0 (R13) & linear arm & 147 & 136 & 11 \\
+ & ridge control & 147 & 140 & 7 \\
+ & boosted pair & 147 & 147 & 0 \\
+ & wider contract & 147 & 147 & 0 \\
+\bottomrule
+\end{tabular}
+\par\smallskip\footnotesize R9, candidate minus linear by the linear arm's status: proven folds $+0.78$ (106 folds; 54/5/47), unproven $-0.34$ (41 folds; 19/1/21). R13: the linear arm's 12 folds whose realized score differs from R8's are all among its 44 unproven solves.
+\end{table}
+
+\begin{table}[!htb]
+\centering\footnotesize
+\caption{The re-evaluation at the 5.0 and 60.0 budgets (R13): each pair's paired difference under the official card rule with its 90\% season-aware block-bootstrap interval and wins/ties/losses, and the overlap of the two arms' squads on the same 147 folds; the pairs are the boosted pair against the linear arm and the wider contract against the boosted pair.}
+\label{tab:budget}
+\begin{tabular}{l rr rr}
+\toprule
+ & \multicolumn{2}{c}{Boosted pair $-$ linear} & \multicolumn{2}{c}{Wider $-$ boosted pair} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Deterministic budget & 5.0 & 60.0 & 5.0 & 60.0 \\
+\midrule
+Paired mean, points a gameweek & $-0.69$ & $-0.53$ & $-0.20$ & $-0.20$ \\
+90\% interval & \ci{-2.49}{+1.03} & \ci{-2.35}{+1.23} & \ci{-1.81}{+1.05} & \ci{-1.78}{+1.07} \\
+Wins/ties/losses & 74/5/68 & 76/5/66 & 69/10/68 & 69/10/68 \\
+Shared squad members of 15, mean & 5.85 & 5.84 & 9.30 & 9.30 \\
+Shared starters of 11, mean & 4.76 & 4.73 & 7.35 & 7.35 \\
+Folds with the same captain & 56 & 56 & 100 & 100 \\
+Folds with identical squads & 1 & 1 & 2 & 2 \\
+Tied folds (equal realized points) & 5 & 5 & 10 & 10 \\
+Tied folds with identical squads & 1 & 1 & 1 & 1 \\
+\bottomrule
+\end{tabular}
+\par\smallskip\footnotesize Means and counts are over the same 147 folds; the recorded means at 5.0 were $-0.75$ (R8) and $-0.20$ (R7). At 60.0 only the linear arm's 16 squads and the ridge control's 5 changed; the wider pair's interval ends differ between the budgets, and from the recorded R7 interval, only because the bootstrap stream is seeded from an id that names the budget and the scoring convention.
+\end{table}
+
+\paragraph{Zero-Minute Starters:} The boosted pair's squads started more players who then played no minutes (108 against the linear arm's 83 over 147 folds) despite a lower appearance log loss. One reading, stated in the records as a hypothesis, is that its appearance probabilities were sharper and the product $p_i g_i$ lets a confident probability on a high-rate player outweigh a diffuse one on a steady starter. The two forecasts select substantially different squads from the same roster (Table~\ref{tab:budget}), and the appearance calibration of the selected players is unmeasured.
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=0.72\linewidth]{fig2_decision_by_season}
+\caption{Season means of the paired decision difference for each candidate. The sign changes across seasons for all five.}
+\label{fig:seasons}
+\end{figure}
+
+\subsection{Re-Evaluation of the Recorded Decisions}
+\label{sec:reeval}
+
+As a supplementary descriptive check (R13), the linear arm, the boosted pair and the wider contract were re-exported from the pinned archive and re-solved at the 5.0 budget with every squad recorded. The purpose was to confirm that the records reproduce, to rescore every squad under the official card rule and to read squad overlap (Tables~\ref{tab:status} and~\ref{tab:budget}). The two boosted tables re-exported byte for byte, every decision came back with its recorded realized score, and both arms were proven on all 147 folds. The linear arm's table did not re-export byte for byte, most likely because a linear fit on a different interpreter and numerical library differs in the last digits, which the first record did not log. 135 of its 147 scores reproduced. The 12 that differ are all folds the rerun stopped unproven and their differences sum to $-8$ points; the boosted pair's paired mean against the linear arm moved from $-0.75$ to $-0.69$ (Table~\ref{tab:budget}) and the wider contract's $-0.20$ did not move. On the rerun's decisions the linear arm's paired difference against the ridge control, solved beside every table, is $+4.79$ (\ci{+2.34}{+6.87}, 85/8/54) at 5.0 and $+4.62$ (\ci{+2.20}{+6.76}, 84/8/55) at 60.0.
+
+\paragraph{Rescoring Under the Card Rule:} Rescoring the fixed squads of these four arms, the three re-solved tables and the ridge control beside them, with card participation, under which a player booked without a minute counts as having played for the automatic substitution, changed no fold score at either budget. The check covers neither the points-only, regime and mixture arms, whose squads were not recorded, nor the decision effect of modelling nonzero points conditional on zero minutes, which would change the forecasts before the solve.
+
+\paragraph{Sensitivity to the Solver Budget:} A second run re-solved every arm at a 60.0-unit budget, twelve times the measurement budget, under a wall cap no solve reached. It proved 33 more linear-arm folds and 24 more ridge-control folds (Table~\ref{tab:status}). It changed 16 of the linear arm's 147 squads and 5 of the ridge control's, all on folds unproven at 5.0, and no captain; every fold proven at both budgets returned the same fifteen players. The objective gains were small: 0.011 expected points a fold on the linear arm (at most 0.305) and 0.007 on the ridge control. The gap between incumbent and bound had averaged 5.3 and 5.9 points (at most 9.0) on the folds left unproven at 5.0, so on the folds the larger budget proved, most of that gap had lain in the bound. The linear arm's realized score fell by 0.16 a gameweek (13 folds, sum $-24$) and the ridge control's rose by one point in total; both boosted arms were proven at both budgets with identical decisions, so the budget increase moved the boosted-pair-minus-linear mean by $+0.16$ through those 13 folds alone and left the wider contract's pair unchanged (Table~\ref{tab:budget}). This is the sensitivity to the tested increase and no upper bound on the search's remaining contribution: 11 of the linear arm's solves were still unproven at 60.0, and the solver's bound is on the surrogate objective in expected points.
+
+
+\subsection{What the Decision Reading Can Resolve, by Candidate}
+\label{sec:precision}
+
+The instrument study (R12) measured the precision of one comparison, the linear arm against the ridge control, treating the 147 folds as independent (Table~\ref{tab:precision}, last row). Its half-width and minimal detectable effect do not transfer to the candidates, whose per-fold standard deviations against the linear arm run from 6.5 to 15.7, so the table applies the same formulas to each. The wider contract was declared against the boosted pair, so its row against the boosted pair is the one that matches its declaration. Every candidate's mean is inside its own half-width. The leave-one-season-out means (not shown) change sign for every candidate depending on which season is dropped, which says the same thing as Figure~\ref{fig:seasons}: no candidate's reading rests on all four seasons together. Folds overlap in squads and weeks within a season, so the IID figures are descriptive approximations that ignore dependence; the season-aware block-bootstrap intervals of Table~\ref{tab:decision} are the ones the records report.
+
+\paragraph{Block Length:} Table~\ref{tab:precision} also recomputes every interval from the recorded per-fold differences with the same season-aware procedure at blocks of 2 and 8 (5{,}000 resamples, seed 0). At blocks of 4 the recomputation reproduces the recorded interval exactly where the record names its bootstrap id (regime, mixture, wider contract) and within 0.04 at either end where it does not (boosted pair \ci{-2.66}{+1.03}, points-only \ci{-1.20}{+2.18}). Every interval contains zero at every block length; the widths change by 0.01 to 0.83 points between blocks of 2 and 8, most for points-only boosting, so the block length changes the widths and not the inference.
+
+\begin{table}[!htb]
+\centering\small
+\caption{Precision of each paired decision reading on the 147 folds. IID diagnostics: 90\% half-width $z_{0.95}\,s/\sqrt{n}$ and two-sided MDE $(z_{0.975}+z_{0.8})\,s/\sqrt{n}$, $s$ the sample standard deviation of the recorded per-fold differences, descriptive approximations that ignore the dependence between folds. Block sensitivity: the recorded 90\% interval (Tables~\ref{tab:sameperiod} and~\ref{tab:decision}, blocks of 4) recomputed at blocks of 2 and 8. The sixth row pairs the wider contract with its own reference; the last row is the instrument record's reading.}
+\label{tab:precision}
+\setlength{\tabcolsep}{3.5pt}
+\footnotesize
+\begin{tabular}{l r r r r l l}
+\toprule
+Comparison & Mean & $s$ & Half-width & MDE & Blocks of 2 & Blocks of 8 \\
+\midrule
+Boosted pair vs linear arm & $-0.75$ & 14.88 & 2.02 & 3.44 & \ci{-2.89}{+1.01} & \ci{-2.62}{+0.78} \\
+Wider contract vs linear arm & $-0.95$ & 15.74 & 2.13 & 3.64 & \ci{-3.37}{+0.88} & \ci{-3.48}{+0.71} \\
+Points-only boosting vs linear arm & $+0.47$ & 13.78 & 1.87 & 3.18 & \ci{-1.48}{+2.22} & \ci{-0.86}{+2.01} \\
+Regime-gated experts vs linear arm & $+0.54$ & 7.90 & 1.07 & 1.83 & \ci{-0.59}{+1.59} & \ci{-0.45}{+1.71} \\
+Gated mixture vs linear arm & $-0.36$ & 6.51 & 0.88 & 1.50 & \ci{-1.05}{+0.67} & \ci{-1.06}{+0.65} \\
+Wider contract vs boosted pair & $-0.20$ & 10.49 & 1.42 & 2.42 & \ci{-1.71}{+1.02} & \ci{-1.98}{+0.86} \\
+\midrule
+Linear arm vs ridge control (R12) & $+4.62$ & 15.10 & 2.05 & 3.49 & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Distribution Quality}
+\label{sec:dist}
+
+The mixture publishes a predictive distribution per player; the linear arm's comparator is a single Gaussian around the ridge mean. Both were scored as discretised distributions on the 52{,}517 rows that appeared and took the component route in both arms, with the logarithmic score $\log\big(F(y+\tfrac12)-F(y-\tfrac12)\big)$ and the mid-point PIT $\tfrac12\big(F(y-\tfrac12)+F(y+\tfrac12)\big)$. Table~\ref{tab:dist} gives the pooled reading: the mixture scores higher on both components, and its tail shares move toward 0.05 except the upper tail for minutes, a reference that is only approximate for the mid-point PIT of a discrete outcome, as noted below. On the 74 folds of 2024-25 and 2025-26 scored fold by fold the mixture won every fold for both components; the per-fold mean log-score differences for points were $+0.38$ (\ci{+0.36}{+0.40}) in 2025-26 and $+0.51$ (\ci{+0.49}{+0.52}) in 2024-25. The same candidate showed no improvement in point accuracy (Table~\ref{tab:player}) and no demonstrated improvement at the decision (Table~\ref{tab:decision}; its realized score differed from the linear arm's on 69 of 147 folds).
+
+Three qualifications attach to this reading. The log score is a proper score of the whole predictive distribution, so a higher value says the mixture is the better distribution and says nothing about sharpness, which was not measured separately. A single Gaussian is also a weak comparator for an integer, right-skewed target, so the size of the gain, about 0.45 nats, says as much about the comparator as about the mixture; a stronger baseline such as the empirical residual distribution was not scored. The mid-point PIT of a discrete outcome is not uniform under a calibrated forecast, so its tails need not equal 0.05 and a randomized PIT \cite{gneitingranjan2013} would be the right reference; the tail readings compare two arms under one convention, and a mean PIT near 0.5 speaks to location only. With those qualifications the result still separates the axes: the conditional, appeared-row distributions improved on every fold scored while neither point accuracy nor realized squad points did. Nothing here is a claim about the full player-points distribution, zero atom included, or about the joint distribution of a squad.
+
+\begin{table}[!htb]
+\centering\small
+\caption{Predictive-distribution scores of the gated mixture and its single-Gaussian control, pooled over 52{,}517 appeared rows. Higher log score is better; tails are the share of mid-point PITs below 0.05 and above 0.95, which a calibrated discrete forecast need not put at 0.05.}
+\label{tab:dist}
+\begin{tabular}{llrrrr}
+\toprule
+Component & Arm & Mean log score & Mean PIT & Lower tail & Upper tail \\
+\midrule
+Points & control & $-2.495$ & 0.465 & 0.004 & 0.074 \\
+Points & mixture & $-2.043$ & 0.505 & 0.027 & 0.041 \\
+Minutes & control & $-4.725$ & 0.506 & 0.068 & 0.033 \\
+Minutes & mixture & $-4.182$ & 0.510 & 0.045 & 0.016 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Scenario Calibration}
+\label{sec:calib}
+
+Three records read the samplers (Table~\ref{tab:calib} and Figure~\ref{fig:pit}). The \emph{binding record} R2 read the foundation sampler alone on the frozen decisions. The \emph{block record} R11 read the foundation and club-block samplers on a regenerated component table whose decisions differ from R2's on ten folds. The \emph{joint record} R6 read all three samplers on R2's table under the deterministic budget, where R2 had used a ten-second wall clock, so eleven decisions differ by fingerprint and ten realized scores move, all on unproven solves. Numbers across records therefore mix a sampler change with table and decision changes. The clean comparison is within R6, where the three samplers share table, decisions, scenario count and seed. There every arm passes S1; the foundation sampler fails S2 by seven folds, the club-block sampler by two, and the joint sampler passes by one fold at seed 0.
+
+\begin{table}[!htb]
+\centering\small
+\caption{Calibration of the three samplers on the frozen 137 folds, 1{,}000 scenarios a fold, seed 0. S1 band $[0.43, 0.57]$ on the mean PIT; S2 band $[0.04, 0.16]$, at most 21 folds, on the share of folds with the realized score below the scenario tenth percentile. The block record's decisions differ from the joint record's on about ten folds.}
+\label{tab:calib}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrrrl}
+\toprule
+Sampler & Record & Mean PIT & Below $q^{10}$ & Rate & S2 \\
+\midrule
+Foundation & binding record (R2) & 0.5147 & 28 & 0.204 & fail \\
+Foundation & block record, control arm (R11) & 0.5197 & 25 & 0.182 & fail \\
+Club block & block record, candidate (R11) & 0.5166 & 22 & 0.161 & fail \\
+Foundation & joint record, control A (R6) & 0.5209 & 28 & 0.204 & fail \\
+Club block & joint record, control B (R6) & 0.5186 & 23 & 0.168 & fail \\
+Joint club-match & joint record, candidate (R6) & 0.5207 & 21 & 0.153 & pass (seed 0) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=0.88\linewidth]{fig4_sampler_pit}
+\caption{PIT histograms of the sampler arms over the 137 calibration folds. Every arm's pooled mean PIT is inside the S1 band; the excess mass in the lowest bin is the lower-tail under-coverage that S2 measures.}
+\label{fig:pit}
+\end{figure}
+
+\paragraph{By Season:} The pooled mean PIT hides season structure that every arm shares (Table~\ref{tab:calibseason}): every sampler runs high in 2022-23 and low in 2023-24, both outside the pooled S1 band if that band is applied season by season, and the lower-tail count is highest in 2023-24 for every sampler. A pooled mean PIT of 0.52 therefore averages a season that runs high and one that runs low. The gates were declared on the pooled reading and are read as declared. The season readings are descriptive, since a pooled band applied to 27 to 37 folds is not a test with its own error rate, but a conditional-calibration claim would have to survive them.
+
+\begin{table}[!htb]
+\centering\small
+\caption{Season readings of the three arms of the joint record (same decisions, scenario count and seed). Mean PIT, and folds with the realized score below the scenario tenth percentile, by season. The binding record holds pooled readings only.}
+\label{tab:calibseason}
+\begin{tabular}{l rrrr rrrr}
+\toprule
+& \multicolumn{4}{c}{Mean PIT} & \multicolumn{4}{c}{Below $q^{10}$ (folds)} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+Arm & 21-22 & 22-23 & 23-24 & 24-25 & 21-22 & 22-23 & 23-24 & 24-25 \\
+\midrule
+Folds & 27 & 36 & 37 & 37 & 27 & 36 & 37 & 37 \\
+Foundation (control A) & 0.500 & 0.608 & 0.424 & 0.548 & 7 & 4 & 13 & 4 \\
+Club block (control B) & 0.497 & 0.612 & 0.424 & 0.539 & 7 & 1 & 12 & 3 \\
+Joint club-match & 0.501 & 0.613 & 0.425 & 0.541 & 6 & 1 & 11 & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Seed Sensitivity:} A reading added after the result re-drew, under seeds 0 to 9, the twelve folds whose PIT lay close enough to 0.10 for the tail indicator to change with the seed. The joint sampler's lower-tail counts at seeds 0 to 9 were 21, 22, 23, 25, 25, 23, 25, 24, 23 and 23 (mean 23.4), inside the band of at most 21 at seed 0 alone. The club-block sampler's were 23, 24, 24, 24, 23, 26, 26, 23, 23 and 24 (mean 24.0), inside on none. The count expected under the joint sampler's own probabilities, 22.7 to 22.9 across seeds, is above the ceiling. The within-club appearance co-movement the sampler was built to carry is almost absent in the measured squads: correlation 0.0030 in its scenarios against $-0.0007$ in the club-block sampler's. Against the club-block sampler its scenario mean is 0.156 points lower and its scenario tenth percentile 0.110 lower, so the tail gain is mostly a location shift and only slightly a fatter lower tail. The 137 folds had been read by three samplers before this one, the two of Table~\ref{tab:calib} and a conditional residual sampler whose numbers were not recorded, and the joint protocol was committed after the block record had listed the folds it flipped. The record stands as development evidence on reused folds; nothing was pinned.
+
+
+Every sampler under-covers the lower tail: 21 to 28 folds below the scenario tenth percentile against the 13.7 that a tenth percentile implies on 137 folds, 1.5 to 2.0 times nominal. The under-coverage may reflect a spread that is too narrow, a location that is wrong for part of the population, or both; the gates and the season table do not identify their separate contributions. Club co-movement, the mechanism the two candidates added, moved the count from 28 toward 21 to 25 within the joint record; what remains is of the same order. The projection's own uncertainty, which none of the samplers carries, is a plausible remainder and is not measured here.
+
+\section{Discussion}
+\label{sec:discussion}
+
+
+\paragraph{Why the Two Readings Can Diverge:} The tables are consistent with three mechanisms and establish none. First, the functional: the solver reads a conditional mean, the rule rewards a conditional median \cite{gneiting2011}, and the boosted pair lowered MAE while raising RMSE and under-predicting further on average (Table~\ref{tab:sameperiod}). Second, the selection: fifteen players from about six hundred under tight constraints are decided by the ordering near the top of each position's price band, not by the error over all rows. Two forecasts can therefore differ in MAE by a few hundredths and agree on most of the squad. Where overlap was measured (Table~\ref{tab:budget}) the picture is mixed: the boosted pair and the linear arm, a few hundredths of MAE apart, share about six of fifteen squad members, far from agreement on most of the squad. The wider contract and the boosted pair share about nine. Third, the noise: the paired per-fold difference has a standard deviation of about 15 points under the boosted arms, so a one-point effect needs several hundred folds for a 90\% half-width of one point and well over a thousand to be detected at the usual power. The search noise of unproven solves adds to it (Section~\ref{sec:reeval}). The zero-minute-starter count of the boosted pair (108 against 83) is the one diagnostic that points at a mechanism, and it is a hypothesis.
+
+
+\paragraph{Reading the Calibration Result:} The joint sampler's seed reading, not its seed-0 pass, is the finding: a one-fold margin with 1{,}000 draws a fold is inside Monte Carlo noise. The method that stops that error is cheap, re-draw at several seeds and state the expected count before calling a gate passed. The season structure under the pooled location statement needs calibration read by season or by covariate, which the gates as declared do not do.
+
+\paragraph{Planning-Side Corrections:} Two pre-registered measurements tested the interface from the decision side on other inputs, in realized points a gameweek net of charged hits, and neither certified anything (records R10 and R3). The first asked whether the winner's curse, the upward bias of the selected players' projections, can be corrected before the solve. A rank-conditional debias fitted walk-forward on the boosted pair's own residuals scored $-0.85$ against the same table unshrunk (\ci{-1.59}{-0.02}, 51/63/62, 176 folds over five seasons, every solve proven), below its comparator in four of five seasons; a position-level shrinkage read $+0.07$ (\ci{-0.28}{+0.56}). The table's own selection gap was $+0.50$ a selected starter where the earlier form baseline had measured $+2.95$, so there was little curse left to correct. The second shrank each later week's projection of a rolling three-week planner toward the position mean by a factor $\rho^{k}$ for horizon offset $k$, on the planner's deterministic baseline projection. Against the undiscounted three-week planner on 184 weeks it read $-0.56$ (\ci{-1.51}{+0.89}) at $\rho = 0.75$, $-0.03$ (\ci{-0.83}{+0.64}) at 0.9 and $-0.14$ (\ci{-0.76}{+0.90}) at 0.6; every three-week arm read below the one-week plan, the undiscounted one by $-0.51$ (\ci{-1.79}{+0.34}) and the $\rho = 0.75$ one by $-1.07$ (\ci{-2.52}{+0.26}).
+
+\paragraph{Future Work:} The readings point to a decision reading of the sequential problem itself, with carried squads, transfers and chips, on the same folds, so that the policy the system serves is the policy measured. The 37 decision folds of 2025-26 could join it as a declared development reading. The readings also point to solves run to proof on every fold, which would remove the search's contribution to a paired difference instead of probing it. Information the archive does not hold, pre-deadline availability and projected line-ups with verifiable as-of times, is now recorded by the live capture and can be measured in the prospective season. Decision-focused training \cite{elmachtoub2022}, distributional estimators \cite{duan2020}, an objective closer to the realized score and a rank objective for a private league remain open; this paper measured none of them.
+
+\section{Limitations}
+\label{sec:limitations}
+
+The study rests on one archive, one game and at most thirteen as-of features: no odds, no line-ups, no event data, and nothing is claimed for other fantasy games or for estimators not tried. That the archive's pre-match columns were known at each historical deadline is a structural assumption the tests enforce but cannot verify (Table~\ref{tab:timeclass}). The decision reading is a weekly independent selection (Section~\ref{sec:game}) with a surrogate objective (Section~\ref{sec:opt}); not every solve is proven (Table~\ref{tab:status}), and the budget reading of Section~\ref{sec:reeval} is a sensitivity, not a bound. The served system's availability rule applies only at live deadlines, cannot be validated on the archive and enters no measurement here. The season 2025-26 is development data read by earlier work (Section~\ref{sec:data}), and the 137 calibration folds have been read by four samplers (Section~\ref{sec:calib}). The precision figures are IID approximations, no equivalence bound was declared and no correction was applied over six candidates (Section~\ref{sec:protocol}); the calibration gates read pooled PIT and tail rates, so the season structure of Table~\ref{tab:calibseason} qualifies them, and the mixture's mid-point PIT is read under one convention and not against a randomized reference (Section~\ref{sec:dist}).
+
+\section{Reproducibility}
+\label{sec:repro}
+
+Every number in Section~\ref{sec:results} is extracted by a script from thirteen stored JSON records, each measured under a declaration committed before its run. They are R1, the frozen first evaluation of the component model against the ridge control; R2, the foundation sampler on the two gates; R3, the mean-reversion discount; R4, the gated mixture; R5, the regime-gated experts; R6, the joint club-match sampler; R7, the wider feature contract; R8, the boosted pair; R9, points-only boosting; R10, the rank-conditional shrinkage; R11, the club-block sampler; R12, the precision instrument; and R13, the solver-budget and card-rule re-evaluation. The extractor fits and measures nothing: every cell is a recorded value, the difference of two recorded values, or an arithmetic summary of recorded values, and a provenance file names the record and JSON pointer of every cell. The re-evaluation record carries its fold-level decisions and the digests of the evaluation documents it was summarized from, and the extractor recomputes from them every summary of Tables~\ref{tab:status} and~\ref{tab:budget}, intervals included. It reports 145 of 145 record checks holding, and a manifest pins the digest of every record, table and figure. The archive itself is pinned and checksummed but not redistributed, and the fitting, solving and sampling code belongs to the system that produced the records and is available from the authors. The solvers are OR-Tools CP-SAT \cite{ortools} (one worker, seed 0, deterministic budget 5.0) and HiGHS \cite{huangfu2018} 1.15.1; the estimators are scikit-learn \cite{pedregosa2011} 1.9 under Python 3.11 and 3.13 with pinned constraints. The records, their declarations, the extractor, the manifest and the fold-level decisions are provided as supplementary material.
+
+\section{Conclusion}
+
+Five pre-declared changes to a component forecasting model for Fantasy Premier League were read by a points-MAE rule and by the realized points of a squad selected afresh each week by an exact 0--1 programme, on the same seasons and against the same reference arm. Two lowered MAE; none produced a squad reading that separated from its reference, and the two with the clearest MAE gain scored fewer squad points on the mean. The engineering lesson is that a forecast change for a constrained selection has to be read at the decision before it is promoted on a player-level metric: with the same solver on both sides, the solver's status recorded and the forecast's functional matched to what the solver consumes. Point accuracy, distribution quality and decision value have to be read separately, because they moved separately here. Whether richer information or a different objective moves the squad is the open question.
+
+\paragraph{Acknowledgements:} The public archive is maintained by Vaastav Anand; the league members whose weekly decisions the system serves are the reason the measurements exist.
+
+\begin{thebibliography}{99}\small
+
+\bibitem{groos2025} D.\ Groos. OpenFPL: An open-source forecasting method rivaling state-of-the-art Fantasy Premier League services. arXiv:2508.09992, 2025.
+
+\bibitem{gupta2019} A.\ Gupta. Time series modeling for Dream Team in Fantasy Premier League. arXiv:1909.12938, 2019.
+
+\bibitem{bonello2019} N.\ Bonello, J.\ Beel, S.\ Lawless and J.\ Debattista. Multi-stream data analytics for enhanced performance prediction in fantasy football. In \emph{Proceedings of AICS}, 2019. arXiv:1912.07441.
+
+\bibitem{matthews2012} T.\ Matthews, S.\ Ramchurn and G.\ Chalkiadakis. Competing with humans at fantasy football: team formation in large partially-observable domains. In \emph{Proceedings of the 26th AAAI Conference on Artificial Intelligence}, pages 1394--1400, 2012.
+
+\bibitem{bonomo2014} F.\ Bonomo, G.\ Dur\'an and J.\ Marenco. Mathematical programming as a tool for virtual soccer coaches: a case study of a fantasy sport game. \emph{International Transactions in Operational Research}, 21(3):399--414, 2014.
+
+\bibitem{venter2024} V.\ Z.\ Venter and J.\ H.\ van Vuuren. An optimisation approach towards soccer Fantasy Premiere League team selection. \emph{ORiON}, 40(1), 2024. DOI 10.5784/40-1-753.
+
+\bibitem{ramezani2026} D.\ Ramezani and T.\ Dinh. A data-driven framework for team selection in Fantasy Premier League. arXiv:2505.02170v3, 2026.
+
+\bibitem{elmachtoub2022} A.\ N.\ Elmachtoub and P.\ Grigas. Smart ``predict, then optimize''. \emph{Management Science}, 68(1):9--26, 2022.
+
+\bibitem{gneiting2011} T.\ Gneiting. Making and evaluating point forecasts. \emph{Journal of the American Statistical Association}, 106(494):746--762, 2011.
+
+\bibitem{gneitingranjan2013} T.\ Gneiting and R.\ Ranjan. Combining predictive distributions. \emph{Electronic Journal of Statistics}, 7:1747--1782, 2013.
+
+\bibitem{egidi2018} L.\ Egidi and J.\ Gabry. Bayesian hierarchical models for predicting individual performance in soccer. \emph{Journal of Quantitative Analysis in Sports}, 2018. DOI 10.1515/jqas-2017-0066.
+
+\bibitem{whitaker2020} G.\ A.\ Whitaker, R.\ Silva and D.\ Edwards. A Bayesian inference approach for determining player abilities in football. arXiv:1710.00001, revised 2020.
+
+\bibitem{baio2010} G.\ Baio and M.\ Blangiardo. Bayesian hierarchical model for the prediction of football results. \emph{Journal of Applied Statistics}, 37(2):253--264, 2010.
+
+\bibitem{egidi2018b} L.\ Egidi, F.\ Pauli and N.\ Torelli. Combining historical data and bookmakers' odds in modelling football scores. \emph{Statistical Modelling}, 18(5--6):436--459, 2018.
+
+\bibitem{scholtes2024} A.\ Scholtes and O.\ Karakus. Bayes-xG: player and position correction on expected goals using Bayesian hierarchical approach. arXiv:2311.13707, 2023; published 2024.
+
+\bibitem{macridemartino2025} R.\ Macr\`i-Demartino, L.\ Egidi and N.\ Torelli. Bayesian weighted discrete-time dynamic models for association football prediction. arXiv:2508.05891, 2025; \emph{Journal of the Royal Statistical Society, Series C}, 2026. DOI 10.1093/jrsssc/qlag032.
+
+\bibitem{rossi2018} A.\ Rossi, L.\ Pappalardo, P.\ Cintia, F.\ M.\ Iaia, J.\ Fernández and D.\ Medina. Effective injury forecasting in soccer with GPS training data and machine learning. \emph{PLOS ONE}, 13(7):e0201264, 2018.
+
+\bibitem{gneiting2007} T.\ Gneiting and A.\ E.\ Raftery. Strictly proper scoring rules, prediction, and estimation. \emph{Journal of the American Statistical Association}, 102(477):359--378, 2007.
+
+\bibitem{duan2020} T.\ Duan, A.\ Avati, D.\ Y.\ Ding, K.\ K.\ Thai, S.\ Basu, A.\ Y.\ Ng and A.\ Schuler. NGBoost: natural gradient boosting for probabilistic prediction. In \emph{Proceedings of ICML}, 2020.
+
+\bibitem{kunsch1989} H.\ R.\ Künsch. The jackknife and the bootstrap for general stationary observations. \emph{Annals of Statistics}, 17(3):1217--1241, 1989.
+
+\bibitem{deng2013} A.\ Deng, Y.\ Xu, R.\ Kohavi and T.\ Walker. Improving the sensitivity of online controlled experiments by utilizing pre-experiment data. In \emph{Proceedings of WSDM}, 2013.
+
+\bibitem{ortools} L.\ Perron and F.\ Didier. CP-SAT, OR-Tools. Google, 2025. \url{https://developers.google.com/optimization/cp/cp_solver}.
+
+\bibitem{huangfu2018} Q.\ Huangfu and J.\ A.\ J.\ Hall. Parallelizing the dual revised simplex method. \emph{Mathematical Programming Computation}, 10(1):119--142, 2018. HiGHS, \url{https://highs.dev}.
+
+\bibitem{pedregosa2011} F.\ Pedregosa et al. Scikit-learn: machine learning in Python. \emph{Journal of Machine Learning Research}, 12:2825--2830, 2011.
+
+\bibitem{plglossary} Premier League. FPL glossary: fantasy talk explained. 2026. \url{https://www.premierleague.com/en/news/2683145}.
+
+\bibitem{vaastav} V.\ Anand. Fantasy Premier League historical data archive. \url{https://github.com/vaastav/Fantasy-Premier-League}; the revision used is pinned and checksummed in the supplementary package.
+
+\end{thebibliography}
+
+\end{document}

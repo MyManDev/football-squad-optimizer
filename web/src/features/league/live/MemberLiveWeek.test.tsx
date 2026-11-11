@@ -15,9 +15,9 @@ import { withLeague } from "../../../testSupport/league";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import { createForwarderClient, type ForwarderClient } from "../forwarder/client";
 import type { FplEntryBundle } from "../forwarder/documents";
-import { MemberLiveWeek } from "./MemberLiveWeek";
-import { memberLiveScore } from "./memberLiveScore";
-import type { MemberLiveDependencies } from "./useMemberLiveScore";
+import { MemberLiveWeek, MemberLiveWeekView } from "./MemberLiveWeek";
+import { memberLiveScore, type MemberLiveScore } from "./memberLiveScore";
+import type { MemberLive, MemberLiveDependencies } from "./useMemberLiveScore";
 
 afterEach(() => {
   cleanup();
@@ -339,3 +339,45 @@ it.each(["entry", "capture"] as const)(
     expect(forwarder.entryBundle).toHaveBeenCalledTimes(2);
   },
 );
+
+describe("beside the GOL board", () => {
+  const scored = (name: LiveExample): MemberLiveScore => {
+    const result = memberLiveScore({
+      live: forwardedLive(name, WEEK),
+      member: MEMBER,
+      table: TABLE,
+      fixtures: CALENDAR,
+    });
+    if (!result.ok) throw new Error(result.reason);
+    return result.live;
+  };
+  const view = (shown: MemberLiveScore, waiting: boolean) => {
+    const live: MemberLive = {
+      shown,
+      refreshing: false,
+      refresh: () => undefined,
+      moments: null,
+      matches: null,
+    };
+    return (
+      <LanguageProvider initialLanguage="tr">
+        <MemberLiveWeekView squad={SQUAD} live={live} waiting={waiting} />
+      </LanguageProvider>
+    );
+  };
+
+  it("keeps the read before's lists while the board has a moment to land, then takes the new one's", () => {
+    const before = scored("in_progress");
+    const after = scored("finished");
+    const incoming = `Player ${after.score.autosubs[0]![1]}`;
+    expect(before.score.autosubs).toEqual([]);
+    const { rerender } = render(view(before, false));
+    expect(screen.queryByText(incoming)).toBeNull();
+    // The new read comes while the board brings its moment: nothing moves under the board.
+    rerender(view(after, true));
+    expect(screen.queryByText(incoming)).toBeNull();
+    // Its points landed, the card takes the new read.
+    rerender(view(after, false));
+    expect(screen.getByText(incoming)).toBeInTheDocument();
+  });
+});
