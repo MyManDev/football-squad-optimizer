@@ -10,15 +10,18 @@
  * drew, or the one the visitor last saw, for the same season, member and week (`planMotion`):
  * never for a first read with nothing seen before, a reread, an older or same-time copy, a
  * language, theme or width change, or another rival. The plan is data; the page's parts play
- * it once (`claimMotion`), only while the page is in view and clear, never under the
- * reduced-motion preference, and only with transform and opacity, in the motion tokens' times.
+ * it once (`claimMotion`), never under the reduced-motion preference, and only with transform
+ * and opacity, in the motion tokens' times. Drawn while the opening cover stands or the tab is
+ * hidden, a plan is held at its first frame (the points it counts from, nothing new yet in) and
+ * plays when the page is seen; where a dialog covers the page then, it ends at once.
  *
  * Order on one read, from the render that draws it: the rows that change group or rise with
- * the armband slide at once; the rows' own changes, at most six rows, each a third of uiFast
- * after the one before: the glyphs, the flash and the points' rise first, the count a uiFast
- * later, the arrow and the edge after the data time, the substitution chips, the shirt and the
- * armband after data and ui; the duel's figures count after uiFast, its ball rolls after the data
- * time. Everything has ended within about 1.3 seconds; the light's three breaths take 4.2.
+ * the armband slide at once, over the headings; the rows' own changes, at most six rows, each
+ * a third of uiFast after the one before: the glyphs, the flash and the points' rise first, the
+ * count a uiFast later, the arrow and the edge after the data time, the substitution chips, the
+ * shirt and the armband after data and ui; the duel's figures count after uiFast, its word
+ * changes and pops as they land, its ball rolls after the data time. Everything has ended
+ * within about 1.3 seconds; the light's three breaths take 4.2.
  */
 
 import { countTo, type Count } from "../../../design/countMotion";
@@ -32,6 +35,7 @@ import {
   type LiveBoard,
   type LiveEvents,
   type LiveGroup,
+  type LiveRow,
   type LiveState,
 } from "./liveBoard";
 import { duelStatus } from "./liveDuel";
@@ -53,6 +57,12 @@ export interface RowLook {
   /** What the score takes of his points: none, once, or the armband's two or three. */
   multiplier: number;
   minutes: number;
+  /**
+   * What his appearances alone give, match by match where the read says each match's minutes,
+   * so a double week's second match brings its own point. Absent from a look kept before it was
+   * noted: the week's minutes stand in.
+   */
+  appearance?: number;
   started: boolean;
   /** The state the row draws; a pick the score does not count draws none. */
   state: LiveState | null;
@@ -91,6 +101,13 @@ export function lookKey(board: Pick<LiveBoard, "season" | "entryId" | "gameweek"
   return `${board.season}:${board.entryId}:${board.gameweek}`;
 }
 
+/** What a row's appearances alone give: each match's own where the read says its minutes. */
+function appearanceOf(row: LiveRow): number {
+  return row.fixtures.length > 0 && row.fixtures.every((fixture) => fixture.minutes !== null)
+    ? row.fixtures.reduce((sum, fixture) => sum + appearancePoints(fixture.minutes ?? 0), 0)
+    : appearancePoints(row.minutes);
+}
+
 /** The look of a drawn board, beside the duel drawn with it. */
 export function lookOf(board: LiveBoard, rival: DuelLook | null): LiveLook {
   const rows: Record<string, RowLook> = {};
@@ -103,6 +120,7 @@ export function lookOf(board: LiveBoard, rival: DuelLook | null): LiveLook {
         take: rowTake(row),
         multiplier: row.multiplier,
         minutes: row.minutes,
+        appearance: appearanceOf(row),
         started: row.started,
         state: row.counted ? row.state : null,
         group,
@@ -209,12 +227,12 @@ export function planMotion(
     const events = after.counted ? (fresh.get(id) ?? null) : null;
     const both = before.started && after.started;
     const pointsFrom = both && before.shown !== after.shown ? before.shown : null;
-    // Only what the score takes floats, never the minute that brings an appearance's point.
+    // Only what the score takes floats, never the minute that brings an appearance's point,
+    // in a double week's second match too.
     const appearanceOnly =
       events === null &&
       after.multiplier === before.multiplier &&
-      after.points - before.points ===
-        appearancePoints(after.minutes) - appearancePoints(before.minutes);
+      after.points - before.points === appearanceIn(after) - appearanceIn(before);
     const float = both && !appearanceOnly ? after.take - before.take : 0;
     const state =
       after.state !== before.state && (after.state === "up" || after.state === "down")
@@ -289,25 +307,30 @@ export function planMotion(
           },
     );
   });
-  const was = previous.rival;
-  const now = next.rival;
-  const duel =
-    was !== null && now !== null && was.rivalId === now.rivalId && !sameDuel(was, now)
-      ? {
-          rivalId: now.rivalId,
-          rivalNetFrom: was.rivalNet,
-          memberNetFrom: was.memberNet,
-          marginFrom: was.margin,
-          statusChanged: duelStatus(was.margin) !== duelStatus(now.margin),
-        }
-      : null;
   return {
     token: `${next.key}:${next.sourceTime}`,
     reopen,
     netFrom: previous.net,
     rows,
-    duel,
+    duel: duelMotion(previous.rival, next.rival),
     playing: next.playing,
+  };
+}
+
+/** A row's appearance points as its look notes them, or from its week's minutes. */
+const appearanceIn = (row: RowLook): number => row.appearance ?? appearancePoints(row.minutes);
+
+/** How the duel moves from one look of it to the next: only for the same rival, and a change. */
+export function duelMotion(was: DuelLook | null, now: DuelLook | null): DuelMotion | null {
+  if (was === null || now === null || was.rivalId !== now.rivalId || sameDuel(was, now)) {
+    return null;
+  }
+  return {
+    rivalId: now.rivalId,
+    rivalNetFrom: was.rivalNet,
+    memberNetFrom: was.memberNet,
+    marginFrom: was.margin,
+    statusChanged: duelStatus(was.margin) !== duelStatus(now.margin),
   };
 }
 
@@ -324,17 +347,22 @@ export function claimMotion(key: string): boolean {
 
 const counting = new WeakMap<Element, Count>();
 
-/** Counts `element` from one value to another after `delay`, stopping any count already on it. */
+/**
+ * Counts `element` from one value to another after `delay`, stopping any count already on it.
+ * Returns the count's animation, or null where the value was written at once.
+ */
 export function countLive(
   element: HTMLElement,
   from: number,
   to: number,
   format: (value: number) => string,
   delay = 0,
-): void {
+): Animation | null {
   settleCount(element);
   const count = countTo(element, from, to, format, undefined, delay);
-  if (count !== null) counting.set(element, count);
+  if (count === null) return null;
+  counting.set(element, count);
+  return count.animation;
 }
 
 /** Stops a count on `element` where it is, so its owner can write the value it holds. */
@@ -351,8 +379,9 @@ export function forgetLiveMotion(): void {
 }
 
 /**
- * Whether a plan may play yet: "wait" while the opening cover stands. Whether the page is in
- * view and no dialog covers it is asked as each part plays.
+ * Whether a plan may play yet: "wait" while the opening cover stands or the tab is hidden, the
+ * plan's parts held at their first frame; "open" once the page is seen. Whether a dialog covers
+ * the page is asked as each part plays.
  */
 export type MotionGate = "wait" | "open";
 
@@ -420,24 +449,17 @@ const settle = (animation: Animation, then: () => void) => {
   animation.finished.then(then, then);
 };
 
-/** Plays one row's own changes; returns what it started. */
-export function playRow(
-  row: HTMLElement,
-  motion: RowMotion,
-  times: MotionTimes,
-  locale: string,
-): Animation[] {
-  if (motion.rank === null) return [];
-  const { uiFast, ui, data } = times;
-  const start = motion.rank * times.step;
-  const started: Animation[] = [];
-  const play = (
-    element: Element | null,
-    keyframes: Keyframe[],
-    duration: number,
-    delay: number,
-    easing = LIVE_EASE,
-  ) => {
+/** Starts one timed part of a row's motion, noted in `started`. */
+type Play = (
+  element: Element | null,
+  keyframes: Keyframe[],
+  duration: number,
+  delay: number,
+  easing?: string,
+) => Animation | null;
+
+function player(started: Animation[]): Play {
+  return (element, keyframes, duration, delay, easing = LIVE_EASE) => {
     if (element === null) return null;
     const animation = element.animate(keyframes, {
       duration,
@@ -448,20 +470,59 @@ export function playRow(
     started.push(animation);
     return animation;
   };
-  const events = motion.events;
-  if (events !== null) {
-    const drop = (kind: "goal" | "assist", count: number) => {
-      if (count === 0) return;
-      const more = row.querySelector(`[data-live-glyph='${kind}-more']`);
-      const glyphs = [...row.querySelectorAll(`[data-live-glyph='${kind}']`)];
-      for (const glyph of more === null ? glyphs.slice(-count) : [more]) {
-        play(glyph, GLYPH_DROP, data, start);
-      }
-    };
-    drop("goal", events.goals);
-    drop("assist", events.assists);
-    if (events.card) play(row.querySelector("[data-live-glyph='card']"), CARD_TURN, data, start);
-    // The row flashes once for an event, behind its content.
+}
+
+/** Plays one row's own changes; returns what it started. */
+export function playRow(
+  row: HTMLElement,
+  motion: RowMotion,
+  times: MotionTimes,
+  locale: string,
+): Animation[] {
+  return startRow(row, motion, times, locale, true);
+}
+
+/**
+ * One row's own changes held at their first frame while the page waits (the opening cover, a
+ * hidden tab): its figure at the points it counts from, a new glyph, the edge and the arrow not
+ * yet in. When the page is seen they are played, and the row is lit (`lightRow`): the flash and
+ * the rise show from their first frame, so they are made only then.
+ */
+export function holdRow(
+  row: HTMLElement,
+  motion: RowMotion,
+  times: MotionTimes,
+  locale: string,
+): Animation[] {
+  const held = startRow(row, motion, times, locale, false);
+  for (const animation of held) animation.pause();
+  return held;
+}
+
+/** A held row's flash and rise, made as its held changes play; returns what it started. */
+export function lightRow(
+  row: HTMLElement,
+  motion: RowMotion,
+  times: MotionTimes,
+  locale: string,
+): Animation[] {
+  if (motion.rank === null) return [];
+  const started: Animation[] = [];
+  light(row, motion, times, locale, player(started), motion.rank * times.step);
+  return started;
+}
+
+/** The row's flash for an event, behind its content, and the rise or fall of what it took. */
+function light(
+  row: HTMLElement,
+  motion: RowMotion,
+  times: MotionTimes,
+  locale: string,
+  play: Play,
+  start: number,
+) {
+  const { data } = times;
+  if (motion.events !== null) {
     const flash = document.createElement("span");
     flash.className = styles.flash ?? "";
     flash.setAttribute("aria-hidden", "true");
@@ -482,18 +543,45 @@ export function playRow(
     if (risen === null) float.remove();
     else settle(risen, () => float.remove());
   }
+}
+
+function startRow(
+  row: HTMLElement,
+  motion: RowMotion,
+  times: MotionTimes,
+  locale: string,
+  lit: boolean,
+): Animation[] {
+  if (motion.rank === null) return [];
+  const { uiFast, ui, data } = times;
+  const start = motion.rank * times.step;
+  const started: Animation[] = [];
+  const play = player(started);
+  const events = motion.events;
+  if (events !== null) {
+    const drop = (kind: "goal" | "assist", count: number) => {
+      if (count === 0) return;
+      const more = row.querySelector(`[data-live-glyph='${kind}-more']`);
+      const glyphs = [...row.querySelectorAll(`[data-live-glyph='${kind}']`)];
+      for (const glyph of more === null ? glyphs.slice(-count) : [more]) {
+        play(glyph, GLYPH_DROP, data, start);
+      }
+    };
+    drop("goal", events.goals);
+    drop("assist", events.assists);
+    if (events.card) play(row.querySelector("[data-live-glyph='card']"), CARD_TURN, data, start);
+  }
+  if (lit) light(row, motion, times, locale, play, start);
   const figure = row.querySelector<HTMLElement>("[data-live-number]");
   if (motion.pointsFrom !== null && figure !== null) {
-    const to = Number(figure.dataset.value);
-    countLive(
+    const count = countLive(
       figure,
       motion.pointsFrom,
-      to,
+      Number(figure.dataset.value),
       (value) => countedWhole(value, locale),
       uiFast + start,
     );
-    const count = figure.getAnimations?.().at(-1);
-    if (count !== undefined) started.push(count);
+    if (count !== null) started.push(count);
   }
   if (motion.state !== null) {
     play(

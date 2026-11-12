@@ -14,6 +14,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  mockDefaultRival,
   mockEntryAdviceIndex,
   mockEntrySquadEnvelopes,
   mockLeagueMembersEnvelope,
@@ -46,10 +47,11 @@ import type { FplEntryBundle, FplH2hMatches } from "../forwarder/documents";
 import { LeagueContext } from "../LeagueContext";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { advanceRecap, liveBoard } from "./liveBoard";
+import { liveDuel } from "./liveDuel";
 import { LivePage } from "./LivePage";
 import { signedWhole } from "./liveFormat";
-import { forgetLooks, keepLook } from "./liveLooks";
-import { forgetLiveMotion, lookOf } from "./liveMotion";
+import { forgetLooks, keepLook, readLook } from "./liveLooks";
+import { APPEAR, FLASH, forgetLiveMotion, lookKey, lookOf } from "./liveMotion";
 import type { LiveForwarder } from "./liveSources";
 import { WIDE_QUERY } from "./useWide";
 
@@ -1043,11 +1045,15 @@ describe("LIVE's motion", () => {
     row: string | null;
     keyframes: Keyframe[];
     options: KeyframeAnimationOptions;
+    /** Held at its first frame, until played. */
+    paused: boolean;
+    animation: Animation;
   };
 
   /**
    * Every animate() call, noted as it is made. Each one is over at once, as a count and the GOL
-   * board read it, or, `running`, LIVE's own play on until they are stopped.
+   * board read it, unless it is held (paused) first; or, `running`, LIVE's own play on until
+   * they are stopped or finished.
    */
   function recordMotion({ running = false } = {}): Started[] {
     const started: Started[] = [];
@@ -1058,36 +1064,66 @@ describe("LIVE's motion", () => {
         const listeners = new Map<string, () => void>();
         const live = this.closest("[data-live-page]") !== null;
         const runs = running && live;
-        let playState: AnimationPlayState = runs ? "running" : "finished";
-        let stopped: () => void = () => undefined;
-        const finished = runs
-          ? new Promise<void>((resolve) => {
-              stopped = resolve;
-            })
-          : Promise.resolve();
-        started.push({
+        let playState: AnimationPlayState = "running";
+        let settle: () => void = () => undefined;
+        const finished = new Promise<void>((resolve) => {
+          settle = resolve;
+        });
+        const end = () => {
+          if (playState === "idle" || playState === "finished") return;
+          playState = "finished";
+          listeners.get("finish")?.();
+          settle();
+        };
+        const over = () =>
+          queueMicrotask(() => {
+            if (playState === "running") end();
+          });
+        const animation = {
+          finished,
+          get playState() {
+            return playState;
+          },
+          effect: {
+            getComputedTiming: () => ({
+              progress: playState === "running" || playState === "paused" ? 0 : null,
+            }),
+          },
+          addEventListener(type: string, listener: () => void) {
+            listeners.set(type, listener);
+          },
+          pause() {
+            playState = "paused";
+            record.paused = true;
+          },
+          play() {
+            playState = "running";
+            record.paused = false;
+            if (!runs) over();
+          },
+          finish() {
+            record.paused = false;
+            end();
+          },
+          cancel() {
+            playState = "idle";
+            record.paused = false;
+            listeners.get("cancel")?.();
+            settle();
+          },
+        } as unknown as Animation;
+        const record: Started = {
           element: this,
           live,
           row: this.closest("[data-live-row]")?.getAttribute("data-live-row") ?? null,
           keyframes,
           options,
-        });
-        return {
-          finished,
-          get playState() {
-            return playState;
-          },
-          effect: { getComputedTiming: () => ({ progress: runs ? 0 : null }) },
-          addEventListener(type: string, listener: () => void) {
-            listeners.set(type, listener);
-            if (!runs && type === "finish") queueMicrotask(listener);
-          },
-          cancel() {
-            playState = "idle";
-            listeners.get("cancel")?.();
-            stopped();
-          },
-        } as unknown as Animation;
+          paused: false,
+          animation,
+        };
+        started.push(record);
+        if (!runs) over();
+        return animation;
       },
     });
     return started;
@@ -1206,12 +1242,20 @@ describe("LIVE's motion", () => {
     fireEvent.click(board);
     await landBoards(["assist"]);
     await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
-    // The captain's goal puts the member ahead: Önde pops once, after the data time.
-    const pop = onLive(started).filter(({ element }) => element.matches("[data-live-status]"));
-    expect(pop).toHaveLength(1);
-    expect(pop[0]!.keyframes).toEqual(MODEL_POP);
-    expect(pop[0]!.options).toMatchObject({ duration: MOTION_MS.data, delay: MOTION_MS.data });
+    // The captain's goal puts the member ahead: Önde comes, and pops once, as the figures land.
+    const pops = () =>
+      onLive(started).filter(({ element }) => element.matches("[data-live-status]"));
+    await vi.waitFor(() => expect(pops()).toHaveLength(1));
+    expect(pops()[0]!.keyframes).toEqual(MODEL_POP);
+    expect(pops()[0]!.options).toMatchObject({ duration: MOTION_MS.data });
+    expect(pops()[0]!.options.delay ?? 0).toBe(0);
+    expect(document.querySelector("[data-live-status]")).toHaveTextContent(copy.live.status.ahead);
     expect(rolled(started)).toBe(true);
+    // The recap was not there: it comes in whole, its heading with its names, once what stood
+    // there has slid away.
+    const recap = onLive(started).find(({ element }) => element === recapRegion());
+    expect(recap?.keyframes).toEqual(APPEAR);
+    expect(recap?.options).toMatchObject({ duration: MOTION_MS.ui, delay: MOTION_MS.ui });
     // Only transform and opacity, and nothing without end.
     for (const { keyframes, options } of onLive(started)) {
       for (const frame of keyframes) {
@@ -1287,7 +1331,7 @@ describe("LIVE's motion", () => {
     expect(markup()).toBe(withMotion);
   });
 
-  it("holds everything while the opening cover stands, then moves what changed since the last look", async () => {
+  it("holds a return at its start while the opening cover stands, then moves what changed since the last look", async () => {
     const kickoff = seen("kickoff");
     const cover = document.createElement("div");
     cover.setAttribute("data-opening-mark", "");
@@ -1296,18 +1340,130 @@ describe("LIVE's motion", () => {
     renderLive({ forwarder: fakeForwarder([beat("goal")]) });
     await rows();
     await settle();
-    // Nothing moves under the cover; Canlı puan holds what the visitor last saw.
-    expect(started).toEqual([]);
+    // Under the cover the page shows what the visitor last saw: the captain's points and
+    // Canlı puan as they were, his ball held before it drops in, nothing lit, nothing running.
+    const captain = () => document.querySelector("[data-live-row='10'] [data-live-number]");
+    expect(figure(captain()?.textContent)).toBe(2);
     expect(figure(net())).toBe(kickoff.net);
+    expect(onLive(started).length).toBeGreaterThan(0);
+    expect(onLive(started).every(({ paused }) => paused)).toBe(true);
+    expect(
+      onLive(started).some(({ element }) =>
+        element.matches("[data-live-row='10'] [data-live-glyph='goal']"),
+      ),
+    ).toBe(true);
+    expect(onLive(started).some(({ keyframes }) => keyframes === FLASH)).toBe(false);
     await act(async () => {
       cover.remove();
     });
-    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    await vi.waitFor(() => expect(figure(captain()?.textContent)).toBe(10));
+    expect(movedRows(started)).toEqual(["10", "7"]);
+    expect(onLive(started).some(({ keyframes }) => keyframes === FLASH)).toBe(true);
     expect(totalCounted(started)).toBe(true);
     await vi.waitFor(() => expect(figure(net())).toBe(liveBoard(liveBeat("goal").input)!.net));
     // No GOL board for what happened while away: the recap tells it.
     expect(document.querySelector("[data-goal-board]")).toBeNull();
     expect(told()).toEqual(["P10", "P7"]);
+  });
+
+  it("holds a return drawn in a hidden tab until it is seen, and tells what changed then", async () => {
+    seen("kickoff");
+    const key = lookKey(liveBoard(liveBeat("goal").input)!);
+    let state: DocumentVisibilityState = "hidden";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+    try {
+      const started = recordMotion();
+      renderLive({ forwarder: fakeForwarder([beat("goal")]) });
+      await rows();
+      await settle();
+      // Drawn unseen: held at what was last seen, and not yet the look the visitor last saw.
+      expect(onLive(started).length).toBeGreaterThan(0);
+      expect(onLive(started).every(({ paused }) => paused)).toBe(true);
+      expect(readLook(key)!.look.sourceTime).toBe(liveBeat("kickoff").at);
+      state = "visible";
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await vi.waitFor(() =>
+        expect(onLive(started).some(({ keyframes }) => keyframes === FLASH)).toBe(true),
+      );
+      expect(movedRows(started)).toEqual(["10", "7"]);
+      // Coming back is its first sight, not a look again: what changed since is told.
+      expect(told()).toEqual(["P10", "P7"]);
+      await vi.waitFor(() => expect(readLook(key)!.look.sourceTime).toBe(liveBeat("goal").at));
+    } finally {
+      delete (document as { visibilityState?: unknown }).visibilityState;
+    }
+  });
+
+  it("rolls the duel on a return though the rival answers after the member", async () => {
+    // The look kept at kickoff, with the duel beside it.
+    const rivalId = mockDefaultRival(ENTRY)!;
+    const kickoff = liveBeat("kickoff").input;
+    const member = liveBoard(kickoff)!;
+    const rival = liveBoard({
+      ...kickoff,
+      member: { ...kickoff.member, entry_id: rivalId, captain: 7, vice: 10 },
+    })!;
+    const margin = liveDuel(member, rival, null).margin;
+    keepLook(
+      lookOf(member, { rivalId, rivalNet: rival.net, memberNet: member.net, margin }),
+      advanceRecap(null, member),
+    );
+    forgetLooks();
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("goal")]);
+    const bundleOf = forwarder.entryBundle.getMockImplementation()!;
+    let answerRival: () => void = () => undefined;
+    forwarder.entryBundle.mockImplementation(async (entryId: number, ...rest) => {
+      if (entryId !== ENTRY) {
+        await new Promise<void>((resolve) => {
+          answerRival = resolve;
+        });
+      }
+      return bundleOf(entryId, ...rest);
+    });
+    renderLive({ forwarder });
+    await rows();
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    expect(rolled(started)).toBe(false);
+    await act(async () => {
+      answerRival();
+    });
+    await vi.waitFor(() => expect(rolled(started)).toBe(true));
+    // The member's end counts from the total last seen, as Canlı puan does.
+    const end = started.find(({ element }) =>
+      element.matches("[data-live-end='member'] [data-live-number]"),
+    );
+    expect(end).toBeDefined();
+  });
+
+  it("keeps the duel's line on the read before while its figures count, then pops the new word", async () => {
+    const started = recordMotion({ running: true });
+    await goalAfterKickoff(started);
+    const word = () => document.querySelector("[data-live-status]");
+    const gap = () => document.querySelector("[data-live-margin]");
+    const figures = started.filter(({ element }) =>
+      element.matches(
+        "[data-live-end] [data-live-number], [data-live-rival-net] [data-live-number]",
+      ),
+    );
+    expect(figures).toHaveLength(3);
+    // The captain's goal puts the member ahead; while the figures count to it, the line says
+    // the level duel they still show.
+    expect(word()).toHaveTextContent(copy.live.status.level);
+    expect(gap()).toHaveTextContent("0");
+    expect(onLive(started).some(({ element }) => element.matches("[data-live-status]"))).toBe(
+      false,
+    );
+    await act(async () => {
+      for (const { animation } of figures) animation.finish();
+    });
+    await vi.waitFor(() => expect(word()).toHaveTextContent(copy.live.status.ahead));
+    expect(gap()).not.toHaveTextContent(/^0$/);
+    expect(
+      onLive(started).filter(({ element }) => element.matches("[data-live-status]")),
+    ).toHaveLength(1);
   });
 
   it("counts Canlı puan from the last look, as the rows, when the page opens again in sight", async () => {

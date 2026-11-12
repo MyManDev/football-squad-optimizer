@@ -516,6 +516,16 @@
   background: var(--color-bg);
 }
 
+/* While a read slides the groups, the rows pass over the headings that cross them, and a row
+   that changes group over the rows it crosses. */
+.groups[data-live-sliding] .row {
+  z-index: 1;
+}
+
+.groups[data-live-sliding] .row[data-live-crossing] {
+  z-index: 2;
+}
+
 /* The state's colour lies on the 4 px edge; it grows along it when the state changes. */
 .edge {
   position: absolute;

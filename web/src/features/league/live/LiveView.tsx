@@ -47,15 +47,20 @@ import {
   claimMotion,
   countLive,
   fillScales,
+  holdRow,
   laneTransform,
+  lightRow,
   lookKey,
   motionTimes,
   playDuel,
   playRow,
   type MotionGate,
   type MotionPlan,
+  type MotionTimes,
+  type RowMotion,
 } from "./liveMotion";
 import { LiveNumber } from "./LiveNumber";
+import { keepBy, readingAnchors, type Place } from "./livePlace";
 import type { RivalChoice } from "./liveRival";
 import { rowLabel, subLine } from "./liveRowText";
 import styles from "./LivePage.module.css";
@@ -597,14 +602,20 @@ interface FlowSnapshot {
   /** Where the groups' top stood on the screen before the change, and the phone bar's bottom. */
   groupsTop: number;
   barBottom: number;
-  /**
-   * What the visitor reads, where they read past the groups' top: the first row, heading or
-   * Farklar wholly below the bar that the read does not take to another group.
-   */
-  anchor: { part: string; top: number } | null;
+  /** What the visitor may be reading, likeliest first (`readingAnchors`). */
+  anchors: Place[];
   /** On a read: each row's, heading's and Farklar's top on the screen before the change. */
   places: Map<string, number> | null;
   recapKey: string;
+  /** Where each of the recap's names stood in it before the change. */
+  recapPlaces: Map<string, readonly [number, number]>;
+}
+
+/** A row's own changes for a plan drawn while the page waited, held at their first frame. */
+interface HeldRow {
+  row: HTMLElement;
+  motion: RowMotion;
+  animations: Animation[];
 }
 
 /** A scroll by the visitor this recently is theirs: the page keeps its hands off. */
@@ -625,12 +636,24 @@ function partsOf(groups: HTMLElement, after: HTMLElement | null): [string, HTMLE
 
 const topOf = (element: Element) => element.getBoundingClientRect().top;
 
+/** Where each of the recap's names stands in it: across, and down, by element id. */
+function recapPlaces(recap: HTMLElement | null): Map<string, readonly [number, number]> {
+  const places = new Map<string, readonly [number, number]>();
+  if (recap === null) return places;
+  const origin = recap.getBoundingClientRect();
+  for (const item of recap.querySelectorAll<HTMLElement>("[data-live-recap-item]")) {
+    const box = item.getBoundingClientRect();
+    places.set(item.dataset.liveRecapItem ?? "", [box.left - origin.left, box.top - origin.top]);
+  }
+  return places;
+}
+
 /** The bottom of the phone's top bar, which covers the page under it; 0 without one. */
 function barBottom(): number {
   return document.querySelector("[data-phone-bar]")?.getBoundingClientRect().bottom ?? 0;
 }
 
-/** Nothing covers the page and it is in view: a read's motion may be seen. */
+/** Nothing covers the page: a read's motion may be seen. */
 function pageClear(): boolean {
   return (
     document.visibilityState !== "hidden" &&
@@ -638,17 +661,24 @@ function pageClear(): boolean {
   );
 }
 
+/** A newer read's plan, not the one drawn before (nor the same read given its duel later). */
+const newPlan = (plan: MotionPlan | null, before: MotionPlan | null): plan is MotionPlan =>
+  plan !== null && plan.token !== before?.token;
+
 /**
  * The recap, the groups and, on one column, Farklar below them: the one place that sees them
  * both before and after a change.
  *
  * - Where the visitor reads past the groups' top, the part they read stays where it was on the
  *   screen, whatever changed above it (the recap, a group that came or went, a row that grew):
- *   the page scrolls by the change, under reduced motion too, unless the visitor is moving it.
- * - A read drawn slides every row, heading and Farklar from where it stood to its new place
- *   (a new heading comes into view); where the groups' top is in sight and the recap above it
- *   changed, the groups glide from where they stood. A look's clearing of the recap jumps.
- * - It plays the rows' own changes for the read (`playRow`), once.
+ *   the page scrolls by the change, under reduced motion too, unless the visitor scrolled it in
+ *   the last moment.
+ * - A read drawn slides every row, heading and Farklar from where it stood to its new place,
+ *   the rows over the headings they cross (a new heading comes into view); where the groups'
+ *   top is in sight and the recap above it changed, the groups glide from where they stood,
+ *   and what the recap gained comes into view. A look's clearing of the recap jumps.
+ * - It plays the rows' own changes for the read (`playRow`), once; drawn while the page waits
+ *   (the opening cover, a hidden tab), they are held at their first frame until it is seen.
  */
 class LiveFlow extends Component<FlowProps> {
   // Not `refs`: React keeps a field of that name on every class component.
@@ -657,18 +687,15 @@ class LiveFlow extends Component<FlowProps> {
     groups: createRef(),
     after: createRef(),
   };
-  /** The plan whose rows this part has played: its own remount plays them no second time. */
+  /** The plan whose rows this part has taken: its own remount plays them no second time. */
   private played: string | null = null;
-  private touching = false;
+  private held: HeldRow[] = [];
+  private heldTimes: MotionTimes | null = null;
+  /** The reads whose slides run: the last to end takes off what they put on the groups. */
+  private sliding = 0;
   private scrolledAt = Number.NEGATIVE_INFINITY;
   private ownScroll = false;
 
-  private readonly onTouchStart = () => {
-    this.touching = true;
-  };
-  private readonly onTouchEnd = () => {
-    this.touching = false;
-  };
   private readonly onScroll = () => {
     if (this.ownScroll) {
       this.ownScroll = false;
@@ -678,58 +705,54 @@ class LiveFlow extends Component<FlowProps> {
   };
 
   componentDidMount() {
-    window.addEventListener("touchstart", this.onTouchStart, { passive: true });
-    window.addEventListener("touchend", this.onTouchEnd, { passive: true });
-    window.addEventListener("touchcancel", this.onTouchEnd, { passive: true });
     window.addEventListener("scroll", this.onScroll, { passive: true });
     this.decorate();
   }
 
   componentWillUnmount() {
-    window.removeEventListener("touchstart", this.onTouchStart);
-    window.removeEventListener("touchend", this.onTouchEnd);
-    window.removeEventListener("touchcancel", this.onTouchEnd);
     window.removeEventListener("scroll", this.onScroll);
+    this.drop();
   }
 
   getSnapshotBeforeUpdate(previous: FlowProps): FlowSnapshot | null {
     const groups = this.parts.groups.current;
     if (groups === null) return null;
     const { plan, gate } = this.props;
-    const read = plan !== null && plan !== previous.plan;
+    const read = newPlan(plan, previous.plan);
     const bar = barBottom();
     const groupsTop = topOf(groups);
     const tops = partsOf(groups, this.parts.after.current).map(
       ([part, element]) => [part, topOf(element)] as const,
     );
-    let anchor: FlowSnapshot["anchor"] = null;
-    if (groupsTop <= bar) {
-      for (const [part, top] of tops) {
-        if (top < bar || (anchor !== null && top >= anchor.top)) continue;
-        const moves =
-          read && part.startsWith("row:") && plan.rows.get(Number(part.slice(4)))?.moved;
-        if (!moves) anchor = { part, top };
-      }
-    }
+    // A row the read takes to another group is not what the visitor goes on reading.
+    const anchors = readingAnchors(
+      tops,
+      bar,
+      groupsTop,
+      (part) =>
+        read && part.startsWith("row:") && plan.rows.get(Number(part.slice(4)))?.moved === true,
+    );
     return {
       groupsTop,
       barBottom: bar,
-      anchor,
+      anchors,
       places: read && gate === "open" ? new Map(tops) : null,
       recapKey: previous.recapKey,
+      recapPlaces: recapPlaces(this.parts.recap.current),
     };
   }
 
   componentDidUpdate(previous: FlowProps, _state: unknown, snapshot: FlowSnapshot | null) {
+    const { plan, gate } = this.props;
     const groups = this.parts.groups.current;
-    const read = this.props.plan !== null && this.props.plan !== previous.plan;
+    const read = newPlan(plan, previous.plan);
     if (snapshot !== null && groups !== null) {
       const parts = partsOf(groups, this.parts.after.current);
       // Where everything stands after the change, before the page moves anything.
       const now = new Map(parts.map(([part, element]) => [part, topOf(element)]));
       const groupsNow = topOf(groups);
       const scrolled = this.keep(snapshot, now);
-      const times = read && this.props.gate === "open" && pageClear() ? motionTimes(groups) : null;
+      const times = read && gate === "open" && pageClear() ? motionTimes(groups) : null;
       let glide = 0;
       if (times !== null && scrolled === 0 && snapshot.groupsTop > snapshot.barBottom) {
         glide = snapshot.groupsTop - groupsNow;
@@ -742,13 +765,13 @@ class LiveFlow extends Component<FlowProps> {
         }
       }
       if (times !== null && snapshot.places !== null) {
-        this.slide(parts, snapshot.places, now, scrolled, glide, times);
+        this.slide(groups, parts, snapshot.places, now, scrolled, glide, times);
       }
       if (times !== null && snapshot.recapKey !== this.props.recapKey) {
-        this.reveal(snapshot.recapKey, times);
+        this.reveal(snapshot.recapKey, snapshot.recapPlaces, times);
       }
     }
-    if (read || previous.gate !== this.props.gate) this.decorate();
+    if (plan?.token !== previous.plan?.token || previous.gate !== gate) this.decorate();
   }
 
   /**
@@ -756,30 +779,32 @@ class LiveFlow extends Component<FlowProps> {
    * Returns how far the page scrolled.
    */
   private keep(snapshot: FlowSnapshot, now: Map<string, number>): number {
-    const anchor = snapshot.anchor;
-    if (anchor === null) return 0;
-    const top = now.get(anchor.part);
-    if (top === undefined || Math.abs(top - anchor.top) < 1) return 0;
-    if (this.touching || performance.now() - this.scrolledAt < SCROLL_QUIET_MS) return 0;
+    const by = keepBy(snapshot.anchors, now);
+    // A pan or a fling scrolls every frame: the visitor moving the page keeps it.
+    if (by === 0 || performance.now() - this.scrolledAt < SCROLL_QUIET_MS) return 0;
     const from = window.scrollY;
     this.ownScroll = true;
-    window.scrollBy({ top: top - anchor.top, left: 0, behavior: "instant" });
+    window.scrollBy({ top: by, left: 0, behavior: "instant" });
     return window.scrollY - from;
   }
 
   /**
    * Each row, heading and Farklar slides from where it stood on the screen to its new place,
    * the page's scroll and the groups' glide taken into account; a new heading comes into view.
+   * While they slide, the rows pass over the headings that cross them, and a row that changes
+   * group over the rows it crosses; nothing of it stays once they have all ended.
    */
   private slide(
+    groups: HTMLElement,
     parts: [string, HTMLElement][],
     before: Map<string, number>,
     now: Map<string, number>,
     scrolled: number,
     glide: number,
-    times: NonNullable<ReturnType<typeof motionTimes>>,
+    times: MotionTimes,
   ) {
     const plan = this.props.plan;
+    const slides: Animation[] = [];
     for (const [part, element] of parts) {
       const was = before.get(part);
       if (was === undefined) {
@@ -791,56 +816,114 @@ class LiveFlow extends Component<FlowProps> {
       // Farklar stands outside the groups, so their glide does not carry it.
       const shift = was - now.get(part)! + scrolled - (part === "after" ? 0 : glide);
       if (Math.abs(shift) < 1) continue;
-      const slide = element.animate(
-        [{ transform: `translateY(${shift}px)` }, { transform: "translateY(0px)" }],
-        { duration: times.data, easing: LIVE_EASE },
+      slides.push(
+        element.animate(
+          [{ transform: `translateY(${shift}px)` }, { transform: "translateY(0px)" }],
+          { duration: times.data, easing: LIVE_EASE },
+        ),
       );
-      // A row that changes group passes over the rows it crosses.
       if (part.startsWith("row:") && plan?.rows.get(Number(part.slice(4)))?.moved) {
-        element.style.zIndex = "1";
-        const lower = () => {
-          element.style.removeProperty("z-index");
-          // Nothing of the slide stays: not even an empty style.
-          if (element.getAttribute("style") === "") element.removeAttribute("style");
-        };
-        slide.finished.then(lower, lower);
+        element.dataset.liveCrossing = "";
       }
     }
+    if (slides.length === 0) return;
+    groups.dataset.liveSliding = "";
+    const run = (this.sliding += 1);
+    const ended = () => {
+      if (run !== this.sliding) return;
+      delete groups.dataset.liveSliding;
+      for (const row of groups.querySelectorAll<HTMLElement>("[data-live-crossing]")) {
+        delete row.dataset.liveCrossing;
+      }
+    };
+    void Promise.allSettled(slides.map((slide) => slide.finished)).then(ended);
   }
 
-  /** The recap's new names come into view once what stands below has started to move. */
-  private reveal(before: string, times: NonNullable<ReturnType<typeof motionTimes>>) {
+  /**
+   * What the recap gained comes into view once what stood there has slid away: a recap that was
+   * not there comes in whole, its heading with its names; one that was, the names it gained and
+   * those it moved along its line together, so none stands alone in a new place meanwhile.
+   */
+  private reveal(
+    before: string,
+    places: Map<string, readonly [number, number]>,
+    times: MotionTimes,
+  ) {
     const recap = this.parts.recap.current;
     if (recap === null) return;
-    const had = new Set(before.split(","));
+    const timing = {
+      duration: times.ui,
+      delay: times.ui,
+      easing: LIVE_EASE,
+      fill: "backwards" as const,
+    };
+    if (before === "") {
+      recap.animate(APPEAR, timing);
+      return;
+    }
+    const now = recapPlaces(recap);
     for (const item of recap.querySelectorAll<HTMLElement>("[data-live-recap-item]")) {
-      if (had.has(item.dataset.liveRecapItem ?? "")) continue;
-      item.animate(APPEAR, {
-        duration: times.ui,
-        delay: times.ui,
-        easing: LIVE_EASE,
-        fill: "backwards",
-      });
+      const was = places.get(item.dataset.liveRecapItem ?? "");
+      const at = now.get(item.dataset.liveRecapItem ?? "");
+      const moved =
+        was === undefined ||
+        at === undefined ||
+        Math.abs(was[0] - at[0]) >= 1 ||
+        Math.abs(was[1] - at[1]) >= 1;
+      if (moved) item.animate(APPEAR, timing);
     }
   }
 
   /**
-   * The rows' own changes for the plan drawn, once the cover has gone: once, by whichever part
-   * takes the plan first, so a remount after the 1024 px turn plays nothing again.
+   * The rows' own changes for the plan drawn: once, by whichever part takes the plan first, so
+   * a remount after the 1024 px turn plays nothing again. While the page waits (the opening
+   * cover, a hidden tab) they are held at their first frame, and play once it is seen.
    */
   private decorate() {
     const { plan, gate, locale } = this.props;
     const groups = this.parts.groups.current;
-    if (plan === null || gate === "wait" || groups === null) return;
-    const key = `${plan.token}:rows`;
-    if (this.played === key || !claimMotion(key)) return;
+    const key = plan === null ? null : `${plan.token}:rows`;
+    // Rows held for a plan no longer drawn take their end at once.
+    if (this.played !== key) this.drop();
+    if (plan === null || key === null || groups === null) return;
+    if (this.played === key) {
+      if (gate === "open") this.release(locale);
+      return;
+    }
+    if (!claimMotion(key)) return;
     this.played = key;
-    const times = pageClear() ? motionTimes(groups) : null;
-    if (times === null) return;
+    const times = motionTimes(groups);
+    if (times === null || (gate === "open" && !pageClear())) return;
     for (const [id, motion] of plan.rows) {
       const row = groups.querySelector<HTMLElement>(`[data-live-row='${id}']`);
-      if (row !== null) playRow(row, motion, times, locale);
+      if (row === null) continue;
+      if (gate === "open") playRow(row, motion, times, locale);
+      else this.held.push({ row, motion, animations: holdRow(row, motion, times, locale) });
     }
+    this.heldTimes = times;
+  }
+
+  /** The rows held while the page waited play now it is seen; under a dialog they just end. */
+  private release(locale: string) {
+    const { held, heldTimes: times } = this;
+    this.held = [];
+    if (times === null) return;
+    const clear = pageClear();
+    for (const { row, motion, animations } of held) {
+      for (const animation of animations) {
+        if (clear) animation.play();
+        else animation.finish();
+      }
+      if (clear) lightRow(row, motion, times, locale);
+    }
+  }
+
+  /** Held rows that will not play take their end state. */
+  private drop() {
+    for (const { animations } of this.held) {
+      for (const animation of animations) animation.cancel();
+    }
+    this.held = [];
   }
 
   render() {
@@ -907,58 +990,121 @@ function RivalBlockPart({
   // The week's opponent is named so; any other member, in any league, is a rival.
   const label = rival.opponent ? copy.opponent : copy.rival;
   const whole = (value: number) => countedWhole(value, locale);
+  const word = copy.status[duelStatus(margin)];
+  const gapText = signedWhole(margin, locale);
   const bar = useRef<HTMLDivElement>(null);
   const status = useRef<HTMLElement>(null);
   const points = useRef<HTMLSpanElement>(null);
   const ends = useRef<HTMLParagraphElement>(null);
+  const gap = useRef<HTMLSpanElement>(null);
   const rolling = useRef<Animation[]>([]);
+  /** The roll is held at its first frame while the page waits. */
+  const held = useRef(false);
   const played = useRef<string | null>(null);
+  // The line above the bar, Önde, Berabere or Geride and Fark, written here: while the figures
+  // count to a read that changed the margin, it says the duel they show, the read before's,
+  // until they land (`spoken.held`).
+  const spoken = useRef({ word, gap: gapText, held: false, turn: 0 });
   const motion = plan?.duel ?? null;
   const token = plan?.token ?? null;
   // The duel moves for a read drawn with the same rival it was drawn with before, once.
   const shown = rival.duel !== null && rival.board !== null ? rival.entryId : null;
+  /** Writes the line: the word and Fark. */
+  const say = (said: string, fark: string) => {
+    if (status.current !== null) status.current.textContent = said;
+    if (gap.current !== null) gap.current.textContent = fark;
+  };
   useLayoutEffect(() => {
+    spoken.current.word = word;
+    spoken.current.gap = gapText;
+    if (!spoken.current.held) say(word, gapText);
+  }, [word, gapText]);
+  useLayoutEffect(() => {
+    /** The line as the duel drawn says it, held no longer. */
+    const speak = () => {
+      spoken.current.turn += 1;
+      spoken.current.held = false;
+      say(spoken.current.word, spoken.current.gap);
+    };
     if (motion === null || shown !== motion.rivalId) {
       // Another rival drawn while the duel rolled: its roll stops, never to play again.
       for (const animation of rolling.current) animation.cancel();
       rolling.current = [];
+      held.current = false;
+      if (spoken.current.held) speak();
     }
-    if (motion === null || token === null || gate === "wait" || shown !== motion.rivalId) {
+    if (motion === null || token === null || shown !== motion.rivalId) return;
+    const key = `${token}:duel`;
+    if (played.current === key) {
+      // Held at its first frame while the page waited: it plays now the page is seen.
+      if (gate === "open" && held.current) {
+        held.current = false;
+        const clear = pageClear();
+        for (const animation of rolling.current) {
+          if (clear) animation.play();
+          else animation.finish();
+        }
+      }
       return;
     }
-    const key = `${token}:duel`;
     // Once, by whichever part takes the plan first: its own remount (React's strict check)
     // finds it rolling, and a remount after the 1024 px turn plays nothing again.
-    if (played.current === key || !claimMotion(key)) return;
+    if (!claimMotion(key)) return;
     played.current = key;
     const element = bar.current;
-    const times = pageClear() ? motionTimes(element) : null;
-    if (times === null || element === null) return;
+    const times = motionTimes(element);
+    if (times === null || element === null || (gate === "open" && !pageClear())) return;
+    if (spoken.current.held) speak();
     const running = playDuel(element, motion.marginFrom, margin, times);
-    rolling.current = running;
-    const later = times.uiFast;
-    const figure = (selector: string, from: number) => {
-      const target = ends.current?.querySelector<HTMLElement>(selector) ?? null;
-      if (target !== null) countLive(target, from, Number(target.dataset.value), whole, later);
+    const count = (target: HTMLElement | null | undefined, from: number) => {
+      if (target === null || target === undefined) return null;
+      const counted = countLive(target, from, Number(target.dataset.value), whole, times.uiFast);
+      if (counted !== null) running.push(counted);
+      return counted;
     };
-    const rivalFigure = points.current?.querySelector<HTMLElement>("[data-live-number]");
-    if (rivalFigure) {
-      countLive(rivalFigure, motion.rivalNetFrom, Number(rivalFigure.dataset.value), whole, later);
-    }
-    figure("[data-live-end='member'] [data-live-number]", motion.memberNetFrom);
-    figure("[data-live-end='rival'] [data-live-number]", motion.rivalNetFrom);
-    if (motion.statusChanged && status.current !== null) {
-      running.push(
-        status.current.animate(MODEL_POP, {
-          duration: times.data,
-          delay: times.data,
-          easing: LIVE_EASE,
-        }),
+    const figure = (side: string) =>
+      ends.current?.querySelector<HTMLElement>(`[data-live-end='${side}'] [data-live-number]`);
+    const counts = [
+      count(points.current?.querySelector<HTMLElement>("[data-live-number]"), motion.rivalNetFrom),
+      count(figure("member"), motion.memberNetFrom),
+      count(figure("rival"), motion.rivalNetFrom),
+    ].filter((counted) => counted !== null);
+    if (motion.marginFrom !== margin) {
+      // The line changes as the figures land; the word pops where it changed.
+      const turn = (spoken.current.turn += 1);
+      spoken.current.held = true;
+      say(copy.status[duelStatus(motion.marginFrom)], signedWhole(motion.marginFrom, locale));
+      const land = (pop: boolean) => {
+        if (spoken.current.turn !== turn) return;
+        speak();
+        const target = status.current;
+        if (!pop || !motion.statusChanged || target === null || !pageClear()) return;
+        rolling.current.push(
+          target.animate(MODEL_POP, { duration: times.data, easing: LIVE_EASE }),
+        );
+      };
+      // Landed when every figure has; one stopped (another read, another rival) stops it.
+      Promise.all(counts.map((counted) => counted.finished)).then(
+        () => land(true),
+        () => land(false),
       );
     }
+    if (gate === "wait") {
+      for (const animation of running) animation.pause();
+      held.current = true;
+    }
+    rolling.current = running;
     // Played once per plan; the figures and the margin are read as they stand then.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, gate, shown]);
+  // A roll held for a page that never showed it ends with the part.
+  useLayoutEffect(
+    () => () => {
+      if (!held.current) return;
+      for (const animation of rolling.current) animation.cancel();
+    },
+    [],
+  );
   return (
     <section className={styles.rival} aria-labelledby={`${id}-label`} data-live-rival>
       <div className={styles.rivalHead}>
@@ -999,11 +1145,9 @@ function RivalBlockPart({
           aria-hidden={pending !== null || undefined}
         >
           <p className={styles.status}>
-            <strong ref={status} data-live-status="">
-              {copy.status[duelStatus(margin)]}
-            </strong>
+            <strong ref={status} data-live-status="" />
             {" · "}
-            {copy.margin} <span className={styles.figure}>{signedWhole(margin, locale)}</span>
+            {copy.margin} <span ref={gap} className={styles.figure} data-live-margin="" />
           </p>
           <DuelBar ref={bar} margin={margin} />
           <p ref={ends} className={styles.ends}>

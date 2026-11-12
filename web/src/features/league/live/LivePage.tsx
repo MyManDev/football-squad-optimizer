@@ -25,7 +25,9 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -65,6 +67,7 @@ import { leagueTotalsBefore, liveDuel, type LiveDuel } from "./liveDuel";
 import { createLiveLight, type LiveLight } from "./liveLight";
 import { keepLook, readLook } from "./liveLooks";
 import {
+  duelMotion,
   lookKey,
   lookOf,
   planMotion,
@@ -493,6 +496,19 @@ interface Told {
   recap: LiveRecap | null;
   look: LiveLook | null;
   plan: MotionPlan | null;
+  /** The look the plan was made from: a duel drawn late for the same read moves from it. */
+  from: LiveLook | null;
+}
+
+const onVisibility = (listener: () => void) => {
+  document.addEventListener("visibilitychange", listener);
+  return () => document.removeEventListener("visibilitychange", listener);
+};
+const tabShown = () => document.visibilityState !== "hidden";
+
+/** Whether the tab is in view. */
+function useTabShown(): boolean {
+  return useSyncExternalStore(onVisibility, tabShown, () => true);
 }
 
 /**
@@ -503,8 +519,8 @@ interface Told {
 function toldAtOpen(board: LiveBoard): Told {
   const kept = readLook(lookKey(board));
   return kept === null
-    ? { board: null, recap: null, look: null, plan: null }
-    : { board: null, recap: recapFrom(kept.marks), look: kept.look, plan: null };
+    ? { board: null, recap: null, look: null, plan: null, from: null }
+    : { board: null, recap: recapFrom(kept.marks), look: kept.look, plan: null, from: null };
 }
 
 /**
@@ -517,13 +533,24 @@ function tell(told: Told, drawn: LiveBoard, duel: DuelLook | null, clear: boolea
   const look = lookOf(drawn, duel);
   const before = told.look;
   const same = before !== null && before.key === look.key;
-  const plan =
-    same && look.time > before.time
-      ? planMotion(before, look, recap.fresh, told.board === null)
-      : same && look.time === before.time
-        ? told.plan
-        : null;
-  return { board: drawn, recap, look, plan };
+  if (same && look.time > before.time) {
+    const plan = planMotion(before, look, recap.fresh, told.board === null);
+    return { board: drawn, recap, look, plan, from: plan === null ? null : before };
+  }
+  return same && look.time === before.time
+    ? { board: drawn, recap, look, plan: told.plan, from: told.from }
+    : { board: drawn, recap, look, plan: null, from: null };
+}
+
+/**
+ * The duel drawn after its read (the rival answered after the member): the read's plan moves
+ * it from the duel the plan's look had, as it moves the rows, where it has no duel yet.
+ */
+function duelLate(told: Told, duel: DuelLook | null): MotionPlan | null {
+  const { plan, from } = told;
+  if (plan === null || plan.duel !== null || from === null) return plan;
+  const moves = duelMotion(from.rival, duel);
+  return moves === null ? plan : { ...plan, duel: moves };
 }
 
 /** The duel as drawn beside `board`, or null while none is: no rival, or one still read. */
@@ -604,7 +631,10 @@ function LiveShown({
   );
   const gained = holding ? brought : 0;
   const drawnDuel = duelLook(drawn, drawnRival);
-  const gate: MotionGate = useCoverGone() ? "open" : "wait";
+  // A read's motion waits for the page to be seen: the opening cover gone and the tab in view.
+  const coverGone = useCoverGone();
+  const tabInView = useTabShown();
+  const gate: MotionGate = coverGone && tabInView ? "open" : "wait";
 
   // What the reads since the visitor last looked brought the member: each newer board adds
   // to it, and Yenile or a return to the page (the visitor looking again) clears it. A look
@@ -625,15 +655,30 @@ function LiveShown({
     setTold((current) => ({ ...current, recap: lookedAt(current.recap) }));
   } else if (!holding && told.look !== null && !sameDuel(told.look.rival, drawnDuel)) {
     // The duel drawn changed without a read (the rival's first read, another rival): the next
-    // read moves the duel from where it now stands.
+    // read moves the duel from where it now stands. The first duel drawn for the read the plan
+    // moves, late, moves with it; another rival never does.
     setTold((current) =>
-      current.look === null ? current : { ...current, look: { ...current.look, rival: drawnDuel } },
+      current.look === null
+        ? current
+        : {
+            ...current,
+            look: { ...current.look, rival: drawnDuel },
+            plan: current.look.rival === null ? duelLate(current, drawnDuel) : current.plan,
+          },
     );
   }
   const look = useCallback(() => setLookLater(true), [setLookLater]);
+  // A board drawn while the tab was hidden has not been seen: coming back to it is its first
+  // sight, not a look again, so the recap stays and moves with it.
+  const unseen = useRef(false);
+  useLayoutEffect(() => {
+    if (document.visibilityState === "hidden") unseen.current = true;
+  }, [told.board]);
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") look();
+      if (document.visibilityState !== "visible") return;
+      if (unseen.current) unseen.current = false;
+      else look();
     };
     const onShow = (event: PageTransitionEvent) => {
       if (event.persisted) look();
@@ -650,10 +695,12 @@ function LiveShown({
     refresh();
   }, [look, refresh]);
 
-  // What was drawn is what the visitor last saw of the week.
+  // What was drawn is what the visitor last saw of the week, once the page is seen.
   useEffect(() => {
-    if (told.look !== null && told.recap !== null) keepLook(told.look, told.recap);
-  }, [told.look, told.recap]);
+    if (gate === "open" && told.look !== null && told.recap !== null) {
+      keepLook(told.look, told.recap);
+    }
+  }, [gate, told.look, told.recap]);
 
   // The heading's light: one of the member's own rows is being played in the board drawn. The
   // follow window stays open longer, up to three hours from a kickoff FPL has not finished,

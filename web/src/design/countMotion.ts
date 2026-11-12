@@ -17,6 +17,8 @@ const COUNT_EASE = `cubic-bezier(${MOTION_EASE.join(", ")})`;
 
 /** A count in flight, as `countTo` returns it. */
 export interface Count {
+  /** The animation that times it: paused, the count holds the value it shows. */
+  readonly animation: Animation;
   /** Whether the count is still writing values. */
   readonly running: boolean;
   /**
@@ -86,6 +88,7 @@ export function countTo(
   write(from);
   requestAnimationFrame(step);
   return {
+    animation,
     get running() {
       return !done;
     },

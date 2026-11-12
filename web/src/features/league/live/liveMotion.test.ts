@@ -27,6 +27,8 @@ import {
   claimMotion,
   fillScales,
   forgetLiveMotion,
+  holdRow,
+  lightRow,
   lookKey,
   lookOf,
   planMotion,
@@ -35,6 +37,7 @@ import {
   type DuelLook,
   type LiveLook,
   type MotionPlan,
+  type RowLook,
   type RowMotion,
 } from "./liveMotion";
 
@@ -183,6 +186,63 @@ describe("what a read moves on a row", () => {
     expect(motionOf(made, 14)).toBeUndefined();
   });
 
+  it("floats no appearance point in a double week's second match, at its first minute or its hour", () => {
+    const [goal] = told(["goal"]);
+    const look = goal!.look;
+    const row = (minutes: number, points: number, appearance?: number): RowLook => ({
+      ...look.rows["6"]!,
+      minutes,
+      points,
+      shown: points,
+      take: points,
+      appearance,
+    });
+    const step = (from: RowLook, to: RowLook) =>
+      planMotion(
+        { ...look, rows: { ...look.rows, "6": from } },
+        {
+          ...look,
+          time: look.time + 60_000,
+          sourceTime: new Date(look.time + 60_000).toISOString(),
+          rows: { ...look.rows, "6": to },
+        },
+        new Map(),
+      )!.rows.get(6);
+    // Ninety minutes in his first match: his second match's first minute brings its own point,
+    expect(step(row(90, 2, 2), row(91, 3, 3))).toMatchObject({ pointsFrom: 2, float: 0 });
+    // and its hour the second.
+    expect(step(row(149, 3, 3), row(150, 4, 4))).toMatchObject({ pointsFrom: 3, float: 0 });
+    // A look kept before each match was noted reads the week's minutes.
+    expect(step(row(30, 1), row(60, 2))).toMatchObject({ pointsFrom: 1, float: 0 });
+  });
+
+  it("notes a row's appearance match by match where the read says each match's minutes", () => {
+    const board = boardOf("goal");
+    const [first] = board.groups.playing.filter((row) => row.elementId === 6);
+    const fixture = first!.fixtures[0]!;
+    const twice = (minutes: (number | null)[]) => ({
+      ...board,
+      groups: {
+        ...board.groups,
+        playing: board.groups.playing.map((row) =>
+          row.elementId === 6
+            ? {
+                ...row,
+                minutes: 91,
+                fixtures: minutes.map((played, index) => ({
+                  ...fixture,
+                  id: fixture.id + index,
+                  minutes: played,
+                })),
+              }
+            : row,
+        ),
+      },
+    });
+    expect(lookOf(twice([90, 1]), null).rows["6"]!.appearance).toBe(3);
+    expect(lookOf(twice([90, null]), null).rows["6"]!.appearance).toBe(2);
+  });
+
   it("pops the armband the vice takes from a captain who did not play, and raises his row", () => {
     const [before] = told(["second"]);
     const look = before!.look;
@@ -290,6 +350,7 @@ describe("the motion itself", () => {
       keyframes: Keyframe[];
       options: KeyframeAnimationOptions;
       end: () => void;
+      paused: boolean;
     }[] = [];
     Object.defineProperty(Element.prototype, "animate", {
       configurable: true,
@@ -299,12 +360,19 @@ describe("the motion itself", () => {
         const finished = new Promise<void>((resolve) => {
           end = resolve;
         });
-        started.push({ element: this, keyframes, options, end });
+        const record = { element: this, keyframes, options, end, paused: false };
+        started.push(record);
         return {
           finished,
           playState: "running",
           effect: { getComputedTiming: () => ({ progress: 0 }) },
           addEventListener() {},
+          pause() {
+            record.paused = true;
+          },
+          play() {
+            record.paused = false;
+          },
           cancel() {},
         } as unknown as Animation;
       },
@@ -388,6 +456,37 @@ describe("the motion itself", () => {
       expect(animation.options.iterations ?? 1).not.toBe(Infinity);
       for (const key of keys(animation.keyframes)) expect(["transform", "opacity"]).toContain(key);
     }
+  });
+
+  it("holds a row's changes at their first frame while the page waits, and lights it as they play", () => {
+    const started = recordAnimations();
+    const row = rowElement();
+    const motion: RowMotion = {
+      rank: 1,
+      pointsFrom: 2,
+      events: { goals: 1, assists: 0, card: false },
+      float: 8,
+      state: "up",
+      chips: false,
+      dim: null,
+      armband: false,
+      moved: false,
+    };
+    const held = holdRow(row, motion, times, "tr-TR");
+    // The ball, the count, the arrow and the edge, each held; the figure at the points it
+    // counts from; nothing lit yet.
+    expect(held).toHaveLength(4);
+    expect(started.every(({ paused }) => paused)).toBe(true);
+    expect(row.querySelector("[data-live-number]")?.textContent).toBe("2");
+    expect(row.querySelector(".flash")).toBeNull();
+    expect(row.querySelector("[data-sign]")).toBeNull();
+    // Played, the row is lit from its own start, as a row played at once is.
+    const lit = lightRow(row, motion, times, "tr-TR");
+    expect(lit).toHaveLength(2);
+    const on = (selector: string) =>
+      started.find(({ element }) => element.matches(selector))?.options;
+    expect(on(".flash")).toMatchObject({ duration: times.data * 2, delay: times.step });
+    expect(row.querySelector("[data-sign='up']")?.textContent).toBe("+8");
   });
 
   it("removes the flash and the rise once they have played", async () => {
