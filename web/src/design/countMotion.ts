@@ -32,6 +32,7 @@ export interface Count {
  * Returns the count in flight, or null when the value was written at once: no change, a value
  * that is not finite, reduced motion, or a browser without `element.animate`. The count's end,
  * or a cancel from outside, leaves the final value written; `stop` leaves the value on screen.
+ * A `delay` holds `from` on screen, dimmed as the count's first frame, until the count starts.
  */
 export function countTo(
   element: HTMLElement,
@@ -39,6 +40,7 @@ export function countTo(
   to: number,
   format: (value: number) => string,
   source?: MediaSource,
+  delay = 0,
 ): Count | null {
   const duration = motionDuration("data", source);
   if (
@@ -51,7 +53,12 @@ export function countTo(
     element.textContent = format(to);
     return null;
   }
-  const animation = element.animate(COUNT_KEYFRAMES, { duration, easing: COUNT_EASE });
+  const animation = element.animate(
+    COUNT_KEYFRAMES,
+    delay > 0
+      ? { duration, delay, easing: COUNT_EASE, fill: "backwards" }
+      : { duration, easing: COUNT_EASE },
+  );
   let shown = from;
   let done = false;
   const write = (value: number) => {

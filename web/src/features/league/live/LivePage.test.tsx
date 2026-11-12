@@ -42,6 +42,8 @@ import { LeagueContext } from "../LeagueContext";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { LivePage } from "./LivePage";
 import { signedWhole } from "./liveFormat";
+import { forgetLooks } from "./liveLooks";
+import { forgetLiveMotion } from "./liveMotion";
 import type { LiveForwarder } from "./liveSources";
 import { WIDE_QUERY } from "./useWide";
 
@@ -49,6 +51,10 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   sessionStorage.clear();
+  // What one test's visitor saw is not the next one's last look.
+  localStorage.clear();
+  forgetLooks();
+  forgetLiveMotion();
   forgetIdentity();
   delete (window as { matchMedia?: unknown }).matchMedia;
 });
@@ -678,7 +684,16 @@ describe("the GOL board on LIVE", () => {
       writable: true,
       value(this: Element) {
         if (this.matches("[data-live-total]")) popped.push(this);
-        return { finished: Promise.resolve(), cancel() {} } as unknown as Animation;
+        // Over at once, as a count (Canlı puan's own figure, inside the total) reads it.
+        return {
+          finished: Promise.resolve(),
+          playState: "finished",
+          effect: { getComputedTiming: () => ({ progress: null }) },
+          addEventListener(type: string, listener: () => void) {
+            if (type === "finish") queueMicrotask(listener);
+          },
+          cancel() {},
+        } as unknown as Animation;
       },
     });
     try {

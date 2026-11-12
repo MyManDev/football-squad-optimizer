@@ -50,6 +50,8 @@ export interface MemberLive {
   shown: MemberLiveScore | null;
   /** Whether a refresh is being read; the shown week stays until it answers. */
   refreshing: boolean;
+  /** Whether any read is on its way: a refresh, or a followed read (a tick's, a return's). */
+  reading: boolean;
   refresh: () => void;
   /** The newest read's goals, assists and cards, or null when no read has brought any. */
   moments: LiveMomentBatch | null;
@@ -202,6 +204,8 @@ interface State {
   identity: string;
   shown: MemberLiveScore | null;
   refreshing: boolean;
+  /** A followed read is on its way: a tick's, or the one made on coming back to the page. */
+  following: boolean;
   moments: LiveMomentBatch | null;
   matches: LiveWindowFilter | null;
   start: number;
@@ -256,6 +260,7 @@ export function useMemberLiveScore(
     identity,
     shown: null,
     refreshing: false,
+    following: false,
     moments: null,
     matches: null,
     start: 0,
@@ -265,6 +270,7 @@ export function useMemberLiveScore(
       identity,
       shown: null,
       refreshing: false,
+      following: false,
       moments: null,
       matches: null,
       start: state.start,
@@ -369,6 +375,7 @@ export function useMemberLiveScore(
           identity,
           shown,
           refreshing: kept && current.refreshing,
+          following: kept && current.following,
           moments: moments ?? (kept ? current.moments : null),
           matches,
           start: current.start + (begins ? 1 : 0),
@@ -425,6 +432,7 @@ export function useMemberLiveScore(
           identity,
           shown,
           refreshing,
+          following: current.identity === identity && current.following,
           moments: moments ?? (current.identity === identity ? current.moments : null),
           matches,
           start: current.start,
@@ -476,10 +484,17 @@ export function useMemberLiveScore(
     const read = new AbortController();
     following.current = read;
     lastRead.current = Date.now();
+    setState((current) =>
+      current.identity === identity && !current.following
+        ? { ...current, following: true }
+        : current,
+    );
     void readLive(sources.current.forwarder, inputs.member.gameweek, read.signal)
       .catch(() => null)
       .then((live) => {
         if (following.current === read) following.current = null;
+        // Ended, answered or not, in the same render as what it brings.
+        setState((current) => (current.following ? { ...current, following: false } : current));
         if (read.signal.aborted || live === null) return;
         const shown = scored(live, inputs, sources.current.fixtures);
         if (shown !== null) accept(shown, live, inputs, false);
@@ -532,6 +547,7 @@ export function useMemberLiveScore(
   return {
     shown: current ? state.shown : null,
     refreshing: state.identity === identity && state.refreshing,
+    reading: state.identity === identity && (state.refreshing || state.following),
     refresh,
     moments: current ? state.moments : null,
     matches: current ? state.matches : null,

@@ -8,12 +8,24 @@
  * move to the page is never taken away when the board arrives. A phone reads one column: the
  * score, the rival, the read, the recap, the groups and Farklar, closed. From 1024 px the
  * rival and Farklar, open, stand in a column of their own beside the rest, in that order in
- * the document as on the screen. Display only: every number comes scored from the page.
+ * the document as on the screen. Every number comes scored from the page; a read's motion
+ * (`liveMotion.ts`) plays on what is drawn here, once, after the read is drawn.
  */
 
-import { useId, type ReactNode } from "react";
+import {
+  Component,
+  createRef,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+  type Ref,
+  type RefObject,
+} from "react";
 
 import { useLanguage } from "../../../i18n/context";
+import { MODEL_POP } from "../advice/modelSwitch";
 import { ClubShirt } from "../components/ClubShirt";
 import { BoardArrow, DisclosureIcon } from "../components/memberIcons";
 import {
@@ -26,6 +38,24 @@ import {
 } from "./liveBoard";
 import { duelStatus, type DuelSwing, type LiveDuel } from "./liveDuel";
 import { clockTime, signedWhole, wholePoints } from "./liveFormat";
+import type { LiveLight } from "./liveLight";
+import {
+  APPEAR,
+  LIVE_EASE,
+  ballOffset,
+  claimMotion,
+  countLive,
+  fillScales,
+  laneTransform,
+  lookKey,
+  motionTimes,
+  playDuel,
+  playRow,
+  releaseMotion,
+  type MotionGate,
+  type MotionPlan,
+} from "./liveMotion";
+import { LiveNumber } from "./LiveNumber";
 import type { RivalChoice } from "./liveRival";
 import { rowLabel, subLine } from "./liveRowText";
 import styles from "./LivePage.module.css";
@@ -51,24 +81,39 @@ export interface LiveRivalView {
   onSelect: (entryId: number) => void;
 }
 
-/** LIVE's heading: the page's one h1, its light while one of the member's matches is on. */
+/**
+ * LIVE's heading: the page's one h1, its light while one of the member's matches is on. The
+ * light breathes three times when a newer read is drawn (`breath`), then stands still; only
+ * the light is drawn again for it, never the heading the shell focuses.
+ */
 export function LiveHeader({
   team,
   gameweek,
-  playing,
+  entryId,
+  light,
 }: {
   team: string;
   gameweek: number | null;
-  playing: boolean;
+  entryId: number;
+  light: LiveLight;
 }) {
   const { messages } = useLanguage();
   const copy = messages.live;
+  const lit = useSyncExternalStore(light.subscribe, light.get, light.get);
+  const playing = lit !== null && lit.entryId === entryId && lit.playing;
+  const breath = playing ? lit.breath : null;
   return (
     <header className={styles.header}>
       <h1 className={styles.title}>
         {copy.title}
         {playing ? (
-          <span className={styles.light} role="img" aria-label={copy.matchInProgress} />
+          <span
+            key={breath ?? "still"}
+            className={styles.light}
+            role="img"
+            aria-label={copy.matchInProgress}
+            data-breath={breath ?? undefined}
+          />
         ) : null}
       </h1>
       {team === "" ? null : (
@@ -106,25 +151,36 @@ export interface LiveViewProps {
   wide: boolean;
   differentialsOpen: boolean;
   onDifferentialsToggle: (open: boolean) => void;
+  /** What the read drawn moves, or null. */
+  plan: MotionPlan | null;
+  /** Whether the opening cover still stands: a plan waits for it to go. */
+  gate: MotionGate;
 }
 
 /** The board itself, under the heading. */
 export function LiveView(props: LiveViewProps) {
-  const { board, rival, wide } = props;
-  const score = <ScoreCard board={board} net={props.net} />;
+  const { board, rival, wide, plan, gate } = props;
+  const { locale } = useLanguage();
+  const score = <ScoreCard board={board} net={props.net} plan={plan} gate={gate} />;
   const fresh = (
     <Freshness board={board} refreshing={props.refreshing} onRefresh={props.onRefresh} />
   );
-  const recap = props.recap.length > 0 ? <Recap items={props.recap} /> : null;
-  const groups = <Groups board={board} />;
   const sides =
     rival === null ? null : (
-      <RivalBlock rival={rival} own={props.own} net={board.net} team={props.team} />
+      <RivalBlock
+        rival={rival}
+        own={props.own}
+        net={board.net}
+        team={props.team}
+        plan={plan}
+        gate={gate}
+      />
     );
   const shownDuel = rival?.duel ?? rival?.pending?.duel ?? null;
-  const differentials =
+  const differentials = (ref?: Ref<HTMLDetailsElement>) =>
     rival !== null && shownDuel !== null ? (
       <Differentials
+        ref={ref}
         duel={shownDuel}
         pending={rival.duel === null}
         own={props.own}
@@ -134,18 +190,29 @@ export function LiveView(props: LiveViewProps) {
         onToggle={props.onDifferentialsToggle}
       />
     ) : null;
+  const recapKey = props.recap.map((item) => item.elementId).join(",");
+  const flow = (after: boolean) => (
+    <LiveFlow plan={plan} gate={gate} locale={locale} recapKey={recapKey}>
+      {(refs) => (
+        <>
+          {props.recap.length > 0 ? <Recap ref={refs.recap} items={props.recap} /> : null}
+          <Groups ref={refs.groups} board={board} />
+          {after ? differentials(refs.after) : null}
+        </>
+      )}
+    </LiveFlow>
+  );
   return wide ? (
     <div className={styles.columns}>
       <div className={styles.column}>
         {score}
         {fresh}
-        {recap}
-        {groups}
+        {flow(false)}
       </div>
-      {sides || differentials ? (
+      {sides || shownDuel ? (
         <div className={styles.side}>
           {sides}
-          {differentials}
+          {differentials()}
         </div>
       ) : null}
     </div>
@@ -154,21 +221,32 @@ export function LiveView(props: LiveViewProps) {
       {score}
       {sides}
       {fresh}
-      {recap}
-      {groups}
-      {differentials}
+      {flow(true)}
     </>
   );
 }
 
 /**
  * The score's head, from its top to Canlı puan: the GOL board stands clear of it while it is
- * in view, and its points run into the total (`data-live-total`).
+ * in view, and its points run into the total (`data-live-total`), which counts to each value it
+ * is given. Opening the page again on a newer read, it holds the total last seen until the
+ * opening cover has gone, then counts on from it.
  */
-function ScoreCard({ board, net }: { board: LiveBoard; net: number }) {
+function ScoreCard({
+  board,
+  net,
+  plan,
+  gate,
+}: {
+  board: LiveBoard;
+  net: number;
+  plan: MotionPlan | null;
+  gate: MotionGate;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   const chip = board.chip === null ? null : (messages.leagueMembers.chipNames[board.chip] ?? null);
+  const total = plan !== null && plan.reopen && gate === "wait" ? plan.netFrom : net;
   return (
     <section className={styles.score} aria-label={copy.livePoints} data-live-head>
       <dl className={styles.scoreGrid}>
@@ -176,7 +254,12 @@ function ScoreCard({ board, net }: { board: LiveBoard; net: number }) {
           <dt>{copy.livePoints}</dt>
           <dd>
             <span className={styles.totalFigure} data-live-total>
-              {wholePoints(net, locale)}
+              <LiveNumber
+                key={lookKey(board)}
+                follow
+                value={total}
+                format={(value) => wholePoints(value, locale)}
+              />
             </span>
           </dd>
         </div>
@@ -255,36 +338,58 @@ function Freshness({
   );
 }
 
-/** A ball per goal, an A per assist and a card: three drawn, then the count. */
-function Glyphs({ goals, assists, card }: { goals: number; assists: number; card: boolean }) {
-  const repeat = (count: number, glyph: (index: number) => ReactNode) =>
+/**
+ * A ball per goal, an A per assist and a card: three drawn, then the count. A row's glyphs
+ * (`marked`) carry what its motion finds them by.
+ */
+function Glyphs({
+  goals,
+  assists,
+  card,
+  marked = false,
+}: {
+  goals: number;
+  assists: number;
+  card: boolean;
+  marked?: boolean;
+}) {
+  const mark = (kind: string) => (marked ? kind : undefined);
+  const repeat = (count: number, kind: string, glyph: (index: number) => ReactNode) =>
     count <= 3 ? (
       Array.from({ length: count }, (_, index) => glyph(index))
     ) : (
       <>
         {glyph(0)}
-        <span className={styles.times}>×{count}</span>
+        <span className={styles.times} data-live-glyph={mark(`${kind}-more`)}>
+          ×{count}
+        </span>
       </>
     );
   if (goals === 0 && assists === 0 && !card) return null;
   return (
     <span className={styles.glyphs}>
-      {repeat(goals, (index) => (
-        <BallIcon key={`g${index}`} />
+      {repeat(goals, "goal", (index) => (
+        <BallIcon key={`g${index}`} glyph={mark("goal")} />
       ))}
-      {repeat(assists, (index) => (
-        <span key={`a${index}`} className={styles.assist}>
+      {repeat(assists, "assist", (index) => (
+        <span key={`a${index}`} className={styles.assist} data-live-glyph={mark("assist")}>
           A
         </span>
       ))}
-      {card ? <span className={styles.card} /> : null}
+      {card ? <span className={styles.card} data-live-glyph={mark("card")} /> : null}
     </span>
   );
 }
 
-function BallIcon({ className = styles.ball }: { className?: string }) {
+function BallIcon({ className = styles.ball, glyph }: { className?: string; glyph?: string }) {
   return (
-    <svg className={className} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      focusable="false"
+      data-live-glyph={glyph}
+    >
       <circle cx="8" cy="8" r="7" />
       <path className={styles.patch} d="M8 4.6l2.6 1.9-1 3.1H6.4l-1-3.1z" />
       <path
@@ -310,7 +415,8 @@ function Row({ row }: { row: LiveRow }) {
       data-state={state ?? undefined}
       data-counted={row.counted ? "" : undefined}
     >
-      <span className={styles.rowBody} aria-hidden="true">
+      <span className={styles.edge} data-live-edge="" aria-hidden="true" />
+      <span className={styles.rowBody} aria-hidden="true" data-live-body="">
         <ClubShirt
           code={row.code}
           name={row.fullName}
@@ -322,7 +428,7 @@ function Row({ row }: { row: LiveRow }) {
           <span className={styles.rowName}>
             <span className={styles.name}>{row.name}</span>
             {row.armband === "captain" ? (
-              <span className={styles.armband}>
+              <span className={styles.armband} data-live-armband="">
                 {messages.leagueMembers.captainMark}
                 {row.multiplier >= 2 ? (
                   <span className={styles.times}> ×{row.multiplier}</span>
@@ -338,35 +444,43 @@ function Row({ row }: { row: LiveRow }) {
             ) : null}
             {row.phase === "playing" ? <span className={styles.dot} /> : null}
             {row.counted ? (
-              <Glyphs goals={row.goals} assists={row.assists} card={row.card} />
+              <Glyphs goals={row.goals} assists={row.assists} card={row.card} marked />
             ) : null}
           </span>
           <span className={styles.subLine}>{subLine(row, copy, locale)}</span>
         </span>
-        <span className={styles.points}>
-          <span className={styles.pointsValue}>
-            {row.started ? wholePoints(rowPoints(row), locale) : "–"}
+        <span className={styles.points} data-live-points="">
+          {row.started ? (
+            <LiveNumber
+              className={styles.pointsValue}
+              value={rowPoints(row)}
+              format={(value) => wholePoints(value, locale)}
+            />
+          ) : (
+            <span className={styles.pointsValue}>–</span>
+          )}
+          <span className={styles.arrow} data-live-arrow="">
+            {arrow ? <BoardArrow direction={arrow} /> : null}
           </span>
-          <span className={styles.arrow}>{arrow ? <BoardArrow direction={arrow} /> : null}</span>
         </span>
       </span>
     </li>
   );
 }
 
-function Groups({ board }: { board: LiveBoard }) {
+function Groups({ board, ref }: { board: LiveBoard; ref?: Ref<HTMLDivElement> }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   const id = useId();
   return (
-    <div className={styles.groups}>
+    <div ref={ref} className={styles.groups}>
       {LIVE_GROUPS.map((group: LiveGroup) => {
         const rows = board.groups[group];
         if (rows.length === 0) return null;
         const heading = `${id}-${group}`;
         return (
           <section key={group} className={styles.group} aria-labelledby={heading}>
-            <h2 className={styles.groupTitle} id={heading}>
+            <h2 className={styles.groupTitle} id={heading} data-live-group={group}>
               {group === "playing" ? <span className={styles.dot} aria-hidden="true" /> : null}
               <span>{copy.groups[group]}</span>
               {group === "bench" ? null : (
@@ -385,12 +499,12 @@ function Groups({ board }: { board: LiveBoard }) {
   );
 }
 
-function Recap({ items }: { items: readonly RecapItem[] }) {
+function Recap({ items, ref }: { items: readonly RecapItem[]; ref?: Ref<HTMLElement> }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   const id = useId();
   return (
-    <section className={styles.recap} aria-labelledby={id}>
+    <section ref={ref} className={styles.recap} aria-labelledby={id}>
       <h2 className={styles.sectionTitle} id={id}>
         {copy.sinceLastLook}
       </h2>
@@ -399,6 +513,7 @@ function Recap({ items }: { items: readonly RecapItem[] }) {
           <li
             key={item.elementId}
             className={styles.recapItem}
+            data-live-recap-item={item.elementId}
             aria-label={[
               item.name,
               item.goals > 0 ? `${copy.goal} ${wholePoints(item.goals, locale)}` : null,
@@ -425,28 +540,274 @@ function Recap({ items }: { items: readonly RecapItem[] }) {
   );
 }
 
+interface FlowRefs {
+  recap: RefObject<HTMLElement | null>;
+  groups: RefObject<HTMLDivElement | null>;
+  after: RefObject<HTMLDetailsElement | null>;
+}
+
+interface FlowProps {
+  plan: MotionPlan | null;
+  gate: MotionGate;
+  locale: string;
+  /** The recap's items, in order: a change in them may move what stands below. */
+  recapKey: string;
+  children: (refs: FlowRefs) => ReactNode;
+}
+
+interface FlowSnapshot {
+  /** Where the groups' top stood on the screen, and the phone bar's bottom, before the change. */
+  groupsTop: number;
+  barBottom: number;
+  /** Each row and group heading's place in the groups, before a read's change. */
+  places: Map<string, number> | null;
+  recapKey: string;
+}
+
+/** A scroll by the visitor this recently is theirs: the page keeps its hands off. */
+const SCROLL_QUIET_MS = 150;
+
+/** Each row's and group heading's top, from the groups' own. */
+function placesIn(groups: HTMLElement): Map<string, number> {
+  const top = groups.getBoundingClientRect().top;
+  const places = new Map<string, number>();
+  for (const row of groups.querySelectorAll<HTMLElement>("[data-live-row]")) {
+    places.set(`row:${row.dataset.liveRow}`, row.getBoundingClientRect().top - top);
+  }
+  for (const heading of groups.querySelectorAll<HTMLElement>("[data-live-group]")) {
+    places.set(`group:${heading.dataset.liveGroup}`, heading.getBoundingClientRect().top - top);
+  }
+  return places;
+}
+
+/** The bottom of the phone's top bar, which covers the page under it; 0 without one. */
+function barBottom(): number {
+  return document.querySelector("[data-phone-bar]")?.getBoundingClientRect().bottom ?? 0;
+}
+
+/** Nothing covers the page and it is in view: a read's motion may be seen. */
+function pageClear(): boolean {
+  return (
+    document.visibilityState !== "hidden" &&
+    document.querySelector("dialog[open], [aria-modal='true']") === null
+  );
+}
+
+/**
+ * The recap, the groups and, on one column, Farklar below them: the one place that sees them
+ * both before and after a change. A read drawn slides each row that changed group to its new
+ * place from where it stood, and plays the rows' own changes; the recap's growing or clearing
+ * keeps the rows where the visitor reads them when the recap is out of sight above, or, on a
+ * read, glides what stands below it into place. Under reduced motion nothing slides or glides;
+ * the place is still kept.
+ */
+class LiveFlow extends Component<FlowProps> {
+  // Not `refs`: React keeps a field of that name on every class component.
+  private readonly parts: FlowRefs = {
+    recap: createRef(),
+    groups: createRef(),
+    after: createRef(),
+  };
+  private running: Animation[] = [];
+  private claim: string | null = null;
+  private touching = false;
+  private scrolledAt = Number.NEGATIVE_INFINITY;
+  private ownScroll = false;
+
+  private readonly onTouchStart = () => {
+    this.touching = true;
+  };
+  private readonly onTouchEnd = () => {
+    this.touching = false;
+  };
+  private readonly onScroll = () => {
+    if (this.ownScroll) {
+      this.ownScroll = false;
+      return;
+    }
+    this.scrolledAt = performance.now();
+  };
+
+  componentDidMount() {
+    window.addEventListener("touchstart", this.onTouchStart, { passive: true });
+    window.addEventListener("touchend", this.onTouchEnd, { passive: true });
+    window.addEventListener("touchcancel", this.onTouchEnd, { passive: true });
+    window.addEventListener("scroll", this.onScroll, { passive: true });
+    this.decorate();
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("touchstart", this.onTouchStart);
+    window.removeEventListener("touchend", this.onTouchEnd);
+    window.removeEventListener("touchcancel", this.onTouchEnd);
+    window.removeEventListener("scroll", this.onScroll);
+    this.stop();
+  }
+
+  getSnapshotBeforeUpdate(previous: FlowProps): FlowSnapshot | null {
+    const groups = this.parts.groups.current;
+    if (groups === null) return null;
+    const read = this.props.plan !== null && this.props.plan !== previous.plan;
+    return {
+      groupsTop: groups.getBoundingClientRect().top,
+      barBottom: barBottom(),
+      places: read && this.props.gate === "open" ? placesIn(groups) : null,
+      recapKey: previous.recapKey,
+    };
+  }
+
+  componentDidUpdate(previous: FlowProps, _state: unknown, snapshot: FlowSnapshot | null) {
+    const groups = this.parts.groups.current;
+    const read = this.props.plan !== null && this.props.plan !== previous.plan;
+    if (snapshot !== null && groups !== null) {
+      const moved = groups.getBoundingClientRect().top - snapshot.groupsTop;
+      if (Math.abs(moved) >= 1) this.keep(groups, moved, snapshot, read);
+      const times = read && pageClear() ? motionTimes(groups) : null;
+      if (times !== null && snapshot.places !== null) this.slide(groups, snapshot.places, times);
+      if (times !== null && snapshot.recapKey !== this.props.recapKey) {
+        this.reveal(snapshot.recapKey, times);
+      }
+    }
+    if (read || previous.gate !== this.props.gate) this.decorate();
+  }
+
+  /** The groups moved on the screen by `moved` px because what stands above them changed. */
+  private keep(groups: HTMLElement, moved: number, snapshot: FlowSnapshot, read: boolean) {
+    if (snapshot.groupsTop <= snapshot.barBottom) {
+      // The change is out of sight above: the rows stay where the visitor reads them, unless
+      // the visitor is moving the page themselves.
+      if (this.touching || performance.now() - this.scrolledAt < SCROLL_QUIET_MS) return;
+      this.ownScroll = true;
+      window.scrollBy({ top: moved, left: 0, behavior: "instant" });
+      return;
+    }
+    // In sight, only a read glides what stands below the change into place; a look jumps.
+    const times = read && pageClear() ? motionTimes(groups) : null;
+    if (times === null) return;
+    for (const part of [groups, this.parts.after.current]) {
+      if (part === null) continue;
+      this.running.push(
+        part.animate([{ transform: `translateY(${-moved}px)` }, { transform: "translateY(0px)" }], {
+          duration: times.data,
+          easing: LIVE_EASE,
+        }),
+      );
+    }
+  }
+
+  /** Each row and heading slides from where it stood to its new place; a new heading appears. */
+  private slide(
+    groups: HTMLElement,
+    before: Map<string, number>,
+    times: NonNullable<ReturnType<typeof motionTimes>>,
+  ) {
+    const plan = this.props.plan;
+    const top = groups.getBoundingClientRect().top;
+    const parts = [
+      ...groups.querySelectorAll<HTMLElement>("[data-live-row]"),
+      ...groups.querySelectorAll<HTMLElement>("[data-live-group]"),
+    ];
+    for (const part of parts) {
+      const row = part.dataset.liveRow;
+      const key = row !== undefined ? `row:${row}` : `group:${part.dataset.liveGroup}`;
+      const was = before.get(key);
+      if (was === undefined) {
+        if (row === undefined) {
+          this.running.push(part.animate(APPEAR, { duration: times.data, easing: LIVE_EASE }));
+        }
+        continue;
+      }
+      const shift = was - (part.getBoundingClientRect().top - top);
+      if (Math.abs(shift) < 1) continue;
+      const slide = part.animate(
+        [{ transform: `translateY(${shift}px)` }, { transform: "translateY(0px)" }],
+        { duration: times.data, easing: LIVE_EASE },
+      );
+      this.running.push(slide);
+      // A row that changes group passes over the rows it crosses.
+      if (row !== undefined && plan?.rows.get(Number(row))?.moved) {
+        part.style.zIndex = "1";
+        const lower = () => {
+          part.style.removeProperty("z-index");
+        };
+        slide.finished.then(lower, lower);
+      }
+    }
+  }
+
+  /** The recap's new names come into view once what stands below has started to move. */
+  private reveal(before: string, times: NonNullable<ReturnType<typeof motionTimes>>) {
+    const recap = this.parts.recap.current;
+    if (recap === null) return;
+    const had = new Set(before.split(","));
+    for (const item of recap.querySelectorAll<HTMLElement>("[data-live-recap-item]")) {
+      if (had.has(item.dataset.liveRecapItem ?? "")) continue;
+      this.running.push(
+        item.animate(APPEAR, {
+          duration: times.ui,
+          delay: times.ui,
+          easing: LIVE_EASE,
+          fill: "backwards",
+        }),
+      );
+    }
+  }
+
+  /** The rows' own changes for the plan drawn, once the cover has gone; once per plan. */
+  private decorate() {
+    const { plan, gate, locale } = this.props;
+    const groups = this.parts.groups.current;
+    if (plan === null || gate === "wait" || groups === null) return;
+    const key = `${plan.token}:rows`;
+    if (!claimMotion(key)) return;
+    this.claim = key;
+    const times = pageClear() ? motionTimes(groups) : null;
+    if (times === null) return;
+    for (const [id, motion] of plan.rows) {
+      const row = groups.querySelector<HTMLElement>(`[data-live-row='${id}']`);
+      if (row !== null) this.running.push(...playRow(row, motion, times, locale));
+    }
+  }
+
+  /** Stops what is running; a plan stopped before it ended may play again on the next mount. */
+  private stop() {
+    const unfinished = this.running.some((animation) => animation.playState !== "finished");
+    for (const animation of this.running) animation.cancel();
+    this.running = [];
+    if (unfinished && this.claim !== null) releaseMotion(this.claim);
+  }
+
+  render() {
+    return this.props.children(this.parts);
+  }
+}
+
 /**
  * Where the duel stands, drawn: the track's middle is level, and the ball rests on the side
- * of the one ahead, further the more they lead, never at the end. Decoration only; the words
- * beside it say the same.
+ * of the one ahead, further the more they lead, never at the end; each side's fill runs from
+ * the middle to the ball. Decoration only; the words beside it say the same.
  */
-function DuelBar({ margin }: { margin: number }) {
-  const share = margin / (Math.abs(margin) + 20);
-  const ball = 50 - share * 44;
+function DuelBar({ margin, ref }: { margin: number; ref?: Ref<HTMLDivElement> }) {
+  const offset = ballOffset(margin);
+  const fills = fillScales(offset);
   return (
-    <div
-      className={styles.bar}
-      aria-hidden="true"
-      data-lead={margin > 0 ? "member" : margin < 0 ? "rival" : undefined}
-    >
+    <div ref={ref} className={styles.bar} aria-hidden="true">
       <span className={styles.track} />
       <span
-        className={styles.lead}
-        style={{ left: `${Math.min(ball, 50)}%`, width: `${Math.abs(50 - ball)}%` }}
+        className={styles.fill}
+        data-live-fill="member"
+        style={{ transform: `scaleX(${fills.member})` }}
+      />
+      <span
+        className={styles.fill}
+        data-live-fill="rival"
+        style={{ transform: `scaleX(${fills.rival})` }}
       />
       <span className={styles.centre} />
-      <span className={styles.barBall} style={{ left: `${ball}%` }}>
-        <BallIcon className={styles.barBallIcon} />
+      <span className={styles.lane} data-live-lane="" style={{ transform: laneTransform(offset) }}>
+        <span className={styles.barBall} data-live-ball="">
+          <BallIcon className={styles.barBallIcon} />
+        </span>
       </span>
     </div>
   );
@@ -457,12 +818,16 @@ function RivalBlock({
   own,
   net,
   team,
+  plan,
+  gate,
 }: {
   rival: LiveRivalView;
   own: boolean;
   /** The member's net in the read the duel comes from. */
   net: number;
   team: string;
+  plan: MotionPlan | null;
+  gate: MotionGate;
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
@@ -475,6 +840,53 @@ function RivalBlock({
   const totalGap = duel?.totalGap ?? null;
   // The week's opponent is named so; any other member, in any league, is a rival.
   const label = rival.opponent ? copy.opponent : copy.rival;
+  const whole = (value: number) => wholePoints(value, locale);
+  const bar = useRef<HTMLDivElement>(null);
+  const status = useRef<HTMLElement>(null);
+  const points = useRef<HTMLSpanElement>(null);
+  const ends = useRef<HTMLParagraphElement>(null);
+  const motion = plan?.duel ?? null;
+  const token = plan?.token ?? null;
+  // The duel moves for a read drawn with the same rival it was drawn with before, once.
+  const shown = rival.duel !== null && rival.board !== null ? rival.entryId : null;
+  useLayoutEffect(() => {
+    if (motion === null || token === null || gate === "wait" || shown !== motion.rivalId) {
+      return undefined;
+    }
+    const key = `${token}:duel`;
+    if (!claimMotion(key)) return undefined;
+    const element = bar.current;
+    const times = pageClear() ? motionTimes(element) : null;
+    if (times === null || element === null) return undefined;
+    const running = playDuel(element, motion.marginFrom, margin, times);
+    const later = times.uiFast;
+    const figure = (selector: string, from: number) => {
+      const target = ends.current?.querySelector<HTMLElement>(selector) ?? null;
+      if (target !== null) countLive(target, from, Number(target.dataset.value), whole, later);
+    };
+    const rivalFigure = points.current?.querySelector<HTMLElement>("[data-live-number]");
+    if (rivalFigure) {
+      countLive(rivalFigure, motion.rivalNetFrom, Number(rivalFigure.dataset.value), whole, later);
+    }
+    figure("[data-live-end='member'] [data-live-number]", motion.memberNetFrom);
+    figure("[data-live-end='rival'] [data-live-number]", motion.rivalNetFrom);
+    if (motion.statusChanged && status.current !== null) {
+      running.push(
+        status.current.animate(MODEL_POP, {
+          duration: times.data,
+          delay: times.data,
+          easing: LIVE_EASE,
+        }),
+      );
+    }
+    return () => {
+      const unfinished = running.some((animation) => animation.playState !== "finished");
+      for (const animation of running) animation.cancel();
+      if (unfinished) releaseMotion(key);
+    };
+    // Played once per plan; the figures and the margin are read as they stand then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, gate, shown]);
   return (
     <section className={styles.rival} aria-labelledby={`${id}-label`} data-live-rival>
       <div className={styles.rivalHead}>
@@ -498,12 +910,13 @@ function RivalBlock({
         {/* While the next rival is read, the last one's points keep their room, out of sight. */}
         {rival.board !== null || rivalNet !== null ? (
           <span
+            ref={points}
             className={styles.rivalPoints}
             data-live-rival-net
             data-pending={rival.board === null || undefined}
             aria-hidden={rival.board === null || undefined}
           >
-            {wholePoints(rival.board?.net ?? rivalNet ?? 0, locale)}
+            <LiveNumber value={rival.board?.net ?? rivalNet ?? 0} format={whole} />
           </span>
         ) : null}
       </div>
@@ -514,17 +927,19 @@ function RivalBlock({
           aria-hidden={pending !== null || undefined}
         >
           <p className={styles.status}>
-            <strong>{copy.status[duelStatus(margin)]}</strong>
+            <strong ref={status} data-live-status="">
+              {copy.status[duelStatus(margin)]}
+            </strong>
             {" · "}
             {copy.margin} <span className={styles.figure}>{signedWhole(margin, locale)}</span>
           </p>
-          <DuelBar margin={margin} />
-          <p className={styles.ends}>
-            <span className={styles.endMember}>
-              {own ? copy.you : team} {wholePoints(net, locale)}
+          <DuelBar ref={bar} margin={margin} />
+          <p ref={ends} className={styles.ends}>
+            <span className={styles.endMember} data-live-end="member">
+              {own ? copy.you : team} <LiveNumber value={net} format={whole} />
             </span>
-            <span className={styles.endRival}>
-              {wholePoints(rivalNet, locale)} {rival.name}
+            <span className={styles.endRival} data-live-end="rival">
+              <LiveNumber value={rivalNet} format={whole} /> {rival.name}
             </span>
           </p>
           <dl className={styles.duelCells}>
@@ -605,6 +1020,7 @@ function Differentials({
   rival,
   open,
   onToggle,
+  ref,
 }: {
   duel: LiveDuel;
   pending: boolean;
@@ -613,11 +1029,13 @@ function Differentials({
   rival: LiveRivalView;
   open: boolean;
   onToggle: (open: boolean) => void;
+  ref?: Ref<HTMLDetailsElement>;
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   return (
     <details
+      ref={ref}
       className={styles.differentials}
       open={open}
       onToggle={(event) => {

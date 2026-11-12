@@ -3,13 +3,19 @@
    edge in its state's colour. From 1024 px the rival and Farklar stand in a 360 px column
    beside a 640 px one; both give way to the room the shell leaves. Colours are the tokens'
    only: the states are good and bad, the member is --color-chart-you and the rival
-   --color-chart-rival. Nothing here moves: the page is drawn in its final state. */
+   --color-chart-rival. The page is drawn in its final state; a read's motion (liveMotion.ts)
+   plays on it by script, transform and opacity only, and the one animation here, the light's
+   three breaths, stands still under reduced motion. The flash and the points' rise are made
+   and removed by the script, so nothing of them stays. */
 
 .page {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+  /* What a read changes above the rows is kept out of their way by the page itself, in every
+     browser alike (LiveFlow), so no browser anchors the scroll on its own as well. */
+  overflow-anchor: none;
 }
 
 .columns {
@@ -46,13 +52,42 @@
   letter-spacing: 0.04em;
 }
 
-/* While one of the member's matches is played; it stands still. */
+/* While one of the member's matches is played. A newer read drawn makes it breathe three
+   times (its glow comes and goes), then it stands still; it never breathes on its own. */
 .light {
+  position: relative;
   flex: none;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: var(--color-good);
+}
+
+.light::after {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: var(--color-good);
+  opacity: 0;
+  content: "";
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .light[data-breath]::after {
+    animation: live-breath var(--motion-pulse) var(--motion-ease) 3;
+  }
+}
+
+@keyframes live-breath {
+  0%,
+  100% {
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .subtitle {
@@ -221,37 +256,55 @@
   margin: 0;
 }
 
+/* Önde, Berabere or Geride pops when it changes: a box a transform applies to. */
+.status strong {
+  display: inline-block;
+}
+
 .figure {
   font-family: var(--font-mono);
   font-weight: 600;
 }
 
-/* The duel drawn: the track, the middle, the leader's fill from the middle, the ball. */
+/* The duel drawn: the track, the middle, each side's fill from the middle to the ball, and the
+   ball on a lane as wide as the bar, moved along it by its share of the width. */
 .bar {
   position: relative;
   height: 28px;
+  overflow: hidden;
 }
 
 .track,
-.lead {
+.fill {
   position: absolute;
   top: 10px;
   height: 8px;
-  border-radius: var(--radius-s);
 }
 
 .track {
   right: 0;
   left: 0;
+  border-radius: var(--radius-s);
   background: var(--color-line);
 }
 
-.bar[data-lead="member"] .lead {
-  background: var(--color-chart-you);
+/* Square at the middle, round at the end under the ball. */
+.fill {
+  width: 50%;
 }
 
-.bar[data-lead="rival"] .lead {
+.fill[data-live-fill="member"] {
+  right: 50%;
+  border-radius: var(--radius-s) 0 0 var(--radius-s);
+  background: var(--color-chart-you);
+  transform-origin: right center;
+}
+
+.fill[data-live-fill="rival"] {
+  left: 50%;
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
   background: var(--color-chart-rival);
+  transform-origin: left center;
 }
 
 .centre {
@@ -263,9 +316,15 @@
   background: var(--color-text-faint);
 }
 
+.lane {
+  position: absolute;
+  inset: 0;
+}
+
 .barBall {
   position: absolute;
   top: 2px;
+  left: 50%;
   width: 24px;
   height: 24px;
   margin-left: -12px;
@@ -449,6 +508,7 @@
 }
 
 .row {
+  position: relative;
   min-height: 52px;
   border: 1px solid var(--color-line);
   border-left: 4px solid var(--color-line);
@@ -456,15 +516,39 @@
   background: var(--color-bg);
 }
 
-.row[data-state="up"] {
-  border-left-color: var(--color-good);
+/* The state's colour lies on the 4 px edge; it grows along it when the state changes. */
+.edge {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: -4px;
+  width: 4px;
+  border-radius: var(--radius-s) 0 0 var(--radius-s);
+  pointer-events: none;
 }
 
-.row[data-state="down"] {
-  border-left-color: var(--color-bad);
+.row[data-state="up"] .edge {
+  background: var(--color-good);
+  transform-origin: center bottom;
+}
+
+.row[data-state="down"] .edge {
+  background: var(--color-bad);
+  transform-origin: center top;
+}
+
+/* A goal's, an assist's or a card's flash, once, behind the row's content. */
+.flash {
+  position: absolute;
+  inset: 0;
+  background: var(--color-mark);
+  color: var(--color-mark-text);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .rowBody {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -518,10 +602,38 @@
 }
 
 .points {
+  position: relative;
   display: flex;
   flex: none;
   align-items: center;
   gap: 2px;
+}
+
+/* What a read brought rises from the points; what it took falls from them. */
+.float {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  padding: 1px 6px;
+  border-radius: var(--radius-s);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.float[data-sign="up"] {
+  background: var(--color-mark);
+  color: var(--color-mark-text);
+}
+
+.float[data-sign="down"] {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-bad);
 }
 
 .pointsValue {

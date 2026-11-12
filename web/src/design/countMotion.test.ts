@@ -115,6 +115,23 @@ describe("countTo", () => {
     expect(frames).toHaveLength(0);
   });
 
+  it("holds the first value through a delay, dimmed, and counts after it", () => {
+    const element = document.createElement("span");
+    const { animate, last } = fakeAnimate(element);
+    countTo(element, 40, 50, format, motion, MOTION_MS.uiFast);
+    const [, options] = animate.mock.calls[0]!;
+    expect(options).toMatchObject({
+      duration: MOTION_MS.data,
+      delay: MOTION_MS.uiFast,
+      fill: "backwards",
+    });
+    runFrame();
+    expect(element.textContent).toBe("40.0");
+    last().setProgress(0.5);
+    runFrame();
+    expect(element.textContent).toBe("45.0");
+  });
+
   it("leaves the final value written when the animation is cancelled from outside", () => {
     const element = document.createElement("span");
     const { last } = fakeAnimate(element);
