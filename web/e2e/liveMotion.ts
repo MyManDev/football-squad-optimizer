@@ -36,6 +36,30 @@ export const IN_PLAY: readonly BeatName[] = ["kickoff", "goal", "card", "over", 
 /** A read shows at most this many rows' own changes (liveMotion.ts, MOVING_ROWS). */
 export const MOVING_ROWS = 6;
 
+/**
+ * What each newer read of the day moves, as the planner makes it (liveMotion.test.ts): the rows
+ * it takes to another group, which slide there, and the rows that show their own changes, the
+ * six that changed most.
+ */
+export const MOVES: Record<
+  Exclude<BeatName, "before">,
+  { moved: string[]; decorated: string[] }
+> = {
+  kickoff: { moved: ["1", "2", "3", "6", "7", "10"], decorated: [] },
+  goal: { moved: [], decorated: ["10", "7"] },
+  card: { moved: [], decorated: ["2"] },
+  over: {
+    moved: ["1", "2", "3", "4", "5", "6", "7", "8", "10", "11"],
+    decorated: ["1", "2", "3", "6", "7", "10"],
+  },
+  bonus: { moved: [], decorated: ["10", "7", "6", "3", "4", "5"] },
+  second: { moved: ["4", "5", "8", "11"], decorated: ["4", "5", "8", "11"] },
+  final: { moved: ["9"], decorated: ["11", "13"] },
+};
+
+/** The times of a read's run at which its held motion is measured, past every delayed part. */
+const FRAMES = [0, 200, 500, 800, 1100];
+
 /** The member's rival in the published league: the same fifteen, the armband on the vice. */
 const RIVAL = mockDefaultRival(LISTED_ENTRY)!;
 const LIVE_PATH = `/league/${LISTED.league_id}/members/${LISTED_ENTRY}/live`;
@@ -81,6 +105,8 @@ export interface ReadMotion {
   endless: string[];
   /** The rows whose own parts move, the row's slide aside. */
   decorated: string[];
+  /** The rows that slide, each as a whole. */
+  slid: string[];
   /** The duel's ball rolls. */
   rolls: boolean;
 }
@@ -88,6 +114,8 @@ export interface ReadMotion {
 export interface BeatResult {
   /** Every LIVE animation started while the beat was read and shown, in order. */
   started: string[];
+  /** The rows whose place within the groups the read changed. */
+  shifted: string[];
   /** Null on the page without motion. */
   motion: ReadMotion | null;
   /** The light's breaths, where it breathed. */
@@ -286,10 +314,19 @@ function framesOf(times: number[]): ReadMotion {
     properties.delete(timing);
   }
   const decorated = new Set<string>();
+  const slid = new Set<string>();
   for (const animation of held) {
     const node = target(animation);
     const row = node.closest<HTMLElement>("[data-live-row]");
-    if (row !== null && row !== node) decorated.add(row.dataset.liveRow!);
+    if (row === null) continue;
+    if (row !== node) decorated.add(row.dataset.liveRow!);
+    else if (
+      (animation.effect as KeyframeEffect)
+        .getKeyframes()
+        .some((frame) => String(frame.transform).includes("translateY"))
+    ) {
+      slid.add(row.dataset.liveRow!);
+    }
   }
   return {
     held: held.length,
@@ -299,19 +336,33 @@ function framesOf(times: number[]): ReadMotion {
       .filter((animation) => animation.effect?.getTiming().iterations === Infinity)
       .map((animation) => describe(target(animation))),
     decorated: [...decorated],
+    slid: [...slid],
     rolls: held.some((animation) => target(animation).matches("[data-live-lane]")),
   };
 }
 
+/** Each row's top within the groups, by its element id. */
+function rowPlaces(): Record<string, number> {
+  const rows = [...document.querySelectorAll<HTMLElement>("[data-live-page] [data-live-row]")];
+  const origin = rows[0]?.closest("section")?.parentElement?.getBoundingClientRect().top ?? 0;
+  return Object.fromEntries(
+    rows.map((row) => [row.dataset.liveRow!, row.getBoundingClientRect().top - origin]),
+  );
+}
+
 /**
- * The held motion plays on from where it was left; one brought to its end stays there, and one
- * that would never end is stopped, its count already taken.
+ * The held motion plays on from where it was left; one brought to its end ends there (played,
+ * it would start again), and one that would never end is stopped, its count already taken.
  */
 function playHeld() {
   const page = window as unknown as { __liveHeld: Animation[] };
   for (const animation of page.__liveHeld) {
     if (animation.effect?.getTiming().iterations === Infinity) animation.cancel();
-    else if (animation.playState === "paused") animation.play();
+    else if (animation.playState === "paused") {
+      const end = animation.effect?.getComputedTiming().endTime;
+      if (typeof end === "number" && Number(animation.currentTime) >= end) animation.finish();
+      else animation.play();
+    }
   }
   page.__liveHeld = [];
 }
@@ -375,13 +426,14 @@ async function land(target: Locator) {
  * The beat at `index` read through Yenile, its GOL moments landed (each board or card line on
  * the page with motion; the still line closed without it), until its read is drawn and LIVE is
  * at rest. With motion, the read's motion is held in the frame that draws it and measured at 0,
- * 100, 200 and 300 ms of its run before it plays out.
+ * 200, 500, 800 and 1100 ms of its run, past every part's delay, before it plays out.
  */
 export async function readBeat(tab: LiveTab, index: number): Promise<BeatResult> {
   const { page, motion } = tab;
   const beat = BEATS[index]!;
   const before = (await startedOn(page)).length;
   const shownBefore = await page.locator("[data-live-page] time").getAttribute("datetime");
+  const placesBefore = await page.evaluate(rowPlaces);
   const drawn = motion ? page.waitForFunction(holdWhenDrawn, beat.at, { polling: "raf" }) : null;
   // Awaited below; a failure before then must not go unhandled.
   drawn?.catch(() => undefined);
@@ -415,23 +467,36 @@ export async function readBeat(tab: LiveTab, index: number): Promise<BeatResult>
   let breaths: number | null = null;
   if (drawn !== null) {
     await drawn;
-    measured = await page.evaluate(framesOf, [0, 100, 200, 300]);
+    measured = await page.evaluate(framesOf, FRAMES);
     if (IN_PLAY.includes(beat.name)) breaths = await finishBreaths(page);
     await page.evaluate(playHeld);
   }
   await atRest(page);
-  return { started: (await startedOn(page)).slice(before), motion: measured, breaths };
+  const placesAfter = await page.evaluate(rowPlaces);
+  const shifted = Object.keys(placesAfter).filter(
+    (id) => id in placesBefore && Math.abs(placesAfter[id]! - placesBefore[id]!) >= 1,
+  );
+  return { started: (await startedOn(page)).slice(before), shifted, motion: measured, breaths };
 }
 
 /**
- * The checks every newer read's motion passes: nothing scrolls sideways or overflows a row or
- * the rival block in any held frame, only transform and opacity move, nothing loops, at most
- * six rows show their own changes, and the light breathes three times exactly when one of the
- * member's rows is played.
+ * The checks every newer read's motion passes: each row whose place within the groups the read
+ * changed slides, and the rows that show their own changes are the planner's, at most six; nothing scrolls
+ * sideways or overflows a row or the rival block in any held frame, only transform and opacity
+ * move, nothing loops, and the light breathes three times exactly when one of the member's
+ * rows is played.
  */
 export function expectReadMotion(result: BeatResult, name: BeatName, label: string) {
   const motion = result.motion!;
   expect(motion.held, `${label}: something moves`).toBeGreaterThan(0);
+  // A row whose place within the groups changed slides there; one that changed group and kept
+  // its place (the whole group taking its head at the first kickoff) has nothing to slide.
+  for (const id of result.shifted) expect(motion.slid, `${label}: row ${id} slides`).toContain(id);
+  if (name !== "before") {
+    expect([...motion.decorated].sort(), `${label}: the rows showing their changes`).toEqual(
+      [...MOVES[name].decorated].sort(),
+    );
+  }
   for (const frame of motion.frames) {
     expect(frame.sideways, `${label} at ${frame.time} ms: sideways scroll`).toBeLessThanOrEqual(0);
     expect(frame.wide, `${label} at ${frame.time} ms: wider than its box`).toEqual([]);
@@ -447,6 +512,70 @@ export function expectReadMotion(result: BeatResult, name: BeatName, label: stri
   else expect(breathing, `${label}: the light stands still`).toEqual([]);
   // The captain's goal puts the member ahead of the rival: the duel's ball rolls to his side.
   if (name === "goal") expect(motion.rolls, `${label}: the duel's ball rolls`).toBe(true);
+}
+
+/** Where the parts the visitor may read stand: each row and heading's top, the bar, the scroll. */
+function readingPlaces() {
+  const live = document.querySelector("[data-live-page]")!;
+  const bar = document.querySelector("[data-phone-bar]")?.getBoundingClientRect().bottom ?? 0;
+  const parts = [...live.querySelectorAll<HTMLElement>("[data-live-row], [data-live-group]")].map(
+    (node) => ({
+      part:
+        node.dataset.liveRow === undefined
+          ? `group:${node.dataset.liveGroup}`
+          : `row:${node.dataset.liveRow}`,
+      top: node.getBoundingClientRect().top,
+    }),
+  );
+  const groupsTop = Math.min(...parts.map(({ top }) => top));
+  return { bar, groupsTop, scrollY: window.scrollY, parts };
+}
+
+/**
+ * The visitor reads past the groups' top while a read lands: scrolled to the page's foot, the
+ * groups' top under the phone bar, and the beat at `index` read with Yenile pressed where it
+ * stands, out of sight, so nothing scrolls it into view; its moments landed, LIVE at rest. The
+ * first row or heading that stood wholly below the bar, and that the read neither took to
+ * another group nor took away, stands where it stood on the screen, though the read moved it
+ * in the page: the page made up for what changed above it.
+ */
+export async function expectPlaceKept(tab: LiveTab, index: number, label: string) {
+  const { page, motion } = tab;
+  const beat = BEATS[index]!;
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  // A scroll this recent is the visitor's, and the page keeps its hands off: wait it out.
+  await page.waitForTimeout(400);
+  const before = await page.evaluate(readingPlaces);
+  expect(before.groupsTop, `${label}: the groups' top is under the bar`).toBeLessThan(before.bar);
+  tab.server.step = index;
+  const answered = page.waitForResponse(liveRead);
+  await page.locator("[data-live-refresh]").dispatchEvent("click");
+  await answered;
+  if (motion) {
+    for (const moment of beat.moments) {
+      await page.waitForFunction(raisedOver, MOMENT[moment], { polling: "raf" });
+      await land(page.locator(MOMENT[moment]));
+    }
+  } else if (beat.moments.length > 0) {
+    await land(page.locator("[data-goal-still]").getByRole("button", { name: "Kapat" }));
+  }
+  await expect(page.locator("[data-live-page] time")).toHaveAttribute("datetime", beat.at);
+  if (motion && IN_PLAY.includes(beat.name)) await finishBreaths(page);
+  await atRest(page);
+  const after = await page.evaluate(readingPlaces);
+  const now = new Map(after.parts.map(({ part, top }) => [part, top]));
+  const moved = new Set(
+    beat.name === "before" ? [] : MOVES[beat.name].moved.map((id) => `row:${id}`),
+  );
+  const read = before.parts
+    .filter(({ top }) => top >= before.bar)
+    .sort((a, b) => a.top - b.top)
+    .find(({ part }) => !moved.has(part) && now.has(part));
+  expect(read, `${label}: a part to read below the bar`).toBeDefined();
+  const top = now.get(read!.part)!;
+  expect(Math.abs(top - read!.top), `${label}: ${read!.part} stays on the screen`).toBeLessThan(1);
+  const shifted = top + after.scrollY - (read!.top + before.scrollY);
+  expect(Math.abs(shifted), `${label}: ${read!.part} moved in the page`).toBeGreaterThan(10);
 }
 
 /**

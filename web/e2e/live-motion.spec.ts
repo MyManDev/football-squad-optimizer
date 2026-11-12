@@ -17,10 +17,11 @@ import {
  * LIVE moves once when a newer read is drawn (liveMotion.ts), on a phone: the synthetic
  * Saturday's eight reads, one per Yenile, on two pages side by side, one with motion and one
  * under the reduced-motion preference. With motion, each newer read moves only after the GOL
- * board's moments have landed, and is held in the frame that draws it: at 0, 100, 200 and
- * 300 ms of its run nothing scrolls sideways or overflows, only transform and opacity move,
- * nothing loops, at most six rows show their own changes, and the heading's light breathes
- * three times while one of the member's rows is played. The first read and a read made again
+ * board's moments have landed, and is held in the frame that draws it: every row it takes to
+ * another group slides, the rows that show their own changes are the planner's, and at 0, 200,
+ * 500, 800 and 1100 ms of its run nothing scrolls sideways or overflows, only transform and
+ * opacity move, nothing loops, and the heading's light breathes three times while one of the
+ * member's rows is played. The first read and a read made again
  * move nothing, the page without motion never moves, and both pages end with the same markup.
  *
  * With `LIVE_MOTION_SHOTS` set, the 375 and 390 px runs also read the day in the night palette,
