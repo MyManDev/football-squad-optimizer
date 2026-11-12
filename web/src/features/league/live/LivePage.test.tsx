@@ -1718,6 +1718,50 @@ describe("LIVE's motion", () => {
     expect(figure(net())).toBe(liveBoard(liveBeat("goal").input)!.net);
   });
 
+  it("says a held duel line in the language switched to while its figures count", async () => {
+    const started = recordMotion({ running: true });
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+    const { user } = renderLive({ forwarder, extra: <English /> });
+    await rows();
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await landBoards(["goal", "assist"]);
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    const word = () => document.querySelector("[data-live-status]");
+    expect(word()).toHaveTextContent(copy.live.status.level);
+    // The language changes while the figures still count: the held line takes it at once.
+    await user.click(screen.getByRole("button", { name: "English" }));
+    await vi.waitFor(() => expect(word()).toHaveTextContent(MESSAGES.en.live.status.level));
+    const figures = started.filter(({ element }) =>
+      element.matches(
+        "[data-live-end] [data-live-number], [data-live-rival-net] [data-live-number]",
+      ),
+    );
+    await act(async () => {
+      for (const { animation } of figures) animation.finish();
+    });
+    await vi.waitFor(() => expect(word()).toHaveTextContent(MESSAGES.en.live.status.ahead));
+  });
+
+  it("breathes for a return's read whose own matches open the follow window a render later", async () => {
+    // 101 kicked off at 12:30, so its 135 minutes end at 14:45; the read, a minute old, still
+    // has it played, and its own matches give it the longer bound one render after its board.
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T14:45:30Z"));
+    seen("kickoff");
+    recordMotion();
+    const card = liveBeat("card").document;
+    const late = { ...card, week: { ...card.week, source_time: "2026-11-21T14:44:30Z" } };
+    renderLive({ forwarder: fakeForwarder([answered(late)]) });
+    const light = () =>
+      within(document.querySelector<HTMLElement>("[data-live-page] h1")!).queryByRole("img", {
+        name: copy.live.matchInProgress,
+      });
+    await vi.waitFor(() => expect(light()).not.toBeNull());
+    await vi.waitFor(() =>
+      expect(light()).toHaveAttribute("data-breath", expect.stringContaining("14:44:30")),
+    );
+  });
+
   it("breathes the heading's light for a newer read while a match is played, never for the first", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T13:05:00Z"));

@@ -1008,7 +1008,7 @@ function RivalBlockPart({
   // The line above the bar, Önde, Berabere or Geride and Fark, written here: while the figures
   // count to a read that changed the margin, it says the duel they show, the read before's,
   // until they land (`spoken.held`).
-  const spoken = useRef({ word, gap: gapText, held: false, turn: 0 });
+  const spoken = useRef({ word, gap: gapText, held: false, turn: 0, from: 0 });
   const motion = plan?.duel ?? null;
   const token = plan?.token ?? null;
   // The duel moves for a read drawn with the same rival it was drawn with before, once.
@@ -1021,8 +1021,11 @@ function RivalBlockPart({
   useLayoutEffect(() => {
     spoken.current.word = word;
     spoken.current.gap = gapText;
-    if (!spoken.current.held) say(word, gapText);
-  }, [word, gapText, drawn]);
+    const { held, from } = spoken.current;
+    // Held, it says the read before's duel, in the language shown now.
+    if (held) say(copy.status[duelStatus(from)], signedWhole(from, locale));
+    else say(word, gapText);
+  }, [word, gapText, drawn, copy, locale]);
   useLayoutEffect(() => {
     /** The line as the duel drawn says it, held no longer. */
     const speak = () => {
@@ -1083,6 +1086,7 @@ function RivalBlockPart({
       // The line changes as the figures land; the word pops where it changed.
       const turn = (spoken.current.turn += 1);
       spoken.current.held = true;
+      spoken.current.from = motion.marginFrom;
       say(copy.status[duelStatus(motion.marginFrom)], signedWhole(motion.marginFrom, locale));
       const land = (pop: boolean) => {
         if (spoken.current.turn !== turn) return;

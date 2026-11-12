@@ -464,6 +464,7 @@ function LiveMember({
           refresh={refreshBoth}
           wide={wide}
           windowOpen={liveMatch.open}
+          windowKnown={live.matches !== null}
           light={light}
         />
       )}
@@ -591,6 +592,7 @@ function LiveShown({
   refresh,
   wide,
   windowOpen,
+  windowKnown,
   light,
 }: {
   /** The member the page is for. */
@@ -608,6 +610,11 @@ function LiveShown({
   wide: boolean;
   /** The follow window of the member's matches is open. */
   windowOpen: boolean;
+  /**
+   * The window is told from the reads' own matches: on a first read they come a render after
+   * its board, and until then the window may stand closed.
+   */
+  windowKnown: boolean;
   light: LiveLight;
 }) {
   const rivalBoard = rival?.board ?? null;
@@ -708,7 +715,10 @@ function LiveShown({
   // It breathes for a newer read drawn, once the opening cover has gone.
   const plan = told.plan;
   const playing = windowOpen && drawn.rows.some((row) => row.phase === "playing");
-  const breath = plan !== null && plan.playing && gate === "open" ? plan.token : null;
+  // A read's breath is offered once its window is known: offered while the window only seems
+  // closed, it would be spent unlit.
+  const breath =
+    windowKnown && plan !== null && plan.playing && gate === "open" ? plan.token : null;
   useEffect(() => light.set({ entryId, playing, breath }), [light, entryId, playing, breath]);
   useEffect(() => () => light.set(null), [light]);
 
