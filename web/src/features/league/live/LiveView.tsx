@@ -910,7 +910,9 @@ class LiveFlow extends Component<FlowProps> {
     if (times === null) return;
     const clear = pageClear();
     for (const { row, motion, animations } of held) {
+      // One its figure stopped meanwhile (written again, in another language) stays stopped.
       for (const animation of animations) {
+        if (animation.playState !== "paused") continue;
         if (clear) animation.play();
         else animation.finish();
       }
@@ -1041,6 +1043,7 @@ function RivalBlockPart({
         held.current = false;
         const clear = pageClear();
         for (const animation of rolling.current) {
+          if (animation.playState !== "paused") continue;
           if (clear) animation.play();
           else animation.finish();
         }
