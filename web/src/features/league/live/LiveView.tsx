@@ -15,6 +15,7 @@
 import {
   Component,
   createRef,
+  memo,
   useId,
   useLayoutEffect,
   useRef,
@@ -232,7 +233,7 @@ export function LiveView(props: LiveViewProps) {
  * is given. Opening the page again on a newer read, it holds the total last seen until the
  * opening cover has gone, then counts on from it.
  */
-function ScoreCard({
+function ScoreCardPart({
   board,
   net,
   plan,
@@ -298,7 +299,7 @@ function ScoreCard({
   );
 }
 
-function Freshness({
+function FreshnessPart({
   board,
   refreshing,
   onRefresh,
@@ -400,7 +401,7 @@ function BallIcon({ className = styles.ball, glyph }: { className?: string; glyp
   );
 }
 
-function Row({ row }: { row: LiveRow }) {
+function RowPart({ row }: { row: LiveRow }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   // A pick the scorer does not count brings the member nothing: its row tells no event and no
@@ -468,7 +469,7 @@ function Row({ row }: { row: LiveRow }) {
   );
 }
 
-function Groups({ board, ref }: { board: LiveBoard; ref?: Ref<HTMLDivElement> }) {
+function GroupsPart({ board, ref }: { board: LiveBoard; ref?: Ref<HTMLDivElement> }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   const id = useId();
@@ -499,7 +500,7 @@ function Groups({ board, ref }: { board: LiveBoard; ref?: Ref<HTMLDivElement> })
   );
 }
 
-function Recap({ items, ref }: { items: readonly RecapItem[]; ref?: Ref<HTMLElement> }) {
+function RecapPart({ items, ref }: { items: readonly RecapItem[]; ref?: Ref<HTMLElement> }) {
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   const id = useId();
@@ -813,7 +814,7 @@ function DuelBar({ margin, ref }: { margin: number; ref?: Ref<HTMLDivElement> })
   );
 }
 
-function RivalBlock({
+function RivalBlockPart({
   rival,
   own,
   net,
@@ -1012,7 +1013,7 @@ function SwingList({
  * rival's change); while the next rival is read, the last one's lists hold their place out
  * of sight.
  */
-function Differentials({
+function DifferentialsPart({
   duel,
   pending,
   own,
@@ -1073,3 +1074,13 @@ function Differentials({
     </details>
   );
 }
+
+// Each part is drawn again only when what it shows changes: a GOL board's landing changes
+// Canlı puan alone, so the rows, the recap and the rival's side are not drawn again for it.
+const ScoreCard = memo(ScoreCardPart);
+const Freshness = memo(FreshnessPart);
+const Row = memo(RowPart);
+const Groups = memo(GroupsPart);
+const Recap = memo(RecapPart);
+const RivalBlock = memo(RivalBlockPart);
+const Differentials = memo(DifferentialsPart);

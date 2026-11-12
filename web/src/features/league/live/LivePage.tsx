@@ -22,6 +22,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -92,6 +93,9 @@ import { useGoalReplay } from "./useGoalReplay";
 import { useLiveWindow } from "./useLiveWindow";
 import { useMemberLiveScore } from "./useMemberLiveScore";
 import { useWide } from "./useWide";
+
+/** The GOL board, drawn again only when its batch, source or wiring changes. */
+const GoalLayer = memo(GoalMomentLayer);
 
 /** The reads the page makes; the site's own unless a test injects them. */
 export interface LiveDependencies {
@@ -218,13 +222,18 @@ function LiveMember({
   // that have landed added to Canlı puan, as the member page's card does; the replay brings no
   // real points, so nothing waits for it.
   const hold = useBoardHold(replaying ? null : stream);
-  const goalBatch = replaying
-    ? replay === null
-      ? null
-      : { id: `replay:${replay.id}`, items: replay.items }
-    : stream === null
-      ? null
-      : { id: `live:${stream.id}`, items: stream.items };
+  // The same batch while nothing new comes, so a landing does not draw the board again.
+  const goalBatch = useMemo(
+    () =>
+      replaying
+        ? replay === null
+          ? null
+          : { id: `replay:${replay.id}`, items: replay.items }
+        : stream === null
+          ? null
+          : { id: `live:${stream.id}`, items: stream.items },
+    [replaying, replay, stream],
+  );
 
   const snapshot = useSyncExternalStore(record.subscribe, record.snapshot, record.snapshot);
   const memberBundle = useQuery({
@@ -376,12 +385,48 @@ function LiveMember({
     rivalBundle.isPending &&
     rivalBundle.dataUpdatedAt === 0 &&
     rivalBundle.errorUpdateCount === 0;
-  const pending = !rivalReading
-    ? null
-    : (kept ??
-      (board === null
+  const pending = useMemo(
+    () =>
+      !rivalReading
         ? null
-        : { duel: liveDuel(board, board, classic ? totals : null), rivalNet: board.net }));
+        : (kept ??
+          (board === null
+            ? null
+            : { duel: liveDuel(board, board, classic ? totals : null), rivalNet: board.net })),
+    [rivalReading, kept, board, classic, totals],
+  );
+  const choose = useCallback(
+    (next: number) =>
+      setSearchParams(
+        (current) => {
+          const params = new URLSearchParams(current);
+          params.set("duel", String(next));
+          return params;
+        },
+        { replace: true },
+      ),
+    [setSearchParams],
+  );
+  // Drawn once the rival is chosen, so the picker never shows an empty choice first; the same
+  // object until something in it changes, so the rival's side is not drawn again for nothing.
+  const showRival = !(standalone || waiting || choices.length === 0);
+  const opponentId = opponent.data?.entryId ?? null;
+  const rivalView = useMemo<LiveRivalView | null>(
+    () =>
+      showRival
+        ? {
+            choices,
+            entryId: rivalId,
+            name: choices.find((choice) => choice.entryId === rivalId)?.name ?? null,
+            board: rivalBoard,
+            duel,
+            pending,
+            opponent: rivalId !== null && rivalId === opponentId,
+            onSelect: choose,
+          }
+        : null,
+    [showRival, choices, rivalId, rivalBoard, duel, pending, opponentId, choose],
+  );
 
   const claimed = useClaimedEntry(leagueId);
   const gameweek = board?.gameweek ?? week;
@@ -394,7 +439,7 @@ function LiveMember({
         (table.isPending || (reading === null && !snapshot.settled.has(memberWeek.gameweek)))));
   return (
     <>
-      <GoalMomentLayer
+      <GoalLayer
         batch={goalBatch}
         source={replaying ? "replay" : "live"}
         scoring={!replaying}
@@ -409,29 +454,7 @@ function LiveMember({
           waiting={hold.waiting}
           team={view.entry.team_name ?? unnamed}
           own={!standalone && claimed === entryId}
-          rival={
-            // Drawn once the rival is chosen, so the picker never shows an empty choice first.
-            standalone || waiting || choices.length === 0
-              ? null
-              : {
-                  choices,
-                  entryId: rivalId,
-                  name: choices.find((choice) => choice.entryId === rivalId)?.name ?? null,
-                  board: rivalBoard,
-                  duel,
-                  pending,
-                  opponent: rivalId !== null && rivalId === opponent.data?.entryId,
-                  onSelect: (next) =>
-                    setSearchParams(
-                      (current) => {
-                        const params = new URLSearchParams(current);
-                        params.set("duel", String(next));
-                        return params;
-                      },
-                      { replace: true },
-                    ),
-                }
-          }
+          rival={rivalView}
           entryId={entryId}
           refreshing={live.refreshing}
           reading={live.reading}
@@ -575,7 +598,10 @@ function LiveShown({
   }
   const holding = waiting && settled.board.gameweek === board.gameweek;
   const drawn = holding ? settled.board : board;
-  const drawnRival = rival === null || !holding ? rival : heldRival(rival, settled);
+  const drawnRival = useMemo(
+    () => (rival === null || !holding ? rival : heldRival(rival, settled)),
+    [rival, holding, settled],
+  );
   const gained = holding ? brought : 0;
   const drawnDuel = duelLook(drawn, drawnRival);
   const gate: MotionGate = useCoverGone() ? "open" : "wait";
@@ -643,12 +669,13 @@ function LiveShown({
   // or closes it; that choice then stands, through a change of rival too.
   const layout = useShellLayout();
   const [open, setOpen] = useState<boolean | null>(null);
+  const recap = useMemo(() => recapItems(told.recap), [told.recap]);
   return (
     <LiveView
       team={team}
       board={drawn}
       net={drawn.net + gained}
-      recap={recapItems(told.recap)}
+      recap={recap}
       own={own}
       rival={drawnRival}
       refreshing={refreshing}
