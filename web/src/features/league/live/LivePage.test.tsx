@@ -20,8 +20,10 @@ import {
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import { PHONE_QUERY } from "../../../design/shell/layout";
+import { REDUCED_MOTION_QUERY } from "../../../design/motion";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import { claimIn, forgetIdentity } from "../../../testSupport/league";
+import { liveBeat, type BeatName } from "../../../testSupport/liveBeats";
 import {
   testActivity,
   testFixtures,
@@ -40,10 +42,11 @@ import type { ForwarderResult, LiveReason } from "../forwarder/client";
 import type { FplEntryBundle, FplH2hMatches } from "../forwarder/documents";
 import { LeagueContext } from "../LeagueContext";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
+import { advanceRecap, liveBoard } from "./liveBoard";
 import { LivePage } from "./LivePage";
 import { signedWhole } from "./liveFormat";
-import { forgetLooks } from "./liveLooks";
-import { forgetLiveMotion } from "./liveMotion";
+import { forgetLooks, keepLook } from "./liveLooks";
+import { forgetLiveMotion, lookOf } from "./liveMotion";
 import type { LiveForwarder } from "./liveSources";
 import { WIDE_QUERY } from "./useWide";
 
@@ -1018,5 +1021,237 @@ describe("the week and the rival", () => {
     expect(block).toHaveTextContent(copy.live.margin);
     expect(document.querySelector("[data-live-differentials]")).toBe(differentials);
     expect(differentials.open).toBe(true);
+  });
+});
+
+describe("LIVE's motion", () => {
+  type Started = {
+    element: Element;
+    keyframes: Keyframe[];
+    options: KeyframeAnimationOptions;
+  };
+
+  /** Every animate() call, each over at once, as a count and the GOL board read it. */
+  function recordMotion(): Started[] {
+    const started: Started[] = [];
+    Object.defineProperty(Element.prototype, "animate", {
+      configurable: true,
+      writable: true,
+      value(this: Element, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
+        started.push({ element: this, keyframes, options });
+        return {
+          finished: Promise.resolve(),
+          playState: "finished",
+          effect: { getComputedTiming: () => ({ progress: null }) },
+          addEventListener(type: string, listener: () => void) {
+            if (type === "finish") queueMicrotask(listener);
+          },
+          cancel() {},
+        } as unknown as Animation;
+      },
+    });
+    return started;
+  }
+
+  afterEach(() => {
+    delete (Element.prototype as { animate?: unknown }).animate;
+    document.querySelectorAll("[data-opening-mark]").forEach((cover) => cover.remove());
+  });
+
+  const beat = (name: BeatName) => answered(liveBeat(name).document);
+  /** The rows a motion played on. */
+  const movedRows = (started: Started[]) =>
+    [
+      ...new Set(
+        started
+          .map(({ element }) => element.closest("[data-live-row]")?.getAttribute("data-live-row"))
+          .filter((id): id is string => id !== undefined && id !== null),
+      ),
+    ].sort();
+  const onPage = (started: Started[]) =>
+    started.filter(({ element }) => element.isConnected && element.closest("[data-live-page]"));
+
+  /** Lands the GOL board's moments of a read, in order. */
+  async function landBoards(kinds: ("goal" | "assist")[]) {
+    for (const kind of kinds) fireEvent.click(await raised(kind));
+  }
+
+  /** The page's markup, with what differs between two renders taken out (ids React makes). */
+  const markup = () =>
+    document
+      .querySelector("[data-live-page]")!
+      .outerHTML.replace(/ (id|for|aria-labelledby|aria-describedby)="[^"]*"/g, "");
+
+  /** The recap's names, in order. */
+  const told = () =>
+    within(recapRegion()!)
+      .getAllByRole("listitem")
+      .map((item) => item.getAttribute("aria-label")!.split(",")[0]);
+
+  it("moves nothing on the first read, then the rows a newer read changed, once its board has landed", async () => {
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal"), beat("goal")]);
+    const { user } = renderLive({ forwarder });
+    await rows();
+    expect(movedRows(started)).toEqual([]);
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    // The board holds the read: no row moves under it.
+    const board = await raised("goal");
+    expect(movedRows(started)).toEqual([]);
+    fireEvent.click(board);
+    await landBoards(["assist"]);
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    // Only transform and opacity, and nothing without end.
+    for (const { keyframes, options } of onPage(started)) {
+      for (const frame of keyframes) {
+        for (const key of Object.keys(frame)) {
+          expect(["transform", "opacity", "offset"]).toContain(key);
+        }
+      }
+      expect(options.iterations ?? 1).not.toBe(Infinity);
+    }
+    // A read of the same source time again moves nothing.
+    const before = started.length;
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(3));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onPage(started.slice(before))).toEqual([]);
+  });
+
+  it("draws the same page under reduced motion, where nothing moves at all", async () => {
+    const moving = recordMotion();
+    {
+      const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+      const { user } = renderLive({ forwarder });
+      await rows();
+      await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+      await landBoards(["goal", "assist"]);
+      await vi.waitFor(() => expect(movedRows(moving)).toEqual(["10", "7"]));
+    }
+    const withMotion = markup();
+    cleanup();
+    localStorage.clear();
+    forgetLooks();
+    forgetLiveMotion();
+    const still = recordMotion();
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        media: query,
+        matches: query === REDUCED_MOTION_QUERY,
+        addEventListener() {},
+        removeEventListener() {},
+      }),
+    });
+    {
+      const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+      const { user } = renderLive({ forwarder });
+      await rows();
+      await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+      await vi.waitFor(() =>
+        expect(document.querySelector("[data-live-page] time")).toHaveAttribute(
+          "datetime",
+          liveBeat("goal").at,
+        ),
+      );
+    }
+    expect(onPage(still)).toEqual([]);
+    expect(markup()).toBe(withMotion);
+  });
+
+  it("waits for the opening cover, then moves what changed since the visitor's last look", async () => {
+    // The visitor saw the kickoff read; the page opens again on the goal's.
+    const seen = liveBoard(liveBeat("kickoff").input)!;
+    keepLook(lookOf(seen, null), advanceRecap(null, seen));
+    forgetLooks();
+    const cover = document.createElement("div");
+    cover.setAttribute("data-opening-mark", "");
+    document.body.append(cover);
+    const started = recordMotion();
+    renderLive({ forwarder: fakeForwarder([beat("goal")]) });
+    await rows();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(movedRows(started)).toEqual([]);
+    await act(async () => {
+      cover.remove();
+    });
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    // No GOL board for what happened while away: the recap tells it.
+    expect(document.querySelector("[data-goal-board]")).toBeNull();
+    expect(told()).toEqual(["P10", "P7"]);
+  });
+
+  it("keeps what changed until the read a look started lands, then shows that read's alone", async () => {
+    recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal"), beat("card")]);
+    const answer = forwarder.liveActivity.getMockImplementation()!;
+    let release: () => void = () => undefined;
+    let calls = 0;
+    forwarder.liveActivity.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 3) {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return answer();
+    });
+    const { user } = renderLive({ forwarder });
+    await rows();
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await landBoards(["goal", "assist"]);
+    await vi.waitFor(() => expect(recapRegion()).not.toBeNull());
+    expect(told()).toEqual(["P10", "P7"]);
+    // Yenile: the recap stands while its read is on its way...
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(calls).toBe(3));
+    expect(told()).toEqual(["P10", "P7"]);
+    // ...and changes once, to what that read brought.
+    await act(async () => {
+      release();
+    });
+    const line = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLElement>("[data-goal-line]");
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    fireEvent.click(line);
+    await vi.waitFor(() => expect(told()).toEqual(["P2"]));
+  });
+
+  it("moves no row for another rival", async () => {
+    const started = recordMotion();
+    const { user } = renderLive({ forwarder: fakeForwarder([beat("goal")]) });
+    await rows();
+    const before = started.length;
+    await user.selectOptions(screen.getByRole("combobox", { name: copy.live.rival }), "35249005");
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(movedRows(started.slice(before))).toEqual([]);
+  });
+
+  it("breathes the heading's light for a newer read while a match is played, never for the first", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T13:05:00Z"));
+    recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+    const { user } = renderLive({ forwarder });
+    const light = () =>
+      within(document.querySelector<HTMLElement>("[data-live-page] h1")!).queryByRole("img", {
+        name: copy.live.matchInProgress,
+      });
+    await vi.waitFor(() => expect(light()).not.toBeNull());
+    expect(light()).not.toHaveAttribute("data-breath");
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await landBoards(["goal", "assist"]);
+    await vi.waitFor(() =>
+      expect(light()).toHaveAttribute("data-breath", expect.stringContaining(liveBeat("goal").at)),
+    );
   });
 });
