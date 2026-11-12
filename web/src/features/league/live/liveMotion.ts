@@ -198,7 +198,11 @@ export function planMotion(
   for (const [key, after] of Object.entries(next.rows)) {
     const id = Number(key);
     const before = previous.rows[key];
-    if (before === undefined || (!after.counted && !before.counted)) continue;
+    if (before === undefined) continue;
+    const chips = after.autosub !== null && after.autosub !== before.autosub;
+    // A pick the score counts neither before nor now moves nothing, but for his chip when the
+    // scorer takes him off.
+    if (!after.counted && !before.counted && !chips) continue;
     const events = after.counted ? (fresh.get(id) ?? null) : null;
     const both = before.started && after.started;
     const pointsFrom = both && before.shown !== after.shown ? before.shown : null;
@@ -213,7 +217,6 @@ export function planMotion(
       after.state !== before.state && (after.state === "up" || after.state === "down")
         ? after.state
         : null;
-    const chips = after.autosub !== null && after.autosub !== before.autosub;
     const dim =
       after.counted === before.counted
         ? null
