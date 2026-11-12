@@ -1396,14 +1396,14 @@ describe("LIVE's motion", () => {
     }
   });
 
-  it("rolls the duel on a return though the rival answers after the member", async () => {
-    // The look kept at kickoff, with the duel beside it.
+  /** What the visitor saw at `name`: the look LIVE keeps, the duel with the default rival beside it. */
+  function seenWithDuel(name: BeatName) {
     const rivalId = mockDefaultRival(ENTRY)!;
-    const kickoff = liveBeat("kickoff").input;
-    const member = liveBoard(kickoff)!;
+    const input = liveBeat(name).input;
+    const member = liveBoard(input)!;
     const rival = liveBoard({
-      ...kickoff,
-      member: { ...kickoff.member, entry_id: rivalId, captain: 7, vice: 10 },
+      ...input,
+      member: { ...input.member, entry_id: rivalId, captain: 7, vice: 10 },
     })!;
     const margin = liveDuel(member, rival, null).margin;
     keepLook(
@@ -1411,6 +1411,45 @@ describe("LIVE's motion", () => {
       advanceRecap(null, member),
     );
     forgetLooks();
+    return { member, rival, margin };
+  }
+
+  /** A figure of the duel's ends, as a number. */
+  const end = (side: "member" | "rival") =>
+    figure(document.querySelector(`[data-live-end='${side}'] [data-live-number]`)?.textContent);
+
+  it("holds the duel at the last look while the opening cover stands, then rolls it", async () => {
+    const kickoff = seenWithDuel("kickoff");
+    const cover = document.createElement("div");
+    cover.setAttribute("data-opening-mark", "");
+    document.body.append(cover);
+    const started = recordMotion();
+    renderLive({ forwarder: fakeForwarder([beat("goal")]) });
+    await rows();
+    await vi.waitFor(() =>
+      expect(document.querySelector("[data-live-rival-net]:not([data-pending])")).not.toBeNull(),
+    );
+    await settle();
+    // Under the cover the duel stands as it was last seen: its ends, its line, its ball.
+    const lanes = () =>
+      onLive(started).filter(({ element }) => element.matches("[data-live-lane]"));
+    expect(end("member")).toBe(kickoff.member.net);
+    expect(end("rival")).toBe(kickoff.rival.net);
+    expect(document.querySelector("[data-live-margin]")).toHaveTextContent(
+      signedWhole(kickoff.margin, "tr-TR"),
+    );
+    expect(lanes()).toHaveLength(1);
+    expect(lanes()[0]!.paused).toBe(true);
+    await act(async () => {
+      cover.remove();
+    });
+    const goal = liveBoard(liveBeat("goal").input)!;
+    await vi.waitFor(() => expect(end("member")).toBe(goal.net));
+    expect(lanes()[0]!.paused).toBe(false);
+  });
+
+  it("rolls the duel on a return though the rival answers after the member", async () => {
+    seenWithDuel("kickoff");
     const started = recordMotion();
     const forwarder = fakeForwarder([beat("goal")]);
     const bundleOf = forwarder.entryBundle.getMockImplementation()!;
