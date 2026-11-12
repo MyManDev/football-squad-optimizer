@@ -994,6 +994,8 @@ function RivalBlockPart({
   const whole = (value: number) => countedWhole(value, locale);
   const word = copy.status[duelStatus(margin)];
   const gapText = signedWhole(margin, locale);
+  // The line's place: drawn only beside a duel, so it is written again each time it is drawn.
+  const drawn = duel !== null && rivalNet !== null;
   const bar = useRef<HTMLDivElement>(null);
   const status = useRef<HTMLElement>(null);
   const points = useRef<HTMLSpanElement>(null);
@@ -1020,7 +1022,7 @@ function RivalBlockPart({
     spoken.current.word = word;
     spoken.current.gap = gapText;
     if (!spoken.current.held) say(word, gapText);
-  }, [word, gapText]);
+  }, [word, gapText, drawn]);
   useLayoutEffect(() => {
     /** The line as the duel drawn says it, held no longer. */
     const speak = () => {
@@ -1054,6 +1056,11 @@ function RivalBlockPart({
     // finds it rolling, and a remount after the 1024 px turn plays nothing again.
     if (!claimMotion(key)) return;
     played.current = key;
+    // A roll an earlier plan still holds, never played (two reads in one wait), gives way.
+    for (const animation of rolling.current) {
+      if (animation.playState === "paused") animation.cancel();
+    }
+    held.current = false;
     const element = bar.current;
     const times = motionTimes(element);
     if (times === null || element === null || (gate === "open" && !pageClear())) return;

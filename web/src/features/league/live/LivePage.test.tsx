@@ -957,6 +957,9 @@ describe("the week and the rival", () => {
     expect(document.querySelector("[data-live-rival] [data-pending]")).toBeNull();
     release();
     await vi.waitFor(() => expect(document.querySelector("[data-live-rival-net]")).not.toBeNull());
+    // Drawn now beside a level duel, its line says so: Berabere, Fark 0.
+    expect(document.querySelector("[data-live-status]")).toHaveTextContent(copy.live.status.level);
+    expect(document.querySelector("[data-live-margin]")).toHaveTextContent(/^0$/);
   });
 
   it("keeps the duel's place, out of sight, while the first rival's bundle is read", async () => {
@@ -1446,6 +1449,30 @@ describe("LIVE's motion", () => {
     const goal = liveBoard(liveBeat("goal").input)!;
     await vi.waitFor(() => expect(end("member")).toBe(goal.net));
     expect(lanes()[0]!.paused).toBe(false);
+  });
+
+  it("lets a roll held under the cover give way to the next read's, held in the same wait", async () => {
+    seenWithDuel("card");
+    const cover = document.createElement("div");
+    cover.setAttribute("data-opening-mark", "");
+    document.body.append(cover);
+    const started = recordMotion();
+    const { user } = renderLive({ forwarder: fakeForwarder([beat("over"), beat("bonus")]) });
+    await rows();
+    const lanes = () =>
+      onLive(started).filter(({ element }) => element.matches("[data-live-lane]"));
+    await vi.waitFor(() => expect(lanes()).toHaveLength(1));
+    expect(lanes()[0]!.paused).toBe(true);
+    // A second read drawn while the cover still stands: its roll is held, the first one ends.
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(lanes()).toHaveLength(2));
+    expect(lanes()[0]!.animation.playState).toBe("idle");
+    expect(lanes()[1]!.paused).toBe(true);
+    await act(async () => {
+      cover.remove();
+    });
+    await vi.waitFor(() => expect(lanes()[1]!.paused).toBe(false));
+    expect(lanes()[0]!.animation.playState).toBe("idle");
   });
 
   it("rolls the duel on a return though the rival answers after the member", async () => {

@@ -25,6 +25,14 @@ describe("the heading's light", () => {
     expect(light.get()).toEqual({ entryId: 1, playing: true, breath: null });
   });
 
+  it("never breathes later for a read whose breath was offered while it was off", () => {
+    const light = createLiveLight();
+    // A newer read drawn while the follow window is closed: no light, and its breath is spent.
+    light.set({ entryId: 1, playing: false, breath: "read-1" });
+    light.set({ entryId: 1, playing: true, breath: "read-1" });
+    expect(light.get()).toEqual({ entryId: 1, playing: true, breath: null });
+  });
+
   it("tells its readers only of a change", () => {
     const light = createLiveLight();
     let told = 0;

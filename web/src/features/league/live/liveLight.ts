@@ -1,9 +1,9 @@
 /**
  * The heading's light, as the board drawn below it says: whether one of the member's own rows
  * is in a match being played, and the read whose arrival it breathes for. The board sets it and
- * the heading reads it, so only the light is drawn again when it changes. A read breathes once:
- * the light coming on again for a read it has breathed for (the follow window closing and opening
- * again on the same board) stands still.
+ * the heading reads it, so only the light is drawn again when it changes. A read breathes once
+ * at most: once its breath is offered, lit or not, the light coming on again for it (the follow
+ * window closing and opening again on the same board) stands still.
  */
 
 export interface LightState {
@@ -43,7 +43,8 @@ export function createLiveLight(): LiveLight {
       const next = again ? { ...wanted, breath: null } : wanted;
       if (same(next, state)) return;
       state = next;
-      if (next !== null && next.playing && next.breath !== null) breathed.add(next.breath);
+      // Offered, a read's breath is spent, lit or not: the light never breathes for it later.
+      if (next !== null && next.breath !== null) breathed.add(next.breath);
       for (const listener of listeners) listener();
     },
     subscribe: (listener) => {
