@@ -320,22 +320,56 @@ function FreshnessPart({
         </p>
         {/* Nothing is left to read once every match is finished. */}
         {board.final ? null : (
-          <button
-            type="button"
-            className={styles.refresh}
-            // Kept focusable while it reads, so keyboard focus and a screen reader keep their
-            // place: a press then does nothing.
-            onClick={() => {
-              if (!refreshing) onRefresh();
-            }}
-            aria-disabled={refreshing || undefined}
-            data-live-refresh
-          >
-            {refreshing ? copy.refreshing : copy.refresh}
-          </button>
+          <Refresh
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            label={refreshing ? copy.refreshing : copy.refresh}
+          />
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Yenile. Kept focusable while it reads, so keyboard focus and a screen reader keep their place:
+ * a press then does nothing. When it goes with focus on it (the week's last read), focus goes to
+ * LIVE's heading, as the GOL board gives it back there, never to the page's body.
+ */
+function Refresh({
+  refreshing,
+  onRefresh,
+  label,
+}: {
+  refreshing: boolean;
+  onRefresh: () => void;
+  label: string;
+}) {
+  const button = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(
+    () => () => {
+      const element = button.current;
+      if (element === null || document.activeElement !== element) return;
+      const heading = element.closest("[data-live-page]")?.querySelector<HTMLElement>("h1");
+      if (heading === null || heading === undefined) return;
+      if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+      heading.focus({ preventScroll: true });
+    },
+    [],
+  );
+  return (
+    <button
+      ref={button}
+      type="button"
+      className={styles.refresh}
+      onClick={() => {
+        if (!refreshing) onRefresh();
+      }}
+      aria-disabled={refreshing || undefined}
+      data-live-refresh
+    >
+      {label}
+    </button>
   );
 }
 
@@ -730,6 +764,8 @@ class LiveFlow extends Component<FlowProps> {
         part.style.zIndex = "1";
         const lower = () => {
           part.style.removeProperty("z-index");
+          // Nothing of the slide stays: not even an empty style.
+          if (part.getAttribute("style") === "") part.removeAttribute("style");
         };
         slide.finished.then(lower, lower);
       }
