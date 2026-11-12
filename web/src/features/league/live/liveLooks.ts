@@ -4,9 +4,10 @@
  * "Son bakıştan beri" (the synthesis of 2026-11-11, section 3.4: a reopen against the last
  * look). Nothing leaves the browser.
  *
- * At most four weeks are kept, the newest reads; a look is replaced only by one at least as new.
- * Every read and write of the storage is in try/catch: where the browser keeps nothing (private
- * browsing, full or blocked storage) the looks are kept in memory for the page's life.
+ * At most 24 looks are kept, one per member and week, the newest reads: the visitor's own week
+ * outlasts the rivals they look at. A look is replaced only by one at least as new, whichever tab
+ * kept it. Every read and write of the storage is in try/catch: where the browser keeps nothing
+ * (private browsing, full or blocked storage) the looks are kept in memory for the page's life.
  */
 
 import type { LiveRecap, RecapMarks } from "./liveBoard";
@@ -14,8 +15,8 @@ import type { DuelLook, LiveLook, RowLook } from "./liveMotion";
 
 export const LOOKS_KEY = "squadopt.liveLook";
 const VERSION = 1;
-/** The weeks kept, the newest reads. */
-export const KEPT_LOOKS = 4;
+/** The looks kept, a member's week each, the newest reads. */
+export const KEPT_LOOKS = 24;
 
 interface StoredMarks {
   identity: string;
@@ -46,6 +47,7 @@ function isRow(value: unknown): value is RowLook {
     isNumber(row.take) &&
     isNumber(row.multiplier) &&
     isNumber(row.minutes) &&
+    (row.appearance === undefined || isNumber(row.appearance)) &&
     isNumber(row.place) &&
     typeof row.started === "boolean" &&
     typeof row.counted === "boolean" &&
@@ -113,9 +115,20 @@ function stored(): KeptLook[] {
   }
 }
 
+/**
+ * The newest look kept for `key`: this tab's, or the one the browser keeps, which another tab
+ * may have kept since.
+ */
+function newest(key: string): KeptLook | undefined {
+  const mine = memory.get(key);
+  const theirs = stored().find((entry) => entry.look.key === key);
+  if (mine === undefined || theirs === undefined) return mine ?? theirs;
+  return theirs.look.time > mine.look.time ? theirs : mine;
+}
+
 /** The look last kept for `key`, with the recap's marks as they were then. */
 export function readLook(key: string): { look: LiveLook; marks: RecapMarks } | null {
-  const kept = memory.get(key) ?? stored().find((entry) => entry.look.key === key);
+  const kept = newest(key);
   if (kept === undefined) return null;
   const { marks } = kept;
   return {
@@ -134,7 +147,7 @@ export function readLook(key: string): { look: LiveLook; marks: RecapMarks } | n
 /** Keeps `look` with the recap's marks, unless a newer look of the same week is kept. */
 export function keepLook(look: LiveLook, recap: LiveRecap): void {
   // Another tab may have kept a newer look of the week since this one last did.
-  const before = memory.get(look.key) ?? stored().find((kept) => kept.look.key === look.key);
+  const before = newest(look.key);
   if (before !== undefined && before.look.time > look.time) return;
   const entry: KeptLook = {
     look,

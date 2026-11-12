@@ -1,6 +1,7 @@
 /**
  * The last look kept in the browser: read back with the recap's marks, never replaced by an
- * older one, at most four weeks, and kept in memory where the browser keeps nothing.
+ * older one from any tab, at most 24 member-weeks, and kept in memory where the browser keeps
+ * nothing.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -31,6 +32,14 @@ function looked(): { look: LiveLook; recap: LiveRecap } {
 const weekAt = (look: LiveLook, week: number, time: number): LiveLook => ({
   ...look,
   key: `2026-27:101:${week}`,
+  time,
+  sourceTime: new Date(time).toISOString(),
+});
+
+/** `look` as another member's, the same week, at `time`. */
+const memberAt = (look: LiveLook, entry: number, time: number): LiveLook => ({
+  ...look,
+  key: `2026-27:${entry}:10`,
   time,
   sourceTime: new Date(time).toISOString(),
 });
@@ -71,7 +80,34 @@ describe("the last look", () => {
     expect(readLook(look.key)!.look.time).toBe(look.time);
   });
 
-  it("keeps the four newest weeks", () => {
+  it("is never replaced by an older look this tab still holds, when another tab kept a newer", () => {
+    const { look, recap } = looked();
+    const older = weekAt(look, 10, look.time - 60_000);
+    // Another tab keeps the newer read; its text is what the browser holds.
+    keepLook(look, recap);
+    const theirs = localStorage.getItem(LOOKS_KEY)!;
+    forgetLooks();
+    localStorage.clear();
+    // This tab saw only the read before, and keeps it again (a look clearing its recap).
+    keepLook(older, recap);
+    localStorage.setItem(LOOKS_KEY, theirs);
+    keepLook(older, recap);
+    expect(readLook(look.key)!.look.time).toBe(look.time);
+    forgetLooks();
+    expect(readLook(look.key)!.look.time).toBe(look.time);
+  });
+
+  it("keeps the visitor's own week while they look at four rivals in it", () => {
+    const { look, recap } = looked();
+    keepLook(look, recap);
+    for (const entry of [102, 103, 104, 105]) {
+      keepLook(memberAt(look, entry, look.time + entry * 60_000), recap);
+    }
+    forgetLooks();
+    expect(readLook(look.key)).not.toBeNull();
+  });
+
+  it("keeps the newest member-weeks, at most 24", () => {
     const { look, recap } = looked();
     for (let week = 1; week <= KEPT_LOOKS + 1; week += 1) {
       keepLook(weekAt(look, week, look.time + week * 60_000), recap);
