@@ -411,6 +411,32 @@ export interface LiveRecap {
   cards: ReadonlySet<number>;
   /** What changed since the last look, by pick. */
   items: ReadonlyMap<number, RecapItem & { pick: number }>;
+  /**
+   * The goals, assists and cards the newest board added, by pick: only those the member's score
+   * takes, as the items tell them. What LIVE's rows move for.
+   */
+  fresh: ReadonlyMap<number, LiveEvents>;
+}
+
+/** The events one board added to a pick. */
+export interface LiveEvents {
+  goals: number;
+  assists: number;
+  card: boolean;
+}
+
+/**
+ * The marks a recap counts against, as a look keeps them for the visitor's next visit: what is
+ * new since is told then, its items starting empty.
+ */
+export type RecapMarks = Pick<
+  LiveRecap,
+  "identity" | "time" | "takes" | "counts" | "detailed" | "cards"
+>;
+
+/** The recap that counts from `marks`, nothing told yet. */
+export function recapFrom(marks: RecapMarks): LiveRecap {
+  return { ...marks, items: new Map(), fresh: new Map() };
 }
 
 /** The recap with `board` taken in: the first board of a member's week is a starting point. */
@@ -423,6 +449,7 @@ export function advanceRecap(recap: LiveRecap | null, board: LiveBoard): LiveRec
   const counts = new Map(same ? recap.counts : []);
   const cards = new Set(same ? recap.cards : []);
   const items = new Map(same ? recap.items : []);
+  const fresh = new Map<number, LiveEvents>();
   // Goals and assists are counted only against marks a board with detail set.
   const counting = same && recap.detailed;
   for (const row of board.rows) {
@@ -450,6 +477,9 @@ export function advanceRecap(recap: LiveRecap | null, board: LiveBoard): LiveRec
     const change = take - (recap.takes.get(row.elementId) ?? take);
     // Only what the member's score takes is told: a pick it does not count tells no event.
     const told = row.multiplier > 0;
+    if (told && (goals > 0 || assists > 0 || card)) {
+      fresh.set(row.elementId, { goals, assists, card });
+    }
     if (change === 0 && !(told && (goals > 0 || assists > 0 || card))) continue;
     const before = items.get(row.elementId);
     const merged = {
@@ -475,6 +505,7 @@ export function advanceRecap(recap: LiveRecap | null, board: LiveBoard): LiveRec
     detailed: (same && recap.detailed) || board.detailed,
     cards,
     items,
+    fresh,
   };
 }
 

@@ -25,10 +25,13 @@ export function useCoverGone(): boolean {
   );
   useEffect(() => {
     if (gone) return undefined;
-    const observer = new MutationObserver(() => {
+    const check = () => {
       if (!document.querySelector(COVER)) setGone(true);
-    });
+    };
+    const observer = new MutationObserver(check);
     observer.observe(document.body, { childList: true, subtree: true });
+    // The cover may have gone in the very render that asked: looked at again once watched.
+    check();
     return () => observer.disconnect();
   }, [gone]);
   return gone;

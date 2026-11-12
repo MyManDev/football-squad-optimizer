@@ -8,20 +8,25 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { StrictMode, type ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  mockDefaultRival,
   mockEntryAdviceIndex,
   mockEntrySquadEnvelopes,
   mockLeagueMembersEnvelope,
 } from "../../../fixtures/league";
+import { useLanguage } from "../../../i18n/context";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import { PHONE_QUERY } from "../../../design/shell/layout";
+import { MOTION_MS, REDUCED_MOTION_QUERY } from "../../../design/motion";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import { claimIn, forgetIdentity } from "../../../testSupport/league";
+import { liveBeat, type BeatName } from "../../../testSupport/liveBeats";
 import {
   testActivity,
   testFixtures,
@@ -30,6 +35,7 @@ import {
   TEST_WEEK,
 } from "../../../testSupport/liveWeek";
 import { FIXTURES_QUERY } from "../../fixtures/data";
+import { MODEL_POP } from "../advice/modelSwitch";
 import type { WeekActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek } from "../../liveScore/weekLive";
 import type { LeagueTree } from "../data";
@@ -40,8 +46,12 @@ import type { ForwarderResult, LiveReason } from "../forwarder/client";
 import type { FplEntryBundle, FplH2hMatches } from "../forwarder/documents";
 import { LeagueContext } from "../LeagueContext";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
+import { advanceRecap, liveBoard } from "./liveBoard";
+import { liveDuel } from "./liveDuel";
 import { LivePage } from "./LivePage";
 import { signedWhole } from "./liveFormat";
+import { forgetLooks, keepLook, readLook } from "./liveLooks";
+import { APPEAR, FLASH, forgetLiveMotion, lookKey, lookOf } from "./liveMotion";
 import type { LiveForwarder } from "./liveSources";
 import { WIDE_QUERY } from "./useWide";
 
@@ -49,6 +59,10 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   sessionStorage.clear();
+  // What one test's visitor saw is not the next one's last look.
+  localStorage.clear();
+  forgetLooks();
+  forgetLiveMotion();
   forgetIdentity();
   delete (window as { matchMedia?: unknown }).matchMedia;
 });
@@ -224,6 +238,8 @@ function renderLive({
   language = "tr",
   heldSquad = false,
   calendar = week.fixtures,
+  strict = false,
+  extra = null,
 }: {
   forwarder: LiveForwarder;
   path?: string;
@@ -235,6 +251,10 @@ function renderLive({
   /** The squad is held from ten minutes ago, and the read of it again fails. */
   heldSquad?: boolean;
   calendar?: typeof week.fixtures;
+  /** Rendered under React's strict check, which mounts every part twice. */
+  strict?: boolean;
+  /** Something more beside the page, inside its language. */
+  extra?: ReactNode;
 }) {
   const loadTable = vi.fn(async () => ({
     contract_version: "provisional_league_ui_v1" as const,
@@ -261,9 +281,10 @@ function renderLive({
   const user = userEvent.setup(
     vi.isFakeTimers() ? { advanceTimers: vi.advanceTimersByTime.bind(vi) } : {},
   );
-  render(
+  const view = (
     <QueryClientProvider client={client}>
       <LanguageProvider initialLanguage={language}>
+        {extra}
         <MemoryRouter initialEntries={[path]}>
           <ForwardedLeagueContext.Provider value={forwardedLeague}>
             <LeagueContext.Provider
@@ -284,8 +305,9 @@ function renderLive({
           <LocationProbe />
         </MemoryRouter>
       </LanguageProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  render(strict ? <StrictMode>{view}</StrictMode> : view);
   return { user, loadTable, tree };
 }
 
@@ -678,7 +700,16 @@ describe("the GOL board on LIVE", () => {
       writable: true,
       value(this: Element) {
         if (this.matches("[data-live-total]")) popped.push(this);
-        return { finished: Promise.resolve(), cancel() {} } as unknown as Animation;
+        // Over at once, as a count (Canlı puan's own figure, inside the total) reads it.
+        return {
+          finished: Promise.resolve(),
+          playState: "finished",
+          effect: { getComputedTiming: () => ({ progress: null }) },
+          addEventListener(type: string, listener: () => void) {
+            if (type === "finish") queueMicrotask(listener);
+          },
+          cancel() {},
+        } as unknown as Animation;
       },
     });
     try {
@@ -926,6 +957,9 @@ describe("the week and the rival", () => {
     expect(document.querySelector("[data-live-rival] [data-pending]")).toBeNull();
     release();
     await vi.waitFor(() => expect(document.querySelector("[data-live-rival-net]")).not.toBeNull());
+    // Drawn now beside a level duel, its line says so: Berabere, Fark 0.
+    expect(document.querySelector("[data-live-status]")).toHaveTextContent(copy.live.status.level);
+    expect(document.querySelector("[data-live-margin]")).toHaveTextContent(/^0$/);
   });
 
   it("keeps the duel's place, out of sight, while the first rival's bundle is read", async () => {
@@ -1003,5 +1037,747 @@ describe("the week and the rival", () => {
     expect(block).toHaveTextContent(copy.live.margin);
     expect(document.querySelector("[data-live-differentials]")).toBe(differentials);
     expect(differentials.open).toBe(true);
+  });
+});
+
+describe("LIVE's motion", () => {
+  type Started = {
+    element: Element;
+    /** On LIVE, and on which row, as it stood when the motion started. */
+    live: boolean;
+    row: string | null;
+    keyframes: Keyframe[];
+    options: KeyframeAnimationOptions;
+    /** Held at its first frame, until played. */
+    paused: boolean;
+    animation: Animation;
+  };
+
+  /**
+   * Every animate() call, noted as it is made. Each one is over at once, as a count and the GOL
+   * board read it, unless it is held (paused) first; or, `running`, LIVE's own play on until
+   * they are stopped or finished.
+   */
+  function recordMotion({ running = false } = {}): Started[] {
+    const started: Started[] = [];
+    Object.defineProperty(Element.prototype, "animate", {
+      configurable: true,
+      writable: true,
+      value(this: Element, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
+        const listeners = new Map<string, () => void>();
+        const live = this.closest("[data-live-page]") !== null;
+        const runs = running && live;
+        let playState: AnimationPlayState = "running";
+        let settle: () => void = () => undefined;
+        const finished = new Promise<void>((resolve) => {
+          settle = resolve;
+        });
+        const end = () => {
+          if (playState === "idle" || playState === "finished") return;
+          playState = "finished";
+          listeners.get("finish")?.();
+          settle();
+        };
+        const over = () =>
+          queueMicrotask(() => {
+            if (playState === "running") end();
+          });
+        const animation = {
+          finished,
+          get playState() {
+            return playState;
+          },
+          effect: {
+            getComputedTiming: () => ({
+              progress: playState === "running" || playState === "paused" ? 0 : null,
+            }),
+          },
+          addEventListener(type: string, listener: () => void) {
+            listeners.set(type, listener);
+          },
+          pause() {
+            playState = "paused";
+            record.paused = true;
+          },
+          play() {
+            playState = "running";
+            record.paused = false;
+            if (!runs) over();
+          },
+          finish() {
+            record.paused = false;
+            end();
+          },
+          cancel() {
+            playState = "idle";
+            record.paused = false;
+            listeners.get("cancel")?.();
+            settle();
+          },
+        } as unknown as Animation;
+        const record: Started = {
+          element: this,
+          live,
+          row: this.closest("[data-live-row]")?.getAttribute("data-live-row") ?? null,
+          keyframes,
+          options,
+          paused: false,
+          animation,
+        };
+        started.push(record);
+        if (!runs) over();
+        return animation;
+      },
+    });
+    return started;
+  }
+
+  /** The screen's media queries, each answered as the test sets it, and told when it changes. */
+  function screenWith(matching: string[]) {
+    const on = new Set(matching);
+    const listeners = new Map<string, Set<() => void>>();
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        media: query,
+        get matches() {
+          return on.has(query);
+        },
+        addEventListener: (_type: string, listener: () => void) => {
+          if (!listeners.has(query)) listeners.set(query, new Set());
+          listeners.get(query)!.add(listener);
+        },
+        removeEventListener: (_type: string, listener: () => void) => {
+          listeners.get(query)?.delete(listener);
+        },
+      }),
+    });
+    return (query: string, matches: boolean) =>
+      act(() => {
+        if (matches) on.add(query);
+        else on.delete(query);
+        for (const listener of listeners.get(query) ?? []) listener();
+      });
+  }
+
+  /** A switch to English beside the page. */
+  function English() {
+    const { setLanguage } = useLanguage();
+    return (
+      <button type="button" onClick={() => setLanguage("en")}>
+        English
+      </button>
+    );
+  }
+
+  afterEach(() => {
+    delete (Element.prototype as { animate?: unknown }).animate;
+    document.querySelectorAll("[data-opening-mark]").forEach((cover) => cover.remove());
+  });
+
+  const beat = (name: BeatName) => answered(liveBeat(name).document);
+  const onLive = (started: Started[]) => started.filter((motion) => motion.live);
+  const movedRows = (started: Started[]) =>
+    [
+      ...new Set(started.map((motion) => motion.row).filter((row): row is string => row !== null)),
+    ].sort();
+  /** The total's own figure counted: Canlı puan's count, not the GOL board's pop. */
+  const totalCounted = (started: Started[]) =>
+    started.some(({ element }) => element.matches("[data-live-total] [data-live-number]"));
+  const rolled = (started: Started[]) =>
+    started.some(({ element }) => element.matches("[data-live-lane]"));
+
+  /** Lands the GOL board's moments of a read, in order. */
+  async function landBoards(kinds: ("goal" | "assist")[]) {
+    for (const kind of kinds) fireEvent.click(await raised(kind));
+  }
+
+  /** The goal's read, after the kickoff's, landed and moved. */
+  async function goalAfterKickoff(
+    started: Started[],
+    forwarder = fakeForwarder([beat("kickoff"), beat("goal")]),
+  ) {
+    const rendered = renderLive({ forwarder });
+    await rows();
+    await rendered.user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await landBoards(["goal", "assist"]);
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    return { ...rendered, forwarder };
+  }
+
+  /** A moment for what a render starts to have started. */
+  const settle = () =>
+    act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+
+  /** The page's markup, with what differs between two renders taken out (ids React makes). */
+  const markup = () =>
+    document
+      .querySelector("[data-live-page]")!
+      .outerHTML.replace(/ (id|for|aria-labelledby|aria-describedby)="[^"]*"/g, "");
+
+  /** The recap's names, in order. */
+  const told = () =>
+    within(recapRegion()!)
+      .getAllByRole("listitem")
+      .map((item) => item.getAttribute("aria-label")!.split(",")[0]);
+
+  /** What the visitor saw: the look LIVE keeps of `name`'s read. */
+  function seen(name: BeatName) {
+    const board = liveBoard(liveBeat(name).input)!;
+    keepLook(lookOf(board, null), advanceRecap(null, board));
+    forgetLooks();
+    return board;
+  }
+
+  it("moves nothing on the first read, then the rows a newer read changed, once its board has landed", async () => {
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal"), beat("goal")]);
+    const { user } = renderLive({ forwarder });
+    await rows();
+    expect(onLive(started)).toEqual([]);
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    // The board holds the read: nothing on LIVE moves under it.
+    const board = await raised("goal");
+    expect(onLive(started)).toEqual([]);
+    fireEvent.click(board);
+    await landBoards(["assist"]);
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    // The captain's goal puts the member ahead: Önde comes, and pops once, as the figures land.
+    const pops = () =>
+      onLive(started).filter(({ element }) => element.matches("[data-live-status]"));
+    await vi.waitFor(() => expect(pops()).toHaveLength(1));
+    expect(pops()[0]!.keyframes).toEqual(MODEL_POP);
+    expect(pops()[0]!.options).toMatchObject({ duration: MOTION_MS.data });
+    expect(pops()[0]!.options.delay ?? 0).toBe(0);
+    expect(document.querySelector("[data-live-status]")).toHaveTextContent(copy.live.status.ahead);
+    expect(rolled(started)).toBe(true);
+    // The recap was not there: it comes in whole, its heading with its names, once what stood
+    // there has slid away.
+    const recap = onLive(started).find(({ element }) => element === recapRegion());
+    expect(recap?.keyframes).toEqual(APPEAR);
+    expect(recap?.options).toMatchObject({ duration: MOTION_MS.ui, delay: MOTION_MS.ui });
+    // Only transform and opacity, and nothing without end.
+    for (const { keyframes, options } of onLive(started)) {
+      for (const frame of keyframes) {
+        for (const key of Object.keys(frame)) {
+          expect(["transform", "opacity", "offset"]).toContain(key);
+        }
+      }
+      expect(options.iterations ?? 1).not.toBe(Infinity);
+    }
+    // The same read again moves nothing.
+    const before = started.length;
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(forwarder.liveActivity).toHaveBeenCalledTimes(3));
+    await settle();
+    expect(onLive(started.slice(before))).toEqual([]);
+  });
+
+  it("moves nothing for the read's copy with event detail, at the same source time", async () => {
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+    const detailed = forwarder.liveActivity.getMockImplementation()!;
+    let reads = 0;
+    // The goal's read comes first without its detail, then with it.
+    forwarder.liveActivity.mockImplementation(async () => {
+      reads += 1;
+      return reads === 2 ? { ok: false as const, reason: "not_found" as const } : detailed();
+    });
+    // The plain read answers with the week alone (the fake types it as a refusal only).
+    forwarder.liveWeek.mockImplementation((async () => ({
+      ok: true as const,
+      copy: null,
+      document: liveBeat("goal").document.week,
+    })) as never);
+    const { user } = renderLive({ forwarder });
+    await rows();
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() =>
+      expect(document.querySelector("[data-live-page] time")).toHaveAttribute(
+        "datetime",
+        liveBeat("goal").at,
+      ),
+    );
+    await vi.waitFor(() => expect(movedRows(started)).toContain("10"));
+    await settle();
+    const before = started.length;
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(reads).toBe(3));
+    await settle();
+    expect(onLive(started.slice(before))).toEqual([]);
+  });
+
+  it("draws the same page under reduced motion, where nothing moves at all", async () => {
+    await goalAfterKickoff(recordMotion());
+    const withMotion = markup();
+    cleanup();
+    localStorage.clear();
+    forgetLooks();
+    forgetLiveMotion();
+    const still = recordMotion();
+    screenWith([REDUCED_MOTION_QUERY]);
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+    const { user } = renderLive({ forwarder });
+    await rows();
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() =>
+      expect(document.querySelector("[data-live-page] time")).toHaveAttribute(
+        "datetime",
+        liveBeat("goal").at,
+      ),
+    );
+    await settle();
+    expect(still).toEqual([]);
+    expect(markup()).toBe(withMotion);
+  });
+
+  it("holds a return at its start while the opening cover stands, then moves what changed since the last look", async () => {
+    const kickoff = seen("kickoff");
+    const cover = document.createElement("div");
+    cover.setAttribute("data-opening-mark", "");
+    document.body.append(cover);
+    const started = recordMotion();
+    renderLive({ forwarder: fakeForwarder([beat("goal")]) });
+    await rows();
+    await settle();
+    // Under the cover the page shows what the visitor last saw: the captain's points and
+    // Canlı puan as they were, his ball held before it drops in, nothing lit, nothing running.
+    const captain = () => document.querySelector("[data-live-row='10'] [data-live-number]");
+    expect(figure(captain()?.textContent)).toBe(2);
+    expect(figure(net())).toBe(kickoff.net);
+    expect(onLive(started).length).toBeGreaterThan(0);
+    expect(onLive(started).every(({ paused }) => paused)).toBe(true);
+    expect(
+      onLive(started).some(({ element }) =>
+        element.matches("[data-live-row='10'] [data-live-glyph='goal']"),
+      ),
+    ).toBe(true);
+    expect(onLive(started).some(({ keyframes }) => keyframes === FLASH)).toBe(false);
+    await act(async () => {
+      cover.remove();
+    });
+    await vi.waitFor(() => expect(figure(captain()?.textContent)).toBe(10));
+    expect(movedRows(started)).toEqual(["10", "7"]);
+    expect(onLive(started).some(({ keyframes }) => keyframes === FLASH)).toBe(true);
+    expect(totalCounted(started)).toBe(true);
+    await vi.waitFor(() => expect(figure(net())).toBe(liveBoard(liveBeat("goal").input)!.net));
+    // No GOL board for what happened while away: the recap tells it.
+    expect(document.querySelector("[data-goal-board]")).toBeNull();
+    expect(told()).toEqual(["P10", "P7"]);
+  });
+
+  it("holds a return drawn in a hidden tab until it is seen, and tells what changed then", async () => {
+    seen("kickoff");
+    const key = lookKey(liveBoard(liveBeat("goal").input)!);
+    let state: DocumentVisibilityState = "hidden";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+    try {
+      const started = recordMotion();
+      renderLive({ forwarder: fakeForwarder([beat("goal")]) });
+      await rows();
+      await settle();
+      // Drawn unseen: held at what was last seen, and not yet the look the visitor last saw.
+      expect(onLive(started).length).toBeGreaterThan(0);
+      expect(onLive(started).every(({ paused }) => paused)).toBe(true);
+      expect(readLook(key)!.look.sourceTime).toBe(liveBeat("kickoff").at);
+      state = "visible";
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await vi.waitFor(() =>
+        expect(onLive(started).some(({ keyframes }) => keyframes === FLASH)).toBe(true),
+      );
+      expect(movedRows(started)).toEqual(["10", "7"]);
+      // Coming back is its first sight, not a look again: what changed since is told.
+      expect(told()).toEqual(["P10", "P7"]);
+      await vi.waitFor(() => expect(readLook(key)!.look.sourceTime).toBe(liveBeat("goal").at));
+    } finally {
+      delete (document as { visibilityState?: unknown }).visibilityState;
+    }
+  });
+
+  /** What the visitor saw at `name`: the look LIVE keeps, the duel with the default rival beside it. */
+  function seenWithDuel(name: BeatName) {
+    const rivalId = mockDefaultRival(ENTRY)!;
+    const input = liveBeat(name).input;
+    const member = liveBoard(input)!;
+    const rival = liveBoard({
+      ...input,
+      member: { ...input.member, entry_id: rivalId, captain: 7, vice: 10 },
+    })!;
+    const margin = liveDuel(member, rival, null).margin;
+    keepLook(
+      lookOf(member, { rivalId, rivalNet: rival.net, memberNet: member.net, margin }),
+      advanceRecap(null, member),
+    );
+    forgetLooks();
+    return { member, rival, margin };
+  }
+
+  /** A figure of the duel's ends, as a number. */
+  const end = (side: "member" | "rival") =>
+    figure(document.querySelector(`[data-live-end='${side}'] [data-live-number]`)?.textContent);
+
+  it("holds the duel at the last look while the opening cover stands, then rolls it", async () => {
+    const kickoff = seenWithDuel("kickoff");
+    const cover = document.createElement("div");
+    cover.setAttribute("data-opening-mark", "");
+    document.body.append(cover);
+    const started = recordMotion();
+    renderLive({ forwarder: fakeForwarder([beat("goal")]) });
+    await rows();
+    await vi.waitFor(() =>
+      expect(document.querySelector("[data-live-rival-net]:not([data-pending])")).not.toBeNull(),
+    );
+    await settle();
+    // Under the cover the duel stands as it was last seen: its ends, its line, its ball.
+    const lanes = () =>
+      onLive(started).filter(({ element }) => element.matches("[data-live-lane]"));
+    expect(end("member")).toBe(kickoff.member.net);
+    expect(end("rival")).toBe(kickoff.rival.net);
+    expect(document.querySelector("[data-live-margin]")).toHaveTextContent(
+      signedWhole(kickoff.margin, "tr-TR"),
+    );
+    expect(lanes()).toHaveLength(1);
+    expect(lanes()[0]!.paused).toBe(true);
+    await act(async () => {
+      cover.remove();
+    });
+    const goal = liveBoard(liveBeat("goal").input)!;
+    await vi.waitFor(() => expect(end("member")).toBe(goal.net));
+    expect(lanes()[0]!.paused).toBe(false);
+  });
+
+  it("lets a roll held under the cover give way to the next read's, held in the same wait", async () => {
+    seenWithDuel("card");
+    const cover = document.createElement("div");
+    cover.setAttribute("data-opening-mark", "");
+    document.body.append(cover);
+    const started = recordMotion();
+    const { user } = renderLive({ forwarder: fakeForwarder([beat("over"), beat("bonus")]) });
+    await rows();
+    const lanes = () =>
+      onLive(started).filter(({ element }) => element.matches("[data-live-lane]"));
+    await vi.waitFor(() => expect(lanes()).toHaveLength(1));
+    expect(lanes()[0]!.paused).toBe(true);
+    // A second read drawn while the cover still stands: its roll is held, the first one ends.
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(lanes()).toHaveLength(2));
+    expect(lanes()[0]!.animation.playState).toBe("idle");
+    expect(lanes()[1]!.paused).toBe(true);
+    await act(async () => {
+      cover.remove();
+    });
+    await vi.waitFor(() => expect(lanes()[1]!.paused).toBe(false));
+    expect(lanes()[0]!.animation.playState).toBe("idle");
+  });
+
+  it("rolls the duel on a return though the rival answers after the member", async () => {
+    seenWithDuel("kickoff");
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("goal")]);
+    const bundleOf = forwarder.entryBundle.getMockImplementation()!;
+    let answerRival: () => void = () => undefined;
+    forwarder.entryBundle.mockImplementation(async (entryId: number, ...rest) => {
+      if (entryId !== ENTRY) {
+        await new Promise<void>((resolve) => {
+          answerRival = resolve;
+        });
+      }
+      return bundleOf(entryId, ...rest);
+    });
+    renderLive({ forwarder });
+    await rows();
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    expect(rolled(started)).toBe(false);
+    await act(async () => {
+      answerRival();
+    });
+    await vi.waitFor(() => expect(rolled(started)).toBe(true));
+    // The member's end counts from the total last seen, as Canlı puan does.
+    const end = started.find(({ element }) =>
+      element.matches("[data-live-end='member'] [data-live-number]"),
+    );
+    expect(end).toBeDefined();
+  });
+
+  it("keeps the duel's line on the read before while its figures count, then pops the new word", async () => {
+    const started = recordMotion({ running: true });
+    await goalAfterKickoff(started);
+    const word = () => document.querySelector("[data-live-status]");
+    const gap = () => document.querySelector("[data-live-margin]");
+    const figures = started.filter(({ element }) =>
+      element.matches(
+        "[data-live-end] [data-live-number], [data-live-rival-net] [data-live-number]",
+      ),
+    );
+    expect(figures).toHaveLength(3);
+    // The captain's goal puts the member ahead; while the figures count to it, the line says
+    // the level duel they still show.
+    expect(word()).toHaveTextContent(copy.live.status.level);
+    expect(gap()).toHaveTextContent("0");
+    expect(onLive(started).some(({ element }) => element.matches("[data-live-status]"))).toBe(
+      false,
+    );
+    await act(async () => {
+      for (const { animation } of figures) animation.finish();
+    });
+    await vi.waitFor(() => expect(word()).toHaveTextContent(copy.live.status.ahead));
+    expect(gap()).not.toHaveTextContent(/^0$/);
+    expect(
+      onLive(started).filter(({ element }) => element.matches("[data-live-status]")),
+    ).toHaveLength(1);
+  });
+
+  it("counts Canlı puan from the last look, as the rows, when the page opens again in sight", async () => {
+    seen("kickoff");
+    const started = recordMotion();
+    renderLive({ forwarder: fakeForwarder([beat("goal")]) });
+    await rows();
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    expect(totalCounted(started)).toBe(true);
+  });
+
+  it("moves nothing when the page opens again on the read last seen", async () => {
+    seen("goal");
+    const started = recordMotion();
+    renderLive({ forwarder: fakeForwarder([beat("goal")]) });
+    await rows();
+    await settle();
+    expect(onLive(started)).toEqual([]);
+    expect(recapRegion()).toBeNull();
+  });
+
+  it("keeps what changed until the read a look started lands, then shows that read's alone", async () => {
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal"), beat("card")]);
+    const answer = forwarder.liveActivity.getMockImplementation()!;
+    let release: () => void = () => undefined;
+    let calls = 0;
+    forwarder.liveActivity.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 3) {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return answer();
+    });
+    await goalAfterKickoff(started, forwarder);
+    expect(told()).toEqual(["P10", "P7"]);
+    // Yenile: the recap stands while its read is on its way...
+    await userEvent.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await vi.waitFor(() => expect(calls).toBe(3));
+    expect(told()).toEqual(["P10", "P7"]);
+    // ...and while the card that read brought is told...
+    await act(async () => {
+      release();
+    });
+    const line = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLElement>("[data-goal-line]");
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    expect(told()).toEqual(["P10", "P7"]);
+    // ...then changes once, to what that read brought.
+    fireEvent.click(line);
+    await vi.waitFor(() => expect(told()).toEqual(["P2"]));
+  });
+
+  it("keeps what changed until the read made on coming back lands", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T13:05:00Z"));
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal"), beat("card")]);
+    const answer = forwarder.liveActivity.getMockImplementation()!;
+    let release: () => void = () => undefined;
+    let calls = 0;
+    forwarder.liveActivity.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 3) {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return answer();
+    });
+    await goalAfterKickoff(started, forwarder);
+    expect(told()).toEqual(["P10", "P7"]);
+    // Back on the page two minutes later: one read at once, and the look waits for it.
+    vi.setSystemTime(Date.parse("2026-11-21T13:07:30Z"));
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await vi.waitFor(() => expect(calls).toBe(3));
+    expect(told()).toEqual(["P10", "P7"]);
+    await act(async () => {
+      release();
+    });
+    fireEvent.click(
+      await vi.waitFor(() => {
+        const found = document.querySelector<HTMLElement>("[data-goal-line]");
+        expect(found).not.toBeNull();
+        return found!;
+      }),
+    );
+    await vi.waitFor(() => expect(told()).toEqual(["P2"]));
+  });
+
+  it("moves nothing for another rival, nor again when the first comes back", async () => {
+    const started = recordMotion({ running: true });
+    const { user } = await goalAfterKickoff(started);
+    const before = started.length;
+    const select = screen.getByRole("combobox", { name: copy.live.rival });
+    const first = (select as HTMLSelectElement).value;
+    await user.selectOptions(select, "35249005");
+    await settle();
+    await user.selectOptions(select, first);
+    await settle();
+    expect(onLive(started.slice(before))).toEqual([]);
+  });
+
+  it("moves no rival's first duel, then rolls it with the next read", async () => {
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+    const bundleOf = forwarder.entryBundle.getMockImplementation()!;
+    let answerRival: () => void = () => undefined;
+    forwarder.entryBundle.mockImplementation(async (entryId: number, ...rest) => {
+      if (entryId !== ENTRY) {
+        await new Promise<void>((resolve) => {
+          answerRival = resolve;
+        });
+      }
+      return bundleOf(entryId, ...rest);
+    });
+    const { user } = renderLive({ forwarder });
+    await rows();
+    // The rival answers after the member's first board: its duel is drawn as it stands.
+    await act(async () => {
+      answerRival();
+    });
+    await vi.waitFor(() =>
+      expect(document.querySelector("[data-live-rival-net]:not([data-pending])")).not.toBeNull(),
+    );
+    await settle();
+    expect(rolled(started)).toBe(false);
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await landBoards(["goal", "assist"]);
+    await vi.waitFor(() => expect(rolled(started)).toBe(true));
+  });
+
+  it("plays nothing again when the page turns at 1024 px, though the read's motion still runs", async () => {
+    const turn = screenWith([PHONE_QUERY]);
+    const started = recordMotion({ running: true });
+    await goalAfterKickoff(started);
+    const before = started.length;
+    await turn(WIDE_QUERY, true);
+    await settle();
+    expect(document.querySelector("[data-live-page]")).toHaveAttribute("data-wide");
+    await turn(WIDE_QUERY, false);
+    await settle();
+    expect(onLive(started.slice(before))).toEqual([]);
+  });
+
+  it("plays each part once under React's strict check", async () => {
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+    const { user } = renderLive({ forwarder, strict: true });
+    await rows();
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await landBoards(["goal", "assist"]);
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    await settle();
+    const drops = onLive(started).filter(({ element }) =>
+      element.matches("[data-live-row='10'] [data-live-glyph='goal']"),
+    );
+    expect(drops).toHaveLength(1);
+    expect(
+      onLive(started).filter(({ element }) => element.matches("[data-live-lane]")),
+    ).toHaveLength(1);
+  });
+
+  it("writes its figures again in another language, moving nothing", async () => {
+    const started = recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+    const rendered = renderLive({ forwarder, extra: <English /> });
+    await rows();
+    await rendered.user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await landBoards(["goal", "assist"]);
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    await settle();
+    const before = started.length;
+    await rendered.user.click(screen.getByRole("button", { name: "English" }));
+    await vi.waitFor(() =>
+      expect(screen.getByRole("button", { name: MESSAGES.en.live.refresh })).toBeInTheDocument(),
+    );
+    await settle();
+    expect(onLive(started.slice(before))).toEqual([]);
+    expect(figure(net())).toBe(liveBoard(liveBeat("goal").input)!.net);
+  });
+
+  it("says a held duel line in the language switched to while its figures count", async () => {
+    const started = recordMotion({ running: true });
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+    const { user } = renderLive({ forwarder, extra: <English /> });
+    await rows();
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await landBoards(["goal", "assist"]);
+    await vi.waitFor(() => expect(movedRows(started)).toEqual(["10", "7"]));
+    const word = () => document.querySelector("[data-live-status]");
+    expect(word()).toHaveTextContent(copy.live.status.level);
+    // The language changes while the figures still count: the held line takes it at once.
+    await user.click(screen.getByRole("button", { name: "English" }));
+    await vi.waitFor(() => expect(word()).toHaveTextContent(MESSAGES.en.live.status.level));
+    const figures = started.filter(({ element }) =>
+      element.matches(
+        "[data-live-end] [data-live-number], [data-live-rival-net] [data-live-number]",
+      ),
+    );
+    await act(async () => {
+      for (const { animation } of figures) animation.finish();
+    });
+    await vi.waitFor(() => expect(word()).toHaveTextContent(MESSAGES.en.live.status.ahead));
+  });
+
+  it("breathes for a return's read whose own matches open the follow window a render later", async () => {
+    // 101 kicked off at 12:30, so its 135 minutes end at 14:45; the read, a minute old, still
+    // has it played, and its own matches give it the longer bound one render after its board.
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T14:45:30Z"));
+    seen("kickoff");
+    recordMotion();
+    const card = liveBeat("card").document;
+    const late = { ...card, week: { ...card.week, source_time: "2026-11-21T14:44:30Z" } };
+    renderLive({ forwarder: fakeForwarder([answered(late)]) });
+    const light = () =>
+      within(document.querySelector<HTMLElement>("[data-live-page] h1")!).queryByRole("img", {
+        name: copy.live.matchInProgress,
+      });
+    await vi.waitFor(() => expect(light()).not.toBeNull());
+    await vi.waitFor(() =>
+      expect(light()).toHaveAttribute("data-breath", expect.stringContaining("14:44:30")),
+    );
+  });
+
+  it("breathes the heading's light for a newer read while a match is played, never for the first", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T13:05:00Z"));
+    recordMotion();
+    const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);
+    const { user } = renderLive({ forwarder });
+    const light = () =>
+      within(document.querySelector<HTMLElement>("[data-live-page] h1")!).queryByRole("img", {
+        name: copy.live.matchInProgress,
+      });
+    await vi.waitFor(() => expect(light()).not.toBeNull());
+    expect(light()).not.toHaveAttribute("data-breath");
+    await user.click(screen.getByRole("button", { name: copy.live.refresh }));
+    await landBoards(["goal", "assist"]);
+    await vi.waitFor(() =>
+      expect(light()).toHaveAttribute("data-breath", expect.stringContaining(liveBeat("goal").at)),
+    );
   });
 });
