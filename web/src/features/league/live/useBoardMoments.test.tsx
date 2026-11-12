@@ -39,6 +39,7 @@ function live(
   return {
     shown,
     refreshing: false,
+    reading: false,
     refresh: () => undefined,
     moments,
     matches: null,

@@ -22,13 +22,15 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
-  useRef,
 } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -51,15 +53,30 @@ import { useClaimedEntry } from "../identity/useLeagueIdentity";
 import { LEAGUE_READ, leagueKeys, useEntrySquad } from "../queries";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { useLeague } from "../useLeague";
+import { useCoverGone } from "../../liveScore/openingCover";
 import {
   advanceRecap,
   liveBoard,
   lookedAt,
+  recapFrom,
   recapItems,
   type LiveBoard,
   type LiveRecap,
 } from "./liveBoard";
 import { leagueTotalsBefore, liveDuel, type LiveDuel } from "./liveDuel";
+import { createLiveLight, type LiveLight } from "./liveLight";
+import { keepLook, readLook } from "./liveLooks";
+import {
+  duelMotion,
+  lookKey,
+  lookOf,
+  planMotion,
+  sameDuel,
+  type DuelLook,
+  type LiveLook,
+  type MotionGate,
+  type MotionPlan,
+} from "./liveMotion";
 import { addressedRival, chooseRival, h2hOpponent, rivalChoices } from "./liveRival";
 import {
   bundleQuery,
@@ -80,6 +97,9 @@ import { useLiveWindow } from "./useLiveWindow";
 import { useMemberLiveScore } from "./useMemberLiveScore";
 import { useWide } from "./useWide";
 
+/** The GOL board, drawn again only when its batch, source or wiring changes. */
+const GoalLayer = memo(GoalMomentLayer);
+
 /** The reads the page makes; the site's own unless a test injects them. */
 export interface LiveDependencies {
   forwarder?: LiveForwarder;
@@ -90,7 +110,6 @@ export interface LiveDependencies {
 interface LiveHead {
   entryId: number;
   gameweek: number | null;
-  playing: boolean;
 }
 
 export function LivePage({ dependencies }: { dependencies?: LiveDependencies } = {}) {
@@ -103,6 +122,7 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
   const fixtures = useFixtures();
   const wide = useWide();
   const [head, setHead] = useState<LiveHead | null>(null);
+  const [light] = useState(createLiveLight);
   const known = head !== null && head.entryId === entryId ? head : null;
   const unnamed = messages.leagueMembers.unknownTeam;
   // A squad held is drawn from, though a later read of it fails.
@@ -122,6 +142,7 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
         wide={wide}
         unnamed={unnamed}
         onHead={setHead}
+        light={light}
       />
     );
   }
@@ -130,7 +151,8 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
       <LiveHeader
         team={entry === undefined ? "" : (entry.payload.entry.team_name ?? unnamed)}
         gameweek={known?.gameweek ?? null}
-        playing={known?.playing ?? false}
+        entryId={entryId}
+        light={light}
       />
       {body}
     </div>
@@ -144,6 +166,7 @@ function LiveMember({
   wide,
   unnamed,
   onHead,
+  light,
 }: {
   squad: LeagueViewEnvelope<EntrySquad>;
   fixtures: FixturesPayload | null;
@@ -151,6 +174,7 @@ function LiveMember({
   wide: boolean;
   unnamed: string;
   onHead: (head: LiveHead) => void;
+  light: LiveLight;
 }) {
   const view = squad.payload;
   const entryId = view.entry.entry_id;
@@ -201,13 +225,18 @@ function LiveMember({
   // that have landed added to Canlı puan, as the member page's card does; the replay brings no
   // real points, so nothing waits for it.
   const hold = useBoardHold(replaying ? null : stream);
-  const goalBatch = replaying
-    ? replay === null
-      ? null
-      : { id: `replay:${replay.id}`, items: replay.items }
-    : stream === null
-      ? null
-      : { id: `live:${stream.id}`, items: stream.items };
+  // The same batch while nothing new comes, so a landing does not draw the board again.
+  const goalBatch = useMemo(
+    () =>
+      replaying
+        ? replay === null
+          ? null
+          : { id: `replay:${replay.id}`, items: replay.items }
+        : stream === null
+          ? null
+          : { id: `live:${stream.id}`, items: stream.items },
+    [replaying, replay, stream],
+  );
 
   const snapshot = useSyncExternalStore(record.subscribe, record.snapshot, record.snapshot);
   const memberBundle = useQuery({
@@ -359,21 +388,52 @@ function LiveMember({
     rivalBundle.isPending &&
     rivalBundle.dataUpdatedAt === 0 &&
     rivalBundle.errorUpdateCount === 0;
-  const pending = !rivalReading
-    ? null
-    : (kept ??
-      (board === null
+  const pending = useMemo(
+    () =>
+      !rivalReading
         ? null
-        : { duel: liveDuel(board, board, classic ? totals : null), rivalNet: board.net }));
+        : (kept ??
+          (board === null
+            ? null
+            : { duel: liveDuel(board, board, classic ? totals : null), rivalNet: board.net })),
+    [rivalReading, kept, board, classic, totals],
+  );
+  const choose = useCallback(
+    (next: number) =>
+      setSearchParams(
+        (current) => {
+          const params = new URLSearchParams(current);
+          params.set("duel", String(next));
+          return params;
+        },
+        { replace: true },
+      ),
+    [setSearchParams],
+  );
+  // Drawn once the rival is chosen, so the picker never shows an empty choice first; the same
+  // object until something in it changes, so the rival's side is not drawn again for nothing.
+  const showRival = !(standalone || waiting || choices.length === 0);
+  const opponentId = opponent.data?.entryId ?? null;
+  const rivalView = useMemo<LiveRivalView | null>(
+    () =>
+      showRival
+        ? {
+            choices,
+            entryId: rivalId,
+            name: choices.find((choice) => choice.entryId === rivalId)?.name ?? null,
+            board: rivalBoard,
+            duel,
+            pending,
+            opponent: rivalId !== null && rivalId === opponentId,
+            onSelect: choose,
+          }
+        : null,
+    [showRival, choices, rivalId, rivalBoard, duel, pending, opponentId, choose],
+  );
 
   const claimed = useClaimedEntry(leagueId);
   const gameweek = board?.gameweek ?? week;
-  // The heading's light: one of the member's own rows is being played. The follow window
-  // stays open longer, up to three hours from a kickoff FPL has not finished, only to time
-  // the reads; the board ends a match at its bound, as its groups and Maçlar do.
-  const playing =
-    liveMatch.open && board !== null && board.rows.some((row) => row.phase === "playing");
-  useEffect(() => onHead({ entryId, gameweek, playing }), [onHead, entryId, gameweek, playing]);
+  useEffect(() => onHead({ entryId, gameweek }), [onHead, entryId, gameweek]);
   const loading =
     ready &&
     board === null &&
@@ -382,7 +442,7 @@ function LiveMember({
         (table.isPending || (reading === null && !snapshot.settled.has(memberWeek.gameweek)))));
   return (
     <>
-      <GoalMomentLayer
+      <GoalLayer
         batch={goalBatch}
         source={replaying ? "replay" : "live"}
         scoring={!replaying}
@@ -397,32 +457,15 @@ function LiveMember({
           waiting={hold.waiting}
           team={view.entry.team_name ?? unnamed}
           own={!standalone && claimed === entryId}
-          rival={
-            // Drawn once the rival is chosen, so the picker never shows an empty choice first.
-            standalone || waiting || choices.length === 0
-              ? null
-              : {
-                  choices,
-                  entryId: rivalId,
-                  name: choices.find((choice) => choice.entryId === rivalId)?.name ?? null,
-                  board: rivalBoard,
-                  duel,
-                  pending,
-                  opponent: rivalId !== null && rivalId === opponent.data?.entryId,
-                  onSelect: (next) =>
-                    setSearchParams(
-                      (current) => {
-                        const params = new URLSearchParams(current);
-                        params.set("duel", String(next));
-                        return params;
-                      },
-                      { replace: true },
-                    ),
-                }
-          }
+          rival={rivalView}
+          entryId={entryId}
           refreshing={live.refreshing}
+          reading={live.reading}
           refresh={refreshBoth}
           wide={wide}
+          windowOpen={liveMatch.open}
+          windowKnown={live.matches !== null}
+          light={light}
         />
       )}
     </>
@@ -448,6 +491,82 @@ function heldRival(
   return { ...rival, board: null, duel: null, pending: room };
 }
 
+/** What LIVE has told of a member's week: the board drawn, the recap, the look and its motion. */
+interface Told {
+  board: LiveBoard | null;
+  recap: LiveRecap | null;
+  look: LiveLook | null;
+  plan: MotionPlan | null;
+  /** The look the plan was made from: a duel drawn late for the same read moves from it. */
+  from: LiveLook | null;
+}
+
+const onVisibility = (listener: () => void) => {
+  document.addEventListener("visibilitychange", listener);
+  return () => document.removeEventListener("visibilitychange", listener);
+};
+const tabShown = () => document.visibilityState !== "hidden";
+
+/** Whether the tab is in view. */
+function useTabShown(): boolean {
+  return useSyncExternalStore(onVisibility, tabShown, () => true);
+}
+
+/**
+ * Where LIVE starts for the board it opens on: from what the visitor last saw of the week, kept
+ * in this browser, so a newer board moves what changed since and the recap tells it; from
+ * nothing, where nothing was seen.
+ */
+function toldAtOpen(board: LiveBoard): Told {
+  const kept = readLook(lookKey(board));
+  return kept === null
+    ? { board: null, recap: null, look: null, plan: null, from: null }
+    : { board: null, recap: recapFrom(kept.marks), look: kept.look, plan: null, from: null };
+}
+
+/**
+ * `drawn` taken in: the recap advanced (cleared first when the visitor looked since), the look,
+ * and the read's motion against the look before. A copy of the same read keeps the motion it
+ * has; another week has none.
+ */
+function tell(told: Told, drawn: LiveBoard, duel: DuelLook | null, clear: boolean): Told {
+  const recap = advanceRecap(clear ? lookedAt(told.recap) : told.recap, drawn);
+  const look = lookOf(drawn, duel);
+  const before = told.look;
+  const same = before !== null && before.key === look.key;
+  if (same && look.time > before.time) {
+    const plan = planMotion(before, look, recap.fresh, told.board === null);
+    return { board: drawn, recap, look, plan, from: plan === null ? null : before };
+  }
+  return same && look.time === before.time
+    ? { board: drawn, recap, look, plan: told.plan, from: told.from }
+    : { board: drawn, recap, look, plan: null, from: null };
+}
+
+/**
+ * The duel drawn after its read (the rival answered after the member): the read's plan moves
+ * it from the duel the plan's look had, as it moves the rows, where it has no duel yet.
+ */
+function duelLate(told: Told, duel: DuelLook | null): MotionPlan | null {
+  const { plan, from } = told;
+  if (plan === null || plan.duel !== null || from === null) return plan;
+  const moves = duelMotion(from.rival, duel);
+  return moves === null ? plan : { ...plan, duel: moves };
+}
+
+/** The duel as drawn beside `board`, or null while none is: no rival, or one still read. */
+function duelLook(board: LiveBoard, rival: LiveRivalView | null): DuelLook | null {
+  if (rival === null || rival.entryId === null || rival.duel === null || rival.board === null) {
+    return null;
+  }
+  return {
+    rivalId: rival.entryId,
+    rivalNet: rival.board.net,
+    memberNet: board.net,
+    margin: rival.duel.margin,
+  };
+}
+
 /**
  * The board as it is shown. Its own part, so it takes the page's board, the hold and the
  * moments' wait once all three have settled for a read: while the GOL board brings a read's
@@ -455,8 +574,13 @@ function heldRival(
  * the read before left it, so nothing moves or jumps under the board, and Canlı puan stands at
  * that read's total plus what the moments that have landed brought. The duel is drawn from that
  * one read whole (its Fark, its ends, Toplam fark and Farklar), so nothing in it disagrees.
+ *
+ * Each newer board drawn is told against the one before (`tell`): what it adds to the recap,
+ * and how it moves (`liveMotion.ts`), which waits for the opening cover to go. What was drawn is
+ * kept as the visitor's last look of the week (`liveLooks.ts`).
  */
 function LiveShown({
+  entryId,
   board,
   brought,
   waiting,
@@ -464,9 +588,15 @@ function LiveShown({
   own,
   rival,
   refreshing,
+  reading,
   refresh,
   wide,
+  windowOpen,
+  windowKnown,
+  light,
 }: {
+  /** The member the page is for. */
+  entryId: number;
   board: LiveBoard;
   brought: number;
   waiting: boolean;
@@ -474,8 +604,18 @@ function LiveShown({
   own: boolean;
   rival: LiveRivalView | null;
   refreshing: boolean;
+  /** A read is on its way: a refresh, or a followed one. */
+  reading: boolean;
   refresh: () => void;
   wide: boolean;
+  /** The follow window of the member's matches is open. */
+  windowOpen: boolean;
+  /**
+   * The window is told from the reads' own matches: on a first read they come a render after
+   * its board, and until then the window may stand closed.
+   */
+  windowKnown: boolean;
+  light: LiveLight;
 }) {
   const rivalBoard = rival?.board ?? null;
   const rivalDuel = rival?.duel ?? null;
@@ -492,36 +632,60 @@ function LiveShown({
   }
   const holding = waiting && settled.board.gameweek === board.gameweek;
   const drawn = holding ? settled.board : board;
-  const drawnRival = rival === null || !holding ? rival : heldRival(rival, settled);
+  const drawnRival = useMemo(
+    () => (rival === null || !holding ? rival : heldRival(rival, settled)),
+    [rival, holding, settled],
+  );
   const gained = holding ? brought : 0;
+  const drawnDuel = duelLook(drawn, drawnRival);
+  // A read's motion waits for the page to be seen: the opening cover gone and the tab in view.
+  const coverGone = useCoverGone();
+  const tabInView = useTabShown();
+  const gate: MotionGate = coverGone && tabInView ? "open" : "wait";
 
   // What the reads since the visitor last looked brought the member: each newer board adds
-  // to it, and Yenile or a return to the page (the visitor looking again) clears it.
-  const [told, setTold] = useState<{ board: LiveBoard | null; recap: LiveRecap | null }>({
-    board: null,
-    recap: null,
-  });
-  // A look while the board plays (Yenile, a return to the page) clears the recap once the board
-  // has played out, before the read it brought is told, so nothing moves under the board.
-  const holdingNow = useRef(holding);
-  useEffect(() => {
-    holdingNow.current = holding;
-  });
+  // to it, and Yenile or a return to the page (the visitor looking again) clears it. A look
+  // clears it with the first newer board drawn after it, or, where no read is on its way, at
+  // once: the recap changes once for a look, never under the board.
+  const [told, setTold] = useState<Told>(() => toldAtOpen(drawn));
   const [lookLater, setLookLater] = useState(false);
-  if (!holding && lookLater) {
+  if (drawn !== told.board) {
+    const newer =
+      told.board === null ||
+      lookKey(drawn) !== lookKey(told.board) ||
+      Date.parse(drawn.sourceTime) > Date.parse(told.board.sourceTime);
+    const clear = lookLater && !holding && (newer || !reading);
+    if (clear) setLookLater(false);
+    setTold((current) => tell(current, drawn, drawnDuel, clear));
+  } else if (lookLater && !holding && !reading) {
     setLookLater(false);
     setTold((current) => ({ ...current, recap: lookedAt(current.recap) }));
+  } else if (!holding && told.look !== null && !sameDuel(told.look.rival, drawnDuel)) {
+    // The duel drawn changed without a read (the rival's first read, another rival): the next
+    // read moves the duel from where it now stands. The first duel drawn for the read the plan
+    // moves, late, moves with it; another rival never does.
+    setTold((current) =>
+      current.look === null
+        ? current
+        : {
+            ...current,
+            look: { ...current.look, rival: drawnDuel },
+            plan: current.look.rival === null ? duelLate(current, drawnDuel) : current.plan,
+          },
+    );
   }
-  if (drawn !== told.board) {
-    setTold((current) => ({ board: drawn, recap: advanceRecap(current.recap, drawn) }));
-  }
-  const look = useCallback(() => {
-    if (holdingNow.current) setLookLater(true);
-    else setTold((current) => ({ ...current, recap: lookedAt(current.recap) }));
-  }, []);
+  const look = useCallback(() => setLookLater(true), [setLookLater]);
+  // A board drawn while the tab was hidden has not been seen: coming back to it is its first
+  // sight, not a look again, so the recap stays and moves with it.
+  const unseen = useRef(false);
+  useLayoutEffect(() => {
+    if (document.visibilityState === "hidden") unseen.current = true;
+  }, [told.board]);
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") look();
+      if (document.visibilityState !== "visible") return;
+      if (unseen.current) unseen.current = false;
+      else look();
     };
     const onShow = (event: PageTransitionEvent) => {
       if (event.persisted) look();
@@ -538,16 +702,37 @@ function LiveShown({
     refresh();
   }, [look, refresh]);
 
+  // What was drawn is what the visitor last saw of the week, once the page is seen.
+  useEffect(() => {
+    if (gate === "open" && told.look !== null && told.recap !== null) {
+      keepLook(told.look, told.recap);
+    }
+  }, [gate, told.look, told.recap]);
+
+  // The heading's light: one of the member's own rows is being played in the board drawn. The
+  // follow window stays open longer, up to three hours from a kickoff FPL has not finished,
+  // only to time the reads; the board ends a match at its bound, as its groups and Maçlar do.
+  // It breathes for a newer read drawn, once the opening cover has gone.
+  const plan = told.plan;
+  const playing = windowOpen && drawn.rows.some((row) => row.phase === "playing");
+  // A read's breath is offered once its window is known: offered while the window only seems
+  // closed, it would be spent unlit.
+  const breath =
+    windowKnown && plan !== null && plan.playing && gate === "open" ? plan.token : null;
+  useEffect(() => light.set({ entryId, playing, breath }), [light, entryId, playing, breath]);
+  useEffect(() => () => light.set(null), [light]);
+
   // Farklar: closed on a phone, open on a tablet and beside the page, until the member opens
   // or closes it; that choice then stands, through a change of rival too.
   const layout = useShellLayout();
   const [open, setOpen] = useState<boolean | null>(null);
+  const recap = useMemo(() => recapItems(told.recap), [told.recap]);
   return (
     <LiveView
       team={team}
       board={drawn}
       net={drawn.net + gained}
-      recap={recapItems(told.recap)}
+      recap={recap}
       own={own}
       rival={drawnRival}
       refreshing={refreshing}
@@ -555,6 +740,8 @@ function LiveShown({
       wide={wide}
       differentialsOpen={open ?? (wide || layout !== "phone")}
       onDifferentialsToggle={setOpen}
+      plan={plan}
+      gate={gate}
     />
   );
 }

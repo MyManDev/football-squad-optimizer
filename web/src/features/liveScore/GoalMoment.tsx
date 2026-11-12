@@ -728,9 +728,15 @@ function Board({
       const received = moment.points === null ? null : signed(moment.points, locale);
       if (received !== null) setDigits(received);
       const release = () => onLandedRef.current?.(moment.key);
-      if (!scoring || !run(number.current, moment.points === 0 ? null : received, release)) {
-        release();
-      }
+      // Points that run land on the score, and a stream that brings none (the replay) lets go
+      // at once; points that cannot run (the score out of view) land as the board has fallen,
+      // as the substitution board's do, so nothing below moves under its fall.
+      const ran = scoring && run(number.current, moment.points === 0 ? null : received, release);
+      if (!scoring) release();
+      const fallen = () => {
+        if (scoring && !ran) release();
+        done.current();
+      };
       const fall = animate(
         board.current,
         [
@@ -739,12 +745,8 @@ function Board({
         ],
         MOMENT_TIMING.fall,
       );
-      if (fall === null) done.current();
-      else
-        fall.finished.then(
-          () => done.current(),
-          () => done.current(),
-        );
+      if (fall === null) fallen();
+      else fall.finished.then(fallen, fallen);
     };
     leaving.current = leave;
     placeBoard(place.current, board.current);

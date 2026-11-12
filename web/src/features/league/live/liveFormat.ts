@@ -38,6 +38,11 @@ export function wholePoints(value: number, locale: string): string {
   return value < 0 ? `−${text}` : text;
 }
 
+/** A figure caught in the middle of its count: rounded first, so passing zero writes '0'. */
+export function countedWhole(value: number, locale: string): string {
+  return wholePoints(Math.round(value), locale);
+}
+
 /** Whole points with their sign: '+8', '−12', '0'. */
 export function signedWhole(value: number, locale: string): string {
   return signedPoints(value, 0, locale);
