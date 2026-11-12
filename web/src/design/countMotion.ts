@@ -82,7 +82,9 @@ export function countTo(
       else requestAnimationFrame(step);
       return;
     }
-    write(from + (to - from) * progress);
+    // A count held (paused, or in its delay) writes nothing again until its value moves.
+    const value = from + (to - from) * progress;
+    if (value !== shown) write(value);
     requestAnimationFrame(step);
   };
   write(from);

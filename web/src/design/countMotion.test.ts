@@ -132,6 +132,30 @@ describe("countTo", () => {
     expect(element.textContent).toBe("45.0");
   });
 
+  it("writes nothing again while it is held, until its value moves", () => {
+    const element = document.createElement("span");
+    const native = Object.getOwnPropertyDescriptor(Node.prototype, "textContent")!;
+    const writes: (string | null)[] = [];
+    Object.defineProperty(element, "textContent", {
+      configurable: true,
+      get() {
+        return native.get!.call(this) as string;
+      },
+      set(value: string | null) {
+        writes.push(value);
+        native.set!.call(this, value);
+      },
+    });
+    const { last } = fakeAnimate(element);
+    countTo(element, 40, 50, format, motion, MOTION_MS.uiFast);
+    // Held at its first value (paused, or in its delay): frame after frame, no write.
+    for (let frame = 0; frame < 5; frame += 1) runFrame();
+    expect(writes).toEqual(["40.0"]);
+    last().setProgress(0.5);
+    runFrame();
+    expect(writes).toEqual(["40.0", "45.0"]);
+  });
+
   it("leaves the final value written when the animation is cancelled from outside", () => {
     const element = document.createElement("span");
     const { last } = fakeAnimate(element);
