@@ -61,6 +61,16 @@ describe("the last look", () => {
     expect(readLook(look.key)!.look.time).toBe(look.time);
   });
 
+  it("is never replaced by an older look from a tab that did not see the newer one", () => {
+    const { look, recap } = looked();
+    keepLook(look, recap);
+    // Another tab, whose memory holds nothing of this week, keeps the read before.
+    forgetLooks();
+    keepLook(weekAt(look, 10, look.time - 60_000), recap);
+    forgetLooks();
+    expect(readLook(look.key)!.look.time).toBe(look.time);
+  });
+
   it("keeps the four newest weeks", () => {
     const { look, recap } = looked();
     for (let week = 1; week <= KEPT_LOOKS + 1; week += 1) {

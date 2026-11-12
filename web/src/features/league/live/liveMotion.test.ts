@@ -32,7 +32,6 @@ import {
   planMotion,
   playDuel,
   playRow,
-  releaseMotion,
   type DuelLook,
   type LiveLook,
   type MotionPlan,
@@ -49,7 +48,7 @@ const beats = liveBeats();
 const boardOf = (name: BeatName): LiveBoard =>
   liveBoard(beats.find((beat) => beat.name === name)!.input)!;
 
-/** The looks and recaps of the beats from `from` to `to`, taken in in order. */
+/** The looks and recaps of the beats `names`, taken in in order. */
 function told(names: BeatName[], duel: (board: LiveBoard) => DuelLook | null = () => null) {
   let recap: LiveRecap | null = null;
   return names.map((name) => {
@@ -278,11 +277,10 @@ describe("the motion itself", () => {
     }
   });
 
-  it("plays each part of a plan once, and again only where a remount stopped it", () => {
+  it("plays each part of a plan once", () => {
     expect(claimMotion("a:rows")).toBe(true);
     expect(claimMotion("a:rows")).toBe(false);
-    releaseMotion("a:rows");
-    expect(claimMotion("a:rows")).toBe(true);
+    expect(claimMotion("a:duel")).toBe(true);
   });
 
   /** Records every animate() call; each animation ends when the test says. */
@@ -357,9 +355,16 @@ describe("the motion itself", () => {
     expect(balls).toHaveLength(1);
     expect(balls[0]!.element).toBe(row.querySelectorAll("[data-live-glyph='goal']")[1]);
     expect(balls[0]!.options).toMatchObject({ duration: times.data, delay: step });
-    expect(
-      on("[class*='flash'], span:not([data-live-edge]):not([data-autosub])[aria-hidden]"),
-    ).toBeDefined();
+    // The flash and the rise: twice the data time, from the row's own start.
+    expect(on(".flash")).toMatchObject({ duration: times.data * 2, delay: step });
+    expect(started.find(({ element }) => element.matches(".flash"))!.keyframes).toEqual(FLASH);
+    expect(on("[data-sign='up']")).toMatchObject({ duration: times.data * 2, delay: step });
+    // The count, a uiFast after.
+    expect(on("[data-live-number]")).toMatchObject({
+      duration: times.data,
+      delay: times.uiFast + step,
+      fill: "backwards",
+    });
     expect(on("[data-live-arrow]")).toMatchObject({ duration: times.ui, delay: times.data + step });
     expect(on("[data-live-edge]")).toMatchObject({
       duration: times.data,
@@ -367,7 +372,15 @@ describe("the motion itself", () => {
     });
     expect(on("[data-autosub]")).toMatchObject({ delay: times.data + times.ui + step });
     expect(on("[data-live-armband]")).toMatchObject({ delay: times.data + times.ui + step });
-    expect(on("[data-live-body] > svg")).toMatchObject({ fill: "backwards" });
+    const shirt = started.find(({ element }) =>
+      element.matches("[data-live-body] > svg:not([data-live-glyph])"),
+    )!;
+    expect(shirt.keyframes).toEqual([{ opacity: 0.55 }, { opacity: 1 }]);
+    expect(shirt.options).toMatchObject({
+      duration: times.data,
+      delay: times.data + times.ui + step,
+      fill: "backwards",
+    });
     // The flash and the rise are the row's while they play, and go when they end.
     const float = row.querySelector("[data-sign]");
     expect(float?.textContent).toBe("+8");
@@ -432,6 +445,7 @@ describe("the motion itself", () => {
         <span data-live-lane><span data-live-ball></span></span>
       </div>`;
     const bar = document.querySelector<HTMLElement>("[data-bar]")!;
+    vi.spyOn(bar, "getBoundingClientRect").mockReturnValue({ width: 300 } as DOMRect);
     playDuel(bar, -4, 3, times);
     const fill = (side: string) =>
       started.find(({ element }) => element.matches(`[data-live-fill='${side}']`))!;
@@ -447,9 +461,17 @@ describe("the motion itself", () => {
       delay: times.data,
       fill: "backwards",
     });
-    // A member's lead puts the ball left: it rolls left, turning anticlockwise.
+    // A member's lead puts the ball left: it rolls left, so it turns anticlockwise, from a
+    // clockwise start to rest, as far as it travels over its 12 px radius.
     const ball = started.find(({ element }) => element.matches("[data-live-ball]"))!;
+    const travelled = ((to - from) / 100) * 300;
+    const turn = (-travelled / 12) * (180 / Math.PI);
+    expect(turn).toBeGreaterThan(0);
+    expect(ball.keyframes[0]!.transform).toBe(`rotate(${turn}deg)`);
     expect(ball.keyframes.at(-1)!.transform).toBe("rotate(0deg)");
+    for (const { keyframes } of started) {
+      for (const key of keys(keyframes)) expect(["transform", "opacity"]).toContain(key);
+    }
   });
 });
 
@@ -467,9 +489,20 @@ describe("LIVE's stylesheet", () => {
     expect(animations).toEqual([
       "animation: live-breath var(--motion-pulse) var(--motion-ease) 3;",
     ]);
-    const wanted = css.indexOf("@media (prefers-reduced-motion: no-preference)");
-    expect(wanted).toBeGreaterThan(-1);
-    expect(css.indexOf("animation:")).toBeGreaterThan(wanted);
+    // The one animation stands inside the block for those who want motion, nowhere else.
+    const opening = "@media (prefers-reduced-motion: no-preference) {";
+    const start = css.indexOf(opening);
+    expect(start).toBeGreaterThan(-1);
+    let depth = 0;
+    let end = start + opening.length - 1;
+    do {
+      if (css[end] === "{") depth += 1;
+      if (css[end] === "}") depth -= 1;
+      end += 1;
+    } while (depth > 0 && end < css.length);
+    const wanted = css.slice(start, end);
+    expect(wanted).toContain(animations[0]);
+    expect(css.slice(0, start) + css.slice(end)).not.toMatch(/animation:/);
   });
 
   it("breathes with opacity alone", () => {
