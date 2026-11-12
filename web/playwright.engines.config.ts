@@ -16,6 +16,7 @@ export default defineConfig({
     "**/forwarded-league.spec.ts",
     "**/member-live-score.spec.ts",
     "**/live-page.spec.ts",
+    "**/live-motion-engines.spec.ts",
     "**/opening-signature.spec.ts",
   ],
   projects: [

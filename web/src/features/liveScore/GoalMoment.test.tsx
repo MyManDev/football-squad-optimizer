@@ -322,6 +322,40 @@ describe("what the second review asked of it", () => {
     fireEvent.click(board()!);
     expect(landed).toHaveBeenCalledWith(moment().key);
   });
+
+  it("tells the page a moment's points arrived once its board has fallen, where they cannot run", async () => {
+    // No live score in view: the points do not run, and wait for the board's fall to end.
+    let fallen: () => void = () => undefined;
+    Object.defineProperty(Element.prototype, "animate", {
+      configurable: true,
+      writable: true,
+      value(this: Element, keyframes: Keyframe[]) {
+        const falls = this.matches("[data-goal-board]") && keyframes[0]?.opacity === 1;
+        const finished = falls
+          ? new Promise<void>((resolve) => {
+              fallen = resolve;
+            })
+          : Promise.resolve();
+        return { finished, cancel() {}, addEventListener() {} } as unknown as Animation;
+      },
+    });
+    try {
+      const landed = vi.fn();
+      render(
+        <LanguageProvider initialLanguage="tr">
+          <GoalMomentLayer batch={{ id: "live:1", items: [moment()] }} onLanded={landed} />
+        </LanguageProvider>,
+      );
+      fireEvent.click(board()!);
+      expect(landed).not.toHaveBeenCalled();
+      await act(async () => {
+        fallen();
+      });
+      expect(landed).toHaveBeenCalledWith(moment().key);
+    } finally {
+      delete (Element.prototype as { animate?: unknown }).animate;
+    }
+  });
 });
 
 describe("what the phone test asked of it", () => {

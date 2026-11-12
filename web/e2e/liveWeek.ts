@@ -10,6 +10,7 @@ import {
 } from "../src/fixtures/forwarder";
 import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import type { FixturesPayload } from "../src/features/fixtures/types";
+import type { DevicePlanDocument } from "../src/features/league/device/types";
 import type { FplEntryBundle } from "../src/features/league/forwarder/documents";
 import type { WeekActivity } from "../src/features/liveScore/weekActivity";
 import type { MemberWeek } from "../src/features/liveScore/weekLive";
@@ -43,13 +44,20 @@ function envelope(payload: unknown, contract = "provisional_league_ui_v1") {
   };
 }
 
-/** The league with a closed week, the capture's table its directory line names, and the calendar. */
-export async function closedWeek(page: Page, calendar?: FixturesPayload) {
+/**
+ * The league with a closed week, the capture's table its directory line names (the example's
+ * unless `table` is given), and the calendar.
+ */
+export async function closedWeek(
+  page: Page,
+  calendar?: FixturesPayload,
+  table?: DevicePlanDocument,
+) {
   await installLeagueMocks(page);
   const { league_id, league_name } = mockLeagueMembersEnvelope.payload;
   const { season, gameweek } = LISTED;
   const bytes = `${JSON.stringify(
-    envelope(exampleTable({ season, gameweek, capture: LISTED.source_snapshot_id! })),
+    envelope(table ?? exampleTable({ season, gameweek, capture: LISTED.source_snapshot_id! })),
   )}\n`;
   await page.route("**/data/leagues.json", (route) =>
     route.fulfill({

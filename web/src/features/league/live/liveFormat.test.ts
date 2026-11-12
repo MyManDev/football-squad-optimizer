@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { clockTime, kickoffShort, signedWhole, wholePoints } from "./liveFormat";
+import { clockTime, countedWhole, kickoffShort, signedWhole, wholePoints } from "./liveFormat";
 
 const ISTANBUL = "Europe/Istanbul";
 
 describe("the LIVE page's values", () => {
+  it("writes a counted figure whole, '0' where the count passes zero, never '−0'", () => {
+    expect([-1.6, -0.6, -0.4, -0, 0.4, 2.5].map((value) => countedWhole(value, "tr-TR"))).toEqual([
+      "−2",
+      "−1",
+      "0",
+      "0",
+      "0",
+      "3",
+    ]);
+  });
+
   it("write a kickoff as its weekday and time in the reader's language and zone", () => {
     expect(kickoffShort("2026-11-21T12:00:00Z", "tr-TR", ISTANBUL)).toBe("Cmt 15:00");
     expect(kickoffShort("2026-11-22T13:30:00Z", "en-GB", "Europe/London")).toBe("Sun 13:30");
