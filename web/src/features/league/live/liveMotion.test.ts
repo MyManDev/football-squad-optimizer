@@ -148,12 +148,9 @@ describe("what a read moves on a row", () => {
     expect(motionOf(made, 3)).toMatchObject({ pointsFrom: 1, float: 5, state: "up" });
   });
 
-  it("shows its own changes on six rows at most, the rest at once, and slides them all", () => {
-    // The 15:00 match already under way in the look before: seven counted rows change at once.
-    const [over, bonus] = told(["over", "bonus"]);
-    const rows = { ...over!.look.rows };
-    for (const id of ["4", "5", "8"]) rows[id] = { ...rows[id]!, started: true };
-    const made = planMotion({ ...over!.look, rows }, bonus!.look, bonus!.recap.fresh)!;
+  it("shows its own changes on six rows at most, the rest at once", () => {
+    // The first match's bonus and the second's hour: seven counted rows change at once.
+    const made = plan("over", "bonus");
     const ranked = [...made.rows.values()].filter((motion) => motion.rank !== null);
     expect(ranked).toHaveLength(MOVING_ROWS);
     expect(ranked.map((motion) => motion.rank).sort()).toEqual([0, 1, 2, 3, 4, 5]);
@@ -162,8 +159,14 @@ describe("what a read moves on a row", () => {
     for (const motion of rest) {
       expect(motion).toMatchObject({ pointsFrom: null, float: 0, events: null, state: null });
     }
-    // The second match's kickoff: every row that changed group slides.
-    for (const id of [4, 5, 8, 11]) expect(motionOf(made, id)!.moved).toBe(true);
+    // The smallest change, the last pick, is the one left out.
+    expect(motionOf(made, 8)!.rank).toBeNull();
+  });
+
+  it("slides every row that changed group, past the six as well", () => {
+    // The first match ends at its window as the second kicks off.
+    const made = plan("card", "over");
+    for (const id of [1, 2, 3, 6, 7, 10, 4, 5, 8, 11]) expect(motionOf(made, id)!.moved).toBe(true);
   });
 
   it("brings the reserve on and takes the starter off: chips, shirts and what the score takes", () => {

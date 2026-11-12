@@ -35,8 +35,9 @@ describe("the replayed match day", () => {
     expect(board("card").net).toBe(17);
   });
 
-  it("ends the first match at its window, then adds its bonus as the second starts", () => {
+  it("ends the first match at its window as the second starts, then adds its bonus", () => {
     expect(ids("over", "finished")).toEqual([10, 1, 2, 3, 6, 7]);
+    expect(ids("over", "playing")).toEqual([4, 5, 8, 11]);
     expect(board("over").final).toBe(false);
     expect(ids("bonus", "playing")).toEqual([4, 5, 8, 11]);
     const changed = board("bonus").rows.filter(

@@ -8,10 +8,11 @@
  * 2. 12:45, the 12:30 match (101, clubs 1 and 2) under way: six picks kick off.
  * 3. 13:00, the captain scores (a forward's 4, twice) and the vice assists (3).
  * 4. 13:10, a card to a defender (2): his point goes.
- * 5. 14:50, 101 past its window, FPL not yet finished: its bonus is still to come; club 2 kept
- *    its goal unconceded.
- * 6. 15:30, 101 finished with its bonus, and the 15:00 match (102, clubs 3 and 4) under way:
- *    seven counted picks' points change at once, and an eighth pick changes group.
+ * 5. 15:20, 101 past its window, FPL not yet finished: its bonus is still to come; club 2 kept
+ *    its goal unconceded. The 15:00 match (102, clubs 3 and 4) is under way: its picks kick off
+ *    as 101's slide to Bitti.
+ * 6. 16:10, 101 finished with its bonus, and 102's picks past the hour: seven counted picks'
+ *    points change at once, one more than a read moves.
  * 7. 17:00, 102 finished; the forward 11 never played.
  * 8. 19:45, the week final: 103 played, and 11 gives way to the first reserve, 13.
  *
@@ -111,9 +112,9 @@ const PLANS: readonly BeatPlan[] = [
   },
   {
     name: "over",
-    at: "2026-11-21T14:50:00Z",
+    at: "2026-11-21T15:20:00Z",
     moments: [],
-    inPlay: [101],
+    inPlay: [101, 102],
     finished: [],
     said: {
       1: { minutes: 90, points: 2 },
@@ -122,11 +123,15 @@ const PLANS: readonly BeatPlan[] = [
       6: { minutes: 90, points: 2 },
       7: { minutes: 90, points: 6, assists: 1 },
       10: { minutes: 90, points: 6, goals: 1 },
+      4: { minutes: 20, points: 1 },
+      5: { minutes: 20, points: 1 },
+      8: { minutes: 20, points: 1 },
+      12: { minutes: 20, points: 1 },
     },
   },
   {
     name: "bonus",
-    at: "2026-11-21T15:30:00Z",
+    at: "2026-11-21T16:10:00Z",
     moments: [],
     inPlay: [102],
     finished: [101],
@@ -135,10 +140,10 @@ const PLANS: readonly BeatPlan[] = [
       6: { minutes: 90, points: 3 },
       7: { minutes: 90, points: 8, assists: 1 },
       10: { minutes: 90, points: 9, goals: 1 },
-      4: { minutes: 30, points: 1 },
-      5: { minutes: 30, points: 1 },
-      8: { minutes: 30, points: 1 },
-      12: { minutes: 30, points: 1 },
+      4: { minutes: 70, points: 2 },
+      5: { minutes: 70, points: 2 },
+      8: { minutes: 70, points: 2 },
+      12: { minutes: 70, points: 2 },
     },
   },
   {
