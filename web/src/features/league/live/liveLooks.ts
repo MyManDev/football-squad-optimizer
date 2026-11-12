@@ -133,7 +133,8 @@ export function readLook(key: string): { look: LiveLook; marks: RecapMarks } | n
 
 /** Keeps `look` with the recap's marks, unless a newer look of the same week is kept. */
 export function keepLook(look: LiveLook, recap: LiveRecap): void {
-  const before = memory.get(look.key);
+  // Another tab may have kept a newer look of the week since this one last did.
+  const before = memory.get(look.key) ?? stored().find((kept) => kept.look.key === look.key);
   if (before !== undefined && before.look.time > look.time) return;
   const entry: KeptLook = {
     look,

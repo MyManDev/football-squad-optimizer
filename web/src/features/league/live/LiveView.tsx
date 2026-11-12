@@ -38,7 +38,7 @@ import {
   type RecapItem,
 } from "./liveBoard";
 import { duelStatus, type DuelSwing, type LiveDuel } from "./liveDuel";
-import { clockTime, signedWhole, wholePoints } from "./liveFormat";
+import { clockTime, countedWhole, signedWhole, wholePoints } from "./liveFormat";
 import type { LiveLight } from "./liveLight";
 import {
   APPEAR,
@@ -52,7 +52,6 @@ import {
   motionTimes,
   playDuel,
   playRow,
-  releaseMotion,
   type MotionGate,
   type MotionPlan,
 } from "./liveMotion";
@@ -230,8 +229,8 @@ export function LiveView(props: LiveViewProps) {
 /**
  * The score's head, from its top to Canlı puan: the GOL board stands clear of it while it is
  * in view, and its points run into the total (`data-live-total`), which counts to each value it
- * is given. Opening the page again on a newer read, it holds the total last seen until the
- * opening cover has gone, then counts on from it.
+ * is given. Opening the page again on a newer read, it counts from the total last seen, once
+ * the opening cover has gone, as the rows count from theirs.
  */
 function ScoreCardPart({
   board,
@@ -247,7 +246,10 @@ function ScoreCardPart({
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   const chip = board.chip === null ? null : (messages.leagueMembers.chipNames[board.chip] ?? null);
-  const total = plan !== null && plan.reopen && gate === "wait" ? plan.netFrom : net;
+  const start =
+    plan !== null && plan.reopen
+      ? { from: plan.netFrom, key: `${plan.token}:total`, ready: gate === "open" }
+      : null;
   return (
     <section className={styles.score} aria-label={copy.livePoints} data-live-head>
       <dl className={styles.scoreGrid}>
@@ -258,7 +260,8 @@ function ScoreCardPart({
               <LiveNumber
                 key={lookKey(board)}
                 follow
-                value={total}
+                value={net}
+                start={start}
                 format={(value) => wholePoints(value, locale)}
               />
             </span>
@@ -591,10 +594,15 @@ interface FlowProps {
 }
 
 interface FlowSnapshot {
-  /** Where the groups' top stood on the screen, and the phone bar's bottom, before the change. */
+  /** Where the groups' top stood on the screen before the change, and the phone bar's bottom. */
   groupsTop: number;
   barBottom: number;
-  /** Each row and group heading's place in the groups, before a read's change. */
+  /**
+   * What the visitor reads, where they read past the groups' top: the first row, heading or
+   * Farklar wholly below the bar that the read does not take to another group.
+   */
+  anchor: { part: string; top: number } | null;
+  /** On a read: each row's, heading's and Farklar's top on the screen before the change. */
   places: Map<string, number> | null;
   recapKey: string;
 }
@@ -602,18 +610,20 @@ interface FlowSnapshot {
 /** A scroll by the visitor this recently is theirs: the page keeps its hands off. */
 const SCROLL_QUIET_MS = 150;
 
-/** Each row's and group heading's top, from the groups' own. */
-function placesIn(groups: HTMLElement): Map<string, number> {
-  const top = groups.getBoundingClientRect().top;
-  const places = new Map<string, number>();
+/** The groups' rows and headings, and Farklar, each by a key that outlives a change of group. */
+function partsOf(groups: HTMLElement, after: HTMLElement | null): [string, HTMLElement][] {
+  const parts: [string, HTMLElement][] = [];
   for (const row of groups.querySelectorAll<HTMLElement>("[data-live-row]")) {
-    places.set(`row:${row.dataset.liveRow}`, row.getBoundingClientRect().top - top);
+    parts.push([`row:${row.dataset.liveRow}`, row]);
   }
   for (const heading of groups.querySelectorAll<HTMLElement>("[data-live-group]")) {
-    places.set(`group:${heading.dataset.liveGroup}`, heading.getBoundingClientRect().top - top);
+    parts.push([`group:${heading.dataset.liveGroup}`, heading]);
   }
-  return places;
+  if (after !== null) parts.push(["after", after]);
+  return parts;
 }
+
+const topOf = (element: Element) => element.getBoundingClientRect().top;
 
 /** The bottom of the phone's top bar, which covers the page under it; 0 without one. */
 function barBottom(): number {
@@ -630,11 +640,15 @@ function pageClear(): boolean {
 
 /**
  * The recap, the groups and, on one column, Farklar below them: the one place that sees them
- * both before and after a change. A read drawn slides each row that changed group to its new
- * place from where it stood, and plays the rows' own changes; the recap's growing or clearing
- * keeps the rows where the visitor reads them when the recap is out of sight above, or, on a
- * read, glides what stands below it into place. Under reduced motion nothing slides or glides;
- * the place is still kept.
+ * both before and after a change.
+ *
+ * - Where the visitor reads past the groups' top, the part they read stays where it was on the
+ *   screen, whatever changed above it (the recap, a group that came or went, a row that grew):
+ *   the page scrolls by the change, under reduced motion too, unless the visitor is moving it.
+ * - A read drawn slides every row, heading and Farklar from where it stood to its new place
+ *   (a new heading comes into view); where the groups' top is in sight and the recap above it
+ *   changed, the groups glide from where they stood. A look's clearing of the recap jumps.
+ * - It plays the rows' own changes for the read (`playRow`), once.
  */
 class LiveFlow extends Component<FlowProps> {
   // Not `refs`: React keeps a field of that name on every class component.
@@ -643,8 +657,8 @@ class LiveFlow extends Component<FlowProps> {
     groups: createRef(),
     after: createRef(),
   };
-  private running: Animation[] = [];
-  private claim: string | null = null;
+  /** The plan whose rows this part has played: its own remount plays them no second time. */
+  private played: string | null = null;
   private touching = false;
   private scrolledAt = Number.NEGATIVE_INFINITY;
   private ownScroll = false;
@@ -676,17 +690,32 @@ class LiveFlow extends Component<FlowProps> {
     window.removeEventListener("touchend", this.onTouchEnd);
     window.removeEventListener("touchcancel", this.onTouchEnd);
     window.removeEventListener("scroll", this.onScroll);
-    this.stop();
   }
 
   getSnapshotBeforeUpdate(previous: FlowProps): FlowSnapshot | null {
     const groups = this.parts.groups.current;
     if (groups === null) return null;
-    const read = this.props.plan !== null && this.props.plan !== previous.plan;
+    const { plan, gate } = this.props;
+    const read = plan !== null && plan !== previous.plan;
+    const bar = barBottom();
+    const groupsTop = topOf(groups);
+    const tops = partsOf(groups, this.parts.after.current).map(
+      ([part, element]) => [part, topOf(element)] as const,
+    );
+    let anchor: FlowSnapshot["anchor"] = null;
+    if (groupsTop <= bar) {
+      for (const [part, top] of tops) {
+        if (top < bar || (anchor !== null && top >= anchor.top)) continue;
+        const moves =
+          read && part.startsWith("row:") && plan.rows.get(Number(part.slice(4)))?.moved;
+        if (!moves) anchor = { part, top };
+      }
+    }
     return {
-      groupsTop: groups.getBoundingClientRect().top,
-      barBottom: barBottom(),
-      places: read && this.props.gate === "open" ? placesIn(groups) : null,
+      groupsTop,
+      barBottom: bar,
+      anchor,
+      places: read && gate === "open" ? new Map(tops) : null,
       recapKey: previous.recapKey,
     };
   }
@@ -695,10 +724,26 @@ class LiveFlow extends Component<FlowProps> {
     const groups = this.parts.groups.current;
     const read = this.props.plan !== null && this.props.plan !== previous.plan;
     if (snapshot !== null && groups !== null) {
-      const moved = groups.getBoundingClientRect().top - snapshot.groupsTop;
-      if (Math.abs(moved) >= 1) this.keep(groups, moved, snapshot, read);
-      const times = read && pageClear() ? motionTimes(groups) : null;
-      if (times !== null && snapshot.places !== null) this.slide(groups, snapshot.places, times);
+      const parts = partsOf(groups, this.parts.after.current);
+      // Where everything stands after the change, before the page moves anything.
+      const now = new Map(parts.map(([part, element]) => [part, topOf(element)]));
+      const groupsNow = topOf(groups);
+      const scrolled = this.keep(snapshot, now);
+      const times = read && this.props.gate === "open" && pageClear() ? motionTimes(groups) : null;
+      let glide = 0;
+      if (times !== null && scrolled === 0 && snapshot.groupsTop > snapshot.barBottom) {
+        glide = snapshot.groupsTop - groupsNow;
+        if (Math.abs(glide) < 1) glide = 0;
+        else {
+          groups.animate(
+            [{ transform: `translateY(${glide}px)` }, { transform: "translateY(0px)" }],
+            { duration: times.data, easing: LIVE_EASE },
+          );
+        }
+      }
+      if (times !== null && snapshot.places !== null) {
+        this.slide(parts, snapshot.places, now, scrolled, glide, times);
+      }
       if (times !== null && snapshot.recapKey !== this.props.recapKey) {
         this.reveal(snapshot.recapKey, times);
       }
@@ -706,66 +751,57 @@ class LiveFlow extends Component<FlowProps> {
     if (read || previous.gate !== this.props.gate) this.decorate();
   }
 
-  /** The groups moved on the screen by `moved` px because what stands above them changed. */
-  private keep(groups: HTMLElement, moved: number, snapshot: FlowSnapshot, read: boolean) {
-    if (snapshot.groupsTop <= snapshot.barBottom) {
-      // The change is out of sight above: the rows stay where the visitor reads them, unless
-      // the visitor is moving the page themselves.
-      if (this.touching || performance.now() - this.scrolledAt < SCROLL_QUIET_MS) return;
-      this.ownScroll = true;
-      window.scrollBy({ top: moved, left: 0, behavior: "instant" });
-      return;
-    }
-    // In sight, only a read glides what stands below the change into place; a look jumps.
-    const times = read && pageClear() ? motionTimes(groups) : null;
-    if (times === null) return;
-    for (const part of [groups, this.parts.after.current]) {
-      if (part === null) continue;
-      this.running.push(
-        part.animate([{ transform: `translateY(${-moved}px)` }, { transform: "translateY(0px)" }], {
-          duration: times.data,
-          easing: LIVE_EASE,
-        }),
-      );
-    }
+  /**
+   * The part the visitor reads stays where it was: the page scrolls by how far it moved.
+   * Returns how far the page scrolled.
+   */
+  private keep(snapshot: FlowSnapshot, now: Map<string, number>): number {
+    const anchor = snapshot.anchor;
+    if (anchor === null) return 0;
+    const top = now.get(anchor.part);
+    if (top === undefined || Math.abs(top - anchor.top) < 1) return 0;
+    if (this.touching || performance.now() - this.scrolledAt < SCROLL_QUIET_MS) return 0;
+    const from = window.scrollY;
+    this.ownScroll = true;
+    window.scrollBy({ top: top - anchor.top, left: 0, behavior: "instant" });
+    return window.scrollY - from;
   }
 
-  /** Each row and heading slides from where it stood to its new place; a new heading appears. */
+  /**
+   * Each row, heading and Farklar slides from where it stood on the screen to its new place,
+   * the page's scroll and the groups' glide taken into account; a new heading comes into view.
+   */
   private slide(
-    groups: HTMLElement,
+    parts: [string, HTMLElement][],
     before: Map<string, number>,
+    now: Map<string, number>,
+    scrolled: number,
+    glide: number,
     times: NonNullable<ReturnType<typeof motionTimes>>,
   ) {
     const plan = this.props.plan;
-    const top = groups.getBoundingClientRect().top;
-    const parts = [
-      ...groups.querySelectorAll<HTMLElement>("[data-live-row]"),
-      ...groups.querySelectorAll<HTMLElement>("[data-live-group]"),
-    ];
-    for (const part of parts) {
-      const row = part.dataset.liveRow;
-      const key = row !== undefined ? `row:${row}` : `group:${part.dataset.liveGroup}`;
-      const was = before.get(key);
+    for (const [part, element] of parts) {
+      const was = before.get(part);
       if (was === undefined) {
-        if (row === undefined) {
-          this.running.push(part.animate(APPEAR, { duration: times.data, easing: LIVE_EASE }));
+        if (part.startsWith("group:")) {
+          element.animate(APPEAR, { duration: times.data, easing: LIVE_EASE });
         }
         continue;
       }
-      const shift = was - (part.getBoundingClientRect().top - top);
+      // Farklar stands outside the groups, so their glide does not carry it.
+      const shift = was - now.get(part)! + scrolled - (part === "after" ? 0 : glide);
       if (Math.abs(shift) < 1) continue;
-      const slide = part.animate(
+      const slide = element.animate(
         [{ transform: `translateY(${shift}px)` }, { transform: "translateY(0px)" }],
         { duration: times.data, easing: LIVE_EASE },
       );
-      this.running.push(slide);
       // A row that changes group passes over the rows it crosses.
-      if (row !== undefined && plan?.rows.get(Number(row))?.moved) {
-        part.style.zIndex = "1";
+      if (part.startsWith("row:") && plan?.rows.get(Number(part.slice(4)))?.moved) {
+        element.style.zIndex = "1";
         const lower = () => {
-          part.style.removeProperty("z-index");
+          element.style.removeProperty("z-index");
           // Nothing of the slide stays: not even an empty style.
-          if (part.getAttribute("style") === "") part.removeAttribute("style");
+          if (element.getAttribute("style") === "") element.removeAttribute("style");
         };
         slide.finished.then(lower, lower);
       }
@@ -779,39 +815,32 @@ class LiveFlow extends Component<FlowProps> {
     const had = new Set(before.split(","));
     for (const item of recap.querySelectorAll<HTMLElement>("[data-live-recap-item]")) {
       if (had.has(item.dataset.liveRecapItem ?? "")) continue;
-      this.running.push(
-        item.animate(APPEAR, {
-          duration: times.ui,
-          delay: times.ui,
-          easing: LIVE_EASE,
-          fill: "backwards",
-        }),
-      );
+      item.animate(APPEAR, {
+        duration: times.ui,
+        delay: times.ui,
+        easing: LIVE_EASE,
+        fill: "backwards",
+      });
     }
   }
 
-  /** The rows' own changes for the plan drawn, once the cover has gone; once per plan. */
+  /**
+   * The rows' own changes for the plan drawn, once the cover has gone: once, by whichever part
+   * takes the plan first, so a remount after the 1024 px turn plays nothing again.
+   */
   private decorate() {
     const { plan, gate, locale } = this.props;
     const groups = this.parts.groups.current;
     if (plan === null || gate === "wait" || groups === null) return;
     const key = `${plan.token}:rows`;
-    if (!claimMotion(key)) return;
-    this.claim = key;
+    if (this.played === key || !claimMotion(key)) return;
+    this.played = key;
     const times = pageClear() ? motionTimes(groups) : null;
     if (times === null) return;
     for (const [id, motion] of plan.rows) {
       const row = groups.querySelector<HTMLElement>(`[data-live-row='${id}']`);
-      if (row !== null) this.running.push(...playRow(row, motion, times, locale));
+      if (row !== null) playRow(row, motion, times, locale);
     }
-  }
-
-  /** Stops what is running; a plan stopped before it ended may play again on the next mount. */
-  private stop() {
-    const unfinished = this.running.some((animation) => animation.playState !== "finished");
-    for (const animation of this.running) animation.cancel();
-    this.running = [];
-    if (unfinished && this.claim !== null) releaseMotion(this.claim);
   }
 
   render() {
@@ -877,25 +906,36 @@ function RivalBlockPart({
   const totalGap = duel?.totalGap ?? null;
   // The week's opponent is named so; any other member, in any league, is a rival.
   const label = rival.opponent ? copy.opponent : copy.rival;
-  const whole = (value: number) => wholePoints(value, locale);
+  const whole = (value: number) => countedWhole(value, locale);
   const bar = useRef<HTMLDivElement>(null);
   const status = useRef<HTMLElement>(null);
   const points = useRef<HTMLSpanElement>(null);
   const ends = useRef<HTMLParagraphElement>(null);
+  const rolling = useRef<Animation[]>([]);
+  const played = useRef<string | null>(null);
   const motion = plan?.duel ?? null;
   const token = plan?.token ?? null;
   // The duel moves for a read drawn with the same rival it was drawn with before, once.
   const shown = rival.duel !== null && rival.board !== null ? rival.entryId : null;
   useLayoutEffect(() => {
+    if (motion === null || shown !== motion.rivalId) {
+      // Another rival drawn while the duel rolled: its roll stops, never to play again.
+      for (const animation of rolling.current) animation.cancel();
+      rolling.current = [];
+    }
     if (motion === null || token === null || gate === "wait" || shown !== motion.rivalId) {
-      return undefined;
+      return;
     }
     const key = `${token}:duel`;
-    if (!claimMotion(key)) return undefined;
+    // Once, by whichever part takes the plan first: its own remount (React's strict check)
+    // finds it rolling, and a remount after the 1024 px turn plays nothing again.
+    if (played.current === key || !claimMotion(key)) return;
+    played.current = key;
     const element = bar.current;
     const times = pageClear() ? motionTimes(element) : null;
-    if (times === null || element === null) return undefined;
+    if (times === null || element === null) return;
     const running = playDuel(element, motion.marginFrom, margin, times);
+    rolling.current = running;
     const later = times.uiFast;
     const figure = (selector: string, from: number) => {
       const target = ends.current?.querySelector<HTMLElement>(selector) ?? null;
@@ -916,11 +956,6 @@ function RivalBlockPart({
         }),
       );
     }
-    return () => {
-      const unfinished = running.some((animation) => animation.playState !== "finished");
-      for (const animation of running) animation.cancel();
-      if (unfinished) releaseMotion(key);
-    };
     // Played once per plan; the figures and the margin are read as they stand then.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, gate, shown]);

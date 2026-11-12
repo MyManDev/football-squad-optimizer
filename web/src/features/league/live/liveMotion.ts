@@ -35,7 +35,7 @@ import {
   type LiveState,
 } from "./liveBoard";
 import { duelStatus } from "./liveDuel";
-import { signedWhole, wholePoints } from "./liveFormat";
+import { countedWhole, signedWhole } from "./liveFormat";
 import styles from "./LivePage.module.css";
 
 /** At most this many rows show their own changes on one read. */
@@ -137,7 +137,10 @@ export function sameDuel(a: DuelLook | null, b: DuelLook | null): boolean {
 
 /** What one row does on a read. */
 export interface RowMotion {
-  /** Its place among the rows that show their own changes, or null past the first six. */
+  /**
+   * Its place among the rows that show their own changes, or null where it shows none of its
+   * own (past the first six, or a slide alone).
+   */
   rank: number | null;
   /** The points it counts from, or null where they are written at once. */
   pointsFrom: number | null;
@@ -319,11 +322,6 @@ export function claimMotion(key: string): boolean {
   return true;
 }
 
-/** Lets a part play again, for a play a remount stopped before it ended. */
-export function releaseMotion(key: string): void {
-  claimed.delete(key);
-}
-
 const counting = new WeakMap<Element, Count>();
 
 /** Counts `element` from one value to another after `delay`, stopping any count already on it. */
@@ -352,8 +350,11 @@ export function forgetLiveMotion(): void {
   claimed.clear();
 }
 
-/** Whether the page may show motion: it is in view, clear, and the opening cover has gone. */
-export type MotionGate = "wait" | "open" | "closed";
+/**
+ * Whether a plan may play yet: "wait" while the opening cover stands. Whether the page is in
+ * view and no dialog covers it is asked as each part plays.
+ */
+export type MotionGate = "wait" | "open";
 
 /** The times of one read's motion, or null under reduced motion or without the API. */
 export interface MotionTimes {
@@ -488,7 +489,7 @@ export function playRow(
       figure,
       motion.pointsFrom,
       to,
-      (value) => wholePoints(Math.round(value), locale),
+      (value) => countedWhole(value, locale),
       uiFast + start,
     );
     const count = figure.getAnimations?.().at(-1);
