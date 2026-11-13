@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-10T09:33:43Z",
+  "generated_at_utc": "2026-11-13T02:03:05Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -27,8 +27,8 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "price_tenths": 46,
-        "expected_points": 3.1222495431173916,
+        "price_tenths": 47,
+        "expected_points": 3.164799672137545,
         "event_points": null,
         "is_captain": false,
         "is_vice_captain": false,
@@ -305,7 +305,7 @@
     "purchase_prices_known": false,
     "squad_sell_value_tenths": 1004,
     "spendable_budget_tenths": 1017,
-    "source_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
+    "source_snapshot_id": "fpl-live-20261113T020056Z-a222553c4c2e",
     "squadopt_comparison": null,
     "data_quality": "partial",
     "missing_fields": [
@@ -337,10 +337,10 @@
         146426,
         661313
       ],
-      "bank_tenths": 11,
+      "bank_tenths": 10,
       "free_transfers": 1,
       "sell_tenths": {
-        "489639": 46,
+        "489639": 47,
         "477424": 56,
         "465730": 55,
         "466075": 59,
