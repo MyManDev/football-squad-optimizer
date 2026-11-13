@@ -1,8 +1,8 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-11-10T09:34:57Z",
+  "generated_at_utc": "2026-11-13T02:04:20Z",
   "payload": {
-    "captured_at_utc": "2026-11-10T09:31:19.812340Z",
+    "captured_at_utc": "2026-11-13T02:00:56.690703Z",
     "league_total_average_score": 167.0,
     "our_total_realized_net_score": 168.0,
     "ownership": {
@@ -13,27 +13,27 @@
         437730,
         503139
       ],
-      "effective_ownership": 348.0,
+      "effective_ownership": 348.20000000000005,
       "gameweek": 5,
       "least_owned_starter": 503139,
-      "mean_starter_ownership": 24.463636363636365,
+      "mean_starter_ownership": 24.481818181818184,
       "most_owned_starter": 223094,
       "ownership_percent": {
         "204936": 7.1,
         "216616": 2.8,
-        "219168": 24.9,
+        "219168": 25.1,
         "223094": 78.9,
         "226182": 11.2,
         "244723": 4.7,
-        "244850": 53.9,
+        "244850": 54.0,
         "437730": 5.6,
-        "446008": 19.2,
+        "446008": 19.1,
         "490145": 0.8,
         "494521": 3.3,
         "503139": 2.1,
-        "60307": 47.9,
-        "67089": 15.3,
-        "97032": 15.0
+        "60307": 48.1,
+        "67089": 15.2,
+        "97032": 14.8
       },
       "squad": [
         {
@@ -235,7 +235,7 @@
     },
     "scored_gameweeks": 3,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20261110T093119Z-75d9520fa67b",
+    "source_snapshot_id": "fpl-live-20261113T020056Z-a222553c4c2e",
     "total_difference_to_average": 1.0,
     "verdict": "+1 points against the game's average over 3 scored gameweeks — one gameweek is noise, not evidence; the starting eleven averages 24% ownership.",
     "verdict_code": "standing",
