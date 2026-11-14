@@ -31,8 +31,13 @@ test("the mobile sidebar opens LLMOPT as a reloadable team page", async ({ page 
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
   await page.goto("/fixtures");
   const shell = MESSAGES.en.shell;
-  const sidebarLink = page.locator("#sidebar").getByRole("link", { name: shell.llmopt });
+  const sidebar = page.locator("#sidebar");
+  const sidebarLink = sidebar.getByRole("link", { name: shell.llmopt });
   await page.getByRole("button", { name: shell.openMenu }).click();
+  const links = sidebar.getByRole("navigation").getByRole("link");
+  await expect(links.nth(0)).toHaveAccessibleName(shell.live);
+  await expect(links.nth(1)).toHaveAccessibleName(shell.llmopt);
+  await expect(links.nth(2)).toHaveAccessibleName(shell.vsSquadopt);
   await sidebarLink.click();
   await expect(page).toHaveURL(PAGE);
   const heading = page.getByRole("heading", { level: 1, name: shell.llmopt });

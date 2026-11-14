@@ -71,12 +71,32 @@ def test_response_asks_a_question_instead_of_returning_a_partial_draft() -> None
     assert response.json() == {"status": "clarification", "message": "Hangi oyuncu?"}
 
 
+@pytest.mark.parametrize("kind", ["keep_player", "avoid_player"])
+def test_model_comparison_accepts_either_side_for_a_held_player(kind: str) -> None:
+    def provider(_request: IntentRequest) -> object:
+        result = _proposed()
+        result["draft"]["comparison"]["kind"] = kind
+        return result
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+        assert response.status_code == 200
+        assert response.json()["draft"] == {
+            "hard": [{"kind": "no_hits"}],
+            "soft": [],
+            "comparison": {"kind": "include_player", "player_id": 1, "both": True},
+        }
+        invalid = _request()
+        invalid["draft"]["comparison"] = {"kind": kind, "player_id": 1, "both": True}
+        assert client.post(URL, json=invalid).status_code == 422
+
+
 @pytest.mark.parametrize(
     "comparison",
     [
         {"kind": "include_player", "player_id": 2, "both": True},
         {"kind": "include_player", "player_id": True, "both": False},
-        {"kind": "avoid_player", "player_id": 1, "both": True},
+        {"kind": "no_hits", "player_id": None, "both": True},
         {"kind": "no_hits", "player_id": 1, "both": False},
         {"kind": "execute", "player_id": None, "both": False},
     ],

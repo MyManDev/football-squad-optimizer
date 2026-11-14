@@ -93,16 +93,16 @@ test.describe("the sidebar before and after the two steps", () => {
     await page.goto("/fixtures");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(await sidebarLinks(page)).toEqual([
+      `${own(EXAMPLE_CLAIM.entryId)}/live`,
+      `${own(EXAMPLE_CLAIM.entryId)}/llmopt`,
       `${own(EXAMPLE_CLAIM.entryId)}/vs`,
       own(EXAMPLE_CLAIM.entryId),
-      `${own(EXAMPLE_CLAIM.entryId)}/live`,
       MEMBERS,
       `${own(EXAMPLE_CLAIM.entryId)}/current-squad`,
       `${own(EXAMPLE_CLAIM.entryId)}/what-if`,
       `${own(EXAMPLE_CLAIM.entryId)}/duel`,
       `${own(EXAMPLE_CLAIM.entryId)}/chips`,
       `${own(EXAMPLE_CLAIM.entryId)}/card`,
-      `${own(EXAMPLE_CLAIM.entryId)}/llmopt`,
       `${own(EXAMPLE_CLAIM.entryId)}/history`,
       "/fixtures",
       ...CONTRIBUTE,
