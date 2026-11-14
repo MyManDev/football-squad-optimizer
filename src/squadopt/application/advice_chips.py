@@ -288,6 +288,7 @@ def advise_with_chip(
     projection: Projection,
     rules: SeasonRules,
     control: MemberControl | None = None,
+    include_resource_state: bool = False,
 ) -> ChipAdvice:
     """The one-week pure-points plan with the member's chosen chip played this gameweek.
 
@@ -381,6 +382,7 @@ def advise_with_chip(
             plan.solver_status, plan.diagnostics
         ),
         week=week,
+        include_resource_state=include_resource_state,
     )
     # The lineup total is published as the chip week scores, and it must be both what the
     # planner counted and what a reader re-adds from the rows beside it.
