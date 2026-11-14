@@ -1,6 +1,6 @@
 {
   "contract_version": "league_directory_v1",
-  "generated_at_utc": "2026-11-13T02:03:05Z",
+  "generated_at_utc": "2026-11-14T02:03:08Z",
   "source_kind": "live",
   "payload": {
     "leagues": [
@@ -10,8 +10,8 @@
         "season": "2026-27",
         "gameweek": 11,
         "path": "leagues/352490",
-        "device_plan": "device/fpl-live-20261113T020056Z-a222553c4c2e/device-plan.json",
-        "device_plan_sha256": "c226274d971117eac270ad824fd45c38efd01fa1a29cb21043363d37452cf800"
+        "device_plan": "device/fpl-live-20261114T020101Z-215338b96572/device-plan.json",
+        "device_plan_sha256": "8d4ee5fb9c097b1855f089e56347e18bce58d548246e4cfec4378dc21532bf32"
       }
     ]
   }
