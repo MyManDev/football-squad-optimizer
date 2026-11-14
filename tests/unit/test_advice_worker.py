@@ -571,7 +571,7 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     assert job is None  # nothing was queued; the refusal above is the whole story
 
 
-@pytest.mark.parametrize("chip", [None, "bboost"])
+@pytest.mark.parametrize("chip", [None, "bboost", "wildcard"])
 def test_a_member_presses_the_button_and_gets_a_computed_answer(
     running: dict[str, Any],
     chip: str | None,
@@ -623,6 +623,9 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
     if chip is not None:
         assert payload["chip_choice"]["chip"] == chip
+        assert payload["chip"] == chip
+        assert payload["bank_after_tenths"] >= 0
+        assert payload["free_transfers_after"] >= 1
 
     # A second ask is answered from the cache and starts no second solve.
     again = client.post(route, json=body)
@@ -1863,6 +1866,28 @@ def test_llmopt_constraints_round_trip_through_the_advice_worker(running, new_pr
     else:
         assert payload["moves"] == []
         assert payload["free_transfers_after"] == 2
+
+
+def test_llmopt_wildcard_rebuilds_the_squad_under_player_preferences(running):
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 1, "chip": "wildcard"}
+    preferences = {"include_players": [1007], "no_hits": True}
+    submitted = client.post(route, json={**selection, "preferences": preferences})
+    assert submitted.status_code == 202, submitted.text
+    assert _work(backend) == 1
+    served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["chip"] == "wildcard"
+    assert payload["chip_strategy"]["selected_chip"] == "wildcard"
+    assert payload["plan_weeks"][0]["chip"] == "wildcard"
+    chosen = {row["player_id"] for row in payload["starting_xi"] + payload["bench"]}
+    assert len(chosen) == 15
+    assert 1007 in chosen and 1007 not in SQUAD_CODES
+    assert payload["transfer_hit_points"] == 0
+    assert payload["bank_after_tenths"] >= 0
 
 
 def test_impossible_llmopt_plan_returns_the_public_no_plan_code(running):

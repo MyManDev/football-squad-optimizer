@@ -218,3 +218,90 @@ test("clarification keeps the first request and pauses calculation", async ({ pa
   await expect(page.getByText("Include player · Smith", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Compute plans" })).toBeEnabled();
 });
+
+for (const wildcardHeld of [true, false]) {
+  test(`a preferred Wildcard in chat checks held chips (${wildcardHeld})`, async ({ page }) => {
+    test.skip(!API, "API build required");
+    await installLeagueMocks(page);
+    await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+    const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+    const player = squad.starting_xi[0]!;
+    const message = `Keep ${player.name} and play Wildcard if possible.`;
+    const posts: { chip?: string; preferences: Record<string, unknown> }[] = [];
+    await page.route(`${API}/api/v1/contributions/players`, (route) =>
+      answer(route, {
+        season: squad.season,
+        players: [{ id: player.player_id, name: player.name, team: player.team }],
+      }),
+    );
+    await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+      answer(route, {
+        contract_version: "league_capabilities_v1",
+        league_id: LEAGUE,
+        capture_snapshot_id: squad.source_snapshot_id,
+        season: squad.season,
+        gameweek: squad.gameweek,
+        strategies: { "saf-puan": { windows: [1], requires_rival: false } },
+        top100: { available: false, weights: [] },
+        managers_word: { available: false },
+        preferences: { available: true },
+        chips: { held_by_entry: { [ENTRY]: wildcardHeld ? ["wildcard"] : [] } },
+      }),
+    );
+    await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+      answer(route, {
+        status: "draft",
+        draft: {
+          hard: [{ kind: "keep_player", player_id: player.player_id }],
+          soft: [{ kind: "wildcard" }],
+        },
+      }),
+    );
+    await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+      if (route.request().method() !== "POST") return answer(route, null);
+      const body = route.request().postDataJSON() as (typeof posts)[number];
+      posts.push(body);
+      const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+      const chip = body.chip === "wildcard" ? "wildcard" : null;
+      return answer(route, {
+        ...envelope,
+        payload: {
+          ...envelope.payload,
+          chip,
+          ...(chip
+            ? { chip_choice: { chip, gain_vs_no_chip: 0, basis: "expected_net_points" } }
+            : {}),
+          preferences: body.preferences,
+          preferences_scope: "all_selected_weeks",
+        },
+      });
+    });
+
+    await page.goto(PAGE);
+    await page.getByRole("textbox", { name: "Plan instructions" }).fill(message);
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Remove · Play Wildcard" })).toBeVisible();
+    expect(posts).toHaveLength(0);
+    await page.getByRole("button", { name: "Compute plans" }).click();
+
+    await expect.poll(() => posts.length).toBe(wildcardHeld ? 2 : 1);
+    await expect(page.getByRole("heading", { name: "Base plan" })).toBeVisible();
+    expect(posts.find(({ chip }) => chip === undefined)?.preferences).toMatchObject({
+      save_chips: true,
+      keep_players: [player.player_id],
+    });
+    if (wildcardHeld) {
+      expect(posts.find(({ chip }) => chip === "wildcard")?.preferences).toMatchObject({
+        save_chips: false,
+        keep_players: [player.player_id],
+      });
+      await expect(page.getByRole("heading", { name: "Preferred plan" })).toBeVisible();
+      await expect(page.getByText("Difference from first plan")).toBeVisible();
+    } else {
+      await expect(
+        page.getByText("This team cannot play its Wildcard this gameweek."),
+      ).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Preferred plan" })).toHaveCount(0);
+    }
+  });
+}

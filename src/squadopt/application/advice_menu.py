@@ -476,6 +476,7 @@ def _advise_menu_entry(
                 inputs=inputs,
                 projection=projection,
                 rules=rules,
+                include_resource_state=include_resource_state,
             ).payload
             if chip_forecast_source is not None:
                 picks = provider.picks(request.entry_id, request.season, request.gameweek - 1)
