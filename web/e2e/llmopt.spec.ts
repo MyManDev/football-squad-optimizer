@@ -44,9 +44,33 @@ test("the mobile sidebar opens LLMOPT as a reloadable team page", async ({ page 
   await expect(sidebarLink).toHaveAttribute("aria-current", "page");
 });
 
+for (const reducedMotion of ["no-preference", "reduce"] as const) {
+  test(`a new rule uses the page motion preference (${reducedMotion})`, async ({ page }) => {
+    await installLeagueMocks(page);
+    await page.emulateMedia({ reducedMotion });
+    await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+    await page.goto(PAGE);
+    const main = page.getByRole("main");
+    const add = main.getByRole("button", { name: "Add rule" });
+    await add.click();
+    const rule = main.getByRole("listitem").filter({ hasText: "Roll the transfer" });
+    await expect(rule).toBeVisible();
+    const animations = await rule.evaluate((row) => {
+      const style = getComputedStyle(row);
+      return { name: style.animationName, duration: style.animationDuration };
+    });
+    if (reducedMotion === "reduce") expect(animations).toEqual({ name: "none", duration: "0s" });
+    else {
+      expect(animations.name).not.toBe("none");
+      expect(animations.duration).toBe("0.2s");
+    }
+  });
+}
+
 test("interpretation previews the constraints before the two advice requests", async ({ page }) => {
   test.skip(!API, "API build required");
   await installLeagueMocks(page);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
   const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
   const players = [...squad.starting_xi, ...squad.bench].map((player) => ({
@@ -140,6 +164,10 @@ test("interpretation previews the constraints before the two advice requests", a
   await expect(page.getByRole("heading", { name: "Base plan" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Preferred plan" })).toBeVisible();
   await expect(page.getByText("Difference from first plan", { exact: true })).toBeVisible();
+  const chat = page.getByRole("listitem").filter({ hasText: message });
+  const preferred = page.getByRole("article").filter({ hasText: "Preferred plan" });
+  expect(await chat.evaluate((row) => getComputedStyle(row).animationDuration)).toBe("0.2s");
+  expect(await preferred.evaluate((card) => getComputedStyle(card).animationDuration)).toBe("0.4s");
 });
 
 test("clarification keeps the first request and pauses calculation", async ({ page }) => {

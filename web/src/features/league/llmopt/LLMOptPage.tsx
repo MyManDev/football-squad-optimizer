@@ -54,6 +54,7 @@ function isWorking(phase: string) {
 }
 
 interface ChatLine {
+  id: number;
   role: "user" | "assistant";
   message: string;
 }
@@ -90,6 +91,7 @@ function Session({ squad }: { squad: EntrySquad }) {
   const [reading, setReading] = useState(false);
   const [calculated, setCalculated] = useState(false);
   const interpret = useRef<AbortController | null>(null);
+  const nextChatLine = useRef(0);
   const confirming = useRef(false);
   const mounted = useRef(true);
 
@@ -132,10 +134,12 @@ function Session({ squad }: { squad: EntrySquad }) {
       if (answer.status === "draft") change(answer.draft);
       else setClarification({ message: clarification?.message ?? text, question: answer.message });
       const reply = answer.status === "clarification" ? answer.message : copy.understood;
+      const userLine = nextChatLine.current++;
+      const replyLine = nextChatLine.current++;
       setConversation((before) => [
         ...before.slice(-18),
-        { role: "user", message: text },
-        { role: "assistant", message: reply },
+        { id: userLine, role: "user", message: text },
+        { id: replyLine, role: "assistant", message: reply },
       ]);
       setMessage("");
     } catch (error) {
@@ -262,8 +266,8 @@ function Session({ squad }: { squad: EntrySquad }) {
       <section className={styles.workspace} aria-label={copy.chat}>
         {conversation.length > 0 && (
           <ol className={styles.conversation} aria-live="polite">
-            {conversation.map(({ role, message }, index) => (
-              <li key={index} data-role={role}>
+            {conversation.map(({ id, role, message }) => (
+              <li key={id} data-role={role}>
                 <strong>{role === "user" ? copy.user : "LLMOPT"}</strong>
                 <span>{message}</span>
               </li>

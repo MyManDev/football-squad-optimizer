@@ -50,7 +50,7 @@ export function PlanResult({
   const moves = plan.moves.filter((move) => move.player_in || move.player_out);
 
   return (
-    <article className={styles.result}>
+    <article className={styles.result} data-plan-ready="">
       <h3>{title}</h3>
       <dl className={styles.figures}>
         <div>
