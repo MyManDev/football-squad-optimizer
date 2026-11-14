@@ -28,6 +28,7 @@ _KINDS: Final = (
     "hold_transfers",
     "no_hits",
     "save_chips",
+    "wildcard",
     "keep_player",
     "include_player",
     "avoid_player",
@@ -55,6 +56,7 @@ Allowed kinds:
 - hold_transfers: make zero transfers for this week.
 - no_hits: make no paid transfers, but allow free transfers.
 - save_chips: use no chip.
+- wildcard: use the Wildcard chip this week and optimize the rebuilt squad.
 - keep_player: retain a held player in the squad; never implies starting or captaining.
 - include_player: require or prefer a player in the selected 15; may acquire them.
 - avoid_player: exclude a player from the selected 15.
@@ -62,6 +64,10 @@ For a player constraint, choose its exact ID from the supplied players. If a nam
 player cannot be matched uniquely, ask for clarification. Use keep_player only for a
 held player and include_player to acquire a player. A constraint without a player uses
 null for player_id. Do not infer roster status from English or Turkish wording alone.
+An instruction to use or play Wildcard (e.g. "wildcard kullan", "jokeri bas") is a hard
+wildcard rule unless explicitly optional. For a comparison with and without Wildcard, use
+kind wildcard, player_id null, and both false. Keep the manager's other supported rules
+in the draft. Ask before resolving contradictory chip instructions.
 
 For a request to compare a constrained and an unconstrained plan, set comparison to
 that constraint and leave the hard and soft lists unchanged unless explicitly edited.

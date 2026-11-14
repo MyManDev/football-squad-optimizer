@@ -88,6 +88,7 @@ function Session({ squad }: { squad: EntrySquad }) {
   const [feedback, setFeedback] = useState("");
   const [checkingSquad, setCheckingSquad] = useState(false);
   const [basisChanged, setBasisChanged] = useState(false);
+  const [wildcardNotHeld, setWildcardNotHeld] = useState(false);
   const [reading, setReading] = useState(false);
   const [calculated, setCalculated] = useState(false);
   const interpret = useRef<AbortController | null>(null);
@@ -109,6 +110,7 @@ function Session({ squad }: { squad: EntrySquad }) {
     setCalculated(false);
     setFeedback("");
     setClarification(undefined);
+    setWildcardNotHeld(false);
     setDraft(next);
   }
 
@@ -217,11 +219,25 @@ function Session({ squad }: { squad: EntrySquad }) {
         season: squad.season,
         gameweek: squad.gameweek,
       };
-      setCalculated(true);
-      if (plans.base) {
-        base.compute({ ...request, preferences: plans.base });
+      // A public team may have no chip list until its FPL inputs are pinned.
+      const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
+      const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
+      const basePlan = wildcardNotHeld && plans.base?.chip === "wildcard" ? null : plans.base;
+      const alternativePlan =
+        wildcardNotHeld && plans.alternative?.chip === "wildcard" ? null : plans.alternative;
+      setWildcardNotHeld(wildcardNotHeld);
+      if (basePlan !== plans.base || alternativePlan !== plans.alternative) {
+        setFeedback(copy.wildcardUnavailable);
       }
-      if (plans.alternative) alternative.compute({ ...request, preferences: plans.alternative });
+      if (!basePlan && !alternativePlan) {
+        setCalculated(false);
+        return;
+      }
+      setCalculated(true);
+      if (basePlan) {
+        base.compute({ ...request, ...basePlan });
+      }
+      if (alternativePlan) alternative.compute({ ...request, ...alternativePlan });
     } catch {
       if (mounted.current) setFeedback(copy.squadUnavailable);
     } finally {
@@ -232,7 +248,9 @@ function Session({ squad }: { squad: EntrySquad }) {
 
   const same = samePlan(base.state, alternative.state);
   const baseAnswer = base.state.phase === "done" ? base.state.envelope.payload : undefined;
-  const hasAlternative = plans.alternative !== null || plans.alternativeConflict;
+  const hasAlternative =
+    (plans.alternative !== null && !(wildcardNotHeld && plans.alternative.chip === "wildcard")) ||
+    plans.alternativeConflict;
   const team = squad.entry.team_name ?? squad.entry.manager_name;
   const teamPath =
     squad.league_id === 0
@@ -362,11 +380,19 @@ function Session({ squad }: { squad: EntrySquad }) {
         <section className={styles.results} aria-label={copy.results} aria-busy={computing}>
           <h2>{copy.results}</h2>
           <div className={styles.planGrid}>
-            <PlanResult title={baseTitle} state={base.state} conflict={plans.baseConflict} />
+            {!(wildcardNotHeld && plans.base?.chip === "wildcard") && (
+              <PlanResult
+                title={baseTitle}
+                state={base.state}
+                squad={squad}
+                conflict={plans.baseConflict}
+              />
+            )}
             {hasAlternative && !same && (
               <PlanResult
                 title={alternativeTitle}
                 state={alternative.state}
+                squad={squad}
                 baseline={baseAnswer}
                 conflict={plans.alternativeConflict}
               />

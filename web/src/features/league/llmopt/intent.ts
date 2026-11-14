@@ -1,9 +1,13 @@
 import { discardBody, withRequestDeadline } from "../../../data/request";
 import type { Language } from "../../../i18n/messages";
-import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
+import {
+  checkedPreferences,
+  preferencesKey,
+  type DecisionPreferences,
+} from "../advice/decisionPreferences";
 
 const playerKinds = ["keep_player", "include_player", "avoid_player"] as const;
-const ruleKinds = ["hold_transfers", "no_hits", "save_chips"] as const;
+const ruleKinds = ["hold_transfers", "no_hits", "save_chips", "wildcard"] as const;
 
 export const CONSTRAINT_KINDS = [...ruleKinds, ...playerKinds] as const;
 export const MAX_CONSTRAINTS = 16;
@@ -17,6 +21,11 @@ export interface PlanDraft {
   hard: Constraint[];
   soft: Constraint[];
   comparison?: Comparison;
+}
+
+interface PreparedPlan {
+  chip: "wildcard" | null;
+  preferences: DecisionPreferences;
 }
 
 export interface CatalogPlayer {
@@ -92,29 +101,35 @@ function playerIds(rules: readonly Constraint[], kind: (typeof playerKinds)[numb
   return [...new Set(rules.flatMap((rule) => (rule.kind === kind ? [rule.player_id] : [])))];
 }
 
-export function constraintsToPreferences(rules: readonly Constraint[]) {
-  return checkedPreferences({
-    keep_players: playerIds(rules, "keep_player"),
-    include_players: playerIds(rules, "include_player"),
-    avoid_players: playerIds(rules, "avoid_player"),
-    no_hits: rules.some(({ kind }) => kind === "no_hits"),
-    hold_transfers: rules.some(({ kind }) => kind === "hold_transfers"),
-    // The one-week comparison uses one scoring path and holds chip use fixed.
-    save_chips: true,
-  });
+function branchSelection(rules: readonly Constraint[]): PreparedPlan {
+  const chip = rules.some(({ kind }) => kind === "wildcard") ? "wildcard" : null;
+  return {
+    chip,
+    preferences: checkedPreferences({
+      keep_players: playerIds(rules, "keep_player"),
+      include_players: playerIds(rules, "include_player"),
+      avoid_players: playerIds(rules, "avoid_player"),
+      no_hits: rules.some(({ kind }) => kind === "no_hits"),
+      hold_transfers: rules.some(({ kind }) => kind === "hold_transfers"),
+      save_chips: chip === null,
+    }),
+  };
 }
 
 function conflicts(rules: readonly Constraint[], held: ReadonlySet<number>) {
   const owned = playerIds(rules, "keep_player");
   const included = [...owned, ...playerIds(rules, "include_player")];
   const excluded = playerIds(rules, "avoid_player");
+  const holdsTransfers = rules.some(({ kind }) => kind === "hold_transfers");
   return (
     owned.some((id) => !held.has(id)) ||
     new Set(included).size > 15 ||
     excluded.length > 15 ||
     included.some((id) => excluded.includes(id)) ||
-    (rules.some(({ kind }) => kind === "hold_transfers") &&
-      (included.some((id) => !held.has(id)) || excluded.some((id) => held.has(id))))
+    (holdsTransfers &&
+      (included.some((id) => !held.has(id)) || excluded.some((id) => held.has(id)))) ||
+    (rules.some(({ kind }) => kind === "wildcard") &&
+      (holdsTransfers || rules.some(({ kind }) => kind === "save_chips")))
   );
 }
 
@@ -127,12 +142,15 @@ export function preparePlans(draft: PlanDraft, held: ReadonlySet<number>) {
   const alternativeRules = [...draft.hard, ...(draft.comparison ? [draft.comparison] : draft.soft)];
   const baseConflict = conflicts(baseRules, held);
   const alternativeConflict = conflicts(alternativeRules, held);
-  const base = baseConflict ? null : constraintsToPreferences(baseRules);
-  const alternative = alternativeConflict ? null : constraintsToPreferences(alternativeRules);
+  const base = baseConflict ? null : branchSelection(baseRules);
+  const alternative = alternativeConflict ? null : branchSelection(alternativeRules);
   return {
     base,
     alternative:
-      alternative && (!base || preferencesKey(base) !== preferencesKey(alternative))
+      alternative &&
+      (!base ||
+        base.chip !== alternative.chip ||
+        preferencesKey(base.preferences) !== preferencesKey(alternative.preferences))
         ? alternative
         : null,
     hardConflict: conflicts(draft.hard, held),
