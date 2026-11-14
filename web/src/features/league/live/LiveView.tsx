@@ -621,6 +621,7 @@ interface HeldRow {
 /** A scroll by the visitor this recently is theirs: the page keeps its hands off. */
 const SCROLL_QUIET_MS = 150;
 const SCROLL_INPUTS = ["pointerdown", "touchmove", "wheel", "keydown"] as const;
+const SCROLL_SETTLEMENT_FRAMES = 4;
 
 /** The groups' rows and headings, and Farklar, each by a key that outlives a change of group. */
 function partsOf(groups: HTMLElement, after: HTMLElement | null): [string, HTMLElement][] {
@@ -811,20 +812,26 @@ class LiveFlow extends Component<FlowProps> {
 
   /**
    * WebKit can move the document again as the row transforms first change its scrollable
-   * overflow. Keep the position that the browser accepted before those transforms. A visitor
-   * input cancels the correction, and 2 frames give the first slide position time to land.
+   * overflow. Restore the position that the browser accepted before those transforms.
+   * WebKit can adjust the scroll after the first two frames, so check the first four.
+   * Visitor input cancels any remaining checks.
    */
   private settleScroll(top: number) {
-    this.scrollSettlement = window.requestAnimationFrame(() => {
-      this.scrollSettlement = window.requestAnimationFrame(() => {
-        this.scrollSettlement = null;
-        const from = window.scrollY;
-        if (!pageClear() || Math.abs(from - top) < 1) return;
+    let framesLeft = SCROLL_SETTLEMENT_FRAMES;
+    const check = () => {
+      this.scrollSettlement = null;
+      if (!pageClear()) return;
+      const from = window.scrollY;
+      if (Math.abs(from - top) >= 1) {
         this.ownScroll = true;
         window.scrollTo({ top, left: 0, behavior: "instant" });
         if (window.scrollY === from) this.ownScroll = false;
-      });
-    });
+      }
+      framesLeft -= 1;
+      if (framesLeft === 0) return;
+      this.scrollSettlement = window.requestAnimationFrame(check);
+    };
+    this.scrollSettlement = window.requestAnimationFrame(check);
   }
 
   /**
