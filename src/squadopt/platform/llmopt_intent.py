@@ -23,7 +23,7 @@ _MAX_CANDIDATES: Final = 64
 _MAX_CONSTRAINTS: Final = 16
 _MAX_SAFE_ID: Final = 2**53 - 1
 _RESPONSE_BYTES: Final = 32 * 1024
-_TIMEOUT_SECONDS: Final = 20
+_TIMEOUT_SECONDS: Final = 35
 _KINDS: Final = (
     "hold_transfers",
     "no_hits",
@@ -385,7 +385,7 @@ class OpenAIIntentProvider:
             }
         payload = {
             "model": self._model,
-            **({"reasoning_effort": "low"} if self._provider == "gemini" else {"store": False}),
+            **({"reasoning_effort": "minimal"} if self._provider == "gemini" else {"store": False}),
             "max_completion_tokens": 1200,
             "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},

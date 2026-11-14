@@ -232,6 +232,6 @@ export async function readIntent(
         draft: parseDraft(value.draft, new Set(players.map(({ id }) => id))),
       };
     },
-    { signal, timeoutMs: 30_000 },
+    { signal, timeoutMs: 45_000 },
   );
 }

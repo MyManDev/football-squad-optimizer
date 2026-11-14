@@ -220,7 +220,7 @@ def test_provider_sends_strict_schema_and_handles_wire_without_network(
         body = json.loads(payload)
         assert body["model"] == "selected-model"
         if provider == "gemini":
-            assert body["reasoning_effort"] == "low"
+            assert body["reasoning_effort"] == "minimal"
             assert "store" not in body
         else:
             assert body["store"] is False
