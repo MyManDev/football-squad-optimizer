@@ -11,7 +11,7 @@ import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
 import { gameweekDeadline, useMinuteClock } from "../advice/deadline";
 import { useAdviceJob } from "../advice/useAdviceJob";
-import { useEntrySquad } from "../queries";
+import { LEAGUE_READ, useEntrySquad } from "../queries";
 import type { EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
 import { LLMOPT_COPY } from "./copy";
@@ -70,8 +70,7 @@ function Session({ squad }: { squad: EntrySquad }) {
     queryKey: ["llmopt-roster", ORIGIN, squad.season, squad.source_snapshot_id],
     queryFn: ({ signal }) => readIntentCatalog(ORIGIN, squad.season, signal),
     enabled: !!ORIGIN,
-    staleTime: 5 * 60_000,
-    retry: false,
+    ...LEAGUE_READ,
   });
   const owned = [...squad.starting_xi, ...squad.bench];
   const held = new Set(owned.map(({ player_id }) => player_id));
