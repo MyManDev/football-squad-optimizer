@@ -33,6 +33,7 @@ _KINDS: Final = (
     "avoid_player",
 )
 _PLAYER_KINDS: Final = frozenset({"keep_player", "include_player", "avoid_player"})
+_TURKISH_ACCUSATIVE_SUFFIXES: Final = ("i", "u", "yi", "yu")
 _LOGGER = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT: Final = """Translate an FPL manager's request into an editable LLMOPT draft.
@@ -275,19 +276,32 @@ def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
     text = _tokens(request.message)
     original = _tokens(request.clarification.message) if request.clarification else ()
     words = set((*text, *original))
+    # Informal Turkish often joins the object suffix to a name without an apostrophe.
+    joined_name_stems = (
+        {
+            word[: -len(suffix)]
+            for word in words
+            for suffix in _TURKISH_ACCUSATIVE_SUFFIXES
+            if len(word) >= 4 + len(suffix) and word.endswith(suffix)
+        }
+        if request.locale == "tr"
+        else set()
+    )
     phrases = tuple(f" {' '.join(tokens)} " for tokens in (text, original))
     ranked = []
     for player in request.players:
         name = _tokens(player["name"])
         named = bool(name) and any(f" {' '.join(name)} " in phrase for phrase in phrases)
         name_hits = words.intersection(word for word in name if len(word) >= 3)
+        joined_hits = joined_name_stems.intersection(name)
         team_hits = words.intersection(_tokens(player.get("team", "")))
-        if player["id"] not in retained and not name_hits and not player.get("held"):
+        if player["id"] not in retained and not (name_hits or joined_hits or player.get("held")):
             continue
         rank = (
             player["id"] in retained,
             named,
             len(name_hits),
+            len(joined_hits),
             bool(team_hits),
             bool(player.get("held")),
         )

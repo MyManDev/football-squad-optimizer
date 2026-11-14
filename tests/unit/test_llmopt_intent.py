@@ -110,6 +110,26 @@ def test_full_roster_is_shortlisted_before_provider_call() -> None:
     assert response.status_code == 200
 
 
+@pytest.mark.parametrize(
+    "message", ["Palmer\u2019\u0131 al", "Palmer'i al", "Palmer\u0131 al", "Palmeri al"]
+)
+def test_full_roster_includes_unheld_player_with_turkish_object_suffix(message: str) -> None:
+    body = _request()
+    body["message"] = message
+    body["players"] = [
+        {"id": player_id, "name": f"Other {player_id}", "team": "Arsenal"}
+        for player_id in range(2, 67)
+    ] + [{"id": 1, "name": "Cole Palmer", "team": "Chelsea", "held": False}]
+
+    def provider(request: IntentRequest) -> object:
+        assert tuple(player["id"] for player in request.players) == (1,)
+        return _proposed()
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=body)
+    assert response.status_code == 200
+
+
 def test_answer_uses_original_request_and_reply_in_shortlist() -> None:
     body = _request()
     body["message"] = "The Chelsea player"
