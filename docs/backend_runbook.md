@@ -106,15 +106,17 @@ SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json
 
 Set both `SQUADOPT_LLMOPT_API_KEY` and `SQUADOPT_LLMOPT_MODEL` in the API process's
 private environment before starting the Uvicorn factory. The configured model must
-support strict Structured Outputs with Chat Completions. A native Windows launch via
+support strict Structured Outputs with Chat Completions. The default provider is OpenAI.
+Set `SQUADOPT_LLMOPT_PROVIDER=gemini` to use Google's Gemini endpoint and a Gemini key.
+A native Windows launch via
 `scripts/run_backend_local.ps1` inherits the shell's process environment. Without both
 values the intent endpoint reports `LLMOPT_DISABLED`, and manual plan preferences
 remain available. The advice worker needs neither setting.
 
 The Compose API service reads `/etc/squadopt/llmopt.env` when present. This
 requires Docker Compose 2.24 or later. On the managed VM, give the file root
-ownership and mode `0600`. Put only `SQUADOPT_LLMOPT_API_KEY` and
-`SQUADOPT_LLMOPT_MODEL` in it, one assignment per line. A standalone Compose
+ownership and mode `0600`. Put `SQUADOPT_LLMOPT_API_KEY`, `SQUADOPT_LLMOPT_MODEL`,
+and the optional `SQUADOPT_LLMOPT_PROVIDER` in it, one assignment per line. A standalone Compose
 launch can set `SQUADOPT_LLMOPT_ENV_FILE` to an absolute path to a different
 private file. The worker does not read this file.
 
@@ -126,7 +128,7 @@ since printing the full config can display the resolved API environment.
 Recreate the API container after the file changes.
 
 `POST /api/v1/llmopt/intent` sends the submitted text and a limited player shortlist
-to the configured OpenAI model. It prepares structured constraints for review and
+to the configured provider. It prepares structured constraints for review and
 does not submit an advice job. Its limits apply per API process. Turning off text
 interpretation requires removing either setting and restarting the API.
 

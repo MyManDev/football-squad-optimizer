@@ -211,13 +211,20 @@ def test_unconfigured_endpoint_leaves_backend_healthy() -> None:
         assert client.get("/health").status_code == 200
 
 
+@pytest.mark.parametrize("provider", ["openai", "gemini"])
 def test_provider_sends_strict_schema_and_handles_wire_without_network(
     monkeypatch: pytest.MonkeyPatch,
+    provider: str,
 ) -> None:
     def post(_provider: OpenAIIntentProvider, payload: bytes) -> bytes:
         body = json.loads(payload)
         assert body["model"] == "selected-model"
-        assert body["store"] is False
+        if provider == "gemini":
+            assert body["reasoning_effort"] == "low"
+            assert "store" not in body
+        else:
+            assert body["store"] is False
+            assert "reasoning_effort" not in body
         schema = body["response_format"]["json_schema"]
         assert schema["strict"] is True
         assert "oneOf" not in schema["schema"]
@@ -237,7 +244,11 @@ def test_provider_sends_strict_schema_and_handles_wire_without_network(
 
     monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
     service = intent_service_from_environment(
-        {"SQUADOPT_LLMOPT_API_KEY": "server-key", "SQUADOPT_LLMOPT_MODEL": "selected-model"}
+        {
+            "SQUADOPT_LLMOPT_API_KEY": "server-key",
+            "SQUADOPT_LLMOPT_MODEL": "selected-model",
+            "SQUADOPT_LLMOPT_PROVIDER": provider,
+        }
     )
     body = {
         **_request(),

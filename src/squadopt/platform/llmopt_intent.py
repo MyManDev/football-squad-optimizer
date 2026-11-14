@@ -360,13 +360,16 @@ _RESULT_SCHEMA: Final = _schema_object(
 
 
 class OpenAIIntentProvider:
-    """One bounded Chat Completions call to the configured model at the official endpoint."""
+    """One bounded Chat Completions call to the selected provider's official endpoint."""
 
-    def __init__(self, *, api_key: str, model: str) -> None:
+    def __init__(self, *, api_key: str, model: str, provider: str = "openai") -> None:
         if not _valid_identifier(api_key, 1024) or not _valid_identifier(model, 256):
             raise ValueError("Invalid LLMOPT provider configuration.")
+        if provider not in ("openai", "gemini"):
+            raise ValueError("Unsupported LLMOPT provider.")
         self._api_key = api_key
         self._model = model
+        self._provider = provider
 
     def __call__(self, request: IntentRequest) -> object:
         context: dict[str, Any] = {
@@ -382,7 +385,7 @@ class OpenAIIntentProvider:
             }
         payload = {
             "model": self._model,
-            "store": False,
+            **({"reasoning_effort": "low"} if self._provider == "gemini" else {"store": False}),
             "max_completion_tokens": 1200,
             "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},
@@ -422,12 +425,17 @@ class OpenAIIntentProvider:
             raise IntentUnavailable("The intent provider did not respond with a draft.") from None
 
     def _post(self, payload: bytes) -> bytes:
-        connection = HTTPSConnection("api.openai.com", timeout=_TIMEOUT_SECONDS)
+        host, path = (
+            ("generativelanguage.googleapis.com", "/v1beta/openai/chat/completions")
+            if self._provider == "gemini"
+            else ("api.openai.com", "/v1/chat/completions")
+        )
+        connection = HTTPSConnection(host, timeout=_TIMEOUT_SECONDS)
         deadline = time.monotonic() + _TIMEOUT_SECONDS
         try:
             connection.request(
                 "POST",
-                "/v1/chat/completions",
+                path,
                 body=payload,
                 headers={
                     "Authorization": f"Bearer {self._api_key}",
@@ -465,10 +473,11 @@ def intent_service_from_environment(env: Mapping[str, str]) -> IntentService | N
     """Explicit activation leaves installations without a provider fully usable."""
     api_key = env.get("SQUADOPT_LLMOPT_API_KEY", "")
     model = env.get("SQUADOPT_LLMOPT_MODEL", "")
+    provider = env.get("SQUADOPT_LLMOPT_PROVIDER", "openai")
     if not api_key or not model:
         return None
     try:
-        return IntentService(OpenAIIntentProvider(api_key=api_key, model=model))
+        return IntentService(OpenAIIntentProvider(api_key=api_key, model=model, provider=provider))
     except ValueError:
         _LOGGER.warning("Invalid LLMOPT provider configuration. Text interpretation is disabled.")
         return None
