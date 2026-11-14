@@ -107,6 +107,8 @@ def propose_expected_swap(
     ):
         return skip("first_week_rebuild")
     preferences = preferences or DecisionPreferences()
+    if preferences.hold_transfers:
+        return skip("hold_transfers")
     if initial.free_transfers == 0 and preferences.no_hits:
         return skip("no_free_transfer_and_no_hits")
     first = horizon.table.loc[horizon.table.gameweek.eq(weeks[0])].set_index(
@@ -184,7 +186,8 @@ def propose_expected_swap(
         raise ValueError("Expected lineup multipliers must be finite and nonnegative.")
     outsiders = sorted(set(first.index) - held, key=_stable_id_key)
     record["cheap_pair_cap"] = 15 * len(outsiders)
-    keep, avoid = set(preferences.keep_players), set(preferences.avoid_players)
+    required = set(preferences.keep_players) | set(preferences.include_players)
+    avoid = set(preferences.avoid_players)
     hit = transfer.transfer_hit_cost_points if initial.free_transfers == 0 else 0.0
     best: tuple[float, object, object, tuple[object, ...]] | None = None
     for outgoing in sorted(held, key=_stable_id_key):
@@ -193,7 +196,7 @@ def propose_expected_swap(
             if first.at[outgoing, "position"] != first.at[incoming, "position"]:
                 continue
             ids = held - {outgoing} | {incoming}
-            if ids in retained_squads or not keep <= ids or ids & avoid:
+            if ids in retained_squads or not required <= ids or ids & avoid:
                 continue
             if (
                 initial.bank_tenths + int(cast(int, first.at[outgoing, "sell_price_tenths"]))

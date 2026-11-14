@@ -56,17 +56,21 @@ test("LIVE recovers the reading position if the browser scrolls as slides start"
     for (const beat of ["kickoff", "goal", "card"] as const) {
       await readBeat(tab, index(beat));
     }
-    // The Linux WebKit trace first reaches the right scroll position, then moves
-    // 2–4 pixels when the new sliding rows are painted. Reproduce that second move.
+    // Linux WebKit can move again after the first two frames of the new slides.
+    // Inject that late adjustment before the last frame the page checks.
     await tab.page.evaluate(() => {
       const root = document.querySelector("[data-live-page]")!;
       const observer = new MutationObserver(() => {
         if (!root.querySelector("[data-live-sliding]")) return;
         observer.disconnect();
-        window.requestAnimationFrame(() => {
-          window.scrollBy({ top: 3, behavior: "instant" });
-          root.dataset.scrollDriftInjected = "";
-        });
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() =>
+            window.requestAnimationFrame(() => {
+              window.scrollBy({ top: 3, behavior: "instant" });
+              root.dataset.scrollDriftInjected = "";
+            }),
+          ),
+        );
       });
       observer.observe(root, {
         attributes: true,

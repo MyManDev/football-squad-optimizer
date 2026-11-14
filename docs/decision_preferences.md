@@ -1,19 +1,19 @@
 # Human constraints and the multiweek control
 
-The member page supports keep-player, avoid-player, no-hit and save-chip constraints
-on pure-points advice, for either forecast model and the selected 1/3/5-week window.
-They do not change goal probabilities, expected points or Top100 utility. Keep means
-membership of every selected squad, not a guaranteed start or captaincy. Avoid means
-absence from every selected squad, including selling an already held player in week
-one. No-hit forbids paid transfers throughout the window. Save-chip forbids chip use
-throughout it. Limits apply to the captured squad, resources and prices; subsequent
-real FPL transfers require a new capture.
+Pure-points advice supports keep-player, include-player, avoid-player, no-hit,
+hold-transfers and save-chip constraints for either forecast model and the selected
+1/3/5-week window. They leave forecast inputs and Top100 utility unchanged. Keep and
+include require the player on every selected squad. The optimizer still chooses the
+starting eleven and captain. Avoid excludes the player from every selected squad,
+which requires selling a held player in week one. No-hit allows free transfers.
+Hold-transfers requires zero moves and rules out a Wildcard or Free Hit rebuild
+throughout the window. Save-chip rules out every chip. An automatic chip request
+conflicts with hold-transfers. Subsequent real FPL transfers require a new capture.
 
-Keep and avoid each accept up to fifteen unique positive persistent player codes.
-Overlaps, malformed IDs, unknown fields and chip/save conflicts are refused.
-Keep requires a currently held player; avoid requires a forecast roster player.
-The api checks both against the member's captured squad and the capture's roster before
-a job exists, so an id the capture does not have is refused and never queued.
+Keep, include and avoid each accept up to fifteen unique positive persistent player
+codes. A player required by keep or include cannot also be avoided. The API checks
+keep against the member's captured squad and include and avoid against the capture's
+roster before admitting a job. Include accepts both held and unheld roster players.
 The first version deliberately refuses rival strategies and manager-news combinations.
 An infeasible set of constraints is reported as no plan, never relaxed silently.
 Automatic chip opportunity rebuilds obey the same human constraints as the final plan.
@@ -21,7 +21,9 @@ The existing approximate chip continuation remains experimental, not a measured 
 
 `preferences` is a canonical object in the advice POST and a JSON query value on GET.
 It participates in the request fingerprint, job specification and cache identity.
-An absent or entirely off object preserves legacy identities. The worker verifies
+The new `include_players` and `hold_transfers` fields are optional. Empty include and
+false hold are omitted from canonical preferences, preserving legacy identities.
+The worker verifies
 the recorded identity before computation. Results echo the object and
 `preferences_scope: all_selected_weeks`; the web client refuses a mismatching answer.
 Capabilities must explicitly enable the new controls. Static advice never substitutes

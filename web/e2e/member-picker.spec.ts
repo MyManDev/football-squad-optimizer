@@ -102,6 +102,7 @@ test.describe("the sidebar before and after the two steps", () => {
       `${own(EXAMPLE_CLAIM.entryId)}/duel`,
       `${own(EXAMPLE_CLAIM.entryId)}/chips`,
       `${own(EXAMPLE_CLAIM.entryId)}/card`,
+      `${own(EXAMPLE_CLAIM.entryId)}/llmopt`,
       `${own(EXAMPLE_CLAIM.entryId)}/history`,
       "/fixtures",
       ...CONTRIBUTE,

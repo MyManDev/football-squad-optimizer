@@ -430,21 +430,23 @@ class AdviceReadStore:
         entry_id: int,
         preferences: DecisionPreferences,
     ) -> None:
-        """Refuse a kept or avoided player the capture does not have for this member.
+        """Refuse a player preference the capture cannot match for this member.
 
         The contract accepts any positive id, and every distinct set is a distinct
         address, so ids nobody holds used to reach the queue as new work and fail only in
-        the worker. The same two sets the solver checks are checked here, before a token
+        the worker. The same players the solver checks are checked here, before a token
         is spent or a job exists.
         """
 
-        if not (preferences.keep_players or preferences.avoid_players):
+        if not (
+            preferences.keep_players or preferences.avoid_players or preferences.include_players
+        ):
             return
         players = self._preference_players_of(context, league_id, entry_id)
         if players is None:
             raise UnsupportedAdviceRequestError(
-                "This member's captured squad cannot be read, so kept or avoided players "
-                "cannot be checked."
+                "This member's captured squad cannot be read, "
+                "so player preferences cannot be checked."
             )
         if not set(preferences.keep_players) <= players.squad:
             raise UnsupportedAdviceRequestError(
@@ -453,6 +455,10 @@ class AdviceReadStore:
         if not set(preferences.avoid_players) <= players.roster:
             raise UnsupportedAdviceRequestError(
                 "An avoided player is not in this capture's roster."
+            )
+        if not set(preferences.include_players) <= players.roster:
+            raise UnsupportedAdviceRequestError(
+                "An included player is not in this capture's roster."
             )
 
     def league_state(self, league_id: int) -> dict[str, object]:

@@ -70,6 +70,7 @@ What the API process serves, and the composition root that wires the backend's p
 | `backend_runtime.py` | The composition root: the one place the backend's parts are wired to each other, for the API and the worker. |
 | `advice_read.py` | The read side of on-demand advice: league state and pure cache lookups. |
 | `advice_submit.py` | The write side: one request becomes a job record, with rate and open-job limits. |
+| `llmopt_intent.py` | Validates LLMOPT messages and model output, prepares editable constraint drafts and limits provider calls. |
 | `public_entry_inputs.py` | Pins one requested team's public FPL inputs separately from the weekly capture. |
 | `public_entry_advice.py` | Read-only cache addressing for public teams, computed through the shared queue. |
 | `advice_documents.py` | The public read contracts: what the advice route and the league route may serve. |

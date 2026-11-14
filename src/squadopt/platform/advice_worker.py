@@ -74,6 +74,8 @@ from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
+from squadopt.live.transfers import HorizonNoSolutionError
+from squadopt.optimization import SolverStatus
 from squadopt.planning.native_highs import (
     NativeWindowOutcome,
     native_window_executor,
@@ -503,6 +505,7 @@ def build_advice_compute(
                     chip_forecast_source=capture.chip_forecast_source if football is None else None,
                     prerequisite=prerequisite,
                     on_document=None if count is None else count.solved,
+                    include_resource_state=True,
                 )
         except ChipUnavailable as error:
             raise AdviceComputeRefused(error.code, str(error)) from error
@@ -511,6 +514,14 @@ def build_advice_compute(
             # the club news, and this member's plan under the word and the setting could
             # not be produced. The same request without the word still answers.
             raise AdviceComputeRefused("MANAGERS_WORD_NOT_SOLVED", str(error)) from error
+        except HorizonNoSolutionError as error:
+            if error.status is SolverStatus.INFEASIBLE:
+                raise AdviceComputeRefused(
+                    "PLAN_NOT_FOUND", "No plan was found for this selection from this capture."
+                ) from error
+            raise AdviceComputeRefused(
+                "ADVICE_FAILED", "The service could not solve this plan."
+            ) from error
         except PLAN_NOT_FOUND_ERRORS as error:
             # One member's outcome, not a fault: the planner found no plan for this
             # selection. Its own text is a solver's diagnostic and the job record travels

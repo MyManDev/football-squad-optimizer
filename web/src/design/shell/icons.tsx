@@ -41,6 +41,12 @@ const NAV_PATHS: Record<NavKey, ReactNode> = {
     </>
   ),
   whatIf: <path d="M3 6h11.5l-3-3M15 12H3.5l3 3" />,
+  llmopt: (
+    <>
+      <path d="M14 3.5H4a1.5 1.5 0 0 0-1.5 1.5v6.5A1.5 1.5 0 0 0 4 13h1v2.5L8.5 13H14a1.5 1.5 0 0 0 1.5-1.5V5A1.5 1.5 0 0 0 14 3.5Z" />
+      <path d="M6 7h6M6 9.5h4" />
+    </>
+  ),
   duel: (
     <>
       <circle cx="5.5" cy="9" r="3" />
