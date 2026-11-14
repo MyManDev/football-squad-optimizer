@@ -215,11 +215,18 @@ export async function openLive(
     ...(video === null ? {} : { recordVideo: { dir: video, size } }),
   });
   const page = await context.newPage();
-  await page.clock.install({ time: NOW });
-  await page.addInitScript((palette) => {
-    localStorage.setItem("squadopt.language", "tr");
-    localStorage.setItem("squadopt.scheme", palette);
-  }, scheme);
+  await page.addInitScript(
+    ({ palette, now }) => {
+      // Shift wall time without virtualizing animation frames. The scroll corrections must
+      // observe the same browser frames in which native animations update the layout.
+      const realNow = Date.now;
+      const started = realNow();
+      Date.now = () => now + (realNow() - started);
+      localStorage.setItem("squadopt.language", "tr");
+      localStorage.setItem("squadopt.scheme", palette);
+    },
+    { palette: scheme, now: NOW },
+  );
   await page.addInitScript(countLiveMotion);
   const server = { step: 0 };
   await serveMatchDay(page, server);
