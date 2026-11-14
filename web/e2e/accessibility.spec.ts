@@ -505,6 +505,7 @@ base(
         "Rakiple yan yana",
         "Çipler ve transferler",
         "Kadro kartı",
+        "LLMOPT",
         "Haftalık geçmiş",
       ].map((name) => navigation.getByRole("link", { name, exact: true })),
       navigation.getByRole("link", { name: "Fikstür", exact: true }),

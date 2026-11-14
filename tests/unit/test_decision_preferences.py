@@ -21,8 +21,12 @@ from squadopt.planning import ChipAvailability, InitialSquadState, PlanningHoriz
         {"keep_players": [True]},
         {"avoid_players": [0]},
         {"keep_players": [1, 1]},
+        {"include_players": [False]},
+        {"include_players": [1, 1]},
         {"no_hits": 1},
+        {"hold_transfers": 1},
         {"keep_players": [1], "avoid_players": [1]},
+        {"include_players": [1], "avoid_players": [1]},
         {"unknown": True},
     ],
 )
@@ -43,6 +47,32 @@ def test_preferences_are_canonical_and_conflicts_are_not_silently_dropped():
     ]:
         with pytest.raises(ValueError):
             p.validate_selection(strategy, news, chip)
+
+
+def test_new_preferences_keep_legacy_canonical_identity_when_off():
+    legacy = DecisionPreferences(no_hits=True)
+    assert (
+        DecisionPreferences.parse(
+            {"no_hits": True, "hold_transfers": False, "include_players": []}
+        ).canonical()
+        == '{"avoid_players":[],"keep_players":[],"no_hits":true,"save_chips":false}'
+    )
+    assert DecisionPreferences.parse(
+        {"include_players": [4, 2], "hold_transfers": True}
+    ).payload() == {
+        **DecisionPreferences().payload(),
+        "include_players": [2, 4],
+        "hold_transfers": True,
+    }
+    assert not DecisionPreferences.parse({"hold_transfers": False, "include_players": []}).active
+    assert legacy == DecisionPreferences.parse(legacy.payload())
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "freehit", "auto"])
+def test_holding_transfers_conflicts_with_rebuilding_chip_requests(chip):
+    with pytest.raises(ValueError, match="Holding transfers conflicts"):
+        DecisionPreferences(hold_transfers=True).validate_selection("saf-puan", False, chip)
+    DecisionPreferences(hold_transfers=True).validate_selection("saf-puan", False, "3xc")
 
 
 def _case(players, length=3):
@@ -81,6 +111,68 @@ def test_every_week_honours_preferences(known_optimum_players, small_config, len
         assert week.transfer_hit_points == 0
         assert week.chip is None
     assert result.diagnostics["decision_preferences"] == p.payload()
+
+
+@pytest.mark.parametrize("length", [1, 3, 5])
+def test_holding_transfers_retains_squad_and_rolls_the_free_transfer(
+    known_optimum_players, small_config, length
+):
+    horizon, initial, _ = _case(known_optimum_players, length)
+    result = optimizer.optimize_transfer_plan(
+        horizon, initial, small_config, preferences=DecisionPreferences(hold_transfers=True)
+    )
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert result.weeks[0].free_transfers_for_next_gameweek == initial.free_transfers + 1
+    for week in result.weeks:
+        assert week.transfer_count == 0
+        assert set(week.selected_squad.player_id) == set(initial.squad_player_ids)
+
+
+@pytest.mark.parametrize("length", [1, 3, 5])
+def test_including_an_unowned_player_requires_membership_in_every_week(
+    known_optimum_players, small_config, length
+):
+    horizon, initial, ids = _case(known_optimum_players, length)
+    player = ids["MID_B"]
+    result = optimizer.optimize_transfer_plan(
+        horizon,
+        initial,
+        small_config,
+        preferences=DecisionPreferences(include_players=(player,), no_hits=True),
+    )
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert tuple(result.weeks[0].transfers_in.player_id) == (player,)
+    for week in result.weeks:
+        assert player in set(week.selected_squad.player_id)
+        assert week.transfer_hit_points == 0
+
+
+def test_holding_transfers_with_an_unowned_target_has_no_plan(known_optimum_players, small_config):
+    horizon, initial, ids = _case(known_optimum_players, 1)
+    result = optimizer.optimize_transfer_plan(
+        horizon,
+        initial,
+        small_config,
+        preferences=DecisionPreferences(include_players=(ids["MID_B"],), hold_transfers=True),
+        protect_hold=True,
+    )
+    assert result.solver_status is SolverStatus.INFEASIBLE
+    assert not result.weeks
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "freehit"])
+def test_holding_transfers_disallows_forced_rebuild_in_solver(
+    known_optimum_players, small_config, chip
+):
+    horizon, initial, _ = _case(known_optimum_players, 1)
+    result = optimizer.optimize_transfer_plan(
+        horizon,
+        initial,
+        small_config,
+        chips=ChipAvailability(available={chip: frozenset({1})}, forced={1: chip}),
+        preferences=DecisionPreferences(hold_transfers=True),
+    )
+    assert result.solver_status is SolverStatus.INFEASIBLE
 
 
 def test_unknown_search_uses_verified_hold_without_claiming_optimality(

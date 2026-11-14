@@ -87,6 +87,7 @@ describe("the sidebar's navigation with the member claimed", () => {
       ["duel", `${OWN}/duel`, false],
       ["chips", `${OWN}/chips`, false],
       ["squadCard", `${OWN}/card`, false],
+      ["llmopt", `${OWN}/llmopt`, false],
       ["history", `${OWN}/history`, false],
       ["fixtures", "/fixtures", true],
       ["contribute", "/contribute", false],
@@ -154,6 +155,30 @@ describe("the sidebar's navigation with the member claimed", () => {
     expect(league(at(MEMBERS))?.active).toBe(true);
     expect(league(at(`/league/${LEAGUE}`))?.active).toBe(false);
     expect(league(at(`${MEMBERS}/35249002`))?.active).toBe(false);
+  });
+
+  it("opens LLMOPT for the claimed member without carrying the previous plan", () => {
+    vi.stubEnv("VITE_ADVICE_API_ORIGIN", "");
+    const seen = { leagueId: LEAGUE, entryId: "35249001", search: "?window=3" };
+    const llmopt = (pathname: string) =>
+      navItems(at(pathname), CLAIMED, seen).find((item) => item.key === "llmopt");
+    expect(llmopt(`${MEMBERS}/35249002`)).toEqual({
+      key: "llmopt",
+      to: `${OWN}/llmopt`,
+      active: false,
+    });
+    expect(llmopt(`${OWN}/llmopt/`)?.active).toBe(true);
+    expect(memberAt(at(`${OWN}/llmopt`, "?window=3"))?.search).toBeNull();
+  });
+
+  it("opens LLMOPT for the standalone team on its team and live pages", () => {
+    for (const pathname of ["/entry/12", "/entry/12/live", "/entry/12/llmopt/"]) {
+      expect(navItems(at(pathname), NO_IDENTITY).find((item) => item.key === "llmopt")).toEqual({
+        key: "llmopt",
+        to: "/entry/12/llmopt",
+        active: pathname === "/entry/12/llmopt/",
+      });
+    }
   });
 
   it("keeps the plan last seen on the own page, and only for that member in that league", () => {

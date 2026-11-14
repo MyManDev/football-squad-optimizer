@@ -442,6 +442,8 @@ export interface AdviceRolePointComponents {
 }
 
 export interface EntryAdvice {
+  bank_after_tenths?: number;
+  free_transfers_after?: number;
   role_forecast?: {
     version: "football_role_forecast_v1";
     model_version:

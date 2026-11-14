@@ -18,6 +18,7 @@ import {
   FIND_YOURSELF,
   isMemberTool,
   leagueIdInAddress,
+  llmoptAddress,
   memberAddress,
   memberHistoryAddress,
   memberLiveAddress,
@@ -46,6 +47,7 @@ export type NavKey =
   | "thisWeek"
   | "live"
   | "league"
+  | "llmopt"
   | ToolNavKey
   | "history"
   | "fixtures"
@@ -91,8 +93,9 @@ export interface Place {
 }
 
 const MEMBER_PAGE = /^\/league\/(\d+)\/members\/(\d+)$/;
-const MEMBER_HISTORY = /^\/league\/(\d+)\/members\/(\d+)\/(?:history|live)$/;
+const MEMBER_WITHOUT_PLAN = /^\/league\/(\d+)\/members\/(\d+)\/(?:history|live|llmopt)$/;
 const MEMBER_TOOL = /^\/league\/(\d+)\/members\/(\d+)\/([a-z-]+)$/;
+const STANDALONE_ENTRY = /^\/entry\/(\d+)(?:\/|$)/;
 
 function path(pathname: string): string {
   return pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
@@ -119,9 +122,10 @@ export function memberAt(
   if (page) {
     return { leagueId: Number(page[1]), entryId: page[2]!, search: planSearch(place.search) };
   }
-  // The history and the live week carry no plan in their address.
-  const history = MEMBER_HISTORY.exec(pathname);
-  if (history) return { leagueId: Number(history[1]), entryId: history[2]!, search: null };
+  // These pages carry no member plan in their address.
+  const withoutPlan = MEMBER_WITHOUT_PLAN.exec(pathname);
+  if (withoutPlan)
+    return { leagueId: Number(withoutPlan[1]), entryId: withoutPlan[2]!, search: null };
   // A tool page carries the plan in its address as the decision page does.
   const tool = MEMBER_TOOL.exec(pathname);
   if (tool && isMemberTool(tool[3])) {
@@ -145,6 +149,11 @@ export function navItems(
 
   if (leagueId === null) {
     items.push({ key: "findLeague", to: "/", active: pathname === "/" });
+    const entryId = STANDALONE_ENTRY.exec(pathname)?.[1];
+    if (entryId !== undefined) {
+      const llmopt = llmoptAddress(0, entryId);
+      items.push({ key: "llmopt", to: llmopt, active: pathname === llmopt });
+    }
   } else if (member === null) {
     items.push({
       key: "findLeague",
@@ -163,6 +172,7 @@ export function navItems(
     const league = membersAddress(leagueId);
     const history = memberHistoryAddress(leagueId, entryId);
     const vs = memberVsAddress(leagueId, entryId);
+    const llmopt = llmoptAddress(leagueId, entryId);
     items.push(
       // The member against the system, week by week, first: what the site is for.
       { key: "vsSquadopt", to: vs, active: pathname === vs },
@@ -173,6 +183,7 @@ export function navItems(
         const page = memberToolAddress(leagueId, entryId, tool);
         return { key: TOOL_NAV[tool], to: `${page}${plan}`, active: pathname === page };
       }),
+      { key: "llmopt", to: llmopt, active: pathname === llmopt },
       { key: "history", to: history, active: pathname === history },
     );
   }

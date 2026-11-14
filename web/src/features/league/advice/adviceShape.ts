@@ -400,6 +400,8 @@ export function isAdvicePayload(value: unknown): boolean {
       decision_information: isDecisionInformation,
       preferences,
       preferences_scope: oneOf("all_selected_weeks"),
+      bank_after_tenths: integer,
+      free_transfers_after: integer,
       selection_top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),
       rival_entry_id: identity,
       rival_label: nullable(text),

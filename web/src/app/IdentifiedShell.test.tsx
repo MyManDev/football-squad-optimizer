@@ -62,12 +62,16 @@ function open(path: string) {
 const sidebar = () => within(screen.getByRole("complementary", { name: TR.sidebar }));
 
 describe("the identified shell", () => {
-  it("keeps a standalone team free of another league's saved identity and tools", () => {
+  it("opens LLMOPT for the standalone team alongside the find-league link", () => {
     claimIn();
     open("/entry/123");
     expect(sidebar().queryByText("Deniz Aral")).toBeNull();
     expect(sidebar().queryByRole("link", { name: TR.thisWeek })).toBeNull();
     expect(sidebar().getByRole("link", { name: TR.findLeague })).toHaveAttribute("href", "/");
+    expect(sidebar().getByRole("link", { name: TR.llmopt })).toHaveAttribute(
+      "href",
+      "/entry/123/llmopt",
+    );
     expect(readMemberClaim()?.entryId).toBe(35249001);
   });
   it("shows the claimed member in the sidebar and opens the league part of it", () => {
@@ -80,6 +84,10 @@ describe("the identified shell", () => {
     expect(sidebar().getByRole("link", { name: TR.thisWeek })).toHaveAttribute(
       "href",
       `${MEMBERS}/35249001`,
+    );
+    expect(sidebar().getByRole("link", { name: TR.llmopt })).toHaveAttribute(
+      "href",
+      `${MEMBERS}/35249001/llmopt`,
     );
   });
 

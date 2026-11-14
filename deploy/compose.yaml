@@ -45,6 +45,9 @@ x-backend: &backend
 services:
   api:
     <<: *backend
+    env_file:
+      - path: ${SQUADOPT_LLMOPT_ENV_FILE:-/etc/squadopt/llmopt.env}
+        required: false
     command: [uvicorn, --factory, squadopt.api.runtime:build_app, --host, 0.0.0.0, --port, "8000", --proxy-headers]
     environment:
       <<: *environment
