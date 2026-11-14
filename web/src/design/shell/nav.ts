@@ -5,9 +5,9 @@
  * league number, then the member the visitor said they are in it. Until then the first
  * item is 'Ligini bul': the league-number form with no league, or the "Sen kimsin?" step
  * of the league entered; 'Bu hafta' and 'Lig' are not there at all. Once both steps are
- * taken, 'Bu hafta' always means the claimed member's own page (on a rival's page too),
- * 'LIVE' right after it their live week (always there, so nothing here reads a clock),
- * 'Lig' is the league's member list, and each of the member's tools (the squad held now,
+ * taken, LIVE, LLMOPT and VS SQUADOPT lead to the claimed member's tools. 'Bu hafta'
+ * always means their own decision page (on a rival's page too). 'Lig' is the league's
+ * member list, and each of the member's tools (the squad held now,
  * the what-if squad, the duel, the chips and the squad card) is a page of its own under
  * their page, and so is their weekly suggestion history. The rule holds per league, so
  * it stands unchanged with many leagues published.
@@ -15,6 +15,7 @@
  * Nothing here reads or writes browser storage; the identity is handed in.
  */
 import {
+  entryLiveAddress,
   FIND_YOURSELF,
   isMemberTool,
   leagueIdInAddress,
@@ -148,12 +149,16 @@ export function navItems(
   const items: NavItem[] = [];
 
   if (leagueId === null) {
-    items.push({ key: "findLeague", to: "/", active: pathname === "/" });
     const entryId = STANDALONE_ENTRY.exec(pathname)?.[1];
     if (entryId !== undefined) {
+      const live = entryLiveAddress(entryId);
       const llmopt = llmoptAddress(0, entryId);
-      items.push({ key: "llmopt", to: llmopt, active: pathname === llmopt });
+      items.push(
+        { key: "live", to: live, active: pathname === live },
+        { key: "llmopt", to: llmopt, active: pathname === llmopt },
+      );
     }
+    items.push({ key: "findLeague", to: "/", active: pathname === "/" });
   } else if (member === null) {
     items.push({
       key: "findLeague",
@@ -174,16 +179,15 @@ export function navItems(
     const vs = memberVsAddress(leagueId, entryId);
     const llmopt = llmoptAddress(leagueId, entryId);
     items.push(
-      // The member against the system, week by week, first: what the site is for.
+      { key: "live", to: live, active: pathname === live },
+      { key: "llmopt", to: llmopt, active: pathname === llmopt },
       { key: "vsSquadopt", to: vs, active: pathname === vs },
       { key: "thisWeek", to: `${own}${plan}`, active: pathname === own },
-      { key: "live", to: live, active: pathname === live },
       { key: "league", to: league, active: pathname === league },
       ...MEMBER_TOOLS.map((tool) => {
         const page = memberToolAddress(leagueId, entryId, tool);
         return { key: TOOL_NAV[tool], to: `${page}${plan}`, active: pathname === page };
       }),
-      { key: "llmopt", to: llmopt, active: pathname === llmopt },
       { key: "history", to: history, active: pathname === history },
     );
   }
