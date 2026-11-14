@@ -182,7 +182,7 @@
 }
 
 .ruleGroup h3,
-.result h3 {
+.resultTitle {
   margin: 0 0 var(--space-2);
   font-family: var(--font-display);
   font-size: var(--step-1);
@@ -236,8 +236,18 @@
 }
 
 .planGrid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
   align-items: start;
+}
+
+.planSquad {
+  min-width: 0;
+}
+
+.lineupTitle {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--step-1);
 }
 
 .figures {
@@ -262,10 +272,4 @@
 .moves {
   margin: 0;
   padding-inline-start: var(--space-4);
-}
-
-.result summary {
-  min-height: 44px;
-  align-content: center;
-  cursor: pointer;
 }
