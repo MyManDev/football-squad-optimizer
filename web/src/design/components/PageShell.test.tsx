@@ -238,16 +238,16 @@ describe("the app shell on a desktop", () => {
 
     const second = renderShell({ identity: CLAIMED });
     expect(navLinks().map((link) => link.textContent)).toEqual([
+      TR.live,
+      TR.llmopt,
       TR.vsSquadopt,
       TR.thisWeek,
-      TR.live,
       TR.league,
       TR.currentSquad,
       TR.whatIf,
       TR.duel,
       TR.chips,
       TR.squadCard,
-      TR.llmopt,
       TR.history,
       TR.fixtures,
       TR.contribute,

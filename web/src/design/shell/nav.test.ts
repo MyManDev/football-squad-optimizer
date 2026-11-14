@@ -78,16 +78,16 @@ describe("the sidebar's navigation with a league and nobody claimed", () => {
 describe("the sidebar's navigation with the member claimed", () => {
   it("opens the claimed member's page as 'Bu hafta', the league, the tools and the history", () => {
     expect(hrefs(at("/fixtures"), CLAIMED)).toEqual([
+      ["live", `${OWN}/live`, false],
+      ["llmopt", `${OWN}/llmopt`, false],
       ["vsSquadopt", `${OWN}/vs`, false],
       ["thisWeek", OWN, false],
-      ["live", `${OWN}/live`, false],
       ["league", MEMBERS, false],
       ["currentSquad", `${OWN}/current-squad`, false],
       ["whatIf", `${OWN}/what-if`, false],
       ["duel", `${OWN}/duel`, false],
       ["chips", `${OWN}/chips`, false],
       ["squadCard", `${OWN}/card`, false],
-      ["llmopt", `${OWN}/llmopt`, false],
       ["history", `${OWN}/history`, false],
       ["fixtures", "/fixtures", true],
       ["contribute", "/contribute", false],
@@ -108,10 +108,8 @@ describe("the sidebar's navigation with the member claimed", () => {
     expect(active(at(`${OWN}/live`))).toEqual(["live"]);
   });
 
-  it("puts LIVE right after 'Bu hafta', always the claimed member's own live week", () => {
-    const keys = navItems(at(`${MEMBERS}/35249002/live`), CLAIMED).map((item) => item.key);
-    expect(keys.slice(1, 3)).toEqual(["thisWeek", "live"]);
-    expect(navItems(at(`${MEMBERS}/35249002/live`), CLAIMED)[2]).toEqual({
+  it("puts the claimed member's own LIVE first even on a rival's live page", () => {
+    expect(navItems(at(`${MEMBERS}/35249002/live`), CLAIMED)[0]).toEqual({
       key: "live",
       to: `${OWN}/live`,
       active: false,
@@ -171,27 +169,30 @@ describe("the sidebar's navigation with the member claimed", () => {
     expect(memberAt(at(`${OWN}/llmopt`, "?window=3"))?.search).toBeNull();
   });
 
-  it("opens LLMOPT for the standalone team on its team and live pages", () => {
+  it("leads with LIVE and LLMOPT for a standalone team", () => {
     for (const pathname of ["/entry/12", "/entry/12/live", "/entry/12/llmopt/"]) {
-      expect(navItems(at(pathname), NO_IDENTITY).find((item) => item.key === "llmopt")).toEqual({
-        key: "llmopt",
-        to: "/entry/12/llmopt",
-        active: pathname === "/entry/12/llmopt/",
-      });
+      expect(hrefs(at(pathname), NO_IDENTITY)).toEqual([
+        ["live", "/entry/12/live", pathname === "/entry/12/live"],
+        ["llmopt", "/entry/12/llmopt", pathname === "/entry/12/llmopt/"],
+        ["findLeague", "/", false],
+        ["fixtures", "/fixtures", false],
+        ["contribute", "/contribute", false],
+      ]);
     }
   });
 
   it("keeps the plan last seen on the own page, and only for that member in that league", () => {
     const plan = "?mode=ortak-koru&window=3";
     const own = { leagueId: LEAGUE, entryId: "35249001", search: plan };
-    // VS SQUADOPT stands first and carries no plan; 'Bu hafta' and the tools follow it.
-    expect(navItems(at("/fixtures"), CLAIMED, own)[0]!.to).toBe(`${OWN}/vs`);
-    expect(navItems(at("/fixtures"), CLAIMED, own)[1]!.to).toBe(`${OWN}${plan}`);
-    expect(navItems(at("/fixtures"), CLAIMED, own)[4]!.to).toBe(`${OWN}/current-squad${plan}`);
+    const route = (context: typeof own, key: "vsSquadopt" | "thisWeek" | "currentSquad") =>
+      navItems(at("/fixtures"), CLAIMED, context).find((item) => item.key === key)?.to;
+    expect(route(own, "vsSquadopt")).toBe(`${OWN}/vs`);
+    expect(route(own, "thisWeek")).toBe(`${OWN}${plan}`);
+    expect(route(own, "currentSquad")).toBe(`${OWN}/current-squad${plan}`);
     const rival = { leagueId: LEAGUE, entryId: "35249002", search: plan };
-    expect(navItems(at("/fixtures"), CLAIMED, rival)[1]!.to).toBe(OWN);
+    expect(route(rival, "thisWeek")).toBe(OWN);
     const elsewhere = { leagueId: 7, entryId: "35249001", search: plan };
-    expect(navItems(at("/fixtures"), CLAIMED, elsewhere)[1]!.to).toBe(OWN);
+    expect(route(elsewhere, "thisWeek")).toBe(OWN);
   });
 });
 
