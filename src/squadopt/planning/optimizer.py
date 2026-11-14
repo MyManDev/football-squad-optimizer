@@ -1348,16 +1348,24 @@ def optimize_transfer_plan(
             raise TransferPlanningValidationError("Only currently held players can be kept.")
         if not set(preferences.avoid_players) <= universe:
             raise TransferPlanningValidationError("Avoided player is outside the forecast roster.")
+        if not set(preferences.include_players) <= universe:
+            raise TransferPlanningValidationError("Included player is outside the forecast roster.")
+        required = set(preferences.keep_players) | set(preferences.include_players)
+        avoided = set(preferences.avoid_players)
         for week, table in enumerate(players_by_week):
             for index, player in enumerate(table.player_id):
-                if player in preferences.keep_players:
+                if player in required:
                     artifacts.model.add(artifacts.squad_vars[week][index] == 1)
-                if player in preferences.avoid_players:
+                if player in avoided:
                     artifacts.model.add(artifacts.squad_vars[week][index] == 0)
+            if preferences.hold_transfers:
+                artifacts.model.add(artifacts.transfer_count_vars[week] == 0)
             if preferences.no_hits:
                 artifacts.model.add(artifacts.paid_transfer_vars[week] == 0)
-            if preferences.save_chips:
-                for variable in artifacts.chip_vars[week].values():
+            for chip, variable in artifacts.chip_vars[week].items():
+                if preferences.save_chips or (
+                    preferences.hold_transfers and chip in ("wildcard", "freehit")
+                ):
                     artifacts.model.add(variable == 0)
     started_at = perf_counter()
     wall_limit = optimization_config.solver_time_limit_seconds

@@ -7,7 +7,12 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useShell } from "../../../design/shell/ShellContext";
 import { crossfade } from "../../../design/viewTransition";
 import { useLanguage } from "../../../i18n/context";
-import { asksForOwnPage, isLiveAddress, memberAddress } from "../../../lib/leagueAddresses";
+import {
+  asksForOwnPage,
+  isLiveAddress,
+  isLLMOptAddress,
+  memberAddress,
+} from "../../../lib/leagueAddresses";
 import { useForwardedLeague, type ForwardedScoring } from "../forwarded/ForwardedLeagueContext";
 import { tableRows } from "../forwarder/documents";
 import { useForwardedStandings, useForwardedStandingsPages } from "../forwarded/reads";
@@ -80,9 +85,8 @@ export function MemberGate({ children }: { children: ReactNode }) {
   // A forwarded league's roster is page 1 of its table; the pages after it are read as a
   // name or a claim asks for them, never all at once.
   const forwarded = useForwardedLeague();
-  // In front of LIVE, LIVE's fewer reads: no scoreboard or history it never opens, and in a
-  // forwarded league no index either.
-  const page = isLiveAddress(useLocation().pathname) ? "live" : "member";
+  const { pathname } = useLocation();
+  const page = isLiveAddress(pathname) ? "live" : isLLMOptAddress(pathname) ? "llmopt" : "member";
   const warm = useCallback(
     (entry: RosterEntry) =>
       prefetchMemberReads(queryClient, tree, entry.entryId, [], page, forwarded !== null),

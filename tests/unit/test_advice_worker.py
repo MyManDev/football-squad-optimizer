@@ -1725,7 +1725,7 @@ def test_worker_publishes_official_facts_for_decisions_and_statement_outcomes(
 
 
 def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str, Any]) -> None:
-    """The worker preserves the producer decision and adds the held official facts."""
+    """The worker preserves the producer decision and adds resources and official facts."""
 
     backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
@@ -1747,7 +1747,10 @@ def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str,
         projection=capture.projection,
         rules=capture.rules,
         horizon_builder=capture.horizon_builder,
+        include_resource_state=True,
     )
+    assert isinstance(expected["bank_after_tenths"], int)
+    assert isinstance(expected["free_transfers_after"], int)
     assert capture.inputs.official_information is not None
     expected["official_information"] = capture.inputs.official_information.public_record(
         worker_module._advice_player_ids(expected)
@@ -1805,7 +1808,11 @@ def test_preferences_round_trip_through_http_worker_cache(running):
     # Ids the capture does not have for this member are refused before a job exists:
     # 1002 is on the roster but not in the fifteen, 1025 is not on the roster at all.
     jobs_before = backend.queue.jobs()
-    for unknown in ({"keep_players": [1002]}, {"avoid_players": [1025]}):
+    for unknown in (
+        {"keep_players": [1002]},
+        {"avoid_players": [1025]},
+        {"include_players": [1025]},
+    ):
         refused = client.post(route, json={**body, "preferences": unknown})
         assert refused.status_code == 422, refused.text
         assert refused.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
@@ -1824,6 +1831,60 @@ def test_preferences_round_trip_through_http_worker_cache(running):
         ).status_code
         == 422
     )
+
+
+@pytest.mark.parametrize(
+    ("new_preferences", "target"),
+    [
+        ({"hold_transfers": True}, None),
+        ({"include_players": [1007]}, 1007),
+    ],
+)
+def test_llmopt_constraints_round_trip_through_the_advice_worker(running, new_preferences, target):
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    preferences = {"no_hits": True, "save_chips": True, **new_preferences}
+    selection = {"strategy": "saf-puan", "window": 1}
+    submitted = client.post(route, json={**selection, "preferences": preferences})
+    assert submitted.status_code == 202, submitted.text
+    assert _work(backend) == 1
+    served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["preferences"] == {"keep_players": [], "avoid_players": [], **preferences}
+    assert isinstance(payload["bank_after_tenths"], int) and payload["bank_after_tenths"] >= 0
+    assert payload["free_transfers_after"] == payload["plan_weeks"][0]["free_transfers_after"]
+    assert payload["transfer_hit_points"] == 0
+    if target is not None:
+        assert [player["player_id"] for player in payload["plan_weeks"][0]["transfers_in"]] == [
+            target
+        ]
+    else:
+        assert payload["moves"] == []
+        assert payload["free_transfers_after"] == 2
+
+
+def test_impossible_llmopt_plan_returns_the_public_no_plan_code(running):
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    # Club 2 is already full. Buying its goalkeeper and making room for him by
+    # selling an outfield player from that club exceeds this squad's one free move.
+    submitted = client.post(
+        route,
+        json={
+            "strategy": "saf-puan",
+            "window": 1,
+            "preferences": {"include_players": [1002], "no_hits": True},
+        },
+    )
+    assert submitted.status_code == 202, submitted.text
+    assert _work(backend) == 1
+    job = client.get(f"/api/v1/advice-jobs/{submitted.json()['job_id']}")
+    assert job.json()["status"] == "failed"
+    assert job.json()["error_code"] == "PLAN_NOT_FOUND"
+    assert "INFEASIBLE" not in job.text
 
 
 def _export_top100(

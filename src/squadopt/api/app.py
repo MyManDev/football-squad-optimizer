@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHttpException
 
+from squadopt.api.llmopt import intent_routes
 from squadopt.api.views import (
     FilePublishedViewStore,
     JsonDocument,
@@ -59,6 +60,7 @@ from squadopt.platform.api_contract import (
     DecisionPreferences,
 )
 from squadopt.platform.contributions import ContributionStore
+from squadopt.platform.llmopt_intent import IntentService
 from squadopt.platform.public_entry_advice import PublicEntryAdviceReader
 from squadopt.platform.queue_contracts import (
     AdviceQueueError,
@@ -71,9 +73,8 @@ _SEASON_PATTERN: Final = r"^[0-9]{4}-[0-9]{2}$"
 # One pattern for the GET query and the POST body: a strategy is a short slug, and
 # anything else is refused before it can reach the menu or be echoed in an error.
 _STRATEGY_PATTERN: Final = r"^[a-z][a-z0-9._-]{0,63}$"
-# The largest advice body the web client can build is 795 bytes (every field at its
-# maximum, 30 preference ids and the rival at 2**53 - 1); the largest a test sends is
-# 129. Four KiB is over five times the first, and a larger body is refused unparsed.
+# Four KiB covers every advice field at its web-client maximum, including up to 45
+# preference ids. A larger body is refused unparsed.
 ADVICE_BODY_MAX_BYTES: Final = 4096
 # A queue transaction holds its lock for milliseconds and gives up after five seconds, so
 # a client told to come back in a couple of seconds finds it free.
@@ -202,6 +203,7 @@ def create_app(
     readiness: Callable[[], tuple[bool, Mapping[str, bool]]] | None = None,
     utc_now: Callable[[], datetime] | None = None,
     contributions: ContributionStore | None = None,
+    llmopt_intent: IntentService | None = None,
 ) -> FastAPI:
     """Build the API with an injectable read adapter and no solver startup work.
 
@@ -216,6 +218,7 @@ def create_app(
         description="Read-only access to published SquadOpt application views.",
         version=BACKEND_API_VERSION,
     )
+    application.include_router(intent_routes(llmopt_intent))
     if contributions is not None:
         from squadopt.api.contributions import ContributionError, contribution_routes
 

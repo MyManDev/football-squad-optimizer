@@ -159,7 +159,7 @@ def test_factory_emits_one_structured_configuration_event(
     monkeypatch.setattr(runtime, "configure_advice_logging", lambda: None)
     monkeypatch.setattr(runtime, "backend_from_environment", lambda **kwargs: object())
     app = FastAPI()
-    monkeypatch.setattr(runtime, "app_for_backend", lambda backend: app)
+    monkeypatch.setattr(runtime, "app_for_backend", lambda backend, **kwargs: app)
     caplog.set_level("INFO", logger="advice.api")
     assert runtime.build_app() is app
     records = [json.loads(record.message) for record in caplog.records]

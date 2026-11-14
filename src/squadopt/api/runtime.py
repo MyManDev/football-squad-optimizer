@@ -37,6 +37,7 @@ from squadopt.platform.advice_observability import (
 )
 from squadopt.platform.backend_runtime import AdviceBackend, backend_from_environment
 from squadopt.platform.contributions import ContributionStore
+from squadopt.platform.llmopt_intent import IntentService, intent_service_from_environment
 
 __all__ = ["app_for_backend", "build_app"]
 
@@ -93,7 +94,10 @@ def _forwarded_trust() -> dict[str, object]:
 
 
 def app_for_backend(
-    backend: AdviceBackend, *, utc_now: Callable[[], datetime] | None = None
+    backend: AdviceBackend,
+    *,
+    utc_now: Callable[[], datetime] | None = None,
+    llmopt_intent: IntentService | None = None,
 ) -> FastAPI:
     """Wire one already-built backend into the application.
 
@@ -114,6 +118,7 @@ def app_for_backend(
         readiness=backend.readiness,
         utc_now=utc_now,
         contributions=ContributionStore(backend.config.store_root / "contributions.sqlite3"),
+        llmopt_intent=llmopt_intent,
     )
 
 
@@ -128,5 +133,6 @@ def build_app() -> FastAPI:
     configure_advice_logging()
     AdviceLog("api").event("advice_forwarded_trust", **_forwarded_trust())
     return app_for_backend(
-        backend_from_environment(metrics=AdviceMetrics(zero_counters=API_COUNTER_FAMILIES))
+        backend_from_environment(metrics=AdviceMetrics(zero_counters=API_COUNTER_FAMILIES)),
+        llmopt_intent=intent_service_from_environment(os.environ),
     )

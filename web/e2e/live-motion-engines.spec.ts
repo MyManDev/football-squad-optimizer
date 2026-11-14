@@ -46,3 +46,43 @@ test("LIVE moves once per newer read at 375px on every engine", async ({ browser
     await still.context.close();
   }
 });
+
+test("LIVE recovers the reading position if the browser scrolls as slides start", async ({
+  browser,
+}) => {
+  const tab = await openLive(browser, { width: 375, motion: true });
+  try {
+    await firstRead(tab);
+    for (const beat of ["kickoff", "goal", "card"] as const) {
+      await readBeat(tab, index(beat));
+    }
+    // Linux WebKit can move again after the first two frames of the new slides.
+    // Inject that late adjustment before the last frame the page checks.
+    await tab.page.evaluate(() => {
+      const root = document.querySelector("[data-live-page]")!;
+      const observer = new MutationObserver(() => {
+        if (!root.querySelector("[data-live-sliding]")) return;
+        observer.disconnect();
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() =>
+            window.requestAnimationFrame(() => {
+              window.scrollBy({ top: 3, behavior: "instant" });
+              root.dataset.scrollDriftInjected = "";
+            }),
+          ),
+        );
+      });
+      observer.observe(root, {
+        attributes: true,
+        attributeFilter: ["data-live-sliding"],
+        subtree: true,
+      });
+    });
+    await expectPlaceKept(tab, index("over"), "browser scroll drift");
+    await expect(tab.page.locator("[data-live-page]")).toHaveAttribute(
+      "data-scroll-drift-injected",
+    );
+  } finally {
+    await tab.context.close();
+  }
+});

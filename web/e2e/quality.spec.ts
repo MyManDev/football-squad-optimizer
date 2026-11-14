@@ -64,6 +64,7 @@ test.describe("a visitor who has said who they are", () => {
       "/league/352490/members/35249001/duel",
       "/league/352490/members/35249001/chips",
       "/league/352490/members/35249001/card",
+      "/league/352490/members/35249001/llmopt",
       "/league/352490/members/35249001/history",
       "/fixtures",
       ...CONTRIBUTE,
