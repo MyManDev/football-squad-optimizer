@@ -12,6 +12,7 @@ import { OpeningMark } from "../design/shell/OpeningMark";
 import { LeagueGate } from "../features/league/pages/LeagueGate";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
+import { isLLMOptAddress } from "../lib/leagueAddresses";
 import { IdentifiedShell } from "./IdentifiedShell";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { UsagePageOpen } from "./UsagePageOpen";
@@ -89,7 +90,8 @@ function RoutePreload() {
   const { pathname } = useLocation();
   useEffect(() => {
     if (LIVE_ADDRESS.test(pathname)) void loadLivePage();
-    else if (MEMBER_PAGE_ADDRESS.test(pathname)) void loadLeagueMemberPage();
+    else if (MEMBER_PAGE_ADDRESS.test(pathname) && !isLLMOptAddress(pathname))
+      void loadLeagueMemberPage();
   }, [pathname]);
   return null;
 }
@@ -112,6 +114,9 @@ const LeagueMemberHistoryPage = lazy(() =>
   import("../features/league/pages/LeagueMemberHistoryPage").then((m) => ({
     default: m.LeagueMemberHistoryPage,
   })),
+);
+const LLMOptPage = lazy(() =>
+  import("../features/league/llmopt/LLMOptPage").then((m) => ({ default: m.LLMOptPage })),
 );
 
 const ReminderPage = lazy(() =>
@@ -262,6 +267,26 @@ function LocalizedApp({ basename }: { basename: string }) {
                     />
                   ),
                 )}
+                {[
+                  "/league/members/:entryId/llmopt",
+                  "/league/:leagueId/members/:entryId/llmopt",
+                ].map((root) => (
+                  <Route
+                    key={root}
+                    path={root}
+                    element={
+                      <LeagueGate
+                        forwarded={
+                          <ForwardedMemberGate>
+                            <LLMOptPage />
+                          </ForwardedMemberGate>
+                        }
+                      >
+                        <LLMOptPage />
+                      </LeagueGate>
+                    }
+                  />
+                ))}
                 {/* How notifications are received: the reminder's page under the member's. It
                     reads no league data, so no gate stands in front of it. */}
                 <Route
@@ -284,6 +309,14 @@ function LocalizedApp({ basename }: { basename: string }) {
                   element={
                     <ForwardedMemberGate standalone>
                       <LivePage />
+                    </ForwardedMemberGate>
+                  }
+                />
+                <Route
+                  path="/entry/:entryId/llmopt"
+                  element={
+                    <ForwardedMemberGate standalone>
+                      <LLMOptPage />
                     </ForwardedMemberGate>
                   }
                 />

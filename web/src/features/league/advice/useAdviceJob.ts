@@ -172,6 +172,7 @@ export function useAdviceJob(
   client: AdviceClient,
   allowPublishedBaseline = true,
   expectedSnapshotId?: string | null,
+  requireMatchingSnapshot = false,
 ): AdviceJob {
   const [state, replaceState] = useState<ComputePhase>({ phase: "idle" });
   // Every transition goes through `carrying`, so no call site can drop the earlier answer.
@@ -281,7 +282,7 @@ export function useAdviceJob(
             if (!alive()) return;
             if (outcome.kind === "advice") {
               if (
-                request.publicEntry &&
+                (request.publicEntry || requireMatchingSnapshot) &&
                 expectedSnapshotId != null &&
                 outcome.envelope.payload.source_snapshot_id !== expectedSnapshotId
               ) {
@@ -385,7 +386,7 @@ export function useAdviceJob(
               if (!alive()) return;
               if (read.kind === "advice") {
                 if (
-                  request.publicEntry &&
+                  (request.publicEntry || requireMatchingSnapshot) &&
                   expectedSnapshotId != null &&
                   read.envelope.payload.source_snapshot_id !== expectedSnapshotId
                 ) {
@@ -445,7 +446,14 @@ export function useAdviceJob(
           if (readAfterMissingJob && generation.current === run) readCached(request);
         });
     },
-    [client, allowPublishedBaseline, expectedSnapshotId, readCached, setState],
+    [
+      client,
+      allowPublishedBaseline,
+      expectedSnapshotId,
+      readCached,
+      requireMatchingSnapshot,
+      setState,
+    ],
   );
 
   const compute = useCallback(

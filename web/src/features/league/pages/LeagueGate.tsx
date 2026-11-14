@@ -6,6 +6,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import {
   isLiveAddress,
+  isLLMOptAddress,
   leagueIdInAddress,
   legacyLeagueAddress,
 } from "../../../lib/leagueAddresses";
@@ -77,18 +78,20 @@ export function LeagueGate({
   const queryClient = useQueryClient();
   const claimedEntry = useClaimedEntry(league?.leagueId ?? 0);
   const entryId = claimedEntry !== null ? entryIdInAddress(entryParameter) : null;
-  // LIVE reads fewer of the member's documents, and its rival's FPL bundle rather than his
-  // published squad, so a rival picked there (?duel=) starts nothing here.
-  const live = isLiveAddress(location.pathname);
+  const page = isLiveAddress(location.pathname)
+    ? "live"
+    : isLLMOptAddress(location.pathname)
+      ? "llmopt"
+      : "member";
+  // The member page alone reads rivals' published squads.
   const address = new URLSearchParams(location.search);
-  const rival = live ? null : address.get("rival");
-  const duel = live ? null : address.get("duel");
+  const rival = page === "member" ? address.get("rival") : null;
+  const duel = page === "member" ? address.get("duel") : null;
   useEffect(() => {
     if (league === null) return;
     const rivals = [entryIdInAddress(rival), entryIdInAddress(duel)];
-    const page = live ? "live" : "member";
     prefetchMemberReads(queryClient, createLeagueTree(league), entryId, rivals, page);
-  }, [league, entryId, rival, duel, live, queryClient]);
+  }, [league, entryId, rival, duel, page, queryClient]);
   if (parameter === undefined) {
     // The old shape of the address: the current league's version of it, or the form.
     const legacy = current === null ? null : legacyLeagueAddress(location.pathname, current);

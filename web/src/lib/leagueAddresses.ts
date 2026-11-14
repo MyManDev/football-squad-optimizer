@@ -26,6 +26,16 @@ export function entryAddress(entryId: number | string): string {
   return `/entry/${entryId}`;
 }
 
+/** The team's conversation and plans, under its league or on its own. */
+export function llmoptAddress(leagueId: number, entryId: number | string): string {
+  const team = leagueId > 0 ? memberAddress(leagueId, entryId) : entryAddress(entryId);
+  return `${team}/llmopt`;
+}
+
+export function isLLMOptAddress(pathname: string): boolean {
+  return /^\/(?:league(?:\/\d+)?\/members|entry)\/\d+\/llmopt\/?$/.test(pathname);
+}
+
 export function memberHistoryAddress(leagueId: number, entryId: number | string): string {
   return `${memberAddress(leagueId, entryId)}/history`;
 }

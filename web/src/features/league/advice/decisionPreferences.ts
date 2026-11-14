@@ -4,6 +4,8 @@ export interface DecisionPreferences {
   avoid_players: number[];
   no_hits: boolean;
   save_chips: boolean;
+  hold_transfers?: boolean;
+  include_players?: number[];
 }
 
 export function checkedPreferences(value: unknown): DecisionPreferences {
@@ -13,7 +15,15 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
   const row = value as Record<string, unknown>;
   if (
     Object.keys(row).some(
-      (k) => !["keep_players", "avoid_players", "no_hits", "save_chips"].includes(k),
+      (k) =>
+        ![
+          "keep_players",
+          "avoid_players",
+          "no_hits",
+          "save_chips",
+          "hold_transfers",
+          "include_players",
+        ].includes(k),
     )
   )
     throw new Error("Unknown preference");
@@ -33,20 +43,29 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
     if (typeof v !== "boolean") throw new Error("Invalid preference flag");
     return v;
   };
-  const result = {
+  const hold = flag(row.hold_transfers);
+  const include = ids(row.include_players);
+  const result: DecisionPreferences = {
     keep_players: ids(row.keep_players),
     avoid_players: ids(row.avoid_players),
     no_hits: flag(row.no_hits),
     save_chips: flag(row.save_chips),
+    ...(hold ? { hold_transfers: true } : {}),
+    ...(include.length ? { include_players: include } : {}),
   };
-  if (result.keep_players.some((id) => result.avoid_players.includes(id)))
+  if ([...result.keep_players, ...include].some((id) => result.avoid_players.includes(id)))
     throw new Error("Conflicting player preferences");
   return result;
 }
 
 export function preferencesKey(value?: DecisionPreferences): string {
   const p = checkedPreferences(value);
-  return p.keep_players.length || p.avoid_players.length || p.no_hits || p.save_chips
+  return p.keep_players.length ||
+    p.avoid_players.length ||
+    p.no_hits ||
+    p.save_chips ||
+    p.hold_transfers ||
+    p.include_players?.length
     ? JSON.stringify(p)
     : "";
 }

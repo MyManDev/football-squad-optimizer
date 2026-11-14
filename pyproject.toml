@@ -602,6 +602,7 @@ exhaustive_ignores = [
     "fpl_capture",
     "history_documents",
     "jobs_contract",
+    "llmopt_intent",
     "manifest",
     "native_windows",
     "official_injury_capture",

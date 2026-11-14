@@ -620,6 +620,8 @@ interface HeldRow {
 
 /** A scroll by the visitor this recently is theirs: the page keeps its hands off. */
 const SCROLL_QUIET_MS = 150;
+const SCROLL_INPUTS = ["pointerdown", "touchmove", "wheel", "keydown"] as const;
+const SCROLL_SETTLEMENT_FRAMES = 4;
 
 /** The groups' rows and headings, and Farklar, each by a key that outlives a change of group. */
 function partsOf(groups: HTMLElement, after: HTMLElement | null): [string, HTMLElement][] {
@@ -695,6 +697,13 @@ class LiveFlow extends Component<FlowProps> {
   private sliding = 0;
   private scrolledAt = Number.NEGATIVE_INFINITY;
   private ownScroll = false;
+  private scrollSettlement: number | null = null;
+
+  private readonly cancelScrollSettlement = () => {
+    if (this.scrollSettlement === null) return;
+    window.cancelAnimationFrame(this.scrollSettlement);
+    this.scrollSettlement = null;
+  };
 
   private readonly onScroll = () => {
     if (this.ownScroll) {
@@ -706,11 +715,18 @@ class LiveFlow extends Component<FlowProps> {
 
   componentDidMount() {
     window.addEventListener("scroll", this.onScroll, { passive: true });
+    for (const input of SCROLL_INPUTS) {
+      window.addEventListener(input, this.cancelScrollSettlement, { capture: true, passive: true });
+    }
     this.decorate();
   }
 
   componentWillUnmount() {
     window.removeEventListener("scroll", this.onScroll);
+    for (const input of SCROLL_INPUTS) {
+      window.removeEventListener(input, this.cancelScrollSettlement, true);
+    }
+    this.cancelScrollSettlement();
     this.drop();
   }
 
@@ -746,6 +762,7 @@ class LiveFlow extends Component<FlowProps> {
     const { plan, gate } = this.props;
     const groups = this.parts.groups.current;
     const read = newPlan(plan, previous.plan);
+    if (read) this.cancelScrollSettlement();
     if (snapshot !== null && groups !== null) {
       const parts = partsOf(groups, this.parts.after.current);
       // Where everything stands after the change, before the page moves anything.
@@ -765,7 +782,9 @@ class LiveFlow extends Component<FlowProps> {
         }
       }
       if (times !== null && snapshot.places !== null) {
+        const settledScroll = window.scrollY;
         this.slide(groups, parts, snapshot.places, now, scrolled, glide, times);
+        if (scrolled !== 0) this.settleScroll(settledScroll);
       }
       if (times !== null && snapshot.recapKey !== this.props.recapKey) {
         this.reveal(snapshot.recapKey, snapshot.recapPlaces, times);
@@ -785,7 +804,34 @@ class LiveFlow extends Component<FlowProps> {
     const from = window.scrollY;
     this.ownScroll = true;
     window.scrollBy({ top: by, left: 0, behavior: "instant" });
-    return window.scrollY - from;
+    const moved = window.scrollY - from;
+    if (moved === 0) this.ownScroll = false;
+    else this.cancelScrollSettlement();
+    return moved;
+  }
+
+  /**
+   * WebKit can move the document again as the row transforms first change its scrollable
+   * overflow. Restore the position that the browser accepted before those transforms.
+   * WebKit can adjust the scroll after the first two frames, so check the first four.
+   * Visitor input cancels any remaining checks.
+   */
+  private settleScroll(top: number) {
+    let framesLeft = SCROLL_SETTLEMENT_FRAMES;
+    const check = () => {
+      this.scrollSettlement = null;
+      if (!pageClear()) return;
+      const from = window.scrollY;
+      if (Math.abs(from - top) >= 1) {
+        this.ownScroll = true;
+        window.scrollTo({ top, left: 0, behavior: "instant" });
+        if (window.scrollY === from) this.ownScroll = false;
+      }
+      framesLeft -= 1;
+      if (framesLeft === 0) return;
+      this.scrollSettlement = window.requestAnimationFrame(check);
+    };
+    this.scrollSettlement = window.requestAnimationFrame(check);
   }
 
   /**

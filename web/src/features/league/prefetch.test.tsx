@@ -99,6 +99,29 @@ describe("prefetchMemberReads", () => {
     client.clear();
   });
 
+  it("starts only the member list, squad and fixtures for LLMOPT", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("null", { headers: { "content-type": "application/json" } })),
+    );
+    const tree = stubTree({
+      members: vi.fn(async () => ({ payload: { members: [] } }) as never),
+      entrySquad: vi.fn(async () => ({ payload: {} }) as never),
+      entryAdviceIndex: vi.fn(),
+      scoreboard: vi.fn(),
+      raw: vi.fn(),
+    });
+    const client = new QueryClient();
+    prefetchMemberReads(client, tree, 35249001, [35249002], "llmopt");
+    expect(tree.members).toHaveBeenCalledTimes(1);
+    expect(tree.entrySquad).toHaveBeenCalledExactlyOnceWith(35249001);
+    expect(tree.entryAdviceIndex).not.toHaveBeenCalled();
+    expect(tree.scoreboard).not.toHaveBeenCalled();
+    expect(tree.raw).not.toHaveBeenCalled();
+    expect(client.getQueryState(FIXTURES_QUERY.queryKey)).toBeDefined();
+    client.clear();
+  });
+
   it("reads the member list alone on a league address without a member", () => {
     const tree = stubTree({
       members: vi.fn(async () => ({ payload: { members: [] } }) as never),

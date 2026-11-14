@@ -664,6 +664,7 @@ def build_advice_payload(
     exclusion: FirstWeekExclusion | None = None,
     move_reason: Callable[[int | None, int | None], str] | None = None,
     choice_points: Mapping[int, float] | None = None,
+    include_resource_state: bool = False,
 ) -> dict[str, object]:
     """One member's advice payload — from their squad and the shared projection only.
 
@@ -756,6 +757,14 @@ def build_advice_payload(
         "window": COMPUTED_WINDOW,
         "source_snapshot_id": picks.source_snapshot_id,
         "moves": moves,
+        **(
+            {
+                "bank_after_tenths": int(week.bank_after_tenths),
+                "free_transfers_after": int(week.free_transfers_for_next_gameweek),
+            }
+            if include_resource_state and week is not None
+            else {}
+        ),
         # The week's hit charge, stated once because that is what it is: the game takes
         # four points for each transfer beyond the free ones, on the week rather than on
         # any one move, so no move row carries it.
@@ -877,6 +886,7 @@ def build_window_payload(
     league_id: int,
     window: int,
     horizon_builder: HorizonBuilder | None,
+    include_resource_state: bool = False,
 ) -> dict[str, object]:
     """One member's ``saf-puan`` advice over a three- or five-week window.
 
@@ -905,7 +915,14 @@ def build_window_payload(
 
     horizon = window_horizon(inputs, window, horizon_builder)
     plan = solve_window_plan(picks, inputs, rules, horizon, window=window)
-    return window_payload(picks, projection, plan, league_id=league_id, window=window)
+    return window_payload(
+        picks,
+        projection,
+        plan,
+        league_id=league_id,
+        window=window,
+        include_resource_state=include_resource_state,
+    )
 
 
 def window_horizon(
@@ -983,6 +1000,7 @@ def window_payload(
     move_reason: Callable[[int | None, int | None], str] | None = None,
     choice_points: Mapping[int, float] | None = None,
     base_horizon: ProjectionHorizon | None = None,
+    include_resource_state: bool = False,
 ) -> dict[str, object]:
     """The published shape of a solved window: the first week as a one-week card, the
     whole window in ``plan_weeks``.
@@ -1054,6 +1072,14 @@ def window_payload(
         "source_snapshot_id": picks.source_snapshot_id,
         # The first week's moves, in the one-week shape the page already renders.
         "moves": moves,
+        **(
+            {
+                "bank_after_tenths": int(first.bank_after_tenths),
+                "free_transfers_after": int(first.free_transfers_for_next_gameweek),
+            }
+            if include_resource_state
+            else {}
+        ),
         # The first week's hit charge, once, as the one-week payload carries it; the
         # rest of the window's charges are on their own rows in ``plan_weeks``.
         "transfer_hit_points": float(first.transfer_hit_points),
@@ -1122,6 +1148,7 @@ def advise_entry(
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
     horizon_builder: HorizonBuilder | None = None,
     pricing: TransferPlanResult | None = None,
+    include_resource_state: bool = False,
 ) -> dict[str, object]:
     """Compute one member's advice for a validated request.
 
@@ -1182,6 +1209,7 @@ def advise_entry(
                 league_id=request.league_id,
                 window=request.window,
                 horizon_builder=horizon_builder,
+                include_resource_state=include_resource_state,
             )
         return build_advice_payload(
             picks,
@@ -1191,6 +1219,7 @@ def advise_entry(
             league_id=request.league_id,
             control=control,
             phase_e_diagnostic=phase_e_diagnostic,
+            include_resource_state=include_resource_state,
         )
     strategy = STRATEGY_CATALOG[request.strategy]
     floor = strategy.constraints.overlap_floor

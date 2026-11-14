@@ -46,6 +46,7 @@ def advise_chip_strategy(
     counts: Top100Counts | None = None,
     preferences: DecisionPreferences = NO_PREFERENCES,
     chip_tail_forecast: ChipTailForecast | None = None,
+    include_resource_state: bool = False,
 ) -> dict[str, object]:
     if chip_tail_forecast is not None and chip != "auto":
         raise EntryError("A dated chip tail requires the automatic chip strategy.")
@@ -111,6 +112,7 @@ def advise_chip_strategy(
         weeks=shown,
         optimality_gap_published=False,
         base_horizon=base,
+        include_resource_state=include_resource_state,
     )
     first = shown[0]
     choice = {

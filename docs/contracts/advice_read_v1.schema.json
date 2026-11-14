@@ -49,6 +49,10 @@
             "null"
           ]
         },
+        "bank_after_tenths": {
+          "minimum": 0,
+          "type": "integer"
+        },
         "bench": {
           "items": {
             "properties": {
@@ -535,6 +539,10 @@
         },
         "expected_points_cost_ceiling": {
           "type": "number"
+        },
+        "free_transfers_after": {
+          "minimum": 0,
+          "type": "integer"
         },
         "gameweek": {
           "minimum": 1,
@@ -1834,6 +1842,18 @@
           "additionalProperties": false,
           "properties": {
             "avoid_players": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 15,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "hold_transfers": {
+              "type": "boolean"
+            },
+            "include_players": {
               "items": {
                 "minimum": 1,
                 "type": "integer"

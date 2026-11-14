@@ -17,7 +17,7 @@
  *
  * LIVE, at the member's address too, reads the member list, the squad and the advice index,
  * and its rival's FPL bundle, never his published squad: there only those three and the
- * fixtures start.
+ * fixtures start. LLMOPT needs the member list, squad and fixtures.
  */
 
 import type { QueryClient } from "@tanstack/react-query";
@@ -33,8 +33,8 @@ export function prefetchMemberReads(
   entryId: number | null,
   /** Members the address names beside this one (`?rival=`, `?duel=`); a null names nobody. */
   rivalIds: readonly (number | null)[] = [],
-  /** The page at the address: the member page, or LIVE, which reads fewer documents. */
-  page: "member" | "live" = "member",
+  /** LIVE and LLMOPT read fewer documents than the member page. */
+  page: "member" | "live" | "llmopt" = "member",
   /**
    * A league read through the forwarder: there LIVE takes its rival from the table, so its
    * index (a head-to-head league's pairings among its reads) is not started.
@@ -53,14 +53,14 @@ export function prefetchMemberReads(
     queryFn: () => tree.entrySquad(entryId),
     ...LEAGUE_READ,
   });
-  if (page !== "live" || !forwarded) {
+  if (page === "member" || (page === "live" && !forwarded)) {
     void client.prefetchQuery({
       queryKey: leagueKeys.adviceIndex(leagueId, entryId),
       queryFn: () => tree.entryAdviceIndex(entryId),
       ...LEAGUE_READ,
     });
   }
-  if (page === "live") {
+  if (page !== "member") {
     prefetchFixtures(client);
     return;
   }
