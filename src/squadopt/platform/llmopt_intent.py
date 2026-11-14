@@ -66,8 +66,10 @@ null for player_id. Do not infer roster status from English or Turkish wording a
 For a request to compare a constrained and an unconstrained plan, set comparison to
 that constraint and leave the hard and soft lists unchanged unless explicitly edited.
 Set comparison.both to true only for an explicit comparison with and without a player,
-using include_player for that comparison. Otherwise use false. Use null for no
-comparison. If the user asks for both but the player is unclear, ask who they mean.
+using include_player for that comparison even when the player is already held. A
+requirement stated for both plans belongs in hard. Otherwise use false for comparison.both.
+Use null for no comparison. If the user asks for both but the player is unclear, ask who
+they mean.
 
 On success use status "draft", return the draft and set message to null. On
 clarification use status "clarification", set draft to null, and ask one short
@@ -180,9 +182,13 @@ def _constraint(
     elif "player_id" in value and (not model or value["player_id"] is not None):
         raise IntentValidationError("Unexpected player for this constraint.")
     both = value.get("both", False)
-    if type(both) is not bool or (both and kind != "include_player"):
+    if type(both) is not bool:
         raise IntentValidationError("Invalid with-and-without comparison.")
     if both:
+        if kind != "include_player" and (not model or kind not in _PLAYER_KINDS):
+            raise IntentValidationError("Invalid with-and-without comparison.")
+        # Both memberships are requested regardless of which side the model named first.
+        result["kind"] = "include_player"
         result["both"] = True
     return result
 
