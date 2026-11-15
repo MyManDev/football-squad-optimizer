@@ -198,13 +198,25 @@ def propose_expected_swap(
             ids = held - {outgoing} | {incoming}
             if ids in retained_squads or not required <= ids or ids & avoid:
                 continue
-            if (
-                initial.bank_tenths + int(cast(int, first.at[outgoing, "sell_price_tenths"]))
-                < int(cast(int, first.at[incoming, "buy_price_tenths"]))
-                or max(Counter(first.loc[list(ids), "team_id"]).values())
-                > optimization.max_players_per_team
+            if initial.bank_tenths + int(cast(int, first.at[outgoing, "sell_price_tenths"])) < int(
+                cast(int, first.at[incoming, "buy_price_tenths"])
             ):
                 continue
+            club_totals = Counter(map(str, first.loc[list(ids), "team_id"]))
+            if max(club_totals.values()) > optimization.max_players_per_team:
+                continue
+            if preferences.club_counts:
+                incoming_club = str(first.at[incoming, "team_id"])
+                if any(
+                    (
+                        int(incoming_club == rule.club)
+                        if rule.scope == "transfers_in"
+                        else club_totals[rule.club]
+                    )
+                    != rule.count
+                    for rule in preferences.club_counts
+                ):
+                    continue
             proxy = (
                 float(multipliers[outgoing])
                 * (

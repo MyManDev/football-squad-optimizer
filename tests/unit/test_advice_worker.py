@@ -1815,6 +1815,7 @@ def test_preferences_round_trip_through_http_worker_cache(running):
         {"keep_players": [1002]},
         {"avoid_players": [1025]},
         {"include_players": [1025]},
+        {"club_counts": [{"club": "Unknown Club", "count": 2}]},
     ):
         refused = client.post(route, json={**body, "preferences": unknown})
         assert refused.status_code == 422, refused.text
@@ -1886,6 +1887,36 @@ def test_llmopt_wildcard_rebuilds_the_squad_under_player_preferences(running):
     chosen = {row["player_id"] for row in payload["starting_xi"] + payload["bench"]}
     assert len(chosen) == 15
     assert 1007 in chosen and 1007 not in SQUAD_CODES
+    assert payload["transfer_hit_points"] == 0
+    assert payload["bank_after_tenths"] >= 0
+
+
+def test_llmopt_wildcard_chooses_club_signings_without_player_ids(running):
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 1, "chip": "wildcard"}
+    preferences = {
+        "club_counts": [
+            {"club": "Club 2", "count": 2, "scope": "transfers_in"},
+            {"club": "Club 1", "count": 2},
+        ],
+        "no_hits": True,
+    }
+    submitted = client.post(route, json={**selection, "preferences": preferences})
+    assert submitted.status_code == 202, submitted.text
+    assert _work(backend) == 1
+    served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["chip"] == "wildcard"
+    assert payload["preferences"]["club_counts"] == preferences["club_counts"][::-1]
+    chosen = {player["player_id"] for player in payload["starting_xi"] + payload["bench"]}
+    signings = {player["player_id"] for player in payload["plan_weeks"][0]["transfers_in"]}
+    assert len(chosen) == 15
+    assert signings == chosen - set(SQUAD_CODES)
+    assert len(signings & {1002, 1005, 1021}) == 2  # The three available Club 2 players.
+    assert len(chosen & {1001, 1004, 1010, 1012, 1018, 1020}) == 2  # Club 1 roster.
     assert payload["transfer_hit_points"] == 0
     assert payload["bank_after_tenths"] >= 0
 

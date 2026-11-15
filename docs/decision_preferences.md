@@ -1,7 +1,7 @@
 # Human constraints and the multiweek control
 
 Pure-points advice supports keep-player, include-player, avoid-player, no-hit,
-hold-transfers and save-chip constraints for either forecast model and the selected
+hold-transfers, save-chip and club-count constraints for either forecast model and the selected
 1/3/5-week window. They leave forecast inputs and Top100 utility unchanged. Keep and
 include require the player on every selected squad. The optimizer still chooses the
 starting eleven and captain. Avoid excludes the player from every selected squad,
@@ -9,6 +9,11 @@ which requires selling a held player in week one. No-hit allows free transfers.
 Hold-transfers requires zero moves and rules out a Wildcard or Free Hit rebuild
 throughout the window. Save-chip rules out every chip. An automatic chip request
 conflicts with hold-transfers. Subsequent real FPL transfers require a new capture.
+
+Club-count constraints apply to each week in the selected window. Each rule names a
+club from the capture and requires between one and three players. The default scope
+counts players in the resulting squad. The `transfers_in` scope counts new signings
+and conflicts with holding transfers. The optimizer chooses the players in both cases.
 
 Keep, include and avoid each accept up to fifteen unique positive persistent player
 codes. A player required by keep or include cannot also be avoided. The API checks
@@ -21,8 +26,9 @@ The existing approximate chip continuation remains experimental, not a measured 
 
 `preferences` is a canonical object in the advice POST and a JSON query value on GET.
 It participates in the request fingerprint, job specification and cache identity.
-The new `include_players` and `hold_transfers` fields are optional. Empty include and
-false hold are omitted from canonical preferences, preserving legacy identities.
+The `include_players`, `hold_transfers` and `club_counts` fields are optional. Empty
+include and club counts and false hold are omitted from canonical preferences,
+preserving legacy identities.
 The worker verifies
 the recorded identity before computation. Results echo the object and
 `preferences_scope: all_selected_weeks`; the web client refuses a mismatching answer.
