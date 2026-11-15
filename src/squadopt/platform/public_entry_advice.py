@@ -130,7 +130,11 @@ class PublicEntryAdviceReader(AdviceReadStore):
         except Exception:
             return None
         roster = frozenset(int(code) for code in inputs.players["player_id"])
-        return PreferencePlayers(squad=frozenset(squad), roster=roster)
+        return PreferencePlayers(
+            squad=frozenset(squad),
+            roster=roster,
+            clubs=frozenset(map(str, inputs.players["team_id"])),
+        )
 
     @staticmethod
     def _check_ids(league_id: int, entry_id: int) -> None:

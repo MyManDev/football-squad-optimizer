@@ -1850,6 +1850,37 @@
               "type": "array",
               "uniqueItems": true
             },
+            "club_counts": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "club": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "count": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "scope": {
+                    "enum": [
+                      "squad",
+                      "transfers_in"
+                    ]
+                  }
+                },
+                "required": [
+                  "club",
+                  "count"
+                ],
+                "type": "object"
+              },
+              "maxItems": 16,
+              "type": "array",
+              "uniqueItems": true
+            },
             "hold_transfers": {
               "type": "boolean"
             },
