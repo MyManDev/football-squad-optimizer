@@ -87,6 +87,17 @@ def make_live_case(tmp_path_factory, *, fit_cutoff=None):
         "events": [
             {"id": 1, "deadline_time": "2026-08-01T12:00:00Z", "is_next": False, "finished": True},
             {"id": 6, "deadline_time": deadline, "is_next": True, "finished": False},
+            *(
+                {
+                    "id": week,
+                    "deadline_time": (
+                        pd.Timestamp(deadline) + pd.Timedelta(weeks=week - 6)
+                    ).isoformat(),
+                    "is_next": False,
+                    "finished": False,
+                }
+                for week in range(7, 11)
+            ),
         ],
         "teams": [{"id": club, "code": club, "name": f"Club {club}"} for club in range(1, 7)],
         "elements": [

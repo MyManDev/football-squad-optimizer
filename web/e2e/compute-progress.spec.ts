@@ -27,6 +27,21 @@ const RUNNING_ONE_OF_THREE = {
   workers: { busy: 3, total: 3 },
 };
 
+test("a queued SquadOpt plan still starts after its five-week solve budget has elapsed", async ({
+  page,
+}) => {
+  test.skip(!apiOrigin, NO_SERVICE);
+  await page.clock.install();
+  const { dock, job } = await askForPlan(page, "en", QUEUED_BEHIND_TWO);
+  await expect(dock.getByText(COMPUTE_COPY.en.queueAhead(2), { exact: false })).toBeVisible();
+
+  await page.clock.fastForward(11 * 60_000);
+  await expect(dock.getByText(COMPUTE_COPY.en.queueAhead(2), { exact: false })).toBeVisible();
+  job.says = RUNNING_ONE_OF_THREE;
+  await page.clock.fastForward(5000);
+  await expect(dock.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "33");
+});
+
 /** The service: every poll answers what the test last told the job to say. */
 async function installService(page: Page, view: object): Promise<{ says: object }> {
   const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;

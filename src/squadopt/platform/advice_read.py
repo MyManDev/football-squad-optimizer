@@ -379,6 +379,7 @@ class AdviceReadStore:
     ``preference_players`` reads the member's captured squad and the capture's roster;
     without one, and for a member whose squad it cannot read, a request that keeps or
     avoids a player is refused, because its ids cannot be checked.
+    ``available_windows`` limits the configured menu to the capture's calendar.
     """
 
     def __init__(
@@ -396,6 +397,7 @@ class AdviceReadStore:
         | None = None,
         preference_players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None]
         | None = None,
+        available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
     ) -> None:
         self._directory = directory
         self._cache = cache
@@ -414,6 +416,7 @@ class AdviceReadStore:
         self._switches = switches
         self._chip_availability = chip_availability
         self._preference_players = preference_players
+        self._available_windows = available_windows
 
     def _preference_players_of(
         self, context: AdviceRequestContext, league_id: int, entry_id: int
@@ -472,6 +475,10 @@ class AdviceReadStore:
                 raise UnsupportedAdviceRequestError(
                     "A requested club is not in this capture's roster."
                 )
+        if players.squad.intersection(preferences.for_week(1).buy_players):
+            raise UnsupportedAdviceRequestError(
+                "A player already in the member's squad cannot be bought in the first week."
+            )
 
     def league_state(self, league_id: int) -> dict[str, object]:
         """Connected or not, from the published tree — never an upstream call."""
@@ -501,6 +508,18 @@ class AdviceReadStore:
             return AdviceSwitchInputs()
         return self._switches.switch_inputs(context) or AdviceSwitchInputs()
 
+    def _capture_windows(self, context: AdviceRequestContext) -> tuple[int, ...]:
+        if self._available_windows is None:
+            return MEMBER_WINDOWS
+        return self._available_windows(context)
+
+    def _check_capture_window(self, context: AdviceRequestContext, window: int) -> None:
+        if window not in self._capture_windows(context):
+            raise UnsupportedAdviceRequestError(
+                f"The capture does not have {window} consecutive gameweeks "
+                f"starting at gameweek {context.gameweek}."
+            )
+
     def _held_chips(
         self, context: AdviceRequestContext, league_id: int, entries: tuple[int, ...]
     ) -> Mapping[int, tuple[str, ...] | None]:
@@ -513,8 +532,8 @@ class AdviceReadStore:
     def league_capabilities(self, league_id: int) -> dict[str, object]:
         """What may be asked for this league right now, so a page enables only that.
 
-        The strategies and their windows are this deployment's; the two switches are
-        offered only while the current capture has the input each one is computed from.
+        The capture limits the deployment's windows to the dates it can project. A
+        switch is offered when the capture has the inputs it is computed from.
         """
 
         league = self._directory.league(league_id)
@@ -538,13 +557,18 @@ class AdviceReadStore:
 
         inputs = self._switch_inputs(context)
         chips = self._held_chips(context, league_id, entries)
+        windows = set(self._capture_windows(context))
         top100 = inputs.top100_counts is not None and any(
-            capability.top100_windows for capability in self._capabilities.values()
+            not windows.isdisjoint(capability.top100_windows)
+            for capability in self._capabilities.values()
         )
         word = (
             inputs.manager_words is not None
             and inputs.rotation_table_sha256 is not None
-            and any(capability.managers_word_windows for capability in self._capabilities.values())
+            and any(
+                not windows.isdisjoint(capability.managers_word_windows)
+                for capability in self._capabilities.values()
+            )
         )
         document: dict[str, object] = {
             "contract_version": LEAGUE_CAPABILITIES_CONTRACT_VERSION,
@@ -554,7 +578,7 @@ class AdviceReadStore:
             "gameweek": context.gameweek,
             "strategies": {
                 slug: {
-                    "windows": list(capability.windows),
+                    "windows": [window for window in capability.windows if window in windows],
                     "requires_rival": capability.requires_rival,
                 }
                 for slug, capability in sorted(self._capabilities.items())
@@ -566,7 +590,7 @@ class AdviceReadStore:
             "chips": {
                 "strategy": {
                     "version": CHIP_STRATEGY_VERSION,
-                    "windows": list(MEMBER_WINDOWS),
+                    "windows": [window for window in MEMBER_WINDOWS if window in windows],
                 },
                 "held_by_entry": {
                     str(entry): list(held) for entry, held in chips.items() if held is not None
@@ -757,6 +781,7 @@ class AdviceReadStore:
                 f"capture is for {context.season} gameweek {context.gameweek}; advice "
                 "waits until the two are for the same week."
             )
+        self._check_capture_window(context, window)
         switches = self._switches_for(
             context,
             league_id,

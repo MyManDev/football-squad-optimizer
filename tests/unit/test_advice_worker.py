@@ -13,7 +13,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -94,12 +94,14 @@ def _capture_with_entries(
     snapshot_root: Path,
     entries: tuple[int, ...] = (ENTRY_ID,),
     *,
-    third_decision_week: bool = False,
+    last_gameweek: int = 3,
+    blank_decision_week: int | None = None,
 ) -> str:
     gw1_finished = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
-    if third_decision_week:
+    for gameweek in range(4, last_gameweek + 1):
+        deadline = datetime(2026, 9, 19, 14, tzinfo=UTC) + timedelta(weeks=gameweek - 4)
         gw1_finished.append(
-            dict(world_module.EVENTS[-1], id=4, deadline_time="2026-09-19T14:00:00Z")
+            dict(world_module.EVENTS[-1], id=gameweek, deadline_time=deadline.isoformat())
         )
     written = write_snapshot(
         snapshot_root,
@@ -109,7 +111,11 @@ def _capture_with_entries(
             BOOTSTRAP_PAYLOAD: world_module._bootstrap(
                 events=gw1_finished, elements=world_module._elements(event_points=2)
             ),
-            FIXTURES_PAYLOAD: _calendar(gameweeks=tuple(event["id"] for event in gw1_finished)),
+            FIXTURES_PAYLOAD: _calendar(
+                gameweeks=tuple(
+                    event["id"] for event in gw1_finished if event["id"] != blank_decision_week
+                )
+            ),
             **{name: raw for entry in entries for name, raw in _entry_payloads(entry, 1).items()},
         },
     )
@@ -128,7 +134,8 @@ def _deployment(
     monkeypatch: pytest.MonkeyPatch,
     entries: tuple[int, ...] = (ENTRY_ID,),
     *,
-    third_decision_week: bool = False,
+    last_gameweek: int = 3,
+    blank_decision_week: int | None = None,
     **configured: Any,
 ) -> dict[str, Any]:
     monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
@@ -136,7 +143,10 @@ def _deployment(
     handoff_root = tmp_path / "handoffs"
     site_root = tmp_path / "site"
     snapshot_id = _capture_with_entries(
-        snapshot_root, entries, third_decision_week=third_decision_week
+        snapshot_root,
+        entries,
+        last_gameweek=last_gameweek,
+        blank_decision_week=blank_decision_week,
     )
     deployment_module._handoff(handoff_root, snapshot_id)
     deployment_module._publish_members(site_root, RIVAL_ID)
@@ -1791,6 +1801,72 @@ def _work(backend: Any, jobs: int = 1) -> int:
     )
 
 
+@pytest.mark.parametrize("chip", [None, "wildcard"])
+@pytest.mark.parametrize("window", [3, 5])
+def test_calendar_limits_member_windows_before_queueing(running, chip, window):
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    league = f"/api/v1/leagues/{LEAGUE_ID}"
+    route = f"{league}/entries/{ENTRY_ID}/advice"
+    capabilities = client.get(f"{league}/capabilities").json()
+    assert capabilities["strategies"]["saf-puan"]["windows"] == [1]
+    assert capabilities["chips"]["strategy"]["windows"] == [1]
+
+    selection = {"strategy": "saf-puan", "window": window}
+    if chip is not None:
+        selection["chip"] = chip
+    for response in (client.get(route, params=selection), client.post(route, json=selection)):
+        assert response.status_code == 422, response.text
+        assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+        assert f"{window} consecutive gameweeks" in response.json()["error"]["message"]
+    assert not backend.queue.jobs()
+
+
+def test_three_week_plan_can_buy_a_player_back_and_include_a_captured_blank(tmp_path, monkeypatch):
+    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4, blank_decision_week=4)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    league = f"/api/v1/leagues/{LEAGUE_ID}"
+    route = f"{league}/entries/{ENTRY_ID}/advice"
+    capabilities = client.get(f"{league}/capabilities").json()
+    assert capabilities["strategies"]["saf-puan"]["windows"] == [1, 3]
+    assert capabilities["chips"]["strategy"]["windows"] == [1, 3]
+
+    owned = STARTING_ELEVEN[0]
+    preferences = {
+        "week_rules": [
+            {"week": 1, "rules": {"avoid_players": [owned]}},
+            {"week": 2, "rules": {"buy_players": [owned]}},
+        ]
+    }
+    selection = {"strategy": "saf-puan", "window": 3}
+    accepted = client.post(route, json={**selection, "preferences": preferences})
+    assert accepted.status_code == 202, accepted.text
+    assert _work(backend) == 1
+    result = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+    assert result.status_code == 200, result.text
+    first, second, blank = result.json()["payload"]["plan_weeks"]
+    assert owned in {player["player_id"] for player in first["transfers_out"]}
+    assert owned in {player["player_id"] for player in second["transfers_in"]}
+    assert blank["gameweek"] == 4
+    assert blank["expected_points"] == 0
+
+
+def test_an_opening_buy_of_an_owned_player_is_refused_before_queueing(running):
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 1}
+    preferences = {"week_rules": [{"week": 1, "rules": {"buy_players": [STARTING_ELEVEN[0]]}}]}
+    for response in (
+        client.get(route, params={**selection, "preferences": json.dumps(preferences)}),
+        client.post(route, json={**selection, "preferences": preferences}),
+    ):
+        assert response.status_code == 422, response.text
+        assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+        assert "already in the member's squad" in response.json()["error"]["message"]
+    assert not backend.queue.jobs()
+
+
 def test_preferences_round_trip_through_http_worker_cache(running):
     backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
@@ -1886,7 +1962,7 @@ def test_llmopt_constraints_round_trip_through_the_advice_worker(running, new_pr
 
 
 def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, third_decision_week=True)["backend"]
+    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
     message = (
         "Bu hafta transferi sakla, haftaya Player 1002'yi al. Üç haftada en fazla 4 puan ceza öde."
     )
@@ -1966,7 +2042,7 @@ def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_pa
 
 
 def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, third_decision_week=True)["backend"]
+    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3}
@@ -2007,7 +2083,7 @@ def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, 
 
 
 def test_llmopt_prices_a_preference_on_the_same_three_week_net_points_basis(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, third_decision_week=True)["backend"]
+    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3}

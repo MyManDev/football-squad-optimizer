@@ -144,6 +144,7 @@ export function AdviceRequestPanel({
   compact = false,
   serverLabel,
   disabled = false,
+  canStart,
 }: {
   request: AdviceRequest;
   job: AdviceJob;
@@ -153,6 +154,8 @@ export function AdviceRequestPanel({
   serverLabel?: string;
   /** Keep the controls visible when the page's gameweek is closed. */
   disabled?: boolean;
+  /** Recheck availability at the time of a press. */
+  canStart?: () => boolean;
   selectionAvailable?: boolean;
   service?: ComputeService;
   /** With a ready service: whether it can answer this exact selection now. */
@@ -224,7 +227,7 @@ export function AdviceRequestPanel({
             device?.state.phase === "solving"
           }
           onClick={() => {
-            if (!disabled && supported) compute(request);
+            if (!disabled && supported && (canStart?.() ?? true)) compute(request);
           }}
         >
           {serverLabel ?? copy.computeButton}
@@ -247,7 +250,7 @@ export function AdviceRequestPanel({
               state.phase === "waiting"
             }
             onClick={() => {
-              if (!disabled) device.run();
+              if (!disabled && (canStart?.() ?? true)) device.run();
             }}
           >
             {copy.deviceButton}

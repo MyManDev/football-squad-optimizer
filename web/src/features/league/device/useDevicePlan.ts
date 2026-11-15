@@ -416,7 +416,7 @@ export function useDevicePlan(
         document = envelope.payload;
         if (selection.kind === "rival") {
           // The rival's eleven comes from their own entry document, held to the same
-          // capture as the member's; a document naming no captain cannot be scored.
+          // capture as the member's, with a full eleven and a captain to score.
           let rivalSquad: EntrySquad;
           try {
             rivalSquad = (await loadRival(selection.rivalEntryId)).payload;
@@ -431,7 +431,7 @@ export function useDevicePlan(
           }
           const rival = rivalFromSquad(selection.rivalEntryId, rivalSquad);
           if (rival === null) {
-            if (alive()) setState({ phase: "refused", status: "rival captain unknown" });
+            if (alive()) setState({ phase: "refused", status: "invalid rival lineup" });
             return;
           }
           strategy = { name: selection.strategy, rival };

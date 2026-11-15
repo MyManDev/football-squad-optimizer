@@ -243,13 +243,25 @@ def test_a_public_team_gets_every_switch_the_capture_has(public, selection):
         assert payload["chip_choice"]["chip"] == "bboost"
 
 
-def test_a_public_team_is_planned_over_a_longer_window(public):
-    """A three-week window is accepted and reaches the menu solve as a league member's does.
-
-    The test world's calendar ends at gameweek 3, so the solve itself stops at the horizon
-    it cannot build; the refusal names that, not the request.
-    """
+def test_a_public_team_refuses_an_unavailable_window_before_fetching(public):
     backend, client, fetch = public
+    route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
+    selection = {**BODY, "window": 3}
+    for response in (client.get(route, params=selection), client.post(route, json=selection)):
+        assert response.status_code == 422, response.text
+        assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+        assert "3 consecutive gameweeks" in response.json()["error"]["message"]
+    fetch.assert_not_called()
+    assert backend.queue_depth() == 0
+
+
+def test_a_public_team_is_planned_over_an_available_longer_window(tmp_path, monkeypatch):
+    backend = worker_tests._deployment(tmp_path, monkeypatch, public_entries=True, last_gameweek=4)[
+        "backend"
+    ]
+    fetch = Mock(side_effect=lambda entry, week: json.dumps(bundle(entry, week)).encode())
+    monkeypatch.setattr(backend.public_inputs, "_fetch", fetch)
+    client = TestClient(app_for_capture(backend, worker_tests.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/public/leagues/239/entries/{ENTRY}/advice"
     accepted = client.post(route, json={**BODY, "window": 3})
     assert accepted.status_code == 202, accepted.text
@@ -262,9 +274,10 @@ def test_a_public_team_is_planned_over_a_longer_window(public):
         ),
         at_utc=worker_tests.world_module.GW2_CAPTURED_AT,
     )
-    assert outcome.status == "failed", outcome
-    assert "Projection horizon targets gameweeks absent" in str(outcome)
-    assert "Unsupported public team request" not in str(outcome)
+    assert outcome.status == "completed", outcome
+    served = client.get(route, params={**BODY, "window": 3})
+    assert served.status_code == 200, served.text
+    assert [week["gameweek"] for week in served.json()["payload"]["plan_weeks"]] == [2, 3, 4]
 
 
 def test_a_chip_the_public_team_does_not_hold_is_refused_after_its_inputs_are_pinned(public):
@@ -295,7 +308,8 @@ def test_public_capabilities_name_the_pure_points_menu_and_the_pinned_teams_chip
     assert document["league_id"] == league
     assert document["capture_snapshot_id"] == backend.contexts.current().capture_snapshot_id
     assert set(document["strategies"]) == {"saf-puan", "ortak-koru", "fark-yarat"}
-    assert document["strategies"]["saf-puan"] == {"windows": [1, 3, 5], "requires_rival": False}
+    assert document["strategies"]["saf-puan"] == {"windows": [1], "requires_rival": False}
+    assert document["chips"]["strategy"]["windows"] == [1]
     assert document["chips"]["held_by_entry"] == {}
     fetch.assert_not_called()
 
@@ -345,6 +359,6 @@ def test_a_public_team_is_planned_against_a_public_rival_whose_inputs_are_pinned
 
     capabilities = client.get(f"/api/v1/public/leagues/239/entries/{ENTRY}/capabilities").json()
     assert capabilities["strategies"]["fark-yarat"] == {
-        "windows": [1, 3, 5],
+        "windows": [1],
         "requires_rival": True,
     }

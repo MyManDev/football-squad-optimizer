@@ -183,7 +183,9 @@ export function PlanResult({
           )
         : state.phase === "waiting"
           ? (jobStanding(computeCopy, state) ?? copy.computing)
-          : copy.computing;
+          : state.phase === "idle"
+            ? copy.resultUnavailable
+            : copy.computing;
     return (
       <article className={styles.result}>
         <h3 className={styles.resultTitle}>{title}</h3>

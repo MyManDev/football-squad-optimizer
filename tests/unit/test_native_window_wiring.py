@@ -177,10 +177,12 @@ def test_the_api_advice_worker_binds_the_native_executor_and_logs_its_outcome(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, recorder: RecordingExecutor
 ) -> None:
     artifacts = tmp_path / "artifacts"
-    world = worker_fixture._deployment(tmp_path, monkeypatch, artifact_root=artifacts)
+    world = worker_fixture._deployment(
+        tmp_path, monkeypatch, last_gameweek=6, artifact_root=artifacts
+    )
     backend = world["backend"]
     identity = backend.contexts.identity()
-    # The football forecast covers gameweeks 2 to 6, so this capture can answer a window.
+    # The published calendar and its football forecast both cover gameweeks 2 to 6.
     path = football_artifact_path(artifacts, world["snapshot_id"])
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(_forecast(identity.inputs)))

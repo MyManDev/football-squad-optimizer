@@ -117,14 +117,18 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   expect(await (await capabilities).json()).toMatchObject({
     contract_version: "league_capabilities_v1",
     capture_snapshot_id: context.snapshotId,
-    chips: { strategy: { windows: [1, 3, 5] } },
+    strategies: { "saf-puan": { windows: [1] } },
+    chips: { strategy: { windows: [1] } },
   });
-  // The automatic chip strategy is refused before any cache read or job (audit
-  // 2026-09-25, H3), while the capability above keeps the named chips over 3 and 5 weeks.
-  const automatic = { strategy: "saf-puan", window: 3, chip: "auto" };
+  // This capture only has one future deadline. Auto chip selection is unsupported even
+  // for that week; fixed chips and ordinary plans cannot extend past the known calendar.
+  const automatic = { strategy: "saf-puan", window: 1, chip: "auto" };
+  const beyondCalendar = { strategy: "saf-puan", window: 3 };
   for (const refused of [
     await page.request.post(route, { data: automatic }),
     await page.request.get(route, { params: automatic }),
+    await page.request.post(route, { data: beyondCalendar }),
+    await page.request.post(route, { data: { ...beyondCalendar, chip: "wildcard" } }),
   ]) {
     expect(refused.status()).toBe(422);
     expect((await refused.json()).error.code).toBe("UNSUPPORTED_ADVICE_REQUEST");
