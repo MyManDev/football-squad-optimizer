@@ -14,6 +14,7 @@ The examples are in [`advice_job_view_v1.examples.json`](advice_job_view_v1.exam
 | `created_at_utc`, `updated_at_utc` | UTC instant | When the job arrived and when its record last changed. |
 | `attempt` | integer | The attempt on the job, from 1. When a worker dies, recovery puts the job back in the queue with the attempt one higher. |
 | `error_code` | string or `null` | Why a `failed` job failed; `null` otherwise. |
+| `infeasibility` | optional object | Solver-proven `PLAN_NOT_FOUND` only. Lists verified rule edits in `repairs` and may carry the requested and reachable bank in `bank`. |
 | `queue_position` | integer or `null` | While `queued`: how many queued jobs will be claimed before this one, 0 when it is next. `null` in every other status, and while `queued` when the service could not read the queue. |
 | `progress` | `{done, total}` or `null` | While `running`: the documents this attempt has solved (`done`) out of those it has to solve (`total`). `null` in every other status, at the start of `running`, before the attempt has recorded its first count, and on a poll that could not read the count. |
 | `workers` | `{busy, total}` or `null` | The workers alive now (`total`) and how many of them hold a job (`busy`). `null` when the service cannot read them. |

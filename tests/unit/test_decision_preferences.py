@@ -337,6 +337,36 @@ def test_frozen_free_hit_uses_temporary_moves_and_the_bank_floor_uses_carry(
     assert last.bank_after_tenths >= 115
 
 
+@pytest.mark.parametrize("status", [cp_model.FEASIBLE, cp_model.UNKNOWN])
+def test_bank_diagnosis_distinguishes_a_witness_from_an_unfinished_probe(
+    known_optimum_players, small_config, monkeypatch, status
+):
+    horizon, initial, _ = _case(known_optimum_players)
+    original_solve = optimizer._solve
+
+    def limited(model, solver):
+        if status == cp_model.FEASIBLE:
+            assert original_solve(model, solver) == cp_model.OPTIMAL
+        return status
+
+    monkeypatch.setattr(optimizer, "_solve", limited)
+    report = optimizer.diagnose_infeasible_preferences(
+        horizon,
+        initial,
+        small_config,
+        TransferPlanningConfig(),
+        ChipAvailability(),
+        DecisionPreferences(hold_transfers=True, min_bank=BankFloor(101, week=2)),
+    )
+    if status == cp_model.FEASIBLE:
+        assert report == {
+            "bank": {"required": 101, "reachable": 100, "exact": False, "week": 2},
+            "repairs": [{"kind": "lower_bank_floor", "tenths": 100}],
+        }
+    else:
+        assert report == {"repairs": []}
+
+
 def test_net_points_priority_compares_the_exact_cost_of_keeping_a_player(
     known_optimum_players, small_config
 ):

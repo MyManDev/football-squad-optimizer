@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 
 import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures } from "../../../lib/clubs";
@@ -105,7 +105,7 @@ function MetricDelta({ label, value }: { label: string; value?: string }) {
   );
 }
 
-export type PreferencePrice = { key: string; label: string; ceiling?: number } & (
+export type PreferencePrice = { key: string; label: string; ceiling?: number; detail?: string } & (
   | { status: "pending" | "conflict" | "unavailable" | "skipped" }
   | { status: "priced"; cost: number; aboveCeiling: boolean; unproven: boolean }
 );
@@ -137,7 +137,7 @@ function PreferencePrices({ prices }: { prices: PreferencePrice[] }) {
             <span>
               {row.status === "priced"
                 ? copy.priceAmount(price.format(row.cost))
-                : statuses[row.status]}
+                : (row.detail ?? statuses[row.status])}
               {row.ceiling !== undefined &&
                 ` · ${copy.priceCeiling(price.format(row.ceiling / 10))}`}
             </span>
@@ -160,6 +160,8 @@ export function PlanResult({
   squad,
   baseline,
   conflict,
+  conflictMessage,
+  diagnosis,
   prices = [],
   onRevise,
   reviseDisabled,
@@ -169,6 +171,8 @@ export function PlanResult({
   squad: EntrySquad;
   baseline?: EntryAdvice;
   conflict?: boolean;
+  conflictMessage?: string;
+  diagnosis?: ReactNode;
   prices?: PreferencePrice[];
   onRevise?: () => void;
   reviseDisabled?: boolean;
@@ -178,7 +182,7 @@ export function PlanResult({
   const computeCopy = COMPUTE_COPY[language];
   if (conflict || state.phase !== "done") {
     const message = conflict
-      ? copy.variantConflict
+      ? (conflictMessage ?? copy.variantConflict)
       : state.phase === "failed" || state.phase === "unavailable"
         ? failureSentence(
             computeCopy,
@@ -193,7 +197,7 @@ export function PlanResult({
     return (
       <article className={styles.result}>
         <h3 className={styles.resultTitle}>{title}</h3>
-        <p role="status">{message}</p>
+        {diagnosis ?? <p role="status">{message}</p>}
         <PreferencePrices prices={prices} />
       </article>
     );

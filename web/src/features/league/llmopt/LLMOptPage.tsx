@@ -21,6 +21,7 @@ import { LEAGUE_READ, useEntrySquad } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
 import { LLMOPT_COPY, ruleLabel } from "./copy";
+import { InfeasibilityResult } from "./InfeasibilityResult";
 import {
   EMPTY_DRAFT,
   IntentError,
@@ -43,6 +44,7 @@ import {
   sameOpeningDecision,
   samePlan,
 } from "./planComparison";
+import { explainDraftConflict } from "./planConflicts";
 import {
   freezeReference,
   referenceWeeks,
@@ -395,6 +397,7 @@ function Workspace({
   const [run, setRun] = useState<PlanRun | null>(restoredRun);
   const confirmation = useRef<PlanConfirmation | undefined>(restored?.confirmation);
   const chatInput = useRef<HTMLTextAreaElement>(null);
+  const computeButton = useRef<HTMLButtonElement>(null);
   const interpret = useRef<AbortController | null>(null);
   const nextChatLine = useRef(conversation.length);
   const confirming = useRef(false);
@@ -426,6 +429,12 @@ function Workspace({
     if (!selected) return;
     change(draft, selected);
     chatInput.current?.focus();
+  }
+
+  function applyRepair(next: PlanDraft) {
+    change(next, reference);
+    setFeedback(copy.repairApplied);
+    computeButton.current?.focus();
   }
 
   function setQuestion(next?: Clarification) {
@@ -495,8 +504,41 @@ function Workspace({
   );
   const canCalculate =
     !plans.hardConflict && (draft.soft.length > 0 || plans.base || plans.alternative);
+  const conflictContext = {
+    gameweek: squad.gameweek,
+    window: plans.window,
+    held,
+    frozen,
+    players,
+    copy,
+  };
+  const hardConflict = plans.hardConflict
+    ? (explainDraftConflict(draft, conflictContext) ?? copy.hardConflict)
+    : undefined;
+
+  function explainBranchConflict(title: "base" | ExplicitTitle) {
+    const comparison = draft.comparison;
+    if (title === "base" || !comparison) return hardConflict;
+    const rule: Constraint =
+      title === "without" && comparison.kind === "include_player"
+        ? { kind: "avoid_player", player_id: comparison.player_id, week: comparison.week }
+        : comparison;
+    return explainDraftConflict({ ...draft, hard: [...draft.hard, rule] }, conflictContext);
+  }
+
   const computing = [base.state, first.state, second.state].some(({ phase }) => isWorking(phase));
   const busy = checkingSquad || reading || computing;
+  const diagnosis = (state: ComputePhase) =>
+    state.phase === "failed" && state.infeasibility ? (
+      <InfeasibilityResult
+        diagnosis={state.infeasibility}
+        request={state.request}
+        draft={draft}
+        players={players}
+        disabled={busy}
+        change={applyRepair}
+      />
+    ) : undefined;
   const baseState = base.state;
   const { resume: resumeBase, readCached: readBase } = base;
   const { compute: computeFirst } = first;
@@ -681,17 +723,27 @@ function Workspace({
   const baseAnswer = baseState.phase === "done" ? baseState.envelope.payload : undefined;
   const states = [first.state, second.state];
   const priceReview =
-    run?.prices.map((target) => ({
-      outcome: target.outcome,
-      price: preferencePrice(
+    run?.prices.map((target) => {
+      const price = preferencePrice(
         target,
         ruleLabel(target.rule, players, copy),
         baseState,
         states,
         !closed && (run !== restoredRun || restored?.confirmation?.followups === undefined),
-      ),
-    })) ?? [];
-  const results: { title: string; state: ComputePhase; conflict?: boolean }[] = [];
+      );
+      if (target.outcome === "conflict")
+        price.detail = explainDraftConflict(
+          { ...draft, hard: [...draft.hard, target.rule] },
+          conflictContext,
+        );
+      return { outcome: target.outcome, price };
+    }) ?? [];
+  const results: {
+    title: string;
+    state: ComputePhase;
+    conflict?: boolean;
+    conflictMessage?: string;
+  }[] = [];
   let same = false;
   if (run) {
     states.forEach((state, index) => {
@@ -706,9 +758,19 @@ function Workspace({
         ) {
           same = true;
         } else {
-          results.push({ title: copy[slot.title], state, conflict: slot.conflict });
+          results.push({
+            title: copy[slot.title],
+            state,
+            conflict: slot.conflict,
+            conflictMessage: slot.conflict ? explainBranchConflict(slot.title) : undefined,
+          });
         }
       } else if (slot?.kind === "priced") {
+        if (state.phase === "failed" && state.infeasibility) {
+          const reason = priceReview.find(({ outcome }) => outcome === index);
+          if (reason) results.push({ title: copy.pricedPlan(reason.price.label), state });
+          return;
+        }
         if (
           state.phase !== "done" ||
           samePlan(baseState, state) ||
@@ -873,9 +935,9 @@ function Workspace({
         {draft.comparison && draft.soft.length > 0 && (
           <p className={styles.muted}>{copy.comparisonScope}</p>
         )}
-        {plans.hardConflict && (
+        {hardConflict && (
           <p role="alert" className={styles.notice}>
-            {copy.hardConflict}
+            {hardConflict}
           </p>
         )}
         {closed && (
@@ -890,6 +952,7 @@ function Workspace({
         )}
         <button
           className={styles.primary}
+          ref={computeButton}
           type="button"
           disabled={
             busy ||
@@ -933,12 +996,16 @@ function Workspace({
                 state={base.state}
                 squad={squad}
                 conflict={run.baseConflict}
+                conflictMessage={
+                  run.baseConflict ? explainBranchConflict(run.baseTitle) : undefined
+                }
+                diagnosis={diagnosis(base.state)}
                 prices={priceReview.map(({ price }) => price)}
                 onRevise={baseAnswer ? () => revisePlan(baseAnswer) : undefined}
                 reviseDisabled={busy}
               />
             )}
-            {results.map(({ title, state, conflict }) => (
+            {results.map(({ title, state, conflict, conflictMessage }) => (
               <PlanResult
                 key={title}
                 title={title}
@@ -946,6 +1013,8 @@ function Workspace({
                 squad={squad}
                 baseline={baseAnswer}
                 conflict={conflict}
+                conflictMessage={conflictMessage}
+                diagnosis={diagnosis(state)}
                 onRevise={
                   state.phase === "done" ? () => revisePlan(state.envelope.payload) : undefined
                 }

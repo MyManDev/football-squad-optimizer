@@ -37,6 +37,7 @@ import {
   type StoredAdviceJob,
 } from "./adviceJobStore";
 import { AdviceContextError, AdviceResponseError, checkedAdvice } from "./adviceResponse";
+import type { PlanInfeasibility } from "./planInfeasibility";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 
 const POLL_INTERVAL_MS = 2000;
@@ -112,6 +113,7 @@ export type ComputePhase =
       /** A service code or one of the page's own; the panel turns it into a sentence. */
       reason?: string | null;
       retryAfterSeconds?: number | null;
+      infeasibility?: PlanInfeasibility;
       earlier?: EarlierAnswer | null;
     };
 
@@ -254,10 +256,16 @@ export function useAdviceJob(
         withRequestDeadline(operation, { signal, timeoutMs: REQUEST_ALLOWANCE_MS });
       let readAfterMissingJob = false;
       const alive = () => generation.current === run && !signal.aborted;
-      const fail = (error?: unknown, reason?: string) => {
+      const fail = (error?: unknown, reason?: string, infeasibility?: PlanInfeasibility) => {
         if (!alive()) return;
         const stated = failure(error);
-        setState({ phase: "failed", request, ...stated, reason: reason ?? stated.reason });
+        setState({
+          phase: "failed",
+          request,
+          ...stated,
+          reason: reason ?? stated.reason,
+          ...(infeasibility ? { infeasibility } : {}),
+        });
       };
       setState(
         resumed
@@ -412,7 +420,7 @@ export function useAdviceJob(
           }
           if (job.status === "failed") {
             forgetJob(request);
-            fail(undefined, job.errorCode ?? undefined);
+            fail(undefined, job.errorCode ?? undefined, job.infeasibility);
             return;
           }
           if (job.status === "running" && waiting.runningSince === undefined) {

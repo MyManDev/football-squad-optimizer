@@ -2237,18 +2237,24 @@ def test_llmopt_wildcard_chooses_club_signings_without_player_ids(running):
     assert payload["bank_after_tenths"] >= 0
 
 
-def test_impossible_llmopt_plan_returns_the_public_no_plan_code(running):
+@pytest.mark.parametrize("dated_purchase", [False, True])
+def test_impossible_llmopt_plan_returns_the_public_no_plan_code(running, dated_purchase):
     backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     # Club 2 is already full. Buying its goalkeeper and making room for him by
     # selling an outfield player from that club exceeds this squad's one free move.
+    requirement = (
+        {"week_rules": [{"week": 1, "rules": {"buy_players": [1002]}}]}
+        if dated_purchase
+        else {"include_players": [1002]}
+    )
     submitted = client.post(
         route,
         json={
             "strategy": "saf-puan",
             "window": 1,
-            "preferences": {"include_players": [1002], "no_hits": True},
+            "preferences": {**requirement, "no_hits": True},
         },
     )
     assert submitted.status_code == 202, submitted.text
@@ -2256,7 +2262,102 @@ def test_impossible_llmopt_plan_returns_the_public_no_plan_code(running):
     job = client.get(f"/api/v1/advice-jobs/{submitted.json()['job_id']}")
     assert job.json()["status"] == "failed"
     assert job.json()["error_code"] == "PLAN_NOT_FOUND"
+    assert job.json()["infeasibility"]["repairs"] == (
+        [{"kind": "release_purchase", "player_id": 1002, "week": 1}] if dated_purchase else []
+    )
     assert "INFEASIBLE" not in job.text
+
+
+def test_llmopt_proves_bank_shortfall_and_the_lower_floor_can_be_solved(running):
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 1}
+    common = {"hold_transfers": True, "no_hits": True}
+
+    def submit(preferences):
+        accepted = client.post(route, json={**selection, "preferences": preferences})
+        assert accepted.status_code == 202, accepted.text
+        assert _work(backend) == 1
+        return client.get(f"/api/v1/advice-jobs/{accepted.json()['job_id']}").json()
+
+    assert submit(common)["status"] == "completed"
+    baseline = client.get(route, params={**selection, "preferences": json.dumps(common)})
+    reachable = baseline.json()["payload"]["plan_weeks"][0]["bank_after_tenths"]
+    impossible = {**common, "min_bank": {"tenths": reachable + 5}}
+    failure = submit(impossible)
+    assert failure["error_code"] == "PLAN_NOT_FOUND"
+    assert failure["infeasibility"] == {
+        "bank": {"required": reachable + 5, "reachable": reachable, "exact": True},
+        "repairs": [{"kind": "lower_bank_floor", "tenths": reachable}],
+    }
+    if reachable:
+        assert submit({**common, "min_bank": {"tenths": reachable}})["status"] == "completed"
+    else:
+        assert baseline.status_code == 200
+
+
+def test_llmopt_only_offers_a_deferral_witness_with_other_rules_preserved(tmp_path, monkeypatch):
+    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 3}
+    common = {"no_hits": True, "keep_players": [1003]}
+    original = {**common, "week_rules": [{"week": 1, "rules": {"buy_players": [1002, 1007]}}]}
+    accepted = client.post(route, json={**selection, "preferences": original})
+    assert accepted.status_code == 202, accepted.text
+    assert _work(backend) == 1
+    failed = client.get(f"/api/v1/advice-jobs/{accepted.json()['job_id']}").json()
+    assert failed["error_code"] == "PLAN_NOT_FOUND"
+    assert failed["infeasibility"] == {
+        "repairs": [{"kind": "defer_purchase", "player_id": 1002, "from_week": 1, "to_week": 2}]
+    }
+
+    repaired = {
+        **common,
+        "week_rules": [
+            {"week": 1, "rules": {"buy_players": [1007]}},
+            {"week": 2, "rules": {"buy_players": [1002]}},
+        ],
+    }
+    accepted = client.post(route, json={**selection, "preferences": repaired})
+    assert accepted.status_code == 202, accepted.text
+    assert _work(backend) == 1
+    solved = client.get(route, params={**selection, "preferences": json.dumps(repaired)})
+    assert solved.status_code == 200, solved.text
+    first, second, last = solved.json()["payload"]["plan_weeks"]
+    assert [p["player_id"] for p in first["transfers_in"]] == [1007]
+    assert 1002 in {p["player_id"] for p in second["transfers_in"]}
+    for week in (first, second, last):
+        lineup = week["lineup"]
+        assert week["transfer_hit_points"] == 0
+        assert 1003 in {p["player_id"] for p in lineup["starting_xi"] + lineup["bench"]}
+
+
+@pytest.mark.parametrize("error_kind", ["unknown", "wall_clock"])
+def test_unfinished_llmopt_search_has_no_preference_diagnosis(running, monkeypatch, error_kind):
+    from squadopt.live.transfers import HorizonNoSolutionError
+    from squadopt.optimization import SolverExecutionError, SolverStatus
+
+    def unfinished(*args, **kwargs):
+        if error_kind == "unknown":
+            raise HorizonNoSolutionError("private solver state", status=SolverStatus.UNKNOWN)
+        raise SolverExecutionError("private wall-clock details")
+
+    monkeypatch.setattr(worker_module, "advise_menu_entry", unfinished)
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    accepted = client.post(
+        route,
+        json={"strategy": "saf-puan", "window": 1, "preferences": {"min_bank": {"tenths": 90}}},
+    )
+    assert accepted.status_code == 202, accepted.text
+    assert _work(backend) == 1
+    failed = client.get(f"/api/v1/advice-jobs/{accepted.json()['job_id']}")
+    assert failed.json()["error_code"] == "ADVICE_FAILED"
+    assert "infeasibility" not in failed.json()
+    assert "private" not in failed.text
 
 
 def _export_top100(

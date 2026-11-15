@@ -57,6 +57,33 @@ const en = {
   deadlineUnknown: "The gameweek deadline is unavailable.",
   hardConflict: "These required rules conflict with each other or with the current squad.",
   variantConflict: "This alternative conflicts with the required rules or with the current squad.",
+  conflictingRules: (week: number, first: string, second: string) =>
+    `In GW ${week}, “${first}” conflicts with “${second}”. Edit one of these rules.`,
+  frozenRuleConflict: (week: number, rule: string) =>
+    `GW ${week} is locked to the previous plan. Edit “${rule}” or unlock the week.`,
+  missingFrozenWeek: (week: number) =>
+    `There is no reference plan for GW ${week}. Remove its lock or choose a plan with that week.`,
+  buyAlreadyHeld: (week: number, player: string) =>
+    `${player} is already in your squad for GW ${week}. Use a keep rule or remove the purchase.`,
+  keepUnowned: (player: string) =>
+    `${player} is outside your squad. Use an include rule to consider signing them.`,
+  infeasibilityTitle: "Why this plan is infeasible",
+  infeasibilityProof:
+    "No plan satisfies these rules together. Edit a required rule and calculate again.",
+  bankAfterFinal: "After the final week",
+  bankAfterWeek: (week: number) => `After GW ${week}`,
+  bankShortfall: (when: string, required: string, reachable: string, difference: string) =>
+    `${when}, the required budget is ${required}. The most this plan can keep is ${reachable}. The shortfall is ${difference}.`,
+  bankWitness: (when: string, required: string, reachable: string) =>
+    `${when}, the required budget is ${required}. A checked alternative leaves ${reachable}.`,
+  lowerBankMinimum: (bank: string) => `Lower the minimum remaining budget to ${bank}`,
+  removeBankMinimum: "Remove the minimum remaining budget",
+  deferPurchase: (player: string, before: number, after: number) =>
+    `Move the ${player} transfer from GW ${before} to GW ${after}`,
+  releasePurchase: (player: string, week: number) =>
+    `Remove the ${player} transfer rule in GW ${week}`,
+  applyRepair: "Apply suggested rules",
+  repairApplied: "Suggested rules selected. Review them and calculate again.",
   wildcardUnavailable: "This team cannot play its Wildcard this gameweek.",
   results: "Plans",
   base: "Base plan",
@@ -178,6 +205,33 @@ const tr: typeof en = {
   deadlineUnknown: "Haftanın son teslim zamanı yüklenemedi.",
   hardConflict: "Kesin şartlar birbiriyle veya mevcut kadroyla çelişiyor.",
   variantConflict: "Bu alternatif kesin şartlarla veya mevcut kadroyla çelişiyor.",
+  conflictingRules: (week: number, first: string, second: string) =>
+    `GW ${week} için “${first}” ile “${second}” çelişiyor. Kurallardan birini düzenle.`,
+  frozenRuleConflict: (week: number, rule: string) =>
+    `GW ${week} önceki plana göre kilitli. “${rule}” kuralını düzenle veya haftanın kilidini kaldır.`,
+  missingFrozenWeek: (week: number) =>
+    `GW ${week} için referans plan yok. Kilidi kaldır veya bu haftayı içeren bir plan seç.`,
+  buyAlreadyHeld: (week: number, player: string) =>
+    `${player} GW ${week} için zaten kadroda. Oyuncuyu tutma kuralı kullan veya transfer kuralını kaldır.`,
+  keepUnowned: (player: string) =>
+    `${player} kadroda değil. Transferini değerlendirmek için kadroya alma kuralını kullan.`,
+  infeasibilityTitle: "Bu plan neden uygulanamıyor?",
+  infeasibilityProof:
+    "Tüm kuralları birlikte karşılayan bir plan yok. Bir kesin şartı düzenleyip tekrar hesapla.",
+  bankAfterFinal: "Son haftanın sonunda",
+  bankAfterWeek: (week: number) => `GW ${week} sonunda`,
+  bankShortfall: (when: string, required: string, reachable: string, difference: string) =>
+    `${when} en az ${required} kalması gerekiyor. Bu plan en fazla ${reachable} bırakabiliyor. Eksik tutar ${difference}.`,
+  bankWitness: (when: string, required: string, reachable: string) =>
+    `${when} en az ${required} kalması gerekiyor. Kontrol edilen bir alternatif ${reachable} bırakıyor.`,
+  lowerBankMinimum: (bank: string) => `Asgari kalan bütçeyi ${bank} olarak değiştir`,
+  removeBankMinimum: "Asgari kalan bütçe kuralını kaldır",
+  deferPurchase: (player: string, before: number, after: number) =>
+    `${player} transferini GW ${before} yerine GW ${after} haftasına al`,
+  releasePurchase: (player: string, week: number) =>
+    `GW ${week} için ${player} transfer kuralını kaldır`,
+  applyRepair: "Önerilen kuralları uygula",
+  repairApplied: "Önerilen kurallar seçildi. Kontrol edip yeniden hesapla.",
   wildcardUnavailable: "Bu takım bu hafta Wildcard kullanamıyor.",
   results: "Planlar",
   base: "Temel plan",
