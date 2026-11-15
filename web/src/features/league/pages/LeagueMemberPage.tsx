@@ -6,7 +6,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { useFixtures } from "../../fixtures/data";
 import { LeagueDataMissing } from "../data";
-import { gameweekDeadline, passedDeadline, useMinuteClock } from "../advice/deadline";
+import { gameweekDeadline, passedDeadline, useDeadlineClock } from "../advice/deadline";
 import { useLeagueScoreboard, useSuggestionHistory } from "../queries";
 import { lastWeekResult } from "./lastWeekResult";
 import { LeagueMemberView } from "./LeagueMemberView";
@@ -49,11 +49,13 @@ export function LeagueMemberPage() {
   // The published calendar: the deadline, and the clubs' next gameweeks on the boards.
   const fixtures = useFixtures();
   // One clock for the page: the deadline check and the top bar's countdown read it.
-  const now = useMinuteClock();
-  const deadlinePassed = passedDeadline(
-    gameweekDeadline(fixtures.data, squad.data?.payload.season, squad.data?.payload.gameweek),
-    now,
+  const deadline = gameweekDeadline(
+    fixtures.data,
+    squad.data?.payload.season,
+    squad.data?.payload.gameweek,
   );
+  const now = useDeadlineClock(deadline);
+  const deadlinePassed = passedDeadline(deadline, now);
   // The card of the member's latest finished week reads the league's scoreboard, under the
   // key /league reads it by, and only once that holds a finished week for this member, the
   // member's history, under the key their history page reads it by. Neither holds the page

@@ -17,8 +17,10 @@ const JOB_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/;
 
 export interface StoredAdviceJob {
   jobId: string;
-  /** When the wait began, in epoch milliseconds: patience is counted from here. */
+  /** When the job was accepted, in epoch milliseconds. */
   startedAt: number;
+  /** When the client first saw the job running. */
+  runningSince?: number;
 }
 
 /** The question a request asks, as one string: every field that changes the answer. */
@@ -71,7 +73,10 @@ export function recallJob(request: AdviceRequest): StoredAdviceJob | null {
     ) {
       return null;
     }
-    return { jobId: value.jobId, startedAt: value.startedAt };
+    const { jobId, startedAt, runningSince } = value;
+    if (runningSince === undefined) return { jobId, startedAt };
+    if (!Number.isFinite(runningSince) || runningSince < startedAt) return null;
+    return { jobId, startedAt, runningSince };
   } catch {
     return null;
   }

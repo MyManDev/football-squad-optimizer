@@ -15,7 +15,7 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { ChipTimingCard } from "../advice/ChipTimingCard";
 import { COMPUTE_COPY, jobStanding, type ComputeCopy } from "../advice/computeCopy";
-import { gameweekDeadline } from "../advice/deadline";
+import { gameweekDeadline, passedDeadline } from "../advice/deadline";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { isDevicePlanEntry } from "../device/types";
@@ -195,6 +195,8 @@ function LeagueMemberContent({
   // Past its deadline the week is closed: nothing is computed for it and none of its plans
   // can be applied, so the page leaves out what only changes or recomputes the plan.
   const closed = deadlinePassed !== null;
+  const deadline = gameweekDeadline(fixtures, view.season, view.gameweek);
+  const canStart = () => !closed && passedDeadline(deadline, Date.now()) === null;
   // While one of the live week's matches is played the page follows it, whichever week it
   // shows: a goal by the member's players plays its moment on an open week's page too.
   // What the member's latest live read said (their clubs, the matches still unfinished), kept
@@ -307,12 +309,12 @@ function LeagueMemberContent({
   const onPitch = squadOnPitch(closed ? null : plan, displayedSquad);
   // The week can still be changed only while the calendar states a deadline that is ahead:
   // an unknown deadline is not an open week, so nothing is offered to apply then.
-  const weekOpen =
-    deadlinePassed === null && gameweekDeadline(fixtures, view.season, view.gameweek) !== null;
+  const weekOpen = !closed && deadline !== null;
   // The way to make the decision on the game's own page, in a new tab. It is placed in the
   // document where it is seen (the heading row, or the end of the decision on a phone), so
   // the tab order follows the screen.
-  const apply = plan && weekOpen ? <ApplyOnFpl plan={plan} squad={view} /> : null;
+  const apply =
+    plan && weekOpen ? <ApplyOnFpl plan={plan} squad={view} canOpen={canStart} /> : null;
   // The page arrives once, and its decision once it is drawn (weekArrival.ts).
   const arrival = useRef<HTMLDivElement>(null);
   useWeekArrival(arrival, !adviceLoading && !rivalsLoading && shown != null);
@@ -432,6 +434,7 @@ function LeagueMemberContent({
         request={request}
         job={job}
         device={device}
+        canStart={canStart}
         selectionAvailable={
           selectionAvailable &&
           !selection.evidence.on &&

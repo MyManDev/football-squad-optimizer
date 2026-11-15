@@ -12,7 +12,7 @@ rival's inputs beside the member's, and the answer is filed under both pins.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Protocol
 
 from squadopt.application.advice import AdviseEntryRequest
@@ -60,6 +60,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
         inputs: PublicEntryInputs,
         *,
         switches: SwitchInputsProvider | None = None,
+        available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
     ) -> None:
         menu = menu_capabilities()
         super().__init__(
@@ -69,6 +70,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
             {slug: capability.requires_rival for slug, capability in menu.items()},
             capabilities=menu,
             switches=switches,
+            available_windows=available_windows,
         )
         self._contexts = context
         self._public_inputs = inputs
@@ -195,6 +197,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
         context = self._context.current()
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
+        self._check_capture_window(context, window)
         # A switch whose input this capture lacks is refused before the team's inputs are
         # fetched: the answer could never be computed, whatever the team holds.
         if top100_weight or managers_word or model != "current":

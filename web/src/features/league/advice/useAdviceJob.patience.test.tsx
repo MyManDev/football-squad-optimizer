@@ -24,6 +24,7 @@ import {
   ANSWER_MISMATCH,
   PATIENCE_EXHAUSTED,
   PATIENCE_MS,
+  QUEUE_PATIENCE_MS,
   useAdviceJob,
   type ComputePhase,
 } from "./useAdviceJob";
@@ -76,12 +77,19 @@ function Harness({
   client,
   request = REQUEST,
   allowBaseline = false,
+  expectedSnapshotId,
 }: {
   client: AdviceClient;
   request?: AdviceRequest;
   allowBaseline?: boolean;
+  expectedSnapshotId?: string;
 }) {
-  const { state, compute, resume } = useAdviceJob(client, allowBaseline);
+  const { state, compute, resume, readCached } = useAdviceJob(
+    client,
+    allowBaseline,
+    expectedSnapshotId,
+    true,
+  );
   return (
     <div>
       <output data-testid="phase">{describePhase(state)}</output>
@@ -90,6 +98,9 @@ function Harness({
       </button>
       <button type="button" onClick={() => resume?.(request)}>
         resume
+      </button>
+      <button type="button" onClick={() => readCached?.(request)}>
+        read cache
       </button>
     </div>
   );
@@ -114,13 +125,47 @@ async function click(name: string): Promise<void> {
 const phase = () => screen.getByTestId("phase").textContent;
 
 describe("patience", () => {
-  it("exceeds each window's measured solve, with room for a queue", () => {
+  it("exceeds each window's measured solve", () => {
     expect(PATIENCE_MS[1]).toBeGreaterThanOrEqual(3 * 60_000);
     expect(PATIENCE_MS[3]).toBeGreaterThanOrEqual(6 * 60_000);
     expect(PATIENCE_MS[5]).toBeGreaterThanOrEqual(10 * 60_000);
     // Measured: about ninety seconds at three weeks, about three and a half minutes at five.
     expect(PATIENCE_MS[3]).toBeGreaterThan(2 * 90_000);
     expect(PATIENCE_MS[5]).toBeGreaterThan(2 * 210_000);
+  });
+
+  it("resumes a late queued three-week job and gives its solve the full running budget", async () => {
+    const request = { ...REQUEST, window: 3 } as const;
+    const client = new SlowClient();
+    client.job = "queued";
+    const view = render(<Harness client={client} request={request} />);
+    await click("go");
+    await act(async () => vi.advanceTimersByTimeAsync(PATIENCE_MS[3] + 30_000));
+    expect(phase()).toBe("waiting:queued:advice-0123456789abcdef-1");
+    expect(recallJob(request)?.runningSince).toBeUndefined();
+    view.unmount();
+
+    client.job = "running";
+    const runningSince = Date.now();
+    render(<Harness client={client} request={request} />);
+    await click("resume");
+    expect(recallJob(request)?.runningSince).toBe(runningSince);
+    await act(async () => vi.advanceTimersByTimeAsync(PATIENCE_MS[3] - 10_000));
+    expect(phase()).toBe("waiting:running:advice-0123456789abcdef-1");
+    client.job = "completed";
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(phase()).toBe("done");
+    expect(client.keys).toHaveLength(1);
+  });
+
+  it("expires a job that stays queued beyond the queue budget", async () => {
+    const client = new SlowClient();
+    client.job = "queued";
+    render(<Harness client={client} />);
+    await click("go");
+    await act(async () => vi.advanceTimersByTimeAsync(QUEUE_PATIENCE_MS));
+    expect(phase()).toBe(`failed:${PATIENCE_EXHAUSTED}:`);
+    expect(recallJob(REQUEST)).toBeNull();
   });
 
   it.each([
@@ -261,9 +306,11 @@ describe("a reload", () => {
   });
 
   it("asks about a remembered job once, even when the baseline's read uses up its patience", async () => {
+    const runningSince = Date.now() - (PATIENCE_MS[1] - 2000);
     rememberJob(REQUEST, {
       jobId: "advice-feedfacefeedface-2",
-      startedAt: Date.now() - (PATIENCE_MS[1] - 2000),
+      startedAt: runningSince,
+      runningSince,
     });
     const client = new SlowClient();
     client.readPublished = () =>
@@ -289,9 +336,14 @@ describe("a reload", () => {
     expect(phase()).toBe("waiting:queued:advice-feedfacefeedface-2");
   });
 
-  it("counts patience from when the wait began, not from the reload", async () => {
-    rememberJob(REQUEST, { jobId: "advice-feedfacefeedface-2", startedAt: Date.now() - 170_000 });
+  it("keeps the running deadline through a reload and a retry in the same queue", async () => {
+    rememberJob(REQUEST, {
+      jobId: "advice-feedfacefeedface-2",
+      startedAt: Date.now() - 300_000,
+      runningSince: Date.now() - 170_000,
+    });
     const client = new SlowClient();
+    client.job = "queued";
     render(<Harness client={client} />);
     await click("resume");
     await act(async () => vi.advanceTimersByTimeAsync(16_000));
@@ -301,7 +353,7 @@ describe("a reload", () => {
   it("drops a job that is too old, unreadable, or gone from the service", async () => {
     const client = new SlowClient();
     render(<Harness client={client} />);
-    rememberJob(REQUEST, { jobId: "advice-old", startedAt: Date.now() - PATIENCE_MS[1] - 1 });
+    rememberJob(REQUEST, { jobId: "advice-old", startedAt: Date.now() - QUEUE_PATIENCE_MS - 1 });
     await click("resume");
     expect(phase()).toBe("idle");
     expect(recallJob(REQUEST)).toBeNull();
@@ -336,4 +388,25 @@ describe("a reload", () => {
       blocked.mockRestore();
     }
   });
+});
+
+it("restores cached advice only from the requested capture in strict mode", async () => {
+  const client = new SlowClient();
+  const capture = "fixture-capture";
+  let snapshot: string | null = null;
+  client.readAdvice = async (request) => {
+    const envelope = mockEntryAdviceEnvelope(request.entryId, request.strategy, request.window);
+    envelope.payload.source_snapshot_id = snapshot;
+    return { kind: "advice", envelope, source: "api-cache" };
+  };
+  render(<Harness client={client} expectedSnapshotId={capture} />);
+  await click("read cache");
+  expect(phase()).toBe("idle");
+  snapshot = "previous-capture";
+  await click("read cache");
+  expect(phase()).toBe("idle");
+  snapshot = capture;
+  await click("read cache");
+  expect(phase()).toBe("done");
+  expect(client.keys).toEqual([]);
 });

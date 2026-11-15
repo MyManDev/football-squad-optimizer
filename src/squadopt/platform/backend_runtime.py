@@ -39,6 +39,7 @@ from squadopt.application.advice import AdviseEntryRequest
 from squadopt.application.advice_capabilities import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
+    MEMBER_WINDOWS,
     advice_capabilities,
     menu_capabilities,
 )
@@ -423,6 +424,22 @@ class CaptureContextProvider:
         if identity is None or identity.context != context:
             raise AdviceBackendNotReadyError("The resolved capture is no longer available.")
         return identity.inputs.deadline.deadline_utc
+
+    def available_windows(self, context: AdviceRequestContext) -> tuple[int, ...]:
+        """The supported windows whose consecutive deadlines are all in this capture."""
+
+        with self._lock:
+            identity = self._identity
+        if identity is None or identity.context != context:
+            identity = self._identity_for(context.capture_snapshot_id)
+        if identity is None or identity.context != context:
+            raise AdviceBackendNotReadyError("The resolved capture is no longer available.")
+        gameweeks = identity.inputs.published_gameweeks
+        return tuple(
+            window
+            for window in MEMBER_WINDOWS
+            if gameweeks.issuperset(range(context.gameweek, context.gameweek + window))
+        )
 
     def _identity_for(self, snapshot_id: str) -> CaptureIdentity | None:
         with self._lock:
@@ -818,6 +835,7 @@ def build_backend(
         switches=contexts,
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
+        available_windows=contexts.available_windows,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -845,6 +863,7 @@ def build_backend(
             contexts,
             public_inputs,
             switches=contexts,
+            available_windows=contexts.available_windows,
         )
         public_submit = AdviceSubmitService(
             public_reader,

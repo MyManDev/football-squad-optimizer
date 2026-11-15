@@ -417,6 +417,7 @@ class RecommendationInputs:
     players: pd.DataFrame
     availability: pd.DataFrame
     official_information: FplInformation | None = None
+    published_gameweeks: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -479,6 +480,7 @@ def read_inputs(
             snapshot_id=snapshot.metadata.snapshot_id,
             observed_at=snapshot.metadata.captured_at_utc,
         ),
+        published_gameweeks=frozenset(entry.gameweek for entry in deadlines),
     )
 
 

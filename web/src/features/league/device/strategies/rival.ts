@@ -31,6 +31,7 @@ import type {
   DeviceRivalPlanKind,
   RivalStrategy,
 } from "../types";
+import { hasCompleteStartingXi } from "../types";
 import { weekPoints } from "./chips";
 
 export interface OverlapBandRule {
@@ -142,8 +143,10 @@ export function solveRival(
   const document = inSolverOrder(published);
   const known = new Set(document.players.map((p) => p.id));
   const rivalIds = [...rival.starting_xi].sort((a, b) => a - b);
-  // A rival score cannot treat missing players as zero, and the rival's captain is one
-  // of their eleven; the server refuses both before any solve.
+  if (!hasCompleteStartingXi(rivalIds)) {
+    throw new DevicePlanRefused("invalid rival lineup", "plan");
+  }
+  // A rival score needs a projection for every starter and the captain among them.
   if (!rivalIds.includes(rival.captain) || rivalIds.some((id) => !known.has(id))) {
     throw new DevicePlanRefused("rival not in the table", "plan");
   }
