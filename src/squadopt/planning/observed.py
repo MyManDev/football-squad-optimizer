@@ -130,6 +130,8 @@ def optimize_observed_window(
     remains a feasible fallback, not a guarantee of better realized FPL performance.
     Fixed allocations include every solver invocation; no hidden hold probes or retries.
     """
+    if preferences is not None and preferences.net_points_priority:
+        raise ValueError("Net points comparisons cannot use observed policy scoring.")
     horizon = horizon.validated_copy()
     validate_observations(horizon, nodes)
     # Stable proposal/seed admission and tie priority for the same named updates.

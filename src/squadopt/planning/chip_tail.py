@@ -54,11 +54,8 @@ def chip_tail_context_fingerprint(
         "transfer": transfer.configuration_fingerprint,
         "preferences": None
         if preferences is None
-        else {
-            f.name: sorted(value) if isinstance(value, (set, frozenset, tuple)) else value
-            for f in fields(preferences)
-            for value in (getattr(preferences, f.name),)
-        },
+        else {"include_players": [], "hold_transfers": False, "club_counts": []}
+        | preferences.payload(),
         "basis": "expected_lineup_selection_utility"
         if expected_lineups
         else "linear_selection_utility",

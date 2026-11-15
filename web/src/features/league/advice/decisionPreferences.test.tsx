@@ -9,7 +9,13 @@ import {
   mockLeagueMembersEnvelope,
 } from "../../../fixtures/league";
 import { DecisionPreferencesPanel } from "./DecisionPreferencesPanel";
-import { checkedPreferences, preferencesFromUrl, preferencesKey } from "./decisionPreferences";
+import {
+  checkedPreferences,
+  holdsOpeningTransfers,
+  preferenceScope,
+  preferencesFromUrl,
+  preferencesKey,
+} from "./decisionPreferences";
 import { adviceRequestKey } from "./adviceJobStore";
 import { checkedAdvice } from "./adviceResponse";
 import { sameAdviceRequest } from "./useAdviceJob";
@@ -34,6 +40,87 @@ it("keeps request, waiting job and board identities distinct and reopens the exa
   expect(preferencesKey(checkedPreferences({ keep_players: [3, 1] }))).toBe(
     preferencesKey(checkedPreferences({ keep_players: [1, 3] })),
   );
+});
+
+it("canonicalizes dated rules and keeps a zero penalty limit in the cache identity", () => {
+  const dated = checkedPreferences({
+    week_rules: [
+      { week: 2, rules: { buy_players: [3] } },
+      { week: 1, rules: { hold_transfers: true } },
+    ],
+    max_hit_points: 0,
+  });
+  expect(dated.week_rules?.map(({ week }) => week)).toEqual([1, 2]);
+  expect(
+    preferencesFromUrl(new URLSearchParams({ preferences: preferencesKey(dated) })).value,
+  ).toEqual(dated);
+  expect(preferencesKey(checkedPreferences({ max_hit_points: 0 }))).not.toBe("");
+  expect(() =>
+    checkedPreferences({ hold_transfers: true, week_rules: dated.week_rules }),
+  ).toThrow();
+  expect(() =>
+    checkedPreferences({ week_rules: [{ week: 2, rules: { week_rules: [] } }] }),
+  ).toThrow();
+});
+
+it("keeps comparable net points selection distinct from ordinary advice", () => {
+  const scoring = checkedPreferences({ net_points_priority: true });
+  const key = preferencesKey(scoring);
+  expect(key).not.toBe("");
+  expect(preferenceScope(scoring)).toBe("all_selected_weeks");
+  expect(preferencesFromUrl(new URLSearchParams({ preferences: key })).value).toEqual(scoring);
+  expect(preferencesKey(checkedPreferences({ net_points_priority: false }))).toBe("");
+  expect(() => checkedPreferences({ net_points_priority: "true" })).toThrow();
+});
+
+it("separates and validates opening objectives in the wire identity", () => {
+  const later = { week_rules: [{ week: 2, rules: { buy_players: [3] } }] };
+  const opening = checkedPreferences({
+    ...later,
+    hold_opening_transfers: true,
+    min_opening_bank_tenths: 25,
+  });
+  expect(preferenceScope(opening)).toBe("selected_weeks");
+  for (const raw of [
+    { hold_opening_transfers: true },
+    { min_opening_bank_tenths: 1 },
+    { min_opening_bank_tenths: 10_000 },
+  ]) {
+    const value = checkedPreferences(raw);
+    const key = preferencesKey(value);
+    expect(key).not.toBe("");
+    expect(preferenceScope(value)).toBe("selected_weeks");
+    expect(preferencesFromUrl(new URLSearchParams({ preferences: key })).value).toEqual(value);
+  }
+  expect(preferencesKey(checkedPreferences({ hold_opening_transfers: false }))).toBe("");
+  expect(holdsOpeningTransfers(opening)).toBe(true);
+  expect(holdsOpeningTransfers(checkedPreferences({ hold_transfers: true }))).toBe(true);
+  expect(
+    holdsOpeningTransfers(
+      checkedPreferences({ week_rules: [{ week: 1, rules: { hold_transfers: true } }] }),
+    ),
+  ).toBe(true);
+  expect(
+    holdsOpeningTransfers(
+      checkedPreferences({ week_rules: [{ week: 2, rules: { hold_transfers: true } }] }),
+    ),
+  ).toBe(false);
+  for (const invalid of [
+    { hold_opening_transfers: 1 },
+    { min_opening_bank_tenths: null },
+    { min_opening_bank_tenths: 0 },
+    { min_opening_bank_tenths: 1.2 },
+    { min_opening_bank_tenths: 10_001 },
+    { week_rules: [{ week: 1, rules: { hold_opening_transfers: true } }] },
+    { week_rules: [{ week: 2, rules: { min_opening_bank_tenths: 25 } }] },
+    { hold_opening_transfers: true, week_rules: [{ week: 1, rules: { buy_players: [3] } }] },
+    {
+      hold_opening_transfers: true,
+      club_counts: [{ club: "Brighton", count: 1, scope: "transfers_in" }],
+    },
+  ]) {
+    expect(() => checkedPreferences(invalid)).toThrow();
+  }
 });
 
 it("refuses conflicting or malformed URL constraints without displaying the ordinary plan", () => {

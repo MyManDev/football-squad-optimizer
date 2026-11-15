@@ -621,7 +621,7 @@ interface HeldRow {
 /** A scroll by the visitor this recently is theirs: the page keeps its hands off. */
 const SCROLL_QUIET_MS = 150;
 const SCROLL_INPUTS = ["pointerdown", "touchmove", "wheel", "keydown"] as const;
-const SCROLL_SETTLEMENT_FRAMES = 4;
+const SCROLL_FRAMES_AFTER_SLIDE = 2;
 
 /** The groups' rows and headings, and Farklar, each by a key that outlives a change of group. */
 function partsOf(groups: HTMLElement, after: HTMLElement | null): [string, HTMLElement][] {
@@ -697,11 +697,10 @@ class LiveFlow extends Component<FlowProps> {
   private sliding = 0;
   private scrolledAt = Number.NEGATIVE_INFINITY;
   private ownScroll = false;
-  private scrollSettlement: { frame: number | null } | null = null;
+  private scrollSettlement: number | null = null;
 
   private readonly cancelScrollSettlement = () => {
-    const frame = this.scrollSettlement?.frame;
-    if (frame != null) window.cancelAnimationFrame(frame);
+    if (this.scrollSettlement !== null) window.cancelAnimationFrame(this.scrollSettlement);
     this.scrollSettlement = null;
   };
 
@@ -768,7 +767,13 @@ class LiveFlow extends Component<FlowProps> {
       // Where everything stands after the change, before the page moves anything.
       const now = new Map(parts.map(([part, element]) => [part, topOf(element)]));
       const groupsNow = topOf(groups);
-      const scrolled = this.keep(snapshot, now);
+      // A render during the slides sees animated positions. The current read already
+      // owns its original anchor until the slides settle or the visitor moves the page.
+      const preservePlace =
+        this.scrollSettlement === null &&
+        performance.now() - this.scrolledAt >= SCROLL_QUIET_MS &&
+        snapshot.anchors.some(({ part }) => now.has(part));
+      const scrolled = preservePlace ? this.keep(snapshot, now) : 0;
       const times = read && gate === "open" && pageClear() ? motionTimes(groups) : null;
       let glide = 0;
       if (times !== null && scrolled === 0 && snapshot.groupsTop > snapshot.barBottom) {
@@ -784,7 +789,8 @@ class LiveFlow extends Component<FlowProps> {
       if (times !== null && snapshot.places !== null) {
         const settledScroll = window.scrollY;
         const slides = this.slide(groups, parts, snapshot.places, now, scrolled, glide, times);
-        if (scrolled !== 0 && slides) this.settleScroll(settledScroll, slides);
+        // The browser can already have aligned the anchor before `keep` runs.
+        if (preservePlace && slides) this.settleScroll(settledScroll, times.data);
       }
       if (times !== null && snapshot.recapKey !== this.props.recapKey) {
         this.reveal(snapshot.recapKey, snapshot.recapPlaces, times);
@@ -799,52 +805,36 @@ class LiveFlow extends Component<FlowProps> {
    */
   private keep(snapshot: FlowSnapshot, now: Map<string, number>): number {
     const by = keepBy(snapshot.anchors, now);
-    // A pan or a fling scrolls every frame: the visitor moving the page keeps it.
-    if (by === 0 || performance.now() - this.scrolledAt < SCROLL_QUIET_MS) return 0;
+    if (by === 0) return 0;
     const from = window.scrollY;
     this.ownScroll = true;
     window.scrollBy({ top: by, left: 0, behavior: "instant" });
     const moved = window.scrollY - from;
     if (moved === 0) this.ownScroll = false;
-    else this.cancelScrollSettlement();
     return moved;
   }
 
   /**
-   * Row transforms can change the scrollable overflow more than once in WebKit.
-   * Check the early frames and once more after the slides' geometry has settled.
-   * Visitor input and newer reads cancel both checks.
+   * WebKit can change scrollable overflow at any point during the row transforms.
+   * Check through the slides and their final paint. Visitor input cancels the check.
    */
-  private settleScroll(top: number, slides: Promise<void>) {
-    const settlement: { frame: number | null } = { frame: null };
-    this.scrollSettlement = settlement;
-    const restore = () => {
+  private settleScroll(top: number, duration: number) {
+    let finish: number | undefined;
+    let framesLeft = SCROLL_FRAMES_AFTER_SLIDE;
+    const check = (time: number) => {
+      this.scrollSettlement = null;
+      if (!pageClear()) return;
+      finish ??= time + duration;
       const from = window.scrollY;
-      if (Math.abs(from - top) < 1) return;
-      this.ownScroll = true;
-      window.scrollTo({ top, left: 0, behavior: "instant" });
-      if (window.scrollY === from) this.ownScroll = false;
-    };
-    let framesLeft = SCROLL_SETTLEMENT_FRAMES;
-    const check = () => {
-      settlement.frame = null;
-      if (!pageClear()) {
-        this.cancelScrollSettlement();
-        return;
+      if (Math.abs(from - top) >= 1) {
+        this.ownScroll = true;
+        window.scrollTo({ top, left: 0, behavior: "instant" });
+        if (window.scrollY === from) this.ownScroll = false;
       }
-      restore();
-      framesLeft -= 1;
-      if (framesLeft > 0) settlement.frame = window.requestAnimationFrame(check);
+      if (time >= finish) framesLeft -= 1;
+      if (framesLeft > 0) this.scrollSettlement = window.requestAnimationFrame(check);
     };
-    settlement.frame = window.requestAnimationFrame(check);
-    void slides.then(() => {
-      if (this.scrollSettlement !== settlement) return;
-      if (settlement.frame !== null) window.cancelAnimationFrame(settlement.frame);
-      settlement.frame = window.requestAnimationFrame(() => {
-        this.scrollSettlement = null;
-        if (pageClear()) restore();
-      });
-    });
+    this.scrollSettlement = window.requestAnimationFrame(check);
   }
 
   /**
@@ -861,7 +851,7 @@ class LiveFlow extends Component<FlowProps> {
     scrolled: number,
     glide: number,
     times: MotionTimes,
-  ) {
+  ): boolean {
     const plan = this.props.plan;
     const slides: Animation[] = [];
     for (const [part, element] of parts) {
@@ -885,7 +875,7 @@ class LiveFlow extends Component<FlowProps> {
         element.dataset.liveCrossing = "";
       }
     }
-    if (slides.length === 0) return;
+    if (slides.length === 0) return false;
     groups.dataset.liveSliding = "";
     const run = (this.sliding += 1);
     const ended = () => {
@@ -895,7 +885,8 @@ class LiveFlow extends Component<FlowProps> {
         delete row.dataset.liveCrossing;
       }
     };
-    return Promise.allSettled(slides.map((slide) => slide.finished)).then(ended);
+    void Promise.allSettled(slides.map((slide) => slide.finished)).then(ended);
+    return true;
   }
 
   /**

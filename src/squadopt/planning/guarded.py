@@ -51,28 +51,36 @@ def optimize_guarded_window(
     seed_cap = budget * 0.1
     final_cap = budget - seed_cap
     seed = None
-    try:
-        seed = plan_in_segments(
-            horizon,
-            initial,
-            replace(
-                optimization,
-                solver_deterministic_time_limit=seed_cap,
-                solver_time_limit_seconds=optimization.solver_time_limit_seconds * 0.1,
-            ),
-            segment_lengths=(1,) * len(horizon.gameweeks),
-            transfer=transfer,
-            chips=chips,
-            preferences=preferences,
-        )
-        seed_work = cast(float, seed.diagnostics["deterministic_time_used"])
-        clock_stopped = seed.diagnostics["construction_wall_clock_stopped"] is True
-    except SegmentConstructionError as error:
-        seed_work = error.actual_work
-        clock_stopped = error.clock_stopped
+    seed_work = 0.0
+    clock_stopped = False
+    sequential = preferences is None or not preferences.needs_full_window
+    if sequential:
+        try:
+            seed = plan_in_segments(
+                horizon,
+                initial,
+                replace(
+                    optimization,
+                    solver_deterministic_time_limit=seed_cap,
+                    solver_time_limit_seconds=optimization.solver_time_limit_seconds * 0.1,
+                ),
+                segment_lengths=(1,) * len(horizon.gameweeks),
+                transfer=transfer,
+                chips=chips,
+                preferences=preferences,
+            )
+            seed_work = cast(float, seed.diagnostics["deterministic_time_used"])
+            clock_stopped = seed.diagnostics["construction_wall_clock_stopped"] is True
+        except SegmentConstructionError as error:
+            seed_work = error.actual_work
+            clock_stopped = error.clock_stopped
+    else:
+        # Independent segments would restart the week offsets and the total hit cap.
+        seed_cap = 0.0
+        final_cap = budget
     if clock_stopped:
         raise SolverExecutionError("Sequential construction reached its wall-clock safety limit.")
-    final_wall = optimization.solver_time_limit_seconds * 0.9
+    final_wall = optimization.solver_time_limit_seconds * (0.9 if sequential else 1.0)
     if seed is None:
         # The hold probe has its own wall ceiling in the underlying solver.
         final_wall -= min(30.0, final_wall / 2)

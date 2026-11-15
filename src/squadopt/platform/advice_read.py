@@ -439,11 +439,14 @@ class AdviceReadStore:
         is spent or a job exists.
         """
 
-        if not (
-            preferences.keep_players
-            or preferences.avoid_players
-            or preferences.include_players
-            or preferences.club_counts
+        rule_sets = (preferences, *(row.rules for row in preferences.week_rules))
+        if not any(
+            rules.keep_players
+            or rules.avoid_players
+            or rules.include_players
+            or rules.buy_players
+            or rules.club_counts
+            for rules in rule_sets
         ):
             return
         players = self._preference_players_of(context, league_id, entry_id)
@@ -452,20 +455,23 @@ class AdviceReadStore:
                 "This member's captured squad cannot be read, "
                 "so player preferences cannot be checked."
             )
-        if not set(preferences.keep_players) <= players.squad:
-            raise UnsupportedAdviceRequestError(
-                "Only a player the member holds in this capture can be kept."
-            )
-        if not set(preferences.avoid_players) <= players.roster:
-            raise UnsupportedAdviceRequestError(
-                "An avoided player is not in this capture's roster."
-            )
-        if not set(preferences.include_players) <= players.roster:
-            raise UnsupportedAdviceRequestError(
-                "An included player is not in this capture's roster."
-            )
-        if not {rule.club for rule in preferences.club_counts} <= players.clubs:
-            raise UnsupportedAdviceRequestError("A requested club is not in this capture's roster.")
+        for rules in rule_sets:
+            if not set(rules.keep_players) <= players.squad:
+                raise UnsupportedAdviceRequestError(
+                    "Only a player the member holds in this capture can be kept."
+                )
+            if not set(rules.avoid_players) <= players.roster:
+                raise UnsupportedAdviceRequestError(
+                    "An avoided player is not in this capture's roster."
+                )
+            if not (set(rules.include_players) | set(rules.buy_players)) <= players.roster:
+                raise UnsupportedAdviceRequestError(
+                    "A required player is not in this capture's roster."
+                )
+            if not {rule.club for rule in rules.club_counts} <= players.clubs:
+                raise UnsupportedAdviceRequestError(
+                    "A requested club is not in this capture's roster."
+                )
 
     def league_state(self, league_id: int) -> dict[str, object]:
         """Connected or not, from the published tree — never an upstream call."""
@@ -595,7 +601,10 @@ class AdviceReadStore:
         """
 
         try:
-            preferences.validate_selection(strategy, managers_word, chip)
+            preferences.validate_selection(
+                strategy, managers_word, chip, top100_weight=top100_weight
+            )
+            preferences.validate_window(window)
         except ValueError as error:
             raise UnsupportedAdviceRequestError(str(error)) from error
         if model not in PREDICTION_MODELS:
@@ -611,7 +620,7 @@ class AdviceReadStore:
                 capabilities=self._capabilities,
                 top100_weight=top100_weight,
                 managers_word=managers_word,
-                chip=chip,
+                chip="wildcard" if preferences.wildcard_week is not None else chip,
             )
         except EntryError as error:
             raise UnsupportedAdviceRequestError(str(error)) from error
@@ -669,9 +678,11 @@ class AdviceReadStore:
         squad or the capture's roster, and each switch's input must be in this capture.
         """
 
-        if chip is not None:
+        if chip is not None or preferences.wildcard_week is not None:
             held = self._held_chips(context, league_id, (entry_id,)).get(entry_id)
-            if held is None or (chip != "auto" and chip not in held):
+            # A future date may renew the chip. The solver checks the requested date
+            # against the season's rights using this same captured usage history.
+            if held is None or (chip is not None and chip != "auto" and chip not in held):
                 raise ChipUnavailableError(
                     "CHIP_HISTORY_UNKNOWN" if held is None else "CHIP_NOT_HELD"
                 )
