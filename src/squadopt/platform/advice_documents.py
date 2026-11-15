@@ -234,6 +234,7 @@ def advice_read_schema() -> dict[str, Any]:
             "free_transfers_before": {"type": "integer", "minimum": 0},
             "free_transfers_after": {"type": "integer", "minimum": 0},
             "expected_points": {"type": "number"},
+            "bank_after_tenths": {"type": "integer", "minimum": 0},
             "lineup_expectation": lineup_expectation_schema(),
             "lineup": lineup_decision_schema(player),
         },

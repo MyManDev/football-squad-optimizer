@@ -247,7 +247,7 @@ class AdviceSubmitService:
         )
 
     def public_job_view(self, job_id: str) -> dict[str, object] | None:
-        """The job as the world may see it: progress and a coded reason, nothing else.
+        """The public job view with progress, coded reasons and verified repairs.
 
         The stored record carries the client's idempotency key and the worker's
         failure text; neither belongs on a public endpoint, so the view names the
@@ -280,7 +280,7 @@ class AdviceSubmitService:
                 # this time, and the poll still answers.
                 progress = None
         workers = look.workers if look is not None else None
-        return {
+        view: dict[str, object] = {
             "contract_version": "advice_job_view_v1",
             "job_id": record.job_id,
             "status": record.status,
@@ -292,6 +292,9 @@ class AdviceSubmitService:
             "progress": progress.as_view() if progress is not None else None,
             "workers": workers.as_view() if workers is not None else None,
         }
+        if record.error is not None and record.error.infeasibility is not None:
+            view["infeasibility"] = record.error.infeasibility
+        return view
 
     def submit(
         self,

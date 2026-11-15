@@ -19,6 +19,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Final
 
+from squadopt.contracts.plan_infeasibility import PlanInfeasibility
 from squadopt.platform.advice_cache import AdviceCacheError, AdviceCacheRepository
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics
 
@@ -91,9 +92,12 @@ class AdviceComputeRefused(ValueError):
     that writes a terminal record.
     """
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(
+        self, code: str, message: str, *, infeasibility: PlanInfeasibility | None = None
+    ) -> None:
         super().__init__(message)
         self.code = code
+        self.infeasibility = infeasibility
 
 
 def _utc_stamp() -> str:
@@ -262,7 +266,11 @@ def _run_advice_worker_once(
         failed = job.transition(
             "failed",
             at_utc=terminal_at_utc(),
-            error=JobError(code=refusal.code, message=sanitize_error_message(str(refusal))),
+            error=JobError(
+                code=refusal.code,
+                message=sanitize_error_message(str(refusal)),
+                infeasibility=refusal.infeasibility,
+            ),
         )
         queue.store(failed)
         if metrics is not None:

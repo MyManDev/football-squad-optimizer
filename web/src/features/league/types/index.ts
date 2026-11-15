@@ -426,6 +426,7 @@ export interface AdvicePlanWeek {
   free_transfers_before: number;
   free_transfers_after: number;
   expected_points: number;
+  bank_after_tenths?: number;
   lineup_expectation?: AdviceLineupExpectation;
   lineup?: AdviceLineup;
 }

@@ -24,10 +24,138 @@
       "anyOf": [
         {
           "additionalProperties": false,
+          "dependentSchemas": {
+            "infeasibility": {
+              "properties": {
+                "code": {
+                  "const": "PLAN_NOT_FOUND"
+                }
+              }
+            }
+          },
           "properties": {
             "code": {
               "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
               "type": "string"
+            },
+            "infeasibility": {
+              "additionalProperties": false,
+              "properties": {
+                "bank": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "exact": {
+                      "type": "boolean"
+                    },
+                    "reachable": {
+                      "maximum": 10000,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "required": {
+                      "maximum": 10000,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "week": {
+                      "maximum": 3,
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "required",
+                    "reachable",
+                    "exact"
+                  ],
+                  "type": "object"
+                },
+                "repairs": {
+                  "items": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "lower_bank_floor"
+                          },
+                          "tenths": {
+                            "maximum": 10000,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "tenths"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "from_week": {
+                            "maximum": 3,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "const": "defer_purchase"
+                          },
+                          "player_id": {
+                            "maximum": 9007199254740991,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "to_week": {
+                            "maximum": 3,
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "player_id",
+                          "from_week",
+                          "to_week"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "release_purchase"
+                          },
+                          "player_id": {
+                            "maximum": 9007199254740991,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "week": {
+                            "maximum": 3,
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "player_id",
+                          "week"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "maxItems": 3,
+                  "type": "array",
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "repairs"
+              ],
+              "type": "object"
             },
             "message": {
               "minLength": 1,

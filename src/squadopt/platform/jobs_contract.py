@@ -29,6 +29,11 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Final, Literal, TypeAlias
 
+from squadopt.contracts.plan_infeasibility import (
+    PlanInfeasibility,
+    infeasibility_schema,
+    parse_infeasibility,
+)
 from squadopt.contracts.schema_paths import contract_schema_path
 
 BACKEND_JOBS_CONTRACT_VERSION: Final = "backend_jobs_v1"
@@ -81,6 +86,7 @@ class JobError:
 
     code: str
     message: str
+    infeasibility: PlanInfeasibility | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.code, str) or not _ERROR_CODE_PATTERN.fullmatch(self.code):
@@ -88,6 +94,19 @@ class JobError:
         if not isinstance(self.message, str) or not self.message.strip():
             raise BackendJobsContractError("error message must be non-empty text.")
         object.__setattr__(self, "message", self.message.strip())
+        if self.infeasibility is not None:
+            if self.code != "PLAN_NOT_FOUND":
+                raise BackendJobsContractError("Only a proven no-plan error may carry repairs.")
+            try:
+                parse_infeasibility(self.infeasibility)
+            except ValueError as error:
+                raise BackendJobsContractError(str(error)) from error
+
+    def as_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {"code": self.code, "message": self.message}
+        if self.infeasibility is not None:
+            payload["infeasibility"] = self.infeasibility
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,11 +234,7 @@ class AdviceJob:
             "attempt": self.attempt,
             "idempotency_key": self.idempotency_key,
             "result_ref": self.result_ref,
-            "error": (
-                None
-                if self.error is None
-                else {"code": self.error.code, "message": self.error.message}
-            ),
+            "error": self.error.as_payload() if self.error is not None else None,
         }
         return payload
 
@@ -273,11 +288,25 @@ class AdviceJob:
         raw_error = payload["error"]
         error: JobError | None = None
         if raw_error is not None:
-            if not isinstance(raw_error, dict) or set(raw_error) != {"code", "message"}:
-                raise BackendJobsContractError("error must be null or {code, message}.")
+            if (
+                not isinstance(raw_error, dict)
+                or not {"code", "message"} <= raw_error.keys()
+                or raw_error.keys() - {"code", "message", "infeasibility"}
+            ):
+                raise BackendJobsContractError("Invalid job error fields.")
             if not isinstance(raw_error["code"], str) or not isinstance(raw_error["message"], str):
                 raise BackendJobsContractError("error code and message must be strings.")
-            error = JobError(code=raw_error["code"], message=raw_error["message"])
+            try:
+                details = (
+                    parse_infeasibility(raw_error["infeasibility"])
+                    if "infeasibility" in raw_error
+                    else None
+                )
+            except ValueError as invalid:
+                raise BackendJobsContractError(str(invalid)) from invalid
+            error = JobError(
+                code=raw_error["code"], message=raw_error["message"], infeasibility=details
+            )
         return cls(
             job_id=payload["job_id"],
             status=payload["status"],
@@ -327,9 +356,13 @@ def backend_jobs_schema() -> dict[str, object]:
                         "properties": {
                             "code": {"type": "string", "pattern": _ERROR_CODE_PATTERN.pattern},
                             "message": {"type": "string", "minLength": 1},
+                            "infeasibility": infeasibility_schema(),
                         },
                         "required": ["code", "message"],
                         "additionalProperties": False,
+                        "dependentSchemas": {
+                            "infeasibility": {"properties": {"code": {"const": "PLAN_NOT_FOUND"}}}
+                        },
                     },
                     {"type": "null"},
                 ]

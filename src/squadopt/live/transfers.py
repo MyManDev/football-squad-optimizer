@@ -17,6 +17,7 @@ records which chip was played so the season's second half knows what is left.
 
 import math
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from types import MappingProxyType
@@ -24,6 +25,7 @@ from typing import Any, Final, TypedDict
 
 import pandas as pd
 
+from squadopt.contracts.plan_infeasibility import PlanInfeasibility
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.data.errors import DataSourceError
 from squadopt.live.errors import LedgerError
@@ -55,7 +57,9 @@ from squadopt.planning.chip_tail import ChipTailForecast
 from squadopt.planning.expected_window import optimize_expected_window
 from squadopt.planning.guarded import optimize_guarded_window
 from squadopt.planning.lineup_utility import improve_plan_lineups
+from squadopt.planning.models import TransferPlanningError
 from squadopt.planning.observed import optimize_observed_window
+from squadopt.planning.optimizer import diagnose_infeasible_preferences
 
 LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
 # Free transfers a manager holds for the second deadline: the game grants one after the
@@ -868,16 +872,9 @@ class HorizonNoSolutionError(DataSourceError):
     on the member's page, the text in the operator's log) and widening what escapes here
     would reopen it.
 
-    What the subclass adds is for the operator. "No solution" has two shapes that want
-    different answers, and the message alone cannot be read by anything but a person:
-    ``INFEASIBLE`` means the constraints and the squad disagree and more time will not help,
-    while a status that stopped at a limit with work still to do means the budget was the
-    binding thing. ``status``, ``deterministic_time_used`` and ``relative_optimality_gap``
-    carry that distinction as values, so a caller can count the second kind without parsing
-    a sentence.
-
-    The three are ``None`` when the solve did not report them. Absent is not zero here
-    either: a gap nobody measured is not a gap of nought.
+    ``INFEASIBLE`` proves the squad and constraints disagree. An unfinished search
+    carries its status and any timings separately. Only a proven failure may carry an
+    infeasibility report with verified preference changes.
     """
 
     def __init__(
@@ -887,11 +884,13 @@ class HorizonNoSolutionError(DataSourceError):
         status: SolverStatus,
         deterministic_time_used: object = None,
         relative_optimality_gap: object = None,
+        infeasibility: PlanInfeasibility | None = None,
     ) -> None:
         super().__init__(message)
         self.status = status
         self.deterministic_time_used = deterministic_time_used
         self.relative_optimality_gap = relative_optimality_gap
+        self.infeasibility = infeasibility
 
 
 NAMED_CHIP_SEED_VERSION: Final = "named_chip_window_seed_v1"
@@ -1255,6 +1254,29 @@ def plan_transfer_horizon(
             table["player_id"].tolist(), table["price_tenths"].tolist(), strict=True
         )
     ]
+    scenario = preferences.scenario if preferences is not None else None
+    if scenario is not None:
+        target = first_gameweek + scenario.week - 1
+        player = scenario.player_id
+        if target not in projection_horizon.target_gameweeks or player not in current:
+            raise DataSourceError("The scenario week and player must be in the captured horizon.")
+        rows = planning_table.player_id.eq(player)
+        if scenario.kind == "price_increase":
+            assert scenario.tenths is not None
+            affected = rows & planning_table.gameweek.ge(target)
+            planning_table.loc[affected, "buy_price_tenths"] += scenario.tenths
+            if player in held_sell_prices:
+                # Preserve any conservative reductions made by spending_power. Only the
+                # sale uplift from the hypothetical market move is added to the old lot.
+                price, purchase = current[player], held.purchase_prices[player]
+                uplift = sell_price_tenths(price + scenario.tenths, purchase, sell_on_fee=fee)
+                uplift -= sell_price_tenths(price, purchase, sell_on_fee=fee)
+                planning_table.loc[affected, "sell_price_tenths"] += uplift
+        else:
+            unavailable = rows & planning_table.gameweek.eq(target)
+            planning_table.loc[unavailable, "expected_points"] = 0.0
+            if "appearance_probability" in planning_table:
+                planning_table.loc[unavailable, "appearance_probability"] = 0.0
 
     settings = OptimizationConfig() if optimization is None else optimization
     game_transfer_limits = preferences is not None and preferences.uses_game_transfer_limits
@@ -1271,6 +1293,18 @@ def plan_transfer_horizon(
         if transfer_config is None
         else transfer_config
     )
+    if preferences is not None and transfer_config is None and not game_transfer_limits:
+        game_limit = rules.transfers.transfers_cap
+        frozen_caps = {
+            first_gameweek + week.week - 1: len(week.transfers_in)
+            for week in preferences.frozen_weeks
+            if len(week.transfers_in) > 1
+            and week.chip not in ("wildcard", "freehit")
+            and (game_limit is None or len(week.transfers_in) <= game_limit)
+        }
+        if frozen_caps:
+            # A prior legal decision may predate our narrower default search policy.
+            planning_policy = replace(planning_policy, transfer_caps_by_gameweek=frozen_caps)
     if net_points_priority:
         planning_policy = planning_policy.for_net_points()
     if len(projection_horizon.target_gameweeks) > 1:
@@ -1337,9 +1371,10 @@ def plan_transfer_horizon(
         and any(week in projection_horizon.target_gameweeks for week in chips.forced)
         else None
     )
+    planning_horizon = PlanningHorizon(planning_table)
     plan = (
         optimize_observed_window(
-            PlanningHorizon(planning_table),
+            planning_horizon,
             state,
             information.nodes,
             settings,
@@ -1350,7 +1385,7 @@ def plan_transfer_horizon(
         )
         if information is not None and information.nodes
         else optimize_expected_window(
-            PlanningHorizon(planning_table),
+            planning_horizon,
             state,
             settings,
             planning_policy,
@@ -1359,7 +1394,7 @@ def plan_transfer_horizon(
         )
         if expected_lineups
         else optimize_guarded_window(
-            PlanningHorizon(planning_table),
+            planning_horizon,
             state,
             settings,
             planning_policy,
@@ -1368,7 +1403,7 @@ def plan_transfer_horizon(
         )
         if guarded_football
         else optimize_chip_strategy(
-            PlanningHorizon(planning_table),
+            planning_horizon,
             state,
             settings,
             planning_policy,
@@ -1381,7 +1416,7 @@ def plan_transfer_horizon(
         )
         if chip_strategy
         else _plan_named_chip_window(
-            PlanningHorizon(planning_table),
+            planning_horizon,
             state,
             settings,
             planning_policy,
@@ -1394,7 +1429,7 @@ def plan_transfer_horizon(
         )
         if named_chips is not None
         else optimize_transfer_plan(
-            PlanningHorizon(planning_table),
+            planning_horizon,
             state,
             settings,
             planning_policy,
@@ -1426,6 +1461,29 @@ def plan_transfer_horizon(
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")
         relative_gap = plan.diagnostics.get("relative_optimality_gap")
+        details: PlanInfeasibility | None = None
+        if (
+            plan.solver_status is SolverStatus.INFEASIBLE
+            and preferences is not None
+            and preferences.active
+        ):
+            details = {"repairs": []}
+            if (
+                not chip_strategy
+                and first_week_overlap is None
+                and first_week_transfer_cap is None
+                and first_week_exclusion is None
+            ):
+                # An auxiliary search cannot change the original proved failure.
+                with suppress(SolverExecutionError, TransferPlanningError):
+                    details = diagnose_infeasible_preferences(
+                        planning_horizon,
+                        state,
+                        settings,
+                        planning_policy,
+                        chips or ChipAvailability(),
+                        preferences,
+                    )
         raise HorizonNoSolutionError(
             f"The transfer planner produced no {len(projection_horizon.target_gameweeks)}-"
             f"week solution; solver status was {plan.solver_status.name}, "
@@ -1433,5 +1491,6 @@ def plan_transfer_horizon(
             status=plan.solver_status,
             deterministic_time_used=used,
             relative_optimality_gap=relative_gap,
+            infeasibility=details,
         )
     return plan, planning_policy
