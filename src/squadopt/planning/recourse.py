@@ -114,6 +114,10 @@ def optimize_observed_recourse(
     before choosing one common first decision. They are not perfect information.
     No seasonal improvement guarantee follows from this finite-menu comparison.
     """
+    if preferences is not None and preferences.needs_full_window:
+        raise TransferPlanningValidationError(
+            "The sliced recourse model cannot preserve timed rules or a total hit ceiling."
+        )
     if not isinstance(require_optimal, bool) or not isinstance(observation_proposals, bool):
         raise ValueError("Recourse search switches must be booleans.")
     proposal_statuses: list[str] = []

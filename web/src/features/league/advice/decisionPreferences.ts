@@ -25,8 +25,13 @@ export function clubCountsConflict(counts: readonly ClubCount[], holdsTransfers:
   return [...minimums.values()].reduce((total, count) => total + count, 0) > 15;
 }
 
-/** Human constraints apply to the entire selected window; forecasts stay unchanged. */
-export interface DecisionPreferences {
+export type PlanWeekNumber = 1 | 2 | 3;
+
+export function isPlanWeek(value: unknown): value is PlanWeekNumber {
+  return value === 1 || value === 2 || value === 3;
+}
+
+interface RulePreferences {
   keep_players: number[];
   avoid_players: number[];
   no_hits: boolean;
@@ -34,6 +39,20 @@ export interface DecisionPreferences {
   hold_transfers?: boolean;
   include_players?: number[];
   club_counts?: ClubCount[];
+}
+
+interface WeekRulePreferences extends RulePreferences {
+  buy_players?: number[];
+}
+
+/** The top-level rules apply across the window. Specific weeks can add restrictions. */
+export interface DecisionPreferences extends RulePreferences {
+  week_rules?: { week: PlanWeekNumber; rules: WeekRulePreferences }[];
+  max_hit_points?: number;
+  wildcard_week?: 2 | 3;
+  hold_opening_transfers?: boolean;
+  min_opening_bank_tenths?: number;
+  net_points_priority?: boolean;
 }
 
 function checkedClubCounts(value: unknown, holdsTransfers: boolean): ClubCount[] {
@@ -69,26 +88,28 @@ function checkedClubCounts(value: unknown, holdsTransfers: boolean): ClubCount[]
   );
 }
 
-export function checkedPreferences(value: unknown): DecisionPreferences {
-  if (value === undefined) value = {};
+function preferenceRecord(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value))
     throw new Error("Invalid preferences");
-  const row = value as Record<string, unknown>;
-  if (
-    Object.keys(row).some(
-      (k) =>
-        ![
-          "keep_players",
-          "avoid_players",
-          "no_hits",
-          "save_chips",
-          "hold_transfers",
-          "include_players",
-          "club_counts",
-        ].includes(k),
-    )
-  )
+  return value as Record<string, unknown>;
+}
+
+const ruleKeys = [
+  "keep_players",
+  "avoid_players",
+  "no_hits",
+  "save_chips",
+  "hold_transfers",
+  "include_players",
+  "club_counts",
+];
+
+function expectKeys(row: Record<string, unknown>, extra: string[]) {
+  if (Object.keys(row).some((key) => !ruleKeys.includes(key) && !extra.includes(key)))
     throw new Error("Unknown preference");
+}
+
+function checkedRules(row: Record<string, unknown>): WeekRulePreferences {
   const ids = (v: unknown): number[] => {
     if (v === undefined) return [];
     if (
@@ -107,8 +128,9 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
   };
   const hold = flag(row.hold_transfers);
   const include = ids(row.include_players);
+  const buy = ids(row.buy_players);
   const clubCounts = checkedClubCounts(row.club_counts, hold);
-  const result: DecisionPreferences = {
+  const result: WeekRulePreferences = {
     keep_players: ids(row.keep_players),
     avoid_players: ids(row.avoid_players),
     no_hits: flag(row.no_hits),
@@ -116,23 +138,150 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
     ...(hold ? { hold_transfers: true } : {}),
     ...(include.length ? { include_players: include } : {}),
     ...(clubCounts.length ? { club_counts: clubCounts } : {}),
+    ...(buy.length ? { buy_players: buy } : {}),
   };
-  if ([...result.keep_players, ...include].some((id) => result.avoid_players.includes(id)))
+  const included = new Set([...result.keep_players, ...include, ...buy]);
+  if (
+    included.size > 15 ||
+    result.avoid_players.some((id) => included.has(id)) ||
+    (hold && buy.length)
+  )
     throw new Error("Conflicting player preferences");
   return result;
 }
 
-export function preferencesKey(value?: DecisionPreferences): string {
-  const p = checkedPreferences(value);
-  return p.keep_players.length ||
+function hasRules(p: WeekRulePreferences) {
+  return Boolean(
+    p.keep_players.length ||
     p.avoid_players.length ||
     p.no_hits ||
     p.save_chips ||
     p.hold_transfers ||
     p.include_players?.length ||
-    p.club_counts?.length
+    p.club_counts?.length ||
+    p.buy_players?.length,
+  );
+}
+
+function checkedWeeks(value: unknown, global: RulePreferences, holdOpening: boolean) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 3) throw new Error("Invalid week rules");
+  const seen = new Set<PlanWeekNumber>();
+  return value
+    .map((item: unknown) => {
+      const row = preferenceRecord(item);
+      if (Object.keys(row).length !== 2 || !isPlanWeek(row.week) || seen.has(row.week))
+        throw new Error("Invalid week rule");
+      seen.add(row.week);
+      const fields = preferenceRecord(row.rules);
+      expectKeys(fields, ["buy_players"]);
+      const rules = checkedRules(fields);
+      const holdsTransfers = !!(
+        global.hold_transfers ||
+        rules.hold_transfers ||
+        (row.week === 1 && holdOpening)
+      );
+      const included = new Set([
+        ...global.keep_players,
+        ...(global.include_players ?? []),
+        ...rules.keep_players,
+        ...(rules.include_players ?? []),
+        ...(rules.buy_players ?? []),
+      ]);
+      if (
+        !hasRules(rules) ||
+        included.size > 15 ||
+        [...global.avoid_players, ...rules.avoid_players].some((id) => included.has(id)) ||
+        (holdsTransfers && rules.buy_players?.length) ||
+        clubCountsConflict(
+          [...(global.club_counts ?? []), ...(rules.club_counts ?? [])],
+          holdsTransfers,
+        )
+      )
+        throw new Error("Conflicting week rules");
+      return { week: row.week, rules };
+    })
+    .sort((left, right) => left.week - right.week);
+}
+
+export function isHitBudget(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 60;
+}
+
+export function checkedPreferences(value: unknown): DecisionPreferences {
+  const row = preferenceRecord(value === undefined ? {} : value);
+  expectKeys(row, [
+    "week_rules",
+    "max_hit_points",
+    "wildcard_week",
+    "hold_opening_transfers",
+    "min_opening_bank_tenths",
+    "net_points_priority",
+  ]);
+  const global = checkedRules(row);
+  const holdOpening = row.hold_opening_transfers;
+  if (holdOpening !== undefined && typeof holdOpening !== "boolean")
+    throw new Error("Invalid opening transfer hold");
+  if (holdOpening && clubCountsConflict(global.club_counts ?? [], true))
+    throw new Error("Conflicting opening transfer hold");
+  const minOpeningBank = row.min_opening_bank_tenths;
+  if (
+    minOpeningBank !== undefined &&
+    (typeof minOpeningBank !== "number" ||
+      !Number.isInteger(minOpeningBank) ||
+      minOpeningBank < 1 ||
+      minOpeningBank > 10_000)
+  )
+    throw new Error("Invalid minimum opening bank");
+  const netPointsPriority = row.net_points_priority;
+  if (netPointsPriority !== undefined && typeof netPointsPriority !== "boolean")
+    throw new Error("Invalid net points priority");
+  const weekRules = checkedWeeks(row.week_rules, global, holdOpening === true);
+  const maxHits = row.max_hit_points;
+  if (maxHits !== undefined && !isHitBudget(maxHits)) throw new Error("Invalid hit budget");
+  const wildcardWeek = row.wildcard_week;
+  if (wildcardWeek !== undefined) {
+    if (wildcardWeek !== 2 && wildcardWeek !== 3) throw new Error("Invalid Wildcard week");
+    const local = weekRules.find(({ week }) => week === wildcardWeek)?.rules;
+    if (global.save_chips || global.hold_transfers || local?.save_chips || local?.hold_transfers)
+      throw new Error("Conflicting Wildcard week");
+  }
+  return {
+    ...global,
+    ...(weekRules.length ? { week_rules: weekRules } : {}),
+    ...(maxHits === undefined ? {} : { max_hit_points: maxHits }),
+    ...(wildcardWeek === undefined ? {} : { wildcard_week: wildcardWeek }),
+    ...(holdOpening ? { hold_opening_transfers: true } : {}),
+    ...(minOpeningBank === undefined ? {} : { min_opening_bank_tenths: minOpeningBank }),
+    ...(netPointsPriority ? { net_points_priority: true } : {}),
+  };
+}
+
+export function holdsOpeningTransfers(p?: DecisionPreferences): boolean {
+  return Boolean(
+    p?.hold_transfers ||
+    p?.hold_opening_transfers ||
+    p?.week_rules?.find(({ week }) => week === 1)?.rules.hold_transfers,
+  );
+}
+
+export function preferencesKey(value?: DecisionPreferences): string {
+  const p = checkedPreferences(value);
+  return hasRules(p) ||
+    p.max_hit_points !== undefined ||
+    p.net_points_priority ||
+    preferenceScope(p) === "selected_weeks"
     ? JSON.stringify(p)
     : "";
+}
+
+export function preferenceScope(p?: DecisionPreferences) {
+  return p?.week_rules?.length ||
+    p?.wildcard_week ||
+    p?.hold_opening_transfers ||
+    p?.min_opening_bank_tenths !== undefined
+    ? "selected_weeks"
+    : "all_selected_weeks";
 }
 
 export function preferencesFromUrl(params: URLSearchParams): {
@@ -142,7 +291,7 @@ export function preferencesFromUrl(params: URLSearchParams): {
   const raw = params.get("preferences");
   if (raw === null) return { valid: true };
   try {
-    if (raw.length > 1500) throw new Error("Too long");
+    if (raw.length > 3000) throw new Error("Too long");
     const value = checkedPreferences(JSON.parse(raw));
     return { value: preferencesKey(value) ? value : undefined, valid: true };
   } catch {

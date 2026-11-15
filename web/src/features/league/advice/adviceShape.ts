@@ -236,7 +236,7 @@ const chipStrategy: Predicate = (value) =>
     selected_chip: chip,
     top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),
     objective_gap: nullable(finite),
-    objective_basis: oneOf("selection_utility_with_chip_reserve"),
+    objective_basis: oneOf("selection_utility_with_chip_reserve", "projected_net_points"),
     experimental: oneOf(true, false),
     reservations: array((row) =>
       fields(row, {
@@ -399,7 +399,7 @@ export function isAdvicePayload(value: unknown): boolean {
       official_injuries: isOfficialInjuryFacts,
       decision_information: isDecisionInformation,
       preferences,
-      preferences_scope: oneOf("all_selected_weeks"),
+      preferences_scope: oneOf("all_selected_weeks", "selected_weeks"),
       bank_after_tenths: integer,
       free_transfers_after: integer,
       selection_top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),

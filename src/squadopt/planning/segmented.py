@@ -91,6 +91,8 @@ def plan_in_segments(
     original discount clock. Pass the result to incumbent protection before selecting
     it against another search; segment optimality is NOT full-horizon optimality.
     """
+    if preferences is not None and preferences.needs_full_window:
+        raise TransferPlanningValidationError("Timed or total hit rules need a full-window solve.")
     forecast = horizon.validated_copy()
     lengths = tuple(segment_lengths)
     if (

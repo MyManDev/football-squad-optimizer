@@ -42,6 +42,8 @@ def optimize_expected_window(
     permits 128 more per week plus one template score, explicitly more work.
     This route does not alter the separate observed-information branch menu.
     """
+    if preferences is not None and preferences.net_points_priority:
+        raise ValueError("Net points comparisons require the scoring-lineup objective.")
     started = perf_counter()
     budget = optimization.solver_deterministic_time_limit
     if budget is None or budget < 5:

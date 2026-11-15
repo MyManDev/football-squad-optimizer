@@ -29,6 +29,7 @@ from tests.unit.test_projection_horizon_builder import _calendar
 import squadopt.application.top100_weight as switches_module_top100
 import squadopt.platform.advice_switches as switches_module
 import squadopt.platform.advice_worker as worker_module
+from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
@@ -40,6 +41,7 @@ from squadopt.application.advice import (
 from squadopt.application.advice_menu import ManagersWordNotSolved, MenuRequest
 from squadopt.application.manager_words import MANAGERS_WORD_RULE_VERSION
 from squadopt.application.weekly_plan import rotation_artifact
+from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.data.snapshots import write_snapshot
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import (
@@ -61,6 +63,7 @@ from squadopt.platform.advice_read import AdviceRequestContext
 from squadopt.platform.advice_worker import build_advice_compute, run_advice_worker
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.llmopt_intent import IntentRequest, IntentService
 from squadopt.platform.queue_contracts import AdviceLeaseLostError, QueueLockTimeout
 
 SEASON = deployment_module.SEASON
@@ -87,8 +90,17 @@ def _entry_payloads(entry_id: int, gameweek: int) -> dict[str, bytes]:
     }
 
 
-def _capture_with_entries(snapshot_root: Path, entries: tuple[int, ...] = (ENTRY_ID,)) -> str:
+def _capture_with_entries(
+    snapshot_root: Path,
+    entries: tuple[int, ...] = (ENTRY_ID,),
+    *,
+    third_decision_week: bool = False,
+) -> str:
     gw1_finished = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
+    if third_decision_week:
+        gw1_finished.append(
+            dict(world_module.EVENTS[-1], id=4, deadline_time="2026-09-19T14:00:00Z")
+        )
     written = write_snapshot(
         snapshot_root,
         source="fpl-live",
@@ -97,7 +109,7 @@ def _capture_with_entries(snapshot_root: Path, entries: tuple[int, ...] = (ENTRY
             BOOTSTRAP_PAYLOAD: world_module._bootstrap(
                 events=gw1_finished, elements=world_module._elements(event_points=2)
             ),
-            FIXTURES_PAYLOAD: _calendar(gameweeks=(1, 2, 3)),
+            FIXTURES_PAYLOAD: _calendar(gameweeks=tuple(event["id"] for event in gw1_finished)),
             **{name: raw for entry in entries for name, raw in _entry_payloads(entry, 1).items()},
         },
     )
@@ -115,13 +127,17 @@ def _deployment(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     entries: tuple[int, ...] = (ENTRY_ID,),
+    *,
+    third_decision_week: bool = False,
     **configured: Any,
 ) -> dict[str, Any]:
     monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
     snapshot_root = tmp_path / "snapshots"
     handoff_root = tmp_path / "handoffs"
     site_root = tmp_path / "site"
-    snapshot_id = _capture_with_entries(snapshot_root, entries)
+    snapshot_id = _capture_with_entries(
+        snapshot_root, entries, third_decision_week=third_decision_week
+    )
     deployment_module._handoff(handoff_root, snapshot_id)
     deployment_module._publish_members(site_root, RIVAL_ID)
     store_root = tmp_path / "store"
@@ -1867,6 +1883,164 @@ def test_llmopt_constraints_round_trip_through_the_advice_worker(running, new_pr
     else:
         assert payload["moves"] == []
         assert payload["free_transfers_after"] == 2
+
+
+def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_path, monkeypatch):
+    backend = _deployment(tmp_path, monkeypatch, third_decision_week=True)["backend"]
+    message = (
+        "Bu hafta transferi sakla, haftaya Player 1002'yi al. Üç haftada en fazla 4 puan ceza öde."
+    )
+
+    def interpret(request: IntentRequest) -> dict[str, Any]:
+        assert request.message == message
+        assert request.locale == "tr"
+        assert any(player["id"] == 1002 for player in request.players)
+        return {
+            "status": "draft",
+            "message": None,
+            "draft": {
+                "window": 3,
+                "hard": [
+                    {"kind": "hold_transfers", "player_id": None, "week": 1},
+                    {"kind": "buy_player", "player_id": 1002, "week": 2},
+                    {"kind": "hit_budget", "player_id": None, "points": 4},
+                ],
+                "soft": [],
+                "comparison": None,
+            },
+        }
+
+    captured = datetime.fromisoformat(world_module.GW2_CAPTURED_AT)
+    client = TestClient(
+        app_for_backend(backend, utc_now=lambda: captured, llmopt_intent=IntentService(interpret))
+    )
+    drafted = client.post(
+        "/api/v1/llmopt/intent",
+        json={
+            "message": message,
+            "locale": "tr",
+            "draft": {"hard": [], "soft": []},
+            "players": [{"id": 1002, "name": "Player 1002", "team": "Club 2"}],
+        },
+    )
+    assert drafted.status_code == 200, drafted.text
+    draft = drafted.json()["draft"]
+    assert draft["hard"] == [
+        {"kind": "hold_transfers", "week": 1},
+        {"kind": "buy_player", "player_id": 1002, "week": 2},
+        {"kind": "hit_budget", "points": 4},
+    ]
+    assert not backend.queue.jobs()
+
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    preferences = {
+        "week_rules": [
+            {"week": 1, "rules": {"hold_transfers": True}},
+            {"week": 2, "rules": {"buy_players": [1002]}},
+        ],
+        "max_hit_points": 4,
+    }
+    too_short = client.post(
+        route, json={"strategy": "saf-puan", "window": 1, "preferences": preferences}
+    )
+    assert too_short.status_code == 422
+    assert not backend.queue.jobs()
+
+    selection = {"strategy": "saf-puan", "window": draft["window"]}
+    submitted = client.post(route, json={**selection, "preferences": preferences})
+    assert submitted.status_code == 202, submitted.text
+    assert _work(backend) == 1
+    served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["preferences_scope"] == "selected_weeks"
+    assert payload["preferences"] == DecisionPreferences.parse(preferences).payload()
+    assert payload["window"] == 3 and payload["moves"] == []
+    first, second, third = payload["plan_weeks"]
+    assert [first["gameweek"], second["gameweek"], third["gameweek"]] == [2, 3, 4]
+    assert first["transfers_in"] == first["transfers_out"] == []
+    assert first["free_transfers_after"] == 2
+    assert 1002 in {player["player_id"] for player in second["transfers_in"]}
+    assert len(second["transfers_in"]) >= 2  # Club 2 was already at its squad limit.
+    assert sum(row["transfer_hit_points"] for row in payload["plan_weeks"]) <= 4
+
+
+def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, monkeypatch):
+    backend = _deployment(tmp_path, monkeypatch, third_decision_week=True)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 3}
+    required = {"keep_players": [1001], "no_hits": True}
+
+    def ask(preferences):
+        queued = client.post(route, json={**selection, "preferences": preferences})
+        assert queued.status_code == 202, queued.text
+        assert _work(backend) == 1
+        response = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+        assert response.status_code == 200, response.text
+        return queued.json()["job_id"], response.json()["payload"]
+
+    base_id, base = ask(required)
+    assert base["plan_weeks"][0]["transfers_in"]
+    roll_id, roll = ask({**required, "hold_opening_transfers": True})
+    floor = base["bank_after_tenths"] + 1
+    cash_id, cash = ask({**required, "min_opening_bank_tenths": floor})
+    assert len({base_id, roll_id, cash_id}) == 3
+    assert roll["plan_weeks"][0]["transfers_in"] == roll["plan_weeks"][0]["transfers_out"] == []
+    assert roll["free_transfers_after"] > base["free_transfers_after"]
+    assert cash["bank_after_tenths"] >= floor
+    actions = {
+        tuple(sorted(player["player_id"] for player in row["plan_weeks"][0]["transfers_in"]))
+        for row in (base, roll, cash)
+    }
+    assert len(actions) == 3
+    for candidate in (base, roll, cash):
+        assert candidate["source_snapshot_id"] == base["source_snapshot_id"]
+        assert candidate["preferences"]["keep_players"] == [1001]
+        assert candidate["preferences"]["no_hits"] is True
+        assert [row["gameweek"] for row in candidate["plan_weeks"]] == [2, 3, 4]
+        assert all(row["transfer_hit_points"] == 0 for row in candidate["plan_weeks"])
+        assert all(len(row["transfers_in"]) <= 1 for row in candidate["plan_weeks"])
+        assert 1001 in {
+            player["player_id"] for player in candidate["starting_xi"] + candidate["bench"]
+        }
+
+
+def test_llmopt_prices_a_preference_on_the_same_three_week_net_points_basis(tmp_path, monkeypatch):
+    backend = _deployment(tmp_path, monkeypatch, third_decision_week=True)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 3}
+    first_week = {"week": 1, "rules": {"hold_transfers": True}}
+    hard = {"net_points_priority": True, "no_hits": True, "week_rules": [first_week]}
+
+    def solve(preferences):
+        queued = client.post(route, json={**selection, "preferences": preferences})
+        assert queued.status_code == 202, queued.text
+        assert _work(backend) == 1
+        response = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+        assert response.status_code == 200, response.text
+        return queued.json()["job_id"], response.json()["payload"]
+
+    base_id, base = solve(hard)
+    soft_week = {"week": 2, "rules": {"buy_players": [1002]}}
+    preference_id, preference = solve({**hard, "week_rules": [first_week, soft_week]})
+    assert base_id != preference_id
+    totals = []
+    for payload in (base, preference):
+        assert payload["solver_status"] == "OPTIMAL"
+        assert payload["preferences"]["net_points_priority"] is True
+        assert payload["preferences"]["no_hits"] is True
+        assert payload["source_snapshot_id"] == base["source_snapshot_id"]
+        assert [row["gameweek"] for row in payload["plan_weeks"]] == [2, 3, 4]
+        assert payload["plan_weeks"][0]["transfers_in"] == []
+        totals.append(
+            sum(
+                row["expected_points"] - row["transfer_hit_points"] for row in payload["plan_weeks"]
+            )
+        )
+    assert totals[0] >= totals[1] - 1e-9
+    assert 1002 in {player["player_id"] for player in preference["plan_weeks"][1]["transfers_in"]}
 
 
 def test_llmopt_wildcard_rebuilds_the_squad_under_player_preferences(running):
