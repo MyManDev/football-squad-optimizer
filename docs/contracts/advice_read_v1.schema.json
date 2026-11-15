@@ -236,7 +236,10 @@
               ]
             },
             "objective_basis": {
-              "const": "selection_utility_with_chip_reserve"
+              "enum": [
+                "selection_utility_with_chip_reserve",
+                "projected_net_points"
+              ]
             },
             "objective_gap": {
               "type": [
@@ -1914,6 +1917,9 @@
               "maximum": 10000,
               "minimum": 1,
               "type": "integer"
+            },
+            "net_points_priority": {
+              "type": "boolean"
             },
             "no_hits": {
               "type": "boolean"

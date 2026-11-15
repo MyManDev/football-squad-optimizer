@@ -26,6 +26,7 @@ _MAX_SAFE_ID: Final = 2**53 - 1
 _WINDOWS: Final = (1, 3)
 _WEEKS: Final = (1, 2, 3)
 _MAX_HIT_POINTS: Final = 60
+_MAX_COST_TENTHS: Final = 1000
 _RESPONSE_BYTES: Final = 32 * 1024
 _TIMEOUT_SECONDS: Final = 35
 _KINDS: Final = (
@@ -59,6 +60,18 @@ Use hard for explicit requirements (e.g. "must", "asla", "kesin", "puan cezas\u0
 Use soft for wishes (e.g. "if possible", "mümkünse", "tercihen"). Ask for clarification
 before choosing when the intent or player is ambiguous. Do not silently omit unsupported
 requirements or resolve a contradiction by weakening it.
+
+List soft rules in the manager's priority order. Preserve their order on follow-up unless
+the manager changes it. A soft rule may carry max_cost_tenths, the most total expected
+net points the manager will give up over the selected window to satisfy that rule.
+Convert an exact point allowance to tenths: 1.5 or 1,5 points becomes 15, and zero becomes
+0. Use null when a wish has no stated cost. Use this field only on a soft rule, and only
+for an allowance from 0 to 100 points in steps of 0.1. Ask for clarification when the
+allowance is ambiguous, more precise, outside this range, or cannot be attached to one
+specific preference. A cap on actual transfer penalties is hit_budget, a different rule.
+"Saka'y\u0131 tutmak üç haftada en fazla 1,5 beklenen puana mal oluyorsa tut" means window 3
+and a soft keep_player rule for held Saka with max_cost_tenths 15. Keep any separate
+Wildcard and club requirements in hard.
 
 Set window to 1 or 3 for the planning horizon. With no explicit horizon or dated rules,
 keep the preceding draft's window, or use null for the default of one week. Any rule
@@ -209,8 +222,11 @@ def _constraint(
     *,
     comparison: bool,
     model: bool,
+    soft: bool = False,
 ) -> dict[str, Any]:
     fields = {"kind", "player_id", "club", "count", "scope", "week", "points"}
+    if soft:
+        fields.add("max_cost_tenths")
     model_required = {"kind", "player_id"}
     if comparison:
         fields.add("both")
@@ -265,6 +281,12 @@ def _constraint(
         result["points"] = points
     elif "points" in value and (not model or value["points"] is not None):
         raise IntentValidationError("Unexpected points for this constraint.")
+    if "max_cost_tenths" in value:
+        max_cost = value["max_cost_tenths"]
+        if max_cost is not None or not model:
+            if type(max_cost) is not int or not 0 <= max_cost <= _MAX_COST_TENTHS:
+                raise IntentValidationError("Invalid expected-net-points cost allowance.")
+            result["max_cost_tenths"] = max_cost
     both = value.get("both", False)
     if type(both) is not bool:
         raise IntentValidationError("Invalid with-and-without comparison.")
@@ -309,7 +331,8 @@ def _draft(
             _constraint(item, player_ids, clubs, comparison=False, model=model) for item in hard
         ],
         "soft": [
-            _constraint(item, player_ids, clubs, comparison=False, model=model) for item in soft
+            _constraint(item, player_ids, clubs, comparison=False, model=model, soft=True)
+            for item in soft
         ],
     }
     constraints = (*result["hard"], *result["soft"])
@@ -528,11 +551,17 @@ _CONSTRAINT_PROPERTIES: Final = {
     "points": {"type": ["integer", "null"]},
 }
 _CONSTRAINT_LIST: Final = {"type": "array", "items": _schema_object(_CONSTRAINT_PROPERTIES)}
+_SOFT_CONSTRAINT_LIST: Final = {
+    "type": "array",
+    "items": _schema_object(
+        {**_CONSTRAINT_PROPERTIES, "max_cost_tenths": {"type": ["integer", "null"]}}
+    ),
+}
 _COMPARISON_SCHEMA: Final = _schema_object({**_CONSTRAINT_PROPERTIES, "both": {"type": "boolean"}})
 _DRAFT_SCHEMA: Final = _schema_object(
     {
         "hard": _CONSTRAINT_LIST,
-        "soft": _CONSTRAINT_LIST,
+        "soft": _SOFT_CONSTRAINT_LIST,
         "comparison": {"anyOf": [_COMPARISON_SCHEMA, {"type": "null"}]},
         "window": {"type": ["integer", "null"], "enum": [*_WINDOWS, None]},
     }

@@ -54,6 +54,8 @@ def optimize_chip_strategy(
     policy. Expected-lineup mode compares two complete resource paths on the same
     nonlinear score; the CP objective proposes them and cannot certify that score.
     """
+    if preferences is not None and preferences.net_points_priority:
+        raise ValueError("Net points comparisons cannot use automatic chips.")
     if expected_lineups and "appearance_probability" not in horizon.table:
         raise ValueError("Expected chip scoring requires appearance probabilities.")
     if transfer.chip_holding_value_points or transfer.banked_transfer_value_points:

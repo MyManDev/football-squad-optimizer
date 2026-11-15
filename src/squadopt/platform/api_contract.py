@@ -302,7 +302,10 @@ class ApiCommandRequest:
         if self.operation == "league.advise":
             try:
                 self.preferences.validate_selection(
-                    self.strategy or "", self.managers_word, self.chip
+                    self.strategy or "",
+                    self.managers_word,
+                    self.chip,
+                    top100_weight=self.top100_weight,
                 )
                 if self.window is not None:
                     self.preferences.validate_window(self.window)

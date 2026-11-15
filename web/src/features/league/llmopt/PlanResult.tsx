@@ -105,18 +105,69 @@ function MetricDelta({ label, value }: { label: string; value?: string }) {
   );
 }
 
+export type PreferencePrice = { key: string; label: string; ceiling?: number } & (
+  | { status: "pending" | "conflict" | "unavailable" | "skipped" }
+  | { status: "priced"; cost: number; aboveCeiling: boolean; unproven: boolean }
+);
+
+function PreferencePrices({ prices }: { prices: PreferencePrice[] }) {
+  const titleId = useId();
+  const { language, locale } = useLanguage();
+  const copy = LLMOPT_COPY[language];
+  if (!prices.length) return null;
+  const price = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 3,
+  });
+  const statuses = {
+    pending: copy.pricePending,
+    conflict: copy.priceConflict,
+    unavailable: copy.priceUnavailable,
+    skipped: copy.priceNotRun,
+  };
+  return (
+    <section className={styles.preferencePrices} aria-labelledby={titleId}>
+      <h4 id={titleId} className={styles.lineupTitle}>
+        {copy.preferencePrices}
+      </h4>
+      <ul aria-live="polite">
+        {prices.map((row) => (
+          <li key={row.key}>
+            <strong>{row.label}</strong>
+            <span>
+              {row.status === "priced"
+                ? copy.priceAmount(price.format(row.cost))
+                : statuses[row.status]}
+              {row.ceiling !== undefined &&
+                ` · ${copy.priceCeiling(price.format(row.ceiling / 10))}`}
+            </span>
+            {row.status === "priced" && row.aboveCeiling && (
+              <span className={styles.muted}>{copy.priceAboveCeiling}</span>
+            )}
+            {row.status === "priced" && row.unproven && (
+              <span className={styles.muted}>{copy.priceUnproven}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function PlanResult({
   title,
   state,
   squad,
   baseline,
   conflict,
+  prices = [],
 }: {
   title: string;
   state: ComputePhase;
   squad: EntrySquad;
   baseline?: EntryAdvice;
   conflict?: boolean;
+  prices?: PreferencePrice[];
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = LLMOPT_COPY[language];
@@ -137,6 +188,7 @@ export function PlanResult({
       <article className={styles.result}>
         <h3 className={styles.resultTitle}>{title}</h3>
         <p role="status">{message}</p>
+        <PreferencePrices prices={prices} />
       </article>
     );
   }
@@ -237,6 +289,7 @@ export function PlanResult({
           </dd>
         </div>
       </dl>
+      <PreferencePrices prices={prices} />
       <PlanSquad plan={plan} squad={squad} />
       {moves.length ? (
         <ul className={styles.moves}>

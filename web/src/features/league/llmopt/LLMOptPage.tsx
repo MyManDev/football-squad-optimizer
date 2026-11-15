@@ -10,25 +10,28 @@ import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
 import { gameweekDeadline, useMinuteClock } from "../advice/deadline";
-import { holdsOpeningTransfers, type DecisionPreferences } from "../advice/decisionPreferences";
+import { checkedPreferences, holdsOpeningTransfers } from "../advice/decisionPreferences";
 import { sameAdviceRequest, useAdviceJob, type ComputePhase } from "../advice/useAdviceJob";
 import { LEAGUE_READ, useEntrySquad } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
-import { LLMOPT_COPY } from "./copy";
+import { LLMOPT_COPY, ruleLabel } from "./copy";
 import {
   EMPTY_DRAFT,
   IntentError,
   MAX_MESSAGE_LENGTH,
+  constraintKey,
   needsThreeWeeks,
   preparePlans,
   readIntent,
   readIntentCatalog,
   type Clarification,
+  type Constraint,
   type PlanDraft,
 } from "./intent";
-import { PlanResult } from "./PlanResult";
+import { PlanResult, type PreferencePrice } from "./PlanResult";
 import {
+  expectedNet,
   meaningfulOpeningAlternative,
   openingAlternatives,
   sameOpeningDecision,
@@ -66,13 +69,149 @@ interface ChatLine {
   message: string;
 }
 
-interface PlanRun {
-  automaticBasis: (AdviceRequest & { preferences: DecisionPreferences }) | null;
-  explicitRequest: AdviceRequest | null;
-  explicitConflict: boolean;
+type PreparedPlan = NonNullable<ReturnType<typeof preparePlans>["base"]>;
+type PlanRequest = AdviceRequest & Pick<PreparedPlan, "preferences">;
+type ExplicitTitle = "with" | "without" | "alternative";
+type ReservedAlternative =
+  | { kind: "explicit"; title: ExplicitTitle; request: PlanRequest | null; conflict: boolean }
+  | { kind: "priced"; request: PlanRequest };
+
+interface PriceTarget {
+  rule: Constraint;
+  outcome: number | "same" | "conflict" | "unavailable" | "skipped";
 }
 
-function visibleAutomatic(state: ComputePhase, reference?: EntryAdvice, previous?: EntryAdvice) {
+interface PlanRun {
+  baseRequest: PlanRequest | null;
+  baseTitle: "base" | "without";
+  baseConflict: boolean;
+  automaticBasis: PlanRequest | null;
+  slots: ReservedAlternative[];
+  prices: PriceTarget[];
+  wildcardUnavailable: boolean;
+}
+
+const ALTERNATIVE_COUNT = 2;
+
+function prepareRun(
+  draft: PlanDraft,
+  held: ReadonlySet<number>,
+  request: AdviceRequest,
+  plans: ReturnType<typeof preparePlans>,
+  wildcardNotHeld: boolean,
+): PlanRun {
+  const pricing = draft.soft.length > 0;
+  const compareBoth = draft.comparison?.both === true;
+  const hardDraft = { window: plans.window, hard: draft.hard, soft: [] };
+  const hard = compareBoth ? preparePlans(hardDraft, held).base : plans.base;
+  const baseline = pricing ? hard : plans.base;
+  let wildcardUnavailable = false;
+  const submit = (plan: PreparedPlan | null) => {
+    if (!plan) return null;
+    if (wildcardNotHeld && plan.chip === "wildcard") {
+      wildcardUnavailable = true;
+      return null;
+    }
+    return {
+      ...request,
+      ...plan,
+      preferences: pricing
+        ? checkedPreferences({ ...plan.preferences, net_points_priority: true })
+        : plan.preferences,
+    };
+  };
+  const baseRequest = submit(baseline);
+  const automaticBasis = pricing || !compareBoth ? baseRequest : submit(hard);
+  const slots: ReservedAlternative[] = [];
+  function addExplicit(plan: PreparedPlan | null, conflict: boolean, title: ExplicitTitle) {
+    const request = submit(plan);
+    if (request || conflict) slots.push({ kind: "explicit", title, request, conflict });
+  }
+  if (pricing && compareBoth) addExplicit(plans.base, plans.baseConflict, "without");
+  if (draft.comparison)
+    addExplicit(plans.alternative, plans.alternativeConflict, compareBoth ? "with" : "alternative");
+  const prices = draft.soft.map((rule): PriceTarget => {
+    if (compareBoth) return { rule, outcome: "skipped" };
+    const branch = preparePlans({ ...hardDraft, soft: [rule] }, held);
+    if (branch.alternativeConflict) return { rule, outcome: "conflict" };
+    if (!branch.alternative) return { rule, outcome: "same" };
+    const request = submit(branch.alternative);
+    if (!request) return { rule, outcome: "unavailable" };
+    const existing = slots.findIndex(
+      (slot) => slot.request && sameAdviceRequest(slot.request, request),
+    );
+    if (existing >= 0) return { rule, outcome: existing };
+    if (slots.length === ALTERNATIVE_COUNT) return { rule, outcome: "skipped" };
+    const outcome = slots.length;
+    slots.push({ kind: "priced", request });
+    return { rule, outcome };
+  });
+  return {
+    baseTitle: !pricing && compareBoth ? "without" : "base",
+    baseConflict: pricing ? plans.hardConflict : plans.baseConflict,
+    baseRequest,
+    automaticBasis,
+    slots,
+    prices,
+    wildcardUnavailable,
+  };
+}
+
+function preferencePrice(
+  target: PriceTarget,
+  label: string,
+  reference: ComputePhase,
+  alternatives: readonly ComputePhase[],
+  closed: boolean,
+): PreferencePrice {
+  const review = { key: constraintKey(target.rule), label, ceiling: target.rule.max_cost_tenths };
+  const { outcome } = target;
+  if (outcome === "conflict" || outcome === "unavailable" || outcome === "skipped")
+    return { ...review, status: outcome };
+  if (reference.phase !== "done")
+    return {
+      ...review,
+      status: isWorking(reference.phase) ? "pending" : "unavailable",
+    };
+  const referencePlan = reference.envelope.payload;
+  if (outcome === "same")
+    return {
+      ...review,
+      status: "priced",
+      cost: 0,
+      aboveCeiling: false,
+      unproven: referencePlan.solver_status !== "OPTIMAL",
+    };
+  const candidate = alternatives[outcome];
+  if (candidate?.phase !== "done")
+    return {
+      ...review,
+      status:
+        candidate && (isWorking(candidate.phase) || (candidate.phase === "idle" && !closed))
+          ? "pending"
+          : "unavailable",
+    };
+
+  const candidatePlan = candidate.envelope.payload;
+  const referenceNet = expectedNet(referencePlan);
+  const candidateNet = expectedNet(candidatePlan);
+  if (referenceNet === null || candidateNet === null) return { ...review, status: "unavailable" };
+  const cost = samePlan(reference, candidate) ? 0 : Math.max(0, referenceNet - candidateNet);
+  return {
+    ...review,
+    status: "priced",
+    cost,
+    aboveCeiling: review.ceiling !== undefined && cost - review.ceiling / 10 > 1e-9,
+    unproven:
+      referencePlan.solver_status !== "OPTIMAL" || candidatePlan.solver_status !== "OPTIMAL",
+  };
+}
+
+function visibleAutomatic(
+  state: ComputePhase,
+  reference?: EntryAdvice,
+  previous: readonly EntryAdvice[] = [],
+) {
   if (state.phase !== "done" || !reference) return null;
   const plan = state.envelope.payload;
   const preferences = state.request.preferences;
@@ -84,7 +223,7 @@ function visibleAutomatic(state: ComputePhase, reference?: EntryAdvice, previous
         : null;
   return kind &&
     meaningfulOpeningAlternative(reference, plan, kind) &&
-    (!previous || !sameOpeningDecision(previous, plan))
+    !previous.some((shown) => sameOpeningDecision(shown, plan))
     ? { kind, state, plan }
     : null;
 }
@@ -119,7 +258,6 @@ function Session({ squad }: { squad: EntrySquad }) {
   const [feedback, setFeedback] = useState("");
   const [checkingSquad, setCheckingSquad] = useState(false);
   const [basisChanged, setBasisChanged] = useState(false);
-  const [wildcardNotHeld, setWildcardNotHeld] = useState(false);
   const [reading, setReading] = useState(false);
   const [run, setRun] = useState<PlanRun | null>(null);
   const automaticStartedFor = useRef<AdviceRequest | null>(null);
@@ -143,7 +281,6 @@ function Session({ squad }: { squad: EntrySquad }) {
     setRun(null);
     setFeedback("");
     setClarification(undefined);
-    setWildcardNotHeld(false);
     setDraft(next);
   }
 
@@ -190,17 +327,18 @@ function Session({ squad }: { squad: EntrySquad }) {
     }
   }
 
-  const plans = preparePlans(draft, held);
+  const plans = preparePlans(
+    {
+      ...draft,
+      window: draft.window ?? (needsThreeWeeks(draft) ? 3 : 1),
+      soft: [],
+    },
+    held,
+  );
+  const canCalculate =
+    !plans.hardConflict && (draft.soft.length > 0 || plans.base || plans.alternative);
   const computing = [base.state, first.state, second.state].some(({ phase }) => isWorking(phase));
   const busy = checkingSquad || reading || computing;
-  const compareBoth = draft.comparison?.both === true;
-  const baseTitle = compareBoth ? copy.without : copy.base;
-  const alternativeTitle = compareBoth
-    ? copy.with
-    : draft.comparison
-      ? copy.alternative
-      : copy.preferred;
-  const hasExplicit = Boolean(run?.explicitRequest || run?.explicitConflict);
   const baseState = base.state;
   const { compute: computeFirst } = first;
   const { compute: computeSecond } = second;
@@ -214,25 +352,30 @@ function Session({ squad }: { squad: EntrySquad }) {
     automaticStartedFor.current = baseState.request;
     if (deadline === null || Date.now() >= Date.parse(deadline)) return;
 
+    const jobs = [computeFirst, computeSecond];
+    run.slots.forEach((slot, index) => {
+      if (slot.kind === "priced") jobs[index]?.(slot.request);
+    });
+    const spare = jobs.slice(run.slots.length);
+    if (!spare.length) return;
     const basis = run.automaticBasis;
+    const reserved = run.slots.flatMap((slot) => (slot.request ? [slot.request] : []));
     const { roll, bank } = openingAlternatives(
       baseState.envelope.payload,
       basis.preferences,
       basis.chip,
     );
-    const available = [holdsOpeningTransfers(run.explicitRequest?.preferences) ? null : roll, bank]
+    const available = [
+      reserved.some(({ preferences }) => holdsOpeningTransfers(preferences)) ? null : roll,
+      bank,
+    ]
       .flatMap((preferences) => (preferences ? [{ ...basis, preferences }] : []))
-      .filter(
-        (candidate) => !run.explicitRequest || !sameAdviceRequest(candidate, run.explicitRequest),
-      );
-    const [firstCandidate, secondCandidate] = available;
-    if (hasExplicit) {
-      if (firstCandidate) computeSecond(firstCandidate);
-    } else {
-      if (firstCandidate) computeFirst(firstCandidate);
-      if (secondCandidate) computeSecond(secondCandidate);
-    }
-  }, [baseState, run, deadline, hasExplicit, computeFirst, computeSecond]);
+      .filter((candidate) => !reserved.some((request) => sameAdviceRequest(candidate, request)));
+    spare.forEach((start, index) => {
+      const candidate = available[index];
+      if (candidate) start(candidate);
+    });
+  }, [baseState, run, deadline, computeFirst, computeSecond]);
 
   async function compute() {
     if (
@@ -243,8 +386,7 @@ function Session({ squad }: { squad: EntrySquad }) {
       !squad.source_snapshot_id ||
       deadline === null ||
       Date.now() >= Date.parse(deadline) ||
-      plans.hardConflict ||
-      (!plans.base && !plans.alternative)
+      !canCalculate
     )
       return;
     confirming.current = true;
@@ -292,34 +434,25 @@ function Session({ squad }: { squad: EntrySquad }) {
       // A public team may have no chip list until its FPL inputs are pinned.
       const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
       const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
-      const basePlan = wildcardNotHeld && plans.base?.chip === "wildcard" ? null : plans.base;
-      const alternativePlan =
-        wildcardNotHeld && plans.alternative?.chip === "wildcard" ? null : plans.alternative;
-      setWildcardNotHeld(wildcardNotHeld);
-      if (basePlan !== plans.base || alternativePlan !== plans.alternative) {
-        setFeedback(copy.wildcardUnavailable);
-      }
-      if (!basePlan && !alternativePlan) {
+      const next = prepareRun(draft, held, request, plans, wildcardNotHeld);
+      if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
+      if (
+        !next.baseRequest &&
+        !next.slots.some((slot) => slot.kind === "explicit" && slot.request)
+      ) {
         setRun(null);
         return;
       }
-      // A with/without comparison adds a rule to the reference branch. Automatic alternatives
-      // inherit the user's required rules, so that comparison rule does not leak into them.
-      const hardPlan = compareBoth
-        ? preparePlans({ window: plans.window, hard: draft.hard, soft: [] }, held).base
-        : basePlan;
-      const explicitRequest = alternativePlan ? { ...request, ...alternativePlan } : null;
       first.reset();
       second.reset();
-      setRun({
-        automaticBasis: hardPlan ? { ...request, ...hardPlan } : null,
-        explicitRequest,
-        explicitConflict: plans.alternativeConflict,
-      });
-      if (basePlan) {
-        base.compute({ ...request, ...basePlan });
+      setRun(next);
+      if (next.baseRequest) {
+        base.compute(next.baseRequest);
       } else base.reset();
-      if (explicitRequest) computeFirst(explicitRequest);
+      const jobs = [computeFirst, computeSecond];
+      next.slots.forEach((slot, index) => {
+        if (slot.kind === "explicit" && slot.request) jobs[index]?.(slot.request);
+      });
     } catch {
       if (mounted.current) setFeedback(copy.squadUnavailable);
     } finally {
@@ -328,14 +461,70 @@ function Session({ squad }: { squad: EntrySquad }) {
     }
   }
 
-  const same = hasExplicit && samePlan(baseState, first.state);
   const baseAnswer = baseState.phase === "done" ? baseState.envelope.payload : undefined;
-  const explicitAnswer =
-    hasExplicit && !same && first.state.phase === "done" ? first.state.envelope.payload : undefined;
-  const firstAutomatic = hasExplicit ? null : visibleAutomatic(first.state, baseAnswer);
-  const secondAutomatic = isWorking(first.state.phase)
-    ? null
-    : visibleAutomatic(second.state, baseAnswer, explicitAnswer ?? firstAutomatic?.plan);
+  const states = [first.state, second.state];
+  const priceReview =
+    run?.prices.map((target) => ({
+      outcome: target.outcome,
+      price: preferencePrice(
+        target,
+        ruleLabel(target.rule, players, copy),
+        baseState,
+        states,
+        closed,
+      ),
+    })) ?? [];
+  const results: { title: string; state: ComputePhase; conflict?: boolean }[] = [];
+  let same = false;
+  if (run) {
+    states.forEach((state, index) => {
+      const slot = run.slots[index];
+      if (slot?.kind === "explicit") {
+        // A requested with/without pair remains visible alongside an independent pricing reference.
+        if (
+          !slot.conflict &&
+          slot.title !== "without" &&
+          (run.baseTitle === "without" || slot.title === "alternative") &&
+          samePlan(baseState, state)
+        ) {
+          same = true;
+        } else {
+          results.push({ title: copy[slot.title], state, conflict: slot.conflict });
+        }
+      } else if (slot?.kind === "priced") {
+        if (
+          state.phase !== "done" ||
+          samePlan(baseState, state) ||
+          results.some((shown) => samePlan(shown.state, state))
+        )
+          return;
+        const approved = priceReview.find(
+          ({ outcome, price }) =>
+            outcome === index && price.status === "priced" && !price.aboveCeiling,
+        );
+        if (approved) results.push({ title: copy.pricedPlan(approved.price.label), state });
+      } else if (!states.slice(0, index).some(({ phase }) => isWorking(phase))) {
+        if (
+          priceReview.some(({ outcome, price }) => {
+            const pricedState = typeof outcome === "number" ? states[outcome] : undefined;
+            return Boolean(
+              pricedState &&
+              price.status === "priced" &&
+              price.aboveCeiling &&
+              samePlan(pricedState, state),
+            );
+          })
+        )
+          return;
+        const previous = results.flatMap(({ state }) =>
+          state.phase === "done" ? [state.envelope.payload] : [],
+        );
+        const automatic = visibleAutomatic(state, baseAnswer, previous);
+        if (automatic)
+          results.push({ title: automatic.kind === "roll" ? copy.rollPlan : copy.bankPlan, state });
+      }
+    });
+  }
   const team = squad.entry.team_name ?? squad.entry.manager_name;
   const teamPath =
     squad.league_id === 0
@@ -452,8 +641,7 @@ function Session({ squad }: { squad: EntrySquad }) {
             !squad.source_snapshot_id ||
             closed ||
             deadline === null ||
-            plans.hardConflict ||
-            (!plans.base && !plans.alternative) ||
+            !canCalculate ||
             basisChanged
           }
           onClick={() => void compute()}
@@ -481,35 +669,25 @@ function Session({ squad }: { squad: EntrySquad }) {
         >
           <h2>{copy.results}</h2>
           <div className={styles.planGrid}>
-            {!(wildcardNotHeld && plans.base?.chip === "wildcard") && (
+            {(run.baseRequest || run.baseConflict) && (
               <PlanResult
-                title={baseTitle}
+                title={copy[run.baseTitle]}
                 state={base.state}
                 squad={squad}
-                conflict={plans.baseConflict}
+                conflict={run.baseConflict}
+                prices={priceReview.map(({ price }) => price)}
               />
             )}
-            {hasExplicit && !same && (
+            {results.map(({ title, state, conflict }) => (
               <PlanResult
-                title={alternativeTitle}
-                state={first.state}
+                key={title}
+                title={title}
+                state={state}
                 squad={squad}
                 baseline={baseAnswer}
-                conflict={run.explicitConflict}
+                conflict={conflict}
               />
-            )}
-            {[firstAutomatic, secondAutomatic].map(
-              (alternative) =>
-                alternative && (
-                  <PlanResult
-                    key={alternative.kind}
-                    title={alternative.kind === "roll" ? copy.rollPlan : copy.bankPlan}
-                    state={alternative.state}
-                    squad={squad}
-                    baseline={baseAnswer}
-                  />
-                ),
-            )}
+            ))}
           </div>
           {same && (
             <p role="status" className={styles.muted}>

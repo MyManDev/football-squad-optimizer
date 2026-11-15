@@ -210,6 +210,117 @@ def test_same_rule_in_two_weeks_and_zero_total_budget_are_preserved() -> None:
     assert response.json() == {"status": "draft", "draft": draft}
 
 
+def test_prices_one_named_soft_rule_without_weakening_hard_wildcard_and_club_requirements() -> None:
+    message = (
+        "Wildcard kullan, Brighton'dan 3 oyuncu al. Saka'y\u0131 tutmak üç haftada en fazla "
+        "1,5 beklenen puana mal oluyorsa tut. Tercihen üçüncü hafta transferi sakla."
+    )
+    expected: dict[str, Any] = {
+        "window": 3,
+        "hard": [
+            {"kind": "wildcard"},
+            {
+                "kind": "club_count",
+                "club": "Brighton",
+                "count": 3,
+                "scope": "transfers_in",
+                "week": 1,
+            },
+        ],
+        "soft": [
+            {"kind": "keep_player", "player_id": 2, "max_cost_tenths": 15},
+            {"kind": "hold_transfers", "week": 3},
+        ],
+    }
+
+    def provider(request: IntentRequest) -> object:
+        follow_up = request.message != message
+        assert request.draft == (expected if follow_up else {"hard": [], "soft": []})
+        assert request.clubs == ("Arsenal", "Brighton")
+        price = 0 if follow_up else 15
+        return {
+            "status": "draft",
+            "draft": {
+                **expected,
+                "hard": [{"player_id": None, **rule} for rule in expected["hard"]],
+                "soft": [
+                    {**expected["soft"][0], "max_cost_tenths": price},
+                    {**expected["soft"][1], "player_id": None, "max_cost_tenths": None},
+                ],
+                "comparison": None,
+            },
+            "message": None,
+        }
+
+    body = {
+        "locale": "tr",
+        "message": message,
+        "draft": {"hard": [], "soft": []},
+        "players": [
+            {"id": 2, "name": "Bukayo Saka", "team": "Arsenal", "held": True},
+            {"id": 3, "name": "Brighton Player", "team": "Brighton"},
+        ],
+    }
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=body)
+        assert response.status_code == 200
+        assert response.json() == {"status": "draft", "draft": expected}
+        follow_up = client.post(
+            URL,
+            json={
+                **body,
+                "message": "Saka için hiç puan kaybetme, diğer tercihler ayn\u0131.",
+                "draft": response.json()["draft"],
+            },
+        )
+        assert follow_up.status_code == 200
+        assert follow_up.json()["draft"] == {
+            **expected,
+            "soft": [{**expected["soft"][0], "max_cost_tenths": 0}, expected["soft"][1]],
+        }
+
+
+@pytest.mark.parametrize(
+    ("section", "allowance"),
+    [
+        ("hard", 15),
+        ("comparison", 15),
+        ("soft", True),
+        ("soft", "15"),
+        ("soft", 1.5),
+        ("soft", -1),
+        ("soft", 1001),
+        ("soft", None),
+    ],
+)
+def test_refuses_misplaced_or_invalid_wish_cost_in_confirmed_draft(
+    section: str, allowance: Any
+) -> None:
+    def provider(_request: IntentRequest) -> object:
+        pytest.fail("Invalid cost reached the provider.")
+
+    preference = {"kind": "keep_player", "player_id": 1, "max_cost_tenths": allowance}
+    draft: dict[str, Any] = {"hard": [], "soft": []}
+    draft[section] = preference if section == "comparison" else [preference]
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json={**_request(), "draft": draft})
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("section", ["hard", "comparison"])
+def test_provider_must_not_attach_cost_to_a_requirement_or_comparison(section: str) -> None:
+    def provider(_request: IntentRequest) -> object:
+        result = _proposed()
+        draft = result["draft"]
+        rule = draft[section] if section == "comparison" else draft[section][0]
+        rule["max_cost_tenths"] = 15
+        return result
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 503
+
+
 @pytest.mark.parametrize(
     ("user_message", "scope", "expected_scope"),
     [
@@ -520,6 +631,11 @@ def test_provider_sends_strict_schema_and_handles_wire_without_network(
             constraint["properties"]["kind"]["enum"]
         )
         assert {"club", "count", "scope", "week", "points"} <= set(constraint["required"])
+        soft_constraint = draft_properties["soft"]["items"]
+        assert soft_constraint["properties"]["max_cost_tenths"] == {"type": ["integer", "null"]}
+        assert "max_cost_tenths" in soft_constraint["required"]
+        assert "max_cost_tenths" not in constraint["properties"]
+        assert "max_cost_tenths" not in draft_properties["comparison"]["anyOf"][0]["properties"]
         context = json.loads(body["messages"][1]["content"])
         assert context["message"] == "The Liverpool player"
         assert context["clubs"] == ["LIV"]

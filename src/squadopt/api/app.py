@@ -182,7 +182,7 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
         raise BackendApiContractError("Unknown prediction model.")
     try:
         preferences = DecisionPreferences.parse(fields.get("preferences", {}))
-        preferences.validate_selection(strategy, word, chip)
+        preferences.validate_selection(strategy, word, chip, top100_weight=weight)
     except ValueError as error:
         raise BackendApiContractError(str(error)) from error
     return AdviceSelection(strategy, window, rival, weight, word, chip, model, preferences)

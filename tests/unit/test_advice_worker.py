@@ -2006,6 +2006,43 @@ def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, 
         }
 
 
+def test_llmopt_prices_a_preference_on_the_same_three_week_net_points_basis(tmp_path, monkeypatch):
+    backend = _deployment(tmp_path, monkeypatch, third_decision_week=True)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 3}
+    first_week = {"week": 1, "rules": {"hold_transfers": True}}
+    hard = {"net_points_priority": True, "no_hits": True, "week_rules": [first_week]}
+
+    def solve(preferences):
+        queued = client.post(route, json={**selection, "preferences": preferences})
+        assert queued.status_code == 202, queued.text
+        assert _work(backend) == 1
+        response = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+        assert response.status_code == 200, response.text
+        return queued.json()["job_id"], response.json()["payload"]
+
+    base_id, base = solve(hard)
+    soft_week = {"week": 2, "rules": {"buy_players": [1002]}}
+    preference_id, preference = solve({**hard, "week_rules": [first_week, soft_week]})
+    assert base_id != preference_id
+    totals = []
+    for payload in (base, preference):
+        assert payload["solver_status"] == "OPTIMAL"
+        assert payload["preferences"]["net_points_priority"] is True
+        assert payload["preferences"]["no_hits"] is True
+        assert payload["source_snapshot_id"] == base["source_snapshot_id"]
+        assert [row["gameweek"] for row in payload["plan_weeks"]] == [2, 3, 4]
+        assert payload["plan_weeks"][0]["transfers_in"] == []
+        totals.append(
+            sum(
+                row["expected_points"] - row["transfer_hit_points"] for row in payload["plan_weeks"]
+            )
+        )
+    assert totals[0] >= totals[1] - 1e-9
+    assert 1002 in {player["player_id"] for player in preference["plan_weeks"][1]["transfers_in"]}
+
+
 def test_llmopt_wildcard_rebuilds_the_squad_under_player_preferences(running):
     backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))

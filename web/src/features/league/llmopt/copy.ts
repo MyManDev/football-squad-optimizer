@@ -1,5 +1,5 @@
 import type { Language } from "../../../i18n/messages";
-import type { Constraint } from "./intent";
+import type { CatalogPlayer, Constraint } from "./intent";
 
 const en = {
   back: "Back to team",
@@ -24,6 +24,9 @@ const en = {
   reload: "Reload",
   hard: "Required",
   soft: "Preferred",
+  preferenceLimit: "Maximum expected points lost (optional)",
+  preferenceLimitLabel: (tenths: number) =>
+    `Up to ${new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(tenths / 10)} points`,
   comparison: "Compare",
   both: "With and without",
   empty: "No rules yet",
@@ -57,6 +60,16 @@ const en = {
   results: "Plans",
   base: "Base plan",
   preferred: "Preferred plan",
+  preferencePrices: "Expected points cost of preferences",
+  pricePending: "Calculating expected points cost…",
+  priceConflict: "This preference conflicts with required rules.",
+  priceUnavailable: "No comparable plan was found for this preference.",
+  priceAmount: (value: string) => `${value} expected points lost`,
+  priceCeiling: (value: string) => `Up to ${value} points`,
+  priceAboveCeiling: "Above your points limit.",
+  priceUnproven: "Cost is based on the plans found.",
+  priceNotRun: "This preference was not evaluated in this calculation.",
+  pricedPlan: (label: string) => `Preferred plan · ${label}`,
   alternative: "Alternative plan",
   rollPlan: "Roll the transfer plan",
   bankPlan: "Plan with more remaining budget",
@@ -120,6 +133,9 @@ const tr: typeof en = {
   reload: "Yenile",
   hard: "Kesin şart",
   soft: "Tercih",
+  preferenceLimit: "Azami beklenen puan kaybı (isteğe bağlı)",
+  preferenceLimitLabel: (tenths: number) =>
+    `En fazla ${new Intl.NumberFormat("tr", { maximumFractionDigits: 1 }).format(tenths / 10)} puan`,
   comparison: "Karşılaştır",
   both: "Oyunculu ve oyuncusuz",
   empty: "Henüz kural yok",
@@ -153,6 +169,16 @@ const tr: typeof en = {
   results: "Planlar",
   base: "Temel plan",
   preferred: "Tercihli plan",
+  preferencePrices: "Tercihlerin beklenen puan maliyeti",
+  pricePending: "Beklenen puan maliyeti hesaplanıyor…",
+  priceConflict: "Bu tercih kesin şartlarla çelişiyor.",
+  priceUnavailable: "Tercih için karşılaştırılabilir plan bulunamadı.",
+  priceAmount: (value: string) => `${value} beklenen puan kaybı`,
+  priceCeiling: (value: string) => `En fazla ${value} puan`,
+  priceAboveCeiling: "Belirlediğin puan sınırının üzerinde.",
+  priceUnproven: "Maliyet bulunan planlara göre hesaplandı.",
+  priceNotRun: "Bu tercih bu hesaplamada değerlendirilmedi.",
+  pricedPlan: (label: string) => `Tercihli plan · ${label}`,
   alternative: "Alternatif plan",
   rollPlan: "Transferi saklayan plan",
   bankPlan: "Daha fazla bütçe bırakan plan",
@@ -195,3 +221,23 @@ const tr: typeof en = {
 
 export const LLMOPT_COPY: Record<Language, typeof en> = { en, tr };
 export type LLMOptCopy = typeof en;
+
+export function ruleLabel(
+  rule: Constraint,
+  players: readonly CatalogPlayer[],
+  copy: LLMOptCopy,
+): string {
+  const timing =
+    rule.week === undefined
+      ? ""
+      : ` · ${rule.week === 1 ? copy.thisWeek : copy.relativeWeek(rule.week)}`;
+  if (rule.kind === "club_count") {
+    const scope = rule.scope === "transfers_in" ? copy.clubTransfers : copy.clubSquad;
+    return `${rule.club} · ${scope} · ${rule.count}${timing}`;
+  }
+  if (rule.kind === "hit_budget")
+    return `${copy.rules[rule.kind]} · ${copy.hitBudgetPoints(rule.points)}`;
+  if (!("player_id" in rule)) return `${copy.rules[rule.kind]}${timing}`;
+  const selected = players.find(({ id }) => id === rule.player_id);
+  return `${copy.rules[rule.kind]} · ${selected?.name ?? rule.player_id}${timing}`;
+}

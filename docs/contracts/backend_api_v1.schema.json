@@ -127,6 +127,9 @@
               "minimum": 1,
               "type": "integer"
             },
+            "net_points_priority": {
+              "type": "boolean"
+            },
             "no_hits": {
               "type": "boolean"
             },
@@ -402,6 +405,9 @@
               "maximum": 10000,
               "minimum": 1,
               "type": "integer"
+            },
+            "net_points_priority": {
+              "type": "boolean"
             },
             "no_hits": {
               "type": "boolean"

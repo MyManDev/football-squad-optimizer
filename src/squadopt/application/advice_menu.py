@@ -132,7 +132,9 @@ class MenuRequest:
     def __post_init__(self) -> None:
         self.entry_request()  # the shared fields are refused by the type that owns them
         try:
-            self.preferences.validate_selection(self.strategy, self.managers_word, self.chip)
+            self.preferences.validate_selection(
+                self.strategy, self.managers_word, self.chip, top100_weight=self.top100_weight
+            )
             self.preferences.validate_window(self.window)
         except ValueError as error:
             raise EntryError(str(error)) from error

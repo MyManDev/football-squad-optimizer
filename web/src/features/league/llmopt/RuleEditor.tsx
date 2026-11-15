@@ -7,10 +7,11 @@ import {
   type PlanWeekNumber,
 } from "../advice/decisionPreferences";
 
-import type { LLMOptCopy } from "./copy";
+import { ruleLabel, type LLMOptCopy } from "./copy";
 import {
   CONSTRAINT_KINDS,
   constraintKey,
+  isPreferenceCost,
   isPlayerKind,
   MAX_CONSTRAINTS,
   needsThreeWeeks,
@@ -43,6 +44,7 @@ export function RuleEditor({
   const [clubScope, setClubScope] = useState<"squad" | "transfers_in">("squad");
   const [week, setWeek] = useState<PlanWeekNumber>();
   const [points, setPoints] = useState("4");
+  const [cost, setCost] = useState("");
   const [both, setBoth] = useState(false);
   const availablePlayers = kind === "keep_player" ? players.filter(({ held }) => held) : players;
   const player = availablePlayers.find(({ id }) => String(id) === playerId);
@@ -51,6 +53,11 @@ export function RuleEditor({
   const listFull = draft.hard.length + draft.soft.length >= MAX_CONSTRAINTS;
   const selectedWeek = week ?? (kind === "buy_player" ? 1 : undefined);
   const hitBudget = points.trim() ? Number(points) : null;
+  const costInput = cost.trim();
+  const maxCost = /^\d+(?:[.,]\d)?$/.test(costInput)
+    ? Math.round(Number(costInput.replace(",", ".")) * 10)
+    : null;
+  const invalidCost = strength === "soft" && costInput !== "" && !isPreferenceCost(maxCost);
 
   function apply(next: PlanDraft) {
     change(needsThreeWeeks(next) ? { ...next, window: 3 } : next);
@@ -58,7 +65,7 @@ export function RuleEditor({
 
   function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (disabled || (strength !== "comparison" && listFull)) return;
+    if (disabled || invalidCost || (strength !== "comparison" && listFull)) return;
     let rule: Constraint;
     const timing = selectedWeek === undefined ? {} : { week: selectedWeek };
     if (kind === "hit_budget") {
@@ -82,6 +89,10 @@ export function RuleEditor({
     } else {
       rule = { kind, ...timing };
     }
+    if (strength === "soft" && isPreferenceCost(maxCost)) {
+      rule = { ...rule, max_cost_tenths: maxCost };
+      setCost("");
+    }
     if (strength === "comparison") {
       apply({
         ...draft,
@@ -104,21 +115,12 @@ export function RuleEditor({
     }
   }
 
-  function label(rule: Constraint) {
-    const timing =
-      rule.week === undefined
-        ? ""
-        : ` · ${rule.week === 1 ? copy.thisWeek : copy.relativeWeek(rule.week)}`;
-    if (rule.kind === "club_count") {
-      const scope = rule.scope === "transfers_in" ? copy.clubTransfers : copy.clubSquad;
-      return `${rule.club} · ${scope} · ${rule.count}${timing}`;
-    }
-    if (rule.kind === "hit_budget")
-      return `${copy.rules[rule.kind]} · ${copy.hitBudgetPoints(rule.points)}`;
-    if (!("player_id" in rule)) return `${copy.rules[rule.kind]}${timing}`;
-    const selected = players.find(({ id }) => id === rule.player_id);
-    return `${copy.rules[rule.kind]} · ${selected?.name ?? rule.player_id}${timing}`;
-  }
+  const label = (rule: Constraint) => {
+    const description = ruleLabel(rule, players, copy);
+    return rule.max_cost_tenths === undefined
+      ? description
+      : `${description} · ${copy.preferenceLimitLabel(rule.max_cost_tenths)}`;
+  };
 
   const columns = [
     { strength: "hard", rules: draft.hard },
@@ -279,6 +281,16 @@ export function RuleEditor({
             ))}
           </select>
         </label>
+        {strength === "soft" && (
+          <label>
+            {copy.preferenceLimit}
+            <input
+              inputMode="decimal"
+              value={cost}
+              onChange={(event) => setCost(event.target.value)}
+            />
+          </label>
+        )}
         {strength === "comparison" && kind === "include_player" && (
           <label className={styles.checkbox}>
             <input
@@ -293,6 +305,7 @@ export function RuleEditor({
           className={styles.secondary}
           disabled={
             disabled ||
+            invalidCost ||
             (strength !== "comparison" && listFull) ||
             (isPlayerKind(kind) && !player) ||
             (kind === "club_count" && !selectedClub) ||

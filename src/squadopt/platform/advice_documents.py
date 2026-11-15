@@ -367,7 +367,9 @@ def advice_read_schema() -> dict[str, Any]:
                     "selected_chip": chip,
                     "top100_weight": {"enum": [0, 5, 10, 20, 30, 40, 50]},
                     "objective_gap": nullable_number,
-                    "objective_basis": {"const": "selection_utility_with_chip_reserve"},
+                    "objective_basis": {
+                        "enum": ["selection_utility_with_chip_reserve", "projected_net_points"]
+                    },
                     "experimental": {"type": "boolean"},
                     "reservations": {
                         "type": "array",

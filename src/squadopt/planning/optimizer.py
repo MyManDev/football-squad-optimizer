@@ -2,9 +2,10 @@
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from itertools import pairwise
+from math import lcm
 from numbers import Integral
 from time import perf_counter
 from typing import Final
@@ -1285,6 +1286,32 @@ def optimize_transfer_plan(
     availability = ChipAvailability() if chips is None else chips
     if not isinstance(availability, ChipAvailability):
         raise TransferPlanningValidationError("chips must be a ChipAvailability instance.")
+    net_points_priority = (
+        isinstance(preferences, DecisionPreferences) and preferences.net_points_priority
+    )
+    if net_points_priority:
+        if chip_tail is not None:
+            raise TransferPlanningValidationError("Net points comparisons cannot use a chip tail.")
+        settings = settings.for_net_points()
+        # Make the actual charged hit exact on the forecast coefficient scale too.
+        charge_denominator = Decimal(str(settings.hit_points_charged)).as_integer_ratio()[1]
+        optimization_config = replace(
+            optimization_config,
+            bench_weight=0.0,
+            expected_points_scale=lcm(
+                optimization_config.expected_points_scale, charge_denominator
+            ),
+        )
+        if any(
+            p.holding_value_points for windows in availability.use_windows.values() for p in windows
+        ):
+            availability = replace(
+                availability,
+                use_windows={
+                    name: tuple(replace(p, holding_value_points=None) for p in windows)
+                    for name, windows in availability.use_windows.items()
+                },
+            )
 
     if not isinstance(protect_incumbent, bool):
         raise TransferPlanningValidationError("protect_incumbent must be boolean.")
@@ -1320,6 +1347,13 @@ def optimize_transfer_plan(
         availability,
         chip_tail,
     )
+    if net_points_priority:
+        # Publish the forecast values represented by the same integer coefficients used by CP-SAT.
+        scale = optimization_config.expected_points_scale
+        for players in players_by_week:
+            players["expected_points"] = [
+                scale_expected_points(points, scale) / scale for points in players.expected_points
+            ]
     _fix_week_squads(artifacts, players_by_week, fixed_week_squads, optimization_config.squad_size)
     _forbid_squads(artifacts, players_by_week[0], excluded_squads, optimization_config.squad_size)
     if first_week_overlap is not None and not isinstance(first_week_overlap, FirstWeekOverlap):

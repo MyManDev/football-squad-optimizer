@@ -26,14 +26,15 @@ export const MAX_MESSAGE_LENGTH = 800;
 
 type PlayerKind = (typeof playerKinds)[number] | "buy_player";
 type PlanWindow = 1 | 3;
-export type Constraint =
+export type Constraint = (
   | ({ week?: PlanWeekNumber } & (
       | { kind: (typeof playerKinds)[number]; player_id: number }
       | { kind: (typeof ruleKinds)[number] }
       | ({ kind: "club_count" } & ClubCount)
     ))
   | { kind: "buy_player"; player_id: number; week: PlanWeekNumber }
-  | { kind: "hit_budget"; points: number; week?: never };
+  | { kind: "hit_budget"; points: number; week?: never }
+) & { max_cost_tenths?: number };
 type Comparison = Constraint & { both?: boolean };
 
 export interface PlanDraft {
@@ -81,11 +82,15 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+export function isPreferenceCost(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 1000;
+}
+
 function parseConstraint(
   value: unknown,
   players: ReadonlySet<number>,
   clubs: ReadonlySet<string>,
-  comparison = false,
+  strength: "hard" | "soft" | "comparison" = "hard",
 ) {
   if (
     !record(value) ||
@@ -93,13 +98,17 @@ function parseConstraint(
     Object.keys(value).some(
       (key) =>
         !["kind", "player_id", "club", "count", "scope", "week", "points"].includes(key) &&
-        !(comparison && key === "both"),
+        !(strength === "comparison" && key === "both") &&
+        !(strength === "soft" && key === "max_cost_tenths"),
     )
   )
     throw new Error("Invalid constraint");
   const kind = value.kind as Constraint["kind"];
   const id = value.player_id;
-  const { club, count, scope, week, points } = value;
+  const { club, count, scope, week, points, max_cost_tenths: maxCost } = value;
+  if (maxCost !== undefined && !isPreferenceCost(maxCost))
+    throw new Error("Invalid preference cost limit");
+  const price = maxCost === undefined ? {} : { max_cost_tenths: maxCost };
   if (week !== undefined && !isPlanWeek(week)) throw new Error("Invalid rule week");
   const timing = week === undefined ? {} : { week };
   if (kind === "hit_budget") {
@@ -112,7 +121,7 @@ function parseConstraint(
       !isHitBudget(points)
     )
       throw new Error("Invalid hit budget");
-    return { kind, points } satisfies Constraint;
+    return { kind, points, ...price } satisfies Constraint;
   }
   if (points !== undefined) throw new Error("Unexpected hit budget");
   if (kind === "club_count") {
@@ -130,6 +139,7 @@ function parseConstraint(
       count,
       ...(scope === "transfers_in" ? { scope } : {}),
       ...timing,
+      ...price,
     } satisfies Constraint;
   }
   if (club !== undefined || count !== undefined || scope !== undefined)
@@ -138,12 +148,12 @@ function parseConstraint(
     if (typeof id !== "number" || !players.has(id)) throw new Error("Unknown player");
     if (kind === "buy_player") {
       if (week === undefined) throw new Error("A transfer needs a week");
-      return { kind, player_id: id, week } satisfies Constraint;
+      return { kind, player_id: id, week, ...price } satisfies Constraint;
     }
-    return { kind, player_id: id, ...timing } satisfies Constraint;
+    return { kind, player_id: id, ...timing, ...price } satisfies Constraint;
   }
   if (id !== undefined) throw new Error("Unexpected player");
-  return { kind, ...timing } satisfies Constraint;
+  return { kind, ...timing, ...price } satisfies Constraint;
 }
 
 function parseDraft(
@@ -161,13 +171,13 @@ function parseDraft(
     throw new Error("Invalid draft");
   const draft: PlanDraft = {
     hard: value.hard.map((item) => parseConstraint(item, playerIds, clubs)),
-    soft: value.soft.map((item) => parseConstraint(item, playerIds, clubs)),
+    soft: value.soft.map((item) => parseConstraint(item, playerIds, clubs, "soft")),
     ...(value.window !== undefined ? { window: value.window } : {}),
   };
   const keys = [...draft.hard, ...draft.soft].map(constraintKey);
   if (new Set(keys).size !== keys.length) throw new Error("Repeated constraint");
   if (value.comparison != null) {
-    const item = parseConstraint(value.comparison, playerIds, clubs, true);
+    const item = parseConstraint(value.comparison, playerIds, clubs, "comparison");
     const both = (value.comparison as Record<string, unknown>).both;
     if (both != null && (typeof both !== "boolean" || (both && item.kind !== "include_player")))
       throw new Error("Invalid comparison");

@@ -14,6 +14,7 @@ _WINDOW_FIELDS = {
     "wildcard_week",
     "hold_opening_transfers",
     "min_opening_bank_tenths",
+    "net_points_priority",
 }
 
 
@@ -76,6 +77,7 @@ class DecisionPreferences:
     buy_players: tuple[int, ...] = ()
     hold_opening_transfers: bool = False
     min_opening_bank_tenths: int | None = None
+    net_points_priority: bool = False
 
     def __post_init__(self) -> None:
         for name in _PLAYER_FIELDS:
@@ -101,6 +103,8 @@ class DecisionPreferences:
             raise ValueError("hold_transfers must be a boolean.")
         if not isinstance(self.hold_opening_transfers, bool):
             raise ValueError("hold_opening_transfers must be a boolean.")
+        if not isinstance(self.net_points_priority, bool):
+            raise ValueError("net_points_priority must be a boolean.")
         if self.min_opening_bank_tenths is not None and (
             type(self.min_opening_bank_tenths) is not int
             or not 1 <= self.min_opening_bank_tenths <= 10000
@@ -206,11 +210,16 @@ class DecisionPreferences:
 
     @property
     def uses_game_transfer_limits(self) -> bool:
-        return bool(self.week_rules or self.wildcard_week or self.max_hit_points is not None)
+        return bool(
+            self.week_rules
+            or self.wildcard_week
+            or self.max_hit_points is not None
+            or self.net_points_priority
+        )
 
     @property
     def needs_full_window(self) -> bool:
-        return self.scoped or self.max_hit_points is not None
+        return self.scoped or self.uses_game_transfer_limits
 
     @property
     def active(self) -> bool:
@@ -225,6 +234,7 @@ class DecisionPreferences:
             or self.scoped
             or self.max_hit_points is not None
             or self.buy_players
+            or self.net_points_priority
         )
 
     def payload(self) -> dict[str, object]:
@@ -255,14 +265,20 @@ class DecisionPreferences:
             payload["hold_opening_transfers"] = True
         if self.min_opening_bank_tenths is not None:
             payload["min_opening_bank_tenths"] = self.min_opening_bank_tenths
+        if self.net_points_priority:
+            payload["net_points_priority"] = True
         return payload
 
     def canonical(self) -> str:
         return json.dumps(self.payload(), sort_keys=True, separators=(",", ":"))
 
-    def validate_selection(self, strategy: str, managers_word: bool, chip: str | None) -> None:
+    def validate_selection(
+        self, strategy: str, managers_word: bool, chip: str | None, *, top100_weight: int = 0
+    ) -> None:
         if self.active and (strategy != "saf-puan" or managers_word):
             raise ValueError("Preferences require pure points with manager news off.")
+        if self.net_points_priority and (top100_weight or chip == "auto"):
+            raise ValueError("Net points comparisons cannot use Top100 or automatic chips.")
         if self.save_chips and chip is not None:
             raise ValueError("Saving chips conflicts with a chip selection.")
         if self.hold_transfers and chip in ("wildcard", "freehit", "auto"):
@@ -354,6 +370,7 @@ def preferences_schema() -> dict[str, object]:
             "wildcard_week": {"enum": [2, 3]},
             "hold_opening_transfers": {"type": "boolean"},
             "min_opening_bank_tenths": {"type": "integer", "minimum": 1, "maximum": 10000},
+            "net_points_priority": {"type": "boolean"},
             "week_rules": {
                 "type": "array",
                 "maxItems": 3,

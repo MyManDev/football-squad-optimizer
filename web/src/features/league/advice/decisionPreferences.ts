@@ -52,6 +52,7 @@ export interface DecisionPreferences extends RulePreferences {
   wildcard_week?: 2 | 3;
   hold_opening_transfers?: boolean;
   min_opening_bank_tenths?: number;
+  net_points_priority?: boolean;
 }
 
 function checkedClubCounts(value: unknown, holdsTransfers: boolean): ClubCount[] {
@@ -215,6 +216,7 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
     "wildcard_week",
     "hold_opening_transfers",
     "min_opening_bank_tenths",
+    "net_points_priority",
   ]);
   const global = checkedRules(row);
   const holdOpening = row.hold_opening_transfers;
@@ -231,6 +233,9 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
       minOpeningBank > 10_000)
   )
     throw new Error("Invalid minimum opening bank");
+  const netPointsPriority = row.net_points_priority;
+  if (netPointsPriority !== undefined && typeof netPointsPriority !== "boolean")
+    throw new Error("Invalid net points priority");
   const weekRules = checkedWeeks(row.week_rules, global, holdOpening === true);
   const maxHits = row.max_hit_points;
   if (maxHits !== undefined && !isHitBudget(maxHits)) throw new Error("Invalid hit budget");
@@ -248,6 +253,7 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
     ...(wildcardWeek === undefined ? {} : { wildcard_week: wildcardWeek }),
     ...(holdOpening ? { hold_opening_transfers: true } : {}),
     ...(minOpeningBank === undefined ? {} : { min_opening_bank_tenths: minOpeningBank }),
+    ...(netPointsPriority ? { net_points_priority: true } : {}),
   };
 }
 
@@ -261,7 +267,10 @@ export function holdsOpeningTransfers(p?: DecisionPreferences): boolean {
 
 export function preferencesKey(value?: DecisionPreferences): string {
   const p = checkedPreferences(value);
-  return hasRules(p) || p.max_hit_points !== undefined || preferenceScope(p) === "selected_weeks"
+  return hasRules(p) ||
+    p.max_hit_points !== undefined ||
+    p.net_points_priority ||
+    preferenceScope(p) === "selected_weeks"
     ? JSON.stringify(p)
     : "";
 }

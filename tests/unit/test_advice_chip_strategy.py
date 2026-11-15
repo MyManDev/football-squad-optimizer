@@ -12,6 +12,7 @@ from tests.unit.test_advice_menu import _collaborators, _request
 from tests.unit.test_league_views import _Provider
 from tests.unit.test_member_windows import ENTRY, SEASON
 
+import squadopt.application.advice_chip_strategy as chip_advice
 from squadopt.application.advice import NO_CHIP_LIMIT, WINDOW_TRANSFER_CAP_LIMIT
 from squadopt.application.advice_capabilities import AUTOMATIC_CHIP
 from squadopt.application.advice_chip_strategy import advise_chip_strategy
@@ -147,6 +148,66 @@ def test_opening_resource_preferences_preserve_the_base_multiweek_transfer_polic
     if preferences.hold_opening_transfers:
         assert window["plan_weeks"][0]["transfers_in"] == []
         assert window["plan_weeks"][0]["free_transfers_after"] == 2
+
+
+@pytest.mark.parametrize("chip", ["3xc", "bboost"])
+def test_net_priority_publishes_the_same_expected_net_the_solver_maximized(
+    world, monkeypatch, chip
+):
+    original = chip_advice.plan_transfer_horizon
+    objectives = []
+
+    def measured(*args, **kwargs):
+        result, policy = original(*args, **kwargs)
+        objectives.append(result.objective_value)
+        assert policy.max_transfers_per_gameweek is None
+        assert policy.transfer_hit_cost_points == policy.hit_points_charged
+        return result, policy
+
+    monkeypatch.setattr(chip_advice, "plan_transfer_horizon", measured)
+    w = prepared(world)
+    base = DecisionPreferences(net_points_priority=True)
+    dated = DecisionPreferences.parse(
+        {
+            "net_points_priority": True,
+            "week_rules": [{"week": 2, "rules": {"hold_transfers": True}}],
+        }
+    )
+    result = _advise(w, window=3, chip=chip, weight=0, preferences=base)
+    alternate = _advise(w, window=3, chip=chip, weight=0, preferences=dated)
+    assert result["preferences_scope"] == "all_selected_weeks"
+    assert alternate["preferences_scope"] == "selected_weeks"
+    assert alternate["plan_weeks"][1]["transfers_in"] == []
+    for payload, objective in zip((result, alternate), objectives, strict=True):
+        assert payload["chip_strategy"]["objective_basis"] == "projected_net_points"
+        assert payload["chip"] == chip
+        assert WINDOW_TRANSFER_CAP_LIMIT not in payload["stated_limits"]
+        rows = payload["plan_weeks"]
+        assert math.fsum(
+            w["expected_points"] - w["transfer_hit_points"] for w in rows
+        ) == pytest.approx(objective)
+        validate_advice_document(
+            json.dumps(
+                {
+                    "contract_version": "provisional_league_ui_v1",
+                    "generated_at_utc": "2026-08-27T08:00:00Z",
+                    "source_kind": "example",
+                    "payload": payload,
+                }
+            ).encode()
+        )
+
+
+@pytest.mark.parametrize(("chip", "weight"), [(None, 20), ("auto", 0)])
+def test_net_priority_refuses_incompatible_objectives(world, chip, weight):
+    with pytest.raises(EntryError, match="cannot use Top100 or automatic chips"):
+        _advise(
+            prepared(world),
+            window=3,
+            chip=chip,
+            weight=weight,
+            preferences=DecisionPreferences(net_points_priority=True),
+        )
 
 
 @pytest.mark.parametrize(

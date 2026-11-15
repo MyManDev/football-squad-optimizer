@@ -11,6 +11,7 @@ from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.optimization import SolverStatus
 from squadopt.planning import (
     ChipAvailability,
+    ChipUseWindow,
     InitialSquadState,
     PlanningHorizon,
     TransferPlanningConfig,
@@ -66,6 +67,8 @@ from squadopt.planning.guarded import optimize_guarded_window
         {"min_opening_bank_tenths": 10001},
         {"min_opening_bank_tenths": True},
         {"min_opening_bank_tenths": None},
+        {"net_points_priority": 1},
+        {"week_rules": [{"week": 1, "rules": {"net_points_priority": True}}]},
         {"week_rules": [{"week": 1, "rules": {"hold_opening_transfers": True}}]},
         {"week_rules": [{"week": 1, "rules": {"min_opening_bank_tenths": 1}}]},
         {
@@ -115,6 +118,7 @@ def test_new_preferences_keep_legacy_canonical_identity_when_off():
     )
     assert legacy == DecisionPreferences.parse(legacy.payload())
     assert DecisionPreferences.parse({"no_hits": True, "hold_opening_transfers": False}) == legacy
+    assert DecisionPreferences.parse({"no_hits": True, "net_points_priority": False}) == legacy
 
 
 def test_club_counts_canonicalize_scope_and_preserve_distinct_requests():
@@ -293,6 +297,64 @@ def test_temporary_free_hit_savings_cannot_fund_an_opening_bank_floor(
     )
     assert refused.solver_status is SolverStatus.INFEASIBLE
     assert not refused.weeks
+
+
+def test_net_points_priority_compares_the_exact_cost_of_keeping_a_player(
+    known_optimum_players, small_config
+):
+    players = known_optimum_players.copy()
+    players.loc[players.player_id.eq("DEF_A"), "expected_points"] = 13.12349
+    horizon, initial, ids = _case(players, 1)
+    initial = replace(initial, free_transfers=0)
+    config = replace(small_config, bench_weight=0.75)
+    policy = TransferPlanningConfig(transfer_hit_cost_points=9, hit_points_charged=4.125)
+    base = DecisionPreferences(net_points_priority=True)
+    preferred = replace(base, keep_players=(ids["DEF_B"],))
+    best, keep = (
+        optimizer.optimize_transfer_plan(horizon, initial, config, policy, preferences=preference)
+        for preference in (base, preferred)
+    )
+    assert base.canonical() != DecisionPreferences().canonical()
+    assert best.solver_status is keep.solver_status is SolverStatus.OPTIMAL
+    assert tuple(best.weeks[0].transfers_in.player_id) == (ids["DEF_A"],)
+    assert best.weeks[0].transfer_hit_points == 4.125
+    assert best.weeks[0].captain.expected_points == 13.123
+    assert keep.weeks[0].transfer_count == 0
+    assert best.objective_value == pytest.approx(33.121)
+    assert keep.objective_value == pytest.approx(31.0)
+    assert best.objective_value - keep.objective_value == pytest.approx(2.121)
+
+
+def test_net_points_priority_counts_named_chips_and_equal_weeks_with_no_terminal_utility(
+    known_optimum_players, small_config
+):
+    horizon, initial, _ = _case(known_optimum_players)
+    config = replace(small_config, bench_weight=0.75)
+    policy = TransferPlanningConfig(
+        horizon_discount_factor=0.4,
+        banked_transfer_value_points=11,
+        chip_holding_value_points={"freehit": 8},
+    )
+    chips = ChipAvailability(
+        available={"bboost": frozenset({1}), "3xc": frozenset({2}), "freehit": frozenset({3})},
+        forced={1: "bboost", 2: "3xc"},
+        use_windows={"freehit": (ChipUseWindow(frozenset({3}), holding_value_points=15),)},
+    )
+    result = optimizer.optimize_transfer_plan(
+        horizon,
+        initial,
+        config,
+        policy,
+        chips=chips,
+        preferences=DecisionPreferences(net_points_priority=True, hold_transfers=True),
+    )
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert [week.chip for week in result.weeks] == ["bboost", "3xc", None]
+    expected = sum(week.projected_score - week.transfer_hit_points for week in result.weeks)
+    expected += result.weeks[0].projected_bench_points
+    assert result.objective_value == pytest.approx(expected)
+    assert result.diagnostics["terminal_banked_transfer_value"] == 0
+    assert result.diagnostics["terminal_chip_holding_value"] == 0
 
 
 @pytest.mark.parametrize("length", [1, 3, 5])

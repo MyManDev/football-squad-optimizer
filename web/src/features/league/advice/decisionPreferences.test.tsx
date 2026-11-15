@@ -63,6 +63,16 @@ it("canonicalizes dated rules and keeps a zero penalty limit in the cache identi
   ).toThrow();
 });
 
+it("keeps comparable net points selection distinct from ordinary advice", () => {
+  const scoring = checkedPreferences({ net_points_priority: true });
+  const key = preferencesKey(scoring);
+  expect(key).not.toBe("");
+  expect(preferenceScope(scoring)).toBe("all_selected_weeks");
+  expect(preferencesFromUrl(new URLSearchParams({ preferences: key })).value).toEqual(scoring);
+  expect(preferencesKey(checkedPreferences({ net_points_priority: false }))).toBe("");
+  expect(() => checkedPreferences({ net_points_priority: "true" })).toThrow();
+});
+
 it("separates and validates opening objectives in the wire identity", () => {
   const later = { week_rules: [{ week: 2, rules: { buy_players: [3] } }] };
   const opening = checkedPreferences({

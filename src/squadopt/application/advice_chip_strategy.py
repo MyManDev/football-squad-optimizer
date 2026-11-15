@@ -57,7 +57,7 @@ def advise_chip_strategy(
     if top100_weight and counts is None:
         raise EntryError("Chip strategy requires the requested Top100 inputs.")
     try:
-        preferences.validate_selection(request.strategy, False, chip)
+        preferences.validate_selection(request.strategy, False, chip, top100_weight=top100_weight)
         preferences.validate_window(request.window)
     except ValueError as error:
         raise EntryError(str(error)) from error
@@ -117,7 +117,7 @@ def advise_chip_strategy(
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
         raise SolverExecutionError("Chip strategy reached its wall-clock safety limit.")
-    shown = _rebased_weeks(plan, base)
+    shown = plan.weeks if preferences.net_points_priority else _rebased_weeks(plan, base)
     payload = window_payload(
         picks,
         projection,
@@ -125,7 +125,7 @@ def advise_chip_strategy(
         league_id=request.league_id,
         window=request.window,
         weeks=shown,
-        optimality_gap_published=False,
+        optimality_gap_published=preferences.net_points_priority,
         base_horizon=base,
         include_resource_state=include_resource_state,
     )
@@ -141,7 +141,11 @@ def advise_chip_strategy(
         int(str(row["player_id"])): float(str(row["expected_points"]))
         for _, row in chosen.table.loc[chosen.table.gameweek.eq(request.gameweek)].iterrows()
     }
-    if first.lineup_expectation is None and (top100_weight or first.chip in ("3xc", "bboost")):
+    if (
+        not preferences.net_points_priority
+        and first.lineup_expectation is None
+        and (top100_weight or first.chip in ("3xc", "bboost"))
+    ):
         _rows_on_chip_basis(
             payload,
             picks,
@@ -181,7 +185,9 @@ def advise_chip_strategy(
         "selected_chip": first.chip,
         "top100_weight": top100_weight,
         "objective_gap": plan.diagnostics.get("absolute_optimality_gap"),
-        "objective_basis": "selection_utility_with_chip_reserve",
+        "objective_basis": "projected_net_points"
+        if preferences.net_points_priority
+        else "selection_utility_with_chip_reserve",
         "experimental": automatic,
         "reservations": detail.get("reservations", []),
         "limits": strategy_limits,

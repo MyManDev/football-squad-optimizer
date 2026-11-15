@@ -312,3 +312,38 @@ describe("club count transport", () => {
     expect(preferencesKey(checkedPreferences({ club_counts: [] }))).toBe("");
   });
 });
+
+describe("expected points cost limits", () => {
+  const players = [{ id: 17, name: "Bukayo Saka", team: "Arsenal", held: true }];
+  const preference = { kind: "keep_player", player_id: 17, max_cost_tenths: 15 } as const;
+
+  function response(draft: unknown) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: "draft", draft }))),
+    );
+    return readIntent(
+      "https://advice.example",
+      "Saka'yı tutmak en fazla 1,5 beklenen puana mal oluyorsa tut.",
+      "tr",
+      EMPTY_DRAFT,
+      players,
+      new AbortController().signal,
+    );
+  }
+
+  it("keeps the exact cost limit attached to its optional preference", async () => {
+    const draft = { window: 3, hard: [{ kind: "wildcard" }], soft: [preference] };
+    expect(await response(draft)).toEqual({ status: "draft", draft });
+  });
+
+  it.each([
+    { hard: [preference], soft: [] },
+    { hard: [], soft: [], comparison: preference },
+    { hard: [], soft: [{ ...preference, max_cost_tenths: -1 }] },
+    { hard: [], soft: [{ ...preference, max_cost_tenths: 1.5 }] },
+    { hard: [], soft: [{ ...preference, max_cost_tenths: 1001 }] },
+  ])("refuses invalid or mandatory price limits", async (draft) => {
+    await expect(response(draft)).rejects.toThrow();
+  });
+});

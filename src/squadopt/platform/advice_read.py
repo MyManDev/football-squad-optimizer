@@ -601,7 +601,9 @@ class AdviceReadStore:
         """
 
         try:
-            preferences.validate_selection(strategy, managers_word, chip)
+            preferences.validate_selection(
+                strategy, managers_word, chip, top100_weight=top100_weight
+            )
             preferences.validate_window(window)
         except ValueError as error:
             raise UnsupportedAdviceRequestError(str(error)) from error

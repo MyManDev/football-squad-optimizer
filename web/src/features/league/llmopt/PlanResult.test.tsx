@@ -6,7 +6,7 @@ import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtu
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import type { EntryAdvice } from "../types";
-import { PlanResult } from "./PlanResult";
+import { PlanResult, type PreferencePrice } from "./PlanResult";
 
 const ENTRY = 35249001;
 const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
@@ -14,7 +14,11 @@ const example = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
 
 afterEach(cleanup);
 
-function showWildcard(result: Partial<EntryAdvice>, baseline?: EntryAdvice) {
+function showWildcard(
+  result: Partial<EntryAdvice>,
+  baseline?: EntryAdvice,
+  prices?: PreferencePrice[],
+) {
   const client = new QueryClient();
   client.setQueryData(FIXTURES_QUERY.queryKey, null);
   return render(
@@ -24,6 +28,7 @@ function showWildcard(result: Partial<EntryAdvice>, baseline?: EntryAdvice) {
           title="Base plan"
           squad={squad}
           baseline={baseline}
+          prices={prices}
           state={{
             phase: "done",
             source: "api-cache",
@@ -59,6 +64,28 @@ it("shows the returned Wildcard squad on the member pitch, with its armbands and
   const armband = within(pitch).getByRole("img", { name: "captain" });
   expect(armband.closest('[data-player-motion="90001"]')).toHaveTextContent("Wildcard signing");
   expect(within(pitch).getByRole("img", { name: "vice-captain" })).toBeVisible();
+});
+
+it("displays an over-limit price at its measured precision and qualifies an unproved cost", () => {
+  showWildcard({}, undefined, [
+    {
+      key: "saka",
+      label: "Keep player · Saka",
+      ceiling: 15,
+      status: "priced",
+      cost: 1.54,
+      aboveCeiling: true,
+      unproven: true,
+    },
+    { key: "roll", label: "Roll the transfer", status: "skipped" },
+  ]);
+  const review = screen.getByRole("region", { name: "Expected points cost of preferences" });
+  expect(within(review).getByText(/1\.54 expected points lost · Up to 1\.5 points/)).toBeVisible();
+  expect(within(review).getByText("Above your points limit.")).toBeVisible();
+  expect(within(review).getByText("Cost is based on the plans found.")).toBeVisible();
+  expect(
+    within(review).getByText("This preference was not evaluated in this calculation."),
+  ).toBeVisible();
 });
 
 it("shows when the Wildcard lineup is missing without using the held squad", () => {

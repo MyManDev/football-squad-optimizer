@@ -35,6 +35,15 @@ the opening deadline into the next week. A Free Hit's temporary cash reverts bef
 the comparison. Both resource controls preserve the other rules and the weekly
 transfer settings of the base plan.
 
+`net_points_priority` solves a comparison on the published expected net points over
+all selected weeks. It sums equally weighted scoring lineups and captain points, adds
+the scoring effects of any specified legal chip and deducts the actual hit charges.
+Projected scores use the same forecast precision as the solve. Comparisons share the
+game transfer limits regardless of which preferences each plan applies. Ordinary bench
+utility, terminal resources, Top100 weighting and automatic chip selection are outside
+this objective. The base and every option in a preference cost comparison use this same
+setting in their request and cache identity.
+
 Keep, include and avoid each accept up to fifteen unique positive persistent player
 codes. A player required by keep or include cannot also be avoided. The API checks
 keep against the member's captured squad and include and avoid against the capture's

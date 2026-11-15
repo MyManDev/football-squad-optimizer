@@ -1158,6 +1158,9 @@ def plan_transfer_horizon(
     was for every caller that does not name them.
     """
 
+    net_points_priority = preferences is not None and preferences.net_points_priority
+    if net_points_priority and chip_strategy:
+        raise DataSourceError("Net points comparisons cannot use automatic chips.")
     if chip_tail_forecast is not None and not chip_strategy:
         raise DataSourceError("A dated chip tail requires the automatic chip strategy.")
     if chip_tail_forecast is not None:
@@ -1268,6 +1271,8 @@ def plan_transfer_horizon(
         if transfer_config is None
         else transfer_config
     )
+    if net_points_priority:
+        planning_policy = planning_policy.for_net_points()
     if len(projection_horizon.target_gameweeks) > 1:
         # Initial lots retain the captured sell values, including unknown member
         # purchase bases. A subsequent purchase starts a new lot at its actual
@@ -1293,6 +1298,7 @@ def plan_transfer_horizon(
         )
     bounded_football = (
         projection_horizon.model_name == "fixture_football_candidate"
+        and not net_points_priority
         and len(projection_horizon.target_gameweeks) in (3, 5)
         and settings.solver_deterministic_time_limit is not None
         and settings.solver_deterministic_time_limit >= 2
