@@ -26,6 +26,54 @@ function answer(route: Route, json: unknown, status = 200) {
     : route.fulfill({ json, status, headers: HEADERS });
 }
 
+test("a chat rate limit preserves Turkish instructions and keeps manual rules editable", async ({
+  page,
+}) => {
+  test.skip(!API, "API build required");
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
+  const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+  const player = squad.starting_xi[0]!;
+  const message = "Wildcard kullan ama tüm chipleri de kesinlikle sakla.";
+  let intentPosts = 0;
+  let advicePosts = 0;
+  await page.route(`${API}/api/v1/contributions/players`, (route) =>
+    answer(route, {
+      season: squad.season,
+      players: [{ id: player.player_id, name: player.name, team: player.team }],
+    }),
+  );
+  await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+    if (route.request().method() === "POST") intentPosts += 1;
+    return answer(route, { error: { code: "RATE_LIMITED" } }, 429);
+  });
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+    if (route.request().method() === "POST") advicePosts += 1;
+    return route.abort();
+  });
+
+  await page.goto(PAGE);
+  const instructions = page.getByRole("textbox", { name: "Plan talimatların" });
+  const rules = page.getByRole("main").getByRole("listitem");
+  const add = page.getByRole("button", { name: "Kural ekle" });
+  await add.click();
+  await expect(rules.filter({ hasText: "Transferi sakla" })).toBeVisible();
+  await instructions.fill(message);
+  await page.getByRole("button", { name: "Gönder", exact: true }).click();
+  await expect(
+    page.getByText("Sohbet istek sınırına ulaştı. Biraz bekleyip tekrar dene.", { exact: true }),
+  ).toBeVisible();
+  await expect(instructions).toHaveValue(message);
+  await expect(rules.filter({ hasText: "Transferi sakla" })).toBeVisible();
+
+  await page.getByRole("combobox", { name: "Kural", exact: true }).selectOption("no_hits");
+  await add.click();
+  await expect(rules.filter({ hasText: "Puan cezası alma" })).toBeVisible();
+  await expect(instructions).toHaveValue(message);
+  expect(intentPosts).toBe(1);
+  expect(advicePosts).toBe(0);
+});
+
 for (const reloadAt of ["base", "preferred"] as const) {
   test(`reloading restores the ${reloadAt} job and keeps POSTs tied to confirmation`, async ({
     page,
