@@ -27,6 +27,21 @@ from squadopt.planning import ChipAvailability, InitialSquadState, PlanningHoriz
         {"hold_transfers": 1},
         {"keep_players": [1], "avoid_players": [1]},
         {"include_players": [1], "avoid_players": [1]},
+        {"club_counts": [{"club": "Brighton", "count": 4}]},
+        {"club_counts": [{"club": "Brighton", "count": True}]},
+        {"club_counts": [{"club": "Brighton", "count": 2, "scope": "other"}]},
+        {"club_counts": [{"club": "Brighton", "count": 1}] * 2},
+        {
+            "club_counts": [
+                {"club": "Brighton", "count": 1},
+                {"club": "Brighton", "count": 2, "scope": "transfers_in"},
+            ]
+        },
+        {
+            "hold_transfers": True,
+            "club_counts": [{"club": "Brighton", "count": 1, "scope": "transfers_in"}],
+        },
+        {"club_counts": [{"club": f"Club {index}", "count": 3} for index in range(6)]},
         {"unknown": True},
     ],
 )
@@ -65,7 +80,23 @@ def test_new_preferences_keep_legacy_canonical_identity_when_off():
         "hold_transfers": True,
     }
     assert not DecisionPreferences.parse({"hold_transfers": False, "include_players": []}).active
+    assert DecisionPreferences.parse({"no_hits": True, "club_counts": []}).canonical() == (
+        legacy.canonical()
+    )
     assert legacy == DecisionPreferences.parse(legacy.payload())
+
+
+def test_club_counts_canonicalize_scope_and_preserve_distinct_requests():
+    squad = {"club": "Brighton", "count": 3}
+    incoming = {"club": "Brighton", "count": 2, "scope": "transfers_in"}
+    preferences = DecisionPreferences.parse(
+        {"club_counts": [incoming, {**squad, "scope": "squad"}]}
+    )
+    assert preferences.active
+    assert preferences.payload()["club_counts"] == [squad, incoming]
+    assert (
+        preferences.canonical() != DecisionPreferences.parse({"club_counts": [squad]}).canonical()
+    )
 
 
 @pytest.mark.parametrize("chip", ["wildcard", "freehit", "auto"])

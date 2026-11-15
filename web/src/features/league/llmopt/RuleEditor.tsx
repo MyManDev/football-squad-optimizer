@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 
+import { clubCountKey } from "../advice/decisionPreferences";
+
 import type { LLMOptCopy } from "./copy";
 import {
   CONSTRAINT_KINDS,
@@ -30,9 +32,14 @@ export function RuleEditor({
   const [kind, setKind] = useState<Constraint["kind"]>("hold_transfers");
   const [strength, setStrength] = useState<Strength>("hard");
   const [playerId, setPlayerId] = useState("");
+  const [club, setClub] = useState("");
+  const [clubCount, setClubCount] = useState(1);
+  const [clubScope, setClubScope] = useState<"squad" | "transfers_in">("squad");
   const [both, setBoth] = useState(false);
   const availablePlayers = kind === "keep_player" ? players.filter(({ held }) => held) : players;
   const player = availablePlayers.find(({ id }) => String(id) === playerId);
+  const clubs = [...new Set(players.map(({ team }) => team).filter(Boolean))].sort();
+  const selectedClub = clubs.find((name) => name === club);
   const listFull = draft.hard.length + draft.soft.length >= MAX_CONSTRAINTS;
 
   function add(event: FormEvent<HTMLFormElement>) {
@@ -42,6 +49,14 @@ export function RuleEditor({
     if (isPlayerKind(kind)) {
       if (!player) return;
       rule = { kind, player_id: player.id };
+    } else if (kind === "club_count") {
+      if (!selectedClub) return;
+      rule = {
+        kind,
+        club: selectedClub,
+        count: clubCount,
+        ...(clubScope === "transfers_in" ? { scope: clubScope } : {}),
+      };
     } else {
       rule = { kind };
     }
@@ -52,14 +67,24 @@ export function RuleEditor({
       });
     } else {
       const key = constraintKey(rule);
-      const hard = draft.hard.filter((row) => constraintKey(row) !== key);
-      const soft = draft.soft.filter((row) => constraintKey(row) !== key);
+      const replaces = (row: Constraint, inGroup: Strength) =>
+        constraintKey(row) === key ||
+        (strength === inGroup &&
+          row.kind === "club_count" &&
+          rule.kind === "club_count" &&
+          clubCountKey(row) === clubCountKey(rule));
+      const hard = draft.hard.filter((row) => !replaces(row, "hard"));
+      const soft = draft.soft.filter((row) => !replaces(row, "soft"));
       (strength === "hard" ? hard : soft).push(rule);
       change({ ...draft, hard, soft });
     }
   }
 
   function label(rule: Constraint) {
+    if (rule.kind === "club_count") {
+      const scope = rule.scope === "transfers_in" ? copy.clubTransfers : copy.clubSquad;
+      return `${rule.club} · ${scope} · ${rule.count}`;
+    }
     if (!("player_id" in rule)) return copy.rules[rule.kind];
     const selected = players.find(({ id }) => id === rule.player_id);
     return `${copy.rules[rule.kind]} · ${selected?.name ?? rule.player_id}`;
@@ -114,6 +139,7 @@ export function RuleEditor({
             onChange={(event) => {
               setKind(event.target.value as Constraint["kind"]);
               setPlayerId("");
+              setClub("");
               setBoth(false);
             }}
           >
@@ -137,6 +163,42 @@ export function RuleEditor({
               ))}
             </select>
           </label>
+        )}
+        {kind === "club_count" && (
+          <>
+            <label>
+              {copy.club}
+              <select value={club} onChange={(event) => setClub(event.target.value)}>
+                <option value="">{copy.selectClub}</option>
+                {clubs.map((club) => (
+                  <option key={club}>{club}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {copy.clubCount}
+              <select
+                value={clubCount}
+                onChange={(event) => setClubCount(Number(event.target.value))}
+              >
+                {[1, 2, 3].map((count) => (
+                  <option key={count}>{count}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {copy.clubCountScope}
+              <select
+                value={clubScope}
+                onChange={(event) =>
+                  setClubScope(event.target.value === "transfers_in" ? "transfers_in" : "squad")
+                }
+              >
+                <option value="squad">{copy.clubSquad}</option>
+                <option value="transfers_in">{copy.clubTransfers}</option>
+              </select>
+            </label>
+          </>
         )}
         <label>
           {copy.strength}
@@ -164,7 +226,10 @@ export function RuleEditor({
         <button
           className={styles.secondary}
           disabled={
-            disabled || (strength !== "comparison" && listFull) || (isPlayerKind(kind) && !player)
+            disabled ||
+            (strength !== "comparison" && listFull) ||
+            (isPlayerKind(kind) && !player) ||
+            (kind === "club_count" && !selectedClub)
           }
           type="submit"
         >

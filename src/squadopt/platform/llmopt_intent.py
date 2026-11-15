@@ -19,6 +19,7 @@ INTENT_BODY_MAX_BYTES: Final = 128 * 1024
 INTENT_MAX_MESSAGE: Final = 800
 _MAX_QUESTION: Final = 300
 _MAX_ROSTER: Final = 1000
+_MAX_CLUBS: Final = 32
 _MAX_CANDIDATES: Final = 64
 _MAX_CONSTRAINTS: Final = 16
 _MAX_SAFE_ID: Final = 2**53 - 1
@@ -32,6 +33,7 @@ _KINDS: Final = (
     "keep_player",
     "include_player",
     "avoid_player",
+    "club_count",
 )
 _PLAYER_KINDS: Final = frozenset({"keep_player", "include_player", "avoid_player"})
 _TURKISH_ACCUSATIVE_SUFFIXES: Final = ("i", "u", "yi", "yu")
@@ -60,10 +62,20 @@ Allowed kinds:
 - keep_player: retain a held player in the squad; never implies starting or captaining.
 - include_player: require or prefer a player in the selected 15; may acquire them.
 - avoid_player: exclude a player from the selected 15.
+- club_count: require or prefer exactly count players from one club. "Brighton'dan 3 oyuncu
+  al" means club Brighton, count 3 and scope transfers_in, counting only new arrivals.
+  "Kadromda 3 Brighton olsun" means scope squad, counting all selected players including
+  those already held. Use the canonical name from clubs and an integer count from 1 to 3.
+  Let the solver choose the players. Do not ask for or invent names when the selection is
+  delegated. Set player_id to null for this rule.
 For a player constraint, choose its exact ID from the supplied players. If a named
 player cannot be matched uniquely, ask for clarification. Use keep_player only for a
 held player and include_player to acquire a player. A constraint without a player uses
 null for player_id. Do not infer roster status from English or Turkish wording alone.
+Use null for club, count and scope for other rules. If no club in clubs matches uniquely,
+the requested count is outside 1 through 3, or the user asks for a minimum or maximum
+rather than an exact count, ask for clarification. For a comparison against a club_count
+requirement, use that rule as comparison with both false.
 An instruction to use or play Wildcard (e.g. "wildcard kullan", "jokeri bas") is a hard
 wildcard rule unless explicitly optional. For a comparison with and without Wildcard, use
 kind wildcard, player_id null, and both false. Keep the manager's other supported rules
@@ -112,6 +124,7 @@ class IntentRequest:
     draft: dict[str, Any]
     players: tuple[dict[str, Any], ...]
     clarification: IntentClarification | None = None
+    clubs: tuple[str, ...] = ()
 
 
 class IntentProvider(Protocol):
@@ -166,14 +179,23 @@ def _player(value: object) -> dict[str, Any]:
 
 
 def _constraint(
-    value: object, player_ids: set[int], *, comparison: bool, model: bool
+    value: object,
+    player_ids: set[int],
+    clubs: tuple[str, ...],
+    *,
+    comparison: bool,
+    model: bool,
 ) -> dict[str, Any]:
-    fields = {"kind", "player_id", "both"} if comparison else {"kind", "player_id"}
+    fields = {"kind", "player_id", "club", "count", "scope"}
+    model_required = {"kind", "player_id"}
+    if comparison:
+        fields.add("both")
+        model_required.add("both")
     if (
         not isinstance(value, dict)
         or "kind" not in value
         or value.keys() - fields
-        or (model and value.keys() != fields)
+        or (model and not model_required <= value.keys())
     ):
         raise IntentValidationError("Invalid intent constraint.")
     kind = value["kind"]
@@ -187,6 +209,24 @@ def _constraint(
         result["player_id"] = player_id
     elif "player_id" in value and (not model or value["player_id"] is not None):
         raise IntentValidationError("Unexpected player for this constraint.")
+    if kind == "club_count":
+        result["club"] = _known_club(value.get("club"), clubs)
+        count = value.get("count")
+        if type(count) is not int or not 1 <= count <= 3:
+            raise IntentValidationError("A club count must be an integer from one to three.")
+        result["count"] = count
+        scope = value.get("scope", "squad")
+        if model and scope is None:
+            scope = "squad"
+        if scope not in ("squad", "transfers_in"):
+            raise IntentValidationError("Invalid club count scope.")
+        if scope == "transfers_in":
+            result["scope"] = scope
+    elif any(
+        field in value and (not model or value[field] is not None)
+        for field in ("club", "count", "scope")
+    ):
+        raise IntentValidationError("Unexpected club fields for this constraint.")
     both = value.get("both", False)
     if type(both) is not bool:
         raise IntentValidationError("Invalid with-and-without comparison.")
@@ -199,7 +239,9 @@ def _constraint(
     return result
 
 
-def _draft(value: object, player_ids: set[int], *, model: bool = False) -> dict[str, Any]:
+def _draft(
+    value: object, player_ids: set[int], clubs: tuple[str, ...], *, model: bool = False
+) -> dict[str, Any]:
     if (
         not isinstance(value, dict)
         or not {"hard", "soft"} <= value.keys()
@@ -215,16 +257,34 @@ def _draft(value: object, player_ids: set[int], *, model: bool = False) -> dict[
     ):
         raise IntentValidationError("Invalid constraint list.")
     result: dict[str, Any] = {
-        "hard": [_constraint(item, player_ids, comparison=False, model=model) for item in hard],
-        "soft": [_constraint(item, player_ids, comparison=False, model=model) for item in soft],
+        "hard": [
+            _constraint(item, player_ids, clubs, comparison=False, model=model) for item in hard
+        ],
+        "soft": [
+            _constraint(item, player_ids, clubs, comparison=False, model=model) for item in soft
+        ],
     }
     constraints = (*result["hard"], *result["soft"])
-    unique = {(item["kind"], item.get("player_id")) for item in constraints}
+    unique = {
+        (
+            item["kind"],
+            item.get("player_id"),
+            item.get("club"),
+            item.get("count"),
+            item.get("scope"),
+        )
+        for item in constraints
+    }
     if len(unique) != len(constraints):
         raise IntentValidationError("Duplicate constraint across the draft.")
+    hard_clubs = [
+        (item["club"], item.get("scope")) for item in result["hard"] if item["kind"] == "club_count"
+    ]
+    if len(set(hard_clubs)) != len(hard_clubs):
+        raise IntentValidationError("Hard club counts conflict.")
     if value.get("comparison") is not None:
         result["comparison"] = _constraint(
-            value["comparison"], player_ids, comparison=True, model=model
+            value["comparison"], player_ids, clubs, comparison=True, model=model
         )
     return result
 
@@ -245,6 +305,9 @@ def parse_intent_request(value: object) -> IntentRequest:
     ids = {player["id"] for player in roster}
     if len(ids) != len(roster):
         raise IntentValidationError("Duplicate roster player.")
+    clubs = tuple(sorted({player["team"] for player in roster if "team" in player}))
+    if len(clubs) > _MAX_CLUBS:
+        raise IntentValidationError("Too many clubs in the intent roster.")
     clarification = None
     if "clarification" in value:
         previous = value["clarification"]
@@ -257,13 +320,16 @@ def parse_intent_request(value: object) -> IntentRequest:
     return IntentRequest(
         _text(value["message"], INTENT_MAX_MESSAGE),
         locale,
-        _draft(value["draft"], ids),
+        _draft(value["draft"], ids, clubs),
         roster,
         clarification,
+        clubs,
     )
 
 
-def _validate_result(value: object, candidates: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+def _validate_result(
+    value: object, candidates: tuple[dict[str, Any], ...], clubs: tuple[str, ...]
+) -> dict[str, Any]:
     if not isinstance(value, dict) or value.keys() != {"status", "draft", "message"}:
         raise IntentValidationError("Invalid intent result.")
     if value["status"] == "clarification" and value["draft"] is None:
@@ -271,13 +337,27 @@ def _validate_result(value: object, candidates: tuple[dict[str, Any], ...]) -> d
     if value["status"] != "draft" or value["message"] is not None:
         raise IntentValidationError("Invalid draft status.")
     player_ids = {player["id"] for player in candidates}
-    return {"status": "draft", "draft": _draft(value["draft"], player_ids, model=True)}
+    return {"status": "draft", "draft": _draft(value["draft"], player_ids, clubs, model=True)}
+
+
+def _fold_text(value: str) -> str:
+    value = unicodedata.normalize("NFKD", value.casefold()).replace("\u0131", "i")
+    return "".join(character for character in value if not unicodedata.combining(character))
+
+
+def _known_club(value: object, clubs: tuple[str, ...]) -> str:
+    club = _text(value, 80)
+    if club in clubs:
+        return club
+    key = " ".join(_fold_text(club).split())
+    matches = [name for name in clubs if " ".join(_fold_text(name).split()) == key]
+    if len(matches) != 1:
+        raise IntentValidationError("Club is outside the intent roster or ambiguous.")
+    return matches[0]
 
 
 def _tokens(value: str) -> tuple[str, ...]:
-    value = unicodedata.normalize("NFKD", value.casefold()).replace("\u0131", "i")
-    plain = "".join(character for character in value if not unicodedata.combining(character))
-    return tuple(re.findall(r"[^\W_]+", plain))
+    return tuple(re.findall(r"[^\W_]+", _fold_text(value)))
 
 
 def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
@@ -347,7 +427,7 @@ class IntentService:
         try:
             candidates = _shortlist(request)
             proposal = self._provider(replace(request, players=candidates))
-            return _validate_result(proposal, candidates)
+            return _validate_result(proposal, candidates, request.clubs)
         except IntentValidationError:
             raise IntentUnavailable("The intent response could not be validated.") from None
         finally:
@@ -366,6 +446,9 @@ def _schema_object(properties: dict[str, Any]) -> dict[str, Any]:
 _CONSTRAINT_PROPERTIES: Final = {
     "kind": {"type": "string", "enum": list(_KINDS)},
     "player_id": {"type": ["integer", "null"]},
+    "club": {"type": ["string", "null"]},
+    "count": {"type": ["integer", "null"]},
+    "scope": {"type": ["string", "null"], "enum": ["squad", "transfers_in", None]},
 }
 _CONSTRAINT_LIST: Final = {"type": "array", "items": _schema_object(_CONSTRAINT_PROPERTIES)}
 _COMPARISON_SCHEMA: Final = _schema_object({**_CONSTRAINT_PROPERTIES, "both": {"type": "boolean"}})
@@ -403,6 +486,7 @@ class OpenAIIntentProvider:
             "locale": request.locale,
             "draft": request.draft,
             "players": request.players,
+            "clubs": request.clubs,
         }
         if request.clarification is not None:
             context["clarification"] = {

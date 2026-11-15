@@ -305,3 +305,79 @@ for (const wildcardHeld of [true, false]) {
     }
   });
 }
+
+test("a Turkish club request lets the optimizer pick the three players", async ({ page }) => {
+  test.skip(!API, "API build required");
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
+  const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+  const message = "Wildcard kullan, Brighton'dan 3 oyuncu al. Oyuncuları sen seç.";
+  const clubCount = { club: "Brighton", count: 3, scope: "transfers_in" };
+  const posts: {
+    chip: string;
+    preferences: { club_counts?: unknown; include_players?: number[] };
+  }[] = [];
+  await page.route(`${API}/api/v1/contributions/players`, (route) =>
+    answer(route, {
+      season: squad.season,
+      players: [
+        { id: 501, name: "First Player", team: "Brighton" },
+        { id: 502, name: "Second Player", team: "Brighton" },
+        { id: 503, name: "Third Player", team: "Brighton" },
+      ],
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+    answer(route, {
+      contract_version: "league_capabilities_v1",
+      league_id: LEAGUE,
+      capture_snapshot_id: squad.source_snapshot_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      strategies: { "saf-puan": { windows: [1], requires_rival: false } },
+      top100: { available: false, weights: [] },
+      managers_word: { available: false },
+      preferences: { available: true },
+      chips: { available: ["wildcard"], held_by_entry: { [ENTRY]: ["wildcard"] } },
+    }),
+  );
+  await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+    if (route.request().method() === "POST") {
+      expect(route.request().postDataJSON()).toMatchObject({ message, locale: "tr" });
+    }
+    return answer(route, {
+      status: "draft",
+      draft: { hard: [{ kind: "wildcard" }, { kind: "club_count", ...clubCount }], soft: [] },
+    });
+  });
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+    if (route.request().method() !== "POST") return answer(route, null);
+    const body = route.request().postDataJSON() as (typeof posts)[number];
+    posts.push(body);
+    const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    return answer(route, {
+      ...envelope,
+      payload: {
+        ...envelope.payload,
+        chip: "wildcard",
+        preferences: body.preferences,
+        preferences_scope: "all_selected_weeks",
+      },
+    });
+  });
+
+  await page.goto(PAGE);
+  await page.getByRole("textbox", { name: "Plan talimatların" }).fill(message);
+  await page.getByRole("button", { name: "Gönder", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Kaldır · Wildcard kullan" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Kaldır · Brighton · Gelen transferler · 3" }),
+  ).toBeVisible();
+  expect(posts).toHaveLength(0);
+  await page.getByRole("button", { name: "Planları hesapla" }).click();
+  await expect.poll(() => posts.length).toBe(1);
+  expect(posts[0]?.chip).toBe("wildcard");
+  expect(posts[0]?.preferences.club_counts).toEqual([clubCount]);
+  expect(posts[0]?.preferences.include_players).toBeUndefined();
+  await expect(page.getByRole("heading", { name: "Temel plan" })).toBeVisible();
+});

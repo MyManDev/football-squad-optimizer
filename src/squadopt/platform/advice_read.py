@@ -159,6 +159,7 @@ class PreferencePlayers:
 
     squad: frozenset[int]
     roster: frozenset[int]
+    clubs: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -430,7 +431,7 @@ class AdviceReadStore:
         entry_id: int,
         preferences: DecisionPreferences,
     ) -> None:
-        """Refuse a player preference the capture cannot match for this member.
+        """Refuse a player or club preference the capture cannot match for this member.
 
         The contract accepts any positive id, and every distinct set is a distinct
         address, so ids nobody holds used to reach the queue as new work and fail only in
@@ -439,7 +440,10 @@ class AdviceReadStore:
         """
 
         if not (
-            preferences.keep_players or preferences.avoid_players or preferences.include_players
+            preferences.keep_players
+            or preferences.avoid_players
+            or preferences.include_players
+            or preferences.club_counts
         ):
             return
         players = self._preference_players_of(context, league_id, entry_id)
@@ -460,6 +464,8 @@ class AdviceReadStore:
             raise UnsupportedAdviceRequestError(
                 "An included player is not in this capture's roster."
             )
+        if not {rule.club for rule in preferences.club_counts} <= players.clubs:
+            raise UnsupportedAdviceRequestError("A requested club is not in this capture's roster.")
 
     def league_state(self, league_id: int) -> dict[str, object]:
         """Connected or not, from the published tree — never an upstream call."""

@@ -697,11 +697,11 @@ class LiveFlow extends Component<FlowProps> {
   private sliding = 0;
   private scrolledAt = Number.NEGATIVE_INFINITY;
   private ownScroll = false;
-  private scrollSettlement: number | null = null;
+  private scrollSettlement: { frame: number | null } | null = null;
 
   private readonly cancelScrollSettlement = () => {
-    if (this.scrollSettlement === null) return;
-    window.cancelAnimationFrame(this.scrollSettlement);
+    const frame = this.scrollSettlement?.frame;
+    if (frame != null) window.cancelAnimationFrame(frame);
     this.scrollSettlement = null;
   };
 
@@ -783,8 +783,8 @@ class LiveFlow extends Component<FlowProps> {
       }
       if (times !== null && snapshot.places !== null) {
         const settledScroll = window.scrollY;
-        this.slide(groups, parts, snapshot.places, now, scrolled, glide, times);
-        if (scrolled !== 0) this.settleScroll(settledScroll);
+        const slides = this.slide(groups, parts, snapshot.places, now, scrolled, glide, times);
+        if (scrolled !== 0 && slides) this.settleScroll(settledScroll, slides);
       }
       if (times !== null && snapshot.recapKey !== this.props.recapKey) {
         this.reveal(snapshot.recapKey, snapshot.recapPlaces, times);
@@ -811,27 +811,40 @@ class LiveFlow extends Component<FlowProps> {
   }
 
   /**
-   * WebKit can move the document again as the row transforms first change its scrollable
-   * overflow. Restore the position that the browser accepted before those transforms.
-   * WebKit can adjust the scroll after the first two frames, so check the first four.
-   * Visitor input cancels any remaining checks.
+   * Row transforms can change the scrollable overflow more than once in WebKit.
+   * Check the early frames and once more after the slides' geometry has settled.
+   * Visitor input and newer reads cancel both checks.
    */
-  private settleScroll(top: number) {
+  private settleScroll(top: number, slides: Promise<void>) {
+    const settlement: { frame: number | null } = { frame: null };
+    this.scrollSettlement = settlement;
+    const restore = () => {
+      const from = window.scrollY;
+      if (Math.abs(from - top) < 1) return;
+      this.ownScroll = true;
+      window.scrollTo({ top, left: 0, behavior: "instant" });
+      if (window.scrollY === from) this.ownScroll = false;
+    };
     let framesLeft = SCROLL_SETTLEMENT_FRAMES;
     const check = () => {
-      this.scrollSettlement = null;
-      if (!pageClear()) return;
-      const from = window.scrollY;
-      if (Math.abs(from - top) >= 1) {
-        this.ownScroll = true;
-        window.scrollTo({ top, left: 0, behavior: "instant" });
-        if (window.scrollY === from) this.ownScroll = false;
+      settlement.frame = null;
+      if (!pageClear()) {
+        this.cancelScrollSettlement();
+        return;
       }
+      restore();
       framesLeft -= 1;
-      if (framesLeft === 0) return;
-      this.scrollSettlement = window.requestAnimationFrame(check);
+      if (framesLeft > 0) settlement.frame = window.requestAnimationFrame(check);
     };
-    this.scrollSettlement = window.requestAnimationFrame(check);
+    settlement.frame = window.requestAnimationFrame(check);
+    void slides.then(() => {
+      if (this.scrollSettlement !== settlement) return;
+      if (settlement.frame !== null) window.cancelAnimationFrame(settlement.frame);
+      settlement.frame = window.requestAnimationFrame(() => {
+        this.scrollSettlement = null;
+        if (pageClear()) restore();
+      });
+    });
   }
 
   /**
@@ -882,7 +895,7 @@ class LiveFlow extends Component<FlowProps> {
         delete row.dataset.liveCrossing;
       }
     };
-    void Promise.allSettled(slides.map((slide) => slide.finished)).then(ended);
+    return Promise.allSettled(slides.map((slide) => slide.finished)).then(ended);
   }
 
   /**
