@@ -367,7 +367,9 @@ class CaptureContextProvider:
         self._chip_source: tuple[CapturePicksProvider, SeasonRules] | None = None
         self._chip_members: dict[tuple[int, int], tuple[str, ...] | None] = {}
         self._squad_identity: CaptureIdentity | None = None
-        self._squad_source: tuple[CapturePicksProvider, frozenset[int]] | None = None
+        self._squad_source: tuple[CapturePicksProvider, frozenset[int], frozenset[str]] | None = (
+            None
+        )
         self._squad_members: dict[tuple[int, int], frozenset[int] | None] = {}
 
     def identity(self) -> CaptureIdentity | None:
@@ -628,6 +630,7 @@ class CaptureContextProvider:
                     self._squad_source = (
                         CapturePicksProvider(identity.snapshot, identity.inputs.snapshot_id),
                         frozenset(int(code) for code in identity.inputs.players["player_id"]),
+                        frozenset(map(str, identity.inputs.players["team_id"])),
                     )
                 except Exception as error:
                     self._report(
@@ -637,7 +640,7 @@ class CaptureContextProvider:
                     )
             if self._squad_source is None:
                 return None
-            provider, roster = self._squad_source
+            provider, roster, clubs = self._squad_source
             key = (league_id, entry_id)
             if key not in self._squad_members:
                 try:
@@ -659,7 +662,11 @@ class CaptureContextProvider:
                         reason=str(error),
                     )
             squad = self._squad_members[key]
-            return None if squad is None else PreferencePlayers(squad=squad, roster=roster)
+            return (
+                None
+                if squad is None
+                else PreferencePlayers(squad=squad, roster=roster, clubs=clubs)
+            )
 
     def _report(self, event: str, **fields: object) -> None:
         key = event, str(fields.get("snapshot_id", ""))

@@ -98,6 +98,112 @@ def test_wildcard_is_a_chip_instruction_with_no_player_id() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    ("user_message", "scope", "expected_scope"),
+    [
+        ("Brighton'dan 3 oyuncu al", "transfers_in", {"scope": "transfers_in"}),
+        ("Kadromda 3 Brighton oyuncusu olsun", "squad", {}),
+    ],
+)
+def test_club_request_uses_canonical_name_and_keeps_both_scopes_distinct(
+    user_message: str, scope: str, expected_scope: dict[str, str]
+) -> None:
+    body = _request()
+    body["message"] = user_message
+    # All the Brighton names are unheld and absent from the player shortlist.
+    body["players"] = [
+        {"id": player_id, "name": f"Other {player_id}", "team": "Brighton"}
+        for player_id in range(2, 900)
+    ] + _request()["players"]
+
+    def provider(request: IntentRequest) -> object:
+        assert request.message == user_message
+        assert request.clubs == ("Brighton", "LIV")
+        assert tuple(player["id"] for player in request.players) == (1,)
+        return {
+            "status": "draft",
+            "draft": {
+                "hard": [
+                    {
+                        "kind": "no_hits",
+                        "player_id": None,
+                        "club": None,
+                        "count": None,
+                        "scope": None,
+                    },
+                    {
+                        "kind": "club_count",
+                        "player_id": None,
+                        "club": "brighton",
+                        "count": 3,
+                        "scope": scope,
+                    },
+                ],
+                "soft": [],
+                "comparison": None,
+            },
+            "message": None,
+        }
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=body)
+    assert response.status_code == 200
+    assert response.json()["draft"]["hard"] == [
+        {"kind": "no_hits"},
+        {"kind": "club_count", "club": "Brighton", "count": 3, **expected_scope},
+    ]
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"club": "Invented FC"},
+        {"count": False},
+        {"count": 0},
+        {"count": 4},
+        {"count": "2"},
+        {"player_id": 1},
+        {"scope": "bench"},
+        {"both": True},
+    ],
+)
+def test_club_constraint_refuses_invented_or_invalid_fields(override: dict[str, Any]) -> None:
+    def provider(_request: IntentRequest) -> object:
+        result = _proposed()
+        result["draft"]["comparison"] = {
+            "kind": "club_count",
+            "club": "LIV",
+            "count": 3,
+            "scope": "squad",
+            "player_id": None,
+            "both": False,
+            **override,
+        }
+        return result
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "LLMOPT_UNAVAILABLE"
+
+
+def test_confirmed_club_rules_stay_canonical_and_conflicting_hard_counts_are_refused() -> None:
+    body = _request()
+    first = {"kind": "club_count", "club": "LIV", "count": 3}
+    second = {**first, "count": 2}
+    new_arrivals = {**second, "scope": "transfers_in"}
+    body["draft"] = {"hard": [first, new_arrivals], "soft": [second]}
+
+    def provider(request: IntentRequest) -> object:
+        assert request.draft == body["draft"]
+        return {"status": "clarification", "draft": None, "message": "Which plan?"}
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        assert client.post(URL, json=body).status_code == 200
+        conflicted = {**body, "draft": {"hard": [first, second], "soft": []}}
+        assert client.post(URL, json=conflicted).status_code == 422
+
+
 @pytest.mark.parametrize("kind", ["keep_player", "avoid_player"])
 def test_model_comparison_accepts_either_side_for_a_held_player(kind: str) -> None:
     def provider(_request: IntentRequest) -> object:
@@ -295,8 +401,14 @@ def test_provider_sends_strict_schema_and_handles_wire_without_network(
         schema = body["response_format"]["json_schema"]
         assert schema["strict"] is True
         assert "oneOf" not in schema["schema"]
+        constraint = schema["schema"]["properties"]["draft"]["anyOf"][0]["properties"]["hard"][
+            "items"
+        ]
+        assert "club_count" in constraint["properties"]["kind"]["enum"]
+        assert {"club", "count", "scope"} <= set(constraint["required"])
         context = json.loads(body["messages"][1]["content"])
         assert context["message"] == "The Liverpool player"
+        assert context["clubs"] == ["LIV"]
         assert context["clarification"] == {
             "message": "Compare Salah in and out",
             "question": "Which player?",

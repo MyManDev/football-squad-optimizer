@@ -1350,6 +1350,11 @@ def optimize_transfer_plan(
             raise TransferPlanningValidationError("Avoided player is outside the forecast roster.")
         if not set(preferences.include_players) <= universe:
             raise TransferPlanningValidationError("Included player is outside the forecast roster.")
+        clubs = {str(club) for club in players_by_week[0].team_id}
+        if not {rule.club for rule in preferences.club_counts} <= clubs:
+            raise TransferPlanningValidationError(
+                "A requested club is outside the forecast roster."
+            )
         required = set(preferences.keep_players) | set(preferences.include_players)
         avoided = set(preferences.avoid_players)
         for week, table in enumerate(players_by_week):
@@ -1358,6 +1363,20 @@ def optimize_transfer_plan(
                     artifacts.model.add(artifacts.squad_vars[week][index] == 1)
                 if player in avoided:
                     artifacts.model.add(artifacts.squad_vars[week][index] == 0)
+            if preferences.club_counts:
+                clubs_by_index = tuple(map(str, table.team_id))
+                for rule in preferences.club_counts:
+                    variables = (
+                        artifacts.transfer_in_vars[week]
+                        if rule.scope == "transfers_in"
+                        else artifacts.squad_vars[week]
+                    )
+                    selected = [
+                        variable
+                        for club, variable in zip(clubs_by_index, variables, strict=True)
+                        if club == rule.club
+                    ]
+                    artifacts.model.add(cp_model.LinearExpr.sum(selected) == rule.count)
             if preferences.hold_transfers:
                 artifacts.model.add(artifacts.transfer_count_vars[week] == 0)
             if preferences.no_hits:

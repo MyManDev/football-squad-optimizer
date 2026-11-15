@@ -56,21 +56,17 @@ test("LIVE recovers the reading position if the browser scrolls as slides start"
     for (const beat of ["kickoff", "goal", "card"] as const) {
       await readBeat(tab, index(beat));
     }
-    // Linux WebKit can move again after the first two frames of the new slides.
-    // Inject that late adjustment before the last frame the page checks.
+    // Move the scroll after the initial frame checks, while the slides still run.
     await tab.page.evaluate(() => {
       const root = document.querySelector("[data-live-page]")!;
       const observer = new MutationObserver(() => {
         if (!root.querySelector("[data-live-sliding]")) return;
         observer.disconnect();
-        window.requestAnimationFrame(() =>
-          window.requestAnimationFrame(() =>
-            window.requestAnimationFrame(() => {
-              window.scrollBy({ top: 3, behavior: "instant" });
-              root.dataset.scrollDriftInjected = "";
-            }),
-          ),
-        );
+        window.setTimeout(() => {
+          if (!root.querySelector("[data-live-sliding]")) return;
+          window.scrollBy({ top: 3, behavior: "instant" });
+          root.dataset.scrollDriftInjected = "";
+        }, 120);
       });
       observer.observe(root, {
         attributes: true,
@@ -82,6 +78,39 @@ test("LIVE recovers the reading position if the browser scrolls as slides start"
     await expect(tab.page.locator("[data-live-page]")).toHaveAttribute(
       "data-scroll-drift-injected",
     );
+  } finally {
+    await tab.context.close();
+  }
+});
+
+test("LIVE leaves a visitor's wheel scroll in place when the slides finish", async ({
+  browser,
+}) => {
+  const tab = await openLive(browser, { width: 375, motion: true });
+  const { page } = tab;
+  try {
+    await firstRead(tab);
+    for (const beat of ["kickoff", "goal", "card"] as const) {
+      await readBeat(tab, index(beat));
+    }
+    await page.mouse.move(185, 300);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(400);
+    tab.server.step = index("over");
+    await page.locator("[data-live-refresh]").dispatchEvent("click");
+    const sliding = page.locator("[data-live-sliding]");
+    await expect(sliding).toBeAttached();
+    const beforeWheel = await page.evaluate(() => window.scrollY);
+    await page.mouse.wheel(0, -80);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(beforeWheel - 40);
+    await expect(sliding).toHaveCount(0);
+    const afterSlides = await page.evaluate(
+      () =>
+        new Promise<number>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.scrollY))),
+        ),
+    );
+    expect(afterSlides).toBeLessThan(beforeWheel - 40);
   } finally {
     await tab.context.close();
   }

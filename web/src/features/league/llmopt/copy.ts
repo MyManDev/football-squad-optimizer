@@ -29,6 +29,12 @@ const en = {
   strength: "Apply as",
   player: "Player",
   selectPlayer: "Select a player",
+  club: "Club",
+  selectClub: "Select a club",
+  clubCount: "Players",
+  clubCountScope: "Count in",
+  clubSquad: "Final squad",
+  clubTransfers: "Incoming transfers",
   remove: "Remove",
   compute: "Compute plans",
   computing: "Computing…",
@@ -67,6 +73,7 @@ const en = {
     keep_player: "Keep player",
     include_player: "Include player",
     avoid_player: "Exclude player",
+    club_count: "Club player count",
   } satisfies Record<Constraint["kind"], string>,
 };
 
@@ -98,6 +105,12 @@ const tr: typeof en = {
   strength: "Uygulama şekli",
   player: "Oyuncu",
   selectPlayer: "Oyuncu seç",
+  club: "Kulüp",
+  selectClub: "Kulüp seç",
+  clubCount: "Oyuncu sayısı",
+  clubCountScope: "Nerede sayılsın?",
+  clubSquad: "Son kadro",
+  clubTransfers: "Gelen transferler",
   remove: "Kaldır",
   compute: "Planları hesapla",
   computing: "Hesaplanıyor…",
@@ -136,6 +149,7 @@ const tr: typeof en = {
     keep_player: "Oyuncuyu tut",
     include_player: "Oyuncuyu kadroya al",
     avoid_player: "Oyuncuyu kadro dışında tut",
+    club_count: "Kulüpten oyuncu sayısı",
   },
 };
 
