@@ -134,6 +134,7 @@ test("interpretation previews the constraints before the two advice requests", a
       ...envelope,
       payload: {
         ...envelope.payload,
+        bank_after_tenths: 6,
         preferences: body.preferences,
         preferences_scope: "all_selected_weeks",
       },

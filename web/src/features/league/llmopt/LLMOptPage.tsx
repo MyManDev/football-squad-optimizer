@@ -356,6 +356,7 @@ function Session({ squad }: { squad: EntrySquad }) {
     run.slots.forEach((slot, index) => {
       if (slot.kind === "priced") jobs[index]?.(slot.request);
     });
+    if (run.prices.length) return;
     const spare = jobs.slice(run.slots.length);
     if (!spare.length) return;
     const basis = run.automaticBasis;
@@ -504,18 +505,6 @@ function Session({ squad }: { squad: EntrySquad }) {
         );
         if (approved) results.push({ title: copy.pricedPlan(approved.price.label), state });
       } else if (!states.slice(0, index).some(({ phase }) => isWorking(phase))) {
-        if (
-          priceReview.some(({ outcome, price }) => {
-            const pricedState = typeof outcome === "number" ? states[outcome] : undefined;
-            return Boolean(
-              pricedState &&
-              price.status === "priced" &&
-              price.aboveCeiling &&
-              samePlan(pricedState, state),
-            );
-          })
-        )
-          return;
         const previous = results.flatMap(({ state }) =>
           state.phase === "done" ? [state.envelope.payload] : [],
         );
