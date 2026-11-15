@@ -33,6 +33,7 @@ from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
+    WINDOW_TRANSFER_CAP_LIMIT,
     AdviseEntryRequest,
     EntryError,
     advise_entry,
@@ -1905,13 +1906,15 @@ def test_llmopt_replans_after_a_frozen_wildcard_and_keeps_the_following_lineup(
     assert all(len(row["lineup"]["starting_xi"]) == 11 for row in alternative)
 
 
-def test_frozen_paid_moves_can_exceed_the_default_advice_cap_only_in_that_week(tmp_path, monkeypatch):
+def test_frozen_paid_moves_can_exceed_the_default_advice_cap_only_in_that_week(
+    tmp_path, monkeypatch
+):
     backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     preferences = {
         "frozen_weeks": [
-            {"week": 1, "transfers_in": [1002, 1007], "transfers_out": [1001, 1004], "chip": None}
+            {"week": 1, "transfers_in": [1002, 1007], "transfers_out": [1001, 1011], "chip": None}
         ]
     }
     selection = {"strategy": "saf-puan", "window": 3}
@@ -1920,11 +1923,14 @@ def test_frozen_paid_moves_can_exceed_the_default_advice_cap_only_in_that_week(t
     assert _work(backend) == 1
     served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
     assert served.status_code == 200, served.text
-    first, *later = served.json()["payload"]["plan_weeks"]
+    payload = served.json()["payload"]
+    first, *later = payload["plan_weeks"]
     assert {player["player_id"] for player in first["transfers_in"]} == {1002, 1007}
-    assert {player["player_id"] for player in first["transfers_out"]} == {1001, 1004}
-    assert first["transfer_hit_points"] == max(0, 2 - first["free_transfers_before"]) * 4
+    assert {player["player_id"] for player in first["transfers_out"]} == {1001, 1011}
+    assert first["free_transfers_before"] == 1
+    assert first["transfer_hit_points"] == 4
     assert all(len(week["transfers_in"]) <= 1 for week in later)
+    assert WINDOW_TRANSFER_CAP_LIMIT not in payload["stated_limits"]
 
 
 def test_preferences_round_trip_through_http_worker_cache(running):

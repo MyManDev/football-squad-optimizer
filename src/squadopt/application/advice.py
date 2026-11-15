@@ -1036,7 +1036,9 @@ def window_payload(
         for move in moves:
             move["expected_points_delta"] = None
     limits = window_stated_limits(projection)
-    if (
+    if plan.diagnostics.get("transfer_caps_by_gameweek"):
+        limits.remove(WINDOW_TRANSFER_CAP_LIMIT)
+    elif (
         plan.diagnostics.get("allow_two_free_transfers") is True
         and plan.diagnostics.get("max_transfers_per_gameweek") == 1
     ):

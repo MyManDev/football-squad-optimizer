@@ -1681,6 +1681,8 @@ def optimize_transfer_plan(
     if fixed_week_squads is not None:
         diagnostics["fixed_week_squads"] = dict(fixed_week_squads)
         diagnostics["proof_scope"] = "restricted_week_squads"
+    if settings.transfer_caps_by_gameweek:
+        diagnostics["transfer_caps_by_gameweek"] = dict(settings.transfer_caps_by_gameweek)
     if preferences is not None and preferences.active:
         diagnostics["decision_preferences"] = preferences.payload()
     if protect_hold:
