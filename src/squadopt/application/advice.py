@@ -833,6 +833,7 @@ WINDOW_FREE_PAIR_LIMIT = (
     "Each week allows one transfer, or up to two when both use banked free transfers. "
     "Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap."
 )
+WINDOW_STATIC_PRICE_LIMIT = "Prices are held at the captured values; no price change is modelled."
 WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "The first week's projection is repeated over the later weeks, rescaled by each "
     "club's fixture count in that week relative to its count in the first week, from "
@@ -842,7 +843,7 @@ WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "suspensions after it are not seen.",
     WINDOW_TRANSFER_CAP_LIMIT,
     WINDOW_TOP100_LIMIT,
-    "Prices are held at the captured values; no price change is modelled.",
+    WINDOW_STATIC_PRICE_LIMIT,
     NO_CHIP_LIMIT,
 )
 

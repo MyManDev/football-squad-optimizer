@@ -443,13 +443,17 @@ class AdviceReadStore:
         """
 
         rule_sets = (preferences, *(row.rules for row in preferences.week_rules))
-        if not preferences.frozen_weeks and not any(
-            rules.keep_players
-            or rules.avoid_players
-            or rules.include_players
-            or rules.buy_players
-            or rules.club_counts
-            for rules in rule_sets
+        if (
+            preferences.scenario is None
+            and not preferences.frozen_weeks
+            and not any(
+                rules.keep_players
+                or rules.avoid_players
+                or rules.include_players
+                or rules.buy_players
+                or rules.club_counts
+                for rules in rule_sets
+            )
         ):
             return
         players = self._preference_players_of(context, league_id, entry_id)
@@ -478,6 +482,13 @@ class AdviceReadStore:
         if players.squad.intersection(preferences.for_week(1).buy_players):
             raise UnsupportedAdviceRequestError(
                 "A player already in the member's squad cannot be bought in the first week."
+            )
+        if (
+            preferences.scenario is not None
+            and preferences.scenario.player_id not in players.roster
+        ):
+            raise UnsupportedAdviceRequestError(
+                "The scenario player is not in this capture's roster."
             )
         for frozen in preferences.frozen_weeks:
             incoming, outgoing, starters = map(

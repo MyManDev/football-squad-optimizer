@@ -17,6 +17,7 @@ _WINDOW_FIELDS = {
     "net_points_priority",
     "frozen_weeks",
     "min_bank",
+    "scenario",
 }
 _CHIPS = ("wildcard", "freehit", "bboost", "3xc")
 
@@ -90,6 +91,48 @@ class BankFloor:
 
 
 @dataclass(frozen=True, slots=True)
+class PlanScenario:
+    """A hypothetical market change or a single gameweek absence."""
+
+    kind: Literal["price_increase", "unavailable"]
+    player_id: int
+    week: int = 1
+    tenths: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in ("price_increase", "unavailable"):
+            raise ValueError("Unknown plan scenario.")
+        if type(self.player_id) is not int or not 1 <= self.player_id <= 2**53 - 1:
+            raise ValueError("A plan scenario requires a valid player id.")
+        if type(self.week) is not int or not 1 <= self.week <= 3:
+            raise ValueError("A scenario week must be an offset from 1 to 3.")
+        if self.kind == "price_increase":
+            if type(self.tenths) is not int or not 1 <= self.tenths <= 10_000:
+                raise ValueError("A price increase requires positive £0.1m units.")
+        elif self.tenths is not None:
+            raise ValueError("An absence has no price change.")
+
+    def payload(self) -> dict[str, object]:
+        result: dict[str, object] = {"kind": self.kind, "player_id": self.player_id}
+        if self.week != 1:
+            result["week"] = self.week
+        if self.tenths is not None:
+            result["tenths"] = self.tenths
+        return result
+
+    @classmethod
+    def parse(cls, value: object) -> PlanScenario:
+        if (
+            not isinstance(value, dict)
+            or not {"kind", "player_id"} <= value.keys()
+            or value.keys() - {"kind", "player_id", "week", "tenths"}
+            or ("tenths" in value) != (value["kind"] == "price_increase")
+        ):
+            raise ValueError("Invalid plan scenario.")
+        return cls(**value)
+
+
+@dataclass(frozen=True, slots=True)
 class ClubCount:
     """An exact number of squad members or incoming transfers from one club."""
 
@@ -151,6 +194,7 @@ class DecisionPreferences:
     net_points_priority: bool = False
     frozen_weeks: tuple[FrozenPlanWeek, ...] = ()
     min_bank: BankFloor | None = None
+    scenario: PlanScenario | None = None
 
     def __post_init__(self) -> None:
         for name in _PLAYER_FIELDS:
@@ -242,6 +286,8 @@ class DecisionPreferences:
                 raise ValueError("The future Wildcard conflicts with rules for that week.")
         if self.min_bank is not None and not isinstance(self.min_bank, BankFloor):
             raise ValueError("Invalid minimum bank.")
+        if self.scenario is not None and not isinstance(self.scenario, PlanScenario):
+            raise ValueError("Invalid plan scenario.")
         if (
             not isinstance(self.frozen_weeks, (list, tuple))
             or len(self.frozen_weeks) > 3
@@ -295,6 +341,7 @@ class DecisionPreferences:
             raise ValueError("The selected planning window is invalid.")
         if (
             (self.wildcard_week is not None and self.wildcard_week > window)
+            or (self.scenario is not None and self.scenario.week > window)
             or (
                 self.min_bank is not None
                 and self.min_bank.week is not None
@@ -314,6 +361,7 @@ class DecisionPreferences:
             or self.min_opening_bank_tenths is not None
             or self.frozen_weeks
             or self.min_bank is not None
+            or self.scenario is not None
         )
 
     @property
@@ -379,6 +427,8 @@ class DecisionPreferences:
             payload["frozen_weeks"] = [row.payload() for row in self.frozen_weeks]
         if self.min_bank is not None:
             payload["min_bank"] = self.min_bank.payload()
+        if self.scenario is not None:
+            payload["scenario"] = self.scenario.payload()
         return payload
 
     def canonical(self) -> str:
@@ -472,6 +522,9 @@ class DecisionPreferences:
                     "week_rules": tuple(week_rules),
                     "frozen_weeks": tuple(FrozenPlanWeek(**row) for row in frozen),
                     "min_bank": BankFloor(**bank) if bank is not None else None,
+                    "scenario": PlanScenario.parse(value["scenario"])
+                    if "scenario" in value
+                    else None,
                 }
             )
         )
@@ -547,6 +600,20 @@ def preferences_schema() -> dict[str, object]:
                     "tenths": {"type": "integer", "minimum": 1, "maximum": 10000},
                     "week": {"type": "integer", "minimum": 1, "maximum": 3},
                 },
+            },
+            "scenario": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["kind", "player_id"],
+                "properties": {
+                    "kind": {"enum": ["price_increase", "unavailable"]},
+                    "player_id": {"type": "integer", "minimum": 1, "maximum": 2**53 - 1},
+                    "week": {"type": "integer", "minimum": 1, "maximum": 3},
+                    "tenths": {"type": "integer", "minimum": 1, "maximum": 10000},
+                },
+                "if": {"properties": {"kind": {"const": "price_increase"}}},
+                "then": {"required": ["tenths"]},
+                "else": {"not": {"required": ["tenths"]}},
             },
             "week_rules": {
                 "type": "array",

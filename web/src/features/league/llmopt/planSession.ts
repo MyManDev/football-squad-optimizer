@@ -16,6 +16,7 @@ export interface PlanConfirmation {
   wildcardNotHeld: boolean;
   /** Absent until the confirmed baseline has been checked for follow-up requests. */
   followups?: (StartedAlternative | null)[];
+  scenarioReplayInfeasible?: true;
 }
 
 interface PlanSession {
@@ -82,6 +83,9 @@ export function checkedPlanSession(
     ) {
       session.confirmation = {
         wildcardNotHeld: confirmation.wildcardNotHeld,
+        ...(session.draft.scenario && confirmation.scenarioReplayInfeasible === true
+          ? { scenarioReplayInfeasible: true as const }
+          : {}),
         followups: confirmation.followups?.map((item) => {
           if (item?.kind === "priced" || item?.kind === "roll") return { kind: item.kind };
           if (

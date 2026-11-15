@@ -200,6 +200,11 @@
   background: var(--color-surface);
 }
 
+.scenarioNotes {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .revise {
   composes: secondary;
   justify-self: start;

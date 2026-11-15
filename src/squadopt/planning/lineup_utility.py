@@ -148,9 +148,17 @@ def improve_plan_lineups(
         for frozen in (preferences.frozen_weeks if preferences is not None else ())
         if frozen.starting_xi or frozen.captain is not None
     }
+    scenario = preferences.scenario if preferences is not None else None
     weeks = []
     work: list[dict[str, Any]] = []
     for index, week in enumerate(plan.weeks):
+        unavailable = (
+            (scenario.player_id,)
+            if scenario is not None
+            and scenario.kind == "unavailable"
+            and scenario.week == index + 1
+            else ()
+        )
         if index == 0 and fixed_first is not None:
             if (
                 set(week.selected_squad.player_id) != set(fixed_first.selected_squad.player_id)
@@ -167,7 +175,7 @@ def improve_plan_lineups(
             hit_points=week.transfer_hit_points,
             max_evaluations=max_evaluations,
             locked_first=(index == 0 and fixed_first is not None) or index + 1 in frozen_lineups,
-            not_starting=not_starting if index == 0 else (),
+            not_starting=(*not_starting, *unavailable) if index == 0 else unavailable,
             not_captain=not_captain if index == 0 else (),
         )
         score = result.best

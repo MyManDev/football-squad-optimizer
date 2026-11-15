@@ -301,6 +301,52 @@ def test_public_football_plan_keeps_a_frozen_second_week_lineup(tmp_path, monkey
     assert "lineup_expectation" in second
 
 
+@pytest.mark.parametrize("model", ["current", "football"])
+def test_absence_scenario_benches_the_player_only_in_its_target_week(tmp_path, monkeypatch, model):
+    artifacts = tmp_path / "artifacts"
+    world = _deployment(tmp_path, monkeypatch, last_gameweek=6, artifact_root=artifacts)
+    backend = world["backend"]
+    if model == "football":
+        context = backend.contexts.identity()
+        path = football_artifact_path(artifacts, world["snapshot_id"])
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(_forecast(context.inputs)), encoding="utf-8")
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 3, "model": model}
+    player = 1003
+    scenario = {"kind": "unavailable", "player_id": player, "week": 2}
+    transfers = [
+        {"week": week, "transfers_in": [], "transfers_out": [], "chip": None} for week in (1, 2, 3)
+    ]
+    for frozen in ({"frozen_weeks": transfers}, {}):
+        preferences = {"keep_players": [player], "scenario": scenario, **frozen}
+        accepted = client.post(route, json={**selection, "preferences": preferences})
+        assert accepted.status_code == 202, accepted.text
+        outcome = run_advice_worker_once(
+            backend.queue,
+            backend.cache,
+            build_advice_compute(backend.contexts, backend.job_specs),
+            at_utc=world_module.GW2_CAPTURED_AT,
+        )
+        assert outcome.status == "completed", outcome.error
+        served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+        assert served.status_code == 200, served.text
+        result = served.json()["payload"]
+        assert result["preferences"]["scenario"] == scenario
+        first, second, last = result["plan_weeks"]
+        for week in (first, last):
+            lineup = week["lineup"]
+            selected = lineup["starting_xi"] + lineup["bench"]
+            assert next(p for p in selected if p["player_id"] == player)["expected_points"] > 0
+        lineup = second["lineup"]
+        assert lineup["captain"]["player_id"] != player
+        assert player not in {p["player_id"] for p in lineup["starting_xi"]}
+        benched = next(p for p in lineup["bench"] if p["player_id"] == player)
+        assert benched["expected_points"] == 0
+        assert ("lineup_expectation" in second) is (model == "football")
+
+
 def test_football_missing_and_unknown_refused_before_queue(tmp_path, monkeypatch):
     world = _deployment(tmp_path, monkeypatch, last_gameweek=4)
     client = TestClient(app_for_capture(world["backend"], world_module.GW2_CAPTURED_AT))

@@ -1254,6 +1254,29 @@ def plan_transfer_horizon(
             table["player_id"].tolist(), table["price_tenths"].tolist(), strict=True
         )
     ]
+    scenario = preferences.scenario if preferences is not None else None
+    if scenario is not None:
+        target = first_gameweek + scenario.week - 1
+        player = scenario.player_id
+        if target not in projection_horizon.target_gameweeks or player not in current:
+            raise DataSourceError("The scenario week and player must be in the captured horizon.")
+        rows = planning_table.player_id.eq(player)
+        if scenario.kind == "price_increase":
+            assert scenario.tenths is not None
+            affected = rows & planning_table.gameweek.ge(target)
+            planning_table.loc[affected, "buy_price_tenths"] += scenario.tenths
+            if player in held_sell_prices:
+                # Preserve any conservative reductions made by spending_power. Only the
+                # sale uplift from the hypothetical market move is added to the old lot.
+                price, purchase = current[player], held.purchase_prices[player]
+                uplift = sell_price_tenths(price + scenario.tenths, purchase, sell_on_fee=fee)
+                uplift -= sell_price_tenths(price, purchase, sell_on_fee=fee)
+                planning_table.loc[affected, "sell_price_tenths"] += uplift
+        else:
+            unavailable = rows & planning_table.gameweek.eq(target)
+            planning_table.loc[unavailable, "expected_points"] = 0.0
+            if "appearance_probability" in planning_table:
+                planning_table.loc[unavailable, "appearance_probability"] = 0.0
 
     settings = OptimizationConfig() if optimization is None else optimization
     game_transfer_limits = preferences is not None and preferences.uses_game_transfer_limits

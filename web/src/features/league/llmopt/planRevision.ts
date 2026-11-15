@@ -150,6 +150,13 @@ export function referenceWeeks(reference?: PlanRevision): PlanWeekNumber[] | und
   return reference?.weeks.map((_, index) => (index + 1) as PlanWeekNumber);
 }
 
+export function referenceCaptains(reference?: PlanRevision) {
+  return referenceWeeks(reference)?.flatMap((week) => {
+    const captain = reference?.weeks[week - 1]?.lineup?.captain;
+    return captain === undefined ? [] : [{ week, player_id: captain }];
+  });
+}
+
 export function freezeReference(
   reference: PlanRevision | undefined,
   selected: readonly PlanWeekNumber[] = [],

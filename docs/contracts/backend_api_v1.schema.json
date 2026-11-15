@@ -226,6 +226,56 @@
             "save_chips": {
               "type": "boolean"
             },
+            "scenario": {
+              "additionalProperties": false,
+              "else": {
+                "not": {
+                  "required": [
+                    "tenths"
+                  ]
+                }
+              },
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "price_increase"
+                  }
+                }
+              },
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "price_increase",
+                    "unavailable"
+                  ]
+                },
+                "player_id": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "tenths": {
+                  "maximum": 10000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "week": {
+                  "maximum": 3,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "player_id"
+              ],
+              "then": {
+                "required": [
+                  "tenths"
+                ]
+              },
+              "type": "object"
+            },
             "week_rules": {
               "items": {
                 "additionalProperties": false,
@@ -594,6 +644,56 @@
             },
             "save_chips": {
               "type": "boolean"
+            },
+            "scenario": {
+              "additionalProperties": false,
+              "else": {
+                "not": {
+                  "required": [
+                    "tenths"
+                  ]
+                }
+              },
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "price_increase"
+                  }
+                }
+              },
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "price_increase",
+                    "unavailable"
+                  ]
+                },
+                "player_id": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "tenths": {
+                  "maximum": 10000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "week": {
+                  "maximum": 3,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "player_id"
+              ],
+              "then": {
+                "required": [
+                  "tenths"
+                ]
+              },
+              "type": "object"
             },
             "week_rules": {
               "items": {

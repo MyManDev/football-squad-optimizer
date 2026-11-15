@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 
 import { useLanguage } from "../../../i18n/context";
 import { money, points, signedPoints } from "../../../lib/format";
@@ -34,9 +34,15 @@ function MetricRow({
 export function RevisionComparison({
   previous,
   revised,
+  scenario,
+  introduction,
+  children,
 }: {
   previous: PlanRevision;
   revised?: PlanRevision;
+  scenario?: boolean;
+  introduction?: ReactNode;
+  children?: ReactNode;
 }) {
   const title = useId();
   const { language, locale, messages } = useLanguage();
@@ -53,17 +59,18 @@ export function RevisionComparison({
     players?.map(({ name }) => name).join(", ") || copy.noPlayers;
   return (
     <section className={styles.revision} aria-labelledby={title}>
-      <h2 id={title}>{copy.revisionTitle}</h2>
+      <h2 id={title}>{scenario ? copy.scenarioTitle : copy.revisionTitle}</h2>
+      {introduction}
       <table className={styles.revisionTable}>
         <thead>
           <tr>
             <td />
-            <th scope="col" aria-label={copy.previousPlan}>
-              {copy.previousPlan}
+            <th scope="col" aria-label={scenario ? copy.scenarioOriginal : copy.previousPlan}>
+              {scenario ? copy.scenarioOriginal : copy.previousPlan}
               <small>{beforeWindow}</small>
             </th>
-            <th scope="col" aria-label={copy.revisedPlan}>
-              {copy.revisedPlan}
+            <th scope="col" aria-label={scenario ? copy.scenarioOptimized : copy.revisedPlan}>
+              {scenario ? copy.scenarioOptimized : copy.revisedPlan}
               {afterWindow && <small>{afterWindow}</small>}
             </th>
             <th scope="col">{copy.revisionDelta}</th>
@@ -129,6 +136,7 @@ export function RevisionComparison({
           );
         })}
       </table>
+      {children}
     </section>
   );
 }

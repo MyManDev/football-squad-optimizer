@@ -1933,6 +1933,56 @@ def test_frozen_paid_moves_can_exceed_the_default_advice_cap_only_in_that_week(
     assert WINDOW_TRANSFER_CAP_LIMIT not in payload["stated_limits"]
 
 
+def test_price_scenario_refuses_the_unfunded_old_transfer_and_can_reoptimize(running):
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 1}
+    fixed = {
+        "frozen_weeks": [{"week": 1, "transfers_in": [1007], "transfers_out": [1011], "chip": None}]
+    }
+
+    def run(preferences):
+        accepted = client.post(route, json={**selection, "preferences": preferences})
+        assert accepted.status_code == 202, accepted.text
+        assert _work(backend) == 1
+        job = client.get(f"/api/v1/advice-jobs/{accepted.json()['job_id']}").json()
+        result = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+        return job, result
+
+    job, baseline = run(fixed)
+    assert job["status"] == "completed" and baseline.status_code == 200, job
+    original = baseline.json()["payload"]["plan_weeks"][0]
+    assert {p["player_id"] for p in original["transfers_in"]} == {1007}
+    scenario = {
+        "kind": "price_increase",
+        "player_id": 1007,
+        "tenths": original["bank_after_tenths"] + 1,
+    }
+    job, replay = run({**fixed, "scenario": scenario})
+    assert job["status"] == "failed" and job["error_code"] == "PLAN_NOT_FOUND", job
+    assert replay.status_code == 404
+
+    job, reoptimized = run({"scenario": scenario})
+    assert job["status"] == "completed" and reoptimized.status_code == 200, job
+    payload = reoptimized.json()["payload"]
+    assert payload["preferences"]["scenario"] == scenario
+    changed = payload["plan_weeks"][0]
+    assert (
+        {p["player_id"] for p in changed["transfers_in"]},
+        {p["player_id"] for p in changed["transfers_out"]},
+    ) != ({1007}, {1011})
+    assert changed["bank_after_tenths"] >= 0
+    assert (
+        "Prices are held at the captured values; no price change is modelled."
+        not in payload["stated_limits"]
+    )
+    assert (
+        client.get(route, params={**selection, "preferences": json.dumps(fixed)}).content
+        == baseline.content
+    )
+
+
 def test_preferences_round_trip_through_http_worker_cache(running):
     backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))

@@ -73,6 +73,19 @@ export function checkedAdvice(
   }
   const requested = request.preferences;
   const plan = payload as unknown as EntryAdvice;
+  if (requested?.scenario?.kind === "unavailable") {
+    const { player_id, week = 1 } = requested.scenario;
+    const lineup = plan.plan_weeks?.find(
+      (row) => row.gameweek === plan.gameweek + week - 1,
+    )?.lineup;
+    if (
+      !lineup ||
+      lineup.captain.player_id === player_id ||
+      lineup.vice_captain.player_id === player_id ||
+      lineup.starting_xi.some((player) => player.player_id === player_id)
+    )
+      throw new AdviceContextError("Advice starts or captains the scenario's unavailable player.");
+  }
   for (const frozen of requested?.frozen_weeks ?? []) {
     const week = plan.plan_weeks?.find((row) => row.gameweek === plan.gameweek + frozen.week - 1);
     if (

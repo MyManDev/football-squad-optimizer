@@ -1099,6 +1099,17 @@ def _apply_decision_preferences(
         floor = preferences.min_bank
         index = len(players_by_week) - 1 if floor.week is None else floor.week - 1
         artifacts.model.add(artifacts.base_bank_vars[index] >= floor.tenths)
+    scenario = preferences.scenario
+    if scenario is not None:
+        if scenario.player_id not in universe:
+            raise TransferPlanningValidationError(
+                "The scenario player is outside the forecast roster."
+            )
+        if scenario.kind == "unavailable":
+            week = scenario.week - 1
+            column = players_by_week[week].player_id.tolist().index(scenario.player_id)
+            # The normal captain-implies-starter constraint also bars the armband.
+            artifacts.model.add(artifacts.starter_vars[week][column] == 0)
     for frozen in preferences.frozen_weeks:
         _freeze_week_decision(artifacts, frozen, optimization_config.starting_size)
     for week, table in enumerate(players_by_week):

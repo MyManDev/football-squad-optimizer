@@ -3,6 +3,7 @@ import type { Language } from "../../../i18n/messages";
 import {
   checkedBankFloor,
   checkedPreferences,
+  checkedScenario,
   clubCountKey,
   isHitBudget,
   isPlanWeek,
@@ -11,6 +12,7 @@ import {
   type ClubCount,
   type DecisionPreferences,
   type FrozenPlanWeek,
+  type PlanScenario,
   type PlanWeekNumber,
 } from "../advice/decisionPreferences";
 
@@ -48,6 +50,7 @@ export interface PlanDraft {
   window?: PlanWindow;
   keep_weeks?: PlanWeekNumber[];
   min_bank?: BankFloor;
+  scenario?: PlanScenario;
 }
 
 interface PreparedPlan {
@@ -80,9 +83,12 @@ export function isPlayerKind(kind: Constraint["kind"]): kind is PlayerKind {
 
 export function needsThreeWeeks(draft: PlanDraft) {
   const rules = [...draft.hard, ...draft.soft, ...(draft.comparison ? [draft.comparison] : [])];
-  return [...rules.map(({ week }) => week), ...(draft.keep_weeks ?? []), draft.min_bank?.week].some(
-    (week) => week === 2 || week === 3,
-  );
+  return [
+    ...rules.map(({ week }) => week),
+    ...(draft.keep_weeks ?? []),
+    draft.min_bank?.week,
+    draft.scenario?.week,
+  ].some((week) => week === 2 || week === 3);
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -189,6 +195,10 @@ export function checkedDraft(value: unknown, players: readonly CatalogPlayer[]):
     if (value.keep_weeks.length) draft.keep_weeks = [...value.keep_weeks].sort((a, b) => a - b);
   }
   if (value.min_bank !== undefined) draft.min_bank = checkedBankFloor(value.min_bank);
+  if (value.scenario !== undefined) {
+    draft.scenario = checkedScenario(value.scenario);
+    if (!playerIds.has(draft.scenario.player_id)) throw new Error("Unknown scenario player");
+  }
   const keys = [...draft.hard, ...draft.soft].map(constraintKey);
   if (new Set(keys).size !== keys.length) throw new Error("Repeated constraint");
   if (value.comparison != null) {
@@ -246,6 +256,7 @@ function branchSelection(
   window: PlanWindow,
   frozenWeeks: readonly FrozenPlanWeek[],
   minBank: BankFloor | undefined,
+  scenario: PlanScenario | undefined,
 ): PreparedPlan | null {
   if (rules.some(({ week }) => week !== undefined && week > window)) return null;
   if (playerIds(rules, "keep_player").some((id) => !held.has(id))) return null;
@@ -300,6 +311,7 @@ function branchSelection(
         ...(wildcardWeek === 2 || wildcardWeek === 3 ? { wildcard_week: wildcardWeek } : {}),
         ...(frozenWeeks.length ? { frozen_weeks: frozenWeeks } : {}),
         ...(minBank ? { min_bank: minBank } : {}),
+        ...(scenario ? { scenario } : {}),
       }),
     };
   } catch {
@@ -317,9 +329,12 @@ export function preparePlans(
   const resolved =
     keepWeeks.length === frozenWeeks.length &&
     keepWeeks.every((week) => week <= window && frozenWeeks.some((row) => row.week === week)) &&
-    (draft.min_bank?.week ?? 1) <= window;
+    (draft.min_bank?.week ?? 1) <= window &&
+    (draft.scenario?.week ?? 1) <= window;
   const select = (rules: readonly Constraint[]) =>
-    resolved ? branchSelection(rules, held, window, frozenWeeks, draft.min_bank) : null;
+    resolved
+      ? branchSelection(rules, held, window, frozenWeeks, draft.min_bank, draft.scenario)
+      : null;
   const both = draft.comparison?.kind === "include_player" && draft.comparison.both;
   const baseRules: Constraint[] =
     both && draft.comparison?.kind === "include_player"
@@ -408,6 +423,7 @@ export async function readIntent(
   signal: AbortSignal,
   clarification?: Clarification,
   referenceWeeks?: readonly PlanWeekNumber[],
+  referenceCaptains?: readonly { week: PlanWeekNumber; player_id: number }[],
 ) {
   return withRequestDeadline(
     async (signal) => {
@@ -424,6 +440,7 @@ export async function readIntent(
           })),
           ...(clarification ? { clarification } : {}),
           ...(referenceWeeks?.length ? { reference_weeks: referenceWeeks } : {}),
+          ...(referenceCaptains?.length ? { reference_captains: referenceCaptains } : {}),
         }),
         signal,
       });
