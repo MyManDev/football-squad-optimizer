@@ -47,7 +47,6 @@ from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
     fixture_snapshot,
-    gameweek_deadlines,
     player_snapshot,
     team_codes,
     team_names,
@@ -208,8 +207,7 @@ def build_projection_horizon(
     # The information state. Read once, at the first target, and reused unchanged for
     # every later gameweek — which is the whole claim this module makes.
     inputs = read_inputs(decision_snapshot, season=resolved_season, gameweek=gameweeks[0])
-    published_gameweeks = {deadline.gameweek for deadline in gameweek_deadlines(bootstrap)}
-    unavailable_gameweeks = sorted(set(gameweeks) - published_gameweeks)
+    unavailable_gameweeks = sorted(set(gameweeks) - inputs.published_gameweeks)
     if unavailable_gameweeks:
         raise DataSourceError(
             "Projection horizon targets gameweeks absent from the captured season: "

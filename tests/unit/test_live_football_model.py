@@ -85,7 +85,7 @@ def _forecast(inputs, *, contextual=False):
 @pytest.mark.parametrize("contextual", [False, True])
 def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, weight, contextual):
     artifacts = tmp_path / "artifacts"
-    world = _deployment(tmp_path, monkeypatch, artifact_root=artifacts)
+    world = _deployment(tmp_path, monkeypatch, last_gameweek=6, artifact_root=artifacts)
     backend = world["backend"]
     identity = backend.contexts.identity()
     path = football_artifact_path(artifacts, world["snapshot_id"])
@@ -102,6 +102,7 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities")
     assert capabilities.json()["models"] == ["current", "football"]
+    assert capabilities.json()["strategies"]["saf-puan"]["windows"] == [1, 3, 5]
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": "saf-puan", "window": window, "model": "football", "top100_weight": weight}
     accepted = client.post(route, json=body)
@@ -239,7 +240,7 @@ def test_the_site_holds_the_share_limit_verbatim_and_it_passes_the_honesty_guard
 
 
 def test_football_missing_and_unknown_refused_before_queue(tmp_path, monkeypatch):
-    world = _deployment(tmp_path, monkeypatch)
+    world = _deployment(tmp_path, monkeypatch, last_gameweek=4)
     client = TestClient(app_for_capture(world["backend"], world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     for model, code in [("football", "MODEL_INPUTS_UNAVAILABLE"), ("unknown", "VALIDATION_FAILED")]:
@@ -275,7 +276,7 @@ def test_model_request_identity_roundtrip():
 
 
 def test_forecast_hash_capture_roster_and_blank_guards(tmp_path, monkeypatch):
-    world = _deployment(tmp_path, monkeypatch)
+    world = _deployment(tmp_path, monkeypatch, last_gameweek=6)
     inputs = world["backend"].contexts.identity().inputs
     doc = _forecast(inputs)
     path = tmp_path / "forecast.json"

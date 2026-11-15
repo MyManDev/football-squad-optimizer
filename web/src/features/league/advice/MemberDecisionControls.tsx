@@ -117,7 +117,7 @@ export function MemberDecisionControls({
       ...selection.rivals.map((rival) => rival.entryId),
       ...(computable?.rivals ?? []),
       ...(onDevice?.rivals ?? []),
-      ...(onDevice?.captainMissingRivals ?? []),
+      ...(onDevice?.invalidRivals ?? []),
     ]),
   ];
   const defaultRival = index?.default_rival_entry_id ?? null;

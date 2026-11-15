@@ -16,7 +16,8 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { withLeague } from "../../../testSupport/league";
 import type { FixturesPayload } from "../../fixtures/types";
-import { passedDeadline, useMinuteClock } from "../advice/deadline";
+import { passedDeadline, useDeadlineClock, useMinuteClock } from "../advice/deadline";
+import type { AdviceClient } from "../advice/adviceClient";
 import type { EntryAdvice } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
@@ -67,7 +68,7 @@ function page(language: Language, props: Partial<LeagueMemberViewProps> = {}) {
 
 /** As LeagueMemberPage wires it: one clock, read for the deadline check and the countdown. */
 function Clocked({ language }: { language: Language }) {
-  const now = useMinuteClock();
+  const now = useDeadlineClock(DEADLINE);
   return page(language, { now, deadlinePassed: passedDeadline(DEADLINE, now) });
 }
 
@@ -140,6 +141,29 @@ describe("the page's minute clock", () => {
 });
 
 describe("the way to apply the decision on FPL", () => {
+  it("rejects stale compute and apply clicks if the clock has already reached the deadline", async () => {
+    vi.useFakeTimers({ now: before(0.5) });
+    const client: AdviceClient = {
+      readAdvice: vi.fn(async () => ({ kind: "not-computed" as const })),
+      readPublished: vi.fn(async () => ({ kind: "not-computed" as const })),
+      requestAdvice: vi.fn(async () => ({ kind: "unavailable" as const })),
+      readJob: vi.fn(),
+    };
+    render(page("en", { now: Date.now(), client }));
+    const compute = screen.getByRole("button", { name: MESSAGES.en.leagueMembers.computeButton });
+    expect(compute).toBeEnabled();
+    const link = fplLink("en")!;
+    // Change wall time without letting the timer remove the controls yet.
+    vi.setSystemTime(new Date(DEADLINE));
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    await act(async () => {
+      compute.click();
+      link.dispatchEvent(click);
+    });
+    expect(client.requestAdvice).not.toHaveBeenCalled();
+    expect(click.defaultPrevented).toBe(true);
+  });
+
   it.each(["tr", "en"] as const)(
     "opens the game's transfers page in a new tab while the week is open (%s)",
     (language) => {

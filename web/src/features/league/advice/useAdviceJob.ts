@@ -17,7 +17,7 @@
  * state carries how the wait is going, each part as the service last said it.
  */
 
-import { cancellableDelay, withRequestDeadline } from "../../../data/request";
+import { cancellableDelay, isTimeoutError, withRequestDeadline } from "../../../data/request";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { WindowSize } from "../../../lib/decisionVocabulary";
@@ -43,14 +43,17 @@ const POLL_INTERVAL_MS = 2000;
 // A long solve is asked about less often once its first minute has passed.
 const SLOW_POLL_INTERVAL_MS = 5000;
 const SLOW_POLL_AFTER_MS = 60_000;
-/**
- * How long a wait lasts before it is called a failure, per window. The solves measured on
- * the machine that serves them took seconds, about a minute and a half, and about three
- * and a half minutes; each budget leaves room above that for a queue ahead of the job.
- */
+/** How long the solver has after this client first sees it running, per window. */
 export const PATIENCE_MS: Record<WindowSize, number> = { 1: 180_000, 3: 360_000, 5: 600_000 };
-// Sending the request, and reading the answer at the end, are outside the wait itself.
+export const QUEUE_PATIENCE_MS = 15 * 60_000;
+// Bound each network read or write, including custom clients that ignore cancellation.
 const REQUEST_ALLOWANCE_MS = 30_000;
+
+function waitDeadline(job: StoredAdviceJob, window: WindowSize): number {
+  return job.runningSince === undefined
+    ? job.startedAt + QUEUE_PATIENCE_MS
+    : job.runningSince + (PATIENCE_MS[window] ?? PATIENCE_MS[1]);
+}
 
 /** The page's own reasons for a failure, beside the service's codes. */
 export const PATIENCE_EXHAUSTED = "PATIENCE_EXHAUSTED";
@@ -216,7 +219,11 @@ export function useAdviceJob(
           if (read.kind !== "advice" || signal.aborted || generation.current !== run) return;
           checkedAdvice(read.envelope, request);
           const snapshot = read.envelope.payload.source_snapshot_id;
-          if (snapshot != null && expectedSnapshotId != null && snapshot !== expectedSnapshotId)
+          if (
+            expectedSnapshotId != null &&
+            (snapshot != null || request.publicEntry || requireMatchingSnapshot) &&
+            snapshot !== expectedSnapshotId
+          )
             return;
           setState((prev) =>
             prev.phase === "idle"
@@ -233,7 +240,7 @@ export function useAdviceJob(
           if (active.current === controller) active.current = null;
         });
     },
-    [client, expectedSnapshotId, setState],
+    [client, expectedSnapshotId, requireMatchingSnapshot, setState],
   );
 
   const start = useCallback(
@@ -242,10 +249,11 @@ export function useAdviceJob(
       active.current?.abort();
       const controller = new AbortController();
       active.current = controller;
-      let taskSignal = controller.signal;
+      const { signal } = controller;
+      const call = <T>(operation: (signal: AbortSignal) => Promise<T>) =>
+        withRequestDeadline(operation, { signal, timeoutMs: REQUEST_ALLOWANCE_MS });
       let readAfterMissingJob = false;
-      const alive = () => generation.current === run && !taskSignal.aborted;
-      const patience = PATIENCE_MS[request.window] ?? PATIENCE_MS[1];
+      const alive = () => generation.current === run && !signal.aborted;
       const fail = (error?: unknown, reason?: string) => {
         if (!alive()) return;
         const stated = failure(error);
@@ -257,61 +265,62 @@ export function useAdviceJob(
           : { phase: "requesting", request },
       );
 
-      void withRequestDeadline(
-        async (signal) => {
-          taskSignal = signal;
-          const options = { signal };
-          let jobId: string;
-          let startedAt: number;
-          let status: WaitingPhase["status"] = null;
-          if (resumed) {
-            ({ jobId, startedAt } = resumed);
-          } else {
-            let outcome;
-            try {
-              // One key for this click, whatever the transport retries underneath it.
-              outcome = await client.requestAdvice(request, {
-                ...options,
-                idempotencyKey: newIdempotencyKey(),
-              });
-              if (outcome.kind === "advice") checkedAdvice(outcome.envelope, request);
-            } catch (error) {
-              fail(error);
-              return;
-            }
-            if (!alive()) return;
-            if (outcome.kind === "advice") {
-              if (
-                (request.publicEntry || requireMatchingSnapshot) &&
-                expectedSnapshotId != null &&
-                outcome.envelope.payload.source_snapshot_id !== expectedSnapshotId
-              ) {
-                fail(undefined, ANSWER_OTHER_CAPTURE);
-                return;
-              }
-              setState({
-                phase: "done",
-                request,
-                envelope: outcome.envelope,
-                source: outcome.source,
-              });
-              return;
-            }
-            if (outcome.kind === "unavailable") {
-              setState({ phase: "unavailable", request, reason: outcome.reason ?? null });
-              return;
-            }
-            jobId = outcome.jobId;
-            status = outcome.status ?? "queued";
-            startedAt = Date.now();
-            rememberJob(request, { jobId, startedAt });
-          }
-
-          // A job: fetch the published baseline once, show it while we wait.
-          let fallback: LeagueViewEnvelope<EntryAdvice> | null = null;
+      void (async () => {
+        let waiting: StoredAdviceJob;
+        let status: WaitingPhase["status"] = null;
+        if (resumed) {
+          waiting = resumed;
+        } else {
+          let outcome;
           try {
-            const published = allowPublishedBaseline
-              ? await client.readPublished(
+            // One key for this click, whatever the transport retries underneath it.
+            outcome = await call((signal) =>
+              client.requestAdvice(request, { signal, idempotencyKey: newIdempotencyKey() }),
+            );
+            if (outcome.kind === "advice") checkedAdvice(outcome.envelope, request);
+          } catch (error) {
+            fail(error, isTimeoutError(error) ? PATIENCE_EXHAUSTED : undefined);
+            return;
+          }
+          if (!alive()) return;
+          if (outcome.kind === "advice") {
+            if (
+              (request.publicEntry || requireMatchingSnapshot) &&
+              expectedSnapshotId != null &&
+              outcome.envelope.payload.source_snapshot_id !== expectedSnapshotId
+            ) {
+              fail(undefined, ANSWER_OTHER_CAPTURE);
+              return;
+            }
+            setState({
+              phase: "done",
+              request,
+              envelope: outcome.envelope,
+              source: outcome.source,
+            });
+            return;
+          }
+          if (outcome.kind === "unavailable") {
+            setState({ phase: "unavailable", request, reason: outcome.reason ?? null });
+            return;
+          }
+          status = outcome.status ?? "queued";
+          const startedAt = Date.now();
+          waiting = {
+            jobId: outcome.jobId,
+            startedAt,
+            runningSince: status === "running" ? startedAt : undefined,
+          };
+          rememberJob(request, waiting);
+        }
+        const { jobId, startedAt } = waiting;
+
+        // A job: fetch the published baseline once, show it while we wait.
+        let fallback: LeagueViewEnvelope<EntryAdvice> | null = null;
+        try {
+          const published = allowPublishedBaseline
+            ? await call((signal) =>
+                client.readPublished(
                   {
                     ...request,
                     strategy: "saf-puan",
@@ -321,123 +330,122 @@ export function useAdviceJob(
                     managersWord: undefined,
                     chip: undefined,
                   },
-                  options,
-                )
-              : null;
-            if (published?.kind === "advice") fallback = published.envelope;
-          } catch {
-            fallback = null; // the wait is just quieter
+                  { signal },
+                ),
+              )
+            : null;
+          if (published?.kind === "advice") fallback = published.envelope;
+        } catch {
+          fallback = null; // the wait is just quieter
+        }
+        if (!alive()) return;
+        setState({ phase: "waiting", request, jobId, status, fallback });
+
+        // A wait picked up after a reload has heard nothing yet: its first question takes no
+        // delay, and it is asked even if the baseline's read has used up the patience.
+        let askNow = resumed !== null;
+        let answers = 0;
+        let attempt: number | undefined;
+        let progress: AdviceJobProgress | undefined;
+        while (askNow || Date.now() < waitDeadline(waiting, request.window)) {
+          if (!askNow) {
+            const now = Date.now();
+            const interval =
+              now - startedAt < SLOW_POLL_AFTER_MS ? POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS;
+            await cancellableDelay(
+              Math.min(interval, waitDeadline(waiting, request.window) - now),
+              signal,
+            );
+            if (!alive()) return;
+          }
+          askNow = false;
+          let job;
+          try {
+            job = await call((signal) => client.readJob(jobId, { signal }));
+          } catch (error) {
+            if (!alive()) return;
+            if (
+              error instanceof AdviceResponseError ||
+              (error instanceof AdviceApiError && error.status >= 400 && error.status < 500)
+            ) {
+              forgetJob(request);
+              // A remembered job the service no longer knows is not this visit's
+              // failure: the page is simply back where a fresh visit starts.
+              if (resumed && error instanceof AdviceApiError && error.status === 404) {
+                setState({ phase: "idle" });
+                readAfterMissingJob = true;
+              } else {
+                fail(error);
+              }
+              return;
+            }
+            continue; // one flaky poll is not a failed computation
           }
           if (!alive()) return;
-          setState({ phase: "waiting", request, jobId, status, fallback });
-
-          // A wait picked up after a reload has heard nothing yet: its first question takes no
-          // delay, and it is asked even if the baseline's read has used up the patience.
-          let askNow = resumed !== null;
-          let answers = 0;
-          let attempt: number | undefined;
-          let progress: AdviceJobProgress | undefined;
-          while (askNow || Date.now() - startedAt < patience) {
-            if (!askNow) {
-              const waited = Date.now() - startedAt;
-              await cancellableDelay(
-                waited < SLOW_POLL_AFTER_MS ? POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS,
-                signal,
-              );
-              signal.throwIfAborted();
-              if (!alive()) return;
-            }
-            askNow = false;
-            let job;
+          if (job.status === "completed") {
+            forgetJob(request);
+            let read;
             try {
-              job = await client.readJob(jobId, options);
+              read = await call((signal) => client.readAdvice(request, { signal }));
+              if (read.kind === "advice") checkedAdvice(read.envelope, request);
             } catch (error) {
-              if (
-                error instanceof AdviceResponseError ||
-                (error instanceof AdviceApiError && error.status >= 400 && error.status < 500)
-              ) {
-                if (!alive()) return;
-                forgetJob(request);
-                // A remembered job the service no longer knows is not this visit's
-                // failure: the page is simply back where a fresh visit starts.
-                if (resumed && error instanceof AdviceApiError && error.status === 404) {
-                  setState({ phase: "idle" });
-                  readAfterMissingJob = true;
-                } else {
-                  fail(error);
-                }
-                return;
-              }
-              continue; // one flaky poll is not a failed computation
+              // Completed but the answer cannot be read: an honest failure, not a wait
+              // that never ends. A stale read from a superseded request changes nothing.
+              fail(error, failure(error).reason ?? ANSWER_UNREADABLE);
+              return;
             }
             if (!alive()) return;
-            if (job.status === "completed") {
-              forgetJob(request);
-              let read;
-              try {
-                read = await client.readAdvice(request, options);
-                if (read.kind === "advice") checkedAdvice(read.envelope, request);
-              } catch (error) {
-                // Completed but the answer cannot be read: an honest failure, not a wait
-                // that never ends. A stale read from a superseded request changes nothing.
-                fail(error, failure(error).reason ?? ANSWER_UNREADABLE);
+            if (read.kind === "advice") {
+              if (
+                (request.publicEntry || requireMatchingSnapshot) &&
+                expectedSnapshotId != null &&
+                read.envelope.payload.source_snapshot_id !== expectedSnapshotId
+              ) {
+                fail(undefined, ANSWER_OTHER_CAPTURE);
                 return;
               }
-              if (!alive()) return;
-              if (read.kind === "advice") {
-                if (
-                  (request.publicEntry || requireMatchingSnapshot) &&
-                  expectedSnapshotId != null &&
-                  read.envelope.payload.source_snapshot_id !== expectedSnapshotId
-                ) {
-                  fail(undefined, ANSWER_OTHER_CAPTURE);
-                  return;
-                }
-                setState({ phase: "done", request, envelope: read.envelope, source: read.source });
-              } else {
-                fail(undefined, ANSWER_UNREADABLE); // completed but unreadable: say so
-              }
-              return;
+              setState({ phase: "done", request, envelope: read.envelope, source: read.source });
+            } else {
+              fail(undefined, ANSWER_UNREADABLE); // completed but unreadable: say so
             }
-            if (job.status === "failed") {
-              forgetJob(request);
-              fail(undefined, job.errorCode ?? undefined);
-              return;
-            }
-            answers += 1;
-            // A poll that could not read the count does not take it back: `done` only goes up
-            // within an attempt, and a new attempt starts again.
-            const sameRun = job.status === "running" && job.attempt === attempt;
-            progress = job.progress ?? (sameRun ? progress : undefined);
-            attempt = job.attempt;
-            setState({
-              phase: "waiting",
-              request,
-              jobId,
-              status: job.status,
-              fallback,
-              queuePosition: job.queuePosition,
-              progress,
-              workers: job.workers,
-              answers,
-            });
+            return;
           }
+          if (job.status === "failed") {
+            forgetJob(request);
+            fail(undefined, job.errorCode ?? undefined);
+            return;
+          }
+          if (job.status === "running" && waiting.runningSince === undefined) {
+            waiting = { ...waiting, runningSince: Math.max(startedAt, Date.now()) };
+            rememberJob(request, waiting);
+          }
+          answers += 1;
+          // A poll that could not read the count does not take it back: `done` only goes up
+          // within an attempt, and a new attempt starts again.
+          const sameRun = job.status === "running" && job.attempt === attempt;
+          progress = job.progress ?? (sameRun ? progress : undefined);
+          attempt = job.attempt;
+          setState({
+            phase: "waiting",
+            request,
+            jobId,
+            status: job.status,
+            fallback,
+            queuePosition: job.queuePosition,
+            progress,
+            workers: job.workers,
+            answers,
+          });
+        }
+        if (alive()) {
+          forgetJob(request);
+          fail(undefined, PATIENCE_EXHAUSTED);
+        }
+      })()
+        .catch((error) => {
           if (alive()) {
             forgetJob(request);
-            fail(undefined, PATIENCE_EXHAUSTED);
-          }
-        },
-        {
-          signal: controller.signal,
-          timeoutMs:
-            REQUEST_ALLOWANCE_MS +
-            Math.max(patience - (resumed ? Date.now() - resumed.startedAt : 0), 0),
-        },
-      )
-        .catch(() => {
-          if (generation.current === run) {
-            forgetJob(request);
-            setState({ phase: "failed", request, reason: PATIENCE_EXHAUSTED });
+            fail(error);
           }
         })
         .finally(() => {
@@ -469,8 +477,11 @@ export function useAdviceJob(
     (request: AdviceRequest) => {
       const remembered = recallJob(request);
       if (!remembered) return false;
-      const age = Date.now() - remembered.startedAt;
-      if (age < 0 || age >= (PATIENCE_MS[request.window] ?? PATIENCE_MS[1])) {
+      const now = Date.now();
+      if (
+        now < (remembered.runningSince ?? remembered.startedAt) ||
+        now >= waitDeadline(remembered, request.window)
+      ) {
         forgetJob(request);
         return false;
       }

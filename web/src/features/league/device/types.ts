@@ -103,6 +103,10 @@ export interface DeviceRival {
   captain: number;
 }
 
+export function hasCompleteStartingXi(playerIds: readonly number[]): boolean {
+  return playerIds.length === 11 && new Set(playerIds).size === 11;
+}
+
 export type DeviceRivalPlanKind = "within_free_transfers" | "with_hits";
 
 /** What a rival strategy publishes beyond the plan itself, as the server names it. */

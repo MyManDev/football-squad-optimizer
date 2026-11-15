@@ -37,12 +37,18 @@ export function minutesLeft(deadlineUtc: string, now: number): number | null {
   return left > 0 ? Math.floor(left / 60_000) : null;
 }
 
-/** The gameweek's deadline if it has passed, re-read once a minute so an open page notices. */
+/** A clock that updates at the stated deadline as well as once a minute. */
+export function useDeadlineClock(deadlineUtc: string | null): number {
+  return useMinuteClock(Date.now, deadlineUtc === null ? null : Date.parse(deadlineUtc));
+}
+
+/** The gameweek's deadline if it has passed. */
 export function useDeadlinePassed(
   season: string | undefined,
   gameweek: number | undefined,
 ): string | null {
   const { data } = useFixtures();
-  const now = useMinuteClock();
-  return passedDeadline(gameweekDeadline(data, season, gameweek), now);
+  const deadline = gameweekDeadline(data, season, gameweek);
+  const now = useDeadlineClock(deadline);
+  return passedDeadline(deadline, now);
 }

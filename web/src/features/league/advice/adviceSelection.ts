@@ -210,8 +210,8 @@ export interface DeviceComputable {
   loading?: boolean;
   /** Rivals whose entry document could not be read; the rival a link names among them is kept. */
   unreadRivals?: number[];
-  /** Read rivals whose starting eleven names no captain, including a benched captain. */
-  captainMissingRivals?: number[];
+  /** Read rivals without a complete starting XI and exactly one captain in it. */
+  invalidRivals?: number[];
 }
 
 /**
@@ -229,7 +229,7 @@ function rivalHeldByDevice(
   if (!Number.isSafeInteger(named) || named <= 0 || named === entryId) return [];
   return onDevice.loading === true ||
     onDevice.unreadRivals?.includes(named) === true ||
-    onDevice.captainMissingRivals?.includes(named) === true
+    onDevice.invalidRivals?.includes(named) === true
     ? [named]
     : [];
 }
