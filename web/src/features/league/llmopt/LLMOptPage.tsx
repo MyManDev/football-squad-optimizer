@@ -87,6 +87,10 @@ function isWorking(phase: string) {
   return phase === "requesting" || phase === "waiting";
 }
 
+function deadlineOpen(deadline: string | null) {
+  return deadline !== null && Date.now() < Date.parse(deadline);
+}
+
 interface ChatLine {
   id: number;
   role: "user" | "assistant";
@@ -582,7 +586,7 @@ function Workspace({
       confirmation.current.followups !== undefined
     )
       return;
-    if (deadline === null || Date.now() >= Date.parse(deadline)) return;
+    if (!deadlineOpen(deadline)) return;
 
     type Candidate = { request: PlanRequest; alternative: StartedAlternative };
     const candidates = run.slots.map((slot): Candidate | null =>
@@ -644,8 +648,7 @@ function Workspace({
       clarification !== undefined ||
       !ORIGIN ||
       !squad.source_snapshot_id ||
-      deadline === null ||
-      Date.now() >= Date.parse(deadline) ||
+      !deadlineOpen(deadline) ||
       !canCalculate
     )
       return;
@@ -676,7 +679,7 @@ function Workspace({
           gameweek: squad.gameweek,
           snapshotId: squad.source_snapshot_id,
         }) ||
-        Date.now() >= Date.parse(deadline)
+        !deadlineOpen(deadline)
       ) {
         setBasisChanged(true);
         setRun(null);

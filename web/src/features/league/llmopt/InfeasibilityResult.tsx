@@ -29,7 +29,7 @@ export function InfeasibilityResult({
   const title = useId();
   const minimum = request.preferences?.min_bank;
   const bank =
-    diagnosis.bank?.required === minimum?.tenths && diagnosis.bank?.week === minimum?.week
+    minimum && diagnosis.bank?.required === minimum.tenths && diagnosis.bank.week === minimum.week
       ? diagnosis.bank
       : undefined;
   const repairs = bank
