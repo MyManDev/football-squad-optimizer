@@ -64,8 +64,9 @@ test("LIVE recovers the reading position if the browser scrolls as slides start"
         observer.disconnect();
         window.setTimeout(() => {
           if (!root.querySelector("[data-live-sliding]")) return;
-          window.scrollBy({ top: 3, behavior: "instant" });
-          root.dataset.scrollDriftInjected = "";
+          const before = window.scrollY;
+          window.scrollBy({ top: -8, behavior: "instant" });
+          if (window.scrollY !== before) root.dataset.scrollDriftInjected = "";
         }, 120);
       });
       observer.observe(root, {
