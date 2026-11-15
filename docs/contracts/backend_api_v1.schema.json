@@ -93,6 +93,9 @@
               "type": "array",
               "uniqueItems": true
             },
+            "hold_opening_transfers": {
+              "type": "boolean"
+            },
             "hold_transfers": {
               "type": "boolean"
             },
@@ -117,6 +120,11 @@
             "max_hit_points": {
               "maximum": 60,
               "minimum": 0,
+              "type": "integer"
+            },
+            "min_opening_bank_tenths": {
+              "maximum": 10000,
+              "minimum": 1,
               "type": "integer"
             },
             "no_hits": {
@@ -361,6 +369,9 @@
               "type": "array",
               "uniqueItems": true
             },
+            "hold_opening_transfers": {
+              "type": "boolean"
+            },
             "hold_transfers": {
               "type": "boolean"
             },
@@ -385,6 +396,11 @@
             "max_hit_points": {
               "maximum": 60,
               "minimum": 0,
+              "type": "integer"
+            },
+            "min_opening_bank_tenths": {
+              "maximum": 10000,
+              "minimum": 1,
               "type": "integer"
             },
             "no_hits": {

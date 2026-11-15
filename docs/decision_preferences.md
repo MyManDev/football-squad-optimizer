@@ -28,6 +28,13 @@ An optional `max_hit_points` caps actual transfer charges across the full horizo
 It uses the published charge per paid transfer. Timed rules and total hit budgets use
 the game transfer limits so a weekly instruction can require multiple moves.
 
+`hold_opening_transfers` keeps the captured squad through the opening deadline
+and bars an opening Wildcard or Free Hit. A legal Wildcard scheduled later still
+applies. `min_opening_bank_tenths` requires a minimum amount of cash carried from
+the opening deadline into the next week. A Free Hit's temporary cash reverts before
+the comparison. Both resource controls preserve the other rules and the weekly
+transfer settings of the base plan.
+
 Keep, include and avoid each accept up to fifteen unique positive persistent player
 codes. A player required by keep or include cannot also be avoided. The API checks
 keep against the member's captured squad and include and avoid against the capture's
@@ -43,8 +50,9 @@ The `include_players`, `hold_transfers` and `club_counts` fields are optional. E
 include and club counts and false hold are omitted from canonical preferences,
 preserving legacy identities.
 The worker verifies the recorded identity before computation. Results echo the
-preferences object. The scope is `selected_weeks` when any rule or Wildcard is
-timed and `all_selected_weeks` otherwise. The web client refuses a mismatching answer.
+preferences object. The scope is `selected_weeks` when the request carries a timed
+rule, scheduled Wildcard or opening resource control. The scope is `all_selected_weeks`
+otherwise. The web client refuses a mismatching answer.
 Capabilities must explicitly enable the new controls. Static advice never substitutes
 for a constrained request. URL sharing, resumed jobs and the personal decision board
 all preserve the constraints. A different member's kept-player selection cannot compute.

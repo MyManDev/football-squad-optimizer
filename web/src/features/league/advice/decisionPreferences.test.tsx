@@ -9,7 +9,13 @@ import {
   mockLeagueMembersEnvelope,
 } from "../../../fixtures/league";
 import { DecisionPreferencesPanel } from "./DecisionPreferencesPanel";
-import { checkedPreferences, preferencesFromUrl, preferencesKey } from "./decisionPreferences";
+import {
+  checkedPreferences,
+  holdsOpeningTransfers,
+  preferenceScope,
+  preferencesFromUrl,
+  preferencesKey,
+} from "./decisionPreferences";
 import { adviceRequestKey } from "./adviceJobStore";
 import { checkedAdvice } from "./adviceResponse";
 import { sameAdviceRequest } from "./useAdviceJob";
@@ -55,6 +61,56 @@ it("canonicalizes dated rules and keeps a zero penalty limit in the cache identi
   expect(() =>
     checkedPreferences({ week_rules: [{ week: 2, rules: { week_rules: [] } }] }),
   ).toThrow();
+});
+
+it("separates and validates opening objectives in the wire identity", () => {
+  const later = { week_rules: [{ week: 2, rules: { buy_players: [3] } }] };
+  const opening = checkedPreferences({
+    ...later,
+    hold_opening_transfers: true,
+    min_opening_bank_tenths: 25,
+  });
+  expect(preferenceScope(opening)).toBe("selected_weeks");
+  for (const raw of [
+    { hold_opening_transfers: true },
+    { min_opening_bank_tenths: 1 },
+    { min_opening_bank_tenths: 10_000 },
+  ]) {
+    const value = checkedPreferences(raw);
+    const key = preferencesKey(value);
+    expect(key).not.toBe("");
+    expect(preferenceScope(value)).toBe("selected_weeks");
+    expect(preferencesFromUrl(new URLSearchParams({ preferences: key })).value).toEqual(value);
+  }
+  expect(preferencesKey(checkedPreferences({ hold_opening_transfers: false }))).toBe("");
+  expect(holdsOpeningTransfers(opening)).toBe(true);
+  expect(holdsOpeningTransfers(checkedPreferences({ hold_transfers: true }))).toBe(true);
+  expect(
+    holdsOpeningTransfers(
+      checkedPreferences({ week_rules: [{ week: 1, rules: { hold_transfers: true } }] }),
+    ),
+  ).toBe(true);
+  expect(
+    holdsOpeningTransfers(
+      checkedPreferences({ week_rules: [{ week: 2, rules: { hold_transfers: true } }] }),
+    ),
+  ).toBe(false);
+  for (const invalid of [
+    { hold_opening_transfers: 1 },
+    { min_opening_bank_tenths: null },
+    { min_opening_bank_tenths: 0 },
+    { min_opening_bank_tenths: 1.2 },
+    { min_opening_bank_tenths: 10_001 },
+    { week_rules: [{ week: 1, rules: { hold_opening_transfers: true } }] },
+    { week_rules: [{ week: 2, rules: { min_opening_bank_tenths: 25 } }] },
+    { hold_opening_transfers: true, week_rules: [{ week: 1, rules: { buy_players: [3] } }] },
+    {
+      hold_opening_transfers: true,
+      club_counts: [{ club: "Brighton", count: 1, scope: "transfers_in" }],
+    },
+  ]) {
+    expect(() => checkedPreferences(invalid)).toThrow();
+  }
 });
 
 it("refuses conflicting or malformed URL constraints without displaying the ordinary plan", () => {

@@ -108,7 +108,7 @@ def propose_expected_swap(
         return skip("first_week_rebuild")
     preferences = preferences or DecisionPreferences()
     week_rules = preferences.for_week(1)
-    if week_rules.hold_transfers:
+    if week_rules.hold_transfers or preferences.hold_opening_transfers:
         return skip("hold_transfers")
     if initial.free_transfers == 0 and week_rules.no_hits:
         return skip("no_free_transfer_and_no_hits")
@@ -211,9 +211,12 @@ def propose_expected_swap(
                 or ids & avoid
             ):
                 continue
-            if initial.bank_tenths + int(cast(int, first.at[outgoing, "sell_price_tenths"])) < int(
-                cast(int, first.at[incoming, "buy_price_tenths"])
-            ):
+            bank_after = (
+                initial.bank_tenths
+                + int(cast(int, first.at[outgoing, "sell_price_tenths"]))
+                - int(cast(int, first.at[incoming, "buy_price_tenths"]))
+            )
+            if bank_after < (preferences.min_opening_bank_tenths or 0):
                 continue
             club_totals = Counter(map(str, first.loc[list(ids), "team_id"]))
             if max(club_totals.values()) > optimization.max_players_per_team:

@@ -50,6 +50,8 @@ export interface DecisionPreferences extends RulePreferences {
   week_rules?: { week: PlanWeekNumber; rules: WeekRulePreferences }[];
   max_hit_points?: number;
   wildcard_week?: 2 | 3;
+  hold_opening_transfers?: boolean;
+  min_opening_bank_tenths?: number;
 }
 
 function checkedClubCounts(value: unknown, holdsTransfers: boolean): ClubCount[] {
@@ -160,7 +162,7 @@ function hasRules(p: WeekRulePreferences) {
   );
 }
 
-function checkedWeeks(value: unknown, global: RulePreferences) {
+function checkedWeeks(value: unknown, global: RulePreferences, holdOpening: boolean) {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > 3) throw new Error("Invalid week rules");
   const seen = new Set<PlanWeekNumber>();
@@ -173,7 +175,11 @@ function checkedWeeks(value: unknown, global: RulePreferences) {
       const fields = preferenceRecord(row.rules);
       expectKeys(fields, ["buy_players"]);
       const rules = checkedRules(fields);
-      const holdsTransfers = !!(global.hold_transfers || rules.hold_transfers);
+      const holdsTransfers = !!(
+        global.hold_transfers ||
+        rules.hold_transfers ||
+        (row.week === 1 && holdOpening)
+      );
       const included = new Set([
         ...global.keep_players,
         ...(global.include_players ?? []),
@@ -203,9 +209,29 @@ export function isHitBudget(value: unknown): value is number {
 
 export function checkedPreferences(value: unknown): DecisionPreferences {
   const row = preferenceRecord(value === undefined ? {} : value);
-  expectKeys(row, ["week_rules", "max_hit_points", "wildcard_week"]);
+  expectKeys(row, [
+    "week_rules",
+    "max_hit_points",
+    "wildcard_week",
+    "hold_opening_transfers",
+    "min_opening_bank_tenths",
+  ]);
   const global = checkedRules(row);
-  const weekRules = checkedWeeks(row.week_rules, global);
+  const holdOpening = row.hold_opening_transfers;
+  if (holdOpening !== undefined && typeof holdOpening !== "boolean")
+    throw new Error("Invalid opening transfer hold");
+  if (holdOpening && clubCountsConflict(global.club_counts ?? [], true))
+    throw new Error("Conflicting opening transfer hold");
+  const minOpeningBank = row.min_opening_bank_tenths;
+  if (
+    minOpeningBank !== undefined &&
+    (typeof minOpeningBank !== "number" ||
+      !Number.isInteger(minOpeningBank) ||
+      minOpeningBank < 1 ||
+      minOpeningBank > 10_000)
+  )
+    throw new Error("Invalid minimum opening bank");
+  const weekRules = checkedWeeks(row.week_rules, global, holdOpening === true);
   const maxHits = row.max_hit_points;
   if (maxHits !== undefined && !isHitBudget(maxHits)) throw new Error("Invalid hit budget");
   const wildcardWeek = row.wildcard_week;
@@ -220,18 +246,33 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
     ...(weekRules.length ? { week_rules: weekRules } : {}),
     ...(maxHits === undefined ? {} : { max_hit_points: maxHits }),
     ...(wildcardWeek === undefined ? {} : { wildcard_week: wildcardWeek }),
+    ...(holdOpening ? { hold_opening_transfers: true } : {}),
+    ...(minOpeningBank === undefined ? {} : { min_opening_bank_tenths: minOpeningBank }),
   };
+}
+
+export function holdsOpeningTransfers(p?: DecisionPreferences): boolean {
+  return Boolean(
+    p?.hold_transfers ||
+    p?.hold_opening_transfers ||
+    p?.week_rules?.find(({ week }) => week === 1)?.rules.hold_transfers,
+  );
 }
 
 export function preferencesKey(value?: DecisionPreferences): string {
   const p = checkedPreferences(value);
-  return hasRules(p) || p.week_rules?.length || p.max_hit_points !== undefined || p.wildcard_week
+  return hasRules(p) || p.max_hit_points !== undefined || preferenceScope(p) === "selected_weeks"
     ? JSON.stringify(p)
     : "";
 }
 
 export function preferenceScope(p?: DecisionPreferences) {
-  return p?.week_rules?.length || p?.wildcard_week ? "selected_weeks" : "all_selected_weeks";
+  return p?.week_rules?.length ||
+    p?.wildcard_week ||
+    p?.hold_opening_transfers ||
+    p?.min_opening_bank_tenths !== undefined
+    ? "selected_weeks"
+    : "all_selected_weeks";
 }
 
 export function preferencesFromUrl(params: URLSearchParams): {

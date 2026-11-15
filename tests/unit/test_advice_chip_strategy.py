@@ -130,6 +130,26 @@ def test_scheduled_wildcard_is_played_only_on_the_requested_week(world):
 
 
 @pytest.mark.parametrize(
+    "preferences",
+    [
+        DecisionPreferences(hold_opening_transfers=True),
+        DecisionPreferences(min_opening_bank_tenths=1),
+    ],
+)
+def test_opening_resource_preferences_preserve_the_base_multiweek_transfer_policy(
+    world, preferences
+):
+    window = _advise(prepared(world), window=3, chip=None, weight=0, preferences=preferences)
+    assert window["preferences_scope"] == "selected_weeks"
+    assert window["preferences"] == preferences.payload()
+    assert WINDOW_TRANSFER_CAP_LIMIT in window["stated_limits"]
+    assert all(len(week["transfers_in"]) <= 1 for week in window["plan_weeks"])
+    if preferences.hold_opening_transfers:
+        assert window["plan_weeks"][0]["transfers_in"] == []
+        assert window["plan_weeks"][0]["free_transfers_after"] == 2
+
+
+@pytest.mark.parametrize(
     "window,chip,weight",
     [
         (1, "auto", 0),

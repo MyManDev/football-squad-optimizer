@@ -564,3 +564,117 @@ test("a future Wildcard is checked on its own week", async ({ page }) => {
     .getByRole("region", { name: "Önümüzdeki haftalar" });
   await expect(later.getByText("Wildcard", { exact: true })).toBeVisible();
 });
+
+test("three-week alternatives preserve hard rules and offer different opening moves", async ({
+  page,
+}) => {
+  test.skip(!API, "API build required");
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
+  const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+  const outgoing = squad.starting_xi.find((player) => player.position === "MID")!;
+  const protectedPlayer = squad.starting_xi.find((player) => player.position === "GK")!;
+  const baseSigning = { ...outgoing, player_id: 9081320, name: "Main Signing" };
+  const budgetSigning = { ...outgoing, player_id: 9081322, name: "Budget Signing" };
+  const posts: { window: number; preferences: Record<string, unknown> }[] = [];
+  await page.route(`${API}/api/v1/contributions/players`, (route) =>
+    answer(route, {
+      season: squad.season,
+      players: [
+        { id: protectedPlayer.player_id, name: protectedPlayer.name, team: protectedPlayer.team },
+      ],
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+    answer(route, {
+      contract_version: "league_capabilities_v1",
+      league_id: LEAGUE,
+      capture_snapshot_id: squad.source_snapshot_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
+      preferences: { available: true },
+      top100: { available: false, weights: [] },
+      managers_word: { available: false },
+    }),
+  );
+  await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+    answer(route, {
+      status: "draft",
+      draft: {
+        window: 3,
+        hard: [{ kind: "keep_player", player_id: protectedPlayer.player_id }, { kind: "no_hits" }],
+        soft: [],
+      },
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+    if (route.request().method() !== "POST") return answer(route, null);
+    const body = route.request().postDataJSON() as (typeof posts)[number];
+    posts.push(body);
+    const roll = body.preferences.hold_opening_transfers === true;
+    const budget = body.preferences.min_opening_bank_tenths !== undefined;
+    const signing = budget ? budgetSigning : baseSigning;
+    const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
+    const payload = {
+      ...envelope.payload,
+      moves: roll
+        ? []
+        : [{ ...envelope.payload.moves[0]!, player_in: signing, player_out: outgoing }],
+      starting_xi: squad.starting_xi.map((player) =>
+        !roll && player.player_id === outgoing.player_id ? signing : player,
+      ),
+      bank_after_tenths: budget ? 17 : 6,
+      free_transfers_after: roll ? 2 : 1,
+      plan_weeks: envelope.payload.plan_weeks!.map((week, i) => ({
+        ...week,
+        gameweek: squad.gameweek + i,
+        transfers_in: !roll && i === 0 ? [signing] : [],
+        transfers_out: !roll && i === 0 ? [outgoing] : [],
+        free_transfers_after: roll ? 2 : 1,
+        chip: null,
+        transfer_hit_points: 0,
+        expected_points: i === 0 ? (roll ? 42 : budget ? 43 : 45) : 44,
+      })),
+      preferences: body.preferences,
+      preferences_scope: roll || budget ? "selected_weeks" : "all_selected_weeks",
+    };
+    return answer(route, { ...envelope, payload });
+  });
+
+  await page.goto(PAGE);
+  await page
+    .getByRole("textbox", { name: "Plan talimatların" })
+    .fill("Üç haftalık plan yap. Kalecim kalsın ve puan cezası alma.");
+  await page.getByRole("button", { name: "Gönder", exact: true }).click();
+  await expect(page.getByLabel("Plan süresi")).toHaveValue("3");
+  expect(posts).toHaveLength(0);
+  await page.getByRole("button", { name: "Planları hesapla" }).click();
+  const cards = page.locator("article[data-plan-ready]");
+  await expect(cards).toHaveCount(3);
+  expect(posts).toHaveLength(3);
+  expect(posts[0]?.preferences.hold_opening_transfers).toBeUndefined();
+  expect(posts[0]?.preferences.min_opening_bank_tenths).toBeUndefined();
+  expect(posts.slice(1).map(({ preferences }) => preferences)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ hold_opening_transfers: true }),
+      expect.objectContaining({ min_opening_bank_tenths: 7 }),
+    ]),
+  );
+  for (const posted of posts) {
+    expect(posted).toMatchObject({
+      window: 3,
+      preferences: { keep_players: [protectedPlayer.player_id], no_hits: true },
+    });
+  }
+  await expect(cards.first().getByRole("heading", { name: "Temel plan" })).toBeVisible();
+  await expect(
+    cards.filter({ has: page.getByRole("heading", { name: /transferi sakla/i }) }),
+  ).toHaveCount(1);
+  await expect(
+    cards.filter({ has: page.getByRole("heading", { name: /bütçe|kasa/i }) }),
+  ).toHaveCount(1);
+  await expect(cards.filter({ hasText: "Main Signing" })).toHaveCount(1);
+  await expect(cards.filter({ hasText: "Budget Signing" })).toHaveCount(1);
+  await expect(cards.getByText("Toplam beklenen net puan", { exact: true })).toHaveCount(3);
+});

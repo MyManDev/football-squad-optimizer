@@ -96,6 +96,15 @@ function UpcomingWeeks({ weeks }: { weeks: AdvicePlanWeek[] }) {
   );
 }
 
+function MetricDelta({ label, value }: { label: string; value?: string }) {
+  if (value === undefined) return null;
+  return (
+    <small className={styles.metricDelta}>
+      <span className="visually-hidden"> {label} </span>({value})
+    </small>
+  );
+}
+
 export function PlanResult({
   title,
   state,
@@ -135,12 +144,27 @@ export function PlanResult({
   const multiweek = plan.window > 1;
   const weeks = multiweek ? plannedWeeks(plan) : null;
   const week = plan.plan_weeks?.find((row) => row.gameweek === plan.gameweek);
+  const baselineWeek = baseline?.plan_weeks?.find((row) => row.gameweek === baseline.gameweek);
   const net = expectedNet(plan);
   const reference = baseline ? expectedNet(baseline) : null;
   const hits = plan.transfer_hit_points ?? week?.transfer_hit_points;
   const totalHits = weeks?.reduce((sum, row) => sum + row.transfer_hit_points, 0);
   const bank = plan.bank_after_tenths;
   const freeTransfers = plan.free_transfers_after ?? week?.free_transfers_after;
+  const baselineHits = baseline?.transfer_hit_points ?? baselineWeek?.transfer_hit_points;
+  const baselineTotalHits =
+    baseline && plannedWeeks(baseline)?.reduce((sum, row) => sum + row.transfer_hit_points, 0);
+  const baselineBank = baseline?.bank_after_tenths;
+  const baselineFreeTransfers =
+    baseline?.free_transfers_after ?? baselineWeek?.free_transfers_after;
+  const pointDelta = (value: number | undefined, original: number | undefined, digits = 0) =>
+    value === undefined || original === undefined || value === original
+      ? undefined
+      : signedPoints(value - original, digits, locale);
+  const bankDelta =
+    bank === undefined || baselineBank === undefined || bank === baselineBank
+      ? undefined
+      : `${bank > baselineBank ? "+" : ""}${money(bank - baselineBank, locale)}`;
   const chip = plan.chip ? messages.leagueMembers.chipNames[plan.chip] : null;
   const moves = plan.moves.filter((move) => move.player_in || move.player_out);
 
@@ -167,26 +191,50 @@ export function PlanResult({
         {multiweek && week && (
           <div>
             <dt>{copy.currentNet}</dt>
-            <dd>{points(weekNet(week), 1, locale)}</dd>
+            <dd>
+              {points(weekNet(week), 1, locale)}
+              <MetricDelta
+                label={copy.difference}
+                value={pointDelta(weekNet(week), baselineWeek && weekNet(baselineWeek), 1)}
+              />
+            </dd>
           </div>
         )}
         {multiweek && (
           <div>
             <dt>{copy.totalHits}</dt>
-            <dd>{totalHits === undefined ? "—" : points(totalHits, 0, locale)}</dd>
+            <dd>
+              {totalHits === undefined ? "—" : points(totalHits, 0, locale)}
+              <MetricDelta
+                label={copy.difference}
+                value={pointDelta(totalHits, baselineTotalHits)}
+              />
+            </dd>
           </div>
         )}
         <div>
           <dt>{copy.hits}</dt>
-          <dd>{hits === undefined ? "—" : points(hits, 0, locale)}</dd>
+          <dd>
+            {hits === undefined ? "—" : points(hits, 0, locale)}
+            <MetricDelta label={copy.difference} value={pointDelta(hits, baselineHits)} />
+          </dd>
         </div>
         <div>
           <dt>{multiweek ? copy.currentBank : copy.bank}</dt>
-          <dd>{bank === undefined ? "—" : money(bank, locale)}</dd>
+          <dd>
+            {bank === undefined ? "—" : money(bank, locale)}
+            <MetricDelta label={copy.difference} value={bankDelta} />
+          </dd>
         </div>
         <div>
           <dt>{copy.transfers}</dt>
-          <dd>{freeTransfers ?? "—"}</dd>
+          <dd>
+            {freeTransfers ?? "—"}
+            <MetricDelta
+              label={copy.difference}
+              value={pointDelta(freeTransfers, baselineFreeTransfers)}
+            />
+          </dd>
         </div>
       </dl>
       <PlanSquad plan={plan} squad={squad} />

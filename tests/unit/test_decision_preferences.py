@@ -61,6 +61,17 @@ from squadopt.planning.guarded import optimize_guarded_window
         {"max_hit_points": None},
         {"wildcard_week": 1},
         {"wildcard_week": 2, "week_rules": [{"week": 2, "rules": {"save_chips": True}}]},
+        {"hold_opening_transfers": 1},
+        {"min_opening_bank_tenths": 0},
+        {"min_opening_bank_tenths": 10001},
+        {"min_opening_bank_tenths": True},
+        {"min_opening_bank_tenths": None},
+        {"week_rules": [{"week": 1, "rules": {"hold_opening_transfers": True}}]},
+        {"week_rules": [{"week": 1, "rules": {"min_opening_bank_tenths": 1}}]},
+        {
+            "hold_opening_transfers": True,
+            "week_rules": [{"week": 1, "rules": {"buy_players": [1]}}],
+        },
         {"unknown": True},
     ],
 )
@@ -103,6 +114,7 @@ def test_new_preferences_keep_legacy_canonical_identity_when_off():
         legacy.canonical()
     )
     assert legacy == DecisionPreferences.parse(legacy.payload())
+    assert DecisionPreferences.parse({"no_hits": True, "hold_opening_transfers": False}) == legacy
 
 
 def test_club_counts_canonicalize_scope_and_preserve_distinct_requests():
@@ -202,6 +214,85 @@ def test_hit_limit_caps_the_actual_total_across_weeks(
     if result.has_solution:
         assert result.total_transfer_hit_points == 8
         assert [week.transfer_hit_points for week in result.weeks] == [4, 4, 0]
+
+
+def test_resource_variants_change_the_opening_action_under_the_same_hard_rules(
+    known_optimum_players, small_config
+):
+    players = known_optimum_players.copy()
+    players.loc[players.player_id.eq("DEF_A"), ["price_tenths", "expected_points"]] = [70, 20]
+    players.loc[players.player_id.eq("GK_B"), "price_tenths"] = 30
+    horizon, initial, ids = _case(players)
+    base = DecisionPreferences(keep_players=(ids["FWD_A"],), no_hits=True)
+    hold = replace(base, hold_opening_transfers=True)
+    keep_cash = replace(base, min_opening_bank_tenths=initial.bank_tenths + 1)
+    assert len({p.canonical() for p in (base, hold, keep_cash)}) == 3
+    assert all(DecisionPreferences.parse(p.payload()) == p for p in (hold, keep_cash))
+    assert all(p.scoped and not p.uses_game_transfer_limits for p in (hold, keep_cash))
+    policy = TransferPlanningConfig(max_transfers_per_gameweek=1)
+    highest, held, richer = (
+        optimizer.optimize_transfer_plan(horizon, initial, small_config, policy, preferences=p)
+        for p in (base, hold, keep_cash)
+    )
+    assert all(p.solver_status is SolverStatus.OPTIMAL for p in (highest, held, richer))
+    assert tuple(highest.weeks[0].transfers_in.player_id) == (ids["DEF_A"],)
+    assert held.weeks[0].transfer_count == 0
+    assert held.weeks[0].free_transfers_for_next_gameweek == 2
+    assert tuple(held.weeks[1].transfers_in.player_id) == (ids["DEF_A"],)
+    assert tuple(richer.weeks[0].transfers_in.player_id) == (ids["GK_B"],)
+    assert richer.weeks[0].bank_after_tenths >= keep_cash.min_opening_bank_tenths
+    assert (
+        max(held.total_projected_score, richer.total_projected_score)
+        < highest.total_projected_score
+    )
+    for plan in (highest, held, richer):
+        assert all(week.transfer_count <= 1 for week in plan.weeks)
+        assert all(ids["FWD_A"] in set(week.selected_squad.player_id) for week in plan.weeks)
+        assert plan.total_transfer_hit_points == 0
+
+
+def test_opening_hold_keeps_a_future_wildcard_available(known_optimum_players, small_config):
+    horizon, initial, _ = _case(known_optimum_players)
+    hold = DecisionPreferences(hold_opening_transfers=True, wildcard_week=2)
+    plan = optimizer.optimize_transfer_plan(
+        horizon,
+        initial,
+        small_config,
+        chips=ChipAvailability(available={"wildcard": frozenset({2})}),
+        preferences=hold,
+        protect_hold=True,
+    )
+    assert plan.solver_status is SolverStatus.OPTIMAL
+    assert plan.weeks[0].transfer_count == 0
+    assert [week.chip for week in plan.weeks] == [None, "wildcard", None]
+
+
+def test_temporary_free_hit_savings_cannot_fund_an_opening_bank_floor(
+    known_optimum_players, small_config
+):
+    players = known_optimum_players.copy()
+    players.loc[players.player_id.eq("GK_B"), "price_tenths"] = 30
+    horizon, initial, ids = _case(players)
+    chips = ChipAvailability(available={"freehit": frozenset({1})}, forced={1: "freehit"})
+    floor = initial.bank_tenths + 1
+    hard = DecisionPreferences.parse(
+        {"week_rules": [{"week": 1, "rules": {"buy_players": [ids["GK_B"]]}}]}
+    )
+    unconstrained = optimizer.optimize_transfer_plan(
+        horizon, initial, small_config, chips=chips, preferences=hard
+    )
+    assert unconstrained.solver_status is SolverStatus.OPTIMAL
+    assert unconstrained.weeks[0].bank_after_tenths >= floor
+    refused = optimizer.optimize_transfer_plan(
+        horizon,
+        initial,
+        small_config,
+        chips=chips,
+        preferences=replace(hard, min_opening_bank_tenths=floor),
+        protect_hold=True,
+    )
+    assert refused.solver_status is SolverStatus.INFEASIBLE
+    assert not refused.weeks
 
 
 @pytest.mark.parametrize("length", [1, 3, 5])

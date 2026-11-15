@@ -101,6 +101,7 @@ class _PlanArtifacts:
     transfer_in_vars: list[list[cp_model.IntVar]]
     transfer_out_vars: list[list[cp_model.IntVar]]
     bank_after_vars: list[cp_model.IntVar]
+    base_bank_vars: list[cp_model.IntVar]
     free_before_vars: list[cp_model.IntVar]
     free_unused_vars: list[cp_model.IntVar]
     free_next_vars: list[cp_model.IntVar]
@@ -323,7 +324,7 @@ def _build_model(
 
     squad_vars: list[list[cp_model.IntVar]] = []
     base_squad_vars: list[list[cp_model.LinearExpr | int]] = []
-    base_bank_vars: list[cp_model.LinearExpr | int] = []
+    base_bank_vars: list[cp_model.IntVar] = []
     starter_vars: list[list[cp_model.IntVar]] = []
     captain_vars: list[list[cp_model.IntVar]] = []
     transfer_in_vars: list[list[cp_model.IntVar]] = []
@@ -556,7 +557,7 @@ def _build_model(
                 objective_terms.append(discount_weight * captain_coefficient * tripled)
 
         # The bank the next week starts from reverts with the squad under a free hit.
-        base_bank: cp_model.LinearExpr | int
+        base_bank: cp_model.IntVar
         if free_hit is None:
             base_bank = bank_after
         else:
@@ -645,6 +646,7 @@ def _build_model(
         transfer_in_vars=transfer_in_vars,
         transfer_out_vars=transfer_out_vars,
         bank_after_vars=bank_after_vars,
+        base_bank_vars=base_bank_vars,
         free_before_vars=free_before_vars,
         free_unused_vars=free_unused_vars,
         free_next_vars=free_next_vars,
@@ -1374,8 +1376,13 @@ def optimize_transfer_plan(
                 artifacts.model.add(
                     cp_model.LinearExpr.sum(artifacts.paid_transfer_vars) <= max_paid
                 )
+        if preferences.min_opening_bank_tenths is not None:
+            artifacts.model.add(artifacts.base_bank_vars[0] >= preferences.min_opening_bank_tenths)
         for week, table in enumerate(players_by_week):
             weekly = preferences.for_week(week + 1)
+            hold_transfers = weekly.hold_transfers or (
+                week == 0 and preferences.hold_opening_transfers
+            )
             required = set(weekly.keep_players) | set(weekly.include_players)
             avoided = set(weekly.avoid_players)
             bought = set(weekly.buy_players)
@@ -1400,7 +1407,7 @@ def optimize_transfer_plan(
                         if club == rule.club
                     ]
                     artifacts.model.add(cp_model.LinearExpr.sum(selected) == rule.count)
-            if weekly.hold_transfers:
+            if hold_transfers:
                 artifacts.model.add(artifacts.transfer_count_vars[week] == 0)
             if weekly.no_hits:
                 artifacts.model.add(artifacts.paid_transfer_vars[week] == 0)
@@ -1409,7 +1416,7 @@ def optimize_transfer_plan(
                 wildcard = chip_vars.get("wildcard")
                 artifacts.model.add(False if wildcard is None else wildcard == 1)
             for chip, variable in chip_vars.items():
-                if weekly.save_chips or (weekly.hold_transfers and chip in ("wildcard", "freehit")):
+                if weekly.save_chips or (hold_transfers and chip in ("wildcard", "freehit")):
                     artifacts.model.add(variable == 0)
     started_at = perf_counter()
     wall_limit = optimization_config.solver_time_limit_seconds

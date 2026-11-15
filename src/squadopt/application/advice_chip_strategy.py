@@ -130,6 +130,13 @@ def advise_chip_strategy(
         include_resource_state=include_resource_state,
     )
     first = shown[0]
+    if (
+        include_resource_state
+        and preferences.min_opening_bank_tenths is not None
+        and first.chip == "freehit"
+    ):
+        # The comparison floor and displayed bank refer to money carried forward.
+        payload["bank_after_tenths"] = int(first.bank_before_tenths)
     choice = {
         int(str(row["player_id"])): float(str(row["expected_points"]))
         for _, row in chosen.table.loc[chosen.table.gameweek.eq(request.gameweek)].iterrows()
@@ -155,7 +162,7 @@ def advise_chip_strategy(
         payload["preferences_scope"] = (
             "selected_weeks" if preferences.scoped else "all_selected_weeks"
         )
-    if preferences.needs_full_window:
+    if preferences.uses_game_transfer_limits:
         limits = payload.get("stated_limits")
         assert isinstance(limits, list)
         payload["stated_limits"] = [text for text in limits if text != WINDOW_TRANSFER_CAP_LIMIT]

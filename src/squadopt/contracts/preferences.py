@@ -8,7 +8,13 @@ from typing import Literal
 
 _PLAYER_FIELDS = ("keep_players", "avoid_players", "include_players", "buy_players")
 _LEGACY_FIELDS = {*_PLAYER_FIELDS[:3], "no_hits", "save_chips", "hold_transfers", "club_counts"}
-_WINDOW_FIELDS = {"week_rules", "max_hit_points", "wildcard_week"}
+_WINDOW_FIELDS = {
+    "week_rules",
+    "max_hit_points",
+    "wildcard_week",
+    "hold_opening_transfers",
+    "min_opening_bank_tenths",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,11 +55,7 @@ class WeekRules:
             raise ValueError("A rule week must be an offset from 1 to 3.")
         if not isinstance(self.rules, DecisionPreferences) or not self.rules.active:
             raise ValueError("A rule week requires active preferences.")
-        if (
-            self.rules.week_rules
-            or self.rules.max_hit_points is not None
-            or self.rules.wildcard_week
-        ):
+        if self.rules.needs_full_window:
             raise ValueError("Weekly rules cannot contain window preferences.")
 
 
@@ -72,6 +74,8 @@ class DecisionPreferences:
     max_hit_points: int | None = None
     wildcard_week: int | None = None
     buy_players: tuple[int, ...] = ()
+    hold_opening_transfers: bool = False
+    min_opening_bank_tenths: int | None = None
 
     def __post_init__(self) -> None:
         for name in _PLAYER_FIELDS:
@@ -95,6 +99,13 @@ class DecisionPreferences:
             raise ValueError("no_hits and save_chips must be booleans.")
         if not isinstance(self.hold_transfers, bool):
             raise ValueError("hold_transfers must be a boolean.")
+        if not isinstance(self.hold_opening_transfers, bool):
+            raise ValueError("hold_opening_transfers must be a boolean.")
+        if self.min_opening_bank_tenths is not None and (
+            type(self.min_opening_bank_tenths) is not int
+            or not 1 <= self.min_opening_bank_tenths <= 10000
+        ):
+            raise ValueError("The opening bank minimum must be an integer from 1 to 10000.")
         if (
             not isinstance(self.club_counts, (list, tuple))
             or len(self.club_counts) > 16
@@ -140,6 +151,14 @@ class DecisionPreferences:
         )
         for row in self.week_rules:
             self._combined(row.rules)
+        if self.hold_opening_transfers:
+            opening = self.for_week(1)
+            if opening.buy_players or any(
+                rule.scope == "transfers_in" for rule in opening.club_counts
+            ):
+                raise ValueError(
+                    "Holding opening transfers conflicts with an opening-week purchase."
+                )
         if self.wildcard_week is not None:
             target = self.for_week(self.wildcard_week)
             if target.save_chips or target.hold_transfers:
@@ -178,7 +197,16 @@ class DecisionPreferences:
 
     @property
     def scoped(self) -> bool:
-        return bool(self.week_rules or self.wildcard_week)
+        return bool(
+            self.week_rules
+            or self.wildcard_week
+            or self.hold_opening_transfers
+            or self.min_opening_bank_tenths is not None
+        )
+
+    @property
+    def uses_game_transfer_limits(self) -> bool:
+        return bool(self.week_rules or self.wildcard_week or self.max_hit_points is not None)
 
     @property
     def needs_full_window(self) -> bool:
@@ -223,6 +251,10 @@ class DecisionPreferences:
             payload["max_hit_points"] = self.max_hit_points
         if self.wildcard_week is not None:
             payload["wildcard_week"] = self.wildcard_week
+        if self.hold_opening_transfers:
+            payload["hold_opening_transfers"] = True
+        if self.min_opening_bank_tenths is not None:
+            payload["min_opening_bank_tenths"] = self.min_opening_bank_tenths
         return payload
 
     def canonical(self) -> str:
@@ -239,7 +271,8 @@ class DecisionPreferences:
             raise ValueError("A future Wildcard conflicts with another chip selection.")
         if chip is not None and chip != "auto":
             current = self.for_week(1)
-            if current.save_chips or (current.hold_transfers and chip in ("wildcard", "freehit")):
+            opening_hold = current.hold_transfers or self.hold_opening_transfers
+            if current.save_chips or (opening_hold and chip in ("wildcard", "freehit")):
                 raise ValueError("The chip conflicts with rules for the first week.")
 
     @classmethod
@@ -272,7 +305,8 @@ class DecisionPreferences:
                 raise ValueError("Invalid rule week.")
             week_rules.append(WeekRules(row["week"], cls._parse(row["rules"], weekly=True)))
         if any(
-            name in value and value[name] is None for name in ("max_hit_points", "wildcard_week")
+            name in value and value[name] is None
+            for name in ("max_hit_points", "wildcard_week", "min_opening_bank_tenths")
         ):
             raise ValueError("Invalid window preference.")
         return cls(**(value | {"club_counts": tuple(counts), "week_rules": tuple(week_rules)}))
@@ -318,6 +352,8 @@ def preferences_schema() -> dict[str, object]:
             **legacy,
             "max_hit_points": {"type": "integer", "minimum": 0, "maximum": 60},
             "wildcard_week": {"enum": [2, 3]},
+            "hold_opening_transfers": {"type": "boolean"},
+            "min_opening_bank_tenths": {"type": "integer", "minimum": 1, "maximum": 10000},
             "week_rules": {
                 "type": "array",
                 "maxItems": 3,

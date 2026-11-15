@@ -10,9 +10,10 @@ import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
 import { gameweekDeadline, useMinuteClock } from "../advice/deadline";
-import { useAdviceJob } from "../advice/useAdviceJob";
+import { holdsOpeningTransfers, type DecisionPreferences } from "../advice/decisionPreferences";
+import { sameAdviceRequest, useAdviceJob, type ComputePhase } from "../advice/useAdviceJob";
 import { LEAGUE_READ, useEntrySquad } from "../queries";
-import type { EntrySquad } from "../types";
+import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
 import { LLMOPT_COPY } from "./copy";
 import {
@@ -27,7 +28,12 @@ import {
   type PlanDraft,
 } from "./intent";
 import { PlanResult } from "./PlanResult";
-import { samePlan } from "./planComparison";
+import {
+  meaningfulOpeningAlternative,
+  openingAlternatives,
+  sameOpeningDecision,
+  samePlan,
+} from "./planComparison";
 import { RuleEditor } from "./RuleEditor";
 import styles from "./LLMOptPage.module.css";
 
@@ -60,6 +66,29 @@ interface ChatLine {
   message: string;
 }
 
+interface PlanRun {
+  automaticBasis: (AdviceRequest & { preferences: DecisionPreferences }) | null;
+  explicitRequest: AdviceRequest | null;
+  explicitConflict: boolean;
+}
+
+function visibleAutomatic(state: ComputePhase, reference?: EntryAdvice, previous?: EntryAdvice) {
+  if (state.phase !== "done" || !reference) return null;
+  const plan = state.envelope.payload;
+  const preferences = state.request.preferences;
+  const kind =
+    preferences?.min_opening_bank_tenths !== undefined
+      ? "bank"
+      : preferences?.hold_opening_transfers
+        ? "roll"
+        : null;
+  return kind &&
+    meaningfulOpeningAlternative(reference, plan, kind) &&
+    (!previous || !sameOpeningDecision(previous, plan))
+    ? { kind, state, plan }
+    : null;
+}
+
 function Session({ squad }: { squad: EntrySquad }) {
   const { language } = useLanguage();
   const copy = LLMOPT_COPY[language];
@@ -81,7 +110,8 @@ function Session({ squad }: { squad: EntrySquad }) {
   ).map((p) => ({ ...p, held: held.has(p.id) }));
   const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
   const base = useAdviceJob(client, false, squad.source_snapshot_id, true);
-  const alternative = useAdviceJob(client, false, squad.source_snapshot_id, true);
+  const first = useAdviceJob(client, false, squad.source_snapshot_id, true);
+  const second = useAdviceJob(client, false, squad.source_snapshot_id, true);
   const [draft, setDraft] = useState<PlanDraft>(EMPTY_DRAFT);
   const [message, setMessage] = useState("");
   const [conversation, setConversation] = useState<ChatLine[]>([]);
@@ -91,7 +121,8 @@ function Session({ squad }: { squad: EntrySquad }) {
   const [basisChanged, setBasisChanged] = useState(false);
   const [wildcardNotHeld, setWildcardNotHeld] = useState(false);
   const [reading, setReading] = useState(false);
-  const [calculated, setCalculated] = useState(false);
+  const [run, setRun] = useState<PlanRun | null>(null);
+  const automaticStartedFor = useRef<AdviceRequest | null>(null);
   const interpret = useRef<AbortController | null>(null);
   const nextChatLine = useRef(0);
   const confirming = useRef(false);
@@ -107,8 +138,9 @@ function Session({ squad }: { squad: EntrySquad }) {
 
   function change(next: PlanDraft) {
     base.reset();
-    alternative.reset();
-    setCalculated(false);
+    first.reset();
+    second.reset();
+    setRun(null);
     setFeedback("");
     setClarification(undefined);
     setWildcardNotHeld(false);
@@ -159,7 +191,7 @@ function Session({ squad }: { squad: EntrySquad }) {
   }
 
   const plans = preparePlans(draft, held);
-  const computing = isWorking(base.state.phase) || isWorking(alternative.state.phase);
+  const computing = [base.state, first.state, second.state].some(({ phase }) => isWorking(phase));
   const busy = checkingSquad || reading || computing;
   const compareBoth = draft.comparison?.both === true;
   const baseTitle = compareBoth ? copy.without : copy.base;
@@ -168,6 +200,39 @@ function Session({ squad }: { squad: EntrySquad }) {
     : draft.comparison
       ? copy.alternative
       : copy.preferred;
+  const hasExplicit = Boolean(run?.explicitRequest || run?.explicitConflict);
+  const baseState = base.state;
+  const { compute: computeFirst } = first;
+  const { compute: computeSecond } = second;
+  useEffect(() => {
+    if (
+      !run?.automaticBasis ||
+      baseState.phase !== "done" ||
+      automaticStartedFor.current === baseState.request
+    )
+      return;
+    automaticStartedFor.current = baseState.request;
+    if (deadline === null || Date.now() >= Date.parse(deadline)) return;
+
+    const basis = run.automaticBasis;
+    const { roll, bank } = openingAlternatives(
+      baseState.envelope.payload,
+      basis.preferences,
+      basis.chip,
+    );
+    const available = [holdsOpeningTransfers(run.explicitRequest?.preferences) ? null : roll, bank]
+      .flatMap((preferences) => (preferences ? [{ ...basis, preferences }] : []))
+      .filter(
+        (candidate) => !run.explicitRequest || !sameAdviceRequest(candidate, run.explicitRequest),
+      );
+    const [firstCandidate, secondCandidate] = available;
+    if (hasExplicit) {
+      if (firstCandidate) computeSecond(firstCandidate);
+    } else {
+      if (firstCandidate) computeFirst(firstCandidate);
+      if (secondCandidate) computeSecond(secondCandidate);
+    }
+  }, [baseState, run, deadline, hasExplicit, computeFirst, computeSecond]);
 
   async function compute() {
     if (
@@ -212,7 +277,7 @@ function Session({ squad }: { squad: EntrySquad }) {
         Date.now() >= Date.parse(deadline)
       ) {
         setBasisChanged(true);
-        setCalculated(false);
+        setRun(null);
         return;
       }
       const request: AdviceRequest = {
@@ -235,14 +300,26 @@ function Session({ squad }: { squad: EntrySquad }) {
         setFeedback(copy.wildcardUnavailable);
       }
       if (!basePlan && !alternativePlan) {
-        setCalculated(false);
+        setRun(null);
         return;
       }
-      setCalculated(true);
+      // A with/without comparison adds a rule to the reference branch. Automatic alternatives
+      // inherit the user's required rules, so that comparison rule does not leak into them.
+      const hardPlan = compareBoth
+        ? preparePlans({ window: plans.window, hard: draft.hard, soft: [] }, held).base
+        : basePlan;
+      const explicitRequest = alternativePlan ? { ...request, ...alternativePlan } : null;
+      first.reset();
+      second.reset();
+      setRun({
+        automaticBasis: hardPlan ? { ...request, ...hardPlan } : null,
+        explicitRequest,
+        explicitConflict: plans.alternativeConflict,
+      });
       if (basePlan) {
         base.compute({ ...request, ...basePlan });
-      }
-      if (alternativePlan) alternative.compute({ ...request, ...alternativePlan });
+      } else base.reset();
+      if (explicitRequest) computeFirst(explicitRequest);
     } catch {
       if (mounted.current) setFeedback(copy.squadUnavailable);
     } finally {
@@ -251,11 +328,14 @@ function Session({ squad }: { squad: EntrySquad }) {
     }
   }
 
-  const same = samePlan(base.state, alternative.state);
-  const baseAnswer = base.state.phase === "done" ? base.state.envelope.payload : undefined;
-  const hasAlternative =
-    (plans.alternative !== null && !(wildcardNotHeld && plans.alternative.chip === "wildcard")) ||
-    plans.alternativeConflict;
+  const same = hasExplicit && samePlan(baseState, first.state);
+  const baseAnswer = baseState.phase === "done" ? baseState.envelope.payload : undefined;
+  const explicitAnswer =
+    hasExplicit && !same && first.state.phase === "done" ? first.state.envelope.payload : undefined;
+  const firstAutomatic = hasExplicit ? null : visibleAutomatic(first.state, baseAnswer);
+  const secondAutomatic = isWorking(first.state.phase)
+    ? null
+    : visibleAutomatic(second.state, baseAnswer, explicitAnswer ?? firstAutomatic?.plan);
   const team = squad.entry.team_name ?? squad.entry.manager_name;
   const teamPath =
     squad.league_id === 0
@@ -393,8 +473,12 @@ function Session({ squad }: { squad: EntrySquad }) {
           </p>
         )}
       </section>
-      {calculated && (
-        <section className={styles.results} aria-label={copy.results} aria-busy={computing}>
+      {run && (
+        <section
+          className={styles.results}
+          aria-label={copy.results}
+          aria-busy={isWorking(baseState.phase)}
+        >
           <h2>{copy.results}</h2>
           <div className={styles.planGrid}>
             {!(wildcardNotHeld && plans.base?.chip === "wildcard") && (
@@ -405,14 +489,26 @@ function Session({ squad }: { squad: EntrySquad }) {
                 conflict={plans.baseConflict}
               />
             )}
-            {hasAlternative && !same && (
+            {hasExplicit && !same && (
               <PlanResult
                 title={alternativeTitle}
-                state={alternative.state}
+                state={first.state}
                 squad={squad}
                 baseline={baseAnswer}
-                conflict={plans.alternativeConflict}
+                conflict={run.explicitConflict}
               />
+            )}
+            {[firstAutomatic, secondAutomatic].map(
+              (alternative) =>
+                alternative && (
+                  <PlanResult
+                    key={alternative.kind}
+                    title={alternative.kind === "roll" ? copy.rollPlan : copy.bankPlan}
+                    state={alternative.state}
+                    squad={squad}
+                    baseline={baseAnswer}
+                  />
+                ),
             )}
           </div>
           {same && (

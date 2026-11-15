@@ -14,7 +14,7 @@ const example = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
 
 afterEach(cleanup);
 
-function showWildcard(result: Partial<EntryAdvice>) {
+function showWildcard(result: Partial<EntryAdvice>, baseline?: EntryAdvice) {
   const client = new QueryClient();
   client.setQueryData(FIXTURES_QUERY.queryKey, null);
   return render(
@@ -23,6 +23,7 @@ function showWildcard(result: Partial<EntryAdvice>) {
         <PlanResult
           title="Base plan"
           squad={squad}
+          baseline={baseline}
           state={{
             phase: "done",
             source: "api-cache",
@@ -95,4 +96,31 @@ it("compares total net points and displays upcoming transfers after the current 
   expect(within(upcoming).getByText(signing.name)).toBeVisible();
   expect(within(upcoming).getByRole("heading", { name: `GW ${gameweek + 2}` })).toBeVisible();
   expect(screen.getByRole("list", { name: "Starting Eleven by Position" })).toBeVisible();
+});
+
+it("shows net points, hit, bank and free-transfer differences against the reference plan", () => {
+  const baseline: EntryAdvice = {
+    ...example.payload,
+    plan_weeks: null,
+    lineup_expectation: undefined,
+    expected_own_points: 43,
+    transfer_hit_points: 0,
+    bank_after_tenths: 12,
+    free_transfers_after: 1,
+  };
+  showWildcard(
+    {
+      plan_weeks: null,
+      lineup_expectation: undefined,
+      expected_own_points: 45,
+      transfer_hit_points: 4,
+      bank_after_tenths: 16,
+      free_transfers_after: 2,
+    },
+    baseline,
+  );
+  expect(screen.getByText("−2.0")).toBeVisible();
+  expect(screen.getByText("Transfer penalty").nextElementSibling).toHaveTextContent("(+4)");
+  expect(screen.getByText("Remaining budget").nextElementSibling).toHaveTextContent("(+£0.4m)");
+  expect(screen.getByText("Free transfers next week").nextElementSibling).toHaveTextContent("(+1)");
 });

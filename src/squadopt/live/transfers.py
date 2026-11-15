@@ -1254,7 +1254,7 @@ def plan_transfer_horizon(
     ]
 
     settings = OptimizationConfig() if optimization is None else optimization
-    full_window_rules = preferences is not None and preferences.needs_full_window
+    game_transfer_limits = preferences is not None and preferences.uses_game_transfer_limits
     planning_policy = (
         # The same MEMBER_PLANNING_POLICY the one-week path builds from. Spelling the
         # controls out here instead would price a member's window at one hit cost and
@@ -1262,7 +1262,7 @@ def plan_transfer_horizon(
         _transfer_config(
             rules,
             transfer_cap=None
-            if len(projection_horizon.target_gameweeks) == 1 or full_window_rules
+            if len(projection_horizon.target_gameweeks) == 1 or game_transfer_limits
             else 1,
         )
         if transfer_config is None
@@ -1301,7 +1301,7 @@ def plan_transfer_horizon(
         and first_week_exclusion is None
     )
     guarded_football = bounded_football and not chip_strategy
-    if bounded_football and transfer_config is None and not full_window_rules:
+    if bounded_football and transfer_config is None and not game_transfer_limits:
         planning_policy = replace(planning_policy, allow_two_free_transfers=True)
     expected_lineups = (
         guarded_football

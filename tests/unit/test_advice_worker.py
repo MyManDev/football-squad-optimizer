@@ -1965,6 +1965,47 @@ def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_pa
     assert sum(row["transfer_hit_points"] for row in payload["plan_weeks"]) <= 4
 
 
+def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, monkeypatch):
+    backend = _deployment(tmp_path, monkeypatch, third_decision_week=True)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 3}
+    required = {"keep_players": [1001], "no_hits": True}
+
+    def ask(preferences):
+        queued = client.post(route, json={**selection, "preferences": preferences})
+        assert queued.status_code == 202, queued.text
+        assert _work(backend) == 1
+        response = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+        assert response.status_code == 200, response.text
+        return queued.json()["job_id"], response.json()["payload"]
+
+    base_id, base = ask(required)
+    assert base["plan_weeks"][0]["transfers_in"]
+    roll_id, roll = ask({**required, "hold_opening_transfers": True})
+    floor = base["bank_after_tenths"] + 1
+    cash_id, cash = ask({**required, "min_opening_bank_tenths": floor})
+    assert len({base_id, roll_id, cash_id}) == 3
+    assert roll["plan_weeks"][0]["transfers_in"] == roll["plan_weeks"][0]["transfers_out"] == []
+    assert roll["free_transfers_after"] > base["free_transfers_after"]
+    assert cash["bank_after_tenths"] >= floor
+    actions = {
+        tuple(sorted(player["player_id"] for player in row["plan_weeks"][0]["transfers_in"]))
+        for row in (base, roll, cash)
+    }
+    assert len(actions) == 3
+    for candidate in (base, roll, cash):
+        assert candidate["source_snapshot_id"] == base["source_snapshot_id"]
+        assert candidate["preferences"]["keep_players"] == [1001]
+        assert candidate["preferences"]["no_hits"] is True
+        assert [row["gameweek"] for row in candidate["plan_weeks"]] == [2, 3, 4]
+        assert all(row["transfer_hit_points"] == 0 for row in candidate["plan_weeks"])
+        assert all(len(row["transfers_in"]) <= 1 for row in candidate["plan_weeks"])
+        assert 1001 in {
+            player["player_id"] for player in candidate["starting_xi"] + candidate["bench"]
+        }
+
+
 def test_llmopt_wildcard_rebuilds_the_squad_under_player_preferences(running):
     backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
