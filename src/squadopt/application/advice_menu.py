@@ -51,6 +51,7 @@ from squadopt.application.advice_capabilities import (
     validate_advice_selection,
 )
 from squadopt.application.advice_chip_strategy import advise_chip_strategy
+from squadopt.application.advice_chips import ChipUnavailable as ChipUnavailable
 from squadopt.application.advice_chips import advise_with_chip, member_chip_menu
 from squadopt.application.advice_variants import (
     TOP100_WINDOW_LIMIT,
@@ -112,14 +113,6 @@ class ManagersWordNotSolved(EntryError):
     """
 
 
-class ChipUnavailable(EntryError):
-    """The captured history cannot support the member's declared chip."""
-
-    def __init__(self, code: str) -> None:
-        super().__init__("This chip is not available from the member's captured history.")
-        self.code = code
-
-
 @dataclass(frozen=True, slots=True)
 class MenuRequest:
     """One address on the member menu: an ``AdviseEntryRequest`` plus the switches."""
@@ -139,7 +132,10 @@ class MenuRequest:
     def __post_init__(self) -> None:
         self.entry_request()  # the shared fields are refused by the type that owns them
         try:
-            self.preferences.validate_selection(self.strategy, self.managers_word, self.chip)
+            self.preferences.validate_selection(
+                self.strategy, self.managers_word, self.chip, top100_weight=self.top100_weight
+            )
+            self.preferences.validate_window(self.window)
         except ValueError as error:
             raise EntryError(str(error)) from error
         if isinstance(self.top100_weight, bool) or not isinstance(self.top100_weight, int):

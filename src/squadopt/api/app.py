@@ -126,7 +126,7 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
     a value both routes hand to this parser is refused with the same message. The GET's
     query declarations still act first: a strategy outside the pattern, a rival below 1, a
     window, top100_weight or rival that is not an integer, a managers_word that is not a
-    boolean, or a preferences string over 1500 characters is refused there with the
+    boolean, or a preferences string over 3000 characters is refused there with the
     framework's contract message ("The request did not match the API contract."). Exactly the
     declared keys (additionalProperties: false), a string strategy, a window the member
     menu offers with bool explicitly refused, and a rival that is null or a positive
@@ -182,7 +182,7 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
         raise BackendApiContractError("Unknown prediction model.")
     try:
         preferences = DecisionPreferences.parse(fields.get("preferences", {}))
-        preferences.validate_selection(strategy, word, chip)
+        preferences.validate_selection(strategy, word, chip, top100_weight=weight)
     except ValueError as error:
         raise BackendApiContractError(str(error)) from error
     return AdviceSelection(strategy, window, rival, weight, word, chip, model, preferences)
@@ -502,7 +502,7 @@ def create_app(
         managers_word: Annotated[bool, Query()] = False,
         chip: Annotated[str | None, Query()] = None,
         model: Annotated[str, Query()] = "current",
-        preferences: Annotated[str | None, Query(max_length=1500)] = None,
+        preferences: Annotated[str | None, Query(max_length=3000)] = None,
     ) -> Response:
         if league_id == 0 and not request.url.path.startswith("/api/v1/public/"):
             return _contract_error(422, "VALIDATION_FAILED", "A league id must be positive.")

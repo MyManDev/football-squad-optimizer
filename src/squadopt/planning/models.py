@@ -4,7 +4,7 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from numbers import Integral, Real
 from types import MappingProxyType
 from typing import Final
@@ -600,6 +600,17 @@ class TransferPlanningConfig:
             self,
             "objective_weight_scale",
             _integer(self.objective_weight_scale, "objective_weight_scale", 1),
+        )
+
+    def for_net_points(self) -> "TransferPlanningConfig":
+        """Use actual charges and equal weeks with no value beyond the window."""
+        return replace(
+            self,
+            transfer_hit_cost_points=self.hit_points_charged,
+            horizon_discount_factor=1.0,
+            objective_weight_scale=1,
+            banked_transfer_value_points=0.0,
+            chip_holding_value_points={},
         )
 
     @property

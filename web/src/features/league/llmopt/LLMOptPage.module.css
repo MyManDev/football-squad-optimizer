@@ -50,7 +50,9 @@
 }
 
 .chat textarea,
-.editor select {
+.editor select,
+.editor input[type="number"],
+.windowChoice select {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
   color: var(--color-text);
@@ -120,6 +122,8 @@
 
 .chat textarea:focus-visible,
 .editor select:focus-visible,
+.editor input[type="number"]:focus-visible,
+.windowChoice select:focus-visible,
 .workspace button:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
@@ -175,6 +179,10 @@
   gap: var(--space-3);
 }
 
+.planGrid:has(> :nth-child(3)) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+}
+
 .ruleGroup {
   border-top: 1px solid var(--color-line);
   padding-top: var(--space-2);
@@ -209,6 +217,13 @@
   gap: var(--space-1);
   flex: 1 1 9rem;
   min-width: 0;
+}
+
+.windowChoice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  justify-self: start;
 }
 
 .editor .checkbox {
@@ -267,9 +282,52 @@
   margin: 0;
   font-family: var(--font-mono);
   font-weight: 600;
+  text-align: end;
+}
+
+.metricDelta {
+  margin-inline-start: var(--space-1);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.preferencePrices ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preferencePrices li {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+  border-top: 1px solid var(--color-line);
+  overflow-wrap: anywhere;
 }
 
 .moves {
   margin: 0;
   padding-inline-start: var(--space-4);
+}
+
+.laterWeeks,
+.laterWeek {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.laterWeek {
+  padding-block: var(--space-2);
+  border-top: 1px solid var(--color-line);
+}
+
+.laterWeek h5 {
+  margin: 0;
+  font-size: var(--step-0);
+}
+
+.laterWeek .figures dd {
+  text-align: end;
+  overflow-wrap: anywhere;
 }

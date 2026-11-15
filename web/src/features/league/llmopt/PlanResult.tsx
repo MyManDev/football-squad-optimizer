@@ -8,9 +8,9 @@ import { COMPUTE_COPY, failureSentence, jobStanding } from "../advice/computeCop
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { MemberBench, MemberPitch } from "../components/MemberPitch";
 import { squadOnPitch } from "../pages/squadOnPitch";
-import type { EntryAdvice, EntrySquad } from "../types";
+import type { AdvicePlanWeek, EntryAdvice, EntrySquad } from "../types";
 import { LLMOPT_COPY } from "./copy";
-import { expectedNet } from "./planComparison";
+import { expectedNet, plannedWeeks, weekNet } from "./planComparison";
 import styles from "./LLMOptPage.module.css";
 
 function PlanSquad({ plan, squad }: { plan: EntryAdvice; squad: EntrySquad }) {
@@ -45,18 +45,129 @@ function PlanSquad({ plan, squad }: { plan: EntryAdvice; squad: EntrySquad }) {
   );
 }
 
+function UpcomingWeeks({ weeks }: { weeks: AdvicePlanWeek[] }) {
+  const { language, locale, messages } = useLanguage();
+  const copy = LLMOPT_COPY[language];
+  const titleId = useId();
+  return (
+    <section className={styles.laterWeeks} aria-labelledby={titleId}>
+      <h4 id={titleId} className={styles.lineupTitle}>
+        {copy.laterWeeks}
+      </h4>
+      {weeks.map((week) => {
+        const chip = week.chip ? messages.leagueMembers.chipNames[week.chip] : null;
+        return (
+          <div key={week.gameweek} className={styles.laterWeek}>
+            <h5>
+              {copy.week} {week.gameweek}
+            </h5>
+            <dl className={styles.figures}>
+              {chip && (
+                <div>
+                  <dt>{messages.leagueMembers.chipLabel}</dt>
+                  <dd>{chip}</dd>
+                </div>
+              )}
+              <div>
+                <dt>{copy.clubTransfers}</dt>
+                <dd>{week.transfers_in.map(({ name }) => name).join(", ") || copy.noPlayers}</dd>
+              </div>
+              <div>
+                <dt>{copy.outgoing}</dt>
+                <dd>{week.transfers_out.map(({ name }) => name).join(", ") || copy.noPlayers}</dd>
+              </div>
+              <div>
+                <dt>{copy.net}</dt>
+                <dd>{points(weekNet(week), 1, locale)}</dd>
+              </div>
+              <div>
+                <dt>{copy.hits}</dt>
+                <dd>{points(week.transfer_hit_points, 0, locale)}</dd>
+              </div>
+              <div>
+                <dt>{copy.transfers}</dt>
+                <dd>{week.free_transfers_after}</dd>
+              </div>
+            </dl>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function MetricDelta({ label, value }: { label: string; value?: string }) {
+  if (value === undefined) return null;
+  return (
+    <small className={styles.metricDelta}>
+      <span className="visually-hidden"> {label} </span>({value})
+    </small>
+  );
+}
+
+export type PreferencePrice = { key: string; label: string; ceiling?: number } & (
+  | { status: "pending" | "conflict" | "unavailable" | "skipped" }
+  | { status: "priced"; cost: number; aboveCeiling: boolean; unproven: boolean }
+);
+
+function PreferencePrices({ prices }: { prices: PreferencePrice[] }) {
+  const titleId = useId();
+  const { language, locale } = useLanguage();
+  const copy = LLMOPT_COPY[language];
+  if (!prices.length) return null;
+  const price = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 3,
+  });
+  const statuses = {
+    pending: copy.pricePending,
+    conflict: copy.priceConflict,
+    unavailable: copy.priceUnavailable,
+    skipped: copy.priceNotRun,
+  };
+  return (
+    <section className={styles.preferencePrices} aria-labelledby={titleId}>
+      <h4 id={titleId} className={styles.lineupTitle}>
+        {copy.preferencePrices}
+      </h4>
+      <ul aria-live="polite">
+        {prices.map((row) => (
+          <li key={row.key}>
+            <strong>{row.label}</strong>
+            <span>
+              {row.status === "priced"
+                ? copy.priceAmount(price.format(row.cost))
+                : statuses[row.status]}
+              {row.ceiling !== undefined &&
+                ` · ${copy.priceCeiling(price.format(row.ceiling / 10))}`}
+            </span>
+            {row.status === "priced" && row.aboveCeiling && (
+              <span className={styles.muted}>{copy.priceAboveCeiling}</span>
+            )}
+            {row.status === "priced" && row.unproven && (
+              <span className={styles.muted}>{copy.priceUnproven}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function PlanResult({
   title,
   state,
   squad,
   baseline,
   conflict,
+  prices = [],
 }: {
   title: string;
   state: ComputePhase;
   squad: EntrySquad;
   baseline?: EntryAdvice;
   conflict?: boolean;
+  prices?: PreferencePrice[];
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = LLMOPT_COPY[language];
@@ -77,16 +188,35 @@ export function PlanResult({
       <article className={styles.result}>
         <h3 className={styles.resultTitle}>{title}</h3>
         <p role="status">{message}</p>
+        <PreferencePrices prices={prices} />
       </article>
     );
   }
   const plan = state.envelope.payload;
+  const multiweek = plan.window > 1;
+  const weeks = multiweek ? plannedWeeks(plan) : null;
   const week = plan.plan_weeks?.find((row) => row.gameweek === plan.gameweek);
+  const baselineWeek = baseline?.plan_weeks?.find((row) => row.gameweek === baseline.gameweek);
   const net = expectedNet(plan);
   const reference = baseline ? expectedNet(baseline) : null;
   const hits = plan.transfer_hit_points ?? week?.transfer_hit_points;
+  const totalHits = weeks?.reduce((sum, row) => sum + row.transfer_hit_points, 0);
   const bank = plan.bank_after_tenths;
   const freeTransfers = plan.free_transfers_after ?? week?.free_transfers_after;
+  const baselineHits = baseline?.transfer_hit_points ?? baselineWeek?.transfer_hit_points;
+  const baselineTotalHits =
+    baseline && plannedWeeks(baseline)?.reduce((sum, row) => sum + row.transfer_hit_points, 0);
+  const baselineBank = baseline?.bank_after_tenths;
+  const baselineFreeTransfers =
+    baseline?.free_transfers_after ?? baselineWeek?.free_transfers_after;
+  const pointDelta = (value: number | undefined, original: number | undefined, digits = 0) =>
+    value === undefined || original === undefined || value === original
+      ? undefined
+      : signedPoints(value - original, digits, locale);
+  const bankDelta =
+    bank === undefined || baselineBank === undefined || bank === baselineBank
+      ? undefined
+      : `${bank > baselineBank ? "+" : ""}${money(bank - baselineBank, locale)}`;
   const chip = plan.chip ? messages.leagueMembers.chipNames[plan.chip] : null;
   const moves = plan.moves.filter((move) => move.player_in || move.player_out);
 
@@ -101,7 +231,7 @@ export function PlanResult({
           </div>
         )}
         <div>
-          <dt>{copy.net}</dt>
+          <dt>{multiweek ? copy.totalNet : copy.net}</dt>
           <dd>{net === null ? "—" : points(net, 1, locale)}</dd>
         </div>
         {reference !== null && net !== null && (
@@ -110,19 +240,56 @@ export function PlanResult({
             <dd>{signedPoints(net - reference, 1, locale)}</dd>
           </div>
         )}
+        {multiweek && week && (
+          <div>
+            <dt>{copy.currentNet}</dt>
+            <dd>
+              {points(weekNet(week), 1, locale)}
+              <MetricDelta
+                label={copy.difference}
+                value={pointDelta(weekNet(week), baselineWeek && weekNet(baselineWeek), 1)}
+              />
+            </dd>
+          </div>
+        )}
+        {multiweek && (
+          <div>
+            <dt>{copy.totalHits}</dt>
+            <dd>
+              {totalHits === undefined ? "—" : points(totalHits, 0, locale)}
+              <MetricDelta
+                label={copy.difference}
+                value={pointDelta(totalHits, baselineTotalHits)}
+              />
+            </dd>
+          </div>
+        )}
         <div>
           <dt>{copy.hits}</dt>
-          <dd>{hits === undefined ? "—" : points(hits, 0, locale)}</dd>
+          <dd>
+            {hits === undefined ? "—" : points(hits, 0, locale)}
+            <MetricDelta label={copy.difference} value={pointDelta(hits, baselineHits)} />
+          </dd>
         </div>
         <div>
-          <dt>{copy.bank}</dt>
-          <dd>{bank === undefined ? "—" : money(bank, locale)}</dd>
+          <dt>{multiweek ? copy.currentBank : copy.bank}</dt>
+          <dd>
+            {bank === undefined ? "—" : money(bank, locale)}
+            <MetricDelta label={copy.difference} value={bankDelta} />
+          </dd>
         </div>
         <div>
           <dt>{copy.transfers}</dt>
-          <dd>{freeTransfers ?? "—"}</dd>
+          <dd>
+            {freeTransfers ?? "—"}
+            <MetricDelta
+              label={copy.difference}
+              value={pointDelta(freeTransfers, baselineFreeTransfers)}
+            />
+          </dd>
         </div>
       </dl>
+      <PreferencePrices prices={prices} />
       <PlanSquad plan={plan} squad={squad} />
       {moves.length ? (
         <ul className={styles.moves}>
@@ -135,6 +302,7 @@ export function PlanResult({
       ) : (
         <p>{copy.hold}</p>
       )}
+      {weeks && <UpcomingWeeks weeks={weeks.slice(1)} />}
       {plan.solver_status === "FEASIBLE" && <p className={styles.muted}>{copy.notProven}</p>}
     </article>
   );

@@ -3,29 +3,45 @@ import type { Language } from "../../../i18n/messages";
 import {
   checkedPreferences,
   clubCountKey,
-  clubCountsConflict,
+  isHitBudget,
+  isPlanWeek,
   preferencesKey,
   type ClubCount,
   type DecisionPreferences,
+  type PlanWeekNumber,
 } from "../advice/decisionPreferences";
 
 const playerKinds = ["keep_player", "include_player", "avoid_player"] as const;
 const ruleKinds = ["hold_transfers", "no_hits", "save_chips", "wildcard"] as const;
 
-export const CONSTRAINT_KINDS = [...ruleKinds, ...playerKinds, "club_count"] as const;
+export const CONSTRAINT_KINDS = [
+  ...ruleKinds,
+  ...playerKinds,
+  "buy_player",
+  "club_count",
+  "hit_budget",
+] as const;
 export const MAX_CONSTRAINTS = 16;
 export const MAX_MESSAGE_LENGTH = 800;
 
-export type Constraint =
-  | { kind: (typeof playerKinds)[number]; player_id: number }
-  | { kind: (typeof ruleKinds)[number] }
-  | ({ kind: "club_count" } & ClubCount);
+type PlayerKind = (typeof playerKinds)[number] | "buy_player";
+type PlanWindow = 1 | 3;
+export type Constraint = (
+  | ({ week?: PlanWeekNumber } & (
+      | { kind: (typeof playerKinds)[number]; player_id: number }
+      | { kind: (typeof ruleKinds)[number] }
+      | ({ kind: "club_count" } & ClubCount)
+    ))
+  | { kind: "buy_player"; player_id: number; week: PlanWeekNumber }
+  | { kind: "hit_budget"; points: number; week?: never }
+) & { max_cost_tenths?: number };
 type Comparison = Constraint & { both?: boolean };
 
 export interface PlanDraft {
   hard: Constraint[];
   soft: Constraint[];
   comparison?: Comparison;
+  window?: PlanWindow;
 }
 
 interface PreparedPlan {
@@ -47,33 +63,67 @@ export interface Clarification {
 
 export const EMPTY_DRAFT: PlanDraft = { hard: [], soft: [] };
 
-export function isPlayerKind(kind: Constraint["kind"]): kind is (typeof playerKinds)[number] {
-  return kind === "keep_player" || kind === "include_player" || kind === "avoid_player";
+export function isPlayerKind(kind: Constraint["kind"]): kind is PlayerKind {
+  return (
+    kind === "keep_player" ||
+    kind === "include_player" ||
+    kind === "avoid_player" ||
+    kind === "buy_player"
+  );
+}
+
+export function needsThreeWeeks(draft: PlanDraft) {
+  return [...draft.hard, ...draft.soft, ...(draft.comparison ? [draft.comparison] : [])].some(
+    ({ week }) => week === 2 || week === 3,
+  );
 }
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+export function isPreferenceCost(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 1000;
+}
+
 function parseConstraint(
   value: unknown,
   players: ReadonlySet<number>,
   clubs: ReadonlySet<string>,
-  comparison = false,
+  strength: "hard" | "soft" | "comparison" = "hard",
 ) {
   if (
     !record(value) ||
     !CONSTRAINT_KINDS.some((kind) => kind === value.kind) ||
     Object.keys(value).some(
       (key) =>
-        !["kind", "player_id", "club", "count", "scope"].includes(key) &&
-        !(comparison && key === "both"),
+        !["kind", "player_id", "club", "count", "scope", "week", "points"].includes(key) &&
+        !(strength === "comparison" && key === "both") &&
+        !(strength === "soft" && key === "max_cost_tenths"),
     )
   )
     throw new Error("Invalid constraint");
   const kind = value.kind as Constraint["kind"];
   const id = value.player_id;
-  const { club, count, scope } = value;
+  const { club, count, scope, week, points, max_cost_tenths: maxCost } = value;
+  if (maxCost !== undefined && !isPreferenceCost(maxCost))
+    throw new Error("Invalid preference cost limit");
+  const price = maxCost === undefined ? {} : { max_cost_tenths: maxCost };
+  if (week !== undefined && !isPlanWeek(week)) throw new Error("Invalid rule week");
+  const timing = week === undefined ? {} : { week };
+  if (kind === "hit_budget") {
+    if (
+      id !== undefined ||
+      club !== undefined ||
+      count !== undefined ||
+      scope !== undefined ||
+      week !== undefined ||
+      !isHitBudget(points)
+    )
+      throw new Error("Invalid hit budget");
+    return { kind, points, ...price } satisfies Constraint;
+  }
+  if (points !== undefined) throw new Error("Unexpected hit budget");
   if (kind === "club_count") {
     if (
       id !== undefined ||
@@ -88,16 +138,22 @@ function parseConstraint(
       club,
       count,
       ...(scope === "transfers_in" ? { scope } : {}),
+      ...timing,
+      ...price,
     } satisfies Constraint;
   }
   if (club !== undefined || count !== undefined || scope !== undefined)
     throw new Error("Unexpected club count");
   if (isPlayerKind(kind)) {
     if (typeof id !== "number" || !players.has(id)) throw new Error("Unknown player");
-    return { kind, player_id: id } satisfies Constraint;
+    if (kind === "buy_player") {
+      if (week === undefined) throw new Error("A transfer needs a week");
+      return { kind, player_id: id, week, ...price } satisfies Constraint;
+    }
+    return { kind, player_id: id, ...timing, ...price } satisfies Constraint;
   }
   if (id !== undefined) throw new Error("Unexpected player");
-  return { kind } satisfies Constraint;
+  return { kind, ...timing, ...price } satisfies Constraint;
 }
 
 function parseDraft(
@@ -109,47 +165,53 @@ function parseDraft(
     !record(value) ||
     !Array.isArray(value.hard) ||
     !Array.isArray(value.soft) ||
+    (value.window !== undefined && value.window !== 1 && value.window !== 3) ||
     value.hard.length + value.soft.length > MAX_CONSTRAINTS
   )
     throw new Error("Invalid draft");
   const draft: PlanDraft = {
     hard: value.hard.map((item) => parseConstraint(item, playerIds, clubs)),
-    soft: value.soft.map((item) => parseConstraint(item, playerIds, clubs)),
+    soft: value.soft.map((item) => parseConstraint(item, playerIds, clubs, "soft")),
+    ...(value.window !== undefined ? { window: value.window } : {}),
   };
   const keys = [...draft.hard, ...draft.soft].map(constraintKey);
   if (new Set(keys).size !== keys.length) throw new Error("Repeated constraint");
   if (value.comparison != null) {
-    const item = parseConstraint(value.comparison, playerIds, clubs, true);
+    const item = parseConstraint(value.comparison, playerIds, clubs, "comparison");
     const both = (value.comparison as Record<string, unknown>).both;
     if (both != null && (typeof both !== "boolean" || (both && item.kind !== "include_player")))
       throw new Error("Invalid comparison");
     draft.comparison = both === true ? { ...item, both: true } : item;
   }
+  if (needsThreeWeeks(draft)) {
+    if (draft.window === 1) throw new Error("Rule outside the plan window");
+    draft.window = 3;
+  }
   return draft;
 }
 
 export function constraintKey(rule: Constraint): string {
-  if (rule.kind === "club_count") return `${rule.kind}:${clubCountKey(rule)}:${rule.count}`;
-  return "player_id" in rule ? `${rule.kind}:${rule.player_id}` : rule.kind;
+  const scope = rule.week === undefined ? "" : `:week:${rule.week}`;
+  if (rule.kind === "club_count") return `${rule.kind}:${clubCountKey(rule)}:${rule.count}${scope}`;
+  if (rule.kind === "hit_budget") return `${rule.kind}:${rule.points}`;
+  return "player_id" in rule ? `${rule.kind}:${rule.player_id}${scope}` : `${rule.kind}${scope}`;
 }
 
-function playerIds(rules: readonly Constraint[], kind: (typeof playerKinds)[number]) {
+function playerIds(rules: readonly Constraint[], kind: PlayerKind) {
   return [...new Set(rules.flatMap((rule) => (rule.kind === kind ? [rule.player_id] : [])))];
 }
 
-function branchSelection(rules: readonly Constraint[]): PreparedPlan {
-  const chip = rules.some(({ kind }) => kind === "wildcard") ? "wildcard" : null;
+function ruleFields(rules: readonly Constraint[]) {
+  const buy = playerIds(rules, "buy_player");
   return {
-    chip,
-    preferences: checkedPreferences({
-      keep_players: playerIds(rules, "keep_player"),
-      include_players: playerIds(rules, "include_player"),
-      avoid_players: playerIds(rules, "avoid_player"),
-      no_hits: rules.some(({ kind }) => kind === "no_hits"),
-      hold_transfers: rules.some(({ kind }) => kind === "hold_transfers"),
-      save_chips: chip === null,
-      club_counts: clubCounts(rules),
-    }),
+    keep_players: playerIds(rules, "keep_player"),
+    include_players: playerIds(rules, "include_player"),
+    avoid_players: playerIds(rules, "avoid_player"),
+    no_hits: rules.some(({ kind }) => kind === "no_hits"),
+    hold_transfers: rules.some(({ kind }) => kind === "hold_transfers"),
+    save_chips: rules.some(({ kind }) => kind === "save_chips"),
+    club_counts: clubCounts(rules),
+    ...(buy.length ? { buy_players: buy } : {}),
   };
 }
 
@@ -163,38 +225,84 @@ function clubCounts(rules: readonly Constraint[]): ClubCount[] {
   return [...counts.values()];
 }
 
-function conflicts(rules: readonly Constraint[], held: ReadonlySet<number>) {
-  const owned = playerIds(rules, "keep_player");
-  const included = [...owned, ...playerIds(rules, "include_player")];
-  const excluded = playerIds(rules, "avoid_player");
-  const counts = clubCounts(rules);
-  const holdsTransfers = rules.some(({ kind }) => kind === "hold_transfers");
-  return (
-    owned.some((id) => !held.has(id)) ||
-    new Set(included).size > 15 ||
-    excluded.length > 15 ||
-    counts.length > MAX_CONSTRAINTS ||
-    clubCountsConflict(counts, holdsTransfers) ||
-    included.some((id) => excluded.includes(id)) ||
-    (holdsTransfers &&
-      (included.some((id) => !held.has(id)) || excluded.some((id) => held.has(id)))) ||
-    (rules.some(({ kind }) => kind === "wildcard") &&
-      (holdsTransfers || rules.some(({ kind }) => kind === "save_chips")))
+function branchSelection(
+  rules: readonly Constraint[],
+  held: ReadonlySet<number>,
+  window: PlanWindow,
+): PreparedPlan | null {
+  if (rules.some(({ week }) => week !== undefined && week > window)) return null;
+  if (playerIds(rules, "keep_player").some((id) => !held.has(id))) return null;
+  const forcedWeeks = new Set(
+    rules.flatMap(({ kind, week }) => (kind === "wildcard" ? [week ?? 1] : [])),
   );
+  if (forcedWeeks.size > 1) return null;
+  const wildcardWeek = [...forcedWeeks][0];
+  const global = ruleFields(rules.filter(({ week }) => week === undefined));
+  const weekRules = ([1, 2, 3] as const).flatMap((week) => {
+    const scoped = rules.filter((rule) => rule.week === week && rule.kind !== "wildcard");
+    return scoped.length ? [{ week, rules: ruleFields(scoped) }] : [];
+  });
+  const firstWeek = weekRules.find(({ week }) => week === 1)?.rules;
+  if (firstWeek?.buy_players?.some((id) => held.has(id))) return null;
+  if (global.hold_transfers || firstWeek?.hold_transfers) {
+    const fixedWeeks = global.hold_transfers
+      ? weekRules
+      : weekRules.filter(({ week }) => week === 1);
+    const fixed = [global, ...fixedWeeks.map(({ rules }) => rules)];
+    if (
+      fixed.some(
+        (row) =>
+          row.include_players.some((id) => !held.has(id)) ||
+          row.avoid_players.some((id) => held.has(id)),
+      )
+    )
+      return null;
+  }
+  if (
+    wildcardWeek === 1 &&
+    (global.hold_transfers ||
+      global.save_chips ||
+      firstWeek?.hold_transfers ||
+      firstWeek?.save_chips)
+  )
+    return null;
+  const caps = rules.flatMap((rule) => (rule.kind === "hit_budget" ? [rule.points] : []));
+  try {
+    return {
+      chip: wildcardWeek === 1 ? "wildcard" : null,
+      preferences: checkedPreferences({
+        ...global,
+        save_chips: wildcardWeek === undefined || global.save_chips,
+        ...(weekRules.length ? { week_rules: weekRules } : {}),
+        ...(caps.length ? { max_hit_points: Math.min(...caps) } : {}),
+        ...(wildcardWeek === 2 || wildcardWeek === 3 ? { wildcard_week: wildcardWeek } : {}),
+      }),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function preparePlans(draft: PlanDraft, held: ReadonlySet<number>) {
+  const window = draft.window ?? (needsThreeWeeks(draft) ? 3 : 1);
   const both = draft.comparison?.kind === "include_player" && draft.comparison.both;
   const baseRules: Constraint[] =
     both && draft.comparison?.kind === "include_player"
-      ? [...draft.hard, { kind: "avoid_player", player_id: draft.comparison.player_id }]
+      ? [
+          ...draft.hard,
+          {
+            kind: "avoid_player",
+            player_id: draft.comparison.player_id,
+            week: draft.comparison.week,
+          },
+        ]
       : draft.hard;
   const alternativeRules = [...draft.hard, ...(draft.comparison ? [draft.comparison] : draft.soft)];
-  const baseConflict = conflicts(baseRules, held);
-  const alternativeConflict = conflicts(alternativeRules, held);
-  const base = baseConflict ? null : branchSelection(baseRules);
-  const alternative = alternativeConflict ? null : branchSelection(alternativeRules);
+  const hard = branchSelection(draft.hard, held, window);
+  const base = both ? branchSelection(baseRules, held, window) : hard;
+  const alternative = branchSelection(alternativeRules, held, window);
   return {
+    window,
     base,
     alternative:
       alternative &&
@@ -203,9 +311,9 @@ export function preparePlans(draft: PlanDraft, held: ReadonlySet<number>) {
         preferencesKey(base.preferences) !== preferencesKey(alternative.preferences))
         ? alternative
         : null,
-    hardConflict: conflicts(draft.hard, held),
-    baseConflict,
-    alternativeConflict,
+    hardConflict: hard === null,
+    baseConflict: base === null,
+    alternativeConflict: alternative === null,
   };
 }
 
