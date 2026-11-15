@@ -55,6 +55,7 @@ export function openingAlternatives(
   reference: DecisionPreferences,
   chip: AdviceRequest["chip"],
 ): Record<OpeningAlternativeGoal, DecisionPreferences | null> {
+  if (reference.frozen_weeks?.some(({ week }) => week === 1)) return { roll: null, bank: null };
   const opening = openingAction(plan);
   const week = reference.week_rules?.find(({ week }) => week === 1)?.rules;
   const alreadyHolds = holdsOpeningTransfers(reference);

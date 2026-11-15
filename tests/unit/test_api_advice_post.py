@@ -14,10 +14,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from squadopt.api.app import ADVICE_BODY_MAX_BYTES, create_app
+from squadopt.contracts.plan_infeasibility import PlanInfeasibility
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import API_COUNTER_FAMILIES, AdviceMetrics
-from squadopt.platform.advice_queue import FileJobQueue, run_advice_worker_once
+from squadopt.platform.advice_queue import (
+    AdviceComputeRefused,
+    FileJobQueue,
+    run_advice_worker_once,
+)
 from squadopt.platform.advice_read import (
     AdviceReadStore,
     AdviceRequestContext,
@@ -1081,6 +1086,31 @@ def test_the_public_job_view_carries_no_private_fields(tmp_path: Path) -> None:
     assert "idempotency_key" not in view
     assert "secret-ish" not in json.dumps(view)
     assert "ertug" not in json.dumps(view)  # no raw worker text, no host paths
+
+
+def test_the_public_job_view_round_trips_a_verified_budget_repair(tmp_path: Path) -> None:
+    client, cache, queue = _world(tmp_path)
+    posted = client.post(ADVICE_URL, json=BODY)
+    assert posted.status_code == 202
+    job_id = posted.json()["job_id"]
+    explanation: PlanInfeasibility = {
+        "repairs": [{"kind": "lower_bank_floor", "tenths": 26}],
+        "bank": {"required": 30, "reachable": 26, "exact": True, "week": 1},
+    }
+
+    def infeasible(_job: AdviceJob) -> bytes:
+        raise AdviceComputeRefused(
+            "PLAN_NOT_FOUND", "private worker context", infeasibility=explanation
+        )
+
+    run_advice_worker_once(queue, cache, infeasible, at_utc="2026-08-27T18:00:00Z")
+    stored = queue.load(job_id)
+    assert stored is not None and stored.error is not None
+    assert stored.error.infeasibility == explanation
+    view = client.get(f"/api/v1/advice-jobs/{job_id}").json()
+    assert view["error_code"] == "PLAN_NOT_FOUND"
+    assert view["infeasibility"] == explanation
+    assert "private worker context" not in json.dumps(view)
 
 
 #: What the page has read from the job view since before the three optional fields

@@ -25,6 +25,7 @@ import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
 import type { ChipSelection } from "./chipChoice";
 
 import { preferencesKey, type DecisionPreferences } from "./decisionPreferences";
+import { checkedPlanInfeasibility, type PlanInfeasibility } from "./planInfeasibility";
 
 export interface AdviceRequest {
   /** Fetch and pin this public team's inputs only when computation is requested. */
@@ -106,6 +107,7 @@ export interface AdviceJobStatus {
   status: "queued" | "running" | "completed" | "failed";
   /** The service's coded reason for a failed job; never its text. */
   errorCode?: string | null;
+  infeasibility?: PlanInfeasibility;
   /** The attempt on the job, from 1; a new attempt starts its count again. */
   attempt?: number;
   /** While queued: how many queued jobs will be claimed first, 0 when this one is next. */
@@ -407,6 +409,7 @@ export class HttpAdviceClient implements AdviceClient {
         job_id: string;
         status: AdviceJobStatus["status"];
         error_code?: unknown;
+        infeasibility?: unknown;
         attempt?: unknown;
         queue_position?: unknown;
         progress?: unknown;
@@ -422,6 +425,10 @@ export class HttpAdviceClient implements AdviceClient {
         typeof body.error_code === "string" && SERVICE_CODE.test(body.error_code)
           ? body.error_code
           : null;
+      const infeasibility =
+        body.status === "failed" && errorCode === "PLAN_NOT_FOUND"
+          ? checkedPlanInfeasibility(body.infeasibility)
+          : undefined;
       // How the wait is going never decides the job: what cannot be read is simply not said.
       const attempt = jobCount(body.attempt);
       const queuePosition = body.status === "queued" ? jobCount(body.queue_position) : null;
@@ -431,6 +438,7 @@ export class HttpAdviceClient implements AdviceClient {
         jobId: body.job_id,
         status: body.status,
         ...(errorCode === null ? {} : { errorCode }),
+        ...(infeasibility ? { infeasibility } : {}),
         ...(attempt === null ? {} : { attempt }),
         ...(queuePosition === null ? {} : { queuePosition }),
         ...(progress === null ? {} : { progress }),

@@ -144,7 +144,11 @@ const planWeek: Predicate = (value) =>
       free_transfers_after: integer,
       expected_points: finite,
     },
-    { lineup_expectation: lineupExpectation, lineup: lineup(player) },
+    {
+      bank_after_tenths: integer,
+      lineup_expectation: lineupExpectation,
+      lineup: lineup(player),
+    },
   );
 const participationEvidence: Predicate = (value) =>
   record(value) &&

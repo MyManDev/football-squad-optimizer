@@ -443,13 +443,17 @@ class AdviceReadStore:
         """
 
         rule_sets = (preferences, *(row.rules for row in preferences.week_rules))
-        if not any(
-            rules.keep_players
-            or rules.avoid_players
-            or rules.include_players
-            or rules.buy_players
-            or rules.club_counts
-            for rules in rule_sets
+        if (
+            preferences.scenario is None
+            and not preferences.frozen_weeks
+            and not any(
+                rules.keep_players
+                or rules.avoid_players
+                or rules.include_players
+                or rules.buy_players
+                or rules.club_counts
+                for rules in rule_sets
+            )
         ):
             return
         players = self._preference_players_of(context, league_id, entry_id)
@@ -479,6 +483,27 @@ class AdviceReadStore:
             raise UnsupportedAdviceRequestError(
                 "A player already in the member's squad cannot be bought in the first week."
             )
+        if (
+            preferences.scenario is not None
+            and preferences.scenario.player_id not in players.roster
+        ):
+            raise UnsupportedAdviceRequestError(
+                "The scenario player is not in this capture's roster."
+            )
+        for frozen in preferences.frozen_weeks:
+            incoming, outgoing, starters = map(
+                set, (frozen.transfers_in, frozen.transfers_out, frozen.starting_xi)
+            )
+            if not (incoming | outgoing | starters) <= players.roster:
+                raise UnsupportedAdviceRequestError("A frozen week names an unknown player.")
+            if frozen.week == 1 and (
+                not outgoing <= players.squad
+                or bool(incoming & players.squad)
+                or not starters <= (players.squad - outgoing) | incoming
+            ):
+                raise UnsupportedAdviceRequestError(
+                    "The first frozen week does not match the member's captured squad."
+                )
 
     def league_state(self, league_id: int) -> dict[str, object]:
         """Connected or not, from the published tree — never an upstream call."""

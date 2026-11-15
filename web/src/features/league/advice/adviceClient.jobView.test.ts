@@ -29,6 +29,24 @@ function readView(view: object, jobId = JOB): Promise<AdviceJobStatus> {
   return client.readJob(jobId);
 }
 
+it("accepts a validated feasible repair only for a proved no-plan result", async () => {
+  const infeasibility = {
+    bank: { required: 30, reachable: 26, exact: true, week: 1 },
+    repairs: [{ kind: "lower_bank_floor", tenths: 26 }],
+  };
+  const failed = { status: "failed", error_code: "PLAN_NOT_FOUND", infeasibility };
+  expect(await readView(failed)).toMatchObject({ infeasibility });
+  expect(await readView({ ...failed, error_code: "ADVICE_FAILED" })).not.toHaveProperty(
+    "infeasibility",
+  );
+  expect(
+    await readView({
+      ...failed,
+      infeasibility: { ...infeasibility, repairs: [{ kind: "lower_bank_floor", tenths: 29 }] },
+    }),
+  ).not.toHaveProperty("infeasibility");
+});
+
 describe("the contract's examples", () => {
   it.each([
     ["queued", { queuePosition: 2, workers: { busy: 1, total: 1 } }],

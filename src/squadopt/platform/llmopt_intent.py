@@ -16,6 +16,7 @@ from math import ceil
 from threading import BoundedSemaphore, Lock
 from typing import Any, Final, Protocol
 
+from squadopt.contracts.preferences import PlanScenario
 from squadopt.platform.advice_submit import FixedWindowRateLimiter
 
 INTENT_BODY_MAX_BYTES: Final = 128 * 1024
@@ -130,6 +131,30 @@ requirement stated for both plans belongs in hard. Otherwise use false for compa
 Use null for no comparison. If the user asks for both but the player is unclear, ask who
 they mean.
 
+On a revision, reference_weeks lists the already-solved relative weeks that can be kept.
+"İlk haftay\u0131 aynen b\u0131rak" or "keep week one exactly as it is" means keep_weeks [1].
+This keeps the prior transfer, chip and available lineup decisions. It does not mean
+hold_transfers. Never invent players or moves for a kept week. If the requested week
+does not exist in reference_weeks, ask the manager to solve that week first. Keep existing
+keep_weeks unless the manager changes them. Use [] when there are no weeks to keep.
+"En az £0,5m kasada kals\u0131n" means min_bank {"tenths":5,"week":null}.
+Bank units are £0.1m, in whole units from 1 to 10000. A null week applies the floor at the
+end of the selected window. Use a relative offset for an explicitly stated week. Ask for
+clarification when the budget is not a minimum remaining bank or cannot be expressed.
+Keep an existing min_bank unless the manager edits or removes it. Use null when absent.
+A kept week or bank floor for week 2 or 3 needs a three-week window.
+
+A what-if question about a price increase or an absent player is a scenario on the solved
+reference plan. "Saka £0,1m pahalan\u0131rsa" means scenario kind price_increase, the exact
+player_id, tenths 1, and a null week for the upcoming deadline. The higher price persists
+from that week onward. "Kaptan\u0131m oynamazsa" means kind unavailable, no tenths, and the
+selected game's captain from reference_captains for that relative week (default week 1).
+Use the named player if given. An absence applies to one week and leaves the player eligible
+for the bench. Ask for clarification when a required player, price amount, or solved reference
+week is missing. Keep the existing hard rules when introducing a scenario. Preserve an
+existing scenario on follow-up, unless the manager asks to change it or return to the normal
+plan. Use null for no scenario and keep the reference horizon when the user asks about it.
+
 On success use status "draft", return the draft and set message to null. On
 clarification use status "clarification", set draft to null, and ask one short
 question in the requested locale. Never echo unrelated personal text.
@@ -166,6 +191,8 @@ class IntentRequest:
     players: tuple[dict[str, Any], ...]
     clarification: IntentClarification | None = None
     clubs: tuple[str, ...] = ()
+    reference_weeks: tuple[int, ...] = ()
+    reference_captains: tuple[tuple[int, int], ...] = ()
 
 
 class IntentProvider(Protocol):
@@ -314,7 +341,8 @@ def _draft(
     if (
         not isinstance(value, dict)
         or not {"hard", "soft"} <= value.keys()
-        or value.keys() - {"hard", "soft", "comparison", "window"}
+        or value.keys()
+        - {"hard", "soft", "comparison", "window", "keep_weeks", "min_bank", "scenario"}
         or (model and "comparison" not in value)
     ):
         raise IntentValidationError("Invalid constraint draft.")
@@ -359,7 +387,52 @@ def _draft(
             value["comparison"], player_ids, clubs, comparison=True, model=model
         )
         constraints += (result["comparison"],)
-    if any(item.get("week", 1) > 1 for item in constraints):
+    keep_weeks = _reference_weeks(value.get("keep_weeks", []))
+    if keep_weeks:
+        result["keep_weeks"] = list(keep_weeks)
+    bank = value.get("min_bank")
+    bank_week = None
+    if bank is not None or (not model and "min_bank" in value):
+        if not isinstance(bank, dict) or "tenths" not in bank or bank.keys() - {"tenths", "week"}:
+            raise IntentValidationError("Invalid minimum bank.")
+        tenths = bank["tenths"]
+        bank_week = bank.get("week")
+        if (
+            type(tenths) is not int
+            or not 1 <= tenths <= 10_000
+            or (bank_week is None and not model and "week" in bank)
+            or (bank_week is not None and (type(bank_week) is not int or bank_week not in _WEEKS))
+        ):
+            raise IntentValidationError("Invalid minimum bank.")
+        result["min_bank"] = {"tenths": tenths}
+        if bank_week is not None:
+            result["min_bank"]["week"] = bank_week
+    scenario_week = 1
+    raw_scenario = value.get("scenario")
+    if raw_scenario is not None or (not model and "scenario" in value):
+        if model and isinstance(raw_scenario, dict):
+            raw_scenario = {
+                key: field
+                for key, field in raw_scenario.items()
+                if field is not None or key not in ("week", "tenths")
+            }
+        try:
+            scenario = PlanScenario.parse(raw_scenario)
+        except ValueError as error:
+            raise IntentValidationError(str(error)) from error
+        if scenario.player_id not in player_ids:
+            raise IntentValidationError("Scenario player is outside the intent roster.")
+        scenario_week = scenario.week
+        result["scenario"] = scenario.payload()
+    if any(
+        week > 1
+        for week in (
+            *keep_weeks,
+            bank_week or 1,
+            scenario_week,
+            *(item.get("week", 1) for item in constraints),
+        )
+    ):
         if window == 1:
             raise IntentValidationError("A constraint is outside the planning window.")
         window = 3
@@ -380,12 +453,45 @@ def _draft(
     return result
 
 
+def _reference_weeks(value: object) -> tuple[int, ...]:
+    if (
+        not isinstance(value, list)
+        or len(value) > len(_WEEKS)
+        or any(type(week) is not int or week not in _WEEKS for week in value)
+        or len(set(value)) != len(value)
+    ):
+        raise IntentValidationError("Invalid reference weeks.")
+    return tuple(sorted(value))
+
+
+def _reference_captains(
+    value: object, weeks: tuple[int, ...], roster_ids: set[int]
+) -> tuple[tuple[int, int], ...]:
+    if not isinstance(value, list) or len(value) > len(weeks):
+        raise IntentValidationError("Invalid reference captains.")
+    captains: dict[int, int] = {}
+    for row in value:
+        if not isinstance(row, dict) or row.keys() != {"week", "player_id"}:
+            raise IntentValidationError("Invalid reference captain.")
+        week = row["week"]
+        player = _player_id(row["player_id"])
+        if (
+            type(week) is not int
+            or week not in weeks
+            or week in captains
+            or player not in roster_ids
+        ):
+            raise IntentValidationError("Reference captain does not match a solved week or roster.")
+        captains[week] = player
+    return tuple(sorted(captains.items()))
+
+
 def parse_intent_request(value: object) -> IntentRequest:
     required = {"message", "locale", "draft", "players"}
     if (
         not isinstance(value, dict)
         or not required <= value.keys()
-        or value.keys() - (required | {"clarification"})
+        or value.keys() - (required | {"clarification", "reference_weeks", "reference_captains"})
     ):
         raise IntentValidationError("Invalid intent request.")
     locale = value["locale"]
@@ -408,6 +514,7 @@ def parse_intent_request(value: object) -> IntentRequest:
             _text(previous["message"], INTENT_MAX_MESSAGE),
             _text(previous["question"], _MAX_QUESTION),
         )
+    weeks = _reference_weeks(value.get("reference_weeks", []))
     return IntentRequest(
         _text(value["message"], INTENT_MAX_MESSAGE),
         locale,
@@ -415,6 +522,8 @@ def parse_intent_request(value: object) -> IntentRequest:
         roster,
         clarification,
         clubs,
+        weeks,
+        _reference_captains(value.get("reference_captains", []), weeks, ids),
     )
 
 
@@ -424,6 +533,8 @@ def _validate_result(
     clubs: tuple[str, ...],
     *,
     previous_window: int | None,
+    reference_weeks: tuple[int, ...] = (),
+    locale: str = "en",
 ) -> dict[str, Any]:
     if not isinstance(value, dict) or value.keys() != {"status", "draft", "message"}:
         raise IntentValidationError("Invalid intent result.")
@@ -432,12 +543,23 @@ def _validate_result(
     if value["status"] != "draft" or value["message"] is not None:
         raise IntentValidationError("Invalid draft status.")
     player_ids = {player["id"] for player in candidates}
-    return {
-        "status": "draft",
-        "draft": _draft(
-            value["draft"], player_ids, clubs, model=True, previous_window=previous_window
-        ),
-    }
+    draft = _draft(value["draft"], player_ids, clubs, model=True, previous_window=previous_window)
+    scenario = draft.get("scenario")
+    if scenario is not None and scenario.get("week", 1) not in reference_weeks:
+        question = (
+            "Bu senaryoyu karş\u0131laşt\u0131rmak için önce ilgili haftay\u0131 planlayal\u0131m."
+            if locale == "tr"
+            else "Which plan should we solve first to compare this scenario against?"
+        )
+        return {"status": "clarification", "message": question}
+    if not set(draft.get("keep_weeks", ())).issubset(reference_weeks):
+        question = (
+            "Korumak istediğin haftay\u0131 önce hesaplayal\u0131m. Hangi hafta olsun?"
+            if locale == "tr"
+            else "Solve the week you want to keep first. Which week should we plan?"
+        )
+        return {"status": "clarification", "message": question}
+    return {"status": "draft", "draft": draft}
 
 
 def _fold_text(value: str) -> str:
@@ -465,6 +587,9 @@ def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
         return request.players
     previous = (*request.draft["hard"], *request.draft["soft"], request.draft.get("comparison", {}))
     retained = {item.get("player_id") for item in previous}
+    retained.update(player for _, player in request.reference_captains)
+    if (scenario := request.draft.get("scenario")) is not None:
+        retained.add(scenario["player_id"])
     text = _tokens(request.message)
     original = _tokens(request.clarification.message) if request.clarification else ()
     words = set((*text, *original))
@@ -528,7 +653,12 @@ class IntentService:
             candidates = _shortlist(request)
             proposal = self._provider(replace(request, players=candidates))
             return _validate_result(
-                proposal, candidates, request.clubs, previous_window=request.draft.get("window")
+                proposal,
+                candidates,
+                request.clubs,
+                previous_window=request.draft.get("window"),
+                reference_weeks=request.reference_weeks,
+                locale=request.locale,
             )
         except IntentValidationError:
             raise IntentUnavailable("The intent response could not be validated.") from None
@@ -568,6 +698,31 @@ _DRAFT_SCHEMA: Final = _schema_object(
         "soft": _SOFT_CONSTRAINT_LIST,
         "comparison": {"anyOf": [_COMPARISON_SCHEMA, {"type": "null"}]},
         "window": {"type": ["integer", "null"], "enum": [*_WINDOWS, None]},
+        "keep_weeks": {"type": "array", "items": {"type": "integer", "enum": list(_WEEKS)}},
+        "min_bank": {
+            "anyOf": [
+                _schema_object(
+                    {
+                        "tenths": {"type": "integer"},
+                        "week": {"type": ["integer", "null"], "enum": [*_WEEKS, None]},
+                    }
+                ),
+                {"type": "null"},
+            ]
+        },
+        "scenario": {
+            "anyOf": [
+                _schema_object(
+                    {
+                        "kind": {"enum": ["price_increase", "unavailable"]},
+                        "player_id": {"type": "integer"},
+                        "week": {"type": ["integer", "null"], "enum": [*_WEEKS, None]},
+                        "tenths": {"type": ["integer", "null"]},
+                    }
+                ),
+                {"type": "null"},
+            ]
+        },
     }
 )
 _RESULT_SCHEMA: Final = _schema_object(
@@ -613,6 +768,10 @@ class OpenAIIntentProvider:
             "draft": request.draft,
             "players": request.players,
             "clubs": request.clubs,
+            "reference_weeks": request.reference_weeks,
+            "reference_captains": [
+                {"week": week, "player_id": player} for week, player in request.reference_captains
+            ],
         }
         if request.clarification is not None:
             context["clarification"] = {

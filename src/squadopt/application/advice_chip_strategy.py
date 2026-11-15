@@ -1,9 +1,12 @@
 """Joint chip and transfer advice, separate from the legacy one-week chip switch."""
 
+from dataclasses import replace
+
 from squadopt.application.advice import (
     NO_CHIP_LIMIT,
     WINDOW_DETERMINISTIC_UNITS_PER_WEEK,
     WINDOW_LINEARIZATION_LEVEL,
+    WINDOW_STATIC_PRICE_LIMIT,
     WINDOW_TRANSFER_CAP_LIMIT,
     WINDOW_WALL_CEILING_SECONDS,
     AdviseEntryRequest,
@@ -117,6 +120,22 @@ def advise_chip_strategy(
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
         raise SolverExecutionError("Chip strategy reached its wall-clock safety limit.")
+    scenario = preferences.scenario
+    opening_absence = scenario is not None and scenario.kind == "unavailable" and scenario.week == 1
+    if scenario is not None and scenario.kind == "unavailable":
+        # Restate weighted plans on the same hypothetical points used in the solve.
+        table = base.table.copy(deep=True)
+        affected = table.player_id.eq(scenario.player_id) & table.gameweek.eq(
+            request.gameweek + scenario.week - 1
+        )
+        table.loc[affected, "expected_points"] = 0.0
+        if "appearance_probability" in table:
+            table.loc[affected, "appearance_probability"] = 0.0
+        base = replace(base, table=table)
+        if opening_absence:
+            opening = projection.table.copy(deep=True)
+            opening.loc[opening.player_id.eq(scenario.player_id), "expected_points"] = 0.0
+            projection = replace(projection, table=opening)
     shown = plan.weeks if preferences.net_points_priority else _rebased_weeks(plan, base)
     payload = window_payload(
         picks,
@@ -143,6 +162,7 @@ def advise_chip_strategy(
     }
     if (
         not preferences.net_points_priority
+        and not opening_absence
         and first.lineup_expectation is None
         and (top100_weight or first.chip in ("3xc", "bboost"))
     ):
@@ -154,6 +174,13 @@ def advise_chip_strategy(
             choice_points=choice if top100_weight else None,
             expected_total=chip_week_points(first),
         )
+    if opening_absence:
+        # The legacy holding comparison does not enforce the hypothetical lineup restriction.
+        payload["expected_gain_vs_hold"] = None
+        moves = payload["moves"]
+        assert isinstance(moves, list)
+        for move in moves:
+            move["expected_points_delta"] = None
     # No raw-point cost against a paired no-chip control has been measured here.
     payload.pop("expected_points_cost", None)
     payload["expected_own_points"] = chip_week_points(first)
@@ -170,6 +197,10 @@ def advise_chip_strategy(
         limits = payload.get("stated_limits")
         assert isinstance(limits, list)
         payload["stated_limits"] = [text for text in limits if text != WINDOW_TRANSFER_CAP_LIMIT]
+    if scenario is not None and scenario.kind == "price_increase":
+        limits = payload["stated_limits"]
+        assert isinstance(limits, list)
+        payload["stated_limits"] = [text for text in limits if text != WINDOW_STATIC_PRICE_LIMIT]
     if requested_chip is None:
         if top100_weight:
             payload["selection_top100_weight"] = top100_weight

@@ -8,6 +8,29 @@ afterEach(() => vi.unstubAllGlobals());
 describe("confirmed LLMOPT rules", () => {
   const held = new Set([7, 11, 15]);
 
+  it("requires the solved week's exact transfers in every revision branch", () => {
+    const draft = {
+      keep_weeks: [1 as const],
+      min_bank: { tenths: 5, week: 2 as const },
+      hard: [{ kind: "buy_player", player_id: 18, week: 2 } as const],
+      soft: [{ kind: "no_hits" } as const],
+    };
+    const frozen = { week: 1 as const, transfers_in: [17], transfers_out: [7], chip: null };
+    const plans = preparePlans(draft, held, [frozen]);
+    expect(plans.window).toBe(3);
+    for (const plan of [plans.base, plans.alternative]) {
+      expect(plan?.preferences).toMatchObject({
+        frozen_weeks: [frozen],
+        min_bank: draft.min_bank,
+        week_rules: [{ week: 2, rules: { buy_players: [18] } }],
+      });
+    }
+    expect(preparePlans(draft, held).hardConflict).toBe(true);
+    expect(
+      preparePlans({ ...draft, hard: [{ kind: "wildcard" }] }, held, [frozen]).hardConflict,
+    ).toBe(true);
+  });
+
   it("compares a hard no-hits rule with the same rule and a preferred transfer roll", () => {
     const draft = preparePlans(
       { hard: [{ kind: "no_hits" }], soft: [{ kind: "hold_transfers" }] },

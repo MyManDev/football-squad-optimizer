@@ -517,12 +517,18 @@ def build_advice_compute(
         except HorizonNoSolutionError as error:
             if error.status is SolverStatus.INFEASIBLE:
                 raise AdviceComputeRefused(
-                    "PLAN_NOT_FOUND", "No plan was found for this selection from this capture."
+                    "PLAN_NOT_FOUND",
+                    "No plan was found for this selection from this capture.",
+                    infeasibility=error.infeasibility,
                 ) from error
             raise AdviceComputeRefused(
                 "ADVICE_FAILED", "The service could not solve this plan."
             ) from error
         except PLAN_NOT_FOUND_ERRORS as error:
+            if request.preferences.active:
+                raise AdviceComputeRefused(
+                    "ADVICE_FAILED", "The service could not solve this plan."
+                ) from error
             # One member's outcome, not a fault: the planner found no plan for this
             # selection. Its own text is a solver's diagnostic and the job record travels
             # out through the jobs endpoint, so the record names the outcome and the log

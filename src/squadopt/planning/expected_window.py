@@ -88,7 +88,7 @@ def optimize_expected_window(
         originals.append(plan)
         if not plan.has_solution:
             continue
-        scored = improve_plan_lineups(plan, settings, transfer)
+        scored = improve_plan_lineups(plan, settings, transfer, preferences=preferences)
         ledger[-1]["lineup_search"] = scored.diagnostics["lineup_search"]
         menu.append((label, scored))
     original_actual = checked_work(sum(float(r["actual"]) for r in ledger), budget)
