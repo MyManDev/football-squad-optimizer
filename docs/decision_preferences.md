@@ -35,6 +35,13 @@ the opening deadline into the next week. A Free Hit's temporary cash reverts bef
 the comparison. Both resource controls preserve the other rules and the weekly
 transfer settings of the base plan.
 
+For a revision, `frozen_weeks` records exact incoming and outgoing transfers and
+the chip for each specified relative week. A row can also carry all eleven starters
+and their captain. The existing chip selection must match the frozen decision.
+`min_bank` sets a minimum amount of cash in £0.1m units after its optional relative
+week, or after the last week when no week is given. It uses the persistent bank when
+Free Hit temporarily changes the squad and spending.
+
 `net_points_priority` solves a comparison on the published expected net points over
 all selected weeks. It sums equally weighted scoring lineups and captain points, adds
 the scoring effects of any specified legal chip and deducts the actual hit charges.

@@ -5,12 +5,17 @@ import { Link, useParams } from "react-router";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { PageLoading } from "../../../design/components/PageLoading";
 import { useLanguage } from "../../../i18n/context";
+import { money } from "../../../lib/format";
 import { entryAddress, memberAddress } from "../../../lib/leagueAddresses";
 import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
-import { checkedPreferences, holdsOpeningTransfers } from "../advice/decisionPreferences";
+import {
+  checkedPreferences,
+  holdsOpeningTransfers,
+  type FrozenPlanWeek,
+} from "../advice/decisionPreferences";
 import { sameAdviceRequest, useAdviceJob, type ComputePhase } from "../advice/useAdviceJob";
 import { LEAGUE_READ, useEntrySquad } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
@@ -39,6 +44,12 @@ import {
   samePlan,
 } from "./planComparison";
 import {
+  freezeReference,
+  referenceWeeks,
+  summarizeRevision,
+  type PlanRevision,
+} from "./planRevision";
+import {
   ALTERNATIVE_COUNT,
   checkedPlanSession,
   readPlanSession,
@@ -47,6 +58,7 @@ import {
   type PlanSessionContext,
   type StartedAlternative,
 } from "./planSession";
+import { RevisionComparison } from "./RevisionComparison";
 import { RuleEditor } from "./RuleEditor";
 import styles from "./LLMOptPage.module.css";
 
@@ -123,11 +135,18 @@ function prepareRun(
   request: AdviceRequest,
   plans: ReturnType<typeof preparePlans>,
   wildcardNotHeld: boolean,
+  frozenWeeks?: readonly FrozenPlanWeek[],
 ): PlanRun {
   const pricing = draft.soft.length > 0;
   const compareBoth = draft.comparison?.both === true;
-  const hardDraft = { window: plans.window, hard: draft.hard, soft: [] };
-  const hard = compareBoth ? preparePlans(hardDraft, held).base : plans.base;
+  const hardDraft = {
+    window: plans.window,
+    hard: draft.hard,
+    soft: [],
+    keep_weeks: draft.keep_weeks,
+    min_bank: draft.min_bank,
+  };
+  const hard = compareBoth ? preparePlans(hardDraft, held, frozenWeeks).base : plans.base;
   const baseline = pricing ? hard : plans.base;
   let wildcardUnavailable = false;
   const submit = (plan: PreparedPlan | null) => {
@@ -156,7 +175,7 @@ function prepareRun(
     addExplicit(plans.alternative, plans.alternativeConflict, compareBoth ? "with" : "alternative");
   const prices = draft.soft.map((rule): PriceTarget => {
     if (compareBoth) return { rule, outcome: "skipped" };
-    const branch = preparePlans({ ...hardDraft, soft: [rule] }, held);
+    const branch = preparePlans({ ...hardDraft, soft: [rule] }, held, frozenWeeks);
     if (branch.alternativeConflict) return { rule, outcome: "conflict" };
     if (!branch.alternative) return { rule, outcome: "same" };
     const request = submit(branch.alternative);
@@ -323,7 +342,7 @@ function Workspace({
   context: PlanSessionContext | null;
   saved: unknown;
 }) {
-  const { language } = useLanguage();
+  const { language, locale } = useLanguage();
   const copy = LLMOPT_COPY[language];
   const { tree, forwarded } = useLeague();
   const now = useDeadlineClock(deadline);
@@ -337,11 +356,12 @@ function Workspace({
   const base = useAdviceJob(client, false, squad.source_snapshot_id, true);
   const first = useAdviceJob(client, false, squad.source_snapshot_id, true);
   const second = useAdviceJob(client, false, squad.source_snapshot_id, true);
-  const [restored] = useState(() => checkedPlanSession(saved, players));
+  const [restored] = useState(() => checkedPlanSession(saved, players, squad.gameweek));
   const [restoredRun] = useState(() => {
     if (!restored?.confirmation) return null;
     const { draft, confirmation } = restored;
-    const plans = preparePlans({ ...draft, soft: [] }, held);
+    const frozen = freezeReference(restored.reference, draft.keep_weeks);
+    const plans = preparePlans({ ...draft, soft: [] }, held, frozen);
     if (plans.hardConflict) return null;
     return prepareRun(
       draft,
@@ -349,9 +369,11 @@ function Workspace({
       requestFor(squad, forwarded, plans.window),
       plans,
       confirmation.wildcardNotHeld,
+      frozen,
     );
   });
   const [draft, setDraft] = useState<PlanDraft>(restored?.draft ?? EMPTY_DRAFT);
+  const [reference, setReference] = useState<PlanRevision | undefined>(restored?.reference);
   const [message, setMessage] = useState("");
   const [conversation, setConversation] = useState<ChatLine[]>(() =>
     restored?.clarification
@@ -372,6 +394,7 @@ function Workspace({
   const [reading, setReading] = useState(false);
   const [run, setRun] = useState<PlanRun | null>(restoredRun);
   const confirmation = useRef<PlanConfirmation | undefined>(restored?.confirmation);
+  const chatInput = useRef<HTMLTextAreaElement>(null);
   const interpret = useRef<AbortController | null>(null);
   const nextChatLine = useRef(conversation.length);
   const confirming = useRef(false);
@@ -385,7 +408,7 @@ function Workspace({
     };
   }, []);
 
-  function change(next: PlanDraft) {
+  function change(next: PlanDraft, previous = revised ?? reference) {
     base.reset();
     first.reset();
     second.reset();
@@ -393,13 +416,26 @@ function Workspace({
     setFeedback("");
     setClarification(undefined);
     setDraft(next);
+    setReference(previous);
     confirmation.current = undefined;
-    writePlanSession(context, { draft: next });
+    writePlanSession(context, { draft: next, reference: previous });
+  }
+
+  function revisePlan(plan: EntryAdvice) {
+    const selected = summarizeRevision(plan);
+    if (!selected) return;
+    change(draft, selected);
+    chatInput.current?.focus();
   }
 
   function setQuestion(next?: Clarification) {
     setClarification(next);
-    writePlanSession(context, { draft, clarification: next, confirmation: confirmation.current });
+    writePlanSession(context, {
+      draft,
+      reference,
+      clarification: next,
+      confirmation: confirmation.current,
+    });
   }
 
   async function send(event: FormEvent<HTMLFormElement>) {
@@ -407,6 +443,7 @@ function Workspace({
     const text = message.trim();
     if (!text || !ORIGIN || interpret.current || checkingSquad || roster.isPending) return;
     const controller = new AbortController();
+    const previous = revised ?? reference;
     interpret.current = controller;
     setReading(true);
     setFeedback("");
@@ -419,9 +456,10 @@ function Workspace({
         players,
         controller.signal,
         clarification,
+        referenceWeeks(previous),
       );
       if (controller.signal.aborted) return;
-      if (answer.status === "draft") change(answer.draft);
+      if (answer.status === "draft") change(answer.draft, previous);
       else setQuestion({ message: clarification?.message ?? text, question: answer.message });
       const reply = answer.status === "clarification" ? answer.message : copy.understood;
       const userLine = nextChatLine.current++;
@@ -445,6 +483,7 @@ function Workspace({
     }
   }
 
+  const frozen = freezeReference(reference, draft.keep_weeks);
   const plans = preparePlans(
     {
       ...draft,
@@ -452,6 +491,7 @@ function Workspace({
       soft: [],
     },
     held,
+    frozen,
   );
   const canCalculate =
     !plans.hardConflict && (draft.soft.length > 0 || plans.base || plans.alternative);
@@ -533,12 +573,27 @@ function Workspace({
       ...confirmation.current,
       followups: candidates.map((candidate) => candidate?.alternative ?? null),
     };
-    writePlanSession(context, { draft, clarification, confirmation: confirmation.current });
+    writePlanSession(context, {
+      draft,
+      reference,
+      clarification,
+      confirmation: confirmation.current,
+    });
     const jobs = [computeFirst, computeSecond];
     candidates.forEach((candidate, index) => {
       if (candidate) jobs[index]?.(candidate.request);
     });
-  }, [baseState, run, deadline, computeFirst, computeSecond, draft, clarification, context]);
+  }, [
+    baseState,
+    run,
+    deadline,
+    computeFirst,
+    computeSecond,
+    draft,
+    reference,
+    clarification,
+    context,
+  ]);
 
   async function compute() {
     if (
@@ -583,6 +638,7 @@ function Workspace({
       ) {
         setBasisChanged(true);
         setRun(null);
+        setReference(undefined);
         confirmation.current = undefined;
         writePlanSession(context, { draft });
         return;
@@ -591,7 +647,7 @@ function Workspace({
       // A public team may have no chip list until its FPL inputs are pinned.
       const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
       const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
-      const next = prepareRun(draft, held, request, plans, wildcardNotHeld);
+      const next = prepareRun(draft, held, request, plans, wildcardNotHeld, frozen);
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
       if (
         !next.baseRequest &&
@@ -599,14 +655,14 @@ function Workspace({
       ) {
         setRun(null);
         confirmation.current = undefined;
-        writePlanSession(context, { draft });
+        writePlanSession(context, { draft, reference });
         return;
       }
       first.reset();
       second.reset();
       setRun(next);
       confirmation.current = { wildcardNotHeld };
-      writePlanSession(context, { draft, confirmation: confirmation.current });
+      writePlanSession(context, { draft, reference, confirmation: confirmation.current });
       if (next.baseRequest) {
         base.compute(next.baseRequest);
       } else base.reset();
@@ -675,6 +731,16 @@ function Workspace({
     });
   }
   const team = squad.entry.team_name ?? squad.entry.manager_name;
+  const alternative = results.find(({ state }) => state.phase === "done")?.state;
+  const revisionAnswer =
+    baseAnswer ?? (alternative?.phase === "done" ? alternative.envelope.payload : undefined);
+  const revised = revisionAnswer && summarizeRevision(revisionAnswer);
+  const bank = draft.min_bank;
+  const bankRule =
+    bank &&
+    (bank.week === undefined
+      ? copy.minimumBank(money(bank.tenths, locale))
+      : copy.minimumWeekBank(money(bank.tenths, locale), squad.gameweek + bank.week - 1));
   const teamPath =
     squad.league_id === 0
       ? entryAddress(squad.entry.entry_id)
@@ -718,6 +784,7 @@ function Workspace({
           <label htmlFor="llmopt-message">{copy.chat}</label>
           <textarea
             id="llmopt-message"
+            ref={chatInput}
             placeholder={copy.placeholder}
             value={message}
             maxLength={MAX_MESSAGE_LENGTH}
@@ -762,6 +829,47 @@ function Workspace({
           </p>
         )}
         <RuleEditor draft={draft} players={players} copy={copy} disabled={busy} change={change} />
+        {(Boolean(draft.keep_weeks?.length) || bankRule) && (
+          <div className={styles.ruleGroup}>
+            <h3>{copy.revisionRules}</h3>
+            <ul>
+              {draft.keep_weeks?.map((week) => {
+                const label = copy.frozenWeek(squad.gameweek + week - 1);
+                return (
+                  <li key={week}>
+                    {label}
+                    <button
+                      className={styles.remove}
+                      type="button"
+                      disabled={busy}
+                      aria-label={`${copy.remove} · ${label}`}
+                      onClick={() => {
+                        const keep = draft.keep_weeks?.filter((item) => item !== week);
+                        change({ ...draft, keep_weeks: keep?.length ? keep : undefined });
+                      }}
+                    >
+                      ×
+                    </button>
+                  </li>
+                );
+              })}
+              {bankRule && (
+                <li>
+                  {bankRule}
+                  <button
+                    className={styles.remove}
+                    type="button"
+                    disabled={busy}
+                    aria-label={`${copy.remove} · ${bankRule}`}
+                    onClick={() => change({ ...draft, min_bank: undefined })}
+                  >
+                    ×
+                  </button>
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
         {draft.comparison && draft.soft.length > 0 && (
           <p className={styles.muted}>{copy.comparisonScope}</p>
         )}
@@ -810,6 +918,7 @@ function Workspace({
           </p>
         )}
       </section>
+      {reference && <RevisionComparison previous={reference} revised={revised} />}
       {run && (
         <section
           className={styles.results}
@@ -825,6 +934,8 @@ function Workspace({
                 squad={squad}
                 conflict={run.baseConflict}
                 prices={priceReview.map(({ price }) => price)}
+                onRevise={baseAnswer ? () => revisePlan(baseAnswer) : undefined}
+                reviseDisabled={busy}
               />
             )}
             {results.map(({ title, state, conflict }) => (
@@ -835,6 +946,10 @@ function Workspace({
                 squad={squad}
                 baseline={baseAnswer}
                 conflict={conflict}
+                onRevise={
+                  state.phase === "done" ? () => revisePlan(state.envelope.payload) : undefined
+                }
+                reviseDisabled={busy}
               />
             ))}
           </div>

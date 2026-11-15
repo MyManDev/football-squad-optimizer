@@ -161,6 +161,8 @@ export function PlanResult({
   baseline,
   conflict,
   prices = [],
+  onRevise,
+  reviseDisabled,
 }: {
   title: string;
   state: ComputePhase;
@@ -168,6 +170,8 @@ export function PlanResult({
   baseline?: EntryAdvice;
   conflict?: boolean;
   prices?: PreferencePrice[];
+  onRevise?: () => void;
+  reviseDisabled?: boolean;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = LLMOPT_COPY[language];
@@ -225,6 +229,16 @@ export function PlanResult({
   return (
     <article className={styles.result} data-plan-ready="">
       <h3 className={styles.resultTitle}>{title}</h3>
+      {onRevise && (
+        <button
+          className={styles.revise}
+          disabled={reviseDisabled}
+          type="button"
+          onClick={onRevise}
+        >
+          {copy.revisePlan}
+        </button>
+      )}
       <dl className={styles.figures}>
         {chip && (
           <div>

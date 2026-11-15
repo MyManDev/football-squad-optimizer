@@ -6,6 +6,7 @@ import {
   type Clarification,
   type PlanDraft,
 } from "./intent";
+import { checkedPlanRevision, type PlanRevision } from "./planRevision";
 
 export const ALTERNATIVE_COUNT = 2;
 
@@ -21,6 +22,7 @@ interface PlanSession {
   draft: PlanDraft;
   clarification?: Clarification;
   confirmation?: PlanConfirmation;
+  reference?: PlanRevision;
 }
 
 export interface PlanSessionContext {
@@ -53,11 +55,15 @@ export function writePlanSession(context: PlanSessionContext | null, session: Pl
 export function checkedPlanSession(
   value: unknown,
   players: readonly CatalogPlayer[],
+  gameweek: number,
 ): PlanSession | null {
   if (!value || typeof value !== "object") return null;
-  const { draft, confirmation, clarification } = value as Partial<PlanSession>;
+  const { draft, confirmation, clarification, reference } = value as Partial<PlanSession>;
   try {
-    const session: PlanSession = { draft: checkedDraft(draft, players) };
+    const session: PlanSession = {
+      draft: checkedDraft(draft, players),
+      reference: checkedPlanRevision(reference, gameweek),
+    };
     if (
       typeof clarification?.message === "string" &&
       clarification.message.length <= MAX_MESSAGE_LENGTH &&

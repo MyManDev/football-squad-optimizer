@@ -7,7 +7,7 @@ from ortools.sat.python import cp_model
 from tests.unit.test_transfer_planning import _horizon_table
 
 import squadopt.planning.optimizer as optimizer
-from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.contracts.preferences import BankFloor, DecisionPreferences, FrozenPlanWeek
 from squadopt.optimization import SolverStatus
 from squadopt.planning import (
     ChipAvailability,
@@ -297,6 +297,44 @@ def test_temporary_free_hit_savings_cannot_fund_an_opening_bank_floor(
     )
     assert refused.solver_status is SolverStatus.INFEASIBLE
     assert not refused.weeks
+
+
+def test_frozen_free_hit_uses_temporary_moves_and_the_bank_floor_uses_carry(
+    known_optimum_players, small_config
+):
+    players = known_optimum_players.copy()
+    players.loc[players.player_id.eq("GK_B"), "price_tenths"] = 30
+    horizon, initial, ids = _case(players)
+    frozen = (
+        FrozenPlanWeek(week=1, transfers_in=(), transfers_out=(), chip=None),
+        FrozenPlanWeek(
+            week=2,
+            transfers_in=(ids["GK_B"],),
+            transfers_out=(ids["GK_A"],),
+            chip="freehit",
+        ),
+    )
+    rights = ChipAvailability(available={"freehit": frozenset({1, 2})})
+    after_free_hit = DecisionPreferences(frozen_weeks=frozen, min_bank=BankFloor(115, week=2))
+    refused = optimizer.optimize_transfer_plan(
+        horizon, initial, small_config, chips=rights, preferences=after_free_hit
+    )
+    assert refused.solver_status is SolverStatus.INFEASIBLE
+
+    final_floor = replace(after_free_hit, min_bank=BankFloor(115))
+    plan = optimizer.optimize_transfer_plan(
+        horizon, initial, small_config, chips=rights, preferences=final_floor
+    )
+    assert plan.solver_status is SolverStatus.OPTIMAL
+    first, second, last = plan.weeks
+    assert first.chip is None and first.transfer_count == 0
+    assert second.chip == "freehit"
+    assert tuple(second.transfers_in.player_id) == (ids["GK_B"],)
+    assert tuple(second.transfers_out.player_id) == (ids["GK_A"],)
+    assert second.bank_after_tenths == 120
+    assert last.bank_before_tenths == 100
+    assert ids["GK_B"] in set(last.transfers_in.player_id)
+    assert last.bank_after_tenths >= 115
 
 
 def test_net_points_priority_compares_the_exact_cost_of_keeping_a_player(

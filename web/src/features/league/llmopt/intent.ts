@@ -1,13 +1,16 @@
 import { discardBody, withRequestDeadline } from "../../../data/request";
 import type { Language } from "../../../i18n/messages";
 import {
+  checkedBankFloor,
   checkedPreferences,
   clubCountKey,
   isHitBudget,
   isPlanWeek,
   preferencesKey,
+  type BankFloor,
   type ClubCount,
   type DecisionPreferences,
+  type FrozenPlanWeek,
   type PlanWeekNumber,
 } from "../advice/decisionPreferences";
 
@@ -43,6 +46,8 @@ export interface PlanDraft {
   soft: Constraint[];
   comparison?: Comparison;
   window?: PlanWindow;
+  keep_weeks?: PlanWeekNumber[];
+  min_bank?: BankFloor;
 }
 
 interface PreparedPlan {
@@ -74,8 +79,9 @@ export function isPlayerKind(kind: Constraint["kind"]): kind is PlayerKind {
 }
 
 export function needsThreeWeeks(draft: PlanDraft) {
-  return [...draft.hard, ...draft.soft, ...(draft.comparison ? [draft.comparison] : [])].some(
-    ({ week }) => week === 2 || week === 3,
+  const rules = [...draft.hard, ...draft.soft, ...(draft.comparison ? [draft.comparison] : [])];
+  return [...rules.map(({ week }) => week), ...(draft.keep_weeks ?? []), draft.min_bank?.week].some(
+    (week) => week === 2 || week === 3,
   );
 }
 
@@ -173,6 +179,16 @@ export function checkedDraft(value: unknown, players: readonly CatalogPlayer[]):
     soft: value.soft.map((item) => parseConstraint(item, playerIds, clubs, "soft")),
     ...(value.window !== undefined ? { window: value.window } : {}),
   };
+  if (value.keep_weeks !== undefined) {
+    if (
+      !Array.isArray(value.keep_weeks) ||
+      !value.keep_weeks.every(isPlanWeek) ||
+      new Set(value.keep_weeks).size !== value.keep_weeks.length
+    )
+      throw new Error("Invalid reference weeks");
+    if (value.keep_weeks.length) draft.keep_weeks = [...value.keep_weeks].sort((a, b) => a - b);
+  }
+  if (value.min_bank !== undefined) draft.min_bank = checkedBankFloor(value.min_bank);
   const keys = [...draft.hard, ...draft.soft].map(constraintKey);
   if (new Set(keys).size !== keys.length) throw new Error("Repeated constraint");
   if (value.comparison != null) {
@@ -228,14 +244,21 @@ function branchSelection(
   rules: readonly Constraint[],
   held: ReadonlySet<number>,
   window: PlanWindow,
+  frozenWeeks: readonly FrozenPlanWeek[],
+  minBank: BankFloor | undefined,
 ): PreparedPlan | null {
   if (rules.some(({ week }) => week !== undefined && week > window)) return null;
   if (playerIds(rules, "keep_player").some((id) => !held.has(id))) return null;
   const forcedWeeks = new Set(
     rules.flatMap(({ kind, week }) => (kind === "wildcard" ? [week ?? 1] : [])),
   );
+  for (const frozen of frozenWeeks) {
+    if (frozen.chip === "wildcard") forcedWeeks.add(frozen.week);
+    else if (frozen.chip !== null) return null;
+  }
   if (forcedWeeks.size > 1) return null;
   const wildcardWeek = [...forcedWeeks][0];
+  if (frozenWeeks.some(({ week, chip }) => week === wildcardWeek && chip === null)) return null;
   const global = ruleFields(rules.filter(({ week }) => week === undefined));
   const weekRules = ([1, 2, 3] as const).flatMap((week) => {
     const scoped = rules.filter((rule) => rule.week === week && rule.kind !== "wildcard");
@@ -275,6 +298,8 @@ function branchSelection(
         ...(weekRules.length ? { week_rules: weekRules } : {}),
         ...(caps.length ? { max_hit_points: Math.min(...caps) } : {}),
         ...(wildcardWeek === 2 || wildcardWeek === 3 ? { wildcard_week: wildcardWeek } : {}),
+        ...(frozenWeeks.length ? { frozen_weeks: frozenWeeks } : {}),
+        ...(minBank ? { min_bank: minBank } : {}),
       }),
     };
   } catch {
@@ -282,8 +307,19 @@ function branchSelection(
   }
 }
 
-export function preparePlans(draft: PlanDraft, held: ReadonlySet<number>) {
+export function preparePlans(
+  draft: PlanDraft,
+  held: ReadonlySet<number>,
+  frozenWeeks: readonly FrozenPlanWeek[] = [],
+) {
   const window = draft.window ?? (needsThreeWeeks(draft) ? 3 : 1);
+  const keepWeeks = draft.keep_weeks ?? [];
+  const resolved =
+    keepWeeks.length === frozenWeeks.length &&
+    keepWeeks.every((week) => week <= window && frozenWeeks.some((row) => row.week === week)) &&
+    (draft.min_bank?.week ?? 1) <= window;
+  const select = (rules: readonly Constraint[]) =>
+    resolved ? branchSelection(rules, held, window, frozenWeeks, draft.min_bank) : null;
   const both = draft.comparison?.kind === "include_player" && draft.comparison.both;
   const baseRules: Constraint[] =
     both && draft.comparison?.kind === "include_player"
@@ -297,9 +333,9 @@ export function preparePlans(draft: PlanDraft, held: ReadonlySet<number>) {
         ]
       : draft.hard;
   const alternativeRules = [...draft.hard, ...(draft.comparison ? [draft.comparison] : draft.soft)];
-  const hard = branchSelection(draft.hard, held, window);
-  const base = both ? branchSelection(baseRules, held, window) : hard;
-  const alternative = branchSelection(alternativeRules, held, window);
+  const hard = select(draft.hard);
+  const base = both ? select(baseRules) : hard;
+  const alternative = select(alternativeRules);
   return {
     window,
     base,
@@ -371,6 +407,7 @@ export async function readIntent(
   players: CatalogPlayer[],
   signal: AbortSignal,
   clarification?: Clarification,
+  referenceWeeks?: readonly PlanWeekNumber[],
 ) {
   return withRequestDeadline(
     async (signal) => {
@@ -386,6 +423,7 @@ export async function readIntent(
             ...(team.trim() ? { team } : {}),
           })),
           ...(clarification ? { clarification } : {}),
+          ...(referenceWeeks?.length ? { reference_weeks: referenceWeeks } : {}),
         }),
         signal,
       });

@@ -522,6 +522,8 @@ class TransferPlanningConfig:
     This bounded financing neighborhood never permits a two-move paid transfer;
     Wildcard and Free Hit retain their ordinary rebuild exemption.
     """
+    transfer_caps_by_gameweek: Mapping[int, int] = field(default_factory=dict)
+    """Replace the default transfer cap at explicitly configured gameweeks."""
 
     def __post_init__(self) -> None:
         if self.contract_version != TRANSFER_PLANNING_CONTRACT_VERSION:
@@ -540,6 +542,18 @@ class TransferPlanningConfig:
                 "max_transfers_per_gameweek",
                 _integer(self.max_transfers_per_gameweek, "max_transfers_per_gameweek", 1),
             )
+        if not isinstance(self.transfer_caps_by_gameweek, Mapping):
+            raise TransferPlanningConfigurationError("Transfer caps must be a mapping.")
+        object.__setattr__(
+            self,
+            "transfer_caps_by_gameweek",
+            MappingProxyType(
+                {
+                    _integer(week, "Cap gameweek", 1): _integer(cap, "Transfer cap", 1)
+                    for week, cap in self.transfer_caps_by_gameweek.items()
+                }
+            ),
+        )
         object.__setattr__(
             self,
             "banked_transfer_value_points",
@@ -638,6 +652,8 @@ class TransferPlanningConfig:
             payload["acquisition_sell_on_fee"] = float(self.acquisition_sell_on_fee).hex()
         if self.allow_two_free_transfers:
             payload["allow_two_free_transfers"] = True
+        if self.transfer_caps_by_gameweek:
+            payload["transfer_caps_by_gameweek"] = dict(self.transfer_caps_by_gameweek)
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 

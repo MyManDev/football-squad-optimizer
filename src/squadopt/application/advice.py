@@ -1119,10 +1119,25 @@ def window_payload(
                 "expected_points": expected_week_points(week),
                 **(
                     {
+                        "bank_after_tenths": int(
+                            week.bank_before_tenths
+                            if week.chip == "freehit"
+                            else week.bank_after_tenths
+                        ),
+                    }
+                    if include_resource_state
+                    else {}
+                ),
+                **(
+                    {
                         "lineup_expectation": lineup_expectation_fields(week),
-                        "lineup": lineup_decision_fields(week),
                     }
                     if week.lineup_expectation is not None
+                    else {}
+                ),
+                **(
+                    {"lineup": lineup_decision_fields(week)}
+                    if include_resource_state or week.lineup_expectation is not None
                     else {}
                 ),
             }

@@ -1271,6 +1271,18 @@ def plan_transfer_horizon(
         if transfer_config is None
         else transfer_config
     )
+    if preferences is not None and transfer_config is None and not game_transfer_limits:
+        game_limit = rules.transfers.transfers_cap
+        frozen_caps = {
+            first_gameweek + week.week - 1: len(week.transfers_in)
+            for week in preferences.frozen_weeks
+            if len(week.transfers_in) > 1
+            and week.chip not in ("wildcard", "freehit")
+            and (game_limit is None or len(week.transfers_in) <= game_limit)
+        }
+        if frozen_caps:
+            # A prior legal decision may predate our narrower default search policy.
+            planning_policy = replace(planning_policy, transfer_caps_by_gameweek=frozen_caps)
     if net_points_priority:
         planning_policy = planning_policy.for_net_points()
     if len(projection_horizon.target_gameweeks) > 1:

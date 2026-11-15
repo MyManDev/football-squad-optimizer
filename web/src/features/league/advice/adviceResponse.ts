@@ -1,6 +1,6 @@
 import { checkedPreferences, preferenceScope, preferencesKey } from "./decisionPreferences";
 import { LeagueDataError } from "../dataErrors";
-import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import type { AdvicePlayer, EntryAdvice, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "./adviceClient";
 import { isAdvicePayload } from "./adviceShape";
 
@@ -10,6 +10,11 @@ export class AdviceContextError extends AdviceResponseError {}
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function samePlayers(players: AdvicePlayer[], expected: number[]) {
+  const ids = new Set(players.map(({ player_id }) => player_id));
+  return players.length === expected.length && expected.every((id) => ids.has(id));
 }
 
 /** A successful transport response still has to answer the selected member and week. */
@@ -68,6 +73,28 @@ export function checkedAdvice(
   }
   const requested = request.preferences;
   const plan = payload as unknown as EntryAdvice;
+  for (const frozen of requested?.frozen_weeks ?? []) {
+    const week = plan.plan_weeks?.find((row) => row.gameweek === plan.gameweek + frozen.week - 1);
+    if (
+      !week ||
+      week.chip !== frozen.chip ||
+      !samePlayers(week.transfers_in, frozen.transfers_in) ||
+      !samePlayers(week.transfers_out, frozen.transfers_out) ||
+      (frozen.starting_xi &&
+        (!week.lineup ||
+          week.lineup.captain.player_id !== frozen.captain ||
+          !samePlayers(week.lineup.starting_xi, frozen.starting_xi)))
+    )
+      throw new AdviceContextError("Advice changes a frozen week.");
+  }
+  if (requested?.min_bank) {
+    const { tenths, week = request.window } = requested.min_bank;
+    const carried = plan.plan_weeks?.find(
+      (row) => row.gameweek === plan.gameweek + week - 1,
+    )?.bank_after_tenths;
+    if (carried === undefined || carried < tenths)
+      throw new AdviceContextError("Advice does not retain the required budget.");
+  }
   if (requested?.hold_opening_transfers) {
     const opening = plan.plan_weeks?.find((week) => week.gameweek === plan.gameweek);
     const openingChip = opening ? opening.chip : plan.chip;

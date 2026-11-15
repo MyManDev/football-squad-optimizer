@@ -129,7 +129,7 @@ def optimize_chip_strategy(
                 diagnostics={**plan.diagnostics, "terminal_chip_holding_value": reserve},
             )
         if expected_lineups:
-            plan = improve_plan_lineups(plan, optimization, transfer)
+            plan = improve_plan_lineups(plan, optimization, transfer, preferences=preferences)
         candidates.append((label, plan))
 
     def utility(plan: TransferPlanResult) -> float:

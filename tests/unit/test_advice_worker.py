@@ -1867,6 +1867,66 @@ def test_an_opening_buy_of_an_owned_player_is_refused_before_queueing(running):
     assert not backend.queue.jobs()
 
 
+def test_llmopt_replans_after_a_frozen_wildcard_and_keeps_the_following_lineup(
+    tmp_path, monkeypatch
+):
+    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    selection = {"strategy": "saf-puan", "window": 3, "chip": "wildcard"}
+    preferences = {"week_rules": [{"week": 1, "rules": {"buy_players": [1007]}}]}
+
+    def solve(rules):
+        accepted = client.post(route, json={**selection, "preferences": rules})
+        assert accepted.status_code == 202, accepted.text
+        assert _work(backend) == 1
+        served = client.get(route, params={**selection, "preferences": json.dumps(rules)})
+        assert served.status_code == 200, served.text
+        return served.json()["payload"]["plan_weeks"]
+
+    original = solve(preferences)
+
+    def decision(offset, row):
+        return {
+            "week": offset,
+            "transfers_in": sorted(p["player_id"] for p in row["transfers_in"]),
+            "transfers_out": sorted(p["player_id"] for p in row["transfers_out"]),
+            "chip": row["chip"],
+            "starting_xi": sorted(p["player_id"] for p in row["lineup"]["starting_xi"]),
+            "captain": row["lineup"]["captain"]["player_id"],
+        }
+
+    frozen = [decision(offset, row) for offset, row in enumerate(original[:2], 1)]
+    assert frozen[0]["chip"] == "wildcard" and 1007 in frozen[0]["transfers_in"]
+    floor = max(1, original[-1]["bank_after_tenths"])
+    alternative = solve({"frozen_weeks": frozen, "min_bank": {"tenths": floor, "week": 3}})
+    assert [decision(offset, row) for offset, row in enumerate(alternative[:2], 1)] == frozen
+    assert alternative[2]["bank_after_tenths"] >= floor
+    assert all(len(row["lineup"]["starting_xi"]) == 11 for row in alternative)
+
+
+def test_frozen_paid_moves_can_exceed_the_default_advice_cap_only_in_that_week(tmp_path, monkeypatch):
+    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    preferences = {
+        "frozen_weeks": [
+            {"week": 1, "transfers_in": [1002, 1007], "transfers_out": [1001, 1004], "chip": None}
+        ]
+    }
+    selection = {"strategy": "saf-puan", "window": 3}
+    accepted = client.post(route, json={**selection, "preferences": preferences})
+    assert accepted.status_code == 202, accepted.text
+    assert _work(backend) == 1
+    served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+    assert served.status_code == 200, served.text
+    first, *later = served.json()["payload"]["plan_weeks"]
+    assert {player["player_id"] for player in first["transfers_in"]} == {1002, 1007}
+    assert {player["player_id"] for player in first["transfers_out"]} == {1001, 1004}
+    assert first["transfer_hit_points"] == max(0, 2 - first["free_transfers_before"]) * 4
+    assert all(len(week["transfers_in"]) <= 1 for week in later)
+
+
 def test_preferences_round_trip_through_http_worker_cache(running):
     backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))

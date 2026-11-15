@@ -15,7 +15,78 @@ _WINDOW_FIELDS = {
     "hold_opening_transfers",
     "min_opening_bank_tenths",
     "net_points_priority",
+    "frozen_weeks",
+    "min_bank",
 }
+_CHIPS = ("wildcard", "freehit", "bboost", "3xc")
+
+
+@dataclass(frozen=True, slots=True)
+class FrozenPlanWeek:
+    week: int
+    transfers_in: tuple[int, ...]
+    transfers_out: tuple[int, ...]
+    chip: str | None
+    starting_xi: tuple[int, ...] = ()
+    captain: int | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.week) is not int or not 1 <= self.week <= 3:
+            raise ValueError("A frozen week must be an offset from 1 to 3.")
+        if self.chip is not None and self.chip not in _CHIPS:
+            raise ValueError("A frozen week must name a legal chip or no chip.")
+        for field in ("transfers_in", "transfers_out", "starting_xi"):
+            ids = getattr(self, field)
+            if (
+                not isinstance(ids, (list, tuple))
+                or len(ids) > 15
+                or any(type(player) is not int or player <= 0 for player in ids)
+                or len(set(ids)) != len(ids)
+            ):
+                raise ValueError("A frozen week contains invalid player ids.")
+            object.__setattr__(self, field, tuple(sorted(ids)))
+        if len(self.transfers_in) != len(self.transfers_out) or set(self.transfers_in).intersection(
+            self.transfers_out
+        ):
+            raise ValueError("A frozen week requires balanced and disjoint transfers.")
+        if (self.starting_xi or self.captain is not None) and (
+            len(self.starting_xi) != 11
+            or type(self.captain) is not int
+            or self.captain not in self.starting_xi
+            or set(self.starting_xi).intersection(self.transfers_out)
+        ):
+            raise ValueError("A frozen lineup must contain eleven starters and their captain.")
+
+    def payload(self) -> dict[str, object]:
+        result: dict[str, object] = {
+            "week": self.week,
+            "transfers_in": list(self.transfers_in),
+            "transfers_out": list(self.transfers_out),
+            "chip": self.chip,
+        }
+        if self.starting_xi:
+            result["starting_xi"] = list(self.starting_xi)
+            result["captain"] = self.captain
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class BankFloor:
+    tenths: int
+    week: int | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.tenths) is not int or not 1 <= self.tenths <= 10_000:
+            raise ValueError("The minimum bank must be an integer from 1 to 10000.")
+        if self.week is not None and (type(self.week) is not int or not 1 <= self.week <= 3):
+            raise ValueError("The minimum bank week must be an offset from 1 to 3.")
+
+    def payload(self) -> dict[str, int]:
+        return (
+            {"tenths": self.tenths}
+            if self.week is None
+            else {"tenths": self.tenths, "week": self.week}
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +149,8 @@ class DecisionPreferences:
     hold_opening_transfers: bool = False
     min_opening_bank_tenths: int | None = None
     net_points_priority: bool = False
+    frozen_weeks: tuple[FrozenPlanWeek, ...] = ()
+    min_bank: BankFloor | None = None
 
     def __post_init__(self) -> None:
         for name in _PLAYER_FIELDS:
@@ -167,6 +240,32 @@ class DecisionPreferences:
             target = self.for_week(self.wildcard_week)
             if target.save_chips or target.hold_transfers:
                 raise ValueError("The future Wildcard conflicts with rules for that week.")
+        if self.min_bank is not None and not isinstance(self.min_bank, BankFloor):
+            raise ValueError("Invalid minimum bank.")
+        if (
+            not isinstance(self.frozen_weeks, (list, tuple))
+            or len(self.frozen_weeks) > 3
+            or any(not isinstance(row, FrozenPlanWeek) for row in self.frozen_weeks)
+            or len({row.week for row in self.frozen_weeks}) != len(self.frozen_weeks)
+        ):
+            raise ValueError("Invalid frozen weeks.")
+        object.__setattr__(
+            self, "frozen_weeks", tuple(sorted(self.frozen_weeks, key=lambda row: row.week))
+        )
+        for frozen in self.frozen_weeks:
+            rules = self.for_week(frozen.week)
+            fixed_in, fixed_out = set(frozen.transfers_in), set(frozen.transfers_out)
+            if (
+                (
+                    fixed_in
+                    and (rules.hold_transfers or (frozen.week == 1 and self.hold_opening_transfers))
+                )
+                or not set(rules.buy_players) <= fixed_in
+                or fixed_in.intersection(rules.avoid_players)
+                or fixed_out.intersection((*rules.keep_players, *rules.include_players))
+                or set(frozen.starting_xi).intersection(rules.avoid_players)
+            ):
+                raise ValueError("A frozen week conflicts with a player or transfer rule.")
 
     def _combined(self, weekly: DecisionPreferences) -> DecisionPreferences:
         counts = {(rule.club, rule.scope): rule for rule in self.club_counts}
@@ -194,8 +293,15 @@ class DecisionPreferences:
     def validate_window(self, window: int) -> None:
         if self.scoped and (type(window) is not int or window < 1):
             raise ValueError("The selected planning window is invalid.")
-        if (self.wildcard_week is not None and self.wildcard_week > window) or any(
-            row.week > window for row in self.week_rules
+        if (
+            (self.wildcard_week is not None and self.wildcard_week > window)
+            or (
+                self.min_bank is not None
+                and self.min_bank.week is not None
+                and self.min_bank.week > window
+            )
+            or any(row.week > window for row in self.week_rules)
+            or any(row.week > window for row in self.frozen_weeks)
         ):
             raise ValueError("A rule names a week outside the selected window.")
 
@@ -206,6 +312,8 @@ class DecisionPreferences:
             or self.wildcard_week
             or self.hold_opening_transfers
             or self.min_opening_bank_tenths is not None
+            or self.frozen_weeks
+            or self.min_bank is not None
         )
 
     @property
@@ -267,6 +375,10 @@ class DecisionPreferences:
             payload["min_opening_bank_tenths"] = self.min_opening_bank_tenths
         if self.net_points_priority:
             payload["net_points_priority"] = True
+        if self.frozen_weeks:
+            payload["frozen_weeks"] = [row.payload() for row in self.frozen_weeks]
+        if self.min_bank is not None:
+            payload["min_bank"] = self.min_bank.payload()
         return payload
 
     def canonical(self) -> str:
@@ -285,6 +397,12 @@ class DecisionPreferences:
             raise ValueError("Holding transfers conflicts with rebuilding or automatic chips.")
         if self.wildcard_week is not None and chip is not None:
             raise ValueError("A future Wildcard conflicts with another chip selection.")
+        for row in self.frozen_weeks:
+            selected = (
+                chip if row.week == 1 else "wildcard" if row.week == self.wildcard_week else None
+            )
+            if chip == "auto" or row.chip != selected:
+                raise ValueError("The chip selection conflicts with a frozen week.")
         if chip is not None and chip != "auto":
             current = self.for_week(1)
             opening_hold = current.hold_transfers or self.hold_opening_transfers
@@ -325,7 +443,38 @@ class DecisionPreferences:
             for name in ("max_hit_points", "wildcard_week", "min_opening_bank_tenths")
         ):
             raise ValueError("Invalid window preference.")
-        return cls(**(value | {"club_counts": tuple(counts), "week_rules": tuple(week_rules)}))
+        frozen = value.get("frozen_weeks", [])
+        if not isinstance(frozen, list) or len(frozen) > 3:
+            raise ValueError("Invalid frozen weeks.")
+        for row in frozen:
+            if (
+                not isinstance(row, dict)
+                or not {"week", "transfers_in", "transfers_out", "chip"} <= row.keys()
+                or row.keys()
+                - {"week", "transfers_in", "transfers_out", "chip", "starting_xi", "captain"}
+                or ("starting_xi" in row) != ("captain" in row)
+                or ("starting_xi" in row and (not row["starting_xi"] or row["captain"] is None))
+            ):
+                raise ValueError("Invalid frozen week.")
+        bank = value.get("min_bank")
+        if "min_bank" in value and (
+            not isinstance(bank, dict)
+            or "tenths" not in bank
+            or bank.keys() - {"tenths", "week"}
+            or ("week" in bank and bank["week"] is None)
+        ):
+            raise ValueError("Invalid minimum bank.")
+        return cls(
+            **(
+                value
+                | {
+                    "club_counts": tuple(counts),
+                    "week_rules": tuple(week_rules),
+                    "frozen_weeks": tuple(FrozenPlanWeek(**row) for row in frozen),
+                    "min_bank": BankFloor(**bank) if bank is not None else None,
+                }
+            )
+        )
 
 
 NO_PREFERENCES = DecisionPreferences()
@@ -371,6 +520,34 @@ def preferences_schema() -> dict[str, object]:
             "hold_opening_transfers": {"type": "boolean"},
             "min_opening_bank_tenths": {"type": "integer", "minimum": 1, "maximum": 10000},
             "net_points_priority": {"type": "boolean"},
+            "frozen_weeks": {
+                "type": "array",
+                "maxItems": 3,
+                "uniqueItems": True,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["week", "transfers_in", "transfers_out", "chip"],
+                    "dependentRequired": {"starting_xi": ["captain"], "captain": ["starting_xi"]},
+                    "properties": {
+                        "week": {"type": "integer", "minimum": 1, "maximum": 3},
+                        "transfers_in": ids,
+                        "transfers_out": ids,
+                        "chip": {"enum": [None, *_CHIPS]},
+                        "starting_xi": {**ids, "minItems": 11, "maxItems": 11},
+                        "captain": {"type": "integer", "minimum": 1},
+                    },
+                },
+            },
+            "min_bank": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["tenths"],
+                "properties": {
+                    "tenths": {"type": "integer", "minimum": 1, "maximum": 10000},
+                    "week": {"type": "integer", "minimum": 1, "maximum": 3},
+                },
+            },
             "week_rules": {
                 "type": "array",
                 "maxItems": 3,

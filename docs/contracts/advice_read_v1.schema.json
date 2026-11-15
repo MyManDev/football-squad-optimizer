@@ -1475,6 +1475,10 @@
         "plan_weeks": {
           "items": {
             "properties": {
+              "bank_after_tenths": {
+                "minimum": 0,
+                "type": "integer"
+              },
               "chip": {
                 "enum": [
                   null,
@@ -1884,6 +1888,77 @@
               "type": "array",
               "uniqueItems": true
             },
+            "frozen_weeks": {
+              "items": {
+                "additionalProperties": false,
+                "dependentRequired": {
+                  "captain": [
+                    "starting_xi"
+                  ],
+                  "starting_xi": [
+                    "captain"
+                  ]
+                },
+                "properties": {
+                  "captain": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "chip": {
+                    "enum": [
+                      null,
+                      "wildcard",
+                      "freehit",
+                      "bboost",
+                      "3xc"
+                    ]
+                  },
+                  "starting_xi": {
+                    "items": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "maxItems": 11,
+                    "minItems": 11,
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "transfers_in": {
+                    "items": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "maxItems": 15,
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "transfers_out": {
+                    "items": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "maxItems": 15,
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "week": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "week",
+                  "transfers_in",
+                  "transfers_out",
+                  "chip"
+                ],
+                "type": "object"
+              },
+              "maxItems": 3,
+              "type": "array",
+              "uniqueItems": true
+            },
             "hold_opening_transfers": {
               "type": "boolean"
             },
@@ -1912,6 +1987,25 @@
               "maximum": 60,
               "minimum": 0,
               "type": "integer"
+            },
+            "min_bank": {
+              "additionalProperties": false,
+              "properties": {
+                "tenths": {
+                  "maximum": 10000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "week": {
+                  "maximum": 3,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "tenths"
+              ],
+              "type": "object"
             },
             "min_opening_bank_tenths": {
               "maximum": 10000,

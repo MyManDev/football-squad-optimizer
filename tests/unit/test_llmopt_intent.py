@@ -110,6 +110,47 @@ def test_response_asks_a_question_instead_of_returning_a_partial_draft() -> None
     assert response.json() == {"status": "clarification", "message": "Hangi oyuncu?"}
 
 
+@pytest.mark.parametrize("reference_weeks", [[1, 2, 3], [2], []])
+def test_revision_interprets_a_frozen_week_and_a_bank_floor(reference_weeks: list[int]) -> None:
+    def provider(request: IntentRequest) -> object:
+        assert request.reference_weeks == tuple(reference_weeks)
+        return {
+            "status": "draft",
+            "draft": {
+                "hard": [{"kind": "no_hits", "player_id": None}],
+                "soft": [],
+                "comparison": None,
+                "window": None,
+                "keep_weeks": [1],
+                "min_bank": {"tenths": 5, "week": 2},
+            },
+            "message": None,
+        }
+
+    body = {
+        **_request(),
+        "message": "İlk haftay\u0131 koru, ikinci hafta sonunda £0,5m kals\u0131n.",
+        "reference_weeks": reference_weeks,
+    }
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=body)
+    assert response.status_code == 200
+    if 1 in reference_weeks:
+        assert response.json() == {
+            "status": "draft",
+            "draft": {
+                "hard": [{"kind": "no_hits"}],
+                "soft": [],
+                "window": 3,
+                "keep_weeks": [1],
+                "min_bank": {"tenths": 5, "week": 2},
+            },
+        }
+    else:
+        assert response.json()["status"] == "clarification"
+        assert "hesaplayal" in response.json()["message"]
+
+
 def test_wildcard_is_a_chip_instruction_with_no_player_id() -> None:
     def provider(request: IntentRequest) -> object:
         assert request.message == "Wildcard kullan, Salah kadroda kals\u0131n."

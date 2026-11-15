@@ -7,9 +7,16 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 from tests.fixtures.backend_app import app_for_capture
-from tests.unit.test_advice_worker import ENTRY_ID, LEAGUE_ID, _deployment, world_module
+from tests.unit.test_advice_worker import (
+    ENTRY_ID,
+    LEAGUE_ID,
+    STARTING_ELEVEN,
+    _deployment,
+    world_module,
+)
 from tests.unit.test_api_advice_switches import COUNTS
 from tests.unit.test_football_development import football_fixture  # noqa: F401
+from tests.unit.test_public_entry_compute import bundle as public_entry_bundle
 
 from squadopt.application.advice import EXPECTED_LINEUP_PLAN_LIMIT, TOP100_LIMIT
 from squadopt.application.advice_variants import TOP100_WINDOW_LIMIT
@@ -237,6 +244,61 @@ def test_the_site_holds_the_share_limit_verbatim_and_it_passes_the_honesty_guard
     assert _web_literal("FOOTBALL_SHARE_STATED_LIMIT") == SHARES_BEFORE_AVAILABILITY_LIMIT
     assert not FORBIDDEN_TEXT_PATTERN.search(SHARES_BEFORE_AVAILABILITY_LIMIT)
     assert not any(character.isdigit() for character in SHARES_BEFORE_AVAILABILITY_LIMIT)
+
+
+def test_public_football_plan_keeps_a_frozen_second_week_lineup(tmp_path, monkeypatch):
+    artifacts = tmp_path / "artifacts"
+    world = _deployment(
+        tmp_path, monkeypatch, last_gameweek=6, artifact_root=artifacts, public_entries=True
+    )
+    backend = world["backend"]
+    context = backend.contexts.identity()
+    path = football_artifact_path(artifacts, world["snapshot_id"])
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(_forecast(context.inputs)), encoding="utf-8")
+    monkeypatch.setattr(
+        backend.public_inputs,
+        "_fetch",
+        lambda entry, week: json.dumps(public_entry_bundle(entry, week)).encode(),
+    )
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = "/api/v1/public/leagues/0/entries/987654/advice"
+    selection = {"strategy": "saf-puan", "window": 3, "model": "football"}
+    preferences = {
+        "frozen_weeks": [
+            {"week": 1, "transfers_in": [], "transfers_out": [], "chip": None},
+            {
+                "week": 2,
+                "transfers_in": [],
+                "transfers_out": [],
+                "chip": None,
+                "starting_xi": list(STARTING_ELEVEN),
+                "captain": STARTING_ELEVEN[0],
+            },
+        ]
+    }
+    accepted = client.post(route, json={**selection, "preferences": preferences})
+    assert accepted.status_code == 202, accepted.text
+    outcome = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(
+            backend.contexts, backend.job_specs, public_inputs=backend.public_inputs
+        ),
+        at_utc=world_module.GW2_CAPTURED_AT,
+    )
+    assert outcome.status == "completed", outcome.error
+    served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["prediction_model"]["version"] == FOOTBALL_MODEL_VERSION
+    first, second, _ = payload["plan_weeks"]
+    assert second["gameweek"] == 3 and second["chip"] is None
+    assert second["transfers_in"] == second["transfers_out"] == []
+    assert set(STARTING_ELEVEN) == {p["player_id"] for p in second["lineup"]["starting_xi"]}
+    assert second["lineup"]["captain"]["player_id"] == STARTING_ELEVEN[0]
+    assert second["bank_after_tenths"] == first["bank_after_tenths"]
+    assert "lineup_expectation" in second
 
 
 def test_football_missing_and_unknown_refused_before_queue(tmp_path, monkeypatch):

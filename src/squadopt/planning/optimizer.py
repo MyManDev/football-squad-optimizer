@@ -13,7 +13,7 @@ from typing import Final
 import pandas as pd
 from ortools.sat.python import cp_model
 
-from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.contracts.preferences import DecisionPreferences, FrozenPlanWeek
 from squadopt.optimization import (
     InvalidConfigurationError,
     OptimizationConfig,
@@ -426,7 +426,9 @@ def _build_model(
             cp_model.LinearExpr.sum(rebuild_vars) if rebuild_vars else 0
         )
         # Transfer discipline: a hard cap on moves per gameweek, lifted under a rebuild.
-        cap = transfer_config.max_transfers_per_gameweek
+        cap = transfer_config.transfer_caps_by_gameweek.get(
+            gameweek, transfer_config.max_transfers_per_gameweek
+        )
         if cap is not None:
             effective_cap: cp_model.IntVar | int = cap
             if cap == 1 and transfer_config.allow_two_free_transfers:
@@ -1016,6 +1018,38 @@ def _fix_week_squads(
             artifacts.model.add(artifacts.squad_vars[index][columns[player]] == 1)
 
 
+def _freeze_week_decision(
+    artifacts: _PlanArtifacts, frozen: FrozenPlanWeek, starting_size: int
+) -> None:
+    index = frozen.week - 1
+    columns = {
+        player: column for column, player in enumerate(artifacts.players_by_week[index].player_id)
+    }
+    if frozen.starting_xi and len(frozen.starting_xi) != starting_size:
+        raise TransferPlanningValidationError("A frozen lineup must specify every starter.")
+    captain = () if frozen.captain is None else (frozen.captain,)
+    for variables, chosen in (
+        (artifacts.transfer_in_vars, frozen.transfers_in),
+        (artifacts.transfer_out_vars, frozen.transfers_out),
+        (artifacts.starter_vars, frozen.starting_xi),
+        (artifacts.captain_vars, captain),
+    ):
+        for player in chosen:
+            if player not in columns:
+                raise TransferPlanningValidationError(
+                    "A frozen player is outside the forecast roster."
+                )
+            artifacts.model.add(variables[index][columns[player]] == 1)
+    # Both transfer directions have this cardinality, so fixing the named moves
+    # and count also rules out any additional transfers.
+    artifacts.model.add(artifacts.transfer_count_vars[index] == len(frozen.transfers_in))
+    available = artifacts.chip_vars[index]
+    if frozen.chip is not None and frozen.chip not in available:
+        artifacts.model.add(False)
+    for chip, variable in available.items():
+        artifacts.model.add(variable == int(chip == frozen.chip))
+
+
 def _bound_first_week_overlap(
     artifacts: _PlanArtifacts,
     first_week: pd.DataFrame,
@@ -1412,6 +1446,12 @@ def optimize_transfer_plan(
                 )
         if preferences.min_opening_bank_tenths is not None:
             artifacts.model.add(artifacts.base_bank_vars[0] >= preferences.min_opening_bank_tenths)
+        if preferences.min_bank is not None:
+            floor = preferences.min_bank
+            index = len(players_by_week) - 1 if floor.week is None else floor.week - 1
+            artifacts.model.add(artifacts.base_bank_vars[index] >= floor.tenths)
+        for frozen in preferences.frozen_weeks:
+            _freeze_week_decision(artifacts, frozen, optimization_config.starting_size)
         for week, table in enumerate(players_by_week):
             weekly = preferences.for_week(week + 1)
             hold_transfers = weekly.hold_transfers or (
