@@ -19,6 +19,7 @@ import {
   EMPTY_DRAFT,
   IntentError,
   MAX_MESSAGE_LENGTH,
+  needsThreeWeeks,
   preparePlans,
   readIntent,
   readIntentCatalog,
@@ -192,8 +193,12 @@ function Session({ squad }: { squad: EntrySquad }) {
           : client.readCapabilities?.(squad.league_id),
       ]);
       if (!mounted.current) return;
-      if (!capabilities?.preferences || !capabilities.strategies["saf-puan"]?.windows.includes(1)) {
+      if (!capabilities?.preferences) {
         setFeedback(copy.serviceUnavailable);
+        return;
+      }
+      if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
+        setFeedback(copy.windowUnavailable);
         return;
       }
       if (
@@ -215,7 +220,7 @@ function Session({ squad }: { squad: EntrySquad }) {
         leagueId: squad.league_id,
         entryId: squad.entry.entry_id,
         strategy: "saf-puan",
-        window: 1,
+        window: plans.window,
         season: squad.season,
         gameweek: squad.gameweek,
       };
@@ -267,7 +272,6 @@ function Session({ squad }: { squad: EntrySquad }) {
           {copy.week} {squad.gameweek}
         </p>
       </header>
-      <p className={styles.muted}>{copy.chipScope}</p>
       {!ORIGIN && (
         <p className={styles.notice} role="status">
           {copy.serviceUnavailable}
@@ -321,6 +325,19 @@ function Session({ squad }: { squad: EntrySquad }) {
             </button>
           )}
         </form>
+        <label className={styles.windowChoice}>
+          {copy.window}
+          <select
+            value={plans.window}
+            disabled={busy}
+            onChange={(event) => change({ ...draft, window: event.target.value === "3" ? 3 : 1 })}
+          >
+            <option value={1} disabled={needsThreeWeeks(draft)}>
+              {copy.oneWeek}
+            </option>
+            <option value={3}>{copy.threeWeeks}</option>
+          </select>
+        </label>
         {feedback && (
           <p role="status" className={styles.notice}>
             {feedback}

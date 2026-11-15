@@ -1,6 +1,11 @@
 import { useState, type FormEvent } from "react";
 
-import { clubCountKey } from "../advice/decisionPreferences";
+import {
+  clubCountKey,
+  isHitBudget,
+  isPlanWeek,
+  type PlanWeekNumber,
+} from "../advice/decisionPreferences";
 
 import type { LLMOptCopy } from "./copy";
 import {
@@ -8,6 +13,7 @@ import {
   constraintKey,
   isPlayerKind,
   MAX_CONSTRAINTS,
+  needsThreeWeeks,
   type CatalogPlayer,
   type Constraint,
   type PlanDraft,
@@ -35,20 +41,35 @@ export function RuleEditor({
   const [club, setClub] = useState("");
   const [clubCount, setClubCount] = useState(1);
   const [clubScope, setClubScope] = useState<"squad" | "transfers_in">("squad");
+  const [week, setWeek] = useState<PlanWeekNumber>();
+  const [points, setPoints] = useState("4");
   const [both, setBoth] = useState(false);
   const availablePlayers = kind === "keep_player" ? players.filter(({ held }) => held) : players;
   const player = availablePlayers.find(({ id }) => String(id) === playerId);
   const clubs = [...new Set(players.map(({ team }) => team).filter(Boolean))].sort();
   const selectedClub = clubs.find((name) => name === club);
   const listFull = draft.hard.length + draft.soft.length >= MAX_CONSTRAINTS;
+  const selectedWeek = week ?? (kind === "buy_player" ? 1 : undefined);
+  const hitBudget = points.trim() ? Number(points) : null;
+
+  function apply(next: PlanDraft) {
+    change(needsThreeWeeks(next) ? { ...next, window: 3 } : next);
+  }
 
   function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (disabled || (strength !== "comparison" && listFull)) return;
     let rule: Constraint;
-    if (isPlayerKind(kind)) {
+    const timing = selectedWeek === undefined ? {} : { week: selectedWeek };
+    if (kind === "hit_budget") {
+      if (!isHitBudget(hitBudget)) return;
+      rule = { kind, points: hitBudget };
+    } else if (isPlayerKind(kind)) {
       if (!player) return;
-      rule = { kind, player_id: player.id };
+      rule =
+        kind === "buy_player"
+          ? { kind, player_id: player.id, week: selectedWeek ?? 1 }
+          : { kind, player_id: player.id, ...timing };
     } else if (kind === "club_count") {
       if (!selectedClub) return;
       rule = {
@@ -56,12 +77,13 @@ export function RuleEditor({
         club: selectedClub,
         count: clubCount,
         ...(clubScope === "transfers_in" ? { scope: clubScope } : {}),
+        ...timing,
       };
     } else {
-      rule = { kind };
+      rule = { kind, ...timing };
     }
     if (strength === "comparison") {
-      change({
+      apply({
         ...draft,
         comparison: both && kind === "include_player" ? { ...rule, both: true } : rule,
       });
@@ -70,24 +92,32 @@ export function RuleEditor({
       const replaces = (row: Constraint, inGroup: Strength) =>
         constraintKey(row) === key ||
         (strength === inGroup &&
-          row.kind === "club_count" &&
-          rule.kind === "club_count" &&
-          clubCountKey(row) === clubCountKey(rule));
+          ((row.kind === "club_count" &&
+            rule.kind === "club_count" &&
+            row.week === rule.week &&
+            clubCountKey(row) === clubCountKey(rule)) ||
+            (row.kind === "hit_budget" && rule.kind === "hit_budget")));
       const hard = draft.hard.filter((row) => !replaces(row, "hard"));
       const soft = draft.soft.filter((row) => !replaces(row, "soft"));
       (strength === "hard" ? hard : soft).push(rule);
-      change({ ...draft, hard, soft });
+      apply({ ...draft, hard, soft });
     }
   }
 
   function label(rule: Constraint) {
+    const timing =
+      rule.week === undefined
+        ? ""
+        : ` · ${rule.week === 1 ? copy.thisWeek : copy.relativeWeek(rule.week)}`;
     if (rule.kind === "club_count") {
       const scope = rule.scope === "transfers_in" ? copy.clubTransfers : copy.clubSquad;
-      return `${rule.club} · ${scope} · ${rule.count}`;
+      return `${rule.club} · ${scope} · ${rule.count}${timing}`;
     }
-    if (!("player_id" in rule)) return copy.rules[rule.kind];
+    if (rule.kind === "hit_budget")
+      return `${copy.rules[rule.kind]} · ${copy.hitBudgetPoints(rule.points)}`;
+    if (!("player_id" in rule)) return `${copy.rules[rule.kind]}${timing}`;
     const selected = players.find(({ id }) => id === rule.player_id);
-    return `${copy.rules[rule.kind]} · ${selected?.name ?? rule.player_id}`;
+    return `${copy.rules[rule.kind]} · ${selected?.name ?? rule.player_id}${timing}`;
   }
 
   const columns = [
@@ -141,6 +171,7 @@ export function RuleEditor({
               setPlayerId("");
               setClub("");
               setBoth(false);
+              setWeek(undefined);
             }}
           >
             {CONSTRAINT_KINDS.map((key) => (
@@ -200,6 +231,41 @@ export function RuleEditor({
             </label>
           </>
         )}
+        {kind === "hit_budget" ? (
+          <label>
+            {copy.hitBudget}
+            <input
+              type="number"
+              min={0}
+              max={60}
+              step={1}
+              value={points}
+              onChange={(event) => setPoints(event.target.value)}
+            />
+          </label>
+        ) : (
+          <label>
+            {copy.ruleWeek}
+            <select
+              value={selectedWeek ?? ""}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                setWeek(isPlanWeek(value) ? value : undefined);
+              }}
+            >
+              {kind !== "buy_player" && (
+                <option value="">{kind === "wildcard" ? copy.thisWeek : copy.everyWeek}</option>
+              )}
+              {([1, 2, 3] as const)
+                .filter((week) => kind !== "wildcard" || week !== 1)
+                .map((week) => (
+                  <option key={week} value={week}>
+                    {week === 1 ? copy.thisWeek : copy.relativeWeek(week)}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
         <label>
           {copy.strength}
           <select
@@ -229,7 +295,8 @@ export function RuleEditor({
             disabled ||
             (strength !== "comparison" && listFull) ||
             (isPlayerKind(kind) && !player) ||
-            (kind === "club_count" && !selectedClub)
+            (kind === "club_count" && !selectedClub) ||
+            (kind === "hit_budget" && !isHitBudget(hitBudget))
           }
           type="submit"
         >

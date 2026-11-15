@@ -30,7 +30,7 @@ function showWildcard(result: Partial<EntryAdvice>) {
               leagueId: squad.league_id,
               entryId: ENTRY,
               strategy: "saf-puan",
-              window: 1,
+              window: result.window ?? 1,
               chip: "wildcard",
             },
             envelope: { ...example, payload: { ...example.payload, ...result, chip: "wildcard" } },
@@ -66,4 +66,33 @@ it("shows when the Wildcard lineup is missing without using the held squad", () 
   expect(screen.getByText("Wildcard", { exact: true })).toBeVisible();
   expect(screen.getByText("The lineup for this plan is unavailable.")).toBeVisible();
   expect(container.querySelector("[data-player-motion]")).toBeNull();
+});
+
+it("compares total net points and displays upcoming transfers after the current pitch", () => {
+  const { gameweek } = example.payload;
+  const signing = { ...example.payload.starting_xi![0]!, name: "Next-week signing" };
+  const weeks = [
+    { gameweek, expected_points: 49, transfer_hit_points: 0, chip: "wildcard" },
+    { gameweek: gameweek + 1, expected_points: 56, transfer_hit_points: 4, chip: null },
+    { gameweek: gameweek + 2, expected_points: 51, transfer_hit_points: 0, chip: null },
+  ] as const;
+  showWildcard({
+    window: 3,
+    plan_weeks: weeks.map((week, index) => ({
+      ...week,
+      free_transfers_before: 1,
+      free_transfers_after: index === 1 ? 1 : 2,
+      transfers_in: index === 1 ? [signing] : [],
+      transfers_out: [],
+    })),
+  });
+  expect(screen.getByText("Total expected net points").nextElementSibling).toHaveTextContent(
+    "152.0",
+  );
+  expect(screen.getByText("Total transfer penalty").nextElementSibling).toHaveTextContent("4");
+  const upcoming = screen.getByRole("region", { name: "Upcoming weeks" });
+  expect(within(upcoming).getByRole("heading", { name: `GW ${gameweek + 1}` })).toBeVisible();
+  expect(within(upcoming).getByText(signing.name)).toBeVisible();
+  expect(within(upcoming).getByRole("heading", { name: `GW ${gameweek + 2}` })).toBeVisible();
+  expect(screen.getByRole("list", { name: "Starting Eleven by Position" })).toBeVisible();
 });

@@ -8,9 +8,9 @@ import { COMPUTE_COPY, failureSentence, jobStanding } from "../advice/computeCop
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { MemberBench, MemberPitch } from "../components/MemberPitch";
 import { squadOnPitch } from "../pages/squadOnPitch";
-import type { EntryAdvice, EntrySquad } from "../types";
+import type { AdvicePlanWeek, EntryAdvice, EntrySquad } from "../types";
 import { LLMOPT_COPY } from "./copy";
-import { expectedNet } from "./planComparison";
+import { expectedNet, plannedWeeks, weekNet } from "./planComparison";
 import styles from "./LLMOptPage.module.css";
 
 function PlanSquad({ plan, squad }: { plan: EntryAdvice; squad: EntrySquad }) {
@@ -41,6 +41,57 @@ function PlanSquad({ plan, squad }: { plan: EntryAdvice; squad: EntrySquad }) {
       </h4>
       <MemberPitch players={onPitch.eleven} codes={codes} />
       <MemberBench players={onPitch.bench} codes={codes} />
+    </section>
+  );
+}
+
+function UpcomingWeeks({ weeks }: { weeks: AdvicePlanWeek[] }) {
+  const { language, locale, messages } = useLanguage();
+  const copy = LLMOPT_COPY[language];
+  const titleId = useId();
+  return (
+    <section className={styles.laterWeeks} aria-labelledby={titleId}>
+      <h4 id={titleId} className={styles.lineupTitle}>
+        {copy.laterWeeks}
+      </h4>
+      {weeks.map((week) => {
+        const chip = week.chip ? messages.leagueMembers.chipNames[week.chip] : null;
+        return (
+          <div key={week.gameweek} className={styles.laterWeek}>
+            <h5>
+              {copy.week} {week.gameweek}
+            </h5>
+            <dl className={styles.figures}>
+              {chip && (
+                <div>
+                  <dt>{messages.leagueMembers.chipLabel}</dt>
+                  <dd>{chip}</dd>
+                </div>
+              )}
+              <div>
+                <dt>{copy.clubTransfers}</dt>
+                <dd>{week.transfers_in.map(({ name }) => name).join(", ") || copy.noPlayers}</dd>
+              </div>
+              <div>
+                <dt>{copy.outgoing}</dt>
+                <dd>{week.transfers_out.map(({ name }) => name).join(", ") || copy.noPlayers}</dd>
+              </div>
+              <div>
+                <dt>{copy.net}</dt>
+                <dd>{points(weekNet(week), 1, locale)}</dd>
+              </div>
+              <div>
+                <dt>{copy.hits}</dt>
+                <dd>{points(week.transfer_hit_points, 0, locale)}</dd>
+              </div>
+              <div>
+                <dt>{copy.transfers}</dt>
+                <dd>{week.free_transfers_after}</dd>
+              </div>
+            </dl>
+          </div>
+        );
+      })}
     </section>
   );
 }
@@ -81,10 +132,13 @@ export function PlanResult({
     );
   }
   const plan = state.envelope.payload;
+  const multiweek = plan.window > 1;
+  const weeks = multiweek ? plannedWeeks(plan) : null;
   const week = plan.plan_weeks?.find((row) => row.gameweek === plan.gameweek);
   const net = expectedNet(plan);
   const reference = baseline ? expectedNet(baseline) : null;
   const hits = plan.transfer_hit_points ?? week?.transfer_hit_points;
+  const totalHits = weeks?.reduce((sum, row) => sum + row.transfer_hit_points, 0);
   const bank = plan.bank_after_tenths;
   const freeTransfers = plan.free_transfers_after ?? week?.free_transfers_after;
   const chip = plan.chip ? messages.leagueMembers.chipNames[plan.chip] : null;
@@ -101,7 +155,7 @@ export function PlanResult({
           </div>
         )}
         <div>
-          <dt>{copy.net}</dt>
+          <dt>{multiweek ? copy.totalNet : copy.net}</dt>
           <dd>{net === null ? "—" : points(net, 1, locale)}</dd>
         </div>
         {reference !== null && net !== null && (
@@ -110,12 +164,24 @@ export function PlanResult({
             <dd>{signedPoints(net - reference, 1, locale)}</dd>
           </div>
         )}
+        {multiweek && week && (
+          <div>
+            <dt>{copy.currentNet}</dt>
+            <dd>{points(weekNet(week), 1, locale)}</dd>
+          </div>
+        )}
+        {multiweek && (
+          <div>
+            <dt>{copy.totalHits}</dt>
+            <dd>{totalHits === undefined ? "—" : points(totalHits, 0, locale)}</dd>
+          </div>
+        )}
         <div>
           <dt>{copy.hits}</dt>
           <dd>{hits === undefined ? "—" : points(hits, 0, locale)}</dd>
         </div>
         <div>
-          <dt>{copy.bank}</dt>
+          <dt>{multiweek ? copy.currentBank : copy.bank}</dt>
           <dd>{bank === undefined ? "—" : money(bank, locale)}</dd>
         </div>
         <div>
@@ -135,6 +201,7 @@ export function PlanResult({
       ) : (
         <p>{copy.hold}</p>
       )}
+      {weeks && <UpcomingWeeks weeks={weeks.slice(1)} />}
       {plan.solver_status === "FEASIBLE" && <p className={styles.muted}>{copy.notProven}</p>}
     </article>
   );

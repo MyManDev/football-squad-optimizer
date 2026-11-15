@@ -36,6 +36,27 @@ it("keeps request, waiting job and board identities distinct and reopens the exa
   );
 });
 
+it("canonicalizes dated rules and keeps a zero penalty limit in the cache identity", () => {
+  const dated = checkedPreferences({
+    week_rules: [
+      { week: 2, rules: { buy_players: [3] } },
+      { week: 1, rules: { hold_transfers: true } },
+    ],
+    max_hit_points: 0,
+  });
+  expect(dated.week_rules?.map(({ week }) => week)).toEqual([1, 2]);
+  expect(
+    preferencesFromUrl(new URLSearchParams({ preferences: preferencesKey(dated) })).value,
+  ).toEqual(dated);
+  expect(preferencesKey(checkedPreferences({ max_hit_points: 0 }))).not.toBe("");
+  expect(() =>
+    checkedPreferences({ hold_transfers: true, week_rules: dated.week_rules }),
+  ).toThrow();
+  expect(() =>
+    checkedPreferences({ week_rules: [{ week: 2, rules: { week_rules: [] } }] }),
+  ).toThrow();
+});
+
 it("refuses conflicting or malformed URL constraints without displaying the ordinary plan", () => {
   const index = mockEntryAdviceIndex(entry).payload;
   for (const raw of [

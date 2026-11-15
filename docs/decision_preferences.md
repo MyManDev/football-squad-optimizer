@@ -15,6 +15,19 @@ club from the capture and requires between one and three players. The default sc
 counts players in the resulting squad. The `transfers_in` scope counts new signings
 and conflicts with holding transfers. The optimizer chooses the players in both cases.
 
+Window-wide rules may be supplemented by `week_rules`. Each row contains a `week`
+offset and a `rules` object. Offsets 1, 2 and 3 refer to the current deadline and
+the next two deadlines. A row must name a week inside the requested horizon.
+Nested `buy_players` requires those player codes among the incoming transfers in
+that week. `include_players` requires squad membership on the specified deadline.
+After merging window-wide and weekly rules, contradictions in the same week are
+refused. An optional `wildcard_week` offset of 2 or 3 schedules Wildcard using
+captured chip history and the season's rules for that date.
+
+An optional `max_hit_points` caps actual transfer charges across the full horizon.
+It uses the published charge per paid transfer. Timed rules and total hit budgets use
+the game transfer limits so a weekly instruction can require multiple moves.
+
 Keep, include and avoid each accept up to fifteen unique positive persistent player
 codes. A player required by keep or include cannot also be avoided. The API checks
 keep against the member's captured squad and include and avoid against the capture's
@@ -29,9 +42,9 @@ It participates in the request fingerprint, job specification and cache identity
 The `include_players`, `hold_transfers` and `club_counts` fields are optional. Empty
 include and club counts and false hold are omitted from canonical preferences,
 preserving legacy identities.
-The worker verifies
-the recorded identity before computation. Results echo the object and
-`preferences_scope: all_selected_weeks`; the web client refuses a mismatching answer.
+The worker verifies the recorded identity before computation. Results echo the
+preferences object. The scope is `selected_weeks` when any rule or Wildcard is
+timed and `all_selected_weeks` otherwise. The web client refuses a mismatching answer.
 Capabilities must explicitly enable the new controls. Static advice never substitutes
 for a constrained request. URL sharing, resumed jobs and the personal decision board
 all preserve the constraints. A different member's kept-player selection cannot compute.

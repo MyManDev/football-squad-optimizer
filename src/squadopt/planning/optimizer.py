@@ -1343,29 +1343,52 @@ def optimize_transfer_plan(
     if preferences is not None:
         if not isinstance(preferences, DecisionPreferences):
             raise TransferPlanningValidationError("Invalid decision preferences.")
+        try:
+            preferences.validate_window(len(players_by_week))
+        except ValueError as error:
+            raise TransferPlanningValidationError(str(error)) from error
         universe = set(players_by_week[0].player_id)
-        if not set(preferences.keep_players) <= set(initial_state.squad_player_ids):
-            raise TransferPlanningValidationError("Only currently held players can be kept.")
-        if not set(preferences.avoid_players) <= universe:
-            raise TransferPlanningValidationError("Avoided player is outside the forecast roster.")
-        if not set(preferences.include_players) <= universe:
-            raise TransferPlanningValidationError("Included player is outside the forecast roster.")
+        held = set(initial_state.squad_player_ids)
         clubs = {str(club) for club in players_by_week[0].team_id}
-        if not {rule.club for rule in preferences.club_counts} <= clubs:
-            raise TransferPlanningValidationError(
-                "A requested club is outside the forecast roster."
-            )
-        required = set(preferences.keep_players) | set(preferences.include_players)
-        avoided = set(preferences.avoid_players)
+        for rules in (preferences, *(row.rules for row in preferences.week_rules)):
+            if not set(rules.keep_players) <= held:
+                raise TransferPlanningValidationError("Only currently held players can be kept.")
+            if not set(rules.avoid_players) <= universe:
+                raise TransferPlanningValidationError(
+                    "Avoided player is outside the forecast roster."
+                )
+            if not (set(rules.include_players) | set(rules.buy_players)) <= universe:
+                raise TransferPlanningValidationError(
+                    "A required player is outside the forecast roster."
+                )
+            if not {rule.club for rule in rules.club_counts} <= clubs:
+                raise TransferPlanningValidationError(
+                    "A requested club is outside the forecast roster."
+                )
+        if preferences.max_hit_points is not None and settings.hit_points_charged > 0:
+            # Compare on the same basis as the displayed charge, not the configured
+            # objective penalty. Round the ratio down exactly on its decimal scale.
+            numerator, denominator = Decimal(str(settings.hit_points_charged)).as_integer_ratio()
+            max_paid = preferences.max_hit_points * denominator // numerator
+            if max_paid < len(players_by_week) * optimization_config.squad_size:
+                artifacts.model.add(
+                    cp_model.LinearExpr.sum(artifacts.paid_transfer_vars) <= max_paid
+                )
         for week, table in enumerate(players_by_week):
+            weekly = preferences.for_week(week + 1)
+            required = set(weekly.keep_players) | set(weekly.include_players)
+            avoided = set(weekly.avoid_players)
+            bought = set(weekly.buy_players)
             for index, player in enumerate(table.player_id):
                 if player in required:
                     artifacts.model.add(artifacts.squad_vars[week][index] == 1)
                 if player in avoided:
                     artifacts.model.add(artifacts.squad_vars[week][index] == 0)
-            if preferences.club_counts:
+                if player in bought:
+                    artifacts.model.add(artifacts.transfer_in_vars[week][index] == 1)
+            if weekly.club_counts:
                 clubs_by_index = tuple(map(str, table.team_id))
-                for rule in preferences.club_counts:
+                for rule in weekly.club_counts:
                     variables = (
                         artifacts.transfer_in_vars[week]
                         if rule.scope == "transfers_in"
@@ -1377,14 +1400,16 @@ def optimize_transfer_plan(
                         if club == rule.club
                     ]
                     artifacts.model.add(cp_model.LinearExpr.sum(selected) == rule.count)
-            if preferences.hold_transfers:
+            if weekly.hold_transfers:
                 artifacts.model.add(artifacts.transfer_count_vars[week] == 0)
-            if preferences.no_hits:
+            if weekly.no_hits:
                 artifacts.model.add(artifacts.paid_transfer_vars[week] == 0)
-            for chip, variable in artifacts.chip_vars[week].items():
-                if preferences.save_chips or (
-                    preferences.hold_transfers and chip in ("wildcard", "freehit")
-                ):
+            chip_vars = artifacts.chip_vars[week]
+            if preferences.wildcard_week == week + 1:
+                wildcard = chip_vars.get("wildcard")
+                artifacts.model.add(False if wildcard is None else wildcard == 1)
+            for chip, variable in chip_vars.items():
+                if weekly.save_chips or (weekly.hold_transfers and chip in ("wildcard", "freehit")):
                     artifacts.model.add(variable == 0)
     started_at = perf_counter()
     wall_limit = optimization_config.solver_time_limit_seconds

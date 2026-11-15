@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
+import { checkedPreferences } from "./decisionPreferences";
 
 const request = { leagueId: 352490, entryId: 101, strategy: "saf-puan", window: 3 } as const;
 
@@ -96,6 +97,60 @@ describe("nested published advice", () => {
   it("accepts a complete multi-week example without changing its bytes", () => {
     const envelope = mockEntryAdviceEnvelope(101, "saf-puan", 3);
     expect(checkedAdvice(envelope, request)).toBe(envelope);
+  });
+
+  it("requires the selected-week preference echo and an actual Wildcard in the scheduled week", () => {
+    const envelope = mockEntryAdviceEnvelope(101, "saf-puan", 3);
+    const preferences = checkedPreferences({
+      week_rules: [{ week: 1, rules: { hold_transfers: true } }],
+      wildcard_week: 2,
+    });
+    const selected = { ...request, preferences, chip: null };
+    const weeks = [0, 1, 2].map((offset) => ({
+      gameweek: envelope.payload.gameweek + offset,
+      transfers_in: [],
+      transfers_out: [],
+      chip: null,
+      expected_points: 45,
+      transfer_hit_points: 0,
+      free_transfers_before: 1,
+      free_transfers_after: 2,
+    }));
+    const answer = {
+      ...envelope,
+      payload: {
+        ...envelope.payload,
+        preferences,
+        preferences_scope: "selected_weeks",
+        chip: null,
+        chip_strategy: {
+          version: "model_opportunity_reservation_v2",
+          mode: "manual",
+          requested_chip: "wildcard",
+          selected_chip: null,
+          top100_weight: 0,
+          objective_gap: 0,
+          objective_basis: "selection_utility_with_chip_reserve",
+          experimental: true,
+          reservations: [],
+          limits: [],
+        },
+        plan_weeks: weeks.map((week, index) => ({
+          ...week,
+          chip: index === 1 ? "wildcard" : null,
+        })),
+      },
+    };
+    expect(checkedAdvice(answer, selected)).toBe(answer);
+    expect(() =>
+      checkedAdvice(
+        { ...answer, payload: { ...answer.payload, preferences_scope: "all_selected_weeks" } },
+        selected,
+      ),
+    ).toThrow(/preferences/);
+    expect(() =>
+      checkedAdvice({ ...answer, payload: { ...answer.payload, plan_weeks: weeks } }, selected),
+    ).toThrow(/Wildcard/);
   });
 });
 

@@ -4,6 +4,7 @@ from squadopt.application.advice import (
     NO_CHIP_LIMIT,
     WINDOW_DETERMINISTIC_UNITS_PER_WEEK,
     WINDOW_LINEARIZATION_LEVEL,
+    WINDOW_TRANSFER_CAP_LIMIT,
     WINDOW_WALL_CEILING_SECONDS,
     AdviseEntryRequest,
     HorizonBuilder,
@@ -12,6 +13,7 @@ from squadopt.application.advice import (
 )
 from squadopt.application.advice_chips import (
     FREE_HIT_LIMIT,
+    ChipUnavailable,
     _rows_on_chip_basis,
     chip_week_points,
     member_chip_menu,
@@ -54,9 +56,22 @@ def advise_chip_strategy(
         raise EntryError("Chip strategy requires the pure-points forecast horizon.")
     if top100_weight and counts is None:
         raise EntryError("Chip strategy requires the requested Top100 inputs.")
+    try:
+        preferences.validate_selection(request.strategy, False, chip)
+        preferences.validate_window(request.window)
+    except ValueError as error:
+        raise EntryError(str(error)) from error
     picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
-    if chip is not None and not member_chip_menu(rules, request.gameweek, picks.chips_used).known:
-        raise EntryError("Chip strategy requires unambiguous captured chip history.")
+    chip_gameweek = request.gameweek
+    requested_chip = chip
+    if preferences.wildcard_week is not None:
+        requested_chip = "wildcard"
+        chip_gameweek += preferences.wildcard_week - 1
+    if (
+        requested_chip is not None
+        and not member_chip_menu(rules, chip_gameweek, picks.chips_used).known
+    ):
+        raise ChipUnavailable("CHIP_HISTORY_UNKNOWN")
     dates = tuple(range(request.gameweek, request.gameweek + request.window))
     base = horizon_builder(dates)
     chosen = (
@@ -66,17 +81,17 @@ def advise_chip_strategy(
     )
     rights = (
         strategy_chip_availability(rules, dates, picks.chips_used)
-        if chip is not None
+        if requested_chip is not None
         else ChipAvailability()
     )
     automatic = chip == "auto"
-    if chip is not None and not automatic:
-        if request.gameweek not in rights.gameweeks_for(chip):
-            raise EntryError("The chosen chip is not held for this gameweek.")
+    if requested_chip is not None and not automatic:
+        if chip_gameweek not in rights.gameweeks_for(requested_chip):
+            raise ChipUnavailable("CHIP_NOT_HELD")
         # A named chip remains an explicit instruction, not permission to spend others.
         rights = ChipAvailability(
-            available={chip: frozenset({request.gameweek})},
-            forced={request.gameweek: chip},
+            available={requested_chip: frozenset({chip_gameweek})},
+            forced={chip_gameweek: requested_chip},
         )
     held = held_squad_from_picks(
         picks,
@@ -137,8 +152,14 @@ def advise_chip_strategy(
         row["expected_points"] = chip_week_points(week)
     if preferences.active:
         payload["preferences"] = preferences.payload()
-        payload["preferences_scope"] = "all_selected_weeks"
-    if chip is None:
+        payload["preferences_scope"] = (
+            "selected_weeks" if preferences.scoped else "all_selected_weeks"
+        )
+    if preferences.needs_full_window:
+        limits = payload.get("stated_limits")
+        assert isinstance(limits, list)
+        payload["stated_limits"] = [text for text in limits if text != WINDOW_TRANSFER_CAP_LIMIT]
+    if requested_chip is None:
         if top100_weight:
             payload["selection_top100_weight"] = top100_weight
         return payload
@@ -149,7 +170,7 @@ def advise_chip_strategy(
     payload["chip_strategy"] = {
         "version": CHIP_STRATEGY_VERSION,
         "mode": "auto" if automatic else "manual",
-        "requested_chip": chip,
+        "requested_chip": requested_chip,
         "selected_chip": first.chip,
         "top100_weight": top100_weight,
         "objective_gap": plan.diagnostics.get("absolute_optimality_gap"),

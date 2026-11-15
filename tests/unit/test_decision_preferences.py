@@ -9,7 +9,13 @@ from tests.unit.test_transfer_planning import _horizon_table
 import squadopt.planning.optimizer as optimizer
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.optimization import SolverStatus
-from squadopt.planning import ChipAvailability, InitialSquadState, PlanningHorizon
+from squadopt.planning import (
+    ChipAvailability,
+    InitialSquadState,
+    PlanningHorizon,
+    TransferPlanningConfig,
+)
+from squadopt.planning.guarded import optimize_guarded_window
 
 
 @pytest.mark.parametrize(
@@ -42,6 +48,19 @@ from squadopt.planning import ChipAvailability, InitialSquadState, PlanningHoriz
             "club_counts": [{"club": "Brighton", "count": 1, "scope": "transfers_in"}],
         },
         {"club_counts": [{"club": f"Club {index}", "count": 3} for index in range(6)]},
+        {"week_rules": [{"week": True, "rules": {"hold_transfers": True}}]},
+        {"week_rules": [{"week": 4, "rules": {"hold_transfers": True}}]},
+        {"week_rules": [{"week": 1, "rules": {"hold_transfers": False}}]},
+        {"week_rules": [{"week": 1, "rules": {"hold_transfers": True}}] * 2},
+        {"week_rules": [{"week": 1, "rules": {"max_hit_points": 0}}]},
+        {"week_rules": [{"week": 1, "rules": {"buy_players": [4], "hold_transfers": True}}]},
+        {"buy_players": [1]},
+        {"avoid_players": [1], "week_rules": [{"week": 2, "rules": {"buy_players": [1]}}]},
+        {"max_hit_points": True},
+        {"max_hit_points": -1},
+        {"max_hit_points": None},
+        {"wildcard_week": 1},
+        {"wildcard_week": 2, "week_rules": [{"week": 2, "rules": {"save_chips": True}}]},
         {"unknown": True},
     ],
 )
@@ -119,6 +138,70 @@ def _case(players, length=3):
         ),
         mapping,
     )
+
+
+def test_week_rules_can_roll_then_force_an_incoming_transfer_after_the_deadline(
+    known_optimum_players, small_config
+):
+    horizon, initial, ids = _case(known_optimum_players)
+    targeted = ids["MID_B"]
+    preferences = DecisionPreferences.parse(
+        {
+            "max_hit_points": 4,
+            "week_rules": [
+                {"week": 3, "rules": {"avoid_players": [targeted]}},
+                {"week": 1, "rules": {"hold_transfers": True}},
+                {"week": 2, "rules": {"buy_players": [targeted]}},
+            ],
+        }
+    )
+    assert DecisionPreferences.parse(preferences.payload()) == preferences
+    assert [row.week for row in preferences.week_rules] == [1, 2, 3]
+    with pytest.raises(ValueError, match="outside the selected window"):
+        preferences.validate_window(1)
+    result = optimize_guarded_window(
+        horizon,
+        initial,
+        replace(small_config, solver_deterministic_time_limit=5.0),
+        TransferPlanningConfig(),
+        preferences=preferences,
+    )
+    assert result.has_solution
+    assert result.weeks[0].transfer_count == 0
+    assert result.weeks[0].free_transfers_for_next_gameweek == initial.free_transfers + 1
+    assert targeted in set(result.weeks[1].transfers_in.player_id)
+    assert targeted not in set(result.weeks[2].selected_squad.player_id)
+    assert result.diagnostics["sequential_incumbent"]["seed_cap"] == 0
+
+
+@pytest.mark.parametrize(
+    ("ceiling", "status"), [(4, SolverStatus.INFEASIBLE), (8, SolverStatus.OPTIMAL)]
+)
+def test_hit_limit_caps_the_actual_total_across_weeks(
+    known_optimum_players, small_config, ceiling, status
+):
+    horizon, initial, ids = _case(known_optimum_players)
+    preferences = DecisionPreferences.parse(
+        {
+            "max_hit_points": ceiling,
+            "week_rules": [
+                {"week": 1, "rules": {"buy_players": [ids["DEF_A"]]}},
+                {"week": 2, "rules": {"buy_players": [ids["MID_B"]]}},
+            ],
+        }
+    )
+    result = optimizer.optimize_transfer_plan(
+        horizon,
+        replace(initial, free_transfers=0),
+        small_config,
+        TransferPlanningConfig(free_transfer_accrual=0, transfer_hit_cost_points=9),
+        preferences=preferences,
+        protect_hold=True,
+    )
+    assert result.solver_status is status
+    if result.has_solution:
+        assert result.total_transfer_hit_points == 8
+        assert [week.transfer_hit_points for week in result.weeks] == [4, 4, 0]
 
 
 @pytest.mark.parametrize("length", [1, 3, 5])

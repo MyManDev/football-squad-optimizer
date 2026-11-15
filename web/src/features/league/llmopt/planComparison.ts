@@ -1,9 +1,23 @@
 import type { ComputePhase } from "../advice/useAdviceJob";
-import type { EntryAdvice } from "../types";
+import type { AdvicePlanWeek, EntryAdvice } from "../types";
+
+export function plannedWeeks(plan: EntryAdvice) {
+  const weeks = [...(plan.plan_weeks ?? [])].sort((a, b) => a.gameweek - b.gameweek);
+  return weeks.length === plan.window &&
+    weeks.every((week, index) => week.gameweek === plan.gameweek + index)
+    ? weeks
+    : null;
+}
+
+export function weekNet(week: AdvicePlanWeek) {
+  return week.expected_points - week.transfer_hit_points;
+}
 
 export function expectedNet(plan: EntryAdvice) {
+  if (plan.window > 1)
+    return plannedWeeks(plan)?.reduce((sum, week) => sum + weekNet(week), 0) ?? null;
   const week = plan.plan_weeks?.find((row) => row.gameweek === plan.gameweek);
-  if (week) return week.expected_points - week.transfer_hit_points;
+  if (week) return weekNet(week);
   if (plan.lineup_expectation) return plan.lineup_expectation.expected_net_points;
   return plan.expected_own_points != null && plan.transfer_hit_points != null
     ? plan.expected_own_points - plan.transfer_hit_points
@@ -11,6 +25,14 @@ export function expectedNet(plan: EntryAdvice) {
 }
 
 function action(plan: EntryAdvice) {
+  const later = plannedWeeks(plan)
+    ?.slice(1)
+    .map((week) => [
+      week.gameweek,
+      week.transfers_out.map(({ player_id }) => player_id).sort((a, b) => a - b),
+      week.transfers_in.map(({ player_id }) => player_id).sort((a, b) => a - b),
+      week.chip,
+    ]);
   return JSON.stringify([
     plan.moves
       .map(({ player_in, player_out }) => [player_out?.player_id, player_in?.player_id].join(":"))
@@ -20,6 +42,7 @@ function action(plan: EntryAdvice) {
     plan.captain?.player_id,
     plan.vice_captain?.player_id,
     plan.chip ?? null,
+    later,
   ]);
 }
 

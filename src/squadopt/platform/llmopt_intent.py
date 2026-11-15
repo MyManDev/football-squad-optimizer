@@ -23,6 +23,9 @@ _MAX_CLUBS: Final = 32
 _MAX_CANDIDATES: Final = 64
 _MAX_CONSTRAINTS: Final = 16
 _MAX_SAFE_ID: Final = 2**53 - 1
+_WINDOWS: Final = (1, 3)
+_WEEKS: Final = (1, 2, 3)
+_MAX_HIT_POINTS: Final = 60
 _RESPONSE_BYTES: Final = 32 * 1024
 _TIMEOUT_SECONDS: Final = 35
 _KINDS: Final = (
@@ -32,10 +35,13 @@ _KINDS: Final = (
     "wildcard",
     "keep_player",
     "include_player",
+    "buy_player",
     "avoid_player",
     "club_count",
+    "hit_budget",
 )
-_PLAYER_KINDS: Final = frozenset({"keep_player", "include_player", "avoid_player"})
+_MEMBERSHIP_KINDS: Final = frozenset({"keep_player", "include_player", "avoid_player"})
+_PLAYER_KINDS: Final = _MEMBERSHIP_KINDS | {"buy_player"}
 _TURKISH_ACCUSATIVE_SUFFIXES: Final = ("i", "u", "yi", "yu")
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,13 +60,25 @@ Use soft for wishes (e.g. "if possible", "mümkünse", "tercihen"). Ask for clar
 before choosing when the intent or player is ambiguous. Do not silently omit unsupported
 requirements or resolve a contradiction by weakening it.
 
+Set window to 1 or 3 for the planning horizon. With no explicit horizon or dated rules,
+keep the preceding draft's window, or use null for the default of one week. Any rule
+for week 2 or 3 needs window 3. Ask for clarification if the requested exact horizon
+or a rule's date cannot be expressed. A rule's week is relative to the upcoming FPL
+gameweek: 1 for "bu hafta", 2 for "haftaya", and 3 for the third week. Use null when
+the manager wants a rule throughout the window or gives no timing. An undated Wildcard
+means week 1. A new undated club transfer instruction is for week 1 when using a longer
+window. Preserve the dates and horizon on follow-up messages unless changed.
+
 Allowed kinds:
-- hold_transfers: make zero transfers for this week.
+- hold_transfers: make zero transfers in the specified week or, with no week, throughout.
 - no_hits: make no paid transfers, but allow free transfers.
 - save_chips: use no chip.
-- wildcard: use the Wildcard chip this week and optimize the rebuilt squad.
+- wildcard: use the Wildcard chip in the specified week and optimize the rebuilt squad.
 - keep_player: retain a held player in the squad; never implies starting or captaining.
 - include_player: require or prefer a player in the selected 15; may acquire them.
+- buy_player: transfer a player in during an exact week. This kind always needs a week.
+  "Haftaya Saka'y\u0131 al" is buy_player in week 2. "Haftaya Saka kadroda olsun" is
+  include_player in week 2. Use include_player for an undated named acquisition.
 - avoid_player: exclude a player from the selected 15.
 - club_count: require or prefer exactly count players from one club. "Brighton'dan 3 oyuncu
   al" means club Brighton, count 3 and scope transfers_in, counting only new arrivals.
@@ -68,10 +86,16 @@ Allowed kinds:
   those already held. Use the canonical name from clubs and an integer count from 1 to 3.
   Let the solver choose the players. Do not ask for or invent names when the selection is
   delegated. Set player_id to null for this rule.
+- hit_budget: cap the total transfer penalty over the selected window. Set points to the
+  stated integer from 0 to 60 and week to null. An instruction to avoid hits in a particular
+  week is a scoped no_hits rule. For all other kinds, set points to null.
+For "Bu hafta transferi sakla, haftaya Saka'y\u0131 al, üç haftada en fazla 4 puan ceza öde",
+use window 3, hard hold_transfers week 1, hard buy_player week 2 for Saka, and hard
+hit_budget points 4. Resolve Saka against the supplied roster.
 For a player constraint, choose its exact ID from the supplied players. If a named
 player cannot be matched uniquely, ask for clarification. Use keep_player only for a
-held player and include_player to acquire a player. A constraint without a player uses
-null for player_id. Do not infer roster status from English or Turkish wording alone.
+held player. A constraint without a player uses null for player_id. Do not infer
+roster status from English or Turkish wording alone.
 Use null for club, count and scope for other rules. If no club in clubs matches uniquely,
 the requested count is outside 1 through 3, or the user asks for a minimum or maximum
 rather than an exact count, ask for clarification. For a comparison against a club_count
@@ -186,7 +210,7 @@ def _constraint(
     comparison: bool,
     model: bool,
 ) -> dict[str, Any]:
-    fields = {"kind", "player_id", "club", "count", "scope"}
+    fields = {"kind", "player_id", "club", "count", "scope", "week", "points"}
     model_required = {"kind", "player_id"}
     if comparison:
         fields.add("both")
@@ -202,6 +226,13 @@ def _constraint(
     if not isinstance(kind, str) or kind not in _KINDS:
         raise IntentValidationError("Unsupported intent constraint.")
     result: dict[str, Any] = {"kind": kind}
+    week = value.get("week")
+    if week is not None or (not model and "week" in value):
+        if type(week) is not int or week not in _WEEKS or kind == "hit_budget":
+            raise IntentValidationError("Invalid intent constraint week.")
+        result["week"] = week
+    if kind == "buy_player" and week is None:
+        raise IntentValidationError("A player purchase requires a week.")
     if kind in _PLAYER_KINDS:
         player_id = _player_id(value.get("player_id"))
         if player_id not in player_ids:
@@ -227,11 +258,18 @@ def _constraint(
         for field in ("club", "count", "scope")
     ):
         raise IntentValidationError("Unexpected club fields for this constraint.")
+    if kind == "hit_budget":
+        points = value.get("points")
+        if type(points) is not int or not 0 <= points <= _MAX_HIT_POINTS:
+            raise IntentValidationError("Invalid total transfer penalty budget.")
+        result["points"] = points
+    elif "points" in value and (not model or value["points"] is not None):
+        raise IntentValidationError("Unexpected points for this constraint.")
     both = value.get("both", False)
     if type(both) is not bool:
         raise IntentValidationError("Invalid with-and-without comparison.")
     if both:
-        if kind != "include_player" and (not model or kind not in _PLAYER_KINDS):
+        if kind != "include_player" and (not model or kind not in _MEMBERSHIP_KINDS):
             raise IntentValidationError("Invalid with-and-without comparison.")
         # Both memberships are requested regardless of which side the model named first.
         result["kind"] = "include_player"
@@ -240,15 +278,25 @@ def _constraint(
 
 
 def _draft(
-    value: object, player_ids: set[int], clubs: tuple[str, ...], *, model: bool = False
+    value: object,
+    player_ids: set[int],
+    clubs: tuple[str, ...],
+    *,
+    model: bool = False,
+    previous_window: int | None = None,
 ) -> dict[str, Any]:
     if (
         not isinstance(value, dict)
         or not {"hard", "soft"} <= value.keys()
-        or value.keys() - {"hard", "soft", "comparison"}
+        or value.keys() - {"hard", "soft", "comparison", "window"}
         or (model and "comparison" not in value)
     ):
         raise IntentValidationError("Invalid constraint draft.")
+    window = value.get("window")
+    if (window is None and not model and "window" in value) or (
+        window is not None and (type(window) is not int or window not in _WINDOWS)
+    ):
+        raise IntentValidationError("Invalid intent window.")
     hard, soft = value["hard"], value["soft"]
     if (
         not isinstance(hard, list)
@@ -272,20 +320,36 @@ def _draft(
             item.get("club"),
             item.get("count"),
             item.get("scope"),
+            item.get("week"),
+            item.get("points"),
         )
         for item in constraints
     }
     if len(unique) != len(constraints):
         raise IntentValidationError("Duplicate constraint across the draft.")
-    hard_clubs = [
-        (item["club"], item.get("scope")) for item in result["hard"] if item["kind"] == "club_count"
-    ]
-    if len(set(hard_clubs)) != len(hard_clubs):
-        raise IntentValidationError("Hard club counts conflict.")
     if value.get("comparison") is not None:
         result["comparison"] = _constraint(
             value["comparison"], player_ids, clubs, comparison=True, model=model
         )
+        constraints += (result["comparison"],)
+    if any(item.get("week", 1) > 1 for item in constraints):
+        if window == 1:
+            raise IntentValidationError("A constraint is outside the planning window.")
+        window = 3
+    if window is None:
+        window = previous_window
+    if window is not None:
+        result["window"] = window
+    club_counts: dict[tuple[int, str, str], int] = {}
+    for item in result["hard"]:
+        if item["kind"] != "club_count":
+            continue
+        weeks = (item["week"],) if "week" in item else range(1, (window or 1) + 1)
+        for assigned_week in weeks:
+            key = (assigned_week, item["club"], item.get("scope", "squad"))
+            previous_count = club_counts.setdefault(key, item["count"])
+            if previous_count != item["count"]:
+                raise IntentValidationError("Hard club counts conflict in a planning week.")
     return result
 
 
@@ -328,7 +392,11 @@ def parse_intent_request(value: object) -> IntentRequest:
 
 
 def _validate_result(
-    value: object, candidates: tuple[dict[str, Any], ...], clubs: tuple[str, ...]
+    value: object,
+    candidates: tuple[dict[str, Any], ...],
+    clubs: tuple[str, ...],
+    *,
+    previous_window: int | None,
 ) -> dict[str, Any]:
     if not isinstance(value, dict) or value.keys() != {"status", "draft", "message"}:
         raise IntentValidationError("Invalid intent result.")
@@ -337,7 +405,12 @@ def _validate_result(
     if value["status"] != "draft" or value["message"] is not None:
         raise IntentValidationError("Invalid draft status.")
     player_ids = {player["id"] for player in candidates}
-    return {"status": "draft", "draft": _draft(value["draft"], player_ids, clubs, model=True)}
+    return {
+        "status": "draft",
+        "draft": _draft(
+            value["draft"], player_ids, clubs, model=True, previous_window=previous_window
+        ),
+    }
 
 
 def _fold_text(value: str) -> str:
@@ -427,7 +500,9 @@ class IntentService:
         try:
             candidates = _shortlist(request)
             proposal = self._provider(replace(request, players=candidates))
-            return _validate_result(proposal, candidates, request.clubs)
+            return _validate_result(
+                proposal, candidates, request.clubs, previous_window=request.draft.get("window")
+            )
         except IntentValidationError:
             raise IntentUnavailable("The intent response could not be validated.") from None
         finally:
@@ -449,6 +524,8 @@ _CONSTRAINT_PROPERTIES: Final = {
     "club": {"type": ["string", "null"]},
     "count": {"type": ["integer", "null"]},
     "scope": {"type": ["string", "null"], "enum": ["squad", "transfers_in", None]},
+    "week": {"type": ["integer", "null"], "enum": [*_WEEKS, None]},
+    "points": {"type": ["integer", "null"]},
 }
 _CONSTRAINT_LIST: Final = {"type": "array", "items": _schema_object(_CONSTRAINT_PROPERTIES)}
 _COMPARISON_SCHEMA: Final = _schema_object({**_CONSTRAINT_PROPERTIES, "both": {"type": "boolean"}})
@@ -457,6 +534,7 @@ _DRAFT_SCHEMA: Final = _schema_object(
         "hard": _CONSTRAINT_LIST,
         "soft": _CONSTRAINT_LIST,
         "comparison": {"anyOf": [_COMPARISON_SCHEMA, {"type": "null"}]},
+        "window": {"type": ["integer", "null"], "enum": [*_WINDOWS, None]},
     }
 )
 _RESULT_SCHEMA: Final = _schema_object(

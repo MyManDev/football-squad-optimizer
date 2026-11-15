@@ -107,10 +107,17 @@ def propose_expected_swap(
     ):
         return skip("first_week_rebuild")
     preferences = preferences or DecisionPreferences()
-    if preferences.hold_transfers:
+    week_rules = preferences.for_week(1)
+    if week_rules.hold_transfers:
         return skip("hold_transfers")
-    if initial.free_transfers == 0 and preferences.no_hits:
+    if initial.free_transfers == 0 and week_rules.no_hits:
         return skip("no_free_transfer_and_no_hits")
+    if (
+        initial.free_transfers == 0
+        and preferences.max_hit_points is not None
+        and transfer.hit_points_charged > preferences.max_hit_points
+    ):
+        return skip("hit_budget_below_single_swap_charge")
     first = horizon.table.loc[horizon.table.gameweek.eq(weeks[0])].set_index(
         "player_id", drop=False
     )
@@ -186,8 +193,9 @@ def propose_expected_swap(
         raise ValueError("Expected lineup multipliers must be finite and nonnegative.")
     outsiders = sorted(set(first.index) - held, key=_stable_id_key)
     record["cheap_pair_cap"] = 15 * len(outsiders)
-    required = set(preferences.keep_players) | set(preferences.include_players)
-    avoid = set(preferences.avoid_players)
+    required = set(week_rules.keep_players) | set(week_rules.include_players)
+    bought = set(week_rules.buy_players)
+    avoid = set(week_rules.avoid_players)
     hit = transfer.transfer_hit_cost_points if initial.free_transfers == 0 else 0.0
     best: tuple[float, object, object, tuple[object, ...]] | None = None
     for outgoing in sorted(held, key=_stable_id_key):
@@ -196,7 +204,12 @@ def propose_expected_swap(
             if first.at[outgoing, "position"] != first.at[incoming, "position"]:
                 continue
             ids = held - {outgoing} | {incoming}
-            if ids in retained_squads or not required <= ids or ids & avoid:
+            if (
+                ids in retained_squads
+                or not required <= ids
+                or not bought <= {incoming}
+                or ids & avoid
+            ):
                 continue
             if initial.bank_tenths + int(cast(int, first.at[outgoing, "sell_price_tenths"])) < int(
                 cast(int, first.at[incoming, "buy_price_tenths"])
@@ -205,7 +218,7 @@ def propose_expected_swap(
             club_totals = Counter(map(str, first.loc[list(ids), "team_id"]))
             if max(club_totals.values()) > optimization.max_players_per_team:
                 continue
-            if preferences.club_counts:
+            if week_rules.club_counts:
                 incoming_club = str(first.at[incoming, "team_id"])
                 if any(
                     (
@@ -214,7 +227,7 @@ def propose_expected_swap(
                         else club_totals[rule.club]
                     )
                     != rule.count
-                    for rule in preferences.club_counts
+                    for rule in week_rules.club_counts
                 ):
                     continue
             proxy = (

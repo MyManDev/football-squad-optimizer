@@ -381,3 +381,186 @@ test("a Turkish club request lets the optimizer pick the three players", async (
   expect(posts[0]?.preferences.include_players).toBeUndefined();
   await expect(page.getByRole("heading", { name: "Temel plan" })).toBeVisible();
 });
+
+test("a Turkish plan holds now, buys next week and caps three weeks of hits", async ({ page }) => {
+  test.skip(!API, "API build required");
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
+  const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+  const outgoing = squad.starting_xi.find((player) => player.position === "MID")!;
+  const incoming = { ...outgoing, player_id: 9081321, name: "Bukayo Saka", team: "Arsenal" };
+  const message =
+    "Bu hafta transferi sakla, haftaya Saka'yı al. Üç haftada en fazla 4 puan ceza öde.";
+  const posts: { window: number; preferences: Record<string, unknown> }[] = [];
+  await page.route(`${API}/api/v1/contributions/players`, (route) =>
+    answer(route, {
+      season: squad.season,
+      players: [{ id: incoming.player_id, name: incoming.name, team: incoming.team }],
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+    answer(route, {
+      contract_version: "league_capabilities_v1",
+      league_id: LEAGUE,
+      capture_snapshot_id: squad.source_snapshot_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
+      top100: { available: false, weights: [] },
+      managers_word: { available: false },
+      preferences: { available: true },
+    }),
+  );
+  await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+    if (route.request().method() === "POST") {
+      expect(route.request().postDataJSON()).toMatchObject({ message, locale: "tr" });
+    }
+    return answer(route, {
+      status: "draft",
+      draft: {
+        window: 3,
+        hard: [
+          { kind: "hold_transfers", week: 1 },
+          { kind: "buy_player", player_id: incoming.player_id, week: 2 },
+          { kind: "hit_budget", points: 4 },
+        ],
+        soft: [],
+      },
+    });
+  });
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+    if (route.request().method() !== "POST") return answer(route, null);
+    const body = route.request().postDataJSON() as (typeof posts)[number];
+    posts.push(body);
+    const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
+    return answer(route, {
+      ...envelope,
+      payload: {
+        ...envelope.payload,
+        moves: [],
+        plan_weeks: envelope.payload.plan_weeks!.map((week, i) => ({
+          ...week,
+          gameweek: squad.gameweek + i,
+          transfers_in: i === 1 ? [incoming] : [],
+          transfers_out: i === 1 ? [outgoing] : [],
+          transfer_hit_points: i === 1 ? 4 : 0,
+          expected_points: [42, 49, 44][i]!,
+        })),
+        preferences: body.preferences,
+        preferences_scope: "selected_weeks",
+      },
+    });
+  });
+
+  await page.goto(PAGE);
+  await page.getByRole("textbox", { name: "Plan talimatların" }).fill(message);
+  await page.getByRole("button", { name: "Gönder", exact: true }).click();
+  await expect(page.getByLabel("Plan süresi")).toHaveValue("3");
+  await expect(
+    page.getByRole("button", { name: "Kaldır · Transferi sakla · Bu hafta" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Kaldır · Oyuncuyu transfer et · Bukayo Saka · 2. hafta" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Kaldır · Toplam ceza sınırı · 4 puan" }),
+  ).toBeVisible();
+  expect(posts).toHaveLength(0);
+  await page.getByRole("button", { name: "Planları hesapla" }).click();
+  await expect.poll(() => posts.length).toBe(1);
+  expect(posts[0]).toMatchObject({
+    window: 3,
+    preferences: {
+      week_rules: [
+        { week: 1, rules: { hold_transfers: true } },
+        { week: 2, rules: { buy_players: [incoming.player_id] } },
+      ],
+      max_hit_points: 4,
+    },
+  });
+  const plan = page.locator("article[data-plan-ready]");
+  await expect(plan.locator("[data-player-motion]")).toHaveCount(15);
+  await expect(plan.getByText("Toplam beklenen net puan", { exact: true })).toBeVisible();
+  const later = plan.getByRole("region", { name: "Önümüzdeki haftalar" });
+  await expect(later.getByRole("heading", { name: `GW ${squad.gameweek + 1}` })).toBeVisible();
+  await expect(later.getByRole("heading", { name: `GW ${squad.gameweek + 2}` })).toBeVisible();
+  await expect(later.getByText(incoming.name, { exact: true })).toBeVisible();
+});
+
+test("a future Wildcard is checked on its own week", async ({ page }) => {
+  test.skip(!API, "API build required");
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
+  const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+  const player = squad.starting_xi[0]!;
+  await page.route(`${API}/api/v1/contributions/players`, (route) =>
+    answer(route, {
+      season: squad.season,
+      players: [{ id: player.player_id, name: player.name, team: player.team }],
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+    answer(route, {
+      contract_version: "league_capabilities_v1",
+      league_id: LEAGUE,
+      capture_snapshot_id: squad.source_snapshot_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
+      preferences: { available: true },
+      top100: { available: false, weights: [] },
+      managers_word: { available: false },
+      chips: { held_by_entry: { [ENTRY]: [] } },
+    }),
+  );
+  await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+    answer(route, {
+      status: "draft",
+      draft: { window: 3, hard: [{ kind: "wildcard", week: 2 }], soft: [] },
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+    if (route.request().method() !== "POST") return answer(route, null);
+    const body = route.request().postDataJSON();
+    expect(body).toMatchObject({ window: 3, preferences: { wildcard_week: 2 } });
+    expect(body.chip ?? null).toBeNull();
+    const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
+    return answer(route, {
+      ...envelope,
+      payload: {
+        ...envelope.payload,
+        chip: null,
+        chip_strategy: {
+          version: "dated_joint_opportunity_v3",
+          mode: "manual",
+          requested_chip: "wildcard",
+          selected_chip: null,
+          top100_weight: 0,
+          objective_gap: null,
+          objective_basis: "selection_utility_with_chip_reserve",
+          experimental: false,
+          reservations: [],
+          limits: [],
+        },
+        plan_weeks: envelope.payload.plan_weeks!.map((week, i) => ({
+          ...week,
+          gameweek: squad.gameweek + i,
+          chip: i === 1 ? "wildcard" : null,
+        })),
+        preferences: body.preferences,
+        preferences_scope: "selected_weeks",
+      },
+    });
+  });
+  await page.goto(PAGE);
+  await page.getByRole("textbox", { name: "Plan talimatların" }).fill("Wildcard'ı haftaya kullan.");
+  await page.getByRole("button", { name: "Gönder", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Kaldır · Wildcard kullan · 2. hafta" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Planları hesapla" }).click();
+  const later = page
+    .locator("article[data-plan-ready]")
+    .getByRole("region", { name: "Önümüzdeki haftalar" });
+  await expect(later.getByText("Wildcard", { exact: true })).toBeVisible();
+});

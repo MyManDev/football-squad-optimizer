@@ -268,7 +268,7 @@ def advice_read_schema() -> dict[str, Any]:
             "bank_after_tenths": {"type": "integer", "minimum": 0},
             "free_transfers_after": {"type": "integer", "minimum": 0},
             "preferences": preferences_schema(),
-            "preferences_scope": {"const": "all_selected_weeks"},
+            "preferences_scope": {"enum": ["all_selected_weeks", "selected_weeks"]},
             "selection_top100_weight": {"enum": [0, 5, 10, 20, 30, 40, 50]},
             "prediction_model": {
                 "type": "object",

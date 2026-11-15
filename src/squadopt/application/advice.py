@@ -1046,7 +1046,7 @@ def window_payload(
     construction = plan.diagnostics.get("sequential_incumbent")
     if first.lineup_expectation is not None:
         limits.append(EXPECTED_LINEUP_PLAN_LIMIT)
-    elif isinstance(construction, dict):
+    elif isinstance(construction, dict) and construction.get("seed_cap") != 0:
         limits.append(
             GUARDED_PLAN_LIMIT
             if construction.get("seed_completed") is True

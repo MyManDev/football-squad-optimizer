@@ -23,6 +23,51 @@ describe("confirmed LLMOPT rules", () => {
     });
   });
 
+  it("rolls the first week and transfers the player in exactly next week within a total hit budget", () => {
+    const plans = preparePlans(
+      {
+        hard: [
+          { kind: "buy_player", player_id: 18, week: 2 },
+          { kind: "hold_transfers", week: 1 },
+          { kind: "hit_budget", points: 4 },
+        ],
+        soft: [],
+      },
+      held,
+    );
+    expect(plans).toMatchObject({
+      window: 3,
+      hardConflict: false,
+      base: {
+        chip: null,
+        preferences: {
+          save_chips: true,
+          max_hit_points: 4,
+          week_rules: [
+            { week: 1, rules: { hold_transfers: true } },
+            { week: 2, rules: { buy_players: [18] } },
+          ],
+        },
+      },
+    });
+    expect(plans.base?.preferences.hold_transfers).toBeUndefined();
+    expect(plans.base?.preferences.week_rules?.[1]?.rules.include_players).toBeUndefined();
+  });
+
+  it("allows a second-week Wildcard alongside first-week restrictions", () => {
+    const hold = { kind: "hold_transfers", week: 1 } as const;
+    const wildcard = { kind: "wildcard", week: 2 } as const;
+    const valid = preparePlans({ window: 3, hard: [hold, wildcard], soft: [] }, held);
+    expect(valid.base).toMatchObject({ chip: null, preferences: { wildcard_week: 2 } });
+    expect(
+      preparePlans({ window: 3, hard: [hold, { ...wildcard, week: 1 }], soft: [] }, held),
+    ).toMatchObject({
+      hardConflict: true,
+      base: null,
+    });
+    expect(preparePlans({ window: 1, hard: [wildcard], soft: [] }, held).base).toBeNull();
+  });
+
   it("refuses to relax a required transfer roll when the required player is not held", () => {
     const draft = preparePlans(
       { hard: [{ kind: "hold_transfers" }, { kind: "include_player", player_id: 18 }], soft: [] },

@@ -970,6 +970,11 @@ def _plan_named_chip_window(
         "linearization_level": linearization_level,
         "preferences": preferences,
     }
+    without_preferences = (
+        replace(preferences, wildcard_week=None)
+        if preferences is not None and preferences.wildcard_week is not None
+        else preferences
+    )
     without_chip = optimize_transfer_plan(
         horizon,
         state,
@@ -977,7 +982,7 @@ def _plan_named_chip_window(
         policy,
         chips=ChipAvailability(),
         protect_hold=True,
-        **restrictions,
+        **(restrictions | {"preferences": without_preferences}),
     )
     _refuse_clock_stopped_seed(without_chip, "without_chip")
     gameweeks = horizon.gameweeks
@@ -1126,7 +1131,9 @@ def plan_transfer_horizon(
 
     A one-week horizon reuses the uncapped operational transfer policy exactly. Longer
     horizons default to at most one transfer per gameweek. Bounded experimental
-    football also admits two moves when both use banked free transfers. The base
+    football also admits two moves when both use banked free transfers. Plans with
+    timed rules or a total hit ceiling use the ordinary game limits so a rule can
+    require more than one move in its requested week. The base
     one-transfer cap is the measured rolling
     discipline in ``docs/transfer_discipline_note.md``: the uncapped rolling planner
     churned, while the cap removed the mechanism. Callers may provide another explicit
@@ -1247,13 +1254,16 @@ def plan_transfer_horizon(
     ]
 
     settings = OptimizationConfig() if optimization is None else optimization
+    full_window_rules = preferences is not None and preferences.needs_full_window
     planning_policy = (
         # The same MEMBER_PLANNING_POLICY the one-week path builds from. Spelling the
         # controls out here instead would price a member's window at one hit cost and
         # their week at another the moment the policy moves.
         _transfer_config(
             rules,
-            transfer_cap=None if len(projection_horizon.target_gameweeks) == 1 else 1,
+            transfer_cap=None
+            if len(projection_horizon.target_gameweeks) == 1 or full_window_rules
+            else 1,
         )
         if transfer_config is None
         else transfer_config
@@ -1291,7 +1301,7 @@ def plan_transfer_horizon(
         and first_week_exclusion is None
     )
     guarded_football = bounded_football and not chip_strategy
-    if bounded_football and transfer_config is None:
+    if bounded_football and transfer_config is None and not full_window_rules:
         planning_policy = replace(planning_policy, allow_two_free_transfers=True)
     expected_lineups = (
         guarded_football

@@ -50,7 +50,9 @@
 }
 
 .chat textarea,
-.editor select {
+.editor select,
+.editor input[type="number"],
+.windowChoice select {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
   color: var(--color-text);
@@ -120,6 +122,8 @@
 
 .chat textarea:focus-visible,
 .editor select:focus-visible,
+.editor input[type="number"]:focus-visible,
+.windowChoice select:focus-visible,
 .workspace button:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
@@ -211,6 +215,13 @@
   min-width: 0;
 }
 
+.windowChoice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  justify-self: start;
+}
+
 .editor .checkbox {
   display: flex;
   align-items: center;
@@ -272,4 +283,26 @@
 .moves {
   margin: 0;
   padding-inline-start: var(--space-4);
+}
+
+.laterWeeks,
+.laterWeek {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.laterWeek {
+  padding-block: var(--space-2);
+  border-top: 1px solid var(--color-line);
+}
+
+.laterWeek h5 {
+  margin: 0;
+  font-size: var(--step-0);
+}
+
+.laterWeek .figures dd {
+  text-align: end;
+  overflow-wrap: anywhere;
 }

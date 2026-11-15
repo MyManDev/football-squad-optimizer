@@ -1,4 +1,4 @@
-import { checkedPreferences, preferencesKey } from "./decisionPreferences";
+import { checkedPreferences, preferenceScope, preferencesKey } from "./decisionPreferences";
 import { LeagueDataError } from "../dataErrors";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "./adviceClient";
@@ -60,17 +60,32 @@ export function checkedAdvice(
     const actual = preferencesKey(checkedPreferences(payload.preferences));
     if (
       actual !== preferencesKey(request.preferences) ||
-      (actual && payload.preferences_scope !== "all_selected_weeks")
+      (actual && payload.preferences_scope !== preferenceScope(request.preferences))
     )
       throw new Error("Preference mismatch");
   } catch {
     throw new AdviceContextError("Advice does not match the selected preferences.");
+  }
+  if (request.preferences?.wildcard_week !== undefined) {
+    const gameweek =
+      typeof payload.gameweek === "number"
+        ? payload.gameweek + request.preferences.wildcard_week - 1
+        : null;
+    if (
+      !Array.isArray(payload.plan_weeks) ||
+      !payload.plan_weeks.some(
+        (week) => record(week) && week.gameweek === gameweek && week.chip === "wildcard",
+      )
+    )
+      throw new AdviceContextError("Advice does not play the Wildcard in the selected week.");
   }
   const top100 = payload.top100;
   const strategy = record(payload.chip_strategy) ? payload.chip_strategy : null;
   const chosenChip =
     strategy?.requested_chip ?? (record(payload.chip_choice) ? payload.chip_choice.chip : null);
   const selectedChip = strategy ? strategy.selected_chip : chosenChip;
+  const requestedChip =
+    request.preferences?.wildcard_week === undefined ? request.chip : "wildcard";
   if (
     (request.top100Weight !== undefined &&
       (strategy?.top100_weight ??
@@ -79,8 +94,8 @@ export function checkedAdvice(
         0) !== request.top100Weight) ||
     (request.managersWord !== undefined &&
       (payload.evidence !== undefined) !== request.managersWord) ||
-    (request.chip !== undefined &&
-      (chosenChip !== request.chip || (payload.chip ?? null) !== selectedChip))
+    (requestedChip !== undefined &&
+      (chosenChip !== requestedChip || (payload.chip ?? null) !== selectedChip))
   ) {
     throw new AdviceContextError("Advice does not match the selected switches.");
   }

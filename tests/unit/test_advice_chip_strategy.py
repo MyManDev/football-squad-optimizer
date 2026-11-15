@@ -12,9 +12,10 @@ from tests.unit.test_advice_menu import _collaborators, _request
 from tests.unit.test_league_views import _Provider
 from tests.unit.test_member_windows import ENTRY, SEASON
 
-from squadopt.application.advice import NO_CHIP_LIMIT
+from squadopt.application.advice import NO_CHIP_LIMIT, WINDOW_TRANSFER_CAP_LIMIT
 from squadopt.application.advice_capabilities import AUTOMATIC_CHIP
 from squadopt.application.advice_chip_strategy import advise_chip_strategy
+from squadopt.application.advice_chips import ChipUnavailable
 from squadopt.application.advice_menu import advise_menu_entry
 from squadopt.application.entries import EntryError
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
@@ -88,6 +89,44 @@ def prepared(world, *, expires=None):
         ),
     )
     return {**world, "rules": rules, "provider": _Provider({ENTRY: replace(picks, chips_used={})})}
+
+
+def test_scheduled_wildcard_is_played_only_on_the_requested_week(world):
+    world = prepared(world)
+    preferences = DecisionPreferences.parse(
+        {
+            "wildcard_week": 2,
+            "max_hit_points": 0,
+            "week_rules": [{"week": 1, "rules": {"save_chips": True, "hold_transfers": True}}],
+        }
+    )
+    payload = _advise(world, window=3, chip=None, weight=0, preferences=preferences)
+    assert payload["preferences_scope"] == "selected_weeks"
+    assert payload["preferences"] == preferences.payload()
+    assert payload.get("chip") is None
+    assert payload["moves"] == []
+    assert WINDOW_TRANSFER_CAP_LIMIT not in payload["stated_limits"]
+    assert [week["chip"] for week in payload["plan_weeks"]] == [None, "wildcard", None]
+    assert [week["transfer_hit_points"] for week in payload["plan_weeks"]] == [0, 0, 0]
+
+    picks = world["provider"].picks(ENTRY, SEASON, 1)
+    world["provider"] = _Provider({ENTRY: replace(picks, chips_used={"wildcard": (1,)})})
+    with pytest.raises(ChipUnavailable) as caught:
+        _advise(world, window=3, chip=None, weight=0, preferences=preferences)
+    assert caught.value.code == "CHIP_NOT_HELD"
+
+    # The week-2 request spans a renewal. An exhausted current right may be followed
+    # by an unused right on that date, so current held-chip flags are insufficient.
+    world["rules"] = replace(
+        world["rules"],
+        chips=(
+            ChipWindow("wildcard", 1, 1, 2, "team"),
+            ChipWindow("wildcard", 1, 3, 38, "team"),
+            *(right for right in world["rules"].chips if right.name != "wildcard"),
+        ),
+    )
+    renewed = _advise(world, window=3, chip=None, weight=0, preferences=preferences)
+    assert [week["chip"] for week in renewed["plan_weeks"]] == [None, "wildcard", None]
 
 
 @pytest.mark.parametrize(

@@ -102,6 +102,14 @@ CHIP_OPTIMIZATION: Final = OptimizationConfig(
 )
 
 
+class ChipUnavailable(EntryError):
+    """The captured history cannot support the member's declared chip."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__("This chip is not available from the member's captured history.")
+        self.code = code
+
+
 @dataclass(frozen=True, slots=True)
 class MemberChipMenu:
     """The chips one member may choose this gameweek, and why not the others.
