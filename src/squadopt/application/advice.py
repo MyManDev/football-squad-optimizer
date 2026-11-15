@@ -833,6 +833,7 @@ WINDOW_FREE_PAIR_LIMIT = (
     "Each week allows one transfer, or up to two when both use banked free transfers. "
     "Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap."
 )
+WINDOW_STATIC_PRICE_LIMIT = "Prices are held at the captured values; no price change is modelled."
 WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "The first week's projection is repeated over the later weeks, rescaled by each "
     "club's fixture count in that week relative to its count in the first week, from "
@@ -842,7 +843,7 @@ WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "suspensions after it are not seen.",
     WINDOW_TRANSFER_CAP_LIMIT,
     WINDOW_TOP100_LIMIT,
-    "Prices are held at the captured values; no price change is modelled.",
+    WINDOW_STATIC_PRICE_LIMIT,
     NO_CHIP_LIMIT,
 )
 
@@ -1036,7 +1037,9 @@ def window_payload(
         for move in moves:
             move["expected_points_delta"] = None
     limits = window_stated_limits(projection)
-    if (
+    if plan.diagnostics.get("transfer_caps_by_gameweek"):
+        limits.remove(WINDOW_TRANSFER_CAP_LIMIT)
+    elif (
         plan.diagnostics.get("allow_two_free_transfers") is True
         and plan.diagnostics.get("max_transfers_per_gameweek") == 1
     ):
@@ -1119,10 +1122,25 @@ def window_payload(
                 "expected_points": expected_week_points(week),
                 **(
                     {
+                        "bank_after_tenths": int(
+                            week.bank_before_tenths
+                            if week.chip == "freehit"
+                            else week.bank_after_tenths
+                        ),
+                    }
+                    if include_resource_state
+                    else {}
+                ),
+                **(
+                    {
                         "lineup_expectation": lineup_expectation_fields(week),
-                        "lineup": lineup_decision_fields(week),
                     }
                     if week.lineup_expectation is not None
+                    else {}
+                ),
+                **(
+                    {"lineup": lineup_decision_fields(week)}
+                    if include_resource_state or week.lineup_expectation is not None
                     else {}
                 ),
             }

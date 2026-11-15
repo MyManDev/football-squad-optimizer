@@ -6,6 +6,7 @@ import {
   type Clarification,
   type PlanDraft,
 } from "./intent";
+import { checkedPlanRevision, type PlanRevision } from "./planRevision";
 
 export const ALTERNATIVE_COUNT = 2;
 
@@ -15,12 +16,14 @@ export interface PlanConfirmation {
   wildcardNotHeld: boolean;
   /** Absent until the confirmed baseline has been checked for follow-up requests. */
   followups?: (StartedAlternative | null)[];
+  scenarioReplayInfeasible?: true;
 }
 
 interface PlanSession {
   draft: PlanDraft;
   clarification?: Clarification;
   confirmation?: PlanConfirmation;
+  reference?: PlanRevision;
 }
 
 export interface PlanSessionContext {
@@ -53,11 +56,15 @@ export function writePlanSession(context: PlanSessionContext | null, session: Pl
 export function checkedPlanSession(
   value: unknown,
   players: readonly CatalogPlayer[],
+  gameweek: number,
 ): PlanSession | null {
   if (!value || typeof value !== "object") return null;
-  const { draft, confirmation, clarification } = value as Partial<PlanSession>;
+  const { draft, confirmation, clarification, reference } = value as Partial<PlanSession>;
   try {
-    const session: PlanSession = { draft: checkedDraft(draft, players) };
+    const session: PlanSession = {
+      draft: checkedDraft(draft, players),
+      reference: checkedPlanRevision(reference, gameweek),
+    };
     if (
       typeof clarification?.message === "string" &&
       clarification.message.length <= MAX_MESSAGE_LENGTH &&
@@ -76,6 +83,9 @@ export function checkedPlanSession(
     ) {
       session.confirmation = {
         wildcardNotHeld: confirmation.wildcardNotHeld,
+        ...(session.draft.scenario && confirmation.scenarioReplayInfeasible === true
+          ? { scenarioReplayInfeasible: true as const }
+          : {}),
         followups: confirmation.followups?.map((item) => {
           if (item?.kind === "priced" || item?.kind === "roll") return { kind: item.kind };
           if (

@@ -295,7 +295,9 @@ def propose_expected_swap(
         raise ValueError("The optional solve did not preserve its fixed first squad.")
     if candidate.weeks[0].chip in {"wildcard", "freehit"}:
         return skip("optional_first_week_rebuild")
-    result = improve_plan_lineups(candidate, settings, transfer, max_evaluations=128)
+    result = improve_plan_lineups(
+        candidate, settings, transfer, preferences=preferences, max_evaluations=128
+    )
     record.update(
         reason="retained",
         lineup_search=result.diagnostics["lineup_search"],

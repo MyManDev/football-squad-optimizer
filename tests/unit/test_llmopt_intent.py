@@ -110,6 +110,89 @@ def test_response_asks_a_question_instead_of_returning_a_partial_draft() -> None
     assert response.json() == {"status": "clarification", "message": "Hangi oyuncu?"}
 
 
+@pytest.mark.parametrize("reference_weeks", [[1, 2, 3], [2], []])
+def test_revision_interprets_a_frozen_week_and_a_bank_floor(reference_weeks: list[int]) -> None:
+    def provider(request: IntentRequest) -> object:
+        assert request.reference_weeks == tuple(reference_weeks)
+        return {
+            "status": "draft",
+            "draft": {
+                "hard": [{"kind": "no_hits", "player_id": None}],
+                "soft": [],
+                "comparison": None,
+                "window": None,
+                "keep_weeks": [1],
+                "min_bank": {"tenths": 5, "week": 2},
+            },
+            "message": None,
+        }
+
+    body = {
+        **_request(),
+        "message": "İlk haftay\u0131 koru, ikinci hafta sonunda £0,5m kals\u0131n.",
+        "reference_weeks": reference_weeks,
+    }
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=body)
+    assert response.status_code == 200
+    if 1 in reference_weeks:
+        assert response.json() == {
+            "status": "draft",
+            "draft": {
+                "hard": [{"kind": "no_hits"}],
+                "soft": [],
+                "window": 3,
+                "keep_weeks": [1],
+                "min_bank": {"tenths": 5, "week": 2},
+            },
+        }
+    else:
+        assert response.json()["status"] == "clarification"
+        assert "hesaplayal" in response.json()["message"]
+
+
+@pytest.mark.parametrize(
+    ("kind", "week", "tenths", "canonical"),
+    [
+        ("unavailable", None, None, {"kind": "unavailable", "player_id": 1}),
+        (
+            "price_increase",
+            2,
+            1,
+            {"kind": "price_increase", "player_id": 1, "week": 2, "tenths": 1},
+        ),
+    ],
+)
+def test_interprets_a_scenario_using_the_captured_reference(
+    kind: str, week: int | None, tenths: int | None, canonical: dict[str, object]
+) -> None:
+    def provider(request: IntentRequest) -> object:
+        assert request.reference_captains == ((1, 1),)
+        return {
+            "status": "draft",
+            "draft": {
+                "hard": [],
+                "soft": [],
+                "comparison": None,
+                "window": 3,
+                "scenario": {"kind": kind, "week": week, "tenths": tenths, "player_id": 1},
+            },
+            "message": None,
+        }
+
+    body = {
+        **_request(),
+        "reference_weeks": [1, 2, 3],
+        "reference_captains": [{"week": 1, "player_id": 1}],
+    }
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=body)
+        assert response.status_code == 200
+        assert response.json()["draft"]["scenario"] == canonical
+        unknown = body | {"reference_captains": [{"week": 1, "player_id": 2}]}
+        assert client.post(URL, json=unknown).status_code == 422
+
+
 def test_wildcard_is_a_chip_instruction_with_no_player_id() -> None:
     def provider(request: IntentRequest) -> object:
         assert request.message == "Wildcard kullan, Salah kadroda kals\u0131n."

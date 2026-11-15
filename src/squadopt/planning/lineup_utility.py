@@ -11,6 +11,7 @@ from dataclasses import replace
 from typing import Any
 
 from squadopt.contracts import order_outfield_bench
+from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning.models import (
     ChipAvailability,
@@ -127,6 +128,7 @@ def improve_plan_lineups(
     transfer: TransferPlanningConfig,
     *,
     fixed_first: PlanningWeekResult | None = None,
+    preferences: DecisionPreferences | None = None,
     max_evaluations: int = LINEUP_EVALUATIONS_PER_WEEK,
     not_starting: Iterable[object] = (),
     not_captain: Iterable[object] = (),
@@ -141,9 +143,22 @@ def improve_plan_lineups(
     if not plan.has_solution:
         return plan
     not_starting, not_captain = tuple(not_starting), tuple(not_captain)
+    frozen_lineups = {
+        frozen.week
+        for frozen in (preferences.frozen_weeks if preferences is not None else ())
+        if frozen.starting_xi or frozen.captain is not None
+    }
+    scenario = preferences.scenario if preferences is not None else None
     weeks = []
     work: list[dict[str, Any]] = []
     for index, week in enumerate(plan.weeks):
+        unavailable = (
+            (scenario.player_id,)
+            if scenario is not None
+            and scenario.kind == "unavailable"
+            and scenario.week == index + 1
+            else ()
+        )
         if index == 0 and fixed_first is not None:
             if (
                 set(week.selected_squad.player_id) != set(fixed_first.selected_squad.player_id)
@@ -159,8 +174,8 @@ def improve_plan_lineups(
             chip=week.chip,
             hit_points=week.transfer_hit_points,
             max_evaluations=max_evaluations,
-            locked_first=index == 0 and fixed_first is not None,
-            not_starting=not_starting if index == 0 else (),
+            locked_first=(index == 0 and fixed_first is not None) or index + 1 in frozen_lineups,
+            not_starting=(*not_starting, *unavailable) if index == 0 else unavailable,
             not_captain=not_captain if index == 0 else (),
         )
         score = result.best
@@ -198,7 +213,7 @@ def improve_plan_lineups(
                 "cap": result.max_evaluations,
                 "cache_hits": result.cache_hits,
                 "budget_exhausted": result.budget_exhausted,
-                "first_action_locked": result.locked_first,
+                "first_action_locked": index == 0 and result.locked_first,
                 "states_evaluated": result.states_evaluated,
                 "autosub_cache_hits": result.autosub_cache_hits,
                 "captain_pairs_considered": result.captain_pairs_considered,

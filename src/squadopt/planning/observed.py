@@ -162,7 +162,9 @@ def optimize_observed_window(
     ) -> TransferPlanResult:
         if not expected_lineups or not plan.has_solution:
             return plan
-        updated = improve_plan_lineups(plan, proposal_optimization, transfer, fixed_first=fixed)
+        updated = improve_plan_lineups(
+            plan, proposal_optimization, transfer, fixed_first=fixed, preferences=preferences
+        )
         lineup_ledger.append(
             {"phase": phase, **cast(Mapping[str, object], updated.diagnostics["lineup_search"])}
         )

@@ -1,6 +1,7 @@
 """Integration tests for planning from a captured multi-gameweek projection."""
 
 import json
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
@@ -26,6 +27,7 @@ from tests.unit.test_projection_horizon_builder import (
 
 from squadopt.application import horizon_plan_document, write_horizon_plan
 from squadopt.application import horizon_plans as horizon_service
+from squadopt.contracts.preferences import DecisionPreferences, FrozenPlanWeek, PlanScenario
 from squadopt.data.errors import DataError, DataSourceError
 from squadopt.live import (
     HeldSquad,
@@ -224,6 +226,49 @@ def test_planning_does_not_mutate_the_projection_horizon(tmp_path: Path) -> None
     plan_transfer_horizon(inputs, horizon, held, rules)
 
     assert_frame_equal(horizon.table, before)
+
+
+@pytest.mark.parametrize("held_lot", [False, True])
+def test_price_scenario_respects_the_sale_basis_of_initial_and_new_lots(tmp_path, held_lot):
+    inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
+    table = horizon.table.assign(price_tenths=50)
+    horizon = replace(horizon, table=table)
+    roster = table.loc[table.gameweek.eq(2)].set_index("player_id")
+    original = set(held.squad_player_ids)
+    counts = Counter(roster.loc[list(original), "team_id"])
+    sale, purchase = next(
+        (a, b)
+        for a in sorted(original)
+        for b in sorted(set(roster.index) - original)
+        if roster.loc[a, "position"] == roster.loc[b, "position"]
+        and (
+            roster.loc[a, "team_id"] == roster.loc[b, "team_id"]
+            or counts[roster.loc[b, "team_id"]] < 3
+        )
+    )
+    held = replace(
+        held, bank_tenths=100, purchase_prices={p: 45 if p == sale else 50 for p in original}
+    )
+    if held_lot:
+        frozen = (
+            FrozenPlanWeek(week=1, transfers_in=(), transfers_out=(), chip=None),
+            FrozenPlanWeek(week=2, transfers_in=(purchase,), transfers_out=(sale,), chip=None),
+            FrozenPlanWeek(week=3, transfers_in=(), transfers_out=(), chip=None),
+        )
+    else:
+        frozen = (
+            FrozenPlanWeek(week=1, transfers_in=(purchase,), transfers_out=(sale,), chip=None),
+            FrozenPlanWeek(week=2, transfers_in=(sale,), transfers_out=(purchase,), chip=None),
+            FrozenPlanWeek(week=3, transfers_in=(purchase,), transfers_out=(sale,), chip=None),
+        )
+    scenario = PlanScenario("price_increase", sale if held_lot else purchase, week=2, tenths=3)
+    preferences = DecisionPreferences(frozen_weeks=frozen, scenario=scenario)
+    plan, _ = plan_transfer_horizon(inputs, horizon, held, rules, preferences=preferences)
+    assert [w.bank_after_tenths for w in plan.weeks] == (
+        [100, 99, 99] if held_lot else [97, 98, 95]
+    )
+    assert plan.weeks[1].transfers_out.iloc[0].sell_price_tenths == (49 if held_lot else 51)
+    assert_frame_equal(horizon.table, table)
 
 
 def test_the_operational_document_is_structured_and_contains_no_percentage_claim(

@@ -31,6 +31,24 @@ export function isPlanWeek(value: unknown): value is PlanWeekNumber {
   return value === 1 || value === 2 || value === 3;
 }
 
+export interface FrozenPlanWeek {
+  week: PlanWeekNumber;
+  transfers_in: number[];
+  transfers_out: number[];
+  chip: "wildcard" | "freehit" | "bboost" | "3xc" | null;
+  starting_xi?: number[];
+  captain?: number;
+}
+
+export interface BankFloor {
+  tenths: number;
+  week?: PlanWeekNumber;
+}
+
+export type PlanScenario = { player_id: number; week?: PlanWeekNumber } & (
+  { kind: "price_increase"; tenths: number } | { kind: "unavailable" }
+);
+
 interface RulePreferences {
   keep_players: number[];
   avoid_players: number[];
@@ -53,6 +71,9 @@ export interface DecisionPreferences extends RulePreferences {
   hold_opening_transfers?: boolean;
   min_opening_bank_tenths?: number;
   net_points_priority?: boolean;
+  frozen_weeks?: FrozenPlanWeek[];
+  min_bank?: BankFloor;
+  scenario?: PlanScenario;
 }
 
 function checkedClubCounts(value: unknown, holdsTransfers: boolean): ClubCount[] {
@@ -109,18 +130,19 @@ function expectKeys(row: Record<string, unknown>, extra: string[]) {
     throw new Error("Unknown preference");
 }
 
+function checkedIds(value: unknown): number[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > 15 ||
+    value.some((id) => !Number.isSafeInteger(id) || id < 1) ||
+    new Set(value).size !== value.length
+  )
+    throw new Error("Invalid player preferences");
+  return [...value].sort((a: number, b: number) => a - b) as number[];
+}
+
 function checkedRules(row: Record<string, unknown>): WeekRulePreferences {
-  const ids = (v: unknown): number[] => {
-    if (v === undefined) return [];
-    if (
-      !Array.isArray(v) ||
-      v.length > 15 ||
-      v.some((id) => !Number.isSafeInteger(id) || id < 1) ||
-      new Set(v).size !== v.length
-    )
-      throw new Error("Invalid player preferences");
-    return [...v].sort((a: number, b: number) => a - b) as number[];
-  };
+  const ids = (value: unknown) => (value === undefined ? [] : checkedIds(value));
   const flag = (v: unknown): boolean => {
     if (v === undefined) return false;
     if (typeof v !== "boolean") throw new Error("Invalid preference flag");
@@ -208,6 +230,90 @@ export function isHitBudget(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 60;
 }
 
+export function checkedBankFloor(value: unknown): BankFloor {
+  const { tenths, week, ...extra } = preferenceRecord(value);
+  if (
+    Object.keys(extra).length ||
+    typeof tenths !== "number" ||
+    !Number.isInteger(tenths) ||
+    tenths < 1 ||
+    tenths > 10_000 ||
+    (week !== undefined && !isPlanWeek(week))
+  )
+    throw new Error("Invalid minimum bank");
+  return { tenths, ...(week === undefined ? {} : { week }) };
+}
+
+export function checkedScenario(value: unknown): PlanScenario {
+  const { kind, player_id, week, tenths, ...extra } = preferenceRecord(value);
+  if (
+    Object.keys(extra).length ||
+    typeof player_id !== "number" ||
+    !Number.isSafeInteger(player_id) ||
+    player_id < 1 ||
+    (week !== undefined && !isPlanWeek(week))
+  )
+    throw new Error("Invalid scenario player or week");
+  const scope = { player_id, ...(week === 2 || week === 3 ? { week } : {}) };
+  if (kind === "unavailable" && tenths === undefined) return { kind, ...scope };
+  if (
+    kind === "price_increase" &&
+    typeof tenths === "number" &&
+    Number.isInteger(tenths) &&
+    tenths >= 1 &&
+    tenths <= 10_000
+  )
+    return { kind, ...scope, tenths };
+  throw new Error("Invalid scenario change");
+}
+
+function checkedFrozenWeeks(value: unknown): FrozenPlanWeek[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 3) throw new Error("Invalid frozen weeks");
+  const seen = new Set<PlanWeekNumber>();
+  return value
+    .map((item: unknown): FrozenPlanWeek => {
+      const { week, transfers_in, transfers_out, chip, starting_xi, captain, ...extra } =
+        preferenceRecord(item);
+      if (
+        Object.keys(extra).length ||
+        !isPlanWeek(week) ||
+        seen.has(week) ||
+        (chip !== null &&
+          chip !== "wildcard" &&
+          chip !== "freehit" &&
+          chip !== "bboost" &&
+          chip !== "3xc")
+      )
+        throw new Error("Invalid frozen week");
+      seen.add(week);
+      const incoming = checkedIds(transfers_in);
+      const outgoing = checkedIds(transfers_out);
+      if (incoming.length !== outgoing.length || incoming.some((id) => outgoing.includes(id)))
+        throw new Error("Invalid frozen transfers");
+      const selected: FrozenPlanWeek = {
+        week,
+        transfers_in: incoming,
+        transfers_out: outgoing,
+        chip,
+      };
+      if (starting_xi !== undefined || captain !== undefined) {
+        const starters = checkedIds(starting_xi);
+        if (
+          starters.length !== 11 ||
+          typeof captain !== "number" ||
+          !starters.includes(captain) ||
+          starters.some((id) => outgoing.includes(id))
+        )
+          throw new Error("Invalid frozen lineup");
+        selected.starting_xi = starters;
+        selected.captain = captain;
+      }
+      return selected;
+    })
+    .sort((left, right) => left.week - right.week);
+}
+
 export function checkedPreferences(value: unknown): DecisionPreferences {
   const row = preferenceRecord(value === undefined ? {} : value);
   expectKeys(row, [
@@ -217,6 +323,9 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
     "hold_opening_transfers",
     "min_opening_bank_tenths",
     "net_points_priority",
+    "frozen_weeks",
+    "min_bank",
+    "scenario",
   ]);
   const global = checkedRules(row);
   const holdOpening = row.hold_opening_transfers;
@@ -237,6 +346,27 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
   if (netPointsPriority !== undefined && typeof netPointsPriority !== "boolean")
     throw new Error("Invalid net points priority");
   const weekRules = checkedWeeks(row.week_rules, global, holdOpening === true);
+  const frozenWeeks = checkedFrozenWeeks(row.frozen_weeks);
+  const minBank = row.min_bank === undefined ? undefined : checkedBankFloor(row.min_bank);
+  const scenario = row.scenario === undefined ? undefined : checkedScenario(row.scenario);
+  for (const frozen of frozenWeeks) {
+    const local = weekRules.find(({ week }) => week === frozen.week)?.rules;
+    const avoided = [...global.avoid_players, ...(local?.avoid_players ?? [])];
+    const required = [
+      ...global.keep_players,
+      ...(global.include_players ?? []),
+      ...(local?.keep_players ?? []),
+      ...(local?.include_players ?? []),
+    ];
+    if (
+      (frozen.transfers_in.length &&
+        (global.hold_transfers || local?.hold_transfers || (frozen.week === 1 && holdOpening))) ||
+      local?.buy_players?.some((id) => !frozen.transfers_in.includes(id)) ||
+      [...frozen.transfers_in, ...(frozen.starting_xi ?? [])].some((id) => avoided.includes(id)) ||
+      frozen.transfers_out.some((id) => required.includes(id))
+    )
+      throw new Error("Frozen week conflicts with player or transfer rules");
+  }
   const maxHits = row.max_hit_points;
   if (maxHits !== undefined && !isHitBudget(maxHits)) throw new Error("Invalid hit budget");
   const wildcardWeek = row.wildcard_week;
@@ -254,6 +384,9 @@ export function checkedPreferences(value: unknown): DecisionPreferences {
     ...(holdOpening ? { hold_opening_transfers: true } : {}),
     ...(minOpeningBank === undefined ? {} : { min_opening_bank_tenths: minOpeningBank }),
     ...(netPointsPriority ? { net_points_priority: true } : {}),
+    ...(frozenWeeks.length ? { frozen_weeks: frozenWeeks } : {}),
+    ...(minBank === undefined ? {} : { min_bank: minBank }),
+    ...(scenario === undefined ? {} : { scenario }),
   };
 }
 
@@ -279,7 +412,10 @@ export function preferenceScope(p?: DecisionPreferences) {
   return p?.week_rules?.length ||
     p?.wildcard_week ||
     p?.hold_opening_transfers ||
-    p?.min_opening_bank_tenths !== undefined
+    p?.min_opening_bank_tenths !== undefined ||
+    p?.frozen_weeks?.length ||
+    p?.min_bank !== undefined ||
+    p?.scenario !== undefined
     ? "selected_weeks"
     : "all_selected_weeks";
 }
