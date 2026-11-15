@@ -1,11 +1,11 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-11-14T02:01:01.186699Z",
+  "generated_at_utc": "2026-11-15T02:01:07.606153Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 5662073,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261114T020101Z-215338b96572",
+    "as_of_snapshot_id": "fpl-live-20261115T020107Z-52858fbaf26c",
     "weeks": [
       {
         "gameweek": 11,
