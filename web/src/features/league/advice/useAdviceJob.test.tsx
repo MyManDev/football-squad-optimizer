@@ -120,7 +120,7 @@ describe("useAdviceJob", () => {
     expect(signals[1].aborted).toBe(true);
   });
 
-  it("a five-minute deadline ends a hanging custom client and fences its late answer", async () => {
+  it("bounds a hanging request and ignores its late answer", async () => {
     const client = new ScriptedClient();
     let finish!: (value: AdviceRequestResult) => void;
     client.requestAdvice = async () =>
@@ -129,7 +129,7 @@ describe("useAdviceJob", () => {
       });
     render(<Harness client={client} />);
     await act(async () => screen.getByText("go").click());
-    await act(async () => vi.advanceTimersByTimeAsync(300_000));
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
     expect(screen.getByTestId("phase")).toHaveTextContent("failed");
     await act(async () =>
       finish({

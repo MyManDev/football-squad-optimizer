@@ -123,3 +123,31 @@ test("an open gameweek shows no deadline notice, counts down and links to FPL", 
   await expect(link).toHaveAttribute("target", "_blank");
   await expect(link).toHaveAttribute("rel", "noopener noreferrer");
 });
+
+test("a member page already open closes at the deadline", async ({ page }) => {
+  const deadline = new Date("2026-09-18T17:30:00Z");
+  await page.clock.install({ time: new Date(deadline.getTime() - 70_000) });
+  await installLeagueMocks(page);
+  await serveTransfer(page);
+  const calendar = openCalendar();
+  calendar.payload.gameweeks[0]!.deadline_utc = deadline.toISOString();
+  await page.route("**/data/fixtures.json", (route) => route.fulfill({ json: calendar }));
+  await page.goto(`/league/352490/members/${ENTRY}`);
+
+  const copy = MESSAGES.tr.leagueMembers;
+  const settings = page.locator("#plan-settings");
+  const apply = page.getByRole("link", { name: copy.applyOnFpl });
+  await expect(settings).toBeVisible();
+  await expect(apply).toBeVisible();
+
+  await page.clock.pauseAt(new Date(deadline.getTime() - 20_000));
+  await page.clock.runFor(19_999);
+  await expect(page.getByTestId("deadline-passed")).toHaveCount(0);
+  await expect(settings).toBeVisible();
+
+  await page.clock.runFor(1);
+  await expect(page.getByTestId("deadline-passed")).toBeVisible();
+  await expect(settings).toHaveCount(0);
+  await expect(apply).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: copy.memberSquad })).toBeVisible();
+});

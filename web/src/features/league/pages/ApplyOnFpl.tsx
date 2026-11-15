@@ -13,7 +13,15 @@ const FPL_PICK_TEAM = "https://fantasy.premierleague.com/my-team";
  * where the captain is set. A week that leaves the team as it stands (no transfer, and the
  * captain already wearing the armband) has nothing to apply, so it offers nothing.
  */
-export function ApplyOnFpl({ plan, squad }: { plan: EntryAdvice; squad: EntrySquad }) {
+export function ApplyOnFpl({
+  plan,
+  squad,
+  canOpen,
+}: {
+  plan: EntryAdvice;
+  squad: EntrySquad;
+  canOpen: () => boolean;
+}) {
   const copy = useLanguage().messages.leagueMembers;
   const held = squad.starting_xi.find((player) => player.is_captain)?.player_id;
   const transfers = plan.moves.length > 0;
@@ -25,6 +33,9 @@ export function ApplyOnFpl({ plan, squad }: { plan: EntryAdvice; squad: EntrySqu
         href={transfers ? FPL_TRANSFERS : FPL_PICK_TEAM}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={(event) => {
+          if (!canOpen()) event.preventDefault();
+        }}
       >
         {copy.applyOnFpl}
         <ExternalIcon />

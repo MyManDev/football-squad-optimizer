@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 
@@ -9,7 +9,7 @@ import { entryAddress, memberAddress } from "../../../lib/leagueAddresses";
 import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
-import { gameweekDeadline, useMinuteClock } from "../advice/deadline";
+import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import { checkedPreferences, holdsOpeningTransfers } from "../advice/decisionPreferences";
 import { sameAdviceRequest, useAdviceJob, type ComputePhase } from "../advice/useAdviceJob";
 import { LEAGUE_READ, useEntrySquad } from "../queries";
@@ -25,6 +25,7 @@ import {
   preparePlans,
   readIntent,
   readIntentCatalog,
+  type CatalogPlayer,
   type Clarification,
   type Constraint,
   type PlanDraft,
@@ -37,6 +38,15 @@ import {
   sameOpeningDecision,
   samePlan,
 } from "./planComparison";
+import {
+  ALTERNATIVE_COUNT,
+  checkedPlanSession,
+  readPlanSession,
+  writePlanSession,
+  type PlanConfirmation,
+  type PlanSessionContext,
+  type StartedAlternative,
+} from "./planSession";
 import { RuleEditor } from "./RuleEditor";
 import styles from "./LLMOptPage.module.css";
 
@@ -91,7 +101,21 @@ interface PlanRun {
   wildcardUnavailable: boolean;
 }
 
-const ALTERNATIVE_COUNT = 2;
+function requestFor(
+  squad: EntrySquad,
+  forwarded: boolean | undefined,
+  window: AdviceRequest["window"],
+): AdviceRequest {
+  return {
+    publicEntry: forwarded,
+    leagueId: squad.league_id,
+    entryId: squad.entry.entry_id,
+    strategy: "saf-puan",
+    window,
+    season: squad.season,
+    gameweek: squad.gameweek,
+  };
+}
 
 function prepareRun(
   draft: PlanDraft,
@@ -157,12 +181,33 @@ function prepareRun(
   };
 }
 
+function restoredSlot(run: PlanRun, index: number, started?: StartedAlternative | null) {
+  const slot = run.slots[index];
+  if (slot?.kind === "explicit") return slot.request;
+  if (slot?.kind === "priced") return started?.kind === "priced" ? slot.request : null;
+  const basis = run.automaticBasis;
+  if (!basis || run.prices.length || !started || started.kind === "priced") return null;
+  try {
+    return {
+      ...basis,
+      preferences: checkedPreferences({
+        ...basis.preferences,
+        ...(started.kind === "bank"
+          ? { min_opening_bank_tenths: started.floor }
+          : { hold_opening_transfers: true }),
+      }),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function preferencePrice(
   target: PriceTarget,
   label: string,
   reference: ComputePhase,
   alternatives: readonly ComputePhase[],
-  closed: boolean,
+  canStart: boolean,
 ): PreferencePrice {
   const review = { key: constraintKey(target.rule), label, ceiling: target.rule.max_cost_tenths };
   const { outcome } = target;
@@ -187,7 +232,7 @@ function preferencePrice(
     return {
       ...review,
       status:
-        candidate && (isWorking(candidate.phase) || (candidate.phase === "idle" && !closed))
+        candidate && (isWorking(candidate.phase) || (candidate.phase === "idle" && canStart))
           ? "pending"
           : "unavailable",
     };
@@ -229,19 +274,60 @@ function visibleAutomatic(
 }
 
 function Session({ squad }: { squad: EntrySquad }) {
-  const { language } = useLanguage();
-  const copy = LLMOPT_COPY[language];
-  const { tree, forwarded } = useLeague();
-  const now = useMinuteClock();
+  const { messages } = useLanguage();
+  const { forwarded } = useLeague();
   const fixtures = useFixtures();
   const deadline = gameweekDeadline(fixtures.data, squad.season, squad.gameweek);
-  const closed = deadline !== null && now >= Date.parse(deadline);
   const roster = useQuery({
     queryKey: ["llmopt-roster", ORIGIN, squad.season, squad.source_snapshot_id],
     queryFn: ({ signal }) => readIntentCatalog(ORIGIN, squad.season, signal),
     enabled: !!ORIGIN,
     ...LEAGUE_READ,
   });
+  const context =
+    ORIGIN && deadline && squad.source_snapshot_id
+      ? {
+          key: `squadopt.llmopt:${JSON.stringify([ORIGIN, forwarded === true, squad.league_id, squad.entry.entry_id])}`,
+          basis: squadBasis(squad),
+          deadline,
+        }
+      : null;
+  const saved = context ? readPlanSession(context) : null;
+  if (fixtures.isPending || (saved && roster.isPending))
+    return <PageLoading label={messages.common.loading} />;
+  return (
+    <Workspace
+      key={context ? `${context.key}:${context.deadline}` : undefined}
+      squad={squad}
+      deadline={deadline}
+      fixturesUnavailable={fixtures.isError}
+      roster={roster}
+      context={context}
+      saved={saved}
+    />
+  );
+}
+
+function Workspace({
+  squad,
+  deadline,
+  fixturesUnavailable,
+  roster,
+  context,
+  saved,
+}: {
+  squad: EntrySquad;
+  deadline: string | null;
+  fixturesUnavailable: boolean;
+  roster: UseQueryResult<CatalogPlayer[]>;
+  context: PlanSessionContext | null;
+  saved: unknown;
+}) {
+  const { language } = useLanguage();
+  const copy = LLMOPT_COPY[language];
+  const { tree, forwarded } = useLeague();
+  const now = useDeadlineClock(deadline);
+  const closed = deadline !== null && now >= Date.parse(deadline);
   const owned = [...squad.starting_xi, ...squad.bench];
   const held = new Set(owned.map(({ player_id }) => player_id));
   const players = (
@@ -251,18 +337,43 @@ function Session({ squad }: { squad: EntrySquad }) {
   const base = useAdviceJob(client, false, squad.source_snapshot_id, true);
   const first = useAdviceJob(client, false, squad.source_snapshot_id, true);
   const second = useAdviceJob(client, false, squad.source_snapshot_id, true);
-  const [draft, setDraft] = useState<PlanDraft>(EMPTY_DRAFT);
+  const [restored] = useState(() => checkedPlanSession(saved, players));
+  const [restoredRun] = useState(() => {
+    if (!restored?.confirmation) return null;
+    const { draft, confirmation } = restored;
+    const plans = preparePlans({ ...draft, soft: [] }, held);
+    if (plans.hardConflict) return null;
+    return prepareRun(
+      draft,
+      held,
+      requestFor(squad, forwarded, plans.window),
+      plans,
+      confirmation.wildcardNotHeld,
+    );
+  });
+  const [draft, setDraft] = useState<PlanDraft>(restored?.draft ?? EMPTY_DRAFT);
   const [message, setMessage] = useState("");
-  const [conversation, setConversation] = useState<ChatLine[]>([]);
-  const [clarification, setClarification] = useState<Clarification>();
-  const [feedback, setFeedback] = useState("");
+  const [conversation, setConversation] = useState<ChatLine[]>(() =>
+    restored?.clarification
+      ? [
+          { id: 0, role: "user", message: restored.clarification.message },
+          { id: 1, role: "assistant", message: restored.clarification.question },
+        ]
+      : [],
+  );
+  const [clarification, setClarification] = useState<Clarification | undefined>(
+    restored?.clarification,
+  );
+  const [feedback, setFeedback] = useState(
+    restoredRun?.wildcardUnavailable ? copy.wildcardUnavailable : "",
+  );
   const [checkingSquad, setCheckingSquad] = useState(false);
   const [basisChanged, setBasisChanged] = useState(false);
   const [reading, setReading] = useState(false);
-  const [run, setRun] = useState<PlanRun | null>(null);
-  const automaticStartedFor = useRef<AdviceRequest | null>(null);
+  const [run, setRun] = useState<PlanRun | null>(restoredRun);
+  const confirmation = useRef<PlanConfirmation | undefined>(restored?.confirmation);
   const interpret = useRef<AbortController | null>(null);
-  const nextChatLine = useRef(0);
+  const nextChatLine = useRef(conversation.length);
   const confirming = useRef(false);
   const mounted = useRef(true);
 
@@ -282,6 +393,13 @@ function Session({ squad }: { squad: EntrySquad }) {
     setFeedback("");
     setClarification(undefined);
     setDraft(next);
+    confirmation.current = undefined;
+    writePlanSession(context, { draft: next });
+  }
+
+  function setQuestion(next?: Clarification) {
+    setClarification(next);
+    writePlanSession(context, { draft, clarification: next, confirmation: confirmation.current });
   }
 
   async function send(event: FormEvent<HTMLFormElement>) {
@@ -304,7 +422,7 @@ function Session({ squad }: { squad: EntrySquad }) {
       );
       if (controller.signal.aborted) return;
       if (answer.status === "draft") change(answer.draft);
-      else setClarification({ message: clarification?.message ?? text, question: answer.message });
+      else setQuestion({ message: clarification?.message ?? text, question: answer.message });
       const reply = answer.status === "clarification" ? answer.message : copy.understood;
       const userLine = nextChatLine.current++;
       const replyLine = nextChatLine.current++;
@@ -340,43 +458,87 @@ function Session({ squad }: { squad: EntrySquad }) {
   const computing = [base.state, first.state, second.state].some(({ phase }) => isWorking(phase));
   const busy = checkingSquad || reading || computing;
   const baseState = base.state;
+  const { resume: resumeBase, readCached: readBase } = base;
   const { compute: computeFirst } = first;
+  const { resume: resumeFirst, readCached: readFirst } = first;
   const { compute: computeSecond } = second;
+  const { resume: resumeSecond, readCached: readSecond } = second;
+  useEffect(() => {
+    if (!run || run !== restoredRun) return;
+    let active = true;
+    // React can replay mount effects. Wait until their cleanup has completed before resuming.
+    queueMicrotask(() => {
+      if (!active) return;
+      if (run.baseRequest && !resumeBase?.(run.baseRequest)) readBase?.(run.baseRequest);
+      const followups = restored?.confirmation?.followups;
+      const firstRequest = restoredSlot(run, 0, followups?.[0]);
+      const secondRequest = restoredSlot(run, 1, followups?.[1]);
+      if (firstRequest && !resumeFirst?.(firstRequest)) readFirst?.(firstRequest);
+      if (secondRequest && !resumeSecond?.(secondRequest)) readSecond?.(secondRequest);
+    });
+    return () => {
+      active = false;
+    };
+  }, [
+    run,
+    restoredRun,
+    restored,
+    resumeBase,
+    readBase,
+    resumeFirst,
+    readFirst,
+    resumeSecond,
+    readSecond,
+  ]);
+
   useEffect(() => {
     if (
       !run?.automaticBasis ||
       baseState.phase !== "done" ||
-      automaticStartedFor.current === baseState.request
+      baseState.request !== run.baseRequest ||
+      !confirmation.current ||
+      confirmation.current.followups !== undefined
     )
       return;
-    automaticStartedFor.current = baseState.request;
     if (deadline === null || Date.now() >= Date.parse(deadline)) return;
 
-    const jobs = [computeFirst, computeSecond];
-    run.slots.forEach((slot, index) => {
-      if (slot.kind === "priced") jobs[index]?.(slot.request);
-    });
-    if (run.prices.length) return;
-    const spare = jobs.slice(run.slots.length);
-    if (!spare.length) return;
-    const basis = run.automaticBasis;
-    const reserved = run.slots.flatMap((slot) => (slot.request ? [slot.request] : []));
-    const { roll, bank } = openingAlternatives(
-      baseState.envelope.payload,
-      basis.preferences,
-      basis.chip,
+    type Candidate = { request: PlanRequest; alternative: StartedAlternative };
+    const candidates = run.slots.map((slot): Candidate | null =>
+      slot.kind === "priced" ? { request: slot.request, alternative: { kind: "priced" } } : null,
     );
-    const available = [
-      reserved.some(({ preferences }) => holdsOpeningTransfers(preferences)) ? null : roll,
-      bank,
-    ]
-      .flatMap((preferences) => (preferences ? [{ ...basis, preferences }] : []))
-      .filter((candidate) => !reserved.some((request) => sameAdviceRequest(candidate, request)));
-    spare.forEach((start, index) => {
-      const candidate = available[index];
-      if (candidate) start(candidate);
+    if (!run.prices.length && run.slots.length < ALTERNATIVE_COUNT) {
+      const basis = run.automaticBasis;
+      const reserved = run.slots.flatMap((slot) => (slot.request ? [slot.request] : []));
+      const { roll, bank } = openingAlternatives(
+        baseState.envelope.payload,
+        basis.preferences,
+        basis.chip,
+      );
+      const bankFloor = bank?.min_opening_bank_tenths;
+      const available: Candidate[] = [];
+      if (roll && !reserved.some(({ preferences }) => holdsOpeningTransfers(preferences)))
+        available.push({ request: { ...basis, preferences: roll }, alternative: { kind: "roll" } });
+      if (bank && bankFloor !== undefined)
+        available.push({
+          request: { ...basis, preferences: bank },
+          alternative: { kind: "bank", floor: bankFloor },
+        });
+      candidates.push(
+        ...available
+          .filter(({ request }) => !reserved.some((other) => sameAdviceRequest(request, other)))
+          .slice(0, ALTERNATIVE_COUNT - run.slots.length),
+      );
+    }
+    confirmation.current = {
+      ...confirmation.current,
+      followups: candidates.map((candidate) => candidate?.alternative ?? null),
+    };
+    writePlanSession(context, { draft, clarification, confirmation: confirmation.current });
+    const jobs = [computeFirst, computeSecond];
+    candidates.forEach((candidate, index) => {
+      if (candidate) jobs[index]?.(candidate.request);
     });
-  }, [baseState, run, deadline, computeFirst, computeSecond]);
+  }, [baseState, run, deadline, computeFirst, computeSecond, draft, clarification, context]);
 
   async function compute() {
     if (
@@ -421,17 +583,11 @@ function Session({ squad }: { squad: EntrySquad }) {
       ) {
         setBasisChanged(true);
         setRun(null);
+        confirmation.current = undefined;
+        writePlanSession(context, { draft });
         return;
       }
-      const request: AdviceRequest = {
-        publicEntry: forwarded,
-        leagueId: squad.league_id,
-        entryId: squad.entry.entry_id,
-        strategy: "saf-puan",
-        window: plans.window,
-        season: squad.season,
-        gameweek: squad.gameweek,
-      };
+      const request = requestFor(squad, forwarded, plans.window);
       // A public team may have no chip list until its FPL inputs are pinned.
       const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
       const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
@@ -442,11 +598,15 @@ function Session({ squad }: { squad: EntrySquad }) {
         !next.slots.some((slot) => slot.kind === "explicit" && slot.request)
       ) {
         setRun(null);
+        confirmation.current = undefined;
+        writePlanSession(context, { draft });
         return;
       }
       first.reset();
       second.reset();
       setRun(next);
+      confirmation.current = { wildcardNotHeld };
+      writePlanSession(context, { draft, confirmation: confirmation.current });
       if (next.baseRequest) {
         base.compute(next.baseRequest);
       } else base.reset();
@@ -472,7 +632,7 @@ function Session({ squad }: { squad: EntrySquad }) {
         ruleLabel(target.rule, players, copy),
         baseState,
         states,
-        closed,
+        !closed && (run !== restoredRun || restored?.confirmation?.followups === undefined),
       ),
     })) ?? [];
   const results: { title: string; state: ComputePhase; conflict?: boolean }[] = [];
@@ -577,7 +737,7 @@ function Session({ squad }: { squad: EntrySquad }) {
               className={styles.secondary}
               type="button"
               disabled={busy}
-              onClick={() => setClarification(undefined)}
+              onClick={() => setQuestion()}
             >
               {copy.dismissQuestion}
             </button>
@@ -615,7 +775,7 @@ function Session({ squad }: { squad: EntrySquad }) {
             {copy.deadline}
           </p>
         )}
-        {fixtures.isError && deadline === null && (
+        {fixturesUnavailable && deadline === null && (
           <p role="status" className={styles.notice}>
             {copy.deadlineUnknown}
           </p>

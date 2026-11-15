@@ -493,7 +493,15 @@ describe("the decision heading", () => {
         ? new Response(JSON.stringify({ job_id: "job-echo", status: "queued" }), { status: 202 })
         : new Promise<Response>(() => undefined),
     );
-    show("tr", { advice: null, client });
+    const fixtures = {
+      ...CALENDAR,
+      gameweeks: CALENDAR.gameweeks.map((week) =>
+        week.gameweek === GW
+          ? { ...week, deadline_utc: new Date(Date.now() + 60_000).toISOString() }
+          : week,
+      ),
+    };
+    show("tr", { advice: null, client, fixtures });
     const echo = within(decision())
       .getByTestId("member-selection-summary")
       .parentElement!.querySelector("[aria-live]")!;

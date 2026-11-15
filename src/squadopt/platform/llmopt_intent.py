@@ -9,7 +9,10 @@ import time
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from http.client import HTTPException, HTTPSConnection
+from math import ceil
 from threading import BoundedSemaphore, Lock
 from typing import Any, Final, Protocol
 
@@ -29,6 +32,7 @@ _MAX_HIT_POINTS: Final = 60
 _MAX_COST_TENTHS: Final = 1000
 _RESPONSE_BYTES: Final = 32 * 1024
 _TIMEOUT_SECONDS: Final = 35
+_DEFAULT_PROVIDER_RETRY_SECONDS: Final = 60
 _KINDS: Final = (
     "hold_transfers",
     "no_hits",
@@ -575,6 +579,21 @@ _RESULT_SCHEMA: Final = _schema_object(
 )
 
 
+def _provider_retry_after(header: str | None) -> int:
+    if not header:
+        return _DEFAULT_PROVIDER_RETRY_SECONDS
+    value = header.strip()
+    if re.fullmatch(r"[0-9]{1,10}", value):
+        return int(value)
+    try:
+        retry_at = parsedate_to_datetime(value)
+    except (TypeError, ValueError, OverflowError):
+        return _DEFAULT_PROVIDER_RETRY_SECONDS
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=UTC)
+    return max(0, ceil((retry_at - datetime.now(UTC)).total_seconds()))
+
+
 class OpenAIIntentProvider:
     """One bounded Chat Completions call to the selected provider's official endpoint."""
 
@@ -661,6 +680,8 @@ class OpenAIIntentProvider:
                 },
             )
             response = connection.getresponse()
+            if response.status == 429:
+                raise IntentLimited(_provider_retry_after(response.getheader("Retry-After")))
             encoding = response.getheader("Content-Encoding", "identity")
             if response.status != 200 or encoding.lower() != "identity":
                 raise IntentUnavailable("The intent provider did not accept the request.")

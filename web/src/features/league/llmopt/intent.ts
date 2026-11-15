@@ -23,6 +23,7 @@ export const CONSTRAINT_KINDS = [
 ] as const;
 export const MAX_CONSTRAINTS = 16;
 export const MAX_MESSAGE_LENGTH = 800;
+export const MAX_QUESTION_LENGTH = 300;
 
 type PlayerKind = (typeof playerKinds)[number] | "buy_player";
 type PlanWindow = 1 | 3;
@@ -156,11 +157,7 @@ function parseConstraint(
   return { kind, ...timing, ...price } satisfies Constraint;
 }
 
-function parseDraft(
-  value: unknown,
-  playerIds: ReadonlySet<number>,
-  clubs: ReadonlySet<string>,
-): PlanDraft {
+export function checkedDraft(value: unknown, players: readonly CatalogPlayer[]): PlanDraft {
   if (
     !record(value) ||
     !Array.isArray(value.hard) ||
@@ -169,6 +166,8 @@ function parseDraft(
     value.hard.length + value.soft.length > MAX_CONSTRAINTS
   )
     throw new Error("Invalid draft");
+  const playerIds = new Set(players.map(({ id }) => id));
+  const clubs = new Set(players.map(({ team }) => team).filter(Boolean));
   const draft: PlanDraft = {
     hard: value.hard.map((item) => parseConstraint(item, playerIds, clubs)),
     soft: value.soft.map((item) => parseConstraint(item, playerIds, clubs, "soft")),
@@ -405,11 +404,7 @@ export async function readIntent(
       if (value.status !== "draft") throw new Error("Invalid response");
       return {
         status: "draft" as const,
-        draft: parseDraft(
-          value.draft,
-          new Set(players.map(({ id }) => id)),
-          new Set(players.map(({ team }) => team).filter(Boolean)),
-        ),
+        draft: checkedDraft(value.draft, players),
       };
     },
     { signal, timeoutMs: 45_000 },

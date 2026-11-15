@@ -7,8 +7,9 @@
  */
 
 import type { AdviceRequest } from "../advice/adviceClient";
-import type { EntrySquad, EntrySquadPlayer } from "../types";
+import type { EntrySquad } from "../types";
 import {
+  hasCompleteStartingXi,
   isDeviceChip,
   isDevicePlanEntry,
   isRivalStrategy,
@@ -107,16 +108,17 @@ export function offeredDeviceSelection(
   return selection;
 }
 
-/** The rival as the device needs them, from their entry document; null when it names no captain. */
+/** A rival can be scored when the entry document names a complete XI and one captain. */
 export function rivalFromSquad(
   entryId: number,
   squad: Pick<EntrySquad, "starting_xi">,
 ): DeviceRival | null {
-  const captain = squad.starting_xi.find((player: EntrySquadPlayer) => player.is_captain);
-  if (!captain) return null;
+  const startingXi = squad.starting_xi.map((player) => player.player_id);
+  const captains = squad.starting_xi.filter((player) => player.is_captain);
+  if (!hasCompleteStartingXi(startingXi) || captains.length !== 1) return null;
   return {
     entry_id: entryId,
-    starting_xi: squad.starting_xi.map((player) => player.player_id),
-    captain: captain.player_id,
+    starting_xi: startingXi,
+    captain: captains[0]!.player_id,
   };
 }

@@ -182,6 +182,8 @@ interface PageOptions {
   service?: "static" | "unreachable";
   /** The other members' documents: read at once, held until a promise settles, or unreadable. */
   rivals?: "read" | Promise<void> | "unreadable";
+  /** The selected rival's publication omits a starter. */
+  partialRival?: boolean;
   /** The shared device document: published, absent, or from another capture. */
   devicePlan?: "published" | "missing" | "other-capture";
 }
@@ -190,9 +192,18 @@ function renderPage(search: string, options: PageOptions | PageOptions["service"
   const {
     service = "static",
     rivals = "read",
+    partialRival = false,
     devicePlan = "published",
   } = typeof options === "string" ? { service: options } : options;
   const documents = squads();
+  if (partialRival) {
+    const rival = documents[RIVAL]!;
+    const missing = rival.payload.starting_xi.find((player) => !player.is_captain)!;
+    documents[RIVAL] = live(rival, {
+      data_quality: "partial",
+      starting_xi: rival.payload.starting_xi.filter((player) => player !== missing),
+    });
+  }
   stubTree({
     entrySquad: vi.fn<LeagueTree["entrySquad"]>().mockImplementation(async (id) => {
       if (id !== ENTRY && rivals === "unreadable")
@@ -355,6 +366,14 @@ describe("a rival strategy solved on the member's device", () => {
     expect(deviceButton()).toBeNull();
     expect(container).not.toHaveTextContent(copy.deviceRefused);
   }, 60_000);
+
+  it("keeps a named rival with a partial XI selected and disables the device solve", async () => {
+    renderPage(`mode=ortak-koru&window=1&rival=${RIVAL}`, { partialRival: true });
+
+    await waitFor(() => expect(rivalOption(RIVAL)).toBeDisabled());
+    expect(rivalOption(RIVAL)).toHaveProperty("selected", true);
+    expect(deviceButton()).toBeNull();
+  });
 
   it("keeps the link's rival and reads as loading until the rivals' documents are read", async () => {
     let release!: () => void;

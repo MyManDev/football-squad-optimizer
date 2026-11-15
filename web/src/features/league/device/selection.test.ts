@@ -115,4 +115,17 @@ describe("what the device solves", () => {
     };
     expect(rivalFromSquad(35249002, unmarked)).toBeNull();
   });
+
+  it("refuses an incomplete XI, repeated starter, or repeated armband", () => {
+    const eleven = squad.starting_xi;
+    const [first, second] = eleven.filter((player) => !player.is_captain);
+    const incomplete = eleven.filter((player) => player !== first);
+    const repeatedStarter = eleven.map((player) => (player === first ? second! : player));
+    const repeatedCaptain = eleven.map((player) =>
+      player === first ? { ...player, is_captain: true } : player,
+    );
+    expect(rivalFromSquad(35249002, { starting_xi: incomplete })).toBeNull();
+    expect(rivalFromSquad(35249002, { starting_xi: repeatedStarter })).toBeNull();
+    expect(rivalFromSquad(35249002, { starting_xi: repeatedCaptain })).toBeNull();
+  });
 });

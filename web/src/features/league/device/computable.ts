@@ -29,7 +29,7 @@ export const NO_DEVICE_RIVALS: DeviceRivalReads = { squads: [], loading: false, 
 
 /**
  * Whether the device can play a rival strategy against this rival: their entry document is
- * on the member's capture and names a captain in their eleven. The device solves against
+ * on the member's capture and names a complete eleven and one captain. The device solves against
  * that eleven and that captain, and refuses a rival without them, as the server does.
  */
 export function deviceRivalUsable(
@@ -69,7 +69,7 @@ export function deviceComputable(
     chips: DEVICE_CHIPS.filter((chip) => deviceChip({ chip }, squad) === chip),
     loading: reads.loading,
     unreadRivals: candidates.filter((id) => reads.unreadable.includes(id)),
-    captainMissingRivals: candidates.filter((id) =>
+    invalidRivals: candidates.filter((id) =>
       reads.squads.some(
         (rival) =>
           rival.entry.entry_id === id &&

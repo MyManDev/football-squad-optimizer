@@ -1,6 +1,9 @@
 """Intent preparation validates the model output without submitting a solve."""
 
 import json
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -26,6 +29,42 @@ def _request() -> dict[str, Any]:
         "draft": {"hard": [{"kind": "no_hits"}], "soft": []},
         "players": [{"id": 1, "name": "Mohamed Salah", "team": "LIV", "held": True}],
     }
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [("27", 27), (None, 60), ("invalid", 60), ("http-date", 90)],
+)
+def test_upstream_rate_limit_returns_retry_after(
+    monkeypatch: pytest.MonkeyPatch, header: str | None, expected: int
+) -> None:
+    retry_after = (
+        format_datetime(datetime.now(UTC) + timedelta(seconds=expected), usegmt=True)
+        if header == "http-date"
+        else header
+    )
+
+    def connection(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(
+            request=lambda *_args, **_kwargs: None,
+            getresponse=lambda: SimpleNamespace(
+                status=429, getheader={"Retry-After": retry_after}.get
+            ),
+            close=lambda: None,
+        )
+
+    monkeypatch.setattr("squadopt.platform.llmopt_intent.HTTPSConnection", connection)
+    provider = OpenAIIntentProvider(api_key="test-key", model="test-model", provider="gemini")
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 429
+    assert response.json()["error"]["code"] == "RATE_LIMITED"
+    assert response.headers["cache-control"] == "no-store"
+    seconds = int(response.headers["retry-after"])
+    if header == "http-date":
+        assert expected - 5 <= seconds <= expected
+    else:
+        assert seconds == expected
 
 
 def _proposed(player_id: int = 1) -> dict[str, Any]:
