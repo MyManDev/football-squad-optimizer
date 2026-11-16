@@ -1,0 +1,139 @@
+/* The heatmap mode: a layer of cells over the document that takes no pointer, and a small
+   button or panel fixed at the bottom right, inside the safe area. The layer sits over the
+   page and the phone bar, under the drawer's scrim; the controls sit over the scrim too, so
+   they can always be closed. The site has no bar of its own at the bottom. */
+.root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+}
+
+.layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 25;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  animation: arrive var(--motion-ui) var(--motion-ease);
+}
+
+.cell {
+  position: absolute;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+  }
+}
+
+.open,
+.panel {
+  position: fixed;
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  z-index: 35;
+}
+
+.open {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-board-edge);
+  border-radius: var(--radius-s);
+  background: var(--color-board);
+  color: var(--color-board-text);
+  font: inherit;
+  font-weight: 600;
+  box-shadow: var(--shadow-drawer);
+  cursor: pointer;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(320px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-drawer);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.panelTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.close {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.line {
+  margin: 0;
+  font-size: var(--step--1);
+  color: var(--color-text-muted);
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.choiceLabel {
+  font-size: var(--step--2);
+  line-height: 16px;
+  color: var(--color-text-muted);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--step--2);
+  color: var(--color-text-muted);
+}
+
+/* The cells' scale: blue for few, yellow, red for the busiest cell. */
+.ramp {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, rgb(37, 99, 235), rgb(250, 204, 21), rgb(220, 38, 38));
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layer {
+    animation: none;
+  }
+}

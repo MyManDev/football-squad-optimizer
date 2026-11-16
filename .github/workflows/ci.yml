@@ -309,6 +309,7 @@ jobs:
             workers/usage/test/rules.test.mjs \
             workers/usage/test/worker.test.mjs \
             workers/usage/test/report.test.mjs \
+            workers/usage/test/report-route.test.mjs \
             workers/usage/test/deploy-steps.test.mjs
 
       - name: Build

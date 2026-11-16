@@ -11,7 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LANGUAGE_STORAGE_KEY } from "../i18n/LanguageProvider";
 import { MEMBER_TOOLS } from "../lib/leagueAddresses";
-import { recordUsage, usagePlace, type UsagePlace, type UsageStep } from "./usage";
+import { recordUsage, sendUsage, usagePlace, type UsagePlace, type UsageStep } from "./usage";
+import { isUsageAdmin, markUsageAdmin, USAGE_ADMIN_KEY } from "./usageAdminFlag";
 import {
   USAGE_DWELLS,
   USAGE_ERRORS,
@@ -52,6 +53,7 @@ beforeEach(() => {
   pointer(false);
   window.history.pushState({}, "", ADDRESS);
   localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+  localStorage.removeItem(USAGE_ADMIN_KEY);
 });
 
 afterEach(() => {
@@ -168,6 +170,50 @@ describe("a failure never reaches the page", () => {
     expect(sent(0).session).toMatch(/^[0-9a-f]{16}$/);
     expect(sent(1).session).toBe(sent(0).session);
     expect(sent(0).lang).toBe("tr");
+  });
+});
+
+describe("an admin's browser (ADR 0016)", () => {
+  it("is marked by the one value the admin page keeps", () => {
+    expect(isUsageAdmin()).toBe(false);
+    markUsageAdmin();
+    expect(localStorage.getItem(USAGE_ADMIN_KEY)).toBe("1");
+    expect(isUsageAdmin()).toBe(true);
+    localStorage.setItem(USAGE_ADMIN_KEY, "yes");
+    expect(isUsageAdmin()).toBe(false);
+  });
+
+  it("sends no event of either version, and makes no token", () => {
+    markUsageAdmin();
+    const event = vi.fn(() => ({ v: 2, kind: "click" }));
+    recordUsage({ step: "open" });
+    sendUsage(event);
+    expect(beacon).not.toHaveBeenCalled();
+    expect(event).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+  });
+
+  it("sends again once the mark is gone", () => {
+    markUsageAdmin();
+    recordUsage({ step: "open" });
+    localStorage.removeItem(USAGE_ADMIN_KEY);
+    recordUsage({ step: "open" });
+    sendUsage(() => ({ v: 2, kind: "error", error: "script" }));
+    expect(beacon).toHaveBeenCalledTimes(2);
+    expect(sent(1)).toMatchObject({ v: 2, kind: "error" });
+  });
+
+  it("never throws where storage refuses, and is then a counted visitor", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    expect(() => markUsageAdmin()).not.toThrow();
+    expect(isUsageAdmin()).toBe(false);
+    recordUsage({ step: "open" });
+    expect(beacon).toHaveBeenCalledTimes(1);
   });
 });
 

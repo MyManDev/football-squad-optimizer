@@ -13,6 +13,7 @@ import { LeagueGate } from "../features/league/pages/LeagueGate";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 import { isLLMOptAddress } from "../lib/leagueAddresses";
+import { AdminHeatmap } from "./AdminHeatmap";
 import { IdentifiedShell } from "./IdentifiedShell";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { UsageBehaviour } from "./UsageBehaviour";
@@ -129,6 +130,10 @@ const FixturesPage = lazy(() =>
 const ContributePage = lazy(() =>
   import("../features/contributions/ContributePage").then((m) => ({ default: m.ContributePage })),
 );
+// The usage record's admin page (ADR 0016): behind Cloudflare Access, in no navigation.
+const UsageAdminPage = lazy(() =>
+  import("../features/usageAdmin/UsageAdminPage").then((m) => ({ default: m.UsageAdminPage })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -152,6 +157,7 @@ function LocalizedApp({ basename }: { basename: string }) {
         <RoutePreload />
         <UsagePageOpen />
         <UsageBehaviour />
+        <AdminHeatmap />
         <IdentifiedShell>
           <RouteErrorBoundary>
             <Suspense fallback={<PageLoading label={messages.common.loading} />}>
@@ -326,6 +332,7 @@ function LocalizedApp({ basename }: { basename: string }) {
                 {import.meta.env.VITE_ADVICE_API_ORIGIN && (
                   <Route path="/contribute" element={<ContributePage />} />
                 )}
+                <Route path="/admin/usage" element={<UsageAdminPage />} />
                 <Route path="*" element={<EmptyState page title={messages.shell.notFound} />} />
               </Routes>
             </Suspense>

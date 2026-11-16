@@ -11,6 +11,7 @@
  */
 import { LANGUAGE_STORAGE_KEY } from "../i18n/LanguageProvider";
 import { isMemberTool } from "../lib/leagueAddresses";
+import { isUsageAdmin } from "./usageAdminFlag";
 
 export type UsageStep = "open" | "tool" | "picker_shown" | "picker_claimed" | "device_solve";
 
@@ -126,10 +127,12 @@ export function usageOrigin(): string | null {
 
 /**
  * Sends one event of either version. The event is built only once the origin has passed, so
- * a page that may not send makes no session token either. Never throws.
+ * a page that may not send makes no session token either. A browser that reads the record
+ * (ADR 0016) sends nothing. Never throws.
  */
 export function sendUsage(event: () => Record<string, unknown>): void {
   try {
+    if (isUsageAdmin()) return;
     const origin = usageOrigin();
     if (origin === null) return;
     const body = JSON.stringify(event());

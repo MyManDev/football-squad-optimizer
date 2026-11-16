@@ -4,6 +4,12 @@ name: Deploy usage record
 # Analytics Engine. Dispatched by hand from the default branch, like the forwarder; nothing
 # here runs on push. The Pages site is not touched. The dataset is created by its first write
 # and has no secret of its own.
+#
+# The report routes (ADR 0016) need four Worker secrets, written after each deploy from the
+# cloudflare-workers environment: the read-only token (secret USAGE_READ_TOKEN), the account
+# (secret CLOUDFLARE_ACCOUNT_ID) and the Access team and audience tag (variables
+# ACCESS_TEAM_DOMAIN and ACCESS_AUD). Without the token or either variable the Worker still
+# deploys, and the report routes answer 503 until a later deploy has them.
 
 on:
   workflow_dispatch:
@@ -79,6 +85,7 @@ jobs:
             workers/usage/test/rules.test.mjs \
             workers/usage/test/worker.test.mjs \
             workers/usage/test/report.test.mjs \
+            workers/usage/test/report-route.test.mjs \
             workers/usage/test/deploy-steps.test.mjs
 
       - name: Deploy the Worker
@@ -86,6 +93,36 @@ jobs:
         if: inputs.action == 'deploy'
         working-directory: workers/usage
         run: npx --yes wrangler@"$WRANGLER_VERSION" deploy
+
+      # Written after the first deploy, which creates the Worker, and on every deploy after it,
+      # so a rotated token or a new audience tag in the environment reaches the Worker. The
+      # values go to wrangler on stdin and are never printed; the notice names only what is
+      # missing. Either all four are written or none is, so the Worker never holds a token
+      # beside a stale Access setting.
+      - name: Write the report settings
+        id: report_settings
+        if: steps.deploy.outcome == 'success'
+        working-directory: workers/usage
+        env:
+          USAGE_READ_TOKEN: ${{ secrets.USAGE_READ_TOKEN }}
+          ACCESS_TEAM_DOMAIN: ${{ vars.ACCESS_TEAM_DOMAIN }}
+          ACCESS_AUD: ${{ vars.ACCESS_AUD }}
+        shell: bash
+        run: |
+          missing=""
+          if [[ -z "$USAGE_READ_TOKEN" ]]; then missing="$missing secret USAGE_READ_TOKEN,"; fi
+          if [[ -z "$ACCESS_TEAM_DOMAIN" ]]; then missing="$missing variable ACCESS_TEAM_DOMAIN,"; fi
+          if [[ -z "$ACCESS_AUD" ]]; then missing="$missing variable ACCESS_AUD,"; fi
+          if [[ -n "$missing" ]]; then
+            echo "::notice::The cloudflare-workers environment has no${missing%,}; the report settings were not written and the report routes answer 503."
+            echo "written=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$USAGE_READ_TOKEN" | npx --yes wrangler@"$WRANGLER_VERSION" secret put ANALYTICS_TOKEN
+          printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | npx --yes wrangler@"$WRANGLER_VERSION" secret put ANALYTICS_ACCOUNT_ID
+          printf '%s' "$ACCESS_TEAM_DOMAIN" | npx --yes wrangler@"$WRANGLER_VERSION" secret put ACCESS_TEAM_DOMAIN
+          printf '%s' "$ACCESS_AUD" | npx --yes wrangler@"$WRANGLER_VERSION" secret put ACCESS_AUD
+          echo "written=yes" >> "$GITHUB_OUTPUT"
 
       - name: Smoke the Worker
         id: smoke
@@ -106,11 +143,14 @@ jobs:
           ACTION: ${{ inputs.action }}
           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
           SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          SETTINGS_OUTCOME: ${{ steps.report_settings.outcome }}
+          SETTINGS_WRITTEN: ${{ steps.report_settings.outputs.written }}
           DELETE_WORKER_OUTCOME: ${{ steps.delete_worker.outcome }}
         run: |
           echo "## Usage record: $ACTION" >> "$GITHUB_STEP_SUMMARY"
           if [[ "$ACTION" == "deploy" ]]; then
             echo "- Deploy: ${DEPLOY_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Report settings: ${SETTINGS_OUTCOME:-not-run} (written: ${SETTINGS_WRITTEN:-no})" >> "$GITHUB_STEP_SUMMARY"
             echo "- Smoke: ${SMOKE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
             echo "- Route: https://squadopt.mymandev.com/api/v1/usage/" >> "$GITHUB_STEP_SUMMARY"
           else
