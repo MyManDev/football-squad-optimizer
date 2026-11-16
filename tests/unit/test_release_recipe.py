@@ -854,7 +854,7 @@ esac
 #: the scenario says GitHub never registers it. The run list honours the `>= <epoch>` filter
 #: the script passes, and without one returns the newest run, as `--limit 1` did.
 _DEPLOY_GH = """case "$*" in
-  "run list --workflow ci.yml"*) echo "11 completed success";;
+  "run list --workflow ci.yml"*) echo "11 1 completed success";;
   "api repos/"*) echo 1;;
   "workflow run deploy-pages.yml"*) date -u +%s > "$DISPATCHED";;
   "run list --workflow deploy-pages.yml"*)
@@ -961,6 +961,97 @@ def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str
         assert "run watch 200 --exit-status" in log
         assert "deploy run 200 finished: failure" in result.stdout
         assert "not this release's run" not in result.stdout
+
+
+#: main's push CI as the deploy script polls it: the first attempt fails; `run rerun 11
+#: --failed` starts a second, which GitHub shows one poll late, then running, then finished.
+_RERUN_GH = """case "$*" in
+  "run list --workflow ci.yml"*)
+    if [ ! -f "$RERUN" ]; then echo "11 1 completed failure"; exit 0; fi
+    polls=$(( $(cat "$POLLS" 2>/dev/null || echo 0) + 1 )); echo "$polls" > "$POLLS"
+    case "$polls" in
+      1) echo "11 1 completed failure";;
+      2) echo "11 2 in_progress ";;
+      *) if [ "$SCENARIO" = fails-again ]; then echo "11 2 completed failure"
+         else echo "11 2 completed success"; fi;;
+    esac;;
+  "run rerun 11 --failed") [ "$SCENARIO" != rerun-refused ] && touch "$RERUN";;
+  "api repos/"*) echo 1;;
+  "workflow run deploy-pages.yml"*) date -u +%s > "$DISPATCHED";;
+  "run list --workflow deploy-pages.yml"*) [ -f "$DISPATCHED" ] && echo 200;;
+  "run watch "*) :;;
+  "run view "*"--json conclusion,jobs"*) echo "success jobs=[]";;
+  "run view 200 --json jobs"*) printf 'verify production source\nproduction %s\n' "$TAG";;
+  *) exit 99;;
+esac
+"""
+
+
+@pytest.mark.parametrize("scenario", ["passes-on-rerun", "fails-again", "rerun-refused"])
+def test_a_failed_main_ci_is_rerun_once_before_the_deploy_refuses(
+    tmp_path: Path, scenario: str
+) -> None:
+    """A flaky check on main stopped the scheduled releases of 14 and 15 Nov 2026 after their
+    release PRs had merged. The failed jobs now run once more; a second failure refuses."""
+
+    if not Path(SHELL).is_file():
+        pytest.skip("A POSIX shell is required")
+    commands = tmp_path / "commands"
+    commands.mkdir()
+    calls = tmp_path / "calls"
+    stubs = {"git": _DEPLOY_GIT, "gh": _RERUN_GH, "sleep": ":\n"}
+    for name, body in stubs.items():
+        target = commands / name
+        target.write_text(
+            '#!/bin/sh\nprintf "%s\\n" "$0 $*" >> "$CALLS"\n' + body,
+            encoding="utf-8",
+            newline="\n",
+        )
+        target.chmod(0o755)
+    result = subprocess.run(
+        [
+            SHELL,
+            "-c",
+            'PATH="$(cd "$COMMANDS" && pwd):$PATH"; export PATH; exec /bin/sh "$@"',
+            "deploy-test",
+            str(ROOT / "scripts/release/deploy.sh"),
+            _DEPLOY_TAG,
+        ],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "COMMANDS": commands.as_posix(),
+            "CALLS": calls.as_posix(),
+            "DISPATCHED": (tmp_path / "dispatched").as_posix(),
+            "POLLS": (tmp_path / "polls").as_posix(),
+            "RERUN": (tmp_path / "rerun").as_posix(),
+            "REMOTE_TAGS": "site-2026-27-gw06-decision",
+            "SCENARIO": scenario,
+            "TAG": _DEPLOY_TAG,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    log = calls.read_text()
+    assert log.count("run rerun 11 --failed") == 1
+    assert (
+        "main CI run 11 attempt 1 ended failure; re-running its failed jobs once" in result.stdout
+    )
+    if scenario == "passes-on-rerun":
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "main CI run 11 succeeded with one site artifact" in result.stdout
+        assert f"tag -a {_DEPLOY_TAG}" in log
+    elif scenario == "fails-again":
+        assert result.returncode == 1
+        assert "attempt 2 ended failure after the re-run; refusing to deploy" in result.stdout
+        assert "tag -a" not in log
+        assert "workflow run" not in log
+    else:
+        assert result.returncode == 1
+        assert "main CI run 11 could not be re-run; refusing to deploy" in result.stdout
+        assert "tag -a" not in log
 
 
 @pytest.mark.parametrize(
