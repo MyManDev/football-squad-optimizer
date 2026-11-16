@@ -141,7 +141,7 @@ export function LeagueMembersView({
 
   return (
     <div className={styles.page}>
-      <header className={barStyles.topBar}>
+      <header className={barStyles.topBar} data-zone="topbar">
         <TopWeek gameweek={view.gameweek} deadline={deadline} passed={deadlinePassed} />
         <ScoreBug cells={cells} />
       </header>
@@ -152,7 +152,7 @@ export function LeagueMembersView({
             {view.league_name}
           </h1>
 
-          <table id="league-member-list" className={styles.table}>
+          <table id="league-member-list" className={styles.table} data-zone="member-table">
             <caption className="visually-hidden">{copy.caption(view.league_name)}</caption>
             <thead>
               <tr>

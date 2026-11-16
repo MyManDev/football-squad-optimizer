@@ -168,6 +168,7 @@ export function MemberFixtureRail({
       data-placement={placement}
       data-open={open ? "true" : undefined}
       data-mark="rail"
+      data-zone="fixtures-rail"
       aria-labelledby={sheet && !open ? undefined : titleId}
       role={open ? "dialog" : undefined}
       aria-modal={open ? true : undefined}

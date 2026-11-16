@@ -109,7 +109,7 @@ export function MemberSections({ closed = false }: { closed?: boolean } = {}) {
   };
   // The holder stays when nothing is linked: the page's scroll padding counts the strip.
   return (
-    <div className={styles.sections} data-shown={shown || undefined}>
+    <div className={styles.sections} data-shown={shown || undefined} data-zone="tool-tabs">
       {found.length > 0 ? (
         <nav className={styles.sectionsBar} aria-label={copy.sectionsLabel} data-pinned-strip>
           {found.map((key) => (

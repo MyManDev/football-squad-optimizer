@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 
 import { recordUsage } from "../../../data/usage";
+import type { UsageZone } from "../../../data/usageBehaviour";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useShellLayout } from "../../../design/shell/layout";
 import { useShell } from "../../../design/shell/ShellContext";
@@ -108,6 +109,15 @@ function computeEcho(
   const standing = state.phase === "waiting" ? jobStanding(computeCopy, state) : null;
   return copy.computeEcho(standing === null ? word : `${word}, ${standing}`);
 }
+
+/** The usage record's zone for each tool's page (ADR 0015); the chips page is the resources. */
+const TOOL_ZONES: Record<MemberTool, UsageZone> = {
+  "current-squad": "squad",
+  "what-if": "what-if",
+  duel: "duel",
+  chips: "resources",
+  card: "squad",
+};
 
 /** A closed section of the page's secondary tools, read one click away. */
 function Tool({ title, children }: { title: string; children: ReactNode }) {
@@ -537,7 +547,11 @@ function LeagueMemberContent({
               deadlinePassed={deadlinePassed}
               now={now}
             />
-            <section aria-labelledby="member-tool-title" className={styles.toolBody}>
+            <section
+              aria-labelledby="member-tool-title"
+              className={styles.toolBody}
+              data-zone={TOOL_ZONES[tool]}
+            >
               <h2 className={styles.decisionTitle} id="member-tool-title">
                 {page.title}
               </h2>
@@ -595,7 +609,7 @@ function LeagueMemberContent({
           ) : null}
 
           <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
-            <div className={styles.decision} data-mark="decision">
+            <div className={styles.decision} data-mark="decision" data-zone="decision">
               <div className={styles.headingRow}>
                 <div className={styles.headingText}>
                   {/* Once the deadline has passed the page is the week being played, not a

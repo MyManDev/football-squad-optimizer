@@ -15,6 +15,7 @@ import { LanguageProvider } from "../i18n/LanguageProvider";
 import { isLLMOptAddress } from "../lib/leagueAddresses";
 import { IdentifiedShell } from "./IdentifiedShell";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
+import { UsageBehaviour } from "./UsageBehaviour";
 import { UsagePageOpen } from "./UsagePageOpen";
 
 const LeagueEntryPage = lazy(() =>
@@ -150,6 +151,7 @@ function LocalizedApp({ basename }: { basename: string }) {
         {/* The shell reads the visitor's league and member through the identity module. */}
         <RoutePreload />
         <UsagePageOpen />
+        <UsageBehaviour />
         <IdentifiedShell>
           <RouteErrorBoundary>
             <Suspense fallback={<PageLoading label={messages.common.loading} />}>

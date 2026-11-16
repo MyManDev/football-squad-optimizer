@@ -25,7 +25,7 @@ export function FplIdHelp() {
   const copy = useLanguage().messages.fplIdHelp;
   const [host, path, number, rest] = ADDRESS;
   return (
-    <details className={styles.help} data-fpl-id-help="league">
+    <details className={styles.help} data-fpl-id-help="league" data-zone="fpl-id-help">
       <summary className={styles.summary}>
         <DisclosureIcon className={styles.icon} />
         {copy.title}
