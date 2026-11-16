@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-15T02:03:21Z",
+  "generated_at_utc": "2026-11-16T02:02:58Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -312,7 +312,7 @@
     "purchase_prices_known": true,
     "squad_sell_value_tenths": 963,
     "spendable_budget_tenths": 1003,
-    "source_snapshot_id": "fpl-live-20261115T020107Z-52858fbaf26c",
+    "source_snapshot_id": "fpl-live-20261116T020055Z-15ce7bd9eedf",
     "squadopt_comparison": null,
     "data_quality": "complete",
     "missing_fields": [],
