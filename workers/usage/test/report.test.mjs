@@ -1,18 +1,21 @@
-// The report script over rows handed to it: the query it sends, the counts it makes, and that
-// no session token reaches its output. Version 1 rows and version 2 rows are counted apart.
+// The report over rows handed to it: the query src/report.js builds, the counts it makes, the
+// script's arguments, read and text around them, and that no session token reaches any output.
+// Version 1 rows and version 2 rows are counted apart.
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { parseArguments, readRows, render } from "../../../scripts/usage_report.mjs";
 import {
+  MAX_RANGE_DAYS,
   ROW_LIMIT,
-  parseArguments,
-  readRows,
-  render,
+  buildReport,
+  rangeRefusal,
   reportQuery,
+  rowsFromAnswer,
   summarize,
   weightedPercentile,
-} from "../../../scripts/usage_report.mjs";
+} from "../src/report.js";
 import { DATASET, DWELLS } from "../src/rules.js";
 
 const A = "aaaaaaaaaaaaaaaa";
@@ -107,6 +110,25 @@ describe("the arguments", () => {
   });
 });
 
+describe("the range the Worker reads", () => {
+  const today = "2026-11-16";
+
+  it("is any range of real days, in order, up to 92 days, ending today at the latest", () => {
+    assert.equal(rangeRefusal(today, today, today), null);
+    assert.equal(rangeRefusal("2026-08-17", today, today), null);
+    assert.equal(MAX_RANGE_DAYS, 92);
+  });
+
+  it("names what is wrong with any other", () => {
+    assert.equal(rangeRefusal(undefined, today, today), "from_not_a_date");
+    assert.equal(rangeRefusal("2026-02-31", today, today), "from_not_a_date");
+    assert.equal(rangeRefusal("2026-11-01", "16.11.2026", today), "to_not_a_date");
+    assert.equal(rangeRefusal("2026-11-10", "2026-11-01", today), "from_after_to");
+    assert.equal(rangeRefusal("2026-11-01", "2026-11-17", today), "to_in_future");
+    assert.equal(rangeRefusal("2026-08-16", today, today), "range_too_long");
+  });
+});
+
 describe("the query", () => {
   it("reads the columns in the Worker's order, undoes sampling, and includes the last day", () => {
     const query = reportQuery("2026-11-01", "2026-11-30");
@@ -146,6 +168,15 @@ describe("reading the rows", () => {
   it("throws on a refused or shapeless answer", async () => {
     await assert.rejects(read(answer({ errors: ["no"] }, 403)), /answered 403/);
     await assert.rejects(read(answer({ meta: [] })), /no data rows/);
+    assert.throws(() => rowsFromAnswer(null), /no data rows/);
+  });
+});
+
+describe("the whole report", () => {
+  it("is the range, whether it was cut off, and the counts, in the order --json prints", () => {
+    const report = buildReport({ from: "2026-11-01", to: "2026-11-30", truncated: false, rows: ROWS });
+    assert.deepEqual(Object.keys(report).slice(0, 4), ["from", "to", "truncated", "events"]);
+    assert.deepEqual(report, { from: "2026-11-01", to: "2026-11-30", truncated: false, ...summarize(ROWS) });
   });
 });
 
