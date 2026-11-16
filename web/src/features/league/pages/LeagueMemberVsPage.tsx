@@ -77,7 +77,7 @@ export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) 
   const signed = (value: number | null) =>
     value === null ? "—" : signedPoints(value, Number.isInteger(value) ? 0 : 1, locale);
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-zone="vs">
       <header>
         <Link to={memberAddress(leagueId, entryId)} className={styles.back}>
           {messages.suggestionHistory.back}

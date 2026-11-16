@@ -48,7 +48,11 @@ export function MemberTopBar({
   const cells = scoreBugCells(entry, humans, view, locale, copy);
   const leagueId = useLeagueId();
   return (
-    <header className={styles.topBar} data-closed={deadlinePassed !== null ? "" : undefined}>
+    <header
+      className={styles.topBar}
+      data-zone="topbar"
+      data-closed={deadlinePassed !== null ? "" : undefined}
+    >
       <h1 className={styles.teamName}>{entry.team_name ?? copy.unknownTeam}</h1>
       <TopWeek
         gameweek={view.gameweek}

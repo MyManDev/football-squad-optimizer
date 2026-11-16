@@ -147,7 +147,7 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
     );
   }
   return (
-    <div className={styles.page} data-live-page data-wide={wide || undefined}>
+    <div className={styles.page} data-live-page data-wide={wide || undefined} data-zone="live">
       <LiveHeader
         team={entry === undefined ? "" : (entry.payload.entry.team_name ?? unnamed)}
         gameweek={known?.gameweek ?? null}

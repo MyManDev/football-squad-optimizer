@@ -200,6 +200,7 @@ export function MemberPitch({
     <div
       className={styles.wrap}
       data-mark="pitch"
+      data-zone="pitch"
       style={{ "--hh": `${height}px` } as CSSProperties}
     >
       <p id={describedBy} className="visually-hidden">

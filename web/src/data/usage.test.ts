@@ -12,6 +12,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LANGUAGE_STORAGE_KEY } from "../i18n/LanguageProvider";
 import { MEMBER_TOOLS } from "../lib/leagueAddresses";
 import { recordUsage, usagePlace, type UsagePlace, type UsageStep } from "./usage";
+import {
+  USAGE_DWELLS,
+  USAGE_ERRORS,
+  USAGE_KINDS,
+  USAGE_MARKS,
+  USAGE_METRICS,
+  USAGE_RATINGS,
+  USAGE_SOURCES,
+  USAGE_TARGETS,
+  USAGE_VISITS,
+  USAGE_ZONES,
+} from "./usageBehaviour";
 
 const ORIGIN = window.location.origin;
 const LEAGUE = 352490;
@@ -165,6 +177,7 @@ const PLACES: [string, UsagePlace][] = [
   ["/", { page: "entry", tool: "" }],
   [`/entry/${ENTRY}`, { page: "team", tool: "week" }],
   [`/entry/${ENTRY}/live`, { page: "team", tool: "live" }],
+  [`/entry/${ENTRY}/llmopt`, { page: "llmopt", tool: "llmopt" }],
   ["/fixtures", { page: "fixtures", tool: "fixtures" }],
   ["/contribute", { page: "contribute", tool: "" }],
   ["/league", { page: "league", tool: "" }],
@@ -182,6 +195,8 @@ const PLACES: [string, UsagePlace][] = [
   [`${member}/vs`, { page: "vs", tool: "vs" }],
   [`${member}/live`, { page: "live", tool: "live" }],
   [`/league/members/${ENTRY}/live`, { page: "live", tool: "live" }],
+  [`${member}/llmopt`, { page: "llmopt", tool: "llmopt" }],
+  [`/league/members/${ENTRY}/llmopt`, { page: "llmopt", tool: "llmopt" }],
   [`${member}/reminder`, { page: "reminder", tool: "" }],
   [`${member}/nothing`, { page: "other", tool: "" }],
   [`/nothing/${ENTRY}`, { page: "other", tool: "" }],
@@ -197,20 +212,33 @@ const WORKER_RULES = resolve(process.cwd(), "../workers/usage/src/rules.js");
 
 describe.runIf(existsSync(WORKER_RULES))("the Worker's lists", () => {
   const STEPS: UsageStep[] = ["open", "tool", "picker_shown", "picker_claimed", "device_solve"];
+  const words = (list: Iterable<string>) => [...new Set(list)].sort();
+  const worker = (name: string) => {
+    const source = readFileSync(WORKER_RULES, "utf8");
+    const list = new RegExp(`export const ${name} = new Set\\(\\[([^\\]]*)\\]\\)`).exec(source);
+    expect(list, name).not.toBeNull();
+    return words([...list![1]!.matchAll(/"([^"]*)"/g)].map((match) => match[1]!));
+  };
 
   // A word only one side knows is an event refused and never seen, so both directions count.
   it("are exactly the words this module can send", () => {
-    const source = readFileSync(WORKER_RULES, "utf8");
-    const worker = (name: string) => {
-      const list = new RegExp(`export const ${name} = new Set\\(\\[([^\\]]*)\\]\\)`).exec(source);
-      expect(list, name).not.toBeNull();
-      return words([...list![1]!.matchAll(/"([^"]*)"/g)].map((match) => match[1]!));
-    };
-    const words = (list: Iterable<string>) => [...new Set(list)].sort();
     expect(words(PLACES.map(([, place]) => place.page))).toEqual(worker("PAGES"));
     expect(words(PLACES.map(([, place]) => place.tool))).toEqual(worker("TOOLS"));
     expect(words(STEPS)).toEqual(worker("STEPS"));
     expect(words(["tr", "en"])).toEqual(worker("LANGUAGES"));
     expect(words(["phone", "tablet", "desktop", "unknown"])).toEqual(worker("DEVICES"));
+  });
+
+  it("are exactly the words the behaviour module can send", () => {
+    expect(words(USAGE_KINDS)).toEqual(worker("KINDS"));
+    expect(words(USAGE_ZONES)).toEqual(worker("ZONES"));
+    expect(words(USAGE_TARGETS)).toEqual(worker("TARGETS"));
+    expect(words(USAGE_MARKS)).toEqual(worker("MARKS"));
+    expect(words(USAGE_DWELLS)).toEqual(worker("DWELLS"));
+    expect(words(USAGE_METRICS)).toEqual(worker("METRICS"));
+    expect(words(USAGE_RATINGS)).toEqual(worker("RATINGS"));
+    expect(words(USAGE_ERRORS)).toEqual(worker("ERRORS"));
+    expect(words(USAGE_SOURCES)).toEqual(worker("SOURCES"));
+    expect(words(USAGE_VISITS)).toEqual(worker("VISITS"));
   });
 });

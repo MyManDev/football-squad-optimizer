@@ -80,7 +80,7 @@ export function WhatIfPanel({
       ready: null,
     }[phase];
     return (
-      <div className={styles.whatIf}>
+      <div className={styles.whatIf} data-zone="what-if">
         {phase !== "loading" && phase !== "ready" ? (
           <button type="button" className={styles.action} onClick={whatIf.start}>
             {phase === "idle" ? copy.whatIfStart : copy.whatIfRetry}
@@ -158,7 +158,7 @@ export function WhatIfPanel({
   );
 
   return (
-    <div className={styles.whatIf}>
+    <div className={styles.whatIf} data-zone="what-if">
       <p className="visually-hidden" aria-live="polite">
         {whatIf.reading ? "" : summary}
       </p>

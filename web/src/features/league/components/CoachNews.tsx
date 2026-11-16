@@ -44,7 +44,7 @@ export function CoachNews({
   const rows = [...news.values()].filter((item) => players.has(item.playerId));
   if (rows.length === 0) return null;
   return (
-    <section className={styles.news} aria-label={copy.title}>
+    <section className={styles.news} aria-label={copy.title} data-zone="coach-news">
       <h3 className={styles.heading}>{copy.title}</h3>
       <ul className={styles.list}>
         {rows.map((item) => (

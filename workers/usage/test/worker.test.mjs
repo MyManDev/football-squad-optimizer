@@ -4,9 +4,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import entryPoint from "../src/index.js";
-import { MARKER_HEADER, MARKER_VALUE, MAX_BODY_BYTES, STATUS_CONTRACT } from "../src/rules.js";
+import { KINDS, MARKER_HEADER, MARKER_VALUE, MAX_BODY_BYTES, STATUS_CONTRACT } from "../src/rules.js";
 import { routeFor } from "../src/worker.js";
-import { SESSION, SITE, goodEvent, harness } from "./support.mjs";
+import { SESSION, SITE, goodBehaviour, goodEvent, harness } from "./support.mjs";
 
 const EVENTS = "/api/v1/usage/events";
 const allowed = (response) => response.headers.get("access-control-allow-origin");
@@ -112,6 +112,83 @@ describe("an event from the site", () => {
   });
 });
 
+describe("a version 2 event from the site", () => {
+  it("is written once for every kind, in the kind's columns, and answered with nothing", async () => {
+    const { send, written } = harness();
+    for (const kind of KINDS) {
+      const response = await send(EVENTS, {
+        body: JSON.stringify(goodBehaviour(kind)),
+        headers: { "content-type": "text/plain;charset=UTF-8" },
+      });
+      assert.equal(response.status, 204, kind);
+      assert.equal(allowed(response), SITE);
+    }
+    assert.equal(written.length, KINDS.size);
+    for (const point of written) {
+      assert.deepEqual(point.indexes, [SESSION]);
+      assert.equal(point.blobs.length, 9);
+      assert.equal(point.doubles[0], 2);
+    }
+    assert.deepEqual(
+      written.map((point) => [point.blobs[2], ...point.blobs.slice(6), point.doubles[1]]),
+      [
+        ["click", "decision", "control", "none", 47],
+        ["scroll", "s30", "", "", 60],
+        ["vital", "lcp", "good", "", 1840],
+        ["error", "chunk", "", "", 0],
+        ["arrival", "whatsapp", "last_week", "", 0],
+      ],
+    );
+  });
+
+  it("is written beside version 1 events, each in its own layout", async () => {
+    const { send, written } = harness();
+    await send(EVENTS, { body: JSON.stringify(goodEvent()) });
+    await send(EVENTS, { body: JSON.stringify(goodBehaviour("click")) });
+    assert.deepEqual(written[0], {
+      indexes: [SESSION],
+      blobs: ["member", "what-if", "tool", "tr", "phone", SESSION],
+      doubles: [1],
+    });
+    assert.equal(written[1].blobs.length, 9);
+  });
+
+  it("is refused, and written nowhere, when it breaks a rule", async () => {
+    const { send, written } = harness();
+    const cases = [
+      [goodBehaviour("click", { zone: "/league/352490/members/35249001" }), "zone_refused"],
+      [goodBehaviour("click", { cell: 400 }), "cell_refused"],
+      [goodBehaviour("click", { cell: 12.5 }), "cell_refused"],
+      [goodBehaviour("click", { x: 120 }), "wrong_fields"],
+      [goodBehaviour("scroll", { depth: 55 }), "depth_refused"],
+      [goodBehaviour("scroll", { dwell: "12 seconds" }), "dwell_refused"],
+      [goodBehaviour("vital", { value: 60001 }), "value_refused"],
+      [goodBehaviour("vital", { metric: "fid" }), "metric_refused"],
+      [goodBehaviour("error", { error: "TypeError: x is undefined" }), "error_refused"],
+      [goodBehaviour("error", { message: "boom" }), "wrong_fields"],
+      [goodBehaviour("arrival", { source: "https://t.co/abc" }), "source_refused"],
+      [goodBehaviour("arrival", { visit: "2026-W46" }), "visit_refused"],
+      [goodBehaviour("arrival", { kind: "pageview" }), "kind_refused"],
+      [goodBehaviour("arrival", { step: "open" }), "wrong_fields"],
+      [goodBehaviour("arrival", { v: 3 }), "wrong_version"],
+    ];
+    for (const [body, reason] of cases) {
+      const response = await send(EVENTS, { body: JSON.stringify(body) });
+      assert.equal(response.status, 400, reason);
+      assert.deepEqual(await response.json(), { error: reason });
+      assert.equal(allowed(response), SITE);
+    }
+    assert.equal(written.length, 0);
+  });
+
+  it("is refused from another origin", async () => {
+    const { send, written } = harness();
+    const response = await send(EVENTS, { origin: "https://evil.example", body: JSON.stringify(goodBehaviour("click")) });
+    assert.equal(response.status, 403);
+    assert.equal(written.length, 0);
+  });
+});
+
 describe("the origin rule", () => {
   it("refuses another origin and a request with none, naming no origin back", async () => {
     const { send, written } = harness();
@@ -141,7 +218,12 @@ describe("the status route", () => {
     const { send, worker } = harness();
     const response = await send("/api/v1/usage/status", { method: "GET", origin: null });
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { contract_version: STATUS_CONTRACT, event_version: 1, bound: true });
+    assert.deepEqual(await response.json(), {
+      contract_version: STATUS_CONTRACT,
+      event_version: 1,
+      event_versions: [1, 2],
+      bound: true,
+    });
     const unbound = await worker.fetch(new Request(`${SITE}/api/v1/usage/status`), {});
     assert.equal((await unbound.json()).bound, false);
   });

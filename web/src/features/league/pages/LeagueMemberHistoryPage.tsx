@@ -62,7 +62,7 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
   const ordered = [...weeks].sort((a, b) => b.gameweek - a.gameweek);
   const week = ordered.find((item) => item.gameweek === selected);
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-zone="history">
       <header>
         <Link to={memberAddress(leagueId, entryId)} className={styles.back}>
           {copy.back}

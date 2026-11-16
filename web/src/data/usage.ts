@@ -36,13 +36,16 @@ export function usagePlace(pathname: string): UsagePlace {
   if (path === "/contribute") return { page: "contribute", tool: "" };
   if (/^\/entry\/[^/]+$/.test(path)) return { page: "team", tool: "week" };
   if (/^\/entry\/[^/]+\/live$/.test(path)) return { page: "team", tool: "live" };
+  if (/^\/entry\/[^/]+\/llmopt$/.test(path)) return { page: "llmopt", tool: "llmopt" };
   const league = LEAGUE_ADDRESS.exec(path);
   if (league === null) return { page: "other", tool: "" };
   const [, members, entry, last] = league;
   if (members === undefined) return { page: "league", tool: "" };
   if (entry === undefined) return { page: "members", tool: "" };
   if (last === undefined) return { page: "member", tool: "week" };
-  if (last === "history" || last === "vs" || last === "live") return { page: last, tool: last };
+  if (last === "history" || last === "vs" || last === "live" || last === "llmopt") {
+    return { page: last, tool: last };
+  }
   if (last === "reminder") return { page: "reminder", tool: "" };
   return isMemberTool(last) ? { page: "member", tool: last } : { page: "other", tool: "" };
 }
@@ -54,11 +57,16 @@ function currentAddress(): string {
   return base !== "" && pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
 }
 
+/** The kind of page and tool the current address is. */
+export function currentUsagePlace(): UsagePlace {
+  return usagePlace(currentAddress());
+}
+
 /**
  * The language the provider starts from. Read from storage rather than the document, whose
  * `lang` the provider sets in an effect that runs after this first page's own.
  */
-function usageLanguage(): "tr" | "en" {
+export function usageLanguage(): "tr" | "en" {
   try {
     return window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === "en" ? "en" : "tr";
   } catch {
@@ -67,7 +75,7 @@ function usageLanguage(): "tr" | "en" {
 }
 
 /** A phone or a tablet has a coarse main pointer; the screen's short side tells them apart. */
-function deviceClass(): "phone" | "tablet" | "desktop" | "unknown" {
+export function deviceClass(): "phone" | "tablet" | "desktop" | "unknown" {
   if (typeof window.matchMedia !== "function") return "unknown";
   if (!window.matchMedia("(pointer: coarse)").matches) return "desktop";
   return Math.min(window.screen.width, window.screen.height) < PHONE_SHORT_SIDE
@@ -84,7 +92,7 @@ function randomToken(): string {
 let unstoredToken: string | null = null;
 
 /** This tab's token, made on its first step. */
-function sessionToken(): string {
+export function sessionToken(): string {
   try {
     const kept = window.sessionStorage.getItem(SESSION_KEY);
     if (kept !== null && SESSION_SHAPE.test(kept)) return kept;
@@ -97,28 +105,51 @@ function sessionToken(): string {
   }
 }
 
-/** Tells the record a step was taken at the current address. Never throws. */
-export function recordUsage({ step }: { step: UsageStep }): void {
+/** A request body larger than this is refused by the Worker before it is parsed. */
+const MAX_EVENT_BYTES = 512;
+
+/**
+ * The origin the build names, when it is this page's own; null otherwise. The Worker refuses
+ * every other origin, so a beacon from one could only log a failure.
+ */
+export function usageOrigin(): string | null {
   try {
     const origin = ((import.meta.env.VITE_USAGE_ORIGIN as string | undefined) ?? "").replace(
       /\/+$/,
       "",
     );
-    // The Worker refuses every other origin, so a beacon from one could only log a failure.
-    if (origin !== window.location.origin) return;
-    // A string goes as text/plain, which a browser sends without asking a preflight first.
-    navigator.sendBeacon(
-      `${origin}/api/v1/usage/events`,
-      JSON.stringify({
-        ...usagePlace(currentAddress()),
-        step,
-        lang: usageLanguage(),
-        device: deviceClass(),
-        session: sessionToken(),
-        v: 1,
-      }),
-    );
+    return origin !== "" && origin === window.location.origin ? origin : null;
   } catch {
-    // A step that cannot be told is a step not counted.
+    return null;
   }
+}
+
+/**
+ * Sends one event of either version. The event is built only once the origin has passed, so
+ * a page that may not send makes no session token either. Never throws.
+ */
+export function sendUsage(event: () => Record<string, unknown>): void {
+  try {
+    const origin = usageOrigin();
+    if (origin === null) return;
+    const body = JSON.stringify(event());
+    // Every word and number is ASCII, so the string's length is its size in bytes.
+    if (body.length > MAX_EVENT_BYTES) return;
+    // A string goes as text/plain, which a browser sends without asking a preflight first.
+    navigator.sendBeacon(`${origin}/api/v1/usage/events`, body);
+  } catch {
+    // An event that cannot be told is an event not counted.
+  }
+}
+
+/** Tells the record a step was taken at the current address. Never throws. */
+export function recordUsage({ step }: { step: UsageStep }): void {
+  sendUsage(() => ({
+    ...currentUsagePlace(),
+    step,
+    lang: usageLanguage(),
+    device: deviceClass(),
+    session: sessionToken(),
+    v: 1,
+  }));
 }

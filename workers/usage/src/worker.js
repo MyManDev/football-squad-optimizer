@@ -3,10 +3,11 @@
 // cookie, keeps nothing of its own, and logs nothing of what a page sent.
 //
 // index.js is the entry point and exports one set of these handlers; tests build their own.
-// See docs/architecture/decisions/0014-usage-measurement.md.
+// See docs/architecture/decisions/0014-usage-measurement.md and 0015-behaviour-measurement.md.
 
 import {
   EVENT_VERSION,
+  EVENT_VERSIONS,
   MARKER_HEADER,
   MARKER_VALUE,
   MAX_BODY_BYTES,
@@ -97,7 +98,12 @@ export function createWorker(options = {}) {
   function status(request, env) {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
     const bound = typeof env.USAGE_EVENTS?.writeDataPoint === "function";
-    return json({ contract_version: STATUS_CONTRACT, event_version: EVENT_VERSION, bound }, 200);
+    // `event_version` keeps naming version 1 for the readers that already know the field;
+    // `event_versions` lists every version this Worker takes.
+    return json(
+      { contract_version: STATUS_CONTRACT, event_version: EVENT_VERSION, event_versions: EVENT_VERSIONS, bound },
+      200,
+    );
   }
 
   return {
