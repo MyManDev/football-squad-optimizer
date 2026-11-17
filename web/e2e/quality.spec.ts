@@ -51,7 +51,7 @@ test.describe("a visitor who has said who they are", () => {
     // The identity block carries Değiştir, a button above the member's navigation links.
     expect(
       await page
-        .locator("#sidebar a")
+        .locator("#sidebar nav a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
     ).toEqual([
       "/league/352490/members/35249001/live",
@@ -247,7 +247,7 @@ test.describe("a visitor who has not said who they are", () => {
       // Until then the sidebar offers that league's step, and the open pages.
       expect(
         await page
-          .locator("#sidebar a")
+          .locator("#sidebar nav a")
           .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
       ).toEqual(["/league/352490/members", "/fixtures", ...CONTRIBUTE]);
       await expect(

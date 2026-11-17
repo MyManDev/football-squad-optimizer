@@ -19,12 +19,6 @@ export function plainPlan(week: WeekReview): RecordedPlan | null {
   );
 }
 
-/** Every other plan the week recorded, in the order recorded. */
-export function otherPlans(week: WeekReview): RecordedPlan[] {
-  const plain = plainPlan(week);
-  return (week.recorded_plans ?? []).filter((row) => row !== plain);
-}
-
 /** A plan's moves with both names stated. */
 export function movesOf(plan: RecordedPlan | null): { out: string; in: string }[] {
   return (plan?.moves ?? [])

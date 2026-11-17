@@ -1,9 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { useLanguage } from "../../../i18n/context";
-import { points } from "../../../lib/format";
 import type { EntryView } from "../types";
-import { neighbourGaps, placesMoved, type LeagueRace, type RaceLine } from "./leagueRace";
+import { placesMoved, type LeagueRace, type RaceLine } from "./leagueRace";
 import styles from "./LeagueRaceCard.module.css";
 
 /** Every place has its own row this many pixels apart, whatever the league's size. */
@@ -41,27 +40,22 @@ const signed = (moved: number) => `${moved > 0 ? "+" : "−"}${Math.abs(moved)}`
  * apart and a long season scrolls sideways inside the chart rather than the page. Tapping a
  * line, or choosing the member, brings that line forward with its weeks marked where a place
  * was gained or lost; stepping through the gameweeks lists whose place changed. Under it,
- * each member's points to the member just ahead and just behind after the latest settled
- * week, the viewer's own row emphasised.
+ * the brought-forward member's place and total after each week.
  */
 export function LeagueRaceCard({
   race,
   members,
   initialEntry = null,
-  viewer = null,
 }: {
   race: LeagueRace;
   members: readonly EntryView[];
   /** The member to bring forward first, the viewer where the page knows one. */
   initialEntry?: number | null;
-  /** The claimed member, whose own gaps are emphasised; none when the page knows no viewer. */
-  viewer?: number | null;
 }) {
-  const { locale, messages } = useLanguage();
+  const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
   const memberId = useId();
-  const gapsId = useId();
   const chart = useRef<HTMLDivElement>(null);
   const [chosen, setChosen] = useState<number | null>(null);
   const [weekIndex, setWeekIndex] = useState(race.gameweeks.length - 1);
@@ -93,8 +87,6 @@ export function LeagueRaceCard({
     )
     .sort((a, b) => (a.line.ranks[week] ?? 0) - (b.line.ranks[week] ?? 0));
   const others = race.lines.filter((line) => line !== highlighted);
-  const gaps = neighbourGaps(race);
-  const count = (value: number) => points(value, 0, locale);
 
   return (
     <section className={styles.race} aria-labelledby={titleId}>
@@ -269,46 +261,6 @@ export function LeagueRaceCard({
           </tbody>
         </table>
       </div>
-
-      {/* The latest settled week's gaps, whichever week the stepper is on; a lone member
-          has no neighbour to measure against. */}
-      {gaps.length > 1 ? (
-        <div className={styles.week}>
-          <h3 className={styles.weekTitle} id={gapsId}>
-            {copy.raceGaps(race.gameweeks[race.gameweeks.length - 1]!)}
-          </h3>
-          <ol className={styles.gaps} aria-labelledby={gapsId}>
-            {gaps.map((gap) => {
-              const own = gap.entryId === viewer;
-              return (
-                <li key={gap.entryId} aria-current={own ? "true" : undefined}>
-                  <span className={`${styles.gapPlace} num`}>{gap.place}</span>
-                  <span className={styles.gapName}>
-                    {name(gap.entryId)}
-                    {own ? ` · ${copy.viewerYouBadge}` : null}
-                  </span>
-                  <span className={styles.gapFigures}>
-                    {gap.ahead !== null ? (
-                      <span data-gap="ahead">
-                        {gap.ahead === 0
-                          ? copy.raceLevelAhead
-                          : copy.raceGapAhead(count(gap.ahead))}
-                      </span>
-                    ) : null}
-                    {gap.behind !== null ? (
-                      <span data-gap="behind">
-                        {gap.behind === 0
-                          ? copy.raceLevelBehind
-                          : copy.raceGapBehind(count(gap.behind))}
-                      </span>
-                    ) : null}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      ) : null}
     </section>
   );
 }

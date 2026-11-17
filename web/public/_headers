@@ -1,3 +1,17 @@
+# Every response: the page runs only its own scripts and sends only to the hosts named here
+# (ADR 0017 step 3). A member's model key is held in the tab, so a script that is not the
+# site's own, or a request to a host not on this list, is refused by the browser.
+# {advice-api-origin} is the compute service's origin: vite/sitePolicy.ts writes the build's
+# VITE_ADVICE_API_ORIGIN in its place, or nothing when the build names none. The model hosts
+# are the providers a member's key may be sent to; loopback is for a model on the member's
+# own machine. A new provider is a reviewed change to this line. The one script from another host
+# is Cloudflare Web Analytics, which Cloudflare adds to every page; the owner kept it (17 Nov 2026).
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self'; connect-src 'self' {advice-api-origin} https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://api.mistral.ai https://api.groq.com https://api.deepseek.com http://localhost:* http://127.0.0.1:* https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
 /data/*
   Cache-Control: public, max-age=0, must-revalidate
 

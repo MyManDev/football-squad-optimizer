@@ -108,6 +108,12 @@ Set both `SQUADOPT_LLMOPT_API_KEY` and `SQUADOPT_LLMOPT_MODEL` in the API proces
 private environment before starting the Uvicorn factory. The configured model must
 support strict Structured Outputs with Chat Completions. The default provider is OpenAI.
 Set `SQUADOPT_LLMOPT_PROVIDER=gemini` to use Google's Gemini endpoint and a Gemini key.
+`SQUADOPT_LLMOPT_FALLBACK_MODELS` names up to three more models of the same provider,
+separated by commas. They are asked in that order when the model before answers that it
+is busy (a 5xx), limited (a 429) or with a reply that is not a draft. Every model shares
+the one 35 second deadline. A free tier answers 503 while a model is in high demand, so
+name at least one fallback there. A list that repeats a model or names more than three
+disables text interpretation, as an invalid model does.
 A native Windows launch via
 `scripts/run_backend_local.ps1` inherits the shell's process environment. Without both
 values the intent endpoint reports `LLMOPT_DISABLED`, and manual plan preferences
@@ -116,7 +122,8 @@ remain available. The advice worker needs neither setting.
 The Compose API service reads `/etc/squadopt/llmopt.env` when present. This
 requires Docker Compose 2.24 or later. On the managed VM, give the file root
 ownership and mode `0600`. Put `SQUADOPT_LLMOPT_API_KEY`, `SQUADOPT_LLMOPT_MODEL`,
-and the optional `SQUADOPT_LLMOPT_PROVIDER` in it, one assignment per line. A standalone Compose
+and the optional `SQUADOPT_LLMOPT_PROVIDER` and `SQUADOPT_LLMOPT_FALLBACK_MODELS` in it,
+one assignment per line. A standalone Compose
 launch can set `SQUADOPT_LLMOPT_ENV_FILE` to an absolute path to a different
 private file. The worker does not read this file.
 
@@ -131,6 +138,16 @@ Recreate the API container after the file changes.
 to the configured provider. It prepares structured constraints for review and
 does not submit an advice job. Its limits apply per API process. Turning off text
 interpretation requires removing either setting and restarting the API.
+
+`POST /api/v1/llmopt/prompt` and `POST /api/v1/llmopt/check` call no model and need
+neither setting (ADR 0017). `/prompt` takes the same body as `/intent` and returns the
+call a member's browser sends to the member's own provider: `system`, `user`, `schema`,
+`schema_name` and `max_output_tokens`. `/check` takes `{"request": ..., "reply": ...}`,
+rebuilds the shortlist and validates the model's reply as `/intent` does, answering the
+same draft or clarification, or 422 `REPLY_REFUSED`. Both refuse with 400
+`CREDENTIAL_REFUSED` any request carrying an `Authorization`, `x-api-key` or
+`x-goog-api-key` header, allow 20 requests a minute per visitor each, and do not count
+against the daily budget.
 
 ### VM data root selection
 

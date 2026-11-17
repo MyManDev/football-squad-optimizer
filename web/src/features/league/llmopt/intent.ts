@@ -424,7 +424,8 @@ const SERVICE_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 /** The longest wait the page honours; a longer header is read as this. */
 const MAX_RETRY_AFTER_SECONDS = 86_400;
 
-async function intentError(response: Response): Promise<IntentError> {
+/** The refusal a failed response of the site's LLMOPT routes carries. */
+export async function intentError(response: Response): Promise<IntentError> {
   let code: string | null = null;
   try {
     const body = (await response.json()) as { error?: { code?: unknown } };
@@ -443,7 +444,17 @@ async function intentError(response: Response): Promise<IntentError> {
 }
 
 export type IntentRefusal =
-  "disabled" | "busy" | "limited" | "tooLarge" | "invalid" | "unsupported" | "unavailable";
+  | "disabled"
+  | "busy"
+  | "limited"
+  | "tooLarge"
+  | "invalid"
+  | "unsupported"
+  | "unavailable"
+  | "keyRefused"
+  | "modelRefused"
+  | "providerLimited"
+  | "providerUnreachable";
 
 const REFUSAL_BY_CODE: Record<string, IntentRefusal> = {
   LLMOPT_DISABLED: "disabled",
@@ -452,6 +463,14 @@ const REFUSAL_BY_CODE: Record<string, IntentRefusal> = {
   PAYLOAD_TOO_LARGE: "tooLarge",
   VALIDATION_FAILED: "invalid",
   UNSUPPORTED_MEDIA_TYPE: "unsupported",
+  REPLY_REFUSED: "invalid",
+  PROVIDER_KEY_REFUSED: "keyRefused",
+  PROVIDER_MODEL_REFUSED: "modelRefused",
+  PROVIDER_RATE_LIMITED: "providerLimited",
+  PROVIDER_UNREACHABLE: "providerUnreachable",
+  PROVIDER_REFUSED: "unsupported",
+  PROVIDER_UNAVAILABLE: "busy",
+  PROVIDER_REPLY_INVALID: "invalid",
 };
 
 const REFUSAL_BY_STATUS: Record<number, IntentRefusal> = {
@@ -471,6 +490,49 @@ export function intentRefusal(error: unknown): IntentRefusal {
   );
 }
 
+/** The body of an intent request, as `/intent`, `/prompt` and `/check` all read it. */
+export function intentBody(
+  message: string,
+  locale: Language,
+  draft: PlanDraft,
+  players: readonly CatalogPlayer[],
+  clarification?: Clarification,
+  referenceWeeks?: readonly PlanWeekNumber[],
+  referenceCaptains?: readonly { week: PlanWeekNumber; player_id: number }[],
+) {
+  return {
+    message,
+    locale,
+    draft,
+    players: players.map(({ team, ...player }) => ({
+      ...player,
+      ...(team.trim() ? { team } : {}),
+    })),
+    ...(clarification ? { clarification } : {}),
+    ...(referenceWeeks?.length ? { reference_weeks: referenceWeeks } : {}),
+    ...(referenceCaptains?.length ? { reference_captains: referenceCaptains } : {}),
+  };
+}
+
+/** A checked answer from the site's intent routes: a draft, or one question back. */
+export function intentAnswer(value: unknown, players: readonly CatalogPlayer[]) {
+  if (!record(value)) throw new Error("Invalid response");
+  // The question is saved with the session and sent back on the next message, so it must
+  // fit the limit both the restore check and the service hold it to.
+  if (
+    value.status === "clarification" &&
+    typeof value.message === "string" &&
+    value.message.trim() &&
+    value.message.trim().length <= MAX_QUESTION_LENGTH
+  )
+    return { status: "clarification" as const, message: value.message.trim() };
+  if (value.status !== "draft") throw new Error("Invalid response");
+  return {
+    status: "draft" as const,
+    draft: checkedDraft(value.draft, players),
+  };
+}
+
 export async function readIntent(
   origin: string,
   message: string,
@@ -487,37 +549,21 @@ export async function readIntent(
       const response = await fetch(`${origin}/api/v1/llmopt/intent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          locale,
-          draft,
-          players: players.map(({ team, ...player }) => ({
-            ...player,
-            ...(team.trim() ? { team } : {}),
-          })),
-          ...(clarification ? { clarification } : {}),
-          ...(referenceWeeks?.length ? { reference_weeks: referenceWeeks } : {}),
-          ...(referenceCaptains?.length ? { reference_captains: referenceCaptains } : {}),
-        }),
+        body: JSON.stringify(
+          intentBody(
+            message,
+            locale,
+            draft,
+            players,
+            clarification,
+            referenceWeeks,
+            referenceCaptains,
+          ),
+        ),
         signal,
       });
       if (!response.ok) throw await intentError(response);
-      const value: unknown = await response.json();
-      if (!record(value)) throw new Error("Invalid response");
-      // The question is saved with the session and sent back on the next message, so it must
-      // fit the limit both the restore check and the service hold it to.
-      if (
-        value.status === "clarification" &&
-        typeof value.message === "string" &&
-        value.message.trim() &&
-        value.message.trim().length <= MAX_QUESTION_LENGTH
-      )
-        return { status: "clarification" as const, message: value.message.trim() };
-      if (value.status !== "draft") throw new Error("Invalid response");
-      return {
-        status: "draft" as const,
-        draft: checkedDraft(value.draft, players),
-      };
+      return intentAnswer(await response.json(), players);
     },
     { signal, timeoutMs: 45_000 },
   );

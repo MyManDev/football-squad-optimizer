@@ -65,6 +65,7 @@ export function isForwarderRefusal(
  * - `not_forwarder`: an answer without the forwarder's mark, such as the site's HTML shell;
  * - `unreadable`: the forwarder's mark on an answer this client does not read: not JSON,
  *   another `contract_version`, another shape or identity, or a status or error it does not name;
+ * - `rate_limited`: the zone's rate rule still refused the read after waiting out its block;
  * - `network`: no answer, because the request failed or ran out of time;
  * - `aborted`: the caller stopped the read.
  */
@@ -78,13 +79,15 @@ export type ForwarderReason =
   | "upstream_unavailable"
   | "not_forwarder"
   | "unreadable"
+  | "rate_limited"
   | "network"
   | "aborted";
 
 type LeagueRefusals =
   "head_to_head_league" | "classic_league" | "league_not_found" | "page_not_found";
 /** The reasons any route can give, whatever its own 404s are. */
-type AnyRoute = "upstream_unavailable" | "not_forwarder" | "unreadable" | "network" | "aborted";
+type AnyRoute =
+  "upstream_unavailable" | "not_forwarder" | "unreadable" | "rate_limited" | "network" | "aborted";
 export type StandingsReason = Exclude<ForwarderReason, "entry_not_found">;
 export type BundleReason = Exclude<ForwarderReason, LeagueRefusals>;
 export type LiveReason = Exclude<ForwarderReason, LeagueRefusals | "entry_not_found">;
@@ -155,6 +158,38 @@ export interface ForwarderClientOptions {
    * site makes through its one client shares it (`requestBudget.ts`).
    */
   budget?: RequestBudget;
+  /** Waits out a rate block; the page's own timer unless a test injects one. */
+  wait?: (durationMs: number, signal?: AbortSignal) => Promise<void>;
+}
+
+/**
+ * How long a refused read waits before it is sent again: the answer's `Retry-After` in
+ * seconds, else the rule's block of 10 seconds, never more than 30.
+ */
+export function rateBlockMs(retryAfter: string | null): number {
+  const seconds = retryAfter !== null && /^\d+$/.test(retryAfter.trim()) ? Number(retryAfter) : 10;
+  return Math.min(Math.max(seconds, 1), 30) * 1000;
+}
+
+/** How many times a read the rate rule refused is sent again before it says so. */
+export const RATE_RETRIES = 2;
+
+function pause(durationMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("The read was stopped.", "AbortError"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", stop);
+      resolve();
+    }, durationMs);
+    function stop() {
+      clearTimeout(timer);
+      reject(new DOMException("The read was stopped.", "AbortError"));
+    }
+    signal?.addEventListener("abort", stop, { once: true });
+  });
 }
 
 const COPIES: readonly string[] = ["miss", "hit", "last-good"];
@@ -171,11 +206,14 @@ export function createForwarderClient({
   fetch: transport = (input, init) => globalThis.fetch(input, init),
   root = FORWARDER_ROOT,
   budget = createRequestBudget(),
+  wait = pause,
 }: ForwarderClientOptions = {}): ForwarderClient {
   /**
    * Ask one route, and read its answer as `read` reads a document, or as one of the
    * refusals `refusals` names for a 404. A 503 is always `upstream_unavailable`. The read
    * waits for its lane's turn in the budget first, and its deadline starts when it is sent.
+   * A 429 is the zone's rate rule, not the forwarder: the read waits out the block (and holds
+   * the budget, so the reads behind it wait too) and is sent again, up to `RATE_RETRIES`.
    */
   async function ask<T, R extends ForwarderReason>(
     path: string,
@@ -185,14 +223,30 @@ export function createForwarderClient({
     lane: RequestLane = "page",
   ): Promise<ForwarderResult<T, R | AnyRoute>> {
     try {
-      const turn = budget.take(lane, signal);
-      if (turn !== null) await turn;
-      return await withRequestDeadline(
+      for (let attempt = 0; ; attempt += 1) {
+        const turn = budget.take(lane, signal);
+        if (turn !== null) await turn;
+        const answer = await send();
+        if (!("blockMs" in answer)) return answer;
+        if (attempt >= RATE_RETRIES) return { ok: false, reason: "rate_limited" };
+        budget.hold?.(answer.blockMs);
+        await wait(answer.blockMs, signal);
+      }
+    } catch {
+      return { ok: false, reason: signal?.aborted ? "aborted" : "network" };
+    }
+
+    function send(): Promise<ForwarderResult<T, R | AnyRoute> | { blockMs: number }> {
+      return withRequestDeadline(
         async (deadline) => {
           const response = await transport(`${root}${path}`, {
             signal: deadline,
             headers: { accept: "application/json" },
           });
+          if (response.status === 429) {
+            await discardBody(response);
+            return { blockMs: rateBlockMs(response.headers.get("retry-after")) };
+          }
           if (response.headers.get(MARKER_HEADER) !== "1") {
             await discardBody(response);
             return { ok: false, reason: "not_forwarder" } as const;
@@ -234,8 +288,6 @@ export function createForwarderClient({
         },
         { signal, timeoutMs },
       );
-    } catch {
-      return { ok: false, reason: signal?.aborted ? "aborted" : "network" };
     }
   }
 
@@ -336,7 +388,10 @@ export function resetSiteForwarderBudget(): void {
 
 /** The site's own client: the browser's fetch, on the site's origin. */
 export const forwarder: ForwarderClient = createForwarderClient({
-  budget: { take: (lane, signal) => siteBudget.take(lane, signal) },
+  budget: {
+    take: (lane, signal) => siteBudget.take(lane, signal),
+    hold: (durationMs) => siteBudget.hold?.(durationMs),
+  },
 });
 
 export const standings: ForwarderClient["standings"] = (league, page, options) =>
