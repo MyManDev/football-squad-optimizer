@@ -28,6 +28,7 @@ import {
   type FplH2hMatches,
   type FplH2hStandings,
 } from "./documents";
+import { createRequestBudget, type RequestBudget, type RequestLane } from "./requestBudget";
 
 /** The forwarder's routes, on the site's own origin. */
 export const FORWARDER_ROOT = "/api/v1/fpl";
@@ -149,6 +150,11 @@ export interface ForwarderClientOptions {
   fetch?: (input: string, init: RequestInit) => Promise<Response>;
   /** Where the routes live; the site's own origin unless a test says otherwise. */
   root?: string;
+  /**
+   * How many reads may start in the rate rule's window; one per client, so every read the
+   * site makes through its one client shares it (`requestBudget.ts`).
+   */
+  budget?: RequestBudget;
 }
 
 const COPIES: readonly string[] = ["miss", "hit", "last-good"];
@@ -164,18 +170,23 @@ function inRange(value: number, first: number, last: number): boolean {
 export function createForwarderClient({
   fetch: transport = (input, init) => globalThis.fetch(input, init),
   root = FORWARDER_ROOT,
+  budget = createRequestBudget(),
 }: ForwarderClientOptions = {}): ForwarderClient {
   /**
    * Ask one route, and read its answer as `read` reads a document, or as one of the
-   * refusals `refusals` names for a 404. A 503 is always `upstream_unavailable`.
+   * refusals `refusals` names for a 404. A 503 is always `upstream_unavailable`. The read
+   * waits for its lane's turn in the budget first, and its deadline starts when it is sent.
    */
   async function ask<T, R extends ForwarderReason>(
     path: string,
     read: (value: unknown) => T | null,
     refusals: readonly R[],
     { signal, timeoutMs }: ForwarderReadOptions = {},
+    lane: RequestLane = "page",
   ): Promise<ForwarderResult<T, R | AnyRoute>> {
     try {
+      const turn = budget.take(lane, signal);
+      if (turn !== null) await turn;
       return await withRequestDeadline(
         async (deadline) => {
           const response = await transport(`${root}${path}`, {
@@ -276,6 +287,8 @@ export function createForwarderClient({
         (value) => readEntrySeason(value, entry),
         ["not_found", "entry_not_found"] as const,
         options,
+        // A scoreboard reads one season per member at once: the reads that can wait.
+        "bulk",
       );
     },
     async events(options) {
@@ -310,8 +323,21 @@ export function createForwarderClient({
   };
 }
 
+/** The share of the rate rule the site's client spends, one per tab. */
+let siteBudget: RequestBudget = createRequestBudget();
+
+/**
+ * Start the site's client on a fresh share. Tests do this between cases, as they clear the
+ * session's storage, so one case's reads do not spend the next one's window.
+ */
+export function resetSiteForwarderBudget(): void {
+  siteBudget = createRequestBudget();
+}
+
 /** The site's own client: the browser's fetch, on the site's origin. */
-export const forwarder: ForwarderClient = createForwarderClient();
+export const forwarder: ForwarderClient = createForwarderClient({
+  budget: { take: (lane, signal) => siteBudget.take(lane, signal) },
+});
 
 export const standings: ForwarderClient["standings"] = (league, page, options) =>
   forwarder.standings(league, page, options);

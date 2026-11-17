@@ -112,6 +112,10 @@ written on the path alone, so it counts these routes too, together with the back
 budget per visitor address. The Free plan allows 100,000 Worker requests a day, and every request
 counts whether a copy answers it or FPL does. #980 is finished only when one week's count is
 recorded under 10 percent of that.
+The site's client keeps one tab under the rule: its reads start while fewer than 35 started in
+the last 10 seconds, and the scoreboard's season reads, one per member of a standings page, while
+fewer than 25 did and no page read waits (`web/src/features/league/forwarder/requestBudget.ts`).
+The rest of the 50 is the backend's.
 
 **9. Deployment.** `.github/workflows/deploy-fpl-proxy.yml` is dispatched by hand from the
 default branch (`develop`) only, into the `cloudflare-workers` environment with its two secrets,
