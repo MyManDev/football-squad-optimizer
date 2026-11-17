@@ -311,6 +311,27 @@ describe("a reload keeps the saved session", () => {
     return jobs[0]!;
   }
 
+  it("says how long a 3-week plan takes while it is computed", async () => {
+    open();
+    await ready();
+    await addRule("hold_transfers");
+    cleanup();
+    const [key, session] = savedSession();
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        ...session,
+        draft: { ...(session.draft as Record<string, unknown>), window: 3 },
+        confirmation: { wildcardNotHeld: false, sending: true },
+      }),
+    );
+    jobs.length = 0;
+    open();
+    await ready();
+    await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+    expect(screen.getByText(en.longWait)).toBeVisible();
+  });
+
   it("asks again for a slot whose job a reload right after Compute could not resume", async () => {
     // What Compute saves before its requests are answered: the confirmed run, still sending.
     const base = await reloadConfirmed({ wildcardNotHeld: false, sending: true });
@@ -324,6 +345,8 @@ describe("a reload keeps the saved session", () => {
     const results = screen.getByRole("region", { name: en.results });
     expect(results).toHaveTextContent(en.computing);
     expect(results).not.toHaveTextContent(en.resultUnavailable);
+    // A one-week plan is quick: it says nothing about the wait.
+    expect(screen.queryByText(en.longWait)).toBeNull();
 
     // Once the request has its job, the saved run no longer asks again on the next reload.
     base.show({

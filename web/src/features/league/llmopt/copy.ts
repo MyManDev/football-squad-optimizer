@@ -96,6 +96,8 @@ const en = {
   changes: { added: "New", changed: "Changed", removed: "Removed" },
   compute: "Compute plans",
   computing: "Computing…",
+  longWait:
+    "Each 3-week plan takes about two minutes. You can leave the page open; the plans appear here when they are ready.",
   resultUnavailable: "No saved result for this plan.",
   checkSquad: "Checking the current squad…",
   newSquad: "The squad or planning inputs changed. Review the rules and calculate again.",
@@ -301,6 +303,8 @@ const tr: typeof en = {
   changes: { added: "Yeni", changed: "Değişti", removed: "Kaldırıldı" },
   compute: "Planları hesapla",
   computing: "Hesaplanıyor…",
+  longWait:
+    "3 haftalık planların her biri yaklaşık iki dakika sürer. Sayfayı açık bırakabilirsin; planlar hazır olunca burada görünür.",
   resultUnavailable: "Bu plan için kayıtlı sonuç yok.",
   checkSquad: "Güncel kadro kontrol ediliyor…",
   newSquad: "Kadro veya plan verileri değişti. Kuralları kontrol edip tekrar hesapla.",
