@@ -130,6 +130,9 @@ const FixturesPage = lazy(() =>
 const ContributePage = lazy(() =>
   import("../features/contributions/ContributePage").then((m) => ({ default: m.ContributePage })),
 );
+const PrivacyPage = lazy(() =>
+  import("../features/privacy/PrivacyPage").then((m) => ({ default: m.PrivacyPage })),
+);
 // The usage record's admin page (ADR 0016): behind Cloudflare Access, in no navigation.
 const UsageAdminPage = lazy(() =>
   import("../features/usageAdmin/UsageAdminPage").then((m) => ({ default: m.UsageAdminPage })),
@@ -329,6 +332,7 @@ function LocalizedApp({ basename }: { basename: string }) {
                   }
                 />
                 <Route path="/fixtures" element={<FixturesPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
                 {import.meta.env.VITE_ADVICE_API_ORIGIN && (
                   <Route path="/contribute" element={<ContributePage />} />
                 )}
