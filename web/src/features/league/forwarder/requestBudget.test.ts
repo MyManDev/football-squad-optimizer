@@ -108,6 +108,23 @@ describe("the forwarder's request budget", () => {
     expect(log).toEqual(["p1", "p3"]);
   });
 
+  it("starts nothing, of either lane, while the rule's block is held", async () => {
+    const time = manualTime();
+    const budget = budgetWith(time);
+    const log: string[] = [];
+    budget.hold!(500);
+    void track(budget, "page", log, "p1");
+    void track(budget, "bulk", log, "s1");
+    await settle();
+    expect(log).toEqual([]);
+    await time.advance(499);
+    await settle();
+    expect(log).toEqual([]);
+    await time.advance(1);
+    await settle();
+    expect(log).toEqual(["p1", "s1"]);
+  });
+
   it("refuses a read whose caller had already stopped", async () => {
     const budget = budgetWith(manualTime());
     const stop = new AbortController();
