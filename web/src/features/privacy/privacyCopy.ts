@@ -34,7 +34,7 @@ export const PRIVACY_COPY: Record<Language, PrivacyCopy> = {
       },
       {
         title: "LLMOPT",
-        body: "What you write in LLMOPT and the candidate players for your squad are sent to Google Gemini to read your request. Your team number and name are not sent, and your text is not written to our server's logs.",
+        body: "What you write in LLMOPT and the candidate players for your squad are sent to Google Gemini to read your request. Your team number and name are not sent, and your text is not written to our server's logs. With your own API key, your text goes directly from your browser to the provider you chose, and the key stays only in that tab and is never sent to SquadOpt.",
       },
       {
         title: "Deadline reminder",
@@ -67,7 +67,7 @@ export const PRIVACY_COPY: Record<Language, PrivacyCopy> = {
       },
       {
         title: "LLMOPT",
-        body: "LLMOPT'a yazdığın metin ve kadron için aday oyuncular, isteğini anlamak üzere Google Gemini'ye gönderilir. Takım numaran ve adın gönderilmez, metnin sunucu kayıtlarımıza yazılmaz.",
+        body: "LLMOPT'a yazdığın metin ve kadron için aday oyuncular, isteğini anlamak üzere Google Gemini'ye gönderilir. Takım numaran ve adın gönderilmez, metnin sunucu kayıtlarımıza yazılmaz. Kendi API anahtarınla metnin tarayıcından doğrudan seçtiğin sağlayıcıya gider; anahtar yalnızca o sekmede kalır ve SquadOpt'a hiç gönderilmez.",
       },
       {
         title: "Deadline hatırlatıcısı",

@@ -32,7 +32,9 @@ import {
   type Constraint,
   type PlanDraft,
 } from "./intent";
-import { serverIntentSource, type IntentSource } from "./intentSource";
+import { ownKeyIntentSource, serverIntentSource, type IntentSource } from "./intentSource";
+import { OwnKeyForm } from "./OwnKeyForm";
+import { useOwnKey } from "./ownKey";
 import { PlanResult, type PreferencePrice } from "./PlanResult";
 import { expectedNet, samePlan } from "./planComparison";
 import { BANK_FLOOR, KEEP_WEEK, SCENARIO, draftChanges, type DraftChanges } from "./planChanges";
@@ -364,7 +366,11 @@ function Workspace({
     } catch (error) {
       if (controller.signal.aborted) return;
       const refusal = intentRefusal(error);
-      if (refusal === "limited" && error instanceof IntentError && error.retryAfterSeconds) {
+      if (
+        (refusal === "limited" || refusal === "providerLimited") &&
+        error instanceof IntentError &&
+        error.retryAfterSeconds
+      ) {
         setWaitLeft(error.retryAfterSeconds);
         setLimit({ seconds: error.retryAfterSeconds });
       } else setFeedback(copy.refusals[refusal]);
@@ -748,6 +754,7 @@ function Workspace({
       )}
       {ORIGIN && roster.isError && <RosterRetry roster={roster} />}
       <section className={styles.workspace} aria-label={copy.chat}>
+        {ORIGIN && <OwnKeyForm copy={copy} disabled={reading} />}
         {conversation.length > 0 && (
           <ol className={styles.conversation} aria-live="polite">
             {conversation.map(({ id, role, message }) => (
@@ -1054,12 +1061,16 @@ function Workspace({
 }
 
 /**
- * The LLMOPT page. The chat is read by `intentSource`, the site's intent service unless
- * another source is given.
+ * The LLMOPT page. The chat is read by `intentSource` when one is given; otherwise by the
+ * member's own model while a key is held (ADR 0017), and by the site's intent service when not.
  */
 export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {}) {
   const { messages, language } = useLanguage();
-  const source = useMemo(() => intentSource ?? serverIntentSource(ORIGIN), [intentSource]);
+  const ownKey = useOwnKey() !== null;
+  const source = useMemo(
+    () => intentSource ?? (ownKey ? ownKeyIntentSource(ORIGIN) : serverIntentSource(ORIGIN)),
+    [intentSource, ownKey],
+  );
   const copy = LLMOPT_COPY[language];
   const { entryId: entryParam } = useParams();
   const entryId = Number(entryParam);

@@ -29,6 +29,15 @@ describe("the privacy page", () => {
     expect(within(llmopt).getByText(/Google Gemini/)).toBeInTheDocument();
   });
 
+  it.each([
+    ["en", /never sent to SquadOpt/],
+    ["tr", /SquadOpt'a hiç gönderilmez/],
+  ] as const)("says in %s that a member's own key never reaches the site", (language, words) => {
+    mount(language);
+    const llmopt = screen.getByRole("heading", { level: 2, name: "LLMOPT" }).parentElement!;
+    expect(within(llmopt).getByText(words)).toBeInTheDocument();
+  });
+
   it("has the same sections in both languages", () => {
     expect(PRIVACY_COPY.tr.sections).toHaveLength(PRIVACY_COPY.en.sections.length);
   });
