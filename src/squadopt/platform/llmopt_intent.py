@@ -276,16 +276,13 @@ def _constraint(
     fields = {"kind", "player_id", "club", "count", "scope", "week", "points"}
     if soft:
         fields.add("max_cost_tenths")
-    model_required = {"kind", "player_id"}
     if comparison:
         fields.add("both")
-        model_required.add("both")
-    if (
-        not isinstance(value, dict)
-        or "kind" not in value
-        or value.keys() - fields
-        or (model and not model_required <= value.keys())
-    ):
+    if model and isinstance(value, dict):
+        # A provider that enforces the schema sends every field, null where it has nothing
+        # to say; one that does not may leave such a field out. Both read the same.
+        value = {name: item for name, item in value.items() if item is not None}
+    if not isinstance(value, dict) or "kind" not in value or value.keys() - fields:
         raise IntentValidationError("Invalid intent constraint.")
     kind = value["kind"]
     if not isinstance(kind, str) or kind not in _KINDS:
@@ -363,12 +360,14 @@ def _draft(
     model: bool = False,
     previous_window: int | None = None,
 ) -> dict[str, Any]:
+    if model and isinstance(value, dict):
+        # As for a rule: a part a model left out, or wrote as null, is an empty part.
+        value = {"hard": [], "soft": [], **{k: v for k, v in value.items() if v is not None}}
     if (
         not isinstance(value, dict)
         or not {"hard", "soft"} <= value.keys()
         or value.keys()
         - {"hard", "soft", "comparison", "window", "keep_weeks", "min_bank", "scenario"}
-        or (model and "comparison" not in value)
     ):
         raise IntentValidationError("Invalid constraint draft.")
     window = value.get("window")
@@ -561,14 +560,22 @@ def _validate_result(
     reference_weeks: tuple[int, ...] = (),
     locale: str = "en",
 ) -> dict[str, Any]:
-    if not isinstance(value, dict) or value.keys() != {"status", "draft", "message"}:
+    if (
+        not isinstance(value, dict)
+        or "status" not in value
+        or value.keys() - {"status", "draft", "message"}
+    ):
         raise IntentValidationError("Invalid intent result.")
-    if value["status"] == "clarification" and value["draft"] is None:
-        return {"status": "clarification", "message": _text(value["message"], _MAX_QUESTION)}
-    if value["status"] != "draft" or value["message"] is not None:
+    # A provider that does not enforce the schema may leave out the part its answer has no
+    # use for, so the status decides which part is read. A draft's message is not read.
+    if value["status"] == "clarification" and value.get("draft") is None:
+        return {"status": "clarification", "message": _text(value.get("message"), _MAX_QUESTION)}
+    if value["status"] != "draft":
         raise IntentValidationError("Invalid draft status.")
     player_ids = {player["id"] for player in candidates}
-    draft = _draft(value["draft"], player_ids, clubs, model=True, previous_window=previous_window)
+    draft = _draft(
+        value.get("draft"), player_ids, clubs, model=True, previous_window=previous_window
+    )
     scenario = draft.get("scenario")
     if scenario is not None and scenario.get("week", 1) not in reference_weeks:
         question = (
@@ -868,7 +875,7 @@ _DRAFT_SCHEMA: Final = _schema_object(
             "anyOf": [
                 _schema_object(
                     {
-                        "kind": {"enum": ["price_increase", "unavailable"]},
+                        "kind": {"type": "string", "enum": ["price_increase", "unavailable"]},
                         "player_id": {"type": "integer"},
                         "week": {"type": ["integer", "null"], "enum": [*_WEEKS, None]},
                         "tenths": {"type": ["integer", "null"]},
