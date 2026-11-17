@@ -14,6 +14,7 @@ import {
   isForwarderRefusal,
   type ForwarderClientOptions,
 } from "./client";
+import { createRequestBudget } from "./requestBudget";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -363,5 +364,63 @@ describe("the forwarder's own refusals, as a release check reads them", () => {
     ["a 404 of a published document", "/data/league/members.json", 404, undefined],
   ])("counts %s", (_, pathname, status, marker) => {
     expect(isForwarderRefusal(pathname, status, marker)).toBe(false);
+  });
+});
+
+describe("the reads' share of the rate rule", () => {
+  function heldBudget(pageLimit: number, bulkLimit: number) {
+    let at = 0;
+    const timers: (() => void)[] = [];
+    const budget = createRequestBudget({
+      windowMs: 1000,
+      pageLimit,
+      bulkLimit,
+      now: () => at,
+      schedule: (run) => {
+        timers.push(run);
+        return () => undefined;
+      },
+    });
+    return {
+      budget,
+      release() {
+        at += 1000;
+        for (const run of timers.splice(0)) run();
+      },
+    };
+  }
+
+  it("sends a scoreboard's seasons as bulk reads and keeps room for the page's own", async () => {
+    const held = heldBudget(3, 2);
+    const transport = vi.fn<Transport>(async () => forwarded(404, { error: "entry_not_found" }));
+    const client = createForwarderClient({ fetch: transport, budget: held.budget });
+    const seasons = [1, 2, 3, 4].map((entry) => client.entrySeason(entry));
+    const page = client.standings(314, 1);
+    await page;
+    expect(transport.mock.calls.map(([url]) => url)).toEqual([
+      `${FORWARDER_ROOT}/entry/1/season`,
+      `${FORWARDER_ROOT}/entry/2/season`,
+      `${FORWARDER_ROOT}/standings/314?page=1`,
+    ]);
+    held.release();
+    expect((await Promise.all(seasons)).map((read) => read.ok)).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(transport).toHaveBeenCalledTimes(5);
+  });
+
+  it("reads a stop while waiting for a turn as aborted, and sends nothing", async () => {
+    const held = heldBudget(1, 1);
+    const transport = vi.fn<Transport>(async () => forwarded(404, { error: "entry_not_found" }));
+    const client = createForwarderClient({ fetch: transport, budget: held.budget });
+    await client.entrySeason(1);
+    const stop = new AbortController();
+    const waiting = client.entrySeason(2, { signal: stop.signal });
+    stop.abort();
+    expect(await waiting).toEqual({ ok: false, reason: "aborted" });
+    expect(transport).toHaveBeenCalledTimes(1);
   });
 });
