@@ -56,7 +56,8 @@ test("the phone drawer contains keyboard focus and Escape returns to its opener"
   const close = page.getByRole("button", { name: "Menüyü kapat", exact: true });
   await expect(close).toBeFocused();
   await page.keyboard.press("Shift+Tab");
-  await expect(page.locator("#sidebar button").last()).toBeFocused();
+  // The drawer's last stop is the privacy link under the two switches.
+  await expect(page.locator("#sidebar").getByRole("link", { name: "Gizlilik" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(close).toBeFocused();
   await page.keyboard.press("Escape");

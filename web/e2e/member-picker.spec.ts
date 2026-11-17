@@ -22,7 +22,7 @@ const humans = mockLeagueMembersEnvelope.payload.members.filter(
 );
 
 const sidebarLinks = (page: Page) =>
-  page.locator("#sidebar a").evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+  page.locator("#sidebar nav a").evaluateAll((links) => links.map((link) => link.getAttribute("href")));
 
 const pickerHeading = (page: Page, language: "tr" | "en" = "tr") =>
   page.getByRole("heading", { level: 1, name: MESSAGES[language].memberPicker.title });
