@@ -265,7 +265,8 @@ own two-parent check because main already contains develop. The way out is anoth
 under a fresh branch and a fresh tag.
 
 The window is not short. The waits are 60 minutes for the site pull request, 45 for the release
-pull request and 40 for main CI. Before starting, stop the develop queue and let anything already
+pull request and 40 for main CI. A main CI run that fails has its failed jobs re-run once, with a fresh 40
+minutes; a second failure refuses. Before starting, stop the develop queue and let anything already
 merging finish. Say so to anyone else merging that day.
 
 **The point of no return is the line `release PR #N merged`.** Before it, stopping `ship.sh`

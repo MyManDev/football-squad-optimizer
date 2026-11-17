@@ -77,10 +77,37 @@ describe("the workflow and CI files", () => {
     assert.doesNotMatch(yaml, /^\s+push:/m);
     assert.match(yaml, /reject non-default dispatch/);
     assert.match(yaml, /deploy-steps\.mjs smoke/);
-    const order = ["Test the Worker", "Deploy the Worker", "Smoke the Worker"];
+    const order = ["Test the Worker", "Deploy the Worker", "Write the report settings", "Smoke the Worker"];
     const positions = order.map((step) => yaml.indexOf(`name: ${step}`));
     assert.ok(positions.every((p) => p >= 0), positions);
     assert.deepEqual([...positions].sort((a, b) => a - b), positions);
+  });
+
+  it("write the report's four settings from the environment, on stdin, or none of them", async () => {
+    const yaml = await text(new URL("deploy-usage.yml", WORKFLOWS));
+    const start = yaml.indexOf("name: Write the report settings");
+    const step = yaml.slice(start, yaml.indexOf("\n      - name:", start));
+    assert.match(step, /if: steps\.deploy\.outcome == 'success'/);
+    assert.match(step, /USAGE_READ_TOKEN: \$\{\{ secrets\.USAGE_READ_TOKEN \}\}/);
+    assert.match(step, /ACCESS_TEAM_DOMAIN: \$\{\{ vars\.ACCESS_TEAM_DOMAIN \}\}/);
+    assert.match(step, /ACCESS_AUD: \$\{\{ vars\.ACCESS_AUD \}\}/);
+    const written = {
+      ANALYTICS_TOKEN: "USAGE_READ_TOKEN",
+      ANALYTICS_ACCOUNT_ID: "CLOUDFLARE_ACCOUNT_ID",
+      ACCESS_TEAM_DOMAIN: "ACCESS_TEAM_DOMAIN",
+      ACCESS_AUD: "ACCESS_AUD",
+    };
+    for (const [secret, source] of Object.entries(written)) {
+      assert.ok(step.includes(`printf '%s' "$${source}" | npx --yes wrangler@"$WRANGLER_VERSION" secret put ${secret}\n`), secret);
+    }
+    // A missing value skips every write with a notice and leaves the deploy green.
+    const skip = step.indexOf("exit 0");
+    assert.ok(skip > 0 && skip < step.indexOf("secret put"));
+    assert.match(step, /::notice::/);
+    // Nothing echoes a value: the only lines that print are the notice and the step output.
+    for (const line of step.split("\n").filter((l) => /\becho\b/.test(l))) {
+      for (const source of Object.values(written)) assert.equal(line.includes(`$${source}`), false, line);
+    }
   });
 
   it("bind the dataset the report reads, on the site's route, with no request logs", async () => {

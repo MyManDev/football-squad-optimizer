@@ -872,7 +872,7 @@ function Workspace({
       : memberAddress(squad.league_id, squad.entry.entry_id);
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-zone="llmopt">
       <header className={styles.header}>
         <Link to={teamPath}>{copy.back}</Link>
         <h1>LLMOPT</h1>

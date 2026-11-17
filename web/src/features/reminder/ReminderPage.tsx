@@ -47,7 +47,7 @@ export function ReminderPageView({
           ? copy.statusDenied
           : copy.statusOff;
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-zone="reminder">
       <header>
         <Link to={memberAddress(target.leagueId, target.entryId)}>{copy.back}</Link>
         <h1>{copy.title}</h1>

@@ -152,7 +152,7 @@ export function ContributePage() {
     setConsent(false);
   }
   return (
-    <section className={styles.page}>
+    <section className={styles.page} data-zone="contribute">
       <header>
         <h1>{tr ? "Katkıda bulun" : "Contribute"}</h1>
         <p>

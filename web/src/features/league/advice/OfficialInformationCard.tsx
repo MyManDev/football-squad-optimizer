@@ -53,7 +53,12 @@ export function NewInformationNotice({
   )
     return null;
   return (
-    <p role="status" className={styles.honesty} data-testid="new-information-notice">
+    <p
+      role="status"
+      className={styles.honesty}
+      data-testid="new-information-notice"
+      data-zone="new-information"
+    >
       {COPY[language].changed}
     </p>
   );

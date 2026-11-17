@@ -417,6 +417,7 @@ export function PageShell({
         {layout === "phone" ? (
           <header
             className={styles.phoneBar}
+            data-zone="topbar"
             inert={overlay}
             data-phone-bar
             data-live={live !== null || undefined}
@@ -493,6 +494,7 @@ export function PageShell({
         ) : null}
         <aside
           id="sidebar"
+          data-zone="nav"
           className={styles.sidebar}
           aria-label={copy.sidebar}
           data-mode={mode}

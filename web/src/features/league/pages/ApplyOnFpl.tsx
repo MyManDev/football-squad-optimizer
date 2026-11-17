@@ -27,7 +27,7 @@ export function ApplyOnFpl({
   const transfers = plan.moves.length > 0;
   if (!transfers && (!plan.captain || plan.captain.player_id === held)) return null;
   return (
-    <div className={styles.apply}>
+    <div className={styles.apply} data-zone="apply-fpl">
       <a
         className={styles.applyLink}
         href={transfers ? FPL_TRANSFERS : FPL_PICK_TEAM}

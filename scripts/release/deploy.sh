@@ -21,15 +21,30 @@ PARENTS=$(( $(git rev-list --parents -n1 origin/main | wc -w) - 1 ))
 log "main $MAIN is a two-parent merge with tree == develop $DEV"
 
 # Wait for a SUCCESSFUL push CI run on exactly that SHA, with one unexpired site artifact.
+# A run that ends without success has its failed jobs re-run once, and the wait starts again.
+# On 14 and 15 Nov 2026 one flaky browser check on main stopped two scheduled releases after
+# their release PRs had merged; a real failure fails the second attempt too, and that refuses.
+# Only failed jobs run again, so the site artifact of a web job that passed is the same one.
 log "waiting for main-push CI on $MAIN"
 deadline=$(( $(date +%s) + 2400 ))
 RUN=""
+RERUN_FROM=""
 while [ "$(date +%s)" -lt "$deadline" ]; do
-  RUN=$("$GH" run list --workflow ci.yml --branch main --event push --commit "$MAIN" --limit 1 --json databaseId,status,conclusion --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"' 2>/dev/null || echo "")
-  case "$RUN" in
-    *" completed success") break;;
-    *" completed "*) log "main CI run $RUN did not succeed; refusing to deploy"; exit 1;;
-  esac
+  RUN=$("$GH" run list --workflow ci.yml --branch main --event push --commit "$MAIN" --limit 1 --json databaseId,attempt,status,conclusion --jq '.[0] | "\(.databaseId) \(.attempt) \(.status) \(.conclusion)"' 2>/dev/null || echo "")
+  # shellcheck disable=SC2086 # the four fields are split on purpose; an empty conclusion is last
+  set -- $RUN
+  CI_ID=${1:-}; CI_ATTEMPT=${2:-0}; CI_STATUS=${3:-}; CI_CONCLUSION=${4:-}
+  if [ "$CI_STATUS" = completed ]; then
+    [ "$CI_CONCLUSION" = success ] && break
+    if [ -z "$RERUN_FROM" ]; then
+      log "main CI run $CI_ID attempt $CI_ATTEMPT ended $CI_CONCLUSION; re-running its failed jobs once"
+      "$GH" run rerun "$CI_ID" --failed >/dev/null 2>&1 || { log "main CI run $CI_ID could not be re-run; refusing to deploy"; exit 1; }
+      RERUN_FROM=$CI_ATTEMPT
+      deadline=$(( $(date +%s) + 2400 ))
+    elif [ "$CI_ATTEMPT" -gt "$RERUN_FROM" ]; then
+      log "main CI run $CI_ID attempt $CI_ATTEMPT ended $CI_CONCLUSION after the re-run; refusing to deploy"; exit 1
+    fi
+  fi
   sleep 45
 done
 case "$RUN" in *" completed success") ;; *) log "no successful main CI run within 40 minutes (last: '$RUN'); refusing"; exit 1;; esac

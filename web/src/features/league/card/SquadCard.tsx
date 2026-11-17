@@ -144,7 +144,7 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
     navigator.canShare({ files: [drawn.file] });
 
   return (
-    <div className={styles.card}>
+    <div className={styles.card} data-zone="squad">
       <fieldset className={styles.fields}>
         <legend>{copy.cardFieldsLegend}</legend>
         {CARD_FIELDS.map((field) => (

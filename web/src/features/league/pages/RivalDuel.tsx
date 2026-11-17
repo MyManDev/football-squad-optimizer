@@ -103,7 +103,7 @@ export function RivalDuel({
     entry.team_name ?? entry.manager_name ?? copy.unknownTeam;
 
   return (
-    <div className={styles.duel}>
+    <div className={styles.duel} data-zone="duel">
       <p className="visually-hidden" id={pickId}>
         {copy.duelPick}
       </p>

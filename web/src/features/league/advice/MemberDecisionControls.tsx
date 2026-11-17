@@ -483,7 +483,7 @@ export function MemberDecisionControls({
         {evidenceNote !== null ? <p className={styles.note}>{evidenceNote}</p> : null}
       </fieldset>
 
-      <fieldset className={styles.fieldset}>
+      <fieldset className={styles.fieldset} data-zone="chip-choice">
         <legend>{chipCopy.legend}</legend>
         <div className={styles.windows}>
           <label className={styles.windowOption}>

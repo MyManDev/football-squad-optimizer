@@ -100,7 +100,7 @@ export function MemberSquad({
   }, [changeKey]);
   if (onPitch.source === null) {
     return (
-      <section id="kadro" className={styles.squad} aria-labelledby={titleId}>
+      <section id="kadro" className={styles.squad} aria-labelledby={titleId} data-zone="squad">
         <h2 className={styles.title} id={titleId}>
           {copy.memberSquad}
         </h2>
@@ -124,7 +124,7 @@ export function MemberSquad({
     .filter(Boolean)
     .join(" · ");
   return (
-    <section id="kadro" className={styles.squad} aria-labelledby={titleId}>
+    <section id="kadro" className={styles.squad} aria-labelledby={titleId} data-zone="squad">
       <div className={styles.head}>
         <div className={styles.heading}>
           <h2 className={styles.title} id={titleId}>
@@ -253,7 +253,7 @@ export function HeldSquad({
     );
   };
   return (
-    <div className={styles.held}>
+    <div className={styles.held} data-zone="squad">
       <h3 className={styles.heldTitle}>{copy.startingXiLabel}</h3>
       <ol className={styles.heldList}>
         {squad.starting_xi.map((player) => row(player, position(player.position), false))}

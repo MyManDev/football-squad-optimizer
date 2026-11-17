@@ -48,7 +48,7 @@ export function FixturesPage() {
   const view = searchParams.get("view") === "team" ? "team" : "general";
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-zone="fixtures">
       <header className={styles.header}>
         <div>
           <div className={styles.kicker}>{data.season}</div>

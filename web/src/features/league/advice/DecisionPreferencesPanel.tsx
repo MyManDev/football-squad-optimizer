@@ -109,7 +109,7 @@ export function DecisionPreferencesPanel({
     owned.find((p) => p.player_id === id)?.name ??
     `#${id}`;
   return (
-    <Card title={tr ? "Karar tercihlerim" : "My decision preferences"}>
+    <Card title={tr ? "Karar tercihlerim" : "My decision preferences"} zone="preferences">
       <p>
         {tr
           ? "Bu kurallar seçtiğiniz 1, 3 veya 5 haftanın tamamında geçerlidir."
