@@ -18,6 +18,9 @@ export default defineConfig({
         // Only vendor code is grouped by hand. Application modules follow their lazy()
         // routes, so index.html preloads the shell and vendor code and no page's chunk.
         manualChunks(id) {
+          // The speed measurements of ADR 0015 are imported only when the usage record is on,
+          // after the page has drawn; kept out of vendor, they cost the first visit nothing.
+          if (id.includes("node_modules/web-vitals")) return undefined;
           if (id.includes("node_modules")) return "vendor";
           return undefined;
         },

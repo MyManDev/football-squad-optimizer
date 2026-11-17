@@ -183,7 +183,12 @@ export function LeagueEntryPage({
         {!inPlace && unopened === null ? <Link to={leagueAddress(239)}>Turkey</Link> : null}
       </div>
       {mode === "league" ? (
-        <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
+        <form
+          onSubmit={submit}
+          className={styles.form}
+          aria-busy={state === "loading"}
+          data-zone="entry-form"
+        >
           <label htmlFor="league-id">{copy.label}</label>
           <p id="league-entry-hint" className={styles.hint}>
             {copy.hint}
@@ -219,7 +224,11 @@ export function LeagueEntryPage({
             </button>
           ) : null}
           {state === "cannotOpen" && others.length > 0 ? (
-            <nav aria-labelledby="league-entry-listed" className={styles.listed}>
+            <nav
+              aria-labelledby="league-entry-listed"
+              className={styles.listed}
+              data-zone="league-list"
+            >
               <h2 id="league-entry-listed" className={styles.listedTitle}>
                 {copy.listedLeagues}
               </h2>
@@ -234,7 +243,7 @@ export function LeagueEntryPage({
           ) : null}
         </form>
       ) : (
-        <form onSubmit={submitEntry} className={styles.form}>
+        <form onSubmit={submitEntry} className={styles.form} data-zone="entry-form">
           <label htmlFor="entry-id">{copy.entryLabel}</label>
           <input
             id="entry-id"

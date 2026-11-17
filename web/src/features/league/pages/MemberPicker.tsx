@@ -170,7 +170,12 @@ export function MemberPicker({
     );
 
   return (
-    <section className={styles.page} aria-labelledby="member-picker-title" data-member-picker="">
+    <section
+      className={styles.page}
+      aria-labelledby="member-picker-title"
+      data-member-picker=""
+      data-zone="member-picker"
+    >
       <h1 id="member-picker-title" ref={heading} tabIndex={-1} className={styles.title}>
         {copy.title}
       </h1>

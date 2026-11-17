@@ -58,7 +58,12 @@ export function ChipTimingCard({
     </span>
   );
   return (
-    <section className={styles.card} aria-labelledby="chip-timing-title" data-chip-timing>
+    <section
+      className={styles.card}
+      aria-labelledby="chip-timing-title"
+      data-chip-timing
+      data-zone="chip-timing"
+    >
       <h3 className={styles.title} id="chip-timing-title">
         {copy.title}
       </h3>

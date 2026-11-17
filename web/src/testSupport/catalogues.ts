@@ -4,6 +4,7 @@ import { COMPUTE_COPY } from "../features/league/advice/computeCopy";
 import { EVIDENCE_COPY } from "../features/league/advice/evidenceCopy";
 import { TOP100_COPY } from "../features/league/advice/top100Copy";
 import { FIXTURES_COPY } from "../features/fixtures/fixturesCopy";
+import { USAGE_ADMIN_COPY } from "../features/usageAdmin/usageAdminCopy";
 import { MESSAGES, type Language } from "../i18n/messages";
 
 /**
@@ -26,4 +27,5 @@ export const CATALOGUES = {
   chipTimingCopy: CHIP_TIMING_COPY,
   computeCopy: COMPUTE_COPY,
   fixturesCopy: FIXTURES_COPY,
+  usageAdminCopy: USAGE_ADMIN_COPY,
 } as const satisfies Record<string, Record<Language, object>>;

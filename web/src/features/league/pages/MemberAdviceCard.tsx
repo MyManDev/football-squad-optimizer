@@ -286,7 +286,7 @@ export function AdviceDetails({
   const { envelope } = shown;
   const view = envelope.payload;
   return (
-    <div className={board.details}>
+    <div className={board.details} data-zone="advice-details">
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
       <EvidenceSection view={view} />
       <Top100Section view={view} />

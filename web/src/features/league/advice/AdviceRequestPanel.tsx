@@ -214,6 +214,7 @@ export function AdviceRequestPanel({
       <div
         className={dockClassName ? `${styles.panel} ${dockClassName}` : styles.panel}
         data-compute-dock
+        data-zone="advice-request"
       >
         <button
           type="button"

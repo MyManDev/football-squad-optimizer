@@ -5,7 +5,11 @@
 // a page cannot send an address, an entry number or a name, because none of them is a word
 // here, and the session is random text of a fixed shape.
 //
-// See docs/architecture/decisions/0014-usage-measurement.md.
+// Version 2 events (clicks, scrolling, speed, errors and arrivals) keep that rule: their text
+// fields are words from closed lists too, and their numbers are integers in fixed ranges, so no
+// pixel position, message or address fits in them.
+//
+// See docs/architecture/decisions/0014-usage-measurement.md and 0015-behaviour-measurement.md.
 
 /** The one site whose pages may send events. */
 export const SITE_ORIGIN = "https://squadopt.mymandev.com";
@@ -14,9 +18,15 @@ export const SITE_ORIGIN = "https://squadopt.mymandev.com";
 export const MARKER_HEADER = "x-squadopt-usage";
 export const MARKER_VALUE = "1";
 
-/** The status answer's name, and the event version the Worker takes. */
+/**
+ * The status answer's name, and the event versions the Worker takes. `EVENT_VERSION` is the
+ * first one, which the status answer has always named as `event_version`; the answer lists
+ * every version beside it rather than changing what that field means to an older reader.
+ */
 export const STATUS_CONTRACT = "usage_status_v1";
 export const EVENT_VERSION = 1;
+export const BEHAVIOUR_VERSION = 2;
+export const EVENT_VERSIONS = [EVENT_VERSION, BEHAVIOUR_VERSION];
 
 /** The Analytics Engine dataset, as wrangler.toml binds it. */
 export const DATASET = "squadopt_usage";
@@ -37,6 +47,7 @@ export const PAGES = new Set([
   "team",
   "fixtures",
   "contribute",
+  "llmopt",
   "other",
 ]);
 
@@ -53,6 +64,7 @@ export const TOOLS = new Set([
   "vs",
   "live",
   "fixtures",
+  "llmopt",
 ]);
 
 /**
@@ -75,6 +87,125 @@ const FIELDS = ["device", "lang", "page", "session", "step", "tool", "v"];
 /** The dataset's text columns in order: `blob1` is the first of these, and so on. */
 export const BLOB_COLUMNS = ["page", "tool", "step", "lang", "device", "session"];
 
+// Version 2 (ADR 0015). Every list below is closed: a word the Worker does not know is refused.
+
+/** What a version 2 event tells. */
+export const KINDS = new Set(["click", "scroll", "vital", "error", "arrival"]);
+
+/**
+ * The part of a page a click landed in, from the nearest `data-zone` around it; `page` when
+ * there is none, so a component without a zone still counts.
+ */
+export const ZONES = new Set([
+  "nav",
+  "topbar",
+  "entry-form",
+  "league-list",
+  "fpl-id-help",
+  "member-table",
+  "member-picker",
+  "decision",
+  "pitch",
+  "squad",
+  "fixtures-rail",
+  "tool-tabs",
+  "chip-timing",
+  "chip-choice",
+  "preferences",
+  "advice-request",
+  "advice-details",
+  "what-if",
+  "duel",
+  "last-week",
+  "apply-fpl",
+  "resources",
+  "coach-news",
+  "new-information",
+  "history",
+  "vs",
+  "live",
+  "llmopt",
+  "reminder",
+  "fixtures",
+  "contribute",
+  "page",
+]);
+
+/** Whether a click was on something that acts (a link, a button, a field) or on plain content. */
+export const TARGETS = new Set(["control", "plain"]);
+
+/** A click on its own, the burst of a frustrated visitor, or a click that changed nothing. */
+export const MARKS = new Set(["none", "rage", "dead"]);
+
+/** How long a page view lasted, as a bucket: the timestamps behind it are not sent. */
+export const DWELLS = new Set(["s5", "s15", "s30", "s60", "s180", "s600", "long"]);
+
+/** The browser's speed measurements, and the rating its thresholds give each. */
+export const METRICS = new Set(["lcp", "inp", "cls", "fcp", "ttfb"]);
+export const RATINGS = new Set(["good", "needs", "poor"]);
+
+/** The kind of uncaught failure; its message and stack are never sent. */
+export const ERRORS = new Set(["script", "promise", "chunk"]);
+
+/** Where a visit came from, matched in the browser; the referrer's address is never sent. */
+export const SOURCES = new Set([
+  "direct",
+  "internal",
+  "whatsapp",
+  "telegram",
+  "google",
+  "bing",
+  "x",
+  "instagram",
+  "facebook",
+  "reddit",
+  "fpl",
+  "other",
+]);
+
+/** How long since this browser's last visit, as a bucket worked out from one stored ISO week. */
+export const VISITS = new Set(["new", "same_week", "last_week", "weeks_2_4", "older", "unknown"]);
+
+/** A click's cell is in a grid this many cells square over its zone: row times 20 plus column. */
+export const GRID = 20;
+
+/**
+ * A version 2 event's fields beside the common ones, and where they go in the dataset: up to
+ * three words in `blob7` to `blob9`, in this order, and at most one number in `double2`.
+ */
+export const KIND_LAYOUT = {
+  click: { words: ["zone", "target", "mark"], number: "cell" },
+  scroll: { words: ["dwell"], number: "depth" },
+  vital: { words: ["metric", "rating"], number: "value" },
+  error: { words: ["error"], number: null },
+  arrival: { words: ["source", "visit"], number: null },
+};
+
+/** How many text columns version 2 adds after version 1's six: `blob7` to `blob9`. */
+export const DETAIL_COLUMNS = 3;
+
+/** The fields every version 2 event carries: version 1's but `step`, and the kind. */
+const COMMON_V2 = ["device", "kind", "lang", "page", "session", "tool", "v"];
+
+const WORD_LISTS = {
+  zone: ZONES,
+  target: TARGETS,
+  mark: MARKS,
+  dwell: DWELLS,
+  metric: METRICS,
+  rating: RATINGS,
+  error: ERRORS,
+  source: SOURCES,
+  visit: VISITS,
+};
+
+/** The integer ranges, both ends included, with the step a value must be a multiple of. */
+export const NUMBER_RANGES = {
+  cell: { min: 0, max: GRID * GRID - 1, step: 1 },
+  depth: { min: 0, max: 100, step: 10 },
+  value: { min: 0, max: 60_000, step: 1 },
+};
+
 export class RefusedError extends Error {
   constructor(reason) {
     super(reason);
@@ -90,18 +221,36 @@ function word(set, value, reason) {
   return value;
 }
 
+/** An integer in its range and on its step; a fraction, text or a boolean is refused. */
+function integer({ min, max, step }, value, reason) {
+  if (!Number.isInteger(value) || value < min || value > max || value % step !== 0) {
+    throw new RefusedError(reason);
+  }
+  return value;
+}
+
+function checkSession(value) {
+  if (typeof value !== "string" || !SESSION.test(value)) throw new RefusedError("session_refused");
+}
+
 /**
- * The event a request carries, or a refusal naming the first thing wrong with it. Exactly the
- * seven fields, nothing beside them, so a page that started sending more would be refused
- * rather than quietly trimmed.
+ * The event a request carries, or a refusal naming the first thing wrong with it. The version
+ * decides which rules apply, so a version neither set of rules knows is refused first.
  */
 export function eventFrom(body) {
   if (!isObject(body)) throw new RefusedError("body_not_object");
+  if (body.v === EVENT_VERSION) return stepEvent(body);
+  if (body.v === BEHAVIOUR_VERSION) return behaviourEvent(body);
+  throw new RefusedError("wrong_version");
+}
+
+/**
+ * A version 1 event: exactly the seven fields, nothing beside them, so a page that started
+ * sending more would be refused rather than quietly trimmed.
+ */
+function stepEvent(body) {
   if (Object.keys(body).sort().join() !== FIELDS.join()) throw new RefusedError("wrong_fields");
-  if (body.v !== EVENT_VERSION) throw new RefusedError("wrong_version");
-  if (typeof body.session !== "string" || !SESSION.test(body.session)) {
-    throw new RefusedError("session_refused");
-  }
+  checkSession(body.session);
   return {
     page: word(PAGES, body.page, "page_refused"),
     tool: word(TOOLS, body.tool, "tool_refused"),
@@ -114,13 +263,50 @@ export function eventFrom(body) {
 }
 
 /**
+ * A version 2 event: the common fields and exactly its kind's, nothing beside them. The kind
+ * is read first because it decides which fields are right.
+ */
+function behaviourEvent(body) {
+  if (!Object.hasOwn(body, "kind")) throw new RefusedError("wrong_fields");
+  const kind = word(KINDS, body.kind, "kind_refused");
+  const { words, number } = KIND_LAYOUT[kind];
+  const expected = [...COMMON_V2, ...words, ...(number === null ? [] : [number])].sort();
+  if (Object.keys(body).sort().join() !== expected.join()) throw new RefusedError("wrong_fields");
+  checkSession(body.session);
+  const event = {
+    page: word(PAGES, body.page, "page_refused"),
+    tool: word(TOOLS, body.tool, "tool_refused"),
+    kind,
+    lang: word(LANGUAGES, body.lang, "lang_refused"),
+    device: word(DEVICES, body.device, "device_refused"),
+    session: body.session,
+    v: body.v,
+  };
+  for (const field of words) event[field] = word(WORD_LISTS[field], body[field], `${field}_refused`);
+  if (number !== null) event[number] = integer(NUMBER_RANGES[number], body[number], `${number}_refused`);
+  return event;
+}
+
+/**
  * The event as one Analytics Engine data point. The session is the index because the dataset
  * samples by index under heavy load, and a visit is only useful with its steps together.
  */
 export function dataPoint(event) {
+  if (event.v === EVENT_VERSION) {
+    return {
+      indexes: [event.session],
+      blobs: BLOB_COLUMNS.map((column) => event[column]),
+      doubles: [event.v],
+    };
+  }
+  // Version 2 keeps version 1's six columns with the kind where the step was, and pads its own
+  // words to three, so a column always holds the same field for a given kind.
+  const { words, number } = KIND_LAYOUT[event.kind];
+  const details = words.map((field) => event[field]);
+  while (details.length < DETAIL_COLUMNS) details.push("");
   return {
     indexes: [event.session],
-    blobs: BLOB_COLUMNS.map((column) => event[column]),
-    doubles: [event.v],
+    blobs: [event.page, event.tool, event.kind, event.lang, event.device, event.session, ...details],
+    doubles: [event.v, number === null ? 0 : event[number]],
   };
 }
