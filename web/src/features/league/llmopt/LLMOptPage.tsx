@@ -941,6 +941,12 @@ function Workspace({
         >
           {checkingSquad ? copy.checkSquad : computing ? copy.computing : copy.compute}
         </button>
+        {/* A 3-week plan is solved at the service, one plan after another: say how long. */}
+        {computing && plans.window === 3 ? (
+          <p className={styles.notice} role="status" data-long-wait>
+            {copy.longWait}
+          </p>
+        ) : null}
         {basisChanged && (
           <p className={styles.notice} role="status">
             {copy.newSquad}{" "}
