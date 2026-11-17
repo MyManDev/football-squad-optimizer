@@ -5,13 +5,14 @@ import { useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
-import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
+import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { stubTree, withLeague } from "../../../testSupport/league";
 import type { AdviceRequest } from "../advice/adviceClient";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import { LLMOPT_COPY } from "./copy";
+import { summarizeRevision } from "./planRevision";
 import type { LLMOptPage as Page } from "./LLMOptPage";
 
 interface FakeJob {
@@ -331,5 +332,89 @@ describe("a reload keeps the saved session", () => {
     const base = await reloadConfirmed({ wildcardNotHeld: false });
     await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
     expect(base.compute).not.toHaveBeenCalled();
+  });
+});
+
+describe("the plan the member compares against", () => {
+  it("stays the chosen plan when a rule is edited after a result", async () => {
+    const chosen = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1).payload;
+    const reference = JSON.parse(
+      JSON.stringify(
+        summarizeRevision({ ...chosen, expected_own_points: 40, bank_after_tenths: 3 }),
+      ),
+    ) as unknown;
+    open();
+    await ready();
+    await addRule("hold_transfers");
+    cleanup();
+    const [key, session] = savedSession();
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({ ...session, reference, confirmation: { wildcardNotHeld: false } }),
+    );
+
+    jobs.length = 0;
+    open();
+    await ready();
+    const base = jobs[0]!;
+    await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+    const shown = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    base.show({
+      phase: "done",
+      source: "api-cache",
+      request: base.readCached.mock.calls[0]![0],
+      envelope: { ...shown, payload: { ...shown.payload, bank_after_tenths: 9 } },
+    });
+    expect(await screen.findByRole("heading", { name: en.base })).toBeVisible();
+    expect(savedSession()[1].reference).toEqual(reference);
+
+    await addRule("no_hits");
+    expect(savedSession()[1]).toMatchObject({
+      draft: { hard: [{ kind: "hold_transfers" }, { kind: "no_hits" }] },
+      reference,
+    });
+  });
+});
+
+describe("a model answer that changes the draft", () => {
+  it("marks the rules it added, changed and removed until the next edit", async () => {
+    intent.mockImplementation(
+      () =>
+        new Response(
+          JSON.stringify({
+            status: "draft",
+            draft: {
+              hard: [{ kind: "save_chips" }, { kind: "no_hits" }],
+              soft: [],
+              comparison: { kind: "include_player", player_id: OUTSIDER.id },
+            },
+          }),
+        ),
+    );
+    open();
+    await ready();
+    await addRule("hold_transfers");
+    await addRule("save_chips");
+    await sendMessage("No hits, keep the chips, and compare Outside Signing.");
+    await screen.findByText(en.understood);
+
+    const item = (name: string) =>
+      screen.getByRole("button", { name: `${en.remove} · ${name}` }).closest("li")!;
+    expect(item(en.rules.no_hits)).toHaveAttribute("data-change", "added");
+    expect(item(en.rules.no_hits)).toHaveTextContent(en.changes.added);
+    expect(item(`${en.rules.include_player} · ${OUTSIDER.name}`)).toHaveAttribute(
+      "data-change",
+      "added",
+    );
+    expect(item(en.rules.save_chips)).not.toHaveAttribute("data-change");
+    const removed = screen.getByText(en.rules.hold_transfers, { selector: "del" });
+    expect(removed.closest("li")).toHaveAttribute("data-change", "removed");
+    expect(removed.closest("li")).toHaveTextContent(en.changes.removed);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: `${en.remove} · ${en.rules.save_chips}` }),
+    );
+    expect(screen.queryByText(en.changes.added)).toBeNull();
+    expect(screen.queryByText(en.rules.hold_transfers, { selector: "del" })).toBeNull();
   });
 });

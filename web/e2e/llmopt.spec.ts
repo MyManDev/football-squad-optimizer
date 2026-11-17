@@ -216,7 +216,9 @@ test("clarification keeps the first request and pauses calculation", async ({ pa
   await expect(page.getByRole("button", { name: "Compute plans" })).toBeDisabled();
   await input.fill(reply);
   await send.click();
-  await expect(page.getByText("Include player · Smith", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Include player · Smith" }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Compute plans" })).toBeEnabled();
 });
 

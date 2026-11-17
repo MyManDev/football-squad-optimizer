@@ -50,6 +50,7 @@ import {
   sameOpeningDecision,
   samePlan,
 } from "./planComparison";
+import { BANK_FLOOR, KEEP_WEEK, SCENARIO, draftChanges, type DraftChanges } from "./planChanges";
 import { explainDraftConflict } from "./planConflicts";
 import {
   referenceCaptains,
@@ -73,7 +74,7 @@ import {
   type StartedAlternative,
 } from "./planSession";
 import { RevisionComparison } from "./RevisionComparison";
-import { RuleEditor } from "./RuleEditor";
+import { ChangeMark, RemovedRule, RuleEditor } from "./RuleEditor";
 import { ScenarioComparison } from "./ScenarioComparison";
 import styles from "./LLMOptPage.module.css";
 
@@ -511,6 +512,7 @@ function Workspace({
   const [limit, setLimit] = useState<{ seconds: number } | null>(null);
   const [waitLeft, setWaitLeft] = useState(0);
   const [run, setRun] = useState<PlanRun | null>(restoredRun);
+  const [changes, setChanges] = useState<DraftChanges | null>(null);
   const confirmation = useRef<PlanConfirmation | undefined>(restored?.confirmation);
   const chatInput = useRef<HTMLTextAreaElement>(null);
   const computeButton = useRef<HTMLButtonElement>(null);
@@ -538,13 +540,16 @@ function Workspace({
     return () => window.clearInterval(timer);
   }, [limit]);
 
-  function change(next: PlanDraft, previous = revised ?? reference) {
+  // An edit keeps the plan the member compares against; only Revise picks another. Before any
+  // plan was picked, the first edit after a result compares against the plan shown.
+  function change(next: PlanDraft, previous = reference ?? revised) {
     base.reset();
     first.reset();
     second.reset();
     setRun(null);
     setFeedback("");
     setClarification(undefined);
+    setChanges(null);
     setDraft(next);
     setReference(previous);
     confirmation.current = undefined;
@@ -579,7 +584,7 @@ function Workspace({
     const text = message.trim();
     if (!text || !ORIGIN || interpret.current || checkingSquad || roster.isPending || limit) return;
     const controller = new AbortController();
-    const previous = revised ?? reference;
+    const previous = reference ?? revised;
     interpret.current = controller;
     setReading(true);
     setFeedback("");
@@ -596,8 +601,10 @@ function Workspace({
         referenceCaptains(previous),
       );
       if (controller.signal.aborted) return;
-      if (answer.status === "draft") change(answer.draft, previous);
-      else setQuestion({ message: clarification?.message ?? text, question: answer.message });
+      if (answer.status === "draft") {
+        change(answer.draft, previous);
+        setChanges(draftChanges(draft, answer.draft));
+      } else setQuestion({ message: clarification?.message ?? text, question: answer.message });
       const reply = answer.status === "clarification" ? answer.message : copy.understood;
       const userLine = nextChatLine.current++;
       const replyLine = nextChatLine.current++;
@@ -826,6 +833,7 @@ function Workspace({
       return;
     confirming.current = true;
     setFeedback("");
+    setChanges(null);
     setCheckingSquad(true);
     try {
       const [fresh, capabilities] = await Promise.all([
@@ -975,12 +983,32 @@ function Workspace({
     draft.scenario && scenarioLabel(draft.scenario, players, squad.gameweek, locale, copy);
   const replaySlot = run?.scenario ? run.slots[0] : undefined;
   const replayConflict = replaySlot?.kind === "explicit" && replaySlot.conflict;
-  const bank = draft.min_bank;
-  const bankRule =
-    bank &&
-    (bank.week === undefined
-      ? copy.minimumBank(money(bank.tenths, locale))
-      : copy.minimumWeekBank(money(bank.tenths, locale), squad.gameweek + bank.week - 1));
+  const bankLabel = (floor: NonNullable<PlanDraft["min_bank"]>) =>
+    floor.week === undefined
+      ? copy.minimumBank(money(floor.tenths, locale))
+      : copy.minimumWeekBank(money(floor.tenths, locale), squad.gameweek + floor.week - 1);
+  const bankRule = draft.min_bank && bankLabel(draft.min_bank);
+  const removedRevision = (changes?.removed ?? []).flatMap((item) =>
+    item.group !== "revision"
+      ? []
+      : "keepWeek" in item
+        ? [copy.frozenWeek(squad.gameweek + item.keepWeek - 1)]
+        : [bankLabel(item.bank)],
+  );
+  const removedScenario = (changes?.removed ?? []).flatMap((item) =>
+    item.group === "scenario"
+      ? [scenarioLabel(item.scenario, players, squad.gameweek, locale, copy)]
+      : [],
+  );
+  const mark = (identity: string) => {
+    const kind = changes?.marks.get(identity);
+    return kind ? (
+      <>
+        {" "}
+        <ChangeMark mark={kind} copy={copy} />
+      </>
+    ) : null;
+  };
 
   return (
     <div className={styles.page} data-zone="llmopt">
@@ -1055,16 +1083,26 @@ function Workspace({
             {feedback}
           </p>
         )}
-        <RuleEditor draft={draft} players={players} copy={copy} disabled={busy} change={change} />
-        {(Boolean(draft.keep_weeks?.length) || bankRule) && (
+        <RuleEditor
+          draft={draft}
+          players={players}
+          copy={copy}
+          disabled={busy}
+          change={change}
+          changes={changes}
+        />
+        {(Boolean(draft.keep_weeks?.length) || bankRule || removedRevision.length > 0) && (
           <div className={styles.ruleGroup}>
             <h3>{copy.revisionRules}</h3>
             <ul>
               {draft.keep_weeks?.map((week) => {
                 const label = copy.frozenWeek(squad.gameweek + week - 1);
                 return (
-                  <li key={week}>
-                    {label}
+                  <li key={week} data-change={changes?.marks.get(KEEP_WEEK(week))}>
+                    <span>
+                      {label}
+                      {mark(KEEP_WEEK(week))}
+                    </span>
                     <button
                       className={styles.remove}
                       type="button"
@@ -1081,8 +1119,11 @@ function Workspace({
                 );
               })}
               {bankRule && (
-                <li>
-                  {bankRule}
+                <li data-change={changes?.marks.get(BANK_FLOOR)}>
+                  <span>
+                    {bankRule}
+                    {mark(BANK_FLOOR)}
+                  </span>
                   <button
                     className={styles.remove}
                     type="button"
@@ -1094,25 +1135,36 @@ function Workspace({
                   </button>
                 </li>
               )}
+              {removedRevision.map((label) => (
+                <RemovedRule key={`removed:${label}`} label={label} copy={copy} />
+              ))}
             </ul>
           </div>
         )}
-        {scenarioDescription && (
+        {(scenarioDescription || removedScenario.length > 0) && (
           <div className={styles.ruleGroup}>
             <h3>{copy.scenarioRule}</h3>
             <ul>
-              <li>
-                {scenarioDescription}
-                <button
-                  className={styles.remove}
-                  type="button"
-                  disabled={busy}
-                  aria-label={`${copy.remove} · ${scenarioDescription}`}
-                  onClick={() => change({ ...draft, scenario: undefined })}
-                >
-                  ×
-                </button>
-              </li>
+              {scenarioDescription && (
+                <li data-change={changes?.marks.get(SCENARIO)}>
+                  <span>
+                    {scenarioDescription}
+                    {mark(SCENARIO)}
+                  </span>
+                  <button
+                    className={styles.remove}
+                    type="button"
+                    disabled={busy}
+                    aria-label={`${copy.remove} · ${scenarioDescription}`}
+                    onClick={() => change({ ...draft, scenario: undefined })}
+                  >
+                    ×
+                  </button>
+                </li>
+              )}
+              {removedScenario.map((label) => (
+                <RemovedRule key={`removed:${label}`} label={label} copy={copy} />
+              ))}
             </ul>
           </div>
         )}

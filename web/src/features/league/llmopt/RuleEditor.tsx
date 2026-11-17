@@ -8,6 +8,7 @@ import {
 } from "../advice/decisionPreferences";
 
 import { ruleLabel, type LLMOptCopy } from "./copy";
+import { ruleIdentity, type DraftChanges, type RuleMark } from "./planChanges";
 import {
   CONSTRAINT_KINDS,
   constraintKey,
@@ -23,18 +24,37 @@ import styles from "./LLMOptPage.module.css";
 
 type Strength = "hard" | "soft" | "comparison";
 
+/** The small word beside a rule the model's last answer added, changed or removed. */
+export function ChangeMark({ mark, copy }: { mark: RuleMark | "removed"; copy: LLMOptCopy }) {
+  return <span className={styles.changeMark}>{copy.changes[mark]}</span>;
+}
+
+/** A rule the model's last answer removed, shown struck through where it was. */
+export function RemovedRule({ label, copy }: { label: string; copy: LLMOptCopy }) {
+  return (
+    <li data-change="removed">
+      <span>
+        <del>{label}</del> <ChangeMark mark="removed" copy={copy} />
+      </span>
+    </li>
+  );
+}
+
 export function RuleEditor({
   draft,
   players,
   copy,
   disabled,
   change,
+  changes,
 }: {
   draft: PlanDraft;
   players: CatalogPlayer[];
   copy: LLMOptCopy;
   disabled: boolean;
   change: (draft: PlanDraft) => void;
+  /** What the model's last answer changed, marked until the next edit or Compute. */
+  changes?: DraftChanges | null;
 }) {
   const [kind, setKind] = useState<Constraint["kind"]>("hold_transfers");
   const [strength, setStrength] = useState<Strength>("hard");
@@ -131,37 +151,60 @@ export function RuleEditor({
   return (
     <>
       <div className={styles.rules}>
-        {columns.map(({ strength, rules }) => (
-          <section key={strength} className={styles.ruleGroup}>
-            <h3>{copy[strength]}</h3>
-            {rules.length ? (
-              <ul>
-                {rules.map((rule, index) => (
-                  <li key={constraintKey(rule)}>
-                    <span>
-                      {label(rule)}
-                      {"both" in rule && rule.both ? ` · ${copy.both}` : ""}
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.remove}
-                      aria-label={`${copy.remove} · ${label(rule)}`}
-                      disabled={disabled}
-                      onClick={() => {
-                        if (strength === "comparison") change({ ...draft, comparison: undefined });
-                        else change({ ...draft, [strength]: rules.filter((_, i) => i !== index) });
-                      }}
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className={styles.muted}>{copy.empty}</p>
-            )}
-          </section>
-        ))}
+        {columns.map(({ strength, rules }) => {
+          const removed = (changes?.removed ?? []).flatMap((item) =>
+            item.group === strength && "rule" in item ? [item.rule] : [],
+          );
+          return (
+            <section key={strength} className={styles.ruleGroup}>
+              <h3>{copy[strength]}</h3>
+              {rules.length || removed.length ? (
+                <ul>
+                  {rules.map((rule, index) => {
+                    const mark = changes?.marks.get(ruleIdentity(strength, rule));
+                    return (
+                      <li key={constraintKey(rule)} data-change={mark}>
+                        <span>
+                          {label(rule)}
+                          {"both" in rule && rule.both ? ` · ${copy.both}` : ""}
+                          {mark && (
+                            <>
+                              {" "}
+                              <ChangeMark mark={mark} copy={copy} />
+                            </>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.remove}
+                          aria-label={`${copy.remove} · ${label(rule)}`}
+                          disabled={disabled}
+                          onClick={() => {
+                            if (strength === "comparison")
+                              change({ ...draft, comparison: undefined });
+                            else
+                              change({ ...draft, [strength]: rules.filter((_, i) => i !== index) });
+                          }}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    );
+                  })}
+                  {removed.map((rule) => (
+                    <RemovedRule
+                      key={`removed:${constraintKey(rule)}`}
+                      label={label(rule)}
+                      copy={copy}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <p className={styles.muted}>{copy.empty}</p>
+              )}
+            </section>
+          );
+        })}
       </div>
       <form onSubmit={add} className={styles.editor}>
         <label>
