@@ -27,6 +27,11 @@ from squadopt.platform.llmopt_intent import (
 URL = "/api/v1/llmopt/intent"
 
 
+@pytest.fixture(autouse=True)
+def _no_pause_between_rounds(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("squadopt.platform.llmopt_intent._ROUND_PAUSE_SECONDS", 0)
+
+
 def _request() -> dict[str, Any]:
     return {
         "message": "Salah ile ve Salah olmadan karş\u0131laşt\u0131r",
@@ -964,7 +969,28 @@ def test_no_model_answering_is_unavailable_unless_all_were_limited(
     with TestClient(create_app(llmopt_intent=service)) as client:
         response = client.post(URL, json=_request())
     assert response.status_code == 503
-    assert asked == ["first", "second", "third"]
+    # The limited model is not asked again; the busy ones are, once.
+    assert asked == ["first", "second", "third", "second", "third"]
+
+
+def test_a_refusal_for_high_demand_is_asked_once_more(monkeypatch: pytest.MonkeyPatch) -> None:
+    replies: list[Exception | bytes] = [
+        IntentUnavailable("The intent provider answered 503."),
+        _answer(),
+    ]
+
+    def post(_provider: OpenAIIntentProvider, _payload: bytes, _deadline: float) -> bytes:
+        reply = replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
+    provider = OpenAIIntentProvider(api_key="k", model="only", provider="gemini")
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    assert replies == []
 
 
 @pytest.mark.parametrize("fallbacks", ["first", "a,b,c,d", "bad name"])

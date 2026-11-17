@@ -44,6 +44,9 @@ _TIMEOUT_SECONDS: Final = 35
 _MAX_MODELS: Final = 4
 #: The least time one model gets before the next is asked, while the deadline allows it.
 _MIN_ATTEMPT_SECONDS: Final = 8
+#: How many times the models are gone through, and the pause before the second time.
+_ROUNDS: Final = 2
+_ROUND_PAUSE_SECONDS = 1.0
 _DEFAULT_PROVIDER_RETRY_SECONDS: Final = 60
 #: The result schema's name in the provider's structured-output request.
 INTENT_SCHEMA_NAME: Final = "llmopt_intent_v1"
@@ -980,30 +983,45 @@ class OpenAIIntentProvider:
 
         A provider's free tier answers 503 while a model is in high demand and counts its
         limits per model, so the next model can answer what the first cannot. Every model
-        shares one deadline, and the order is the configured one. When none answers, the
-        refusal is ``IntentLimited`` only if every model was limited. A model gets an
-        equal share of what is left of the deadline, at least ``_MIN_ATTEMPT_SECONDS``, so
-        one that hangs cannot spend the time of those after it.
+        shares one deadline, and the order is the configured one. A model gets an equal
+        share of what is left of the deadline, at least ``_MIN_ATTEMPT_SECONDS``, so one
+        that hangs cannot spend the time of those after it. A refusal for high demand comes
+        back in under a second and passes within seconds, so when every model refused and
+        time is left, the ones that were not limited are asked once more. When none
+        answers, the refusal is ``IntentLimited`` only if every model was limited.
         """
         call = intent_call(request)
         deadline = time.monotonic() + _TIMEOUT_SECONDS
-        waits: list[int] = []
-        for position, model in enumerate(self._models):
-            now = time.monotonic()
-            if position and now >= deadline:
-                break
-            # A model that hangs must leave the ones after it their share of the deadline.
-            share = max(_MIN_ATTEMPT_SECONDS, (deadline - now) / (len(self._models) - position))
-            try:
-                return self._ask(call, model, min(deadline, now + share))
-            except IntentLimited as limited:
-                waits.append(limited.retry_after)
-            except IntentUnavailable:
-                pass
-            if position + 1 < len(self._models):
-                _LOGGER.warning("LLMOPT model %d did not answer; the next one is asked.", position)
+        waits: dict[str, int] = {}
+        for round_number in range(_ROUNDS):
+            # A limited model stays limited for longer than this call lasts.
+            asking = [model for model in self._models if model not in waits]
+            if round_number:
+                if not asking or deadline - time.monotonic() < _MIN_ATTEMPT_SECONDS:
+                    break
+                time.sleep(_ROUND_PAUSE_SECONDS)
+            for position, model in enumerate(asking):
+                now = time.monotonic()
+                if now >= deadline:
+                    break
+                # A model that hangs must leave the ones after it their share of the deadline.
+                share = max(_MIN_ATTEMPT_SECONDS, (deadline - now) / (len(asking) - position))
+                try:
+                    return self._ask(call, model, min(deadline, now + share))
+                except IntentLimited as limited:
+                    waits[model] = limited.retry_after
+                    reason = "limited"
+                except IntentUnavailable as unavailable:
+                    reason = str(unavailable)
+                _LOGGER.warning(
+                    "LLMOPT model %d of %d gave no draft in round %d: %s",
+                    self._models.index(model) + 1,
+                    len(self._models),
+                    round_number + 1,
+                    reason,
+                )
         if len(waits) == len(self._models):
-            raise IntentLimited(min(waits))
+            raise IntentLimited(min(waits.values()))
         raise IntentUnavailable("The intent provider did not respond with a draft.")
 
     def _ask(self, call: IntentCall, model: str, deadline: float) -> object:
@@ -1042,8 +1060,9 @@ class OpenAIIntentProvider:
             ):
                 raise IntentValidationError("Intent provider did not supply a draft.")
             return read_intent_json(message["content"])
-        except (HTTPException, KeyError, OSError, ValueError, RecursionError):
-            raise IntentUnavailable("The intent provider did not respond with a draft.") from None
+        except (HTTPException, KeyError, OSError, ValueError, RecursionError) as error:
+            # The kind of failure is for the log; a reply's text never reaches it.
+            raise IntentUnavailable(f"no draft ({type(error).__name__})") from None
 
     def _post(self, payload: bytes, deadline: float) -> bytes:
         host, path = (
@@ -1068,7 +1087,7 @@ class OpenAIIntentProvider:
                 raise IntentLimited(_provider_retry_after(response.getheader("Retry-After")))
             encoding = response.getheader("Content-Encoding", "identity")
             if response.status != 200 or encoding.lower() != "identity":
-                raise IntentUnavailable("The intent provider did not accept the request.")
+                raise IntentUnavailable(f"The intent provider answered {response.status}.")
             declared = response.getheader("Content-Length")
             if declared is not None and not 0 <= int(declared) <= _RESPONSE_BYTES:
                 raise IntentUnavailable("The intent response exceeded its size limit.")
