@@ -25,7 +25,7 @@ interface FakeJob {
   show: (state: ComputePhase) => void;
 }
 
-// The page's three advice jobs, in the order each render mounted them.
+// The page's advice jobs (base, first, second, combined), in the order each render mounted them.
 const jobs = vi.hoisted(() => [] as FakeJob[]);
 
 vi.mock("../advice/useAdviceJob", async (importOriginal) => {
@@ -457,5 +457,169 @@ describe("the chat's intent source", () => {
     await ready();
     await sendMessage("No hits.");
     expect(await screen.findByText(en.refusals.disabled, { exact: true })).toBeVisible();
+  });
+});
+
+describe("the plan with all preferences", () => {
+  // Three preferred rules: two get a slot each, the third has none of its own.
+  const soft = [
+    { kind: "no_hits" },
+    { kind: "include_player", player_id: OUTSIDER.id },
+    { kind: "hit_budget", points: 4 },
+  ];
+  const labels = [
+    en.rules.no_hits,
+    `${en.rules.include_player} · ${OUTSIDER.name}`,
+    `${en.rules.hit_budget} · ${en.hitBudgetPoints(4)}`,
+  ];
+  const signing = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3).payload.moves;
+
+  function answer(job: FakeJob, request: AdviceRequest, net: number, moves = signing) {
+    const shown = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    job.show({
+      phase: "done",
+      source: "api-cache",
+      request,
+      envelope: {
+        ...shown,
+        payload: {
+          ...shown.payload,
+          plan_weeks: undefined,
+          lineup_expectation: undefined,
+          expected_own_points: net,
+          transfer_hit_points: 0,
+          moves,
+        },
+      },
+    });
+  }
+
+  async function reloadWith(draft: unknown, confirmation: Record<string, unknown>) {
+    open();
+    await ready();
+    await addRule("save_chips");
+    cleanup();
+    const [key, session] = savedSession();
+    sessionStorage.setItem(key, JSON.stringify({ ...session, draft, confirmation }));
+    jobs.length = 0;
+    open();
+    await ready();
+  }
+
+  async function singlePrices(net: [number, number]) {
+    const [base, first, second] = jobs as [FakeJob, FakeJob, FakeJob];
+    await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+    answer(base, base.readCached.mock.calls[0]![0], 50, []);
+    await waitFor(() => expect(second.compute).toHaveBeenCalledTimes(1));
+    expect(jobs[3]!.compute).not.toHaveBeenCalled();
+    answer(first, first.compute.mock.calls[0]![0], net[0]);
+    expect(jobs[3]!.compute).not.toHaveBeenCalled();
+    answer(second, second.compute.mock.calls[0]![0], net[1]);
+  }
+
+  it("starts once the single prices are in and applies every accepted rule and the one without a slot", async () => {
+    await reloadWith({ hard: [], soft }, { wildcardNotHeld: false });
+    await singlePrices([49, 48.5]);
+    const combined = jobs[3]!;
+    await waitFor(() => expect(combined.compute).toHaveBeenCalledTimes(1));
+    const request = combined.compute.mock.calls[0]![0];
+    expect(request.preferences).toMatchObject({
+      no_hits: true,
+      include_players: [OUTSIDER.id],
+      max_hit_points: 4,
+      net_points_priority: true,
+    });
+    expect(savedSession()[1]).toMatchObject({
+      confirmation: { combined: [0, 1, 2], sending: true },
+    });
+
+    answer(combined, request, 47.6);
+    const card = (await screen.findByRole("heading", { name: en.combinedPlan })).closest(
+      "article",
+    )!;
+    expect(card).toHaveTextContent(en.combinedCost("2.4"));
+    for (const label of labels) expect(card).toHaveTextContent(label);
+    expect(card.querySelectorAll("[data-combined=applied]")).toHaveLength(3);
+    expect(card.querySelectorAll("[data-combined=left-out]")).toHaveLength(0);
+    expect(screen.getByText(en.priceCombined, { exact: true })).toBeVisible();
+    expect(screen.queryByText(en.priceNotRun, { exact: true })).toBeNull();
+  });
+
+  it("names a rule above its limit as left out, and starts nothing for one accepted rule", async () => {
+    const limited = [soft[0], { ...soft[1], max_cost_tenths: 10 }];
+    await reloadWith({ hard: [], soft: limited }, { wildcardNotHeld: false });
+    await singlePrices([49, 47]);
+    expect(await screen.findByText(en.priceAboveCeiling, { exact: true })).toBeVisible();
+    await waitFor(() =>
+      expect(savedSession()[1]).toMatchObject({ confirmation: { combined: [] } }),
+    );
+    expect(jobs[3]!.compute).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: en.combinedPlan })).toBeNull();
+  });
+
+  it("names the rules it applies when they do not fit in one plan", async () => {
+    await reloadWith({ hard: [], soft }, { wildcardNotHeld: false });
+    await singlePrices([49, 48.5]);
+    const combined = jobs[3]!;
+    await waitFor(() => expect(combined.compute).toHaveBeenCalledTimes(1));
+    combined.show({
+      phase: "failed",
+      request: combined.compute.mock.calls[0]![0],
+      infeasibility: { repairs: [] },
+    });
+    const card = (await screen.findByRole("heading", { name: en.combinedPlan })).closest(
+      "article",
+    )!;
+    expect(card).toHaveTextContent(en.combinedInfeasible);
+    for (const label of labels) expect(card).toHaveTextContent(label);
+  });
+
+  it("names a rule that cannot sit beside the others as left out", async () => {
+    // Rolling the transfer cannot be applied beside signing a player from outside the squad.
+    const clash = [soft[0], soft[1], { kind: "hold_transfers" }];
+    await reloadWith({ hard: [], soft: clash }, { wildcardNotHeld: false });
+    await singlePrices([49, 48.5]);
+    const combined = jobs[3]!;
+    await waitFor(() => expect(combined.compute).toHaveBeenCalledTimes(1));
+    expect(combined.compute.mock.calls[0]![0].preferences).not.toHaveProperty("hold_transfers");
+    const card = (await screen.findByRole("heading", { name: en.combinedPlan })).closest(
+      "article",
+    )!;
+    const leftOut = card.querySelectorAll("[data-combined=left-out]");
+    expect(leftOut).toHaveLength(1);
+    expect(leftOut[0]).toHaveTextContent(en.rules.hold_transfers);
+    expect(screen.getByText(en.priceLeftOut, { exact: true })).toBeVisible();
+  });
+
+  it("comes back after a reload, read when it was answered and asked again while sending", async () => {
+    const saved = {
+      wildcardNotHeld: false,
+      followups: [{ kind: "priced" }, { kind: "priced" }],
+      combined: [0, 1, 2],
+    };
+    await reloadWith({ hard: [], soft }, saved);
+    const combined = jobs[3]!;
+    await waitFor(() => expect(combined.readCached).toHaveBeenCalledTimes(1));
+    expect(combined.compute).not.toHaveBeenCalled();
+    expect(combined.readCached.mock.calls[0]![0].preferences).toMatchObject({
+      include_players: [OUTSIDER.id],
+      max_hit_points: 4,
+    });
+    expect(await screen.findByRole("heading", { name: en.combinedPlan })).toBeVisible();
+    cleanup();
+
+    const [key, session] = savedSession();
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({ ...session, confirmation: { ...saved, sending: true } }),
+    );
+    jobs.length = 0;
+    open();
+    await ready();
+    await waitFor(() => expect(jobs[3]!.compute).toHaveBeenCalledTimes(1));
+    expect(jobs[3]!.resume).toHaveBeenCalledTimes(1);
+    expect(jobs[3]!.compute.mock.calls[0]![0].preferences).toMatchObject({
+      include_players: [OUTSIDER.id],
+    });
   });
 });

@@ -18,7 +18,8 @@ export const ALTERNATIVE_SLOTS = ["first", "second"] as const satisfies readonly
   length: typeof ALTERNATIVE_COUNT;
 };
 export type AlternativeSlot = (typeof ALTERNATIVE_SLOTS)[number];
-export type SlotName = "base" | AlternativeSlot;
+/** The base plan, the alternatives, and the plan with all accepted preferences. */
+export type SlotName = "base" | AlternativeSlot | "combined";
 
 /** A job's actions. Each is stable across renders, so effects can depend on them. */
 export type JobControls = Pick<AdviceJob, "compute" | "resume" | "readCached" | "reset">;
@@ -39,20 +40,35 @@ function useControls({ compute, resume, readCached, reset }: AdviceJob): JobCont
   );
 }
 
-/** One advice job per named slot, mounted in a fixed order: base, then the alternatives. */
+/**
+ * One advice job per named slot, mounted in a fixed order: base, the alternatives, then the
+ * plan with all preferences.
+ */
 export function usePlanJobs(client: AdviceClient, snapshotId: string | null | undefined): PlanJobs {
   const base = useAdviceJob(client, false, snapshotId, true);
   const first = useAdviceJob(client, false, snapshotId, true);
   const second = useAdviceJob(client, false, snapshotId, true);
+  const combined = useAdviceJob(client, false, snapshotId, true);
   const baseControls = useControls(base);
   const firstControls = useControls(first);
   const secondControls = useControls(second);
+  const combinedControls = useControls(combined);
   const controls = useMemo(
-    () => ({ base: baseControls, first: firstControls, second: secondControls }),
-    [baseControls, firstControls, secondControls],
+    () => ({
+      base: baseControls,
+      first: firstControls,
+      second: secondControls,
+      combined: combinedControls,
+    }),
+    [baseControls, firstControls, secondControls, combinedControls],
   );
   return {
-    states: { base: base.state, first: first.state, second: second.state },
+    states: {
+      base: base.state,
+      first: first.state,
+      second: second.state,
+      combined: combined.state,
+    },
     controls,
   };
 }

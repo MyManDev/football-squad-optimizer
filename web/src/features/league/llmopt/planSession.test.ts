@@ -37,6 +37,31 @@ describe("createPlanSessionStore", () => {
     expect(readPlanSession(context)).not.toHaveProperty("confirmation");
   });
 
+  it("tells its listeners after each save until they leave", () => {
+    const store = createPlanSessionStore(context);
+    const listener = vi.fn();
+    const leave = store.subscribe(listener);
+    store.save({ draft, confirmation: { wildcardNotHeld: false, combined: [0, 1] } });
+    expect(listener).toHaveBeenCalledTimes(1);
+    leave();
+    store.save({ draft });
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the combined rules only as distinct ascending indexes into the preferred rules", () => {
+    const soft = [{ kind: "no_hits" }, { kind: "hold_transfers" }, { kind: "save_chips" }];
+    const restore = (combined: unknown) =>
+      checkedPlanSession(
+        { draft: { hard: [], soft }, confirmation: { wildcardNotHeld: false, combined } },
+        ROSTER,
+        GAMEWEEK,
+      )?.confirmation;
+    expect(restore([0, 2])).toMatchObject({ combined: [0, 2] });
+    expect(restore([])).toMatchObject({ combined: [] });
+    for (const odd of [[2, 0], [0, 0], [3], [-1], [0.5], "0", null])
+      expect(restore(odd)).not.toHaveProperty("combined");
+  });
+
   it("reads nothing back for another squad basis or deadline", () => {
     createPlanSessionStore(context).save({ draft });
     expect(readPlanSession({ ...context, basis: "other" })).toBeNull();

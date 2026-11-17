@@ -1,5 +1,5 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -15,6 +15,8 @@ import type { ComputePhase } from "../advice/useAdviceJob";
 import { LEAGUE_READ, useEntrySquad } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
+import { combinedCandidates, prepareCombined } from "./combinedPlan";
+import { CombinedRules } from "./CombinedRules";
 import { LLMOPT_COPY, ruleLabel } from "./copy";
 import { InfeasibilityResult } from "./InfeasibilityResult";
 import {
@@ -31,7 +33,8 @@ import {
   type PlanDraft,
 } from "./intent";
 import { serverIntentSource, type IntentSource } from "./intentSource";
-import { PlanResult } from "./PlanResult";
+import { PlanResult, type PreferencePrice } from "./PlanResult";
+import { expectedNet, samePlan } from "./planComparison";
 import { BANK_FLOOR, KEEP_WEEK, SCENARIO, draftChanges, type DraftChanges } from "./planChanges";
 import { explainDraftConflict } from "./planConflicts";
 import { planResults, preferencePrice } from "./planResults";
@@ -263,6 +266,8 @@ function Workspace({
   const [run, setRun] = useState<PlanRun | null>(restoredRun);
   const [changes, setChanges] = useState<DraftChanges | null>(null);
   const [session] = useState(() => createPlanSessionStore(context, restored?.confirmation));
+  // The saved run, read again after each save.
+  const savedRun = useSyncExternalStore(session.subscribe, () => session.confirmation);
   const chatInput = useRef<HTMLTextAreaElement>(null);
   const computeButton = useRef<HTMLButtonElement>(null);
   const interpret = useRef<AbortController | null>(null);
@@ -462,6 +467,11 @@ function Workspace({
         // A replay the saved run proved infeasible is shown from that proof, not asked again.
         if (request && !(run.scenario && savedReplayProof)) restore(request, controls[slot]);
       });
+      const savedCombined = restored?.confirmation?.combined;
+      if (savedCombined?.length) {
+        const { request } = prepareCombined(run, savedCombined);
+        if (request) restore(request, controls.combined);
+      }
     });
     return () => {
       active = false;
@@ -566,6 +576,7 @@ function Workspace({
         return;
       }
       for (const slot of ALTERNATIVE_SLOTS) controls[slot].reset();
+      controls.combined.reset();
       setRun(next);
       session.save({ draft, reference, confirmation: { wildcardNotHeld, sending: true } });
       if (next.baseRequest) {
@@ -601,6 +612,87 @@ function Workspace({
         );
       return { outcome: target.outcome, price };
     }) ?? [];
+  // The plan with all preferences starts once the base and every single price are in, so no
+  // more than three jobs run at once and a run makes at most four.
+  const answered = (state: ComputePhase) =>
+    state.phase === "done" || state.phase === "failed" || state.phase === "unavailable";
+  const singlesIn =
+    !!run &&
+    !run.scenario &&
+    run.prices.length > 0 &&
+    baseState.phase === "done" &&
+    baseState.request === run.baseRequest &&
+    !computing &&
+    run.slots.every((slot, index) => !slot.request || answered(alternatives[index]!));
+  const combinedChoice = run && singlesIn ? combinedCandidates(run, priceReview) : null;
+  useEffect(() => {
+    const confirmed = session.confirmation;
+    if (
+      !run ||
+      !singlesIn ||
+      !confirmed ||
+      confirmed.followups === undefined ||
+      confirmed.combined !== undefined ||
+      !deadlineOpen(deadline)
+    )
+      return;
+    const plan = combinedChoice
+      ? prepareCombined(run, combinedChoice)
+      : { applied: [], request: null };
+    session.save({
+      draft,
+      reference,
+      clarification,
+      confirmation: {
+        ...confirmed,
+        combined: plan.applied,
+        ...(plan.request ? { sending: true as const } : {}),
+      },
+    });
+    if (plan.request) controls.combined.compute(plan.request);
+  }, [
+    run,
+    singlesIn,
+    combinedChoice,
+    deadline,
+    controls,
+    session,
+    draft,
+    reference,
+    clarification,
+  ]);
+  // A rule with no slot of its own is priced in the plan with all preferences, or named as
+  // left out of it.
+  const combined = run ? savedRun?.combined : undefined;
+  const combinedPending =
+    !closed &&
+    (isWorking(baseState.phase) ||
+      (baseState.phase === "done" &&
+        (computing || singlesIn || savedRun?.followups === undefined)));
+  const priceRows = priceReview.map(({ outcome, price }, index): PreferencePrice => {
+    if (outcome !== "skipped") return price;
+    const { key, label, ceiling } = price;
+    if (combined)
+      return { key, label, ceiling, status: combined.includes(index) ? "combined" : "leftOut" };
+    return combinedPending ? { key, label, ceiling, status: "pending" } : price;
+  });
+  const softRules = run?.inputs.draft.soft ?? [];
+  const combinedRules = (keep: boolean) =>
+    softRules.flatMap((rule, index) =>
+      combined?.includes(index) === keep
+        ? [{ key: String(index), label: ruleLabel(rule, players, copy) }]
+        : [],
+    );
+  const combinedState = states.combined;
+  const combinedNet =
+    combinedState.phase === "done" ? expectedNet(combinedState.envelope.payload) : null;
+  const baseNet = baseAnswer ? expectedNet(baseAnswer) : null;
+  const combinedCost =
+    combinedNet === null || baseNet === null
+      ? undefined
+      : samePlan(baseState, combinedState)
+        ? 0
+        : Math.max(0, baseNet - combinedNet);
   const { results, same } = run
     ? planResults({
         run,
@@ -906,7 +998,7 @@ function Workspace({
                   run.baseConflict ? explainBranchConflict(run.baseTitle) : undefined
                 }
                 diagnosis={diagnosis(baseState)}
-                prices={priceReview.map(({ price }) => price)}
+                prices={priceRows}
                 onRevise={baseAnswer ? () => revisePlan(baseAnswer) : undefined}
                 reviseDisabled={busy}
               />
@@ -927,6 +1019,28 @@ function Workspace({
                 reviseDisabled={busy}
               />
             ))}
+            {combined && combined.length > 0 && (
+              <PlanResult
+                title={copy.combinedPlan}
+                state={combinedState}
+                squad={squad}
+                baseline={baseAnswer}
+                diagnosis={diagnosis(combinedState)}
+                onRevise={
+                  combinedState.phase === "done"
+                    ? () => revisePlan(combinedState.envelope.payload)
+                    : undefined
+                }
+                reviseDisabled={busy}
+              >
+                <CombinedRules
+                  applied={combinedRules(true)}
+                  leftOut={combinedRules(false)}
+                  cost={combinedCost}
+                  infeasible={combinedState.phase === "failed" && !!combinedState.infeasibility}
+                />
+              </PlanResult>
+            )}
           </div>
           {same && (
             <p role="status" className={styles.muted}>

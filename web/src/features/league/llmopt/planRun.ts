@@ -25,6 +25,8 @@ export interface PriceTarget {
 }
 
 export interface PlanRun {
+  /** What the run was prepared from, so a later plan of the same run is built the same way. */
+  inputs: RunInputs;
   baseRequest: PlanRequest | null;
   baseTitle: BaseTitle;
   baseConflict: boolean;
@@ -62,6 +64,15 @@ export function requestFor(
   };
 }
 
+/** A plan's request in a priced run, where the solver maximises expected net points. */
+export function pricedRequest(request: AdviceRequest, plan: PreparedPlan): PlanRequest {
+  return {
+    ...request,
+    ...plan,
+    preferences: checkedPreferences({ ...plan.preferences, net_points_priority: true }),
+  };
+}
+
 /** The draft the base plan is prepared from: required rules only, in a settled window. */
 export function baseDraft(draft: PlanDraft): PlanDraft {
   return {
@@ -78,15 +89,8 @@ export function baseDraft(draft: PlanDraft): PlanDraft {
  * The base request is the required-rule plan. Each preferred rule is priced on its own in one of
  * the reserved slots; a rule whose plan matches a slot already reserved shares that slot.
  */
-export function prepareRun({
-  draft,
-  held,
-  request,
-  plans,
-  wildcardNotHeld,
-  frozenWeeks,
-  reference,
-}: RunInputs): PlanRun {
+export function prepareRun(inputs: RunInputs): PlanRun {
+  const { draft, held, request, plans, wildcardNotHeld, frozenWeeks, reference } = inputs;
   const pricing = !draft.scenario && draft.soft.length > 0;
   const compareBoth = !draft.scenario && draft.comparison?.both === true;
   const hardDraft = {
@@ -105,20 +109,16 @@ export function prepareRun({
       wildcardUnavailable = true;
       return null;
     }
-    return {
-      ...request,
-      ...plan,
-      preferences:
-        pricing || draft.scenario
-          ? checkedPreferences({ ...plan.preferences, net_points_priority: true })
-          : plan.preferences,
-    };
+    return pricing || draft.scenario
+      ? pricedRequest(request, plan)
+      : { ...request, ...plan, preferences: plan.preferences };
   };
   const baseRequest = submit(baseline);
   if (draft.scenario) {
     const previous = prepareOriginalScenario(draft, held, plans.window, reference);
     const replay = submit(previous);
     return {
+      inputs,
       scenario: true,
       baseTitle: "scenarioOptimized",
       baseRequest,
@@ -157,6 +157,7 @@ export function prepareRun({
     return { rule, outcome };
   });
   return {
+    inputs,
     baseTitle: !pricing && compareBoth ? "without" : "base",
     baseConflict: pricing ? plans.hardConflict : plans.baseConflict,
     baseRequest,

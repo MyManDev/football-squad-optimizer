@@ -106,7 +106,7 @@ function MetricDelta({ label, value }: { label: string; value?: string }) {
 }
 
 export type PreferencePrice = { key: string; label: string; ceiling?: number; detail?: string } & (
-  | { status: "pending" | "conflict" | "unavailable" | "skipped" }
+  | { status: "pending" | "conflict" | "unavailable" | "skipped" | "combined" | "leftOut" }
   | { status: "priced"; cost: number; aboveCeiling: boolean }
 );
 
@@ -124,6 +124,8 @@ function PreferencePrices({ prices }: { prices: PreferencePrice[] }) {
     conflict: copy.priceConflict,
     unavailable: copy.priceUnavailable,
     skipped: copy.priceNotRun,
+    combined: copy.priceCombined,
+    leftOut: copy.priceLeftOut,
   };
   return (
     <section className={styles.preferencePrices} aria-labelledby={titleId}>
@@ -162,6 +164,7 @@ export function PlanResult({
   prices = [],
   onRevise,
   reviseDisabled,
+  children,
 }: {
   title: string;
   state: ComputePhase;
@@ -173,6 +176,8 @@ export function PlanResult({
   prices?: PreferencePrice[];
   onRevise?: () => void;
   reviseDisabled?: boolean;
+  /** Shown under the plan's figures, or under its status while it has no answer. */
+  children?: ReactNode;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = LLMOPT_COPY[language];
@@ -195,6 +200,7 @@ export function PlanResult({
       <article className={styles.result}>
         <h3 className={styles.resultTitle}>{title}</h3>
         {diagnosis ?? <p role="status">{message}</p>}
+        {children}
         <PreferencePrices prices={prices} />
       </article>
     );
@@ -306,6 +312,7 @@ export function PlanResult({
           </dd>
         </div>
       </dl>
+      {children}
       <PreferencePrices prices={prices} />
       <PlanSquad plan={plan} squad={squad} />
       {moves.length ? (

@@ -17,6 +17,11 @@ export interface PlanConfirmation {
   /** Absent until the confirmed baseline has been checked for follow-up requests. */
   followups?: (StartedAlternative | null)[];
   scenarioReplayInfeasible?: true;
+  /**
+   * Absent until the single prices are in. Then the preferred rules (indexes into the draft's
+   * list) the plan with all preferences applies; empty when no such plan was started.
+   */
+  combined?: number[];
   /** Set while a request this run sent may be unanswered, so a reload can find no job id. */
   sending?: true;
 }
@@ -64,6 +69,8 @@ export interface PlanSessionStore {
   readonly confirmation: PlanConfirmation | undefined;
   /** Saves the whole session. A session saved without a confirmation clears the run's. */
   save(session: PlanSession): void;
+  /** Calls the listener after each save, so the page can render from the saved run. */
+  subscribe(listener: () => void): () => void;
 }
 
 export function createPlanSessionStore(
@@ -71,6 +78,7 @@ export function createPlanSessionStore(
   confirmation?: PlanConfirmation,
 ): PlanSessionStore {
   let current = confirmation;
+  const listeners = new Set<() => void>();
   return {
     get confirmation() {
       return current;
@@ -78,8 +86,29 @@ export function createPlanSessionStore(
     save(session) {
       current = session.confirmation;
       writePlanSession(context, session);
+      for (const listener of listeners) listener();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
   };
+}
+
+/** Saved combined rules: distinct indexes into the preferred rules, in ascending order. */
+function checkedCombined(value: unknown, count: number): { combined?: number[] } {
+  if (
+    !Array.isArray(value) ||
+    !value.every(
+      (index, position) =>
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < count &&
+        (position === 0 || index > (value[position - 1] as number)),
+    )
+  )
+    return {};
+  return { combined: [...(value as number[])] };
 }
 
 export function checkedPlanSession(
@@ -116,6 +145,7 @@ export function checkedPlanSession(
           ? { scenarioReplayInfeasible: true as const }
           : {}),
         ...(confirmation.sending === true ? { sending: true as const } : {}),
+        ...checkedCombined(confirmation.combined, session.draft.soft.length),
         followups: confirmation.followups?.map((item) => {
           if (item?.kind === "priced" || item?.kind === "roll") return { kind: item.kind };
           if (

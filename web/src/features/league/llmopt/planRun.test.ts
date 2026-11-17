@@ -116,7 +116,8 @@ describe("restoreRun", () => {
 
   it("rebuilds the run a saved confirmation stands for", () => {
     const restored = restoreRun({ draft, confirmation: { wildcardNotHeld: false } }, held, window);
-    expect(restored).toEqual(run(draft));
+    const { baseRequest, slots, prices } = run(draft);
+    expect(restored).toMatchObject({ baseRequest, slots, prices, inputs: { draft, held } });
   });
 
   it("restores nothing without a confirmation or once the required rules conflict", () => {
