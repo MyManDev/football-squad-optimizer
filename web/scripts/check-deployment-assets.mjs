@@ -71,6 +71,63 @@ function verifyPublishedDataCacheRule(headersSource) {
   }
 }
 
+// The policy every page ships under (ADR 0017): a member's model key is held in the tab, so
+// the site runs only its own scripts and sends only to the hosts it names. The build writes
+// the compute service's origin into the policy (vite/sitePolicy.ts); a word left in braces
+// means the artifact did not come from that build.
+const REQUIRED_POLICY = [
+  ["script-src", ["'self'", "'wasm-unsafe-eval'"]],
+  ["connect-src", ["'self'"]],
+  ["object-src", ["'none'"]],
+  ["base-uri", ["'none'"]],
+  ["frame-ancestors", ["'none'"]],
+];
+
+export function verifySiteWidePolicy(headersSource) {
+  const policies = parseHeaderBlocks(headersSource).get("/*")?.get("content-security-policy");
+  if (!policies || policies.length !== 1) {
+    throw new Error("Deployment artifact /* rule must carry exactly one Content-Security-Policy");
+  }
+  const policy = policies[0];
+  if (/[{}]/.test(policy)) {
+    throw new Error("Deployment artifact Content-Security-Policy has an unfilled word");
+  }
+  const directives = new Map(
+    policy
+      .split(";")
+      .map((directive) => directive.trim().split(/\s+/))
+      .filter(([name]) => name)
+      .map(([name, ...sources]) => [name.toLowerCase(), sources]),
+  );
+  for (const [name, required] of REQUIRED_POLICY) {
+    const sources = directives.get(name) ?? [];
+    for (const source of required) {
+      if (!sources.includes(source)) {
+        throw new Error(`Deployment artifact Content-Security-Policy ${name} lacks ${source}`);
+      }
+    }
+  }
+  const scripts = directives.get("script-src") ?? [];
+  // Cloudflare Web Analytics is the one script from another host the owner kept (17 Nov 2026).
+  const allowed = new Set([
+    "'self'",
+    "'wasm-unsafe-eval'",
+    "https://static.cloudflareinsights.com",
+  ]);
+  // Hashes of the site's own inline scripts may join later; no other host and no 'unsafe-*' may.
+  const extra = scripts.filter(
+    (source) => !allowed.has(source) && !/^'sha(256|384|512)-/.test(source),
+  );
+  if (extra.length > 0) {
+    throw new Error(
+      `Deployment artifact Content-Security-Policy script-src allows ${extra.join(" ")}`,
+    );
+  }
+  if ((directives.get("connect-src") ?? []).some((source) => /^(https?:|wss?:|\*)$/.test(source))) {
+    throw new Error("Deployment artifact Content-Security-Policy connect-src allows any host");
+  }
+}
+
 export async function inspectDeploymentArtifact(
   directory,
   { maxFiles = MAX_DEPLOYMENT_FILES, maxFileBytes = MAX_DEPLOYMENT_FILE_BYTES } = {},
@@ -130,6 +187,7 @@ export async function inspectDeploymentArtifact(
   }
 
   verifyPublishedDataCacheRule(contents.get("_headers") ?? "");
+  verifySiteWidePolicy(contents.get("_headers") ?? "");
   try {
     JSON.parse(contents.get("data/index.json") ?? "");
   } catch (error) {
