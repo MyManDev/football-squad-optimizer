@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FixturesPayload } from "../fixtures/types";
-import { liveWindow, MATCH_WINDOW_LIMIT_MS, MATCH_WINDOW_MS } from "./liveWindow";
+import { livePhase, liveWindow, MATCH_WINDOW_LIMIT_MS, MATCH_WINDOW_MS } from "./liveWindow";
 
 const team = (team_id: number) => ({ team_id, name: `Club ${team_id}`, short_name: `C${team_id}` });
 const fixture = (fixture_id: number, kickoff_utc: string | null, home = 1, away = 2) => ({
@@ -133,5 +133,69 @@ describe("liveWindow", () => {
     expect(others.slow).toBe(false);
     const inside = liveWindow(CALENDAR, at("2026-11-21T15:30:00Z"), { stalled: new Set([102]) });
     expect(inside).toMatchObject({ open: true, slow: false });
+  });
+});
+
+describe("livePhase", () => {
+  const GW11_FIRST = at("2026-11-21T12:30:00Z");
+  const GW11_END = at("2026-11-21T15:00:00Z") + MATCH_WINDOW_LIMIT_MS;
+
+  it("follows nothing without a calendar", () => {
+    expect(livePhase(null, GW11_FIRST)).toEqual({
+      on: false,
+      nextGameweek: null,
+      nextKickoff: null,
+      changesIn: null,
+    });
+  });
+
+  it("waits for the live week's first kickoff after its deadline", () => {
+    const now = at("2026-11-21T11:30:00Z");
+    expect(livePhase(CALENDAR, now)).toEqual({
+      on: false,
+      nextGameweek: 11,
+      nextKickoff: GW11_FIRST,
+      changesIn: GW11_FIRST - now,
+    });
+  });
+
+  it("is on from the first kickoff until the last match's window ends, every club counted", () => {
+    expect(livePhase(CALENDAR, GW11_FIRST).on).toBe(true);
+    const between = at("2026-11-21T14:50:00Z");
+    expect(livePhase(CALENDAR, between)).toEqual({
+      on: true,
+      nextGameweek: null,
+      nextKickoff: null,
+      changesIn: GW11_END - between,
+    });
+    expect(livePhase(CALENDAR, GW11_END - 1).on).toBe(true);
+  });
+
+  it("waits for the next week with a dated match once the live week is over", () => {
+    const calendar: FixturesPayload = {
+      ...CALENDAR,
+      gameweeks: [
+        ...CALENDAR.gameweeks.slice(0, 2),
+        {
+          gameweek: 12,
+          deadline_utc: "2026-11-28T11:00:00Z",
+          fixtures: [fixture(121, "2026-11-28T15:00:00Z"), fixture(122, "2026-11-28T12:30:00Z")],
+        },
+      ],
+    };
+    const after = livePhase(calendar, GW11_END);
+    expect(after).toEqual({
+      on: false,
+      nextGameweek: 12,
+      nextKickoff: at("2026-11-28T12:30:00Z"),
+      changesIn: at("2026-11-28T12:30:00Z") - GW11_END,
+    });
+    // A later week with no dated match is passed over, so the original calendar names none.
+    expect(livePhase(CALENDAR, GW11_END).nextGameweek).toBeNull();
+  });
+
+  it("waits for the season's first week before any deadline", () => {
+    const now = at("2026-11-01T00:00:00Z");
+    expect(livePhase(CALENDAR, now)).toMatchObject({ on: false, nextGameweek: 10 });
   });
 });
