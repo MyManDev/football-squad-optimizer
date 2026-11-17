@@ -512,9 +512,7 @@ def test_club_request_uses_canonical_name_and_keeps_both_scopes_distinct(
         {"count": 0},
         {"count": 4},
         {"count": "2"},
-        {"player_id": 1},
         {"scope": "bench"},
-        {"both": True},
     ],
 )
 def test_club_constraint_refuses_invented_or_invalid_fields(override: dict[str, Any]) -> None:
@@ -579,8 +577,6 @@ def test_model_comparison_accepts_either_side_for_a_held_player(kind: str) -> No
     [
         {"kind": "include_player", "player_id": 2, "both": True},
         {"kind": "include_player", "player_id": True, "both": False},
-        {"kind": "no_hits", "player_id": None, "both": True},
-        {"kind": "no_hits", "player_id": 1, "both": False},
         {"kind": "execute", "player_id": None, "both": False},
     ],
 )
@@ -983,3 +979,102 @@ def test_an_invalid_fallback_list_disables_text_interpretation(fallbacks: str) -
         )
         is None
     )
+
+
+_FILLED: dict[str, Any] = {"club": None, "count": None, "scope": None, "week": None, "points": None}
+
+
+@pytest.mark.parametrize(
+    ("part", "rule", "expected"),
+    [
+        # What gemini-3.1-flash-lite sent on 17 Nov for a soft wish to hold Saka.
+        (
+            "soft",
+            {**_FILLED, "kind": "include_player", "player_id": 1, "scope": "squad"}
+            | {"max_cost_tenths": None},
+            {"kind": "include_player", "player_id": 1},
+        ),
+        ("hard", {**_FILLED, "kind": "wildcard", "player_id": 1, "week": 1}, None),
+        (
+            "hard",
+            {**_FILLED, "kind": "no_hits", "player_id": None, "club": "LIV", "count": 2},
+            None,
+        ),
+        ("hard", {**_FILLED, "kind": "keep_player", "player_id": 1, "points": 4}, None),
+        (
+            "hard",
+            {**_FILLED, "kind": "hit_budget", "player_id": None, "points": 4, "week": 1},
+            {"kind": "hit_budget", "points": 4},
+        ),
+    ],
+)
+def test_a_field_with_no_meaning_for_the_rule_is_dropped_from_a_model_reply(
+    part: str, rule: dict[str, Any], expected: dict[str, Any] | None
+) -> None:
+    def provider(_request: IntentRequest) -> object:
+        result = _proposed()
+        result["draft"]["hard"] = []
+        result["draft"]["soft"] = []
+        result["draft"]["comparison"] = None
+        result["draft"][part] = [rule]
+        return result
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    kept = {key: value for key, value in rule.items() if key in ("kind", "player_id", "week")}
+    if rule["kind"] in ("wildcard", "no_hits"):
+        kept.pop("player_id")
+    if kept.get("week") is None:
+        kept.pop("week", None)
+    assert response.json()["draft"][part] == [expected or kept]
+
+
+@pytest.mark.parametrize("kind", ["wildcard", "no_hits"])
+def test_with_and_without_a_rule_that_is_no_player_is_its_plain_comparison(kind: str) -> None:
+    # What gemini-3.1-flash-lite sent for a with-and-without-Wildcard request.
+    def provider(_request: IntentRequest) -> object:
+        result = _proposed()
+        result["draft"]["hard"] = []
+        result["draft"]["comparison"] = {**_FILLED, "kind": kind, "player_id": 1, "both": True}
+        return result
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    assert response.json()["draft"]["comparison"] == {"kind": kind}
+
+
+def test_the_page_own_request_is_still_held_to_the_exact_shape() -> None:
+    body = _request()
+    body["draft"] = {"hard": [{"kind": "no_hits", "scope": "squad"}], "soft": []}
+    with TestClient(
+        create_app(llmopt_intent=IntentService(lambda _request: _proposed()))
+    ) as client:
+        response = client.post(URL, json=body)
+    assert response.status_code == 422
+
+
+def test_a_model_gets_its_share_of_the_deadline_and_the_last_one_the_rest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = [1000.0]
+    monkeypatch.setattr("squadopt.platform.llmopt_intent.time.monotonic", lambda: clock[0])
+    allowed: list[float] = []
+
+    def post(_provider: OpenAIIntentProvider, payload: bytes, deadline: float) -> bytes:
+        allowed.append(round(deadline - clock[0], 1))
+        if len(allowed) < 3:
+            # The model hangs until its share is spent.
+            clock[0] = deadline
+            raise IntentUnavailable("The intent provider exceeded its response time.")
+        return _answer()
+
+    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
+    provider = OpenAIIntentProvider(
+        api_key="k", model="first", provider="gemini", fallback_models=["second", "third"]
+    )
+    request = IntentRequest("x", "tr", {"hard": [], "soft": []}, ())
+    assert provider(request) == _proposed()
+    # 35 seconds: a third, then half of what is left, then the rest.
+    assert allowed == [11.7, 11.7, 11.7]

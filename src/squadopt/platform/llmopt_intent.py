@@ -42,6 +42,8 @@ _RESPONSE_BYTES: Final = 32 * 1024
 _TIMEOUT_SECONDS: Final = 35
 #: The most models one call may ask in turn: the first and its fallbacks.
 _MAX_MODELS: Final = 4
+#: The least time one model gets before the next is asked, while the deadline allows it.
+_MIN_ATTEMPT_SECONDS: Final = 8
 _DEFAULT_PROVIDER_RETRY_SECONDS: Final = 60
 #: The result schema's name in the provider's structured-output request.
 INTENT_SCHEMA_NAME: Final = "llmopt_intent_v1"
@@ -286,7 +288,13 @@ def _constraint(
     if not isinstance(kind, str) or kind not in _KINDS:
         raise IntentValidationError("Unsupported intent constraint.")
     result: dict[str, Any] = {"kind": kind}
+    # The strict schema makes a model fill every field of every rule, and a model often
+    # writes a filler ("scope": "squad" on a player rule) where a null belongs. A field that
+    # has no meaning for the rule's kind is therefore dropped from a model's reply, never
+    # read; the page's own requests are still held to the exact shape.
     week = value.get("week")
+    if model and kind == "hit_budget":
+        week = None
     if week is not None or (not model and "week" in value):
         if type(week) is not int or week not in _WEEKS or kind == "hit_budget":
             raise IntentValidationError("Invalid intent constraint week.")
@@ -298,7 +306,7 @@ def _constraint(
         if player_id not in player_ids:
             raise IntentValidationError("Player is outside the intent roster.")
         result["player_id"] = player_id
-    elif "player_id" in value and (not model or value["player_id"] is not None):
+    elif "player_id" in value and not model:
         raise IntentValidationError("Unexpected player for this constraint.")
     if kind == "club_count":
         result["club"] = _known_club(value.get("club"), clubs)
@@ -313,17 +321,14 @@ def _constraint(
             raise IntentValidationError("Invalid club count scope.")
         if scope == "transfers_in":
             result["scope"] = scope
-    elif any(
-        field in value and (not model or value[field] is not None)
-        for field in ("club", "count", "scope")
-    ):
+    elif not model and any(field in value for field in ("club", "count", "scope")):
         raise IntentValidationError("Unexpected club fields for this constraint.")
     if kind == "hit_budget":
         points = value.get("points")
         if type(points) is not int or not 0 <= points <= _MAX_HIT_POINTS:
             raise IntentValidationError("Invalid total transfer penalty budget.")
         result["points"] = points
-    elif "points" in value and (not model or value["points"] is not None):
+    elif "points" in value and not model:
         raise IntentValidationError("Unexpected points for this constraint.")
     if "max_cost_tenths" in value:
         max_cost = value["max_cost_tenths"]
@@ -334,6 +339,10 @@ def _constraint(
     both = value.get("both", False)
     if type(both) is not bool:
         raise IntentValidationError("Invalid with-and-without comparison.")
+    if model and both and kind not in _MEMBERSHIP_KINDS:
+        # "With and without" a rule that is not a player's membership is the plain
+        # comparison of that rule: the flag only means something for a player.
+        both = False
     if both:
         if kind != "include_player" and (not model or kind not in _MEMBERSHIP_KINDS):
             raise IntentValidationError("Invalid with-and-without comparison.")
@@ -972,16 +981,21 @@ class OpenAIIntentProvider:
         A provider's free tier answers 503 while a model is in high demand and counts its
         limits per model, so the next model can answer what the first cannot. Every model
         shares one deadline, and the order is the configured one. When none answers, the
-        refusal is ``IntentLimited`` only if every model was limited.
+        refusal is ``IntentLimited`` only if every model was limited. A model gets an
+        equal share of what is left of the deadline, at least ``_MIN_ATTEMPT_SECONDS``, so
+        one that hangs cannot spend the time of those after it.
         """
         call = intent_call(request)
         deadline = time.monotonic() + _TIMEOUT_SECONDS
         waits: list[int] = []
         for position, model in enumerate(self._models):
-            if position and time.monotonic() >= deadline:
+            now = time.monotonic()
+            if position and now >= deadline:
                 break
+            # A model that hangs must leave the ones after it their share of the deadline.
+            share = max(_MIN_ATTEMPT_SECONDS, (deadline - now) / (len(self._models) - position))
             try:
-                return self._ask(call, model, deadline)
+                return self._ask(call, model, min(deadline, now + share))
             except IntentLimited as limited:
                 waits.append(limited.retry_after)
             except IntentUnavailable:
