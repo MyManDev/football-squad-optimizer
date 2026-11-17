@@ -44,6 +44,30 @@ const POLL_INTERVAL_MS = 2000;
 // A long solve is asked about less often once its first minute has passed.
 const SLOW_POLL_INTERVAL_MS = 5000;
 const SLOW_POLL_AFTER_MS = 60_000;
+/**
+ * A poll the service refused for now (too many asks, or not available this moment) is not
+ * the job's end: the wait backs off and keeps the job. Anything the service said it no
+ * longer knows, 404 or 410, still ends it.
+ */
+const TEMPORARY_REFUSALS = new Set([408, 425, 429, 503]);
+/** The longest one refused poll waits, whatever the service's `Retry-After` asks. */
+export const REFUSAL_PAUSE_CEILING_MS = 60_000;
+
+function pollInterval(startedAt: number, now: number): number {
+  return now - startedAt < SLOW_POLL_AFTER_MS ? POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS;
+}
+
+/**
+ * How long to wait after the `refusals`-th refusal in a row: what `Retry-After` asked, but
+ * never less than the ordinary interval; without one, the interval doubled per refusal.
+ */
+function refusalPause(retryAfterSeconds: number | null, interval: number, refusals: number) {
+  const asked =
+    retryAfterSeconds === null
+      ? interval * 2 ** refusals
+      : Math.max(retryAfterSeconds * 1000, interval);
+  return Math.min(asked, REFUSAL_PAUSE_CEILING_MS);
+}
 /** How long the solver has after this client first sees it running, per window. */
 export const PATIENCE_MS: Record<WindowSize, number> = { 1: 180_000, 3: 360_000, 5: 600_000 };
 export const QUEUE_PATIENCE_MS = 15 * 60_000;
@@ -355,15 +379,20 @@ export function useAdviceJob(
         let answers = 0;
         let attempt: number | undefined;
         let progress: AdviceJobProgress | undefined;
+        // Refusals in a row, and the pause the last one asked for before the next poll.
+        let refusals = 0;
+        let pause: number | null = null;
         while (askNow || Date.now() < waitDeadline(waiting, request.window)) {
           if (!askNow) {
             const now = Date.now();
-            const interval =
-              now - startedAt < SLOW_POLL_AFTER_MS ? POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS;
             await cancellableDelay(
-              Math.min(interval, waitDeadline(waiting, request.window) - now),
+              Math.min(
+                pause ?? pollInterval(startedAt, now),
+                waitDeadline(waiting, request.window) - now,
+              ),
               signal,
             );
+            pause = null;
             if (!alive()) return;
           }
           askNow = false;
@@ -372,6 +401,16 @@ export function useAdviceJob(
             job = await call((signal) => client.readJob(jobId, { signal }));
           } catch (error) {
             if (!alive()) return;
+            if (error instanceof AdviceApiError && TEMPORARY_REFUSALS.has(error.status)) {
+              // Refused for now, not forgotten: the job and its remembered record stay.
+              refusals += 1;
+              pause = refusalPause(
+                error.retryAfterSeconds,
+                pollInterval(startedAt, Date.now()),
+                refusals,
+              );
+              continue;
+            }
             if (
               error instanceof AdviceResponseError ||
               (error instanceof AdviceApiError && error.status >= 400 && error.status < 500)
@@ -390,6 +429,7 @@ export function useAdviceJob(
             continue; // one flaky poll is not a failed computation
           }
           if (!alive()) return;
+          refusals = 0;
           if (job.status === "completed") {
             forgetJob(request);
             let read;
