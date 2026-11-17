@@ -9,6 +9,12 @@
  */
 export const USAGE_ADMIN_KEY = "squadopt.admin";
 
+/**
+ * Told on the window when this tab marks the browser as an admin's, so the app shell can offer
+ * the heatmap mode at once instead of only after the next full load.
+ */
+export const USAGE_ADMIN_EVENT = "squadopt:usage-admin";
+
 /** True when this browser has opened the admin page successfully. */
 export function isUsageAdmin(): boolean {
   try {
@@ -22,6 +28,7 @@ export function isUsageAdmin(): boolean {
 export function markUsageAdmin(): void {
   try {
     window.localStorage.setItem(USAGE_ADMIN_KEY, "1");
+    window.dispatchEvent(new Event(USAGE_ADMIN_EVENT));
   } catch {
     // A storage that refuses keeps nothing; the browser stays a counted visitor.
   }
