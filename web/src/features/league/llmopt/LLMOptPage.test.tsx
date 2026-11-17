@@ -779,6 +779,30 @@ describe("the member's own model key", () => {
     );
   });
 
+  it("says once that a key it cannot hold is not valid, and clears it on the next edit", async () => {
+    const user = userEvent.setup();
+    open();
+    await ready();
+    await user.type(screen.getByRole("textbox", { name: words.model }), "two words");
+    await user.type(screen.getByLabelText(words.key), KEY);
+    await user.click(screen.getByRole("button", { name: words.save }));
+
+    expect(heldModel()).toBeNull();
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent(words.invalid);
+    expect(screen.getByRole("group", { name: words.title })).toContainElement(status);
+    expect(screen.getByLabelText(words.key)).toHaveValue("");
+    expect(document.body.innerHTML).not.toContain(KEY);
+
+    await user.type(screen.getByRole("textbox", { name: words.model }), "x");
+    expect(screen.queryByText(words.invalid)).toBeNull();
+  });
+
+  it("words the invalid key line in Turkish", () => {
+    expect(LLMOPT_COPY.tr.ownKey.invalid).toBe("Anahtar, model ya da adres geçersiz.");
+    expect(en.ownKey.invalid).toBe("The key, model or address is not valid.");
+  });
+
   it("labels the form in Turkish", async () => {
     open("tr");
     await screen.findByRole("heading", { level: 1, name: LLMOPT_COPY.tr.title });

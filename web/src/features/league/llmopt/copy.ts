@@ -45,6 +45,7 @@ const en = {
     baseUrl: "Base URL",
     save: "Save",
     delete: "Delete",
+    invalid: "The key, model or address is not valid.",
     providers: {
       openai: "OpenAI",
       anthropic: "Anthropic",
@@ -248,6 +249,7 @@ const tr: typeof en = {
     baseUrl: "Temel adres",
     save: "Kaydet",
     delete: "Sil",
+    invalid: "Anahtar, model ya da adres geçersiz.",
     providers: {
       openai: "OpenAI",
       anthropic: "Anthropic",

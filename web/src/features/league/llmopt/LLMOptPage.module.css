@@ -463,6 +463,11 @@
   font-weight: 600;
 }
 
+.ownKeyInvalid {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .ownKeyActions {
   grid-column: 1 / -1;
   display: flex;

@@ -27,6 +27,7 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
   const [model, setModel] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [keyTyped, setKeyTyped] = useState(false);
+  const [invalid, setInvalid] = useState(false);
   const local = provider === "local";
   const ready =
     model.trim() !== "" && (local ? localBaseUrl(baseUrl) !== null : keyTyped) && !disabled;
@@ -46,11 +47,13 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
     });
     wipeKeyField();
     if (saved) setBaseUrl("");
+    setInvalid(!saved);
   }
 
   function remove() {
     clearOwnKey();
     wipeKeyField();
+    setInvalid(false);
   }
 
   function saveOnEnter(event: KeyboardEvent<HTMLInputElement>) {
@@ -79,6 +82,7 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
         id={`${id}-provider`}
         value={provider}
         onChange={(event) => {
+          setInvalid(false);
           if (isOwnKeyProvider(event.target.value)) setProvider(event.target.value);
         }}
       >
@@ -100,7 +104,10 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
         autoCorrect="off"
         spellCheck={false}
         maxLength={256}
-        onChange={(event) => setModel(event.target.value)}
+        onChange={(event) => {
+          setInvalid(false);
+          setModel(event.target.value);
+        }}
         onKeyDown={saveOnEnter}
       />
       <label htmlFor={`${id}-key`}>{words.key}</label>
@@ -114,7 +121,10 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
         spellCheck={false}
         maxLength={1024}
         required={!local}
-        onInput={(event) => setKeyTyped(event.currentTarget.value.trim() !== "")}
+        onInput={(event) => {
+          setInvalid(false);
+          setKeyTyped(event.currentTarget.value.trim() !== "");
+        }}
         onKeyDown={saveOnEnter}
       />
       {local && (
@@ -128,10 +138,18 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
             placeholder="http://localhost:11434/v1"
             autoComplete="off"
             spellCheck={false}
-            onChange={(event) => setBaseUrl(event.target.value)}
+            onChange={(event) => {
+              setInvalid(false);
+              setBaseUrl(event.target.value);
+            }}
             onKeyDown={saveOnEnter}
           />
         </>
+      )}
+      {invalid && (
+        <p className={styles.ownKeyInvalid} role="status">
+          {words.invalid}
+        </p>
       )}
       <div className={styles.ownKeyActions}>
         <button className={styles.primary} type="button" disabled={!ready} onClick={save}>
