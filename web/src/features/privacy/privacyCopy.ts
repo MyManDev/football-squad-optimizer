@@ -34,7 +34,7 @@ export const PRIVACY_COPY: Record<Language, PrivacyCopy> = {
       },
       {
         title: "LLMOPT",
-        body: "What you write in LLMOPT and the candidate players for your squad are sent to Google Gemini to read your request. Your team number and name are not sent, and your text is not written to our server's logs.",
+        body: "What you write in LLMOPT and the candidate players for your squad are sent to Google Gemini to read your request. Your team number and name are not sent, and your text is not written to our server's logs. Google may use this text and its answer to improve its products, and people at Google may read them, so do not write personal information in LLMOPT.",
       },
       {
         title: "Deadline reminder",
@@ -67,7 +67,7 @@ export const PRIVACY_COPY: Record<Language, PrivacyCopy> = {
       },
       {
         title: "LLMOPT",
-        body: "LLMOPT'a yazdığın metin ve kadron için aday oyuncular, isteğini anlamak üzere Google Gemini'ye gönderilir. Takım numaran ve adın gönderilmez, metnin sunucu kayıtlarımıza yazılmaz.",
+        body: "LLMOPT'a yazdığın metin ve kadron için aday oyuncular, isteğini anlamak üzere Google Gemini'ye gönderilir. Takım numaran ve adın gönderilmez, metnin sunucu kayıtlarımıza yazılmaz. Google bu metni ve cevabını ürünlerini geliştirmek için kullanabilir ve Google çalışanları okuyabilir; LLMOPT'a kişisel bilgi yazma.",
       },
       {
         title: "Deadline hatırlatıcısı",
