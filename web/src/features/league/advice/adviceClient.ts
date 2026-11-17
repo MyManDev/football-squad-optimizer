@@ -255,12 +255,18 @@ async function apiError(response: Response): Promise<AdviceApiError> {
   }
   const header =
     typeof response.headers?.get === "function" ? response.headers.get("Retry-After") : null;
-  const retryAfter = header === null ? Number.NaN : Number(header);
-  return new AdviceApiError(
-    response.status,
-    code,
-    Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : null,
-  );
+  return new AdviceApiError(response.status, code, retryAfterSeconds(header));
+}
+
+/**
+ * `Retry-After` in whole seconds from now, whether the header gives seconds or an HTTP
+ * date; null when it is absent, unreadable, or already past.
+ */
+export function retryAfterSeconds(header: string | null, now: number = Date.now()): number | null {
+  const stated = header?.trim();
+  if (!stated) return null;
+  const seconds = /^\d+(\.\d+)?$/.test(stated) ? Number(stated) : (Date.parse(stated) - now) / 1000;
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : null;
 }
 
 /** A queue that was only busy says so with 503 and these codes; the same click may ask again. */

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -157,7 +158,8 @@ def test_factory_emits_one_structured_configuration_event(
 ) -> None:
     observe(monkeypatch, "--proxy-headers", "--forwarded-allow-ips", "127.0.0.1")
     monkeypatch.setattr(runtime, "configure_advice_logging", lambda: None)
-    monkeypatch.setattr(runtime, "backend_from_environment", lambda **kwargs: object())
+    backend = SimpleNamespace(config=SimpleNamespace(store_root=Path("unused-store")))
+    monkeypatch.setattr(runtime, "backend_from_environment", lambda **kwargs: backend)
     app = FastAPI()
     monkeypatch.setattr(runtime, "app_for_backend", lambda backend, **kwargs: app)
     caplog.set_level("INFO", logger="advice.api")

@@ -216,7 +216,9 @@ test("clarification keeps the first request and pauses calculation", async ({ pa
   await expect(page.getByRole("button", { name: "Compute plans" })).toBeDisabled();
   await input.fill(reply);
   await send.click();
-  await expect(page.getByText("Include player · Smith", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Include player · Smith" }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Compute plans" })).toBeEnabled();
 });
 
@@ -372,7 +374,7 @@ test("a Turkish club request lets the optimizer pick the three players", async (
   await page.getByRole("button", { name: "Gönder", exact: true }).click();
   await expect(page.getByRole("button", { name: "Kaldır · Wildcard kullan" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Kaldır · Brighton · Gelen transferler · 3" }),
+    page.getByRole("button", { name: "Kaldır · Brighton · Gelen transferler · tam olarak 3" }),
   ).toBeVisible();
   expect(posts).toHaveLength(0);
   await page.getByRole("button", { name: "Planları hesapla" }).click();

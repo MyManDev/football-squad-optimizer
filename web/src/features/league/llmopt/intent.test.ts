@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
-import { EMPTY_DRAFT, preparePlans, readIntent } from "./intent";
+import { EMPTY_DRAFT, IntentError, intentRefusal, preparePlans, readIntent } from "./intent";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -368,5 +368,71 @@ describe("expected points cost limits", () => {
     { hard: [], soft: [{ ...preference, max_cost_tenths: 1001 }] },
   ])("refuses invalid or mandatory price limits", async (draft) => {
     await expect(response(draft)).rejects.toThrow();
+  });
+});
+
+describe("intent refusals", () => {
+  const players = [{ id: 17, name: "Example Player", team: "Brighton" }];
+  const refuse = (status: number, code: string | null, headers: Record<string, string> = {}) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ contract_version: "1", error: { code, message: "operator text" } }),
+            { status, headers },
+          ),
+        ),
+    );
+    return readIntent(
+      "https://advice.example",
+      "Roll the transfer.",
+      "en",
+      EMPTY_DRAFT,
+      players,
+      new AbortController().signal,
+    ).then(
+      () => {
+        throw new Error("expected a refusal");
+      },
+      (error: unknown) => error,
+    );
+  };
+
+  it.each([
+    [503, "LLMOPT_DISABLED", "disabled"],
+    [503, "LLMOPT_UNAVAILABLE", "busy"],
+    [429, "RATE_LIMITED", "limited"],
+    [413, "PAYLOAD_TOO_LARGE", "tooLarge"],
+    [422, "VALIDATION_FAILED", "invalid"],
+    [415, "UNSUPPORTED_MEDIA_TYPE", "unsupported"],
+    [500, "INTERNAL", "unavailable"],
+  ] as const)("names a %i %s refusal as %s", async (status, code, refusal) => {
+    const error = await refuse(status, code);
+    expect(error).toBeInstanceOf(IntentError);
+    expect(error).toMatchObject({ status, code, retryAfterSeconds: null });
+    expect(intentRefusal(error)).toBe(refusal);
+  });
+
+  it("reads the wait from Retry-After and bounds it", async () => {
+    expect(await refuse(429, "RATE_LIMITED", { "Retry-After": "60" })).toMatchObject({
+      retryAfterSeconds: 60,
+    });
+    expect(await refuse(429, "RATE_LIMITED", { "Retry-After": "999999" })).toMatchObject({
+      retryAfterSeconds: 86_400,
+    });
+    expect(await refuse(429, "RATE_LIMITED", { "Retry-After": "0" })).toMatchObject({
+      retryAfterSeconds: null,
+    });
+    expect(await refuse(429, "RATE_LIMITED", { "Retry-After": "soon" })).toMatchObject({
+      retryAfterSeconds: null,
+    });
+  });
+
+  it("falls back on the status when the body names no code", async () => {
+    expect(intentRefusal(await refuse(429, null))).toBe("limited");
+    expect(intentRefusal(await refuse(413, "lower case"))).toBe("tooLarge");
+    expect(intentRefusal(new Error("network"))).toBe("unavailable");
   });
 });

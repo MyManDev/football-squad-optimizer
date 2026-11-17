@@ -66,7 +66,7 @@ it("shows the returned Wildcard squad on the member pitch, with its armbands and
   expect(within(pitch).getByRole("img", { name: "vice-captain" })).toBeVisible();
 });
 
-it("displays an over-limit price at its measured precision and qualifies an unproved cost", () => {
+it("displays an over-limit price at its measured precision and no method note", () => {
   showWildcard({}, undefined, [
     {
       key: "saka",
@@ -75,14 +75,13 @@ it("displays an over-limit price at its measured precision and qualifies an unpr
       status: "priced",
       cost: 1.54,
       aboveCeiling: true,
-      unproven: true,
     },
     { key: "roll", label: "Roll the transfer", status: "skipped" },
   ]);
   const review = screen.getByRole("region", { name: "Expected points cost of preferences" });
   expect(within(review).getByText(/1\.54 expected points lost · Up to 1\.5 points/)).toBeVisible();
   expect(within(review).getByText("Above your points limit.")).toBeVisible();
-  expect(within(review).getByText("Cost is based on the plans found.")).toBeVisible();
+  expect(within(review).queryByText("Cost is based on the plans found.")).toBeNull();
   expect(
     within(review).getByText("This preference was not evaluated in this calculation."),
   ).toBeVisible();

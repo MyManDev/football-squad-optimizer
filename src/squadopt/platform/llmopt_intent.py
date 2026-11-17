@@ -4,23 +4,30 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import time
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from http.client import HTTPException, HTTPSConnection
 from math import ceil
+from pathlib import Path
 from threading import BoundedSemaphore, Lock
 from typing import Any, Final, Protocol
 
 from squadopt.contracts.preferences import PlanScenario
+from squadopt.data.atomic import replace_retrying
 from squadopt.platform.advice_submit import FixedWindowRateLimiter
 
 INTENT_BODY_MAX_BYTES: Final = 128 * 1024
 INTENT_MAX_MESSAGE: Final = 800
+#: The daily budget's file, under the backend's store root.
+INTENT_BUDGET_FILE: Final = "llmopt-daily-budget.json"
+_DAY_SECONDS: Final = 86400
+_BUDGET_VERSION: Final = 1
 _MAX_QUESTION: Final = 300
 _MAX_ROSTER: Final = 1000
 _MAX_CLUBS: Final = 32
@@ -627,27 +634,130 @@ def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
     return tuple(player for _, player in ranked[:_MAX_CANDIDATES])
 
 
-class IntentService:
-    """One model call at a time per slot, within per-address and per-process budgets."""
+class DailyIntentBudget:
+    """The site-wide daily call budget, counted in a file so a restart does not reset it.
+
+    The window opens at the first call after the previous window ended and lasts a day of
+    wall clock time, since a monotonic clock does not survive the process. Every counted
+    call rewrites the file by an atomic replace, so a killed process leaves the previous
+    count or the new one. Without a path, as in most tests, the count lives in memory only.
+    A file that cannot be read or written is logged and the count carries on in memory: the
+    cap still holds within the process, and text interpretation stays available.
+    """
 
     def __init__(
-        self, provider: IntentProvider, *, per_minute: int = 6, per_day: int = 250
+        self, limit: int, path: Path | None = None, *, clock: Callable[[], float] = time.time
+    ) -> None:
+        if limit < 1:
+            raise ValueError("limit must be at least 1.")
+        self._limit = limit
+        self._path = path
+        self._clock = clock
+        self._lock = Lock()
+        self._started, self._count = self._read()
+
+    def _read(self) -> tuple[float, int]:
+        if self._path is None:
+            return 0.0, 0
+        try:
+            document = json.loads(self._path.read_bytes())
+        except FileNotFoundError:
+            return 0.0, 0
+        except (OSError, ValueError):
+            _LOGGER.warning("The LLMOPT daily budget file is unreadable. Counting starts again.")
+            return 0.0, 0
+        if not isinstance(document, dict):
+            document = {}
+        started = document.get("window_started_unix")
+        count = document.get("count")
+        if (
+            document.get("version") != _BUDGET_VERSION
+            or isinstance(started, bool)
+            or not isinstance(started, int | float)
+            or isinstance(count, bool)
+            or not isinstance(count, int)
+            or count < 0
+        ):
+            _LOGGER.warning("The LLMOPT daily budget file is invalid. Counting starts again.")
+            return 0.0, 0
+        return float(started), count
+
+    def _write(self) -> None:
+        if self._path is None:
+            return
+        payload = json.dumps(
+            {
+                "version": _BUDGET_VERSION,
+                "window_started_unix": self._started,
+                "count": self._count,
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+        staging = self._path.with_name(f".{self._path.name}.{os.getpid()}.tmp")
+        try:
+            with staging.open("wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            replace_retrying(staging, self._path)
+        except OSError:
+            _LOGGER.warning("The LLMOPT daily budget file could not be written.")
+
+    def _current(self, now: float) -> tuple[float, int]:
+        if self._count == 0 or now - self._started >= _DAY_SECONDS:
+            return now, 0
+        return self._started, self._count
+
+    def seconds_to_room(self) -> int:
+        """0 while a call fits; otherwise the whole seconds until the window ends."""
+        with self._lock:
+            now = self._clock()
+            started, count = self._current(now)
+            if count < self._limit:
+                return 0
+            # A wall clock set back must not stretch the wait past one window.
+            return min(_DAY_SECONDS, max(1, ceil(started + _DAY_SECONDS - now)))
+
+    def take(self) -> None:
+        """Count one call, and record it before the call is made."""
+        with self._lock:
+            self._started, count = self._current(self._clock())
+            self._count = count + 1
+            self._write()
+
+
+class IntentService:
+    """One model call at a time per slot, within per-address and site-wide daily budgets.
+
+    The per-address minute window stays in memory: a restart outlasts such a window, and a
+    file of it would hold visitors' addresses.
+    """
+
+    def __init__(
+        self,
+        provider: IntentProvider,
+        *,
+        per_minute: int = 6,
+        per_day: int = 250,
+        daily_budget_path: Path | None = None,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self._provider = provider
         self._by_client = FixedWindowRateLimiter(per_minute, 60)
-        self._daily = FixedWindowRateLimiter(per_day, 86400)
+        self._daily = DailyIntentBudget(per_day, daily_budget_path, clock=clock)
         self._slots = BoundedSemaphore(4)
         self._admission_lock = Lock()
 
     def prepare(self, request: IntentRequest, client: str) -> dict[str, Any]:
         with self._admission_lock:
-            if not self._daily.has_room("all"):
-                raise IntentLimited(86400)
+            wait = self._daily.seconds_to_room()
+            if wait:
+                raise IntentLimited(wait)
             if not self._by_client.has_room(client):
                 raise IntentLimited(60)
             if not self._slots.acquire(blocking=False):
                 raise IntentLimited(2)
-            self._daily.allow("all")
+            self._daily.take()
             self._by_client.allow(client)
         try:
             candidates = _shortlist(request)
@@ -866,15 +976,23 @@ def _valid_identifier(value: str, maximum: int) -> bool:
     return 0 < len(value) <= maximum and all(33 <= ord(char) < 127 for char in value)
 
 
-def intent_service_from_environment(env: Mapping[str, str]) -> IntentService | None:
-    """Explicit activation leaves installations without a provider fully usable."""
+def intent_service_from_environment(
+    env: Mapping[str, str], *, store_root: Path | None = None
+) -> IntentService | None:
+    """Explicit activation leaves installations without a provider fully usable.
+
+    ``store_root`` is the backend's store directory, where the daily budget is counted.
+    """
     api_key = env.get("SQUADOPT_LLMOPT_API_KEY", "")
     model = env.get("SQUADOPT_LLMOPT_MODEL", "")
     provider = env.get("SQUADOPT_LLMOPT_PROVIDER", "openai")
     if not api_key or not model:
         return None
     try:
-        return IntentService(OpenAIIntentProvider(api_key=api_key, model=model, provider=provider))
+        return IntentService(
+            OpenAIIntentProvider(api_key=api_key, model=model, provider=provider),
+            daily_budget_path=None if store_root is None else store_root / INTENT_BUDGET_FILE,
+        )
     except ValueError:
         _LOGGER.warning("Invalid LLMOPT provider configuration. Text interpretation is disabled.")
         return None

@@ -3,15 +3,18 @@
 import json
 from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from squadopt.api.app import create_app
 from squadopt.platform.llmopt_intent import (
     INTENT_BODY_MAX_BYTES,
+    INTENT_BUDGET_FILE,
     IntentClarification,
     IntentRequest,
     IntentService,
@@ -712,6 +715,98 @@ def test_validation_and_rate_limits_do_not_call_provider() -> None:
         assert limited.status_code == 429
         assert limited.headers["retry-after"] == "60"
         assert calls == 1
+
+
+def test_daily_budget_survives_a_restart_and_waits_only_to_the_window_end(
+    tmp_path: Path,
+) -> None:
+    now = [1_800_000_000.0]
+    path = tmp_path / INTENT_BUDGET_FILE
+
+    def service() -> IntentService:
+        return IntentService(
+            lambda _request: _proposed(), per_day=2, daily_budget_path=path, clock=lambda: now[0]
+        )
+
+    with TestClient(create_app(llmopt_intent=service())) as client:
+        assert client.post(URL, json=_request()).status_code == 200
+        now[0] += 3600
+        assert client.post(URL, json=_request()).status_code == 200
+        now[0] += 1800
+        limited = client.post(URL, json=_request())
+    assert limited.status_code == 429
+    assert limited.headers["retry-after"] == str(86400 - 5400)
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    assert stored == {"count": 2, "version": 1, "window_started_unix": 1_800_000_000.0}
+
+    now[0] += 600
+    with TestClient(create_app(llmopt_intent=service())) as restarted:
+        limited = restarted.post(URL, json=_request())
+        assert limited.status_code == 429
+        assert limited.headers["retry-after"] == str(86400 - 6000)
+        now[0] = 1_800_000_000.0 + 86400
+        assert restarted.post(URL, json=_request()).status_code == 200
+    assert json.loads(path.read_text(encoding="utf-8"))["count"] == 1
+
+
+def test_unreadable_daily_budget_file_starts_a_new_window(tmp_path: Path) -> None:
+    path = tmp_path / INTENT_BUDGET_FILE
+    path.write_text('{"version": 1, "count": "many"}', encoding="utf-8")
+    service = IntentService(lambda _request: _proposed(), per_day=1, daily_budget_path=path)
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        assert client.post(URL, json=_request()).status_code == 200
+        assert client.post(URL, json=_request()).status_code == 429
+    assert json.loads(path.read_text(encoding="utf-8"))["count"] == 1
+
+
+def test_environment_service_counts_the_day_under_the_store_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(OpenAIIntentProvider, "__call__", lambda _self, _request: _proposed())
+    service = intent_service_from_environment(
+        {"SQUADOPT_LLMOPT_API_KEY": "server-key", "SQUADOPT_LLMOPT_MODEL": "m"},
+        store_root=tmp_path,
+    )
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        assert client.post(URL, json=_request()).status_code == 200
+    assert json.loads((tmp_path / INTENT_BUDGET_FILE).read_text(encoding="utf-8"))["count"] == 1
+
+
+# Cloudflare appends the visitor's address to X-Forwarded-For, cloudflared passes it on,
+# and Docker's port proxy makes the Compose network's gateway the api's TCP peer.
+# deploy/compose.yaml runs uvicorn with --proxy-headers, and the host's FORWARDED_ALLOW_IPS
+# names that gateway (deploy/weekly-schedule/README.md, "Members' addresses").
+_GATEWAY = "172.18.0.1"
+
+
+def test_visitors_behind_the_trusted_proxy_get_separate_buckets() -> None:
+    service = IntentService(lambda _request: _proposed(), per_minute=1)
+    app = ProxyHeadersMiddleware(create_app(llmopt_intent=service), trusted_hosts=_GATEWAY)
+    with TestClient(app, client=(_GATEWAY, 43210)) as proxy:
+
+        def post(forwarded_for: str) -> int:
+            return proxy.post(
+                URL, json=_request(), headers={"X-Forwarded-For": forwarded_for}
+            ).status_code
+
+        assert post("198.51.100.7") == 200
+        assert post("203.0.113.8") == 200
+        assert post("198.51.100.7") == 429
+        # A visitor's own header comes first; Cloudflare's appended address decides.
+        assert post("203.0.113.99, 198.51.100.7") == 429
+        assert post("2001:db8:1:1::5") == 200
+        # One IPv6 subscriber holds a whole /64.
+        assert post("2001:db8:1:1::6") == 429
+
+
+def test_forwarded_header_from_an_untrusted_peer_is_ignored() -> None:
+    service = IntentService(lambda _request: _proposed(), per_minute=1)
+    app = ProxyHeadersMiddleware(create_app(llmopt_intent=service), trusted_hosts=_GATEWAY)
+    with TestClient(app, client=("192.0.2.50", 43210)) as direct:
+        first = direct.post(URL, json=_request(), headers={"X-Forwarded-For": "198.51.100.60"})
+        spoofed = direct.post(URL, json=_request(), headers={"X-Forwarded-For": "198.51.100.61"})
+    assert first.status_code == 200
+    assert spoofed.status_code == 429
 
 
 def test_unconfigured_endpoint_leaves_backend_healthy() -> None:
