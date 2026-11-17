@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 import { refuseMismatchedBuild } from "./e2e/buildOrigin";
+import { CSP_REPORT_FILE } from "./e2e/cspReport";
 import { rememberedLeague } from "./e2e/leagueState";
 
 refuseMismatchedBuild();
@@ -17,6 +18,10 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   fullyParallel: true,
   reporter: process.env.CI ? "github" : "list",
+  // The preview sends the site's Content-Security-Policy and writes each refusal a browser
+  // reports to CSP_REPORT_FILE; the run fails at its end on any the specs did not make.
+  globalSetup: "./e2e/cspReport.setup.ts",
+  globalTeardown: "./e2e/cspReport.teardown.ts",
   use: {
     baseURL,
     // Every league address sits behind the league number; the specs open it already given.
@@ -28,6 +33,7 @@ export default defineConfig({
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
+    env: { SQUADOPT_CSP_REPORT_FILE: CSP_REPORT_FILE },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });
