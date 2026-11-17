@@ -8,6 +8,7 @@ import {
 import { MESSAGES } from "../src/i18n/messages";
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
+import { holdModel, routeChat } from "./llmoptChat";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -101,7 +102,7 @@ test("interpretation previews the constraints before the two advice requests", a
       preferences: { available: true },
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, async (route) => {
+  await routeChat(page, API, async (route) => {
     if (route.request().method() === "POST") {
       expect(route.request().postDataJSON()).toMatchObject({
         message,
@@ -142,6 +143,8 @@ test("interpretation previews the constraints before the two advice requests", a
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   await page.getByRole("textbox", { name: "Plan instructions" }).fill(message);
   await page.getByRole("button", { name: "Send", exact: true }).click();
   const compute = page.getByRole("button", { name: "Compute plans" });
@@ -191,7 +194,7 @@ test("clarification keeps the first request and pauses calculation", async ({ pa
       players: [{ id: playerId, name: "Smith", team: "Chelsea" }],
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, async (route) => {
+  await routeChat(page, API, async (route) => {
     if (route.request().method() === "OPTIONS") return answer(route, null);
     const body = route.request().postDataJSON();
     if (body.message === requested) {
@@ -208,6 +211,8 @@ test("clarification keeps the first request and pauses calculation", async ({ pa
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   const input = page.getByRole("textbox", { name: "Plan instructions" });
   const send = page.getByRole("button", { name: "Send", exact: true });
   await input.fill(requested);
@@ -251,7 +256,7 @@ for (const wildcardHeld of [true, false]) {
         chips: { held_by_entry: { [ENTRY]: wildcardHeld ? ["wildcard"] : [] } },
       }),
     );
-    await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+    await routeChat(page, API, (route) =>
       answer(route, {
         status: "draft",
         draft: {
@@ -281,6 +286,8 @@ for (const wildcardHeld of [true, false]) {
     });
 
     await page.goto(PAGE);
+
+    await holdModel(page);
     await page.getByRole("textbox", { name: "Plan instructions" }).fill(message);
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.getByRole("button", { name: "Remove · Play Wildcard" })).toBeVisible();
@@ -344,7 +351,7 @@ test("a Turkish club request lets the optimizer pick the three players", async (
       chips: { available: ["wildcard"], held_by_entry: { [ENTRY]: ["wildcard"] } },
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+  await routeChat(page, API, (route) => {
     if (route.request().method() === "POST") {
       expect(route.request().postDataJSON()).toMatchObject({ message, locale: "tr" });
     }
@@ -370,6 +377,8 @@ test("a Turkish club request lets the optimizer pick the three players", async (
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   await page.getByRole("textbox", { name: "Plan talimatların" }).fill(message);
   await page.getByRole("button", { name: "Gönder", exact: true }).click();
   await expect(page.getByRole("button", { name: "Kaldır · Wildcard kullan" })).toBeVisible();
@@ -414,7 +423,7 @@ test("a Turkish plan holds now, buys next week and caps three weeks of hits", as
       preferences: { available: true },
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+  await routeChat(page, API, (route) => {
     if (route.request().method() === "POST") {
       expect(route.request().postDataJSON()).toMatchObject({ message, locale: "tr" });
     }
@@ -456,6 +465,8 @@ test("a Turkish plan holds now, buys next week and caps three weeks of hits", as
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   await page.getByRole("textbox", { name: "Plan talimatların" }).fill(message);
   await page.getByRole("button", { name: "Gönder", exact: true }).click();
   await expect(page.getByLabel("Plan süresi")).toHaveValue("3");
@@ -516,7 +527,7 @@ test("a future Wildcard is checked on its own week", async ({ page }) => {
       chips: { held_by_entry: { [ENTRY]: [] } },
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+  await routeChat(page, API, (route) =>
     answer(route, {
       status: "draft",
       draft: { window: 3, hard: [{ kind: "wildcard", week: 2 }], soft: [] },
@@ -556,6 +567,7 @@ test("a future Wildcard is checked on its own week", async ({ page }) => {
     });
   });
   await page.goto(PAGE);
+  await holdModel(page);
   await page.getByRole("textbox", { name: "Plan talimatların" }).fill("Wildcard'ı haftaya kullan.");
   await page.getByRole("button", { name: "Gönder", exact: true }).click();
   await expect(
@@ -601,7 +613,7 @@ test("three-week alternatives preserve hard rules and offer different opening mo
       managers_word: { available: false },
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+  await routeChat(page, API, (route) =>
     answer(route, {
       status: "draft",
       draft: {
@@ -646,6 +658,8 @@ test("three-week alternatives preserve hard rules and offer different opening mo
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   await page
     .getByRole("textbox", { name: "Plan talimatların" })
     .fill("Üç haftalık plan yap. Kalecim kalsın ve puan cezası alma.");
@@ -716,7 +730,7 @@ test("preferred players are priced individually and only shown within their exac
       managers_word: { available: false },
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+  await routeChat(page, API, (route) =>
     answer(route, {
       status: "draft",
       draft: {
@@ -766,6 +780,8 @@ test("preferred players are priced individually and only shown within their exac
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   await page.getByRole("textbox", { name: "Plan talimatların" }).fill(message);
   await page.getByRole("button", { name: "Gönder", exact: true }).click();
   await expect(
@@ -840,7 +856,7 @@ test("accepted preferred players are combined into one plan after their single p
       managers_word: { available: false },
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+  await routeChat(page, API, (route) =>
     answer(route, {
       status: "draft",
       draft: {
@@ -887,6 +903,8 @@ test("accepted preferred players are combined into one plan after their single p
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   await page
     .getByRole("textbox", { name: "Plan instructions" })
     .fill("No hits. Each of these three is worth up to 1.5 points.");

@@ -32,9 +32,9 @@ import {
   type Constraint,
   type PlanDraft,
 } from "./intent";
-import { ownKeyIntentSource, serverIntentSource, type IntentSource } from "./intentSource";
+import { ownKeyIntentSource, type IntentSource } from "./intentSource";
 import { OwnKeyForm } from "./OwnKeyForm";
-import { useOwnKey } from "./ownKey";
+import { clearOwnKey, useOwnKey } from "./ownKey";
 import { PlanResult, type PreferencePrice } from "./PlanResult";
 import { expectedNet, samePlan } from "./planComparison";
 import { BANK_FLOOR, KEEP_WEEK, SCENARIO, draftChanges, type DraftChanges } from "./planChanges";
@@ -106,7 +106,15 @@ interface ChatLine {
   message: string;
 }
 
-function Session({ squad, intentSource }: { squad: EntrySquad; intentSource: IntentSource }) {
+function Session({
+  squad,
+  intentSource,
+  chatReady,
+}: {
+  squad: EntrySquad;
+  intentSource: IntentSource;
+  chatReady: boolean;
+}) {
   const { messages } = useLanguage();
   const { forwarded } = useLeague();
   const fixtures = useFixtures();
@@ -142,6 +150,7 @@ function Session({ squad, intentSource }: { squad: EntrySquad; intentSource: Int
       context={context}
       saved={saved}
       intentSource={intentSource}
+      chatReady={chatReady}
     />
   );
 }
@@ -215,6 +224,7 @@ function Workspace({
   context,
   saved,
   intentSource,
+  chatReady,
 }: {
   squad: EntrySquad;
   deadline: string | null;
@@ -223,6 +233,8 @@ function Workspace({
   context: PlanSessionContext | null;
   saved: unknown;
   intentSource: IntentSource;
+  /** A model is there to read the chat: the member's key is held. */
+  chatReady: boolean;
 }) {
   const { language, locale } = useLanguage();
   const copy = LLMOPT_COPY[language];
@@ -265,6 +277,18 @@ function Workspace({
   // While a rate limit's Retry-After runs, Send stays off and the wait is shown.
   const [limit, setLimit] = useState<{ seconds: number } | null>(null);
   const [waitLeft, setWaitLeft] = useState(0);
+  // A wait belongs to the model that asked for it; another key or provider starts without one.
+  const heldModel = useOwnKey();
+  const waitFor = useRef(heldModel);
+  // Saving a key turns the chat on; the keyboard goes there once it is.
+  const focusChat = useRef(false);
+  useEffect(() => {
+    if (waitFor.current === heldModel) return;
+    waitFor.current = heldModel;
+    setLimit(null);
+    if (heldModel && focusChat.current) chatInput.current?.focus();
+    focusChat.current = false;
+  }, [heldModel]);
   const [run, setRun] = useState<PlanRun | null>(restoredRun);
   const [changes, setChanges] = useState<DraftChanges | null>(null);
   const [session] = useState(() => createPlanSessionStore(context, restored?.confirmation));
@@ -330,7 +354,16 @@ function Workspace({
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = message.trim();
-    if (!text || !ORIGIN || interpret.current || checkingSquad || roster.isPending || limit) return;
+    if (
+      !text ||
+      !ORIGIN ||
+      !chatReady ||
+      interpret.current ||
+      checkingSquad ||
+      roster.isPending ||
+      limit
+    )
+      return;
     const controller = new AbortController();
     const previous = reference ?? revised;
     interpret.current = controller;
@@ -754,7 +787,15 @@ function Workspace({
       )}
       {ORIGIN && roster.isError && <RosterRetry roster={roster} />}
       <section className={styles.workspace} aria-label={copy.chat}>
-        {ORIGIN && <OwnKeyForm copy={copy} disabled={reading} />}
+        {ORIGIN && (
+          <OwnKeyForm
+            copy={copy}
+            disabled={reading}
+            onSaved={() => {
+              focusChat.current = true;
+            }}
+          />
+        )}
         {conversation.length > 0 && (
           <ol className={styles.conversation} aria-live="polite">
             {conversation.map(({ id, role, message }) => (
@@ -775,12 +816,14 @@ function Workspace({
             maxLength={MAX_MESSAGE_LENGTH}
             rows={2}
             onChange={(event) => setMessage(event.target.value)}
-            disabled={!ORIGIN || reading || checkingSquad}
+            disabled={!ORIGIN || !chatReady || reading || checkingSquad}
           />
           <button
             className={styles.primary}
             type="submit"
-            disabled={!ORIGIN || busy || roster.isPending || limit !== null || !message.trim()}
+            disabled={
+              !ORIGIN || !chatReady || busy || roster.isPending || limit !== null || !message.trim()
+            }
           >
             {reading ? copy.interpreting : copy.send}
           </button>
@@ -1067,16 +1110,16 @@ function Workspace({
 }
 
 /**
- * The LLMOPT page. The chat is read by `intentSource` when one is given; otherwise by the
- * member's own model while a key is held (ADR 0017), and by the site's intent service when not.
+ * The LLMOPT page. The chat is read by the member's own model while a key is held (ADR 0017),
+ * and is off until then: the site has no model of its own. The rules can always be edited by
+ * hand. A test gives `intentSource` to stand in for the model.
  */
 export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {}) {
   const { messages, language } = useLanguage();
   const ownKey = useOwnKey() !== null;
-  const source = useMemo(
-    () => intentSource ?? (ownKey ? ownKeyIntentSource(ORIGIN) : serverIntentSource(ORIGIN)),
-    [intentSource, ownKey],
-  );
+  const source = useMemo(() => intentSource ?? ownKeyIntentSource(ORIGIN), [intentSource]);
+  // Leaving the page deletes the key; `pagehide` covers a reload and a closed tab.
+  useEffect(() => clearOwnKey, []);
   const copy = LLMOPT_COPY[language];
   const { entryId: entryParam } = useParams();
   const entryId = Number(entryParam);
@@ -1090,6 +1133,7 @@ export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {
       key={squadBasis(result.data.payload)}
       squad={result.data.payload}
       intentSource={source}
+      chatReady={intentSource !== undefined || ownKey}
     />
   );
 }

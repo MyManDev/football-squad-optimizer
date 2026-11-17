@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { requestsCarrying, sentRequests, watchKeyLeaks } from "../../../testSupport/keyLeaks";
-import { EMPTY_DRAFT, IntentError, intentRefusal } from "./intent";
-import { ownKeyIntentSource, serverIntentSource, type IntentRequest } from "./intentSource";
+import { EMPTY_DRAFT, intentRefusal } from "./intent";
+import { ownKeyIntentSource, type IntentRequest } from "./intentSource";
 import { clearOwnKey, setOwnKey } from "./ownKey";
 
 const ORIGIN = "https://advice.example";
@@ -12,56 +12,6 @@ afterEach(() => {
   clearOwnKey();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-});
-
-describe("serverIntentSource", () => {
-  it("sends the request to the site's intent service and returns its checked draft", async () => {
-    const fetch = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({ status: "draft", draft: { hard: [{ kind: "no_hits" }], soft: [] } }),
-        ),
-    );
-    vi.stubGlobal("fetch", fetch);
-    const answer = await serverIntentSource(ORIGIN).interpret(
-      {
-        message: "No hits.",
-        locale: "en",
-        draft: EMPTY_DRAFT,
-        players: PLAYERS,
-        clarification: { message: "No hits.", question: "Which week?" },
-        referenceWeeks: [1],
-      },
-      new AbortController().signal,
-    );
-    expect(answer).toEqual({ status: "draft", draft: { hard: [{ kind: "no_hits" }], soft: [] } });
-    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(`${ORIGIN}/api/v1/llmopt/intent`);
-    expect(JSON.parse(String(init.body))).toEqual({
-      message: "No hits.",
-      locale: "en",
-      draft: EMPTY_DRAFT,
-      players: PLAYERS,
-      clarification: { message: "No hits.", question: "Which week?" },
-      reference_weeks: [1],
-    });
-  });
-
-  it("rejects a refusal with the service's code", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ error: { code: "LLMOPT_DISABLED" } }), { status: 503 }),
-      ),
-    );
-    const refusal = serverIntentSource(ORIGIN).interpret(
-      { message: "No hits.", locale: "en", draft: EMPTY_DRAFT, players: PLAYERS },
-      new AbortController().signal,
-    );
-    await expect(refusal).rejects.toBeInstanceOf(IntentError);
-    await expect(refusal).rejects.toMatchObject({ code: "LLMOPT_DISABLED" });
-  });
 });
 
 const KEY = "sk-test-own-key-round-0001";
@@ -149,7 +99,7 @@ describe("ownKeyIntentSource", () => {
     ).resolves.toEqual({ status: "clarification", message: "Which week?" });
   });
 
-  it("reads the check's REPLY_REFUSED as the chat not reading the request", async () => {
+  it("reads the check's REPLY_REFUSED as the model giving no readable answer", async () => {
     setOwnKey({ provider: "openai", model: "gpt-5-mini", key: KEY });
     ownKeyFetch(
       () =>
@@ -159,7 +109,7 @@ describe("ownKeyIntentSource", () => {
     );
     const refusal = ownKeyIntentSource(ORIGIN).interpret(REQUEST, new AbortController().signal);
     await expect(refusal).rejects.toMatchObject({ code: "REPLY_REFUSED" });
-    await refusal.catch((error: unknown) => expect(intentRefusal(error)).toBe("invalid"));
+    await refusal.catch((error: unknown) => expect(intentRefusal(error)).toBe("replyInvalid"));
   });
 
   it("calls no provider and no check when no key is held", async () => {

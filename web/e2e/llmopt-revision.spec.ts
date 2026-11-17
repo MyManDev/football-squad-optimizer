@@ -8,6 +8,7 @@ import {
 } from "../src/fixtures/league";
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
+import { holdModel, routeChat } from "./llmoptChat";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -122,7 +123,7 @@ test("a chat revision keeps week one and prices both exact comparisons after rel
       top100: { available: false, weights: [] },
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+  await routeChat(page, API, (route) => {
     if (route.request().method() === "OPTIONS") return answer(route, null);
     const body = route.request().postDataJSON();
     if (body.message === initialMessage) {
@@ -216,6 +217,8 @@ test("a chat revision keeps week one and prices both exact comparisons after rel
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   const input = page.getByRole("textbox", { name: "Plan instructions" });
   const send = page.getByRole("button", { name: "Send", exact: true });
   const compute = page.getByRole("button", { name: "Compute plans" });
@@ -317,6 +320,8 @@ test("a chat revision keeps week one and prices both exact comparisons after rel
   expect(cacheReads).toEqual(expect.arrayContaining(["with", "without"]));
   expect(posts).toHaveLength(3);
 
+  // The reload dropped the key with the tab's memory; the chat needs it again.
+  await holdModel(page);
   await card("With player").getByRole("button", { name: "Revise this plan" }).click();
   await expect(input).toBeFocused();
   await input.fill(shorterMessage);

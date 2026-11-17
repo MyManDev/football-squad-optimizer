@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
-import { EMPTY_DRAFT, IntentError, intentRefusal, preparePlans, readIntent } from "./intent";
+import { readReply } from "../../../testSupport/intentReply";
+import { EMPTY_DRAFT, IntentError, intentBody, intentRefusal, preparePlans } from "./intent";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -273,22 +274,11 @@ describe("club count transport", () => {
   it("validates canonical club names and scopes in an interpreted draft", async () => {
     const message = "Brighton'dan 3 oyuncu al.";
     const hard = [{ kind: "club_count", club: "Brighton", count: 3, scope: "transfers_in" }];
-    const mock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ status: "draft", draft: { hard, soft: [] } })),
-      );
-    vi.stubGlobal("fetch", mock);
-
-    const result = await readIntent(
-      "https://advice.example",
-      message,
-      "tr",
-      EMPTY_DRAFT,
+    const result = await readReply(
+      new Response(JSON.stringify({ status: "draft", draft: { hard, soft: [] } })),
       clubPlayers,
-      new AbortController().signal,
     );
-    expect(JSON.parse(String(mock.mock.calls[0]?.[1]?.body))).toMatchObject({
+    expect(intentBody(message, "tr", EMPTY_DRAFT, clubPlayers)).toMatchObject({
       message,
       players: clubPlayers,
     });
@@ -301,22 +291,10 @@ describe("club count transport", () => {
     { kind: "club_count", club: "Brighton", count: 2, scope: "starting_xi" },
     { kind: "club_count", club: "Brighton", count: 2, player_id: 17 },
   ])("refuses an invalid interpreted club count", async (rule) => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ status: "draft", draft: { hard: [rule], soft: [] } })),
-        ),
-    );
     await expect(
-      readIntent(
-        "https://advice.example",
-        "Kulüpten oyuncu al.",
-        "tr",
-        EMPTY_DRAFT,
+      readReply(
+        new Response(JSON.stringify({ status: "draft", draft: { hard: [rule], soft: [] } })),
         clubPlayers,
-        new AbortController().signal,
       ),
     ).rejects.toThrow("Invalid club count");
   });
@@ -341,18 +319,7 @@ describe("expected points cost limits", () => {
   const preference = { kind: "keep_player", player_id: 17, max_cost_tenths: 15 } as const;
 
   function response(draft: unknown) {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: "draft", draft }))),
-    );
-    return readIntent(
-      "https://advice.example",
-      "Saka'yı tutmak en fazla 1,5 beklenen puana mal oluyorsa tut.",
-      "tr",
-      EMPTY_DRAFT,
-      players,
-      new AbortController().signal,
-    );
+    return readReply(new Response(JSON.stringify({ status: "draft", draft })), players);
   }
 
   it("keeps the exact cost limit attached to its optional preference", async () => {
@@ -374,24 +341,12 @@ describe("expected points cost limits", () => {
 describe("intent refusals", () => {
   const players = [{ id: 17, name: "Example Player", team: "Brighton" }];
   const refuse = (status: number, code: string | null, headers: Record<string, string> = {}) => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({ contract_version: "1", error: { code, message: "operator text" } }),
-            { status, headers },
-          ),
-        ),
-    );
-    return readIntent(
-      "https://advice.example",
-      "Roll the transfer.",
-      "en",
-      EMPTY_DRAFT,
+    return readReply(
+      new Response(
+        JSON.stringify({ contract_version: "1", error: { code, message: "operator text" } }),
+        { status, headers },
+      ),
       players,
-      new AbortController().signal,
     ).then(
       () => {
         throw new Error("expected a refusal");
@@ -401,8 +356,10 @@ describe("intent refusals", () => {
   };
 
   it.each([
-    [503, "LLMOPT_DISABLED", "disabled"],
-    [503, "LLMOPT_UNAVAILABLE", "busy"],
+    [503, "PROVIDER_UNAVAILABLE", "busy"],
+    [422, "REPLY_REFUSED", "replyInvalid"],
+    [502, "PROVIDER_REPLY_CUT", "replyCut"],
+    [402, "PROVIDER_ACCOUNT_REFUSED", "accountRefused"],
     [429, "RATE_LIMITED", "limited"],
     [413, "PAYLOAD_TOO_LARGE", "tooLarge"],
     [422, "VALIDATION_FAILED", "invalid"],

@@ -11,6 +11,7 @@ import {
 } from "../src/fixtures/league";
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
+import { holdModel, routeChat } from "./llmoptChat";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -127,7 +128,7 @@ for (const kind of ["price_increase", "unavailable"] as const) {
           top100: { available: false, weights: [] },
         }),
       );
-      await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+      await routeChat(page, API, (route) => {
         if (route.request().method() === "OPTIONS") return answer(route, null);
         const body = route.request().postDataJSON();
         if (body.message === initialMessage)
@@ -222,6 +223,8 @@ for (const kind of ["price_increase", "unavailable"] as const) {
       });
 
       await page.goto(PAGE);
+
+      await holdModel(page);
       const input = page.getByRole("textbox", { name: "Plan instructions" });
       const send = page.getByRole("button", { name: "Send", exact: true });
       const compute = page.getByRole("button", { name: "Compute plans" });

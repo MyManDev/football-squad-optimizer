@@ -450,6 +450,23 @@
   font-size: 1rem;
 }
 
+.ownKey h2 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.ownKeyNeeded {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* The key is drawn as dots in a text field; see OwnKeyForm for why it is no password field. */
+.ownKeySecret {
+  -webkit-text-security: disc;
+}
+
 .ownKeyHeld {
   display: flex;
   flex-wrap: wrap;
