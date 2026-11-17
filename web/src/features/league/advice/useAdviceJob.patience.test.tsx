@@ -16,7 +16,7 @@ import type {
   AdviceRequestOptions,
   AdviceRequestResult,
 } from "./adviceClient";
-import { AdviceApiError, StaticOnlyAdviceClient } from "./adviceClient";
+import { AdviceApiError, HttpAdviceClient, StaticOnlyAdviceClient } from "./adviceClient";
 import { adviceRequestKey, recallJob, rememberJob } from "./adviceJobStore";
 import type { RequestOptions } from "../../../data/request";
 import { exampleTree } from "../../../testSupport/league";
@@ -409,4 +409,94 @@ it("restores cached advice only from the requested capture in strict mode", asyn
   await click("read cache");
   expect(phase()).toBe("done");
   expect(client.keys).toEqual([]);
+});
+
+describe("a poll refused for now keeps the job", () => {
+  const JOB = "advice-0123456789abcdef-1";
+  const gaps = (polls: number[], started: number) =>
+    polls.map((at, i) => at - (polls[i - 1] ?? started));
+
+  it("429 with Retry-After waits what it asks, never more than a minute", async () => {
+    const client = new SlowClient();
+    client.job = new AdviceApiError(429, "RATE_LIMITED", 20);
+    render(<Harness client={client} />);
+    await click("go");
+    const started = Date.now();
+    await act(async () => vi.advanceTimersByTimeAsync(2000 + 20_000));
+    expect(gaps(client.polls, started)).toEqual([2000, 20_000]);
+    client.job = new AdviceApiError(429, "RATE_LIMITED", 3600);
+    await act(async () => vi.advanceTimersByTimeAsync(20_000 + 60_000 - 1));
+    expect(gaps(client.polls, started)).toEqual([2000, 20_000, 20_000]);
+    expect(phase()).toBe(`waiting:queued:${JOB}`);
+    expect(recallJob(REQUEST)).toMatchObject({ jobId: JOB });
+
+    client.job = "running";
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(gaps(client.polls, started)).toEqual([2000, 20_000, 20_000, 60_000]);
+    expect(phase()).toBe(`waiting:running:${JOB}`);
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(gaps(client.polls, started).at(-1)).toBe(5000); // the ordinary cadence again
+    expect(recallJob(REQUEST)).toMatchObject({ jobId: JOB });
+  });
+
+  it("429 without Retry-After doubles the wait up to a minute, then polls as before", async () => {
+    const client = new SlowClient();
+    client.job = new AdviceApiError(429, "RATE_LIMITED");
+    render(<Harness client={client} />);
+    await click("go");
+    const started = Date.now();
+    await act(async () => vi.advanceTimersByTimeAsync(122_000));
+    expect(gaps(client.polls, started)).toEqual([2000, 4000, 8000, 16_000, 32_000, 60_000]);
+    expect(phase()).toBe(`waiting:queued:${JOB}`);
+    expect(recallJob(REQUEST)).toMatchObject({ jobId: JOB });
+
+    client.job = "running";
+    await act(async () => vi.advanceTimersByTimeAsync(60_000 + 5000));
+    expect(gaps(client.polls, started).slice(-2)).toEqual([60_000, 5000]);
+    expect(phase()).toBe(`waiting:running:${JOB}`);
+  });
+
+  it("503 with an HTTP-date Retry-After, on a remembered job, keeps it through a reload", async () => {
+    vi.setSystemTime(new Date("2026-11-17T12:00:00Z"));
+    rememberJob(REQUEST, { jobId: JOB, startedAt: Date.now() - 30_000 });
+    const polls: number[] = [];
+    let refuse = true;
+    const client = new HttpAdviceClient("https://api.example", async (url) => {
+      expect(url).toContain(`/advice-jobs/${JOB}`);
+      polls.push(Date.now());
+      if (refuse) {
+        return new Response(JSON.stringify({ error: { code: "QUEUE_UNAVAILABLE" } }), {
+          status: 503,
+          headers: { "Retry-After": new Date(Date.now() + 15_000).toUTCString() },
+        });
+      }
+      return new Response(JSON.stringify({ job_id: JOB, status: "running" }), { status: 200 });
+    });
+    render(<Harness client={client} />);
+    const started = Date.now();
+    await click("resume");
+    await act(async () => vi.advanceTimersByTimeAsync(15_000 - 1));
+    expect(gaps(polls, started)).toEqual([0]);
+    expect(phase()).toBe(`waiting:null:${JOB}`);
+    expect(recallJob(REQUEST)).toMatchObject({ jobId: JOB });
+
+    refuse = false;
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(gaps(polls, started)).toEqual([0, 15_000]);
+    expect(phase()).toBe(`waiting:running:${JOB}`);
+    expect(recallJob(REQUEST)).toMatchObject({ jobId: JOB });
+  });
+
+  it.each([404, 410])("%i still ends the job and forgets it", async (status) => {
+    const client = new SlowClient();
+    client.job = new AdviceApiError(status, "NOT_FOUND");
+    render(<Harness client={client} />);
+    await click("go");
+    expect(recallJob(REQUEST)).toMatchObject({ jobId: JOB });
+    await act(async () => vi.advanceTimersByTimeAsync(2000));
+    expect(phase()).toBe("failed:NOT_FOUND:");
+    expect(recallJob(REQUEST)).toBeNull();
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(client.polls).toHaveLength(1);
+  });
 });

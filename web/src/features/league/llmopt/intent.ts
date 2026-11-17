@@ -407,11 +407,68 @@ export async function readIntentCatalog(origin: string, season: string, signal: 
 
 export class IntentError extends Error {
   readonly status: number;
+  /** The service's stable refusal code, when the body carried one. */
+  readonly code: string | null;
+  /** `Retry-After` in whole seconds, when the refusal carried one. */
+  readonly retryAfterSeconds: number | null;
 
-  constructor(status: number) {
+  constructor(status: number, code: string | null = null, retryAfterSeconds: number | null = null) {
     super("The intent service refused the request.");
     this.status = status;
+    this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+const SERVICE_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
+/** The longest wait the page honours; a longer header is read as this. */
+const MAX_RETRY_AFTER_SECONDS = 86_400;
+
+async function intentError(response: Response): Promise<IntentError> {
+  let code: string | null = null;
+  try {
+    const body = (await response.json()) as { error?: { code?: unknown } };
+    const stated = body?.error?.code;
+    if (typeof stated === "string" && SERVICE_CODE.test(stated)) code = stated;
+  } catch {
+    code = null;
+  }
+  const header = response.headers.get("Retry-After")?.trim() ?? "";
+  const seconds = /^\d{1,10}$/.test(header) ? Number(header) : 0;
+  return new IntentError(
+    response.status,
+    code,
+    seconds > 0 ? Math.min(seconds, MAX_RETRY_AFTER_SECONDS) : null,
+  );
+}
+
+export type IntentRefusal =
+  "disabled" | "busy" | "limited" | "tooLarge" | "invalid" | "unsupported" | "unavailable";
+
+const REFUSAL_BY_CODE: Record<string, IntentRefusal> = {
+  LLMOPT_DISABLED: "disabled",
+  LLMOPT_UNAVAILABLE: "busy",
+  RATE_LIMITED: "limited",
+  PAYLOAD_TOO_LARGE: "tooLarge",
+  VALIDATION_FAILED: "invalid",
+  UNSUPPORTED_MEDIA_TYPE: "unsupported",
+};
+
+const REFUSAL_BY_STATUS: Record<number, IntentRefusal> = {
+  413: "tooLarge",
+  415: "unsupported",
+  422: "invalid",
+  429: "limited",
+};
+
+/** Which refusal a failed chat request was; anything unnamed reads as unavailable. */
+export function intentRefusal(error: unknown): IntentRefusal {
+  if (!(error instanceof IntentError)) return "unavailable";
+  return (
+    (error.code === null ? undefined : REFUSAL_BY_CODE[error.code]) ??
+    REFUSAL_BY_STATUS[error.status] ??
+    "unavailable"
+  );
 }
 
 export async function readIntent(
@@ -444,18 +501,18 @@ export async function readIntent(
         }),
         signal,
       });
-      if (!response.ok) {
-        await discardBody(response);
-        throw new IntentError(response.status);
-      }
+      if (!response.ok) throw await intentError(response);
       const value: unknown = await response.json();
       if (!record(value)) throw new Error("Invalid response");
+      // The question is saved with the session and sent back on the next message, so it must
+      // fit the limit both the restore check and the service hold it to.
       if (
         value.status === "clarification" &&
         typeof value.message === "string" &&
-        value.message.trim()
+        value.message.trim() &&
+        value.message.trim().length <= MAX_QUESTION_LENGTH
       )
-        return { status: "clarification" as const, message: value.message };
+        return { status: "clarification" as const, message: value.message.trim() };
       if (value.status !== "draft") throw new Error("Invalid response");
       return {
         status: "draft" as const,

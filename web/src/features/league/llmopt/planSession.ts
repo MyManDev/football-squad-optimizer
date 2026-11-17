@@ -17,6 +17,8 @@ export interface PlanConfirmation {
   /** Absent until the confirmed baseline has been checked for follow-up requests. */
   followups?: (StartedAlternative | null)[];
   scenarioReplayInfeasible?: true;
+  /** Set while a request this run sent may be unanswered, so a reload can find no job id. */
+  sending?: true;
 }
 
 interface PlanSession {
@@ -86,6 +88,7 @@ export function checkedPlanSession(
         ...(session.draft.scenario && confirmation.scenarioReplayInfeasible === true
           ? { scenarioReplayInfeasible: true as const }
           : {}),
+        ...(confirmation.sending === true ? { sending: true as const } : {}),
         followups: confirmation.followups?.map((item) => {
           if (item?.kind === "priced" || item?.kind === "roll") return { kind: item.kind };
           if (
