@@ -799,3 +799,115 @@ test("preferred players are priced individually and only shown within their exac
     0,
   );
 });
+
+test("accepted preferred players are combined into one plan after their single prices", async ({
+  page,
+}) => {
+  test.skip(!API, "API build required");
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+  const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+  const outgoing = squad.starting_xi.find((player) => player.position === "MID")!;
+  const players = [
+    { ...outgoing, player_id: 9081331, name: "First Target", team: "Arsenal" },
+    { ...outgoing, player_id: 9081332, name: "Second Target", team: "Brighton" },
+    { ...outgoing, player_id: 9081333, name: "Third Target", team: "Chelsea" },
+  ];
+  // Opening-week points by the players a request asks for: each single costs under its limit.
+  const opening: Record<string, number> = {
+    "": 45,
+    [String(players[0]!.player_id)]: 44,
+    [String(players[1]!.player_id)]: 43.8,
+    [players.map(({ player_id }) => player_id).join(",")]: 42.6,
+  };
+  const posts: { preferences: Record<string, unknown> }[] = [];
+  await page.route(`${API}/api/v1/contributions/players`, (route) =>
+    answer(route, {
+      season: squad.season,
+      players: players.map(({ player_id, name, team }) => ({ id: player_id, name, team })),
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+    answer(route, {
+      contract_version: "league_capabilities_v1",
+      league_id: LEAGUE,
+      capture_snapshot_id: squad.source_snapshot_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
+      preferences: { available: true },
+      top100: { available: false, weights: [] },
+      managers_word: { available: false },
+    }),
+  );
+  await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+    answer(route, {
+      status: "draft",
+      draft: {
+        window: 3,
+        hard: [{ kind: "no_hits" }],
+        soft: players.map(({ player_id }) => ({
+          kind: "include_player",
+          player_id,
+          max_cost_tenths: 15,
+        })),
+      },
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+    if (route.request().method() !== "POST") return answer(route, null);
+    const body = route.request().postDataJSON() as (typeof posts)[number];
+    posts.push(body);
+    const wanted = (body.preferences.include_players as number[] | undefined) ?? [];
+    const signing = players.find((p) => p.player_id === wanted[0]);
+    const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
+    return answer(route, {
+      ...envelope,
+      payload: {
+        ...envelope.payload,
+        moves: signing
+          ? [{ ...envelope.payload.moves[0]!, player_in: signing, player_out: outgoing }]
+          : [],
+        starting_xi: squad.starting_xi.map((player) =>
+          signing && player.player_id === outgoing.player_id ? signing : player,
+        ),
+        plan_weeks: envelope.payload.plan_weeks!.map((week, i) => ({
+          ...week,
+          gameweek: squad.gameweek + i,
+          transfers_in: signing && i === 0 ? [signing] : [],
+          transfers_out: signing && i === 0 ? [outgoing] : [],
+          chip: null,
+          transfer_hit_points: 0,
+          expected_points: i === 0 ? (opening[wanted.join(",")] ?? 40) : 44,
+        })),
+        preferences: body.preferences,
+        preferences_scope: "all_selected_weeks",
+      },
+    });
+  });
+
+  await page.goto(PAGE);
+  await page
+    .getByRole("textbox", { name: "Plan instructions" })
+    .fill("No hits. Each of these three is worth up to 1.5 points.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByRole("button", { name: "Compute plans" }).click();
+
+  const combined = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: "Plan with all preferences" }),
+  });
+  await expect(combined.getByText("2.4 expected points lost against the base plan")).toBeVisible();
+  for (const { name } of players)
+    await expect(combined.getByText(`Include player · ${name}`, { exact: true })).toBeVisible();
+  await expect(combined.locator("[data-combined=applied]")).toHaveCount(3);
+  await expect(
+    page.getByText(/^Applied in the plan with all preferences\. · Up to 1\.5 points$/),
+  ).toBeVisible();
+  expect(posts).toHaveLength(4);
+  expect(posts[3]?.preferences).toMatchObject({
+    no_hits: true,
+    net_points_priority: true,
+    include_players: players.map(({ player_id }) => player_id),
+  });
+  for (const post of posts) expect(JSON.stringify(post)).not.toContain("max_cost_tenths");
+});

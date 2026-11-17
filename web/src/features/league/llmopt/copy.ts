@@ -1,5 +1,6 @@
 import type { Language } from "../../../i18n/messages";
 import type { CatalogPlayer, Constraint, IntentRefusal } from "./intent";
+import type { OwnKeyProvider } from "./ownKey";
 
 /** A wait in seconds as a whole count of the largest unit that fits, rounded up. */
 function waitUnits(seconds: number): [number, "second" | "minute" | "hour"] {
@@ -31,7 +32,31 @@ const en = {
     invalid: "The chat could not read this request.",
     unsupported: "The chat did not accept this request.",
     unavailable: "Chat is unavailable. You can still edit the rules below.",
+    keyRefused: "The provider refused this API key.",
+    modelRefused: "The provider did not accept this model.",
+    providerLimited: "Your provider's request limit has been reached. Wait a little and try again.",
+    providerUnreachable: "The provider could not be reached.",
   } satisfies Record<IntentRefusal, string>,
+  ownKey: {
+    title: "Your model",
+    provider: "Provider",
+    model: "Model",
+    key: "API key",
+    baseUrl: "Base URL",
+    save: "Save",
+    delete: "Delete",
+    invalid: "The key, model or address is not valid.",
+    providers: {
+      openai: "OpenAI",
+      anthropic: "Anthropic",
+      gemini: "Google Gemini",
+      openrouter: "OpenRouter",
+      mistral: "Mistral",
+      groq: "Groq",
+      deepseek: "DeepSeek",
+      local: "Local",
+    } satisfies Record<OwnKeyProvider, string>,
+  },
   limitedFor: (seconds: number) => {
     const [count, unit] = waitUnits(seconds);
     return `The chat request limit has been reached. You can send again in ${count} ${unit}${count === 1 ? "" : "s"}.`;
@@ -115,7 +140,15 @@ const en = {
   priceCeiling: (value: string) => `Up to ${value} points`,
   priceAboveCeiling: "Above your points limit.",
   priceNotRun: "This preference was not evaluated in this calculation.",
+  priceCombined: "Applied in the plan with all preferences.",
+  priceLeftOut: "Left out of the plan with all preferences.",
   pricedPlan: (label: string) => `Preferred plan · ${label}`,
+  combinedPlan: "Plan with all preferences",
+  combinedRules: "Preferences in this plan",
+  combinedApplied: "Applied",
+  combinedLeftOut: "Left out",
+  combinedCost: (value: string) => `${value} expected points lost against the base plan`,
+  combinedInfeasible: "These preferences do not fit in one plan.",
   alternative: "Alternative plan",
   rollPlan: "Roll the transfer plan",
   bankPlan: "Plan with more remaining budget",
@@ -203,6 +236,30 @@ const tr: typeof en = {
     invalid: "Sohbet bu isteği okuyamadı.",
     unsupported: "Sohbet bu isteği kabul etmedi.",
     unavailable: "Sohbet şu anda kullanılamıyor. Kuralları aşağıdan düzenleyebilirsin.",
+    keyRefused: "Sağlayıcı bu API anahtarını kabul etmedi.",
+    modelRefused: "Sağlayıcı bu modeli kabul etmedi.",
+    providerLimited: "Sağlayıcının istek sınırına ulaşıldı. Biraz bekleyip tekrar dene.",
+    providerUnreachable: "Sağlayıcıya ulaşılamadı.",
+  },
+  ownKey: {
+    title: "Kendi modelin",
+    provider: "Sağlayıcı",
+    model: "Model",
+    key: "API anahtarı",
+    baseUrl: "Temel adres",
+    save: "Kaydet",
+    delete: "Sil",
+    invalid: "Anahtar, model ya da adres geçersiz.",
+    providers: {
+      openai: "OpenAI",
+      anthropic: "Anthropic",
+      gemini: "Google Gemini",
+      openrouter: "OpenRouter",
+      mistral: "Mistral",
+      groq: "Groq",
+      deepseek: "DeepSeek",
+      local: "Yerel",
+    },
   },
   limitedFor: (seconds) => {
     const [count, unit] = waitUnits(seconds);
@@ -288,7 +345,15 @@ const tr: typeof en = {
   priceCeiling: (value: string) => `En fazla ${value} puan`,
   priceAboveCeiling: "Belirlediğin puan sınırının üzerinde.",
   priceNotRun: "Bu tercih bu hesaplamada değerlendirilmedi.",
+  priceCombined: "Tüm tercihlerle planda uygulandı.",
+  priceLeftOut: "Tüm tercihlerle planın dışında kaldı.",
   pricedPlan: (label: string) => `Tercihli plan · ${label}`,
+  combinedPlan: "Tüm tercihlerle plan",
+  combinedRules: "Bu plandaki tercihler",
+  combinedApplied: "Uygulandı",
+  combinedLeftOut: "Dışarıda kaldı",
+  combinedCost: (value: string) => `Temel plana göre ${value} beklenen puan kaybı`,
+  combinedInfeasible: "Bu tercihler tek bir planda birlikte uygulanamıyor.",
   alternative: "Alternatif plan",
   rollPlan: "Transferi saklayan plan",
   bankPlan: "Daha fazla bütçe bırakan plan",

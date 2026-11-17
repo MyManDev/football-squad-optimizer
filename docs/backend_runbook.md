@@ -132,6 +132,16 @@ to the configured provider. It prepares structured constraints for review and
 does not submit an advice job. Its limits apply per API process. Turning off text
 interpretation requires removing either setting and restarting the API.
 
+`POST /api/v1/llmopt/prompt` and `POST /api/v1/llmopt/check` call no model and need
+neither setting (ADR 0017). `/prompt` takes the same body as `/intent` and returns the
+call a member's browser sends to the member's own provider: `system`, `user`, `schema`,
+`schema_name` and `max_output_tokens`. `/check` takes `{"request": ..., "reply": ...}`,
+rebuilds the shortlist and validates the model's reply as `/intent` does, answering the
+same draft or clarification, or 422 `REPLY_REFUSED`. Both refuse with 400
+`CREDENTIAL_REFUSED` any request carrying an `Authorization`, `x-api-key` or
+`x-goog-api-key` header, allow 20 requests a minute per visitor each, and do not count
+against the daily budget.
+
 ### VM data root selection
 
 The VM sync helpers support only the ordinary layout:
