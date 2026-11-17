@@ -285,7 +285,6 @@ function preferencePrice(
       status: "priced",
       cost: 0,
       aboveCeiling: false,
-      unproven: referencePlan.solver_status !== "OPTIMAL",
     };
   const candidate = alternatives[outcome];
   if (candidate?.phase !== "done")
@@ -307,8 +306,6 @@ function preferencePrice(
     status: "priced",
     cost,
     aboveCeiling: review.ceiling !== undefined && cost - review.ceiling / 10 > 1e-9,
-    unproven:
-      referencePlan.solver_status !== "OPTIMAL" || candidatePlan.solver_status !== "OPTIMAL",
   };
 }
 
@@ -875,7 +872,7 @@ function Workspace({
     <div className={styles.page} data-zone="llmopt">
       <header className={styles.header}>
         <Link to={teamPath}>{copy.back}</Link>
-        <h1>LLMOPT</h1>
+        <h1>{copy.title}</h1>
         <p>
           {team ? `${team} · ` : ""}
           {copy.week} {squad.gameweek}
@@ -899,7 +896,7 @@ function Workspace({
           <ol className={styles.conversation} aria-live="polite">
             {conversation.map(({ id, role, message }) => (
               <li key={id} data-role={role}>
-                <strong>{role === "user" ? copy.user : "LLMOPT"}</strong>
+                <strong>{role === "user" ? copy.user : copy.assistant}</strong>
                 <span>{message}</span>
               </li>
             ))}
@@ -1018,10 +1015,6 @@ function Workspace({
           <p className={styles.notice} role="alert">
             {copy.scenarioReferenceRequired}
           </p>
-        )}
-        {((draft.comparison && draft.soft.length > 0) ||
-          (draft.scenario && (draft.comparison || draft.soft.length > 0))) && (
-          <p className={styles.muted}>{copy.comparisonScope}</p>
         )}
         {hardConflict && (
           <p role="alert" className={styles.notice}>

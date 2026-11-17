@@ -2,6 +2,8 @@ import type { Language } from "../../../i18n/messages";
 import type { CatalogPlayer, Constraint } from "./intent";
 
 const en = {
+  title: "LLMOPT",
+  assistant: "LLMOPT",
   back: "Back to team",
   chat: "Plan instructions",
   placeholder: "Roll the transfer this week and buy Saka next week.",
@@ -13,7 +15,6 @@ const en = {
   interpreting: "Reading your instructions…",
   understood: "Instructions updated.",
   dismissQuestion: "Dismiss question",
-  comparisonScope: "This comparison uses the required rules.",
   user: "You",
   limited: "The chat request limit has been reached. Wait a little and try again.",
   intentUnavailable: "Chat is unavailable. You can still edit the rules below.",
@@ -75,8 +76,6 @@ const en = {
   bankAfterWeek: (week: number) => `After GW ${week}`,
   bankShortfall: (when: string, required: string, reachable: string, difference: string) =>
     `${when}, the required budget is ${required}. The most this plan can keep is ${reachable}. The shortfall is ${difference}.`,
-  bankWitness: (when: string, required: string, reachable: string) =>
-    `${when}, the required budget is ${required}. A checked alternative leaves ${reachable}.`,
   lowerBankMinimum: (bank: string) => `Lower the minimum remaining budget to ${bank}`,
   removeBankMinimum: "Remove the minimum remaining budget",
   deferPurchase: (player: string, before: number, after: number) =>
@@ -96,7 +95,6 @@ const en = {
   priceAmount: (value: string) => `${value} expected points lost`,
   priceCeiling: (value: string) => `Up to ${value} points`,
   priceAboveCeiling: "Above your points limit.",
-  priceUnproven: "Cost is based on the plans found.",
   priceNotRun: "This preference was not evaluated in this calculation.",
   pricedPlan: (label: string) => `Preferred plan · ${label}`,
   alternative: "Alternative plan",
@@ -126,7 +124,6 @@ const en = {
   scenarioPrice: (player: string, increase: string, week: number) =>
     `${player} costs ${increase} more from GW ${week} onward`,
   scenarioUnavailable: (player: string, week: number) => `${player} is unavailable in GW ${week}`,
-  scenarioHypothetical: "Both plans use the same hypothetical change.",
   scenarioReferenceRequired:
     "Calculate a reference plan for this window before comparing the scenario.",
   scenarioFeasible: "The original transfers are feasible in this scenario.",
@@ -149,7 +146,6 @@ const en = {
   lineup: "Starting XI and bench",
   lineupUnavailable: "The lineup for this plan is unavailable.",
   bench: "Bench",
-  notProven: "Valid plan found. Search ended before proving the best plan.",
   week: "GW",
   rules: {
     hold_transfers: "Roll the transfer",
@@ -166,6 +162,8 @@ const en = {
 };
 
 const tr: typeof en = {
+  title: "LLMOPT",
+  assistant: "LLMOPT",
   back: "Takıma dön",
   chat: "Plan talimatların",
   placeholder: "Bu hafta transferi sakla, haftaya Saka’yı al.",
@@ -177,7 +175,6 @@ const tr: typeof en = {
   interpreting: "Talimatların okunuyor…",
   understood: "Talimatlar güncellendi.",
   dismissQuestion: "Soruyu kapat",
-  comparisonScope: "Bu karşılaştırma kesin şartlara göre hesaplanır.",
   user: "Sen",
   limited: "Sohbet istek sınırına ulaştı. Biraz bekleyip tekrar dene.",
   intentUnavailable: "Sohbet şu anda kullanılamıyor. Kuralları aşağıdan düzenleyebilirsin.",
@@ -239,8 +236,6 @@ const tr: typeof en = {
   bankAfterWeek: (week: number) => `GW ${week} sonunda`,
   bankShortfall: (when: string, required: string, reachable: string, difference: string) =>
     `${when} en az ${required} kalması gerekiyor. Bu plan en fazla ${reachable} bırakabiliyor. Eksik tutar ${difference}.`,
-  bankWitness: (when: string, required: string, reachable: string) =>
-    `${when} en az ${required} kalması gerekiyor. Kontrol edilen bir alternatif ${reachable} bırakıyor.`,
   lowerBankMinimum: (bank: string) => `Asgari kalan bütçeyi ${bank} olarak değiştir`,
   removeBankMinimum: "Asgari kalan bütçe kuralını kaldır",
   deferPurchase: (player: string, before: number, after: number) =>
@@ -260,7 +255,6 @@ const tr: typeof en = {
   priceAmount: (value: string) => `${value} beklenen puan kaybı`,
   priceCeiling: (value: string) => `En fazla ${value} puan`,
   priceAboveCeiling: "Belirlediğin puan sınırının üzerinde.",
-  priceUnproven: "Maliyet bulunan planlara göre hesaplandı.",
   priceNotRun: "Bu tercih bu hesaplamada değerlendirilmedi.",
   pricedPlan: (label: string) => `Tercihli plan · ${label}`,
   alternative: "Alternatif plan",
@@ -291,7 +285,6 @@ const tr: typeof en = {
     `GW ${week} itibarıyla ${player} fiyatı ${increase} artıyor`,
   scenarioUnavailable: (player: string, week: number) =>
     `${player} GW ${week} haftasında oynayamıyor`,
-  scenarioHypothetical: "İki plan da aynı varsayımsal değişiklikle hesaplanır.",
   scenarioReferenceRequired:
     "Senaryoyu karşılaştırmadan önce bu süre için bir referans plan hesapla.",
   scenarioFeasible: "Önceki transferler bu senaryoda uygulanabilir.",
@@ -314,7 +307,6 @@ const tr: typeof en = {
   lineup: "İlk 11 ve yedekler",
   lineupUnavailable: "Bu planın kadrosu gösterilemiyor.",
   bench: "Yedekler",
-  notProven: "Geçerli bir plan bulundu. Arama, en iyi planı kanıtlamadan sona erdi.",
   week: "GW",
   rules: {
     hold_transfers: "Transferi sakla",

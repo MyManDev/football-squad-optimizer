@@ -53,7 +53,6 @@ export function ScenarioComparison({
           <p>
             <strong>{description}</strong>
           </p>
-          <p>{copy.scenarioHypothetical}</p>
           <p className={styles.notice} role="status">
             {outcome}
           </p>

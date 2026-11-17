@@ -193,13 +193,13 @@ for (const failure of ["proven", "witnessed", "interrupted"] as const) {
     }
 
     await expect(diagnosis).toBeVisible();
-    await expect(diagnosis).toContainText("£3.0m");
     await expect(diagnosis).toContainText("£2.6m");
     if (failure === "proven") {
+      await expect(diagnosis).toContainText("£3.0m");
       await expect(diagnosis).toContainText("The shortfall is £0.4m");
     } else {
-      await expect(diagnosis).toContainText("A checked alternative leaves £2.6m");
-      await expect(diagnosis).not.toContainText(/The most|shortfall/i);
+      await expect(diagnosis).toContainText("No plan satisfies these rules together.");
+      await expect(diagnosis).not.toContainText(/checked alternative|The most|shortfall/i);
     }
     await expect(alternative).toBeEnabled();
     expect(posts).toHaveLength(1);
