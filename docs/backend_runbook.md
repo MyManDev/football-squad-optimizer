@@ -104,6 +104,12 @@ SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json
 
 ### LLMOPT text interpretation
 
+Production runs without a site model since 17 November 2026 (ADR 0017): LLMOPT's chat is
+read by each member's own model, the page calls only `/api/v1/llmopt/prompt` and
+`/api/v1/llmopt/check`, and neither needs any setting below. `/etc/squadopt/llmopt.env`
+holds no key. The settings below remain for a deployment that wants `/intent` answered by
+a key of its own.
+
 Set both `SQUADOPT_LLMOPT_API_KEY` and `SQUADOPT_LLMOPT_MODEL` in the API process's
 private environment before starting the Uvicorn factory. The configured model must
 support strict Structured Outputs with Chat Completions. The default provider is OpenAI.

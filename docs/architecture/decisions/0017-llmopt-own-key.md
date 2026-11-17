@@ -82,8 +82,12 @@ Three facts make that possible:
    - after 30 minutes without a request.
 
    It is never written to `localStorage`, `sessionStorage`, IndexedDB, a cookie, the address,
-   the saved LLMOPT session, the usage record or an error report. The field has
-   `autocomplete="off"`, so the browser does not offer to save it either.
+   the saved LLMOPT session, the usage record or an error report. The field is a text field
+   drawn as dots, with `autocomplete="off"`: a browser offers to save what a password field
+   held once the field leaves the page, whatever `autocomplete` says, and a saved key would
+   outlive the tab. Leaving the LLMOPT page inside the site deletes the key as well, and the
+   30 minutes are read from the clock, so a tab that slept past them drops the key when it
+   is next used or looked at.
 4. **The page is closed to scripts that could read the key.** A key in the page is only as
    safe as the page's scripts, so the site adds a Content-Security-Policy (`web/public/_headers`
    has none today):
@@ -97,10 +101,10 @@ Three facts make that possible:
    That way a hostile page state cannot send the key anywhere. The policy is tested against
    the built site before it ships.
 5. **Every member brings a key.** LLMOPT asks for the member's provider and key before the
-   first message. The site's own key (`SQUADOPT_LLMOPT_API_KEY`) is then only a fallback the
-   owner can leave set during the change, under today's limits, and unset after it. Calls made with a
-   member's key do not count against the site's 250-a-day budget. `/prompt` and `/check` keep
-   a per-visitor rate limit of their own.
+   first message: the chat is off until a key is held, and the rules can be edited by hand
+   meanwhile. The site's own key (`SQUADOPT_LLMOPT_API_KEY`) was a fallback during the
+   change and is unset since 17 November 2026; the page no longer calls `/intent`. `/prompt`
+   and `/check` keep a per-visitor rate limit of their own.
 6. **What the site can still see.** The member's text and the shortlist pass through `/prompt`
    and `/check`, as today, but they are not logged. The provider's reply passes through
    `/check`. The privacy page names the member's chosen provider as the processor of LLMOPT
@@ -150,5 +154,11 @@ Each step is its own PR, reviewed before it is enqueued:
 4. **Web.** Add the in-memory key holder (with Delete and the idle timeout) and the provider
    adapters.
    LLMOPT uses them when a key is present, and today's `/intent` route when it is not.
+   (Since step 6 the page uses only the member's key.)
 5. **Text.** Add the privacy page line and a key form with no explanatory text beyond the
    field names, per the site's no-clutter rule.
+6. **Own key only (2026-11-17).** The site's key is unset and the page reads the chat only
+   with the member's key. The form gains its title and one line that says what turns the
+   chat on, since a chat that is off needs that much said. A chat-completions provider is
+   given room to think (8192 reply tokens), because a reasoning model counts its thinking
+   against the limit and the answer's own 1200 stopped such a model before it wrote.

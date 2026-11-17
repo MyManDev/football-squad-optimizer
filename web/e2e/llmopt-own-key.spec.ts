@@ -47,9 +47,12 @@ test("a member's own key reads the chat at the provider, never reaches the site,
   await page.route(`${API}/api/v1/contributions/players`, (route) =>
     answer(route, { season: squad.season, players }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
-    route.fulfill({ status: 500, headers: CORS }),
-  );
+  // The site has no model of its own: the page never asks its intent route.
+  const askedSite: string[] = [];
+  await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+    askedSite.push(route.request().method());
+    return route.fulfill({ status: 500, headers: CORS });
+  });
   await page.route(`${API}/api/v1/llmopt/prompt`, (route) =>
     answer(route, {
       system: "Read the member's instructions.",
@@ -74,6 +77,15 @@ test("a member's own key reads the chat at the provider, never reaches the site,
   await page.goto(PAGE);
   const main = page.getByRole("main");
   const keyField = main.getByLabel(en.ownKey.key, { exact: true });
+  // Until a key is held the chat is off and the page says what turns it on.
+  const chat = main.getByRole("textbox", { name: en.chat });
+  await expect(main.getByText(en.ownKey.needed)).toBeVisible();
+  await expect(chat).toBeDisabled();
+  // A password field would be offered to the browser's password store; this one is text.
+  await expect(keyField).toHaveAttribute("type", "text");
+  expect(await keyField.evaluate((field) => getComputedStyle(field).webkitTextSecurity)).toBe(
+    "disc",
+  );
   await main.getByLabel(en.ownKey.provider, { exact: true }).selectOption("openai");
   await main.getByRole("textbox", { name: en.ownKey.model }).fill("gpt-5-mini");
   await keyField.fill(KEY);
@@ -84,8 +96,9 @@ test("a member's own key reads the chat at the provider, never reaches the site,
   await expect(held).toContainText("OpenAI");
   await expect(held).toContainText("gpt-5-mini");
   await expect(keyField).toHaveCount(0);
+  await expect(chat).toBeFocused();
 
-  await main.getByRole("textbox", { name: en.chat }).fill("No hits.");
+  await chat.fill("No hits.");
   await main.getByRole("button", { name: en.send, exact: true }).click();
   await expect(
     main.getByRole("button", { name: `${en.remove} · ${en.rules.no_hits}` }),
@@ -98,6 +111,8 @@ test("a member's own key reads the chat at the provider, never reaches the site,
   await remove.click();
   await expect(keyField).toHaveValue("");
   await expect(main.getByText("gpt-5-mini", { exact: true })).toHaveCount(0);
+  await expect(chat).toBeDisabled();
+  expect(askedSite).toEqual([]);
 
   const stored = await page.evaluate(async () => {
     const storage = (store: Storage) =>

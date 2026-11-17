@@ -444,7 +444,6 @@ export async function intentError(response: Response): Promise<IntentError> {
 }
 
 export type IntentRefusal =
-  | "disabled"
   | "busy"
   | "limited"
   | "tooLarge"
@@ -454,23 +453,26 @@ export type IntentRefusal =
   | "keyRefused"
   | "modelRefused"
   | "providerLimited"
-  | "providerUnreachable";
+  | "providerUnreachable"
+  | "accountRefused"
+  | "replyInvalid"
+  | "replyCut";
 
 const REFUSAL_BY_CODE: Record<string, IntentRefusal> = {
-  LLMOPT_DISABLED: "disabled",
-  LLMOPT_UNAVAILABLE: "busy",
   RATE_LIMITED: "limited",
   PAYLOAD_TOO_LARGE: "tooLarge",
   VALIDATION_FAILED: "invalid",
   UNSUPPORTED_MEDIA_TYPE: "unsupported",
-  REPLY_REFUSED: "invalid",
+  REPLY_REFUSED: "replyInvalid",
   PROVIDER_KEY_REFUSED: "keyRefused",
   PROVIDER_MODEL_REFUSED: "modelRefused",
   PROVIDER_RATE_LIMITED: "providerLimited",
   PROVIDER_UNREACHABLE: "providerUnreachable",
   PROVIDER_REFUSED: "unsupported",
   PROVIDER_UNAVAILABLE: "busy",
-  PROVIDER_REPLY_INVALID: "invalid",
+  PROVIDER_REPLY_INVALID: "replyInvalid",
+  PROVIDER_REPLY_CUT: "replyCut",
+  PROVIDER_ACCOUNT_REFUSED: "accountRefused",
 };
 
 const REFUSAL_BY_STATUS: Record<number, IntentRefusal> = {
@@ -490,7 +492,7 @@ export function intentRefusal(error: unknown): IntentRefusal {
   );
 }
 
-/** The body of an intent request, as `/intent`, `/prompt` and `/check` all read it. */
+/** The body of an intent request, as `/prompt` and `/check` both read it. */
 export function intentBody(
   message: string,
   locale: Language,
@@ -531,40 +533,4 @@ export function intentAnswer(value: unknown, players: readonly CatalogPlayer[]) 
     status: "draft" as const,
     draft: checkedDraft(value.draft, players),
   };
-}
-
-export async function readIntent(
-  origin: string,
-  message: string,
-  locale: Language,
-  draft: PlanDraft,
-  players: CatalogPlayer[],
-  signal: AbortSignal,
-  clarification?: Clarification,
-  referenceWeeks?: readonly PlanWeekNumber[],
-  referenceCaptains?: readonly { week: PlanWeekNumber; player_id: number }[],
-) {
-  return withRequestDeadline(
-    async (signal) => {
-      const response = await fetch(`${origin}/api/v1/llmopt/intent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          intentBody(
-            message,
-            locale,
-            draft,
-            players,
-            clarification,
-            referenceWeeks,
-            referenceCaptains,
-          ),
-        ),
-        signal,
-      });
-      if (!response.ok) throw await intentError(response);
-      return intentAnswer(await response.json(), players);
-    },
-    { signal, timeoutMs: 45_000 },
-  );
 }

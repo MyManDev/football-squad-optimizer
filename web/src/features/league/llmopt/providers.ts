@@ -47,14 +47,14 @@ export const PROVIDERS: Readonly<Record<OwnKeyProvider, ProviderSpec>> = {
     endpoint: "https://api.anthropic.com/v1/messages",
     tokens: "max_tokens",
     output: "tool",
-    modelExample: "claude-sonnet-4-5",
+    modelExample: "claude-haiku-5-5",
   },
   gemini: {
     family: "chat",
     endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     tokens: "max_completion_tokens",
     output: "json_schema",
-    modelExample: "gemini-2.5-flash",
+    modelExample: "gemini-flash-latest",
   },
   openrouter: {
     family: "chat",
@@ -94,6 +94,12 @@ export const PROVIDERS: Readonly<Record<OwnKeyProvider, ProviderSpec>> = {
 };
 
 export const ANTHROPIC_VERSION = "2023-06-01";
+/**
+ * The reply limit a chat-completions provider is given. A reasoning model counts its
+ * thinking against the limit, so the answer's own size (`max_output_tokens`) would stop such
+ * a model before it wrote anything. The answer stays as short; this is only room to think.
+ */
+export const CHAT_REPLY_TOKENS = 8192;
 const PROVIDER_TIMEOUT_MS = 60_000;
 const MAX_RETRY_AFTER_SECONDS = 86_400;
 
@@ -152,7 +158,7 @@ export function providerRequest(
     },
     body: {
       model: credential.model,
-      [spec.tokens]: call.max_output_tokens,
+      [spec.tokens]: Math.max(call.max_output_tokens, CHAT_REPLY_TOKENS),
       ...(credential.provider === "openai" ? { store: false } : {}),
       ...(credential.provider === "openrouter" ? { provider: { require_parameters: true } } : {}),
       messages: [
@@ -183,8 +189,8 @@ export function providerReply(provider: OwnKeyProvider, call: ProviderCall, valu
             record(block) && block.type === "tool_use" && block.name === call.schema_name,
         )
       : undefined;
-    if (!record(tool) || !record(tool.input) || value.stop_reason === "max_tokens")
-      throw refusal("PROVIDER_REPLY_INVALID");
+    if (value.stop_reason === "max_tokens") throw refusal("PROVIDER_REPLY_CUT");
+    if (!record(tool) || !record(tool.input)) throw refusal("PROVIDER_REPLY_INVALID");
     return tool.input;
   }
   const choices = value.choices;
@@ -192,6 +198,8 @@ export function providerReply(provider: OwnKeyProvider, call: ProviderCall, valu
   if (!record(choice) || !record(choice.message)) throw refusal("PROVIDER_REPLY_INVALID");
   const finish = choice.finish_reason;
   const { content, refusal: declined } = choice.message;
+  // The model ran into the reply limit, usually while still thinking.
+  if (finish === "length") throw refusal("PROVIDER_REPLY_CUT");
   if (
     (finish !== undefined && finish !== null && finish !== "stop") ||
     (declined !== undefined && declined !== null) ||
@@ -214,11 +222,10 @@ export function retryAfterSeconds(header: string | null, now = Date.now()): numb
 }
 
 /**
- * What a 400 or 422 refused: the key (Gemini answers a bad key with 400), the model, or the
- * request. Only the error's code, type, status, reason and message are tested; nothing of
+ * The words of a provider's error: its code, type, status, reason and message. Nothing of
  * the body is kept, since a provider can repeat part of a key in it.
  */
-async function badRequestCode(response: Response): Promise<string> {
+async function errorWords(response: Response): Promise<(pattern: RegExp) => boolean> {
   let fields: unknown[] = [];
   try {
     const parsed: unknown = await response.json();
@@ -232,9 +239,21 @@ async function badRequestCode(response: Response): Promise<string> {
   } catch {
     fields = [];
   }
-  const said = (pattern: RegExp) =>
+  return (pattern: RegExp) =>
     fields.some((field) => typeof field === "string" && pattern.test(field));
+}
+
+/** An account with no credit or plan left: waiting does not help, so it is no rate limit. */
+const NO_CREDIT = /insufficient[ _-]?(quota|balance)|credit balance/i;
+
+/**
+ * What a 400 or 422 refused: the key (Gemini answers a bad key with 400), the account
+ * (Anthropic answers an empty balance with 400), the model, or the request.
+ */
+async function badRequestCode(response: Response): Promise<string> {
+  const said = await errorWords(response);
   if (said(/api[ _-]?key/i)) return "PROVIDER_KEY_REFUSED";
+  if (said(NO_CREDIT)) return "PROVIDER_ACCOUNT_REFUSED";
   if (said(/model/i)) return "PROVIDER_MODEL_REFUSED";
   return "PROVIDER_REFUSED";
 }
@@ -246,8 +265,13 @@ export async function providerError(response: Response): Promise<IntentError> {
     await discardBody(response);
     return refusal("PROVIDER_KEY_REFUSED", status);
   }
-  if (status === 429) {
+  if (status === 402) {
     await discardBody(response);
+    return refusal("PROVIDER_ACCOUNT_REFUSED", status);
+  }
+  if (status === 429) {
+    // OpenAI answers a key with no credit with 429 too; only a real limit has a wait.
+    if ((await errorWords(response))(NO_CREDIT)) return refusal("PROVIDER_ACCOUNT_REFUSED", status);
     return refusal(
       "PROVIDER_RATE_LIMITED",
       status,

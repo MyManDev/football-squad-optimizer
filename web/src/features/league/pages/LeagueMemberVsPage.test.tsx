@@ -151,7 +151,11 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
     expect(did.getByText("Player 9")).toBeInTheDocument();
     expect(did.getByText("Player 3")).toBeInTheDocument();
     expect(did.getByText("Player 5")).toBeInTheDocument();
-    expect(screen.getByTestId("vs-breakdown")).toBeInTheDocument();
+    // Hidden by its wrapper: a table hidden on its own kept its full width and made the
+    // page scroll sideways.
+    const table = screen.getByTestId("vs-breakdown");
+    expect(table).not.toHaveClass("visually-hidden");
+    expect(table.parentElement).toHaveClass("visually-hidden");
     expect(screen.getByTestId("vs-difference-bars")).toBeInTheDocument();
     const squad = screen.getByRole("region", { name: copy.squad });
     expect(within(squad).getAllByRole("row").length).toBeGreaterThan(11);

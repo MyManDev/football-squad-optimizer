@@ -7,13 +7,14 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock }
 
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { readReply } from "../../../testSupport/intentReply";
 import { requestsCarrying, sentRequests, watchKeyLeaks } from "../../../testSupport/keyLeaks";
 import { stubTree, withLeague } from "../../../testSupport/league";
 import type { AdviceRequest } from "../advice/adviceClient";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import { LLMOPT_COPY } from "./copy";
-import { IntentError } from "./intent";
+import { IntentError, intentBody } from "./intent";
 import type { IntentSource } from "./intentSource";
 import { clearOwnKey, heldModel } from "./ownKey";
 import { summarizeRevision } from "./planRevision";
@@ -91,15 +92,13 @@ beforeEach(() => {
   stubTree({ entrySquad: vi.fn(async () => envelope) });
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === `${ORIGIN}/api/v1/contributions/players`) {
         if (roster === "fail") return new Response("{}", { status: 503 });
         if (roster === "late") await rosterGate;
         return new Response(JSON.stringify({ season: squad.season, players: ROSTER }));
       }
-      if (url === `${ORIGIN}/api/v1/llmopt/intent`)
-        return intent(JSON.parse(String(init?.body)) as Record<string, unknown>);
       return new Response("{}", { status: 404 });
     }),
   );
@@ -113,8 +112,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Opens the page the way a visit or a reload does: a fresh query cache, the tab's storage kept. */
-function open(language: "en" | "tr" = "en", intentSource?: IntentSource) {
+/** Stands in for a held model: `intent` answers the body the page would send to be checked. */
+const model: IntentSource = {
+  interpret: async (request) =>
+    readReply(
+      intent(
+        intentBody(
+          request.message,
+          request.locale,
+          request.draft,
+          request.players,
+          request.clarification,
+          request.referenceWeeks,
+          request.referenceCaptains,
+        ),
+      ),
+      request.players,
+    ),
+};
+
+/**
+ * Opens the page the way a visit or a reload does: a fresh query cache, the tab's storage kept.
+ * The chat is read by `intentSource`; null leaves it to the member's own key, as on the site.
+ */
+function open(language: "en" | "tr" = "en", intentSource: IntentSource | null = model) {
   // The fixtures are set, not read, so the cache keeps them while no page observes them.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
@@ -140,7 +161,7 @@ function open(language: "en" | "tr" = "en", intentSource?: IntentSource) {
             <Routes>
               <Route
                 path="/entry/:entryId/llmopt"
-                element={<LLMOptPage intentSource={intentSource} />}
+                element={<LLMOptPage intentSource={intentSource ?? undefined} />}
               />
             </Routes>,
           )}
@@ -164,8 +185,10 @@ async function sendMessage(text: string) {
 
 describe("chat refusals", () => {
   it.each([
-    [503, "LLMOPT_DISABLED", en.refusals.disabled],
-    [503, "LLMOPT_UNAVAILABLE", en.refusals.busy],
+    [503, "PROVIDER_UNAVAILABLE", en.refusals.busy],
+    [422, "REPLY_REFUSED", en.refusals.replyInvalid],
+    [502, "PROVIDER_REPLY_CUT", en.refusals.replyCut],
+    [402, "PROVIDER_ACCOUNT_REFUSED", en.refusals.accountRefused],
     [429, "RATE_LIMITED", en.refusals.limited],
     [413, "PAYLOAD_TOO_LARGE", en.refusals.tooLarge],
     [422, "VALIDATION_FAILED", en.refusals.invalid],
@@ -181,6 +204,42 @@ describe("chat refusals", () => {
     expect(await screen.findByText(words, { exact: true })).toBeVisible();
     for (const other of Object.values(en.refusals).filter((text) => text !== words))
       expect(screen.queryByText(other, { exact: true })).toBeNull();
+  });
+
+  it("keeps every answer when the model asks a second question", async () => {
+    open();
+    await ready();
+    await sendMessage("Buy a striker.");
+    await screen.findByText("Which week should it be?");
+    await sendMessage("Next week.");
+    await waitFor(() => expect(intent).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: en.chat })).toHaveValue(""));
+    await sendMessage("Haaland.");
+    await waitFor(() => expect(intent).toHaveBeenCalledTimes(3));
+    // The third request still carries the answer to the first question.
+    expect(intent.mock.calls[2]?.[0]).toMatchObject({
+      message: "Haaland.",
+      clarification: {
+        message: "Buy a striker.\nNext week.",
+        question: "Which week should it be?",
+      },
+    });
+  });
+
+  it("keeps the workspace when a later refresh of the squad fails", async () => {
+    const entrySquad = vi.fn(async () => envelope);
+    stubTree({ entrySquad });
+    open();
+    await ready();
+    await userEvent.click(screen.getByRole("button", { name: en.add }));
+    entrySquad.mockRejectedValue(new Error("offline"));
+    await clients[0]!.refetchQueries();
+    expect(entrySquad.mock.calls.length).toBeGreaterThan(1);
+    expect(screen.getByRole("heading", { level: 1, name: en.title })).toBeVisible();
+    expect(screen.queryByText(en.squadUnavailable)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: `${en.remove} · ${en.rules.hold_transfers}` }),
+    ).toBeVisible();
   });
 
   it("keeps Send off while Retry-After runs and turns it back on by itself", async () => {
@@ -477,12 +536,12 @@ describe("the chat's intent source", () => {
   it("shows a refusal the source names in the page's own words", async () => {
     open("en", {
       interpret: async () => {
-        throw new IntentError(503, "LLMOPT_DISABLED");
+        throw new IntentError(401, "PROVIDER_KEY_REFUSED");
       },
     });
     await ready();
     await sendMessage("No hits.");
-    expect(await screen.findByText(en.refusals.disabled, { exact: true })).toBeVisible();
+    expect(await screen.findByText(en.refusals.keyRefused, { exact: true })).toBeVisible();
   });
 });
 
@@ -700,10 +759,11 @@ describe("the member's own model key", () => {
   it("reads the chat with the member's provider, keeps the key out of every store, and Delete deletes it", async () => {
     const watch = watchKeyLeaks(KEY);
     try {
-      open();
+      open("en", null);
       await ready();
       const key = screen.getByLabelText(words.key);
-      expect(key).toHaveAttribute("type", "password");
+      // A text field drawn as dots: a browser offers to save what a password field held.
+      expect(key).toHaveAttribute("type", "text");
       expect(key).toHaveAttribute("autocomplete", "off");
       expect(key).toHaveAttribute("spellcheck", "false");
       expect(screen.getByRole("button", { name: words.save })).toBeDisabled();
@@ -738,13 +798,82 @@ describe("the member's own model key", () => {
       expect(screen.getByLabelText(words.key)).toHaveValue("");
       expect(document.body.innerHTML).not.toContain(KEY);
 
-      await sendMessage("Roll the transfer.");
-      await waitFor(() => expect(intent).toHaveBeenCalledTimes(1));
+      // With the key gone the chat is off again; nothing else reads it.
+      expect(screen.getByRole("textbox", { name: en.chat })).toBeDisabled();
+      expect(screen.getByText(words.needed)).toBeVisible();
       expect(provider).toHaveBeenCalledTimes(1);
       expect(watch.leaks()).toEqual([]);
     } finally {
       watch.restore();
     }
+  });
+
+  it("keeps the chat off until a key is held, with the rules still editable", async () => {
+    open("en", null);
+    await ready();
+    expect(screen.getByText(words.needed)).toBeVisible();
+    expect(screen.getByRole("textbox", { name: en.chat })).toBeDisabled();
+    expect(screen.getByRole("button", { name: en.send })).toBeDisabled();
+    expect(screen.getByRole("button", { name: en.add })).toBeEnabled();
+
+    await saveKey();
+    expect(screen.queryByText(words.needed)).toBeNull();
+    // Save hands the keyboard to the chat, the next thing to do.
+    expect(screen.getByRole("textbox", { name: en.chat })).toHaveFocus();
+    const fetch = globalThis.fetch as unknown as Mock;
+    expect(sentRequests(fetch).map(({ url }) => url)).not.toContain(
+      `${ORIGIN}/api/v1/llmopt/intent`,
+    );
+  });
+
+  it("deletes the key when the member leaves the page", async () => {
+    const { unmount } = open("en", null);
+    await ready();
+    await saveKey();
+    expect(heldModel()).toEqual({ provider: "openai", model: "gpt-5-mini" });
+    unmount();
+    expect(heldModel()).toBeNull();
+  });
+
+  it("moves focus to the form when the held key is deleted", async () => {
+    open("en", null);
+    await ready();
+    await saveKey();
+    await userEvent.click(screen.getByRole("button", { name: words.delete }));
+    expect(screen.getByRole("combobox", { name: words.provider })).toHaveFocus();
+  });
+
+  it.each([
+    [402, {}, en.refusals.accountRefused],
+    [
+      429,
+      { error: { code: "insufficient_quota", type: "insufficient_quota" } },
+      en.refusals.accountRefused,
+    ],
+  ] as const)(
+    "names an account with no credit (%i) apart from a rate limit",
+    async (status, body, line) => {
+      provider.mockImplementation(() => new Response(JSON.stringify(body), { status }));
+      open("en", null);
+      await ready();
+      await saveKey();
+      await sendMessage("No hits.");
+      expect(await screen.findByText(line, { exact: true })).toBeVisible();
+    },
+  );
+
+  it("says the model stopped early when it ran into the reply limit", async () => {
+    provider.mockImplementation(
+      () =>
+        new Response(
+          JSON.stringify({ choices: [{ finish_reason: "length", message: { content: "" } }] }),
+        ),
+    );
+    open("en", null);
+    await ready();
+    await saveKey();
+    await sendMessage("No hits.");
+    expect(await screen.findByText(en.refusals.replyCut, { exact: true })).toBeVisible();
   });
 
   it("names a key the provider refused without showing or logging the key", async () => {
@@ -756,7 +885,7 @@ describe("the member's own model key", () => {
     );
     const watch = watchKeyLeaks(KEY);
     try {
-      open();
+      open("en", null);
       await ready();
       await saveKey();
       await sendMessage("No hits.");
@@ -772,7 +901,7 @@ describe("the member's own model key", () => {
     provider.mockImplementation(
       () => new Response("{}", { status: 429, headers: { "Retry-After": "2" } }),
     );
-    open();
+    open("en", null);
     await ready();
     await saveKey();
     await sendMessage("No hits.");
@@ -782,7 +911,7 @@ describe("the member's own model key", () => {
 
   it("asks for a base URL only for a local server, and only a loopback one", async () => {
     const user = userEvent.setup();
-    open();
+    open("en", null);
     await ready();
     expect(screen.queryByRole("textbox", { name: words.baseUrl })).toBeNull();
     await user.selectOptions(
@@ -804,7 +933,7 @@ describe("the member's own model key", () => {
 
   it("says once that a key it cannot hold is not valid, and clears it on the next edit", async () => {
     const user = userEvent.setup();
-    open();
+    open("en", null);
     await ready();
     await user.type(screen.getByRole("textbox", { name: words.model }), "two words");
     await user.type(screen.getByLabelText(words.key), KEY);
@@ -827,13 +956,13 @@ describe("the member's own model key", () => {
   });
 
   it("labels the form in Turkish", async () => {
-    open("tr");
+    open("tr", null);
     await screen.findByRole("heading", { level: 1, name: LLMOPT_COPY.tr.title });
     const tr = LLMOPT_COPY.tr.ownKey;
     expect(screen.getByRole("group", { name: tr.title })).toBeVisible();
     expect(screen.getByRole("combobox", { name: tr.provider })).toBeVisible();
     expect(screen.getByRole("textbox", { name: tr.model })).toBeRequired();
-    expect(screen.getByLabelText(tr.key)).toHaveAttribute("type", "password");
+    expect(screen.getByText(tr.needed)).toBeVisible();
     expect(screen.getByRole("button", { name: tr.save })).toBeVisible();
     expect(screen.getByRole("button", { name: tr.delete })).toBeVisible();
   });

@@ -113,6 +113,20 @@ describe("the own key holder", () => {
     expect(heldModel()).toBeNull();
   });
 
+  it("deletes a key whose 30 minutes passed while the tab was asleep", async () => {
+    // A sleeping laptop stops timers, not the clock.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    setOwnKey({ provider: "groq", model: "openai/gpt-oss-20b", key: KEY });
+    vi.setSystemTime(Date.now() + OWN_KEY_IDLE_MS);
+    await expect(heldCredential()).rejects.toThrow("No model key is held.");
+    expect(heldModel()).toBeNull();
+
+    setOwnKey({ provider: "groq", model: "openai/gpt-oss-20b", key: KEY });
+    vi.setSystemTime(Date.now() + OWN_KEY_IDLE_MS);
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(heldModel()).toBeNull();
+  });
+
   it("deletes the key when the page is left", () => {
     setOwnKey({ provider: "openrouter", model: "openai/gpt-5-mini", key: KEY });
     window.dispatchEvent(new Event("pagehide"));

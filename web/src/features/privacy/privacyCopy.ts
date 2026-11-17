@@ -34,7 +34,7 @@ export const PRIVACY_COPY: Record<Language, PrivacyCopy> = {
       },
       {
         title: "LLMOPT",
-        body: "What you write in LLMOPT and the candidate players for your squad are sent to Google Gemini to read your request. Your team number and name are not sent, and your text is not written to our server's logs. Google may use this text and its answer to improve its products, and people at Google may read them, so do not write personal information in LLMOPT. With your own API key, your text goes directly from your browser to the provider you chose, and the key stays only in that tab and is never sent to SquadOpt.",
+        body: "LLMOPT's chat works with your own model key. What you write and the candidate players for your squad go from your browser straight to the provider you chose, under your key, and that provider's terms apply to them. Our server prepares the request and checks the answer: it receives your text for that, does not write it to its logs, and never receives the key. The key stays only in that tab, is deleted when you leave the page, and is never sent to SquadOpt. Your team number and name are not sent.",
       },
       {
         title: "Deadline reminder",
@@ -67,7 +67,7 @@ export const PRIVACY_COPY: Record<Language, PrivacyCopy> = {
       },
       {
         title: "LLMOPT",
-        body: "LLMOPT'a yazdığın metin ve kadron için aday oyuncular, isteğini anlamak üzere Google Gemini'ye gönderilir. Takım numaran ve adın gönderilmez, metnin sunucu kayıtlarımıza yazılmaz. Google bu metni ve cevabını ürünlerini geliştirmek için kullanabilir ve Google çalışanları okuyabilir; LLMOPT'a kişisel bilgi yazma. Kendi API anahtarınla metnin tarayıcından doğrudan seçtiğin sağlayıcıya gider; anahtar yalnızca o sekmede kalır ve SquadOpt'a hiç gönderilmez.",
+        body: "LLMOPT sohbeti kendi model anahtarınla çalışır. Yazdığın metin ve kadron için aday oyuncular, tarayıcından doğrudan seçtiğin sağlayıcıya, senin anahtarınla gider; bu veriler için o sağlayıcının koşulları geçerlidir. Sunucumuz isteği hazırlar ve cevabı denetler: bunun için metnini alır, kayıtlarına yazmaz, anahtarı ise hiç almaz. Anahtar yalnızca o sekmede kalır, sayfadan çıkınca silinir ve SquadOpt'a hiç gönderilmez. Takım numaran ve adın gönderilmez.",
       },
       {
         title: "Deadline hatırlatıcısı",

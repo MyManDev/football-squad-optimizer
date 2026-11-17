@@ -256,29 +256,33 @@ function WeekAnalysis({
             }}
             format={(value) => signed(value)}
           />
-          <table className={`${styles.breakdown} visually-hidden`} data-testid="vs-breakdown">
-            <tbody>
-              {(
-                [
-                  [copy.captain, parts.captain],
-                  [copy.transfers, parts.transfers],
-                  [copy.hits, parts.hits],
-                  [copy.lineup, parts.lineup],
-                ] as const
-              ).map(([label, value]) => (
-                <tr key={label}>
-                  <th scope="row">{label}</th>
-                  <td>{signed(value)}</td>
+          {/* The same figures for a screen reader. The wrapper hides them: a table takes
+              its own width and ignores overflow, so hidden on its own it widened the page. */}
+          <div className="visually-hidden">
+            <table className={styles.breakdown} data-testid="vs-breakdown">
+              <tbody>
+                {(
+                  [
+                    [copy.captain, parts.captain],
+                    [copy.transfers, parts.transfers],
+                    [copy.hits, parts.hits],
+                    [copy.lineup, parts.lineup],
+                  ] as const
+                ).map(([label, value]) => (
+                  <tr key={label}>
+                    <th scope="row">{label}</th>
+                    <td>{signed(value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row">{copy.difference}</th>
+                  <td>{signed(week.net_difference)}</td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th scope="row">{copy.difference}</th>
-                <td>{signed(week.net_difference)}</td>
-              </tr>
-            </tfoot>
-          </table>
+              </tfoot>
+            </table>
+          </div>
         </Card>
       ) : null}
 

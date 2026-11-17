@@ -20,13 +20,18 @@ function mount(language: Language) {
 }
 
 describe("the privacy page", () => {
-  it.each(["tr", "en"] as const)("names every flow in %s, Google Gemini among them", (language) => {
+  it.each([
+    ["tr", /kendi model anahtarınla çalışır/],
+    ["en", /works with your own model key/],
+  ] as const)("names every flow in %s, and no model of the site's own", (language, words) => {
     mount(language);
     const copy = PRIVACY_COPY[language];
     expect(screen.getByRole("heading", { level: 1, name: copy.title })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(copy.sections.length);
     const llmopt = screen.getByRole("heading", { level: 2, name: "LLMOPT" }).parentElement!;
-    expect(within(llmopt).getByText(/Google Gemini/)).toBeInTheDocument();
+    expect(within(llmopt).getByText(words)).toBeInTheDocument();
+    // The site sends LLMOPT text to no provider of its own.
+    expect(within(llmopt).queryByText(/Gemini/)).toBeNull();
   });
 
   it.each([

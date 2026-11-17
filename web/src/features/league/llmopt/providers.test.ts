@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { IntentError, intentRefusal } from "./intent";
 import type { OwnKeyProvider, ProviderCredential } from "./ownKey";
 import {
+  CHAT_REPLY_TOKENS,
   PROVIDERS,
   callProvider,
   checkedProviderCall,
@@ -60,7 +61,8 @@ describe("the provider request", () => {
       });
       expect(request.body).toMatchObject({
         model: "some-model",
-        [tokens]: 1200,
+        // Room for a reasoning model to think; the answer itself is no longer.
+        [tokens]: CHAT_REPLY_TOKENS,
         messages: [
           { role: "system", content: CALL.system },
           { role: "user", content: CALL.user },
@@ -87,7 +89,7 @@ describe("the provider request", () => {
     expect(request.url).toBe("https://api.deepseek.com/chat/completions");
     expect(request.headers.Authorization).toBe(`Bearer ${KEY}`);
     expect(request.body.response_format).toEqual({ type: "json_object" });
-    expect(request.body.max_tokens).toBe(1200);
+    expect(request.body.max_tokens).toBe(CHAT_REPLY_TOKENS);
     const [system] = request.body.messages as { content: string }[];
     expect(system!.content.startsWith(CALL.system)).toBe(true);
     expect(system!.content).toContain(JSON.stringify(SCHEMA));
@@ -168,12 +170,24 @@ describe("the provider reply", () => {
   it.each([
     ["openai", null],
     ["openai", { choices: [] }],
-    ["openai", chatReply(ANSWER, "length")],
+    ["openai", chatReply(ANSWER, "content_filter")],
     ["openai", chatReply(ANSWER, "stop", "I cannot help with that.")],
     ["openai", chatReply(null)],
     ["openai", chatReply("  ")],
     ["anthropic", { content: [{ type: "text", text: ANSWER }] }],
     ["anthropic", { content: [{ type: "tool_use", name: "other", input: {} }] }],
+  ] as const)("refuses a %s reply without an answer: %j", (provider, value) => {
+    expect(() => providerReply(provider, CALL, value)).toThrow(IntentError);
+    try {
+      providerReply(provider, CALL, value);
+    } catch (error) {
+      expect(intentRefusal(error)).toBe("replyInvalid");
+    }
+  });
+
+  it.each([
+    ["openai", chatReply("", "length")],
+    ["openai", chatReply(ANSWER, "length")],
     [
       "anthropic",
       {
@@ -181,12 +195,13 @@ describe("the provider reply", () => {
         content: [{ type: "tool_use", name: "llmopt_intent", input: {} }],
       },
     ],
-  ] as const)("refuses a %s reply without an answer: %j", (provider, value) => {
-    expect(() => providerReply(provider, CALL, value)).toThrow(IntentError);
+  ] as const)("names a %s reply that ran into the limit as cut short: %j", (provider, value) => {
     try {
       providerReply(provider, CALL, value);
+      throw new Error("The reply was read.");
     } catch (error) {
-      expect(intentRefusal(error)).toBe("invalid");
+      expect(error).toMatchObject({ code: "PROVIDER_REPLY_CUT" });
+      expect(intentRefusal(error)).toBe("replyCut");
     }
   });
 });
@@ -283,6 +298,41 @@ describe("a provider call", () => {
     expect(intentRefusal(error)).toBe("providerLimited");
   });
 
+  it.each([
+    [402, { error: { message: "Insufficient Balance" } }],
+    [429, { error: { code: "insufficient_quota", type: "insufficient_quota" } }],
+    [400, { error: { type: "invalid_request_error", message: "Your credit balance is too low." } }],
+  ] as const)(
+    "reads a %i for an account with no credit as the account, not a limit",
+    async (status, body) => {
+      stubProvider(() => new Response(JSON.stringify(body), { status }));
+      const error = await failure();
+      expect(error).toMatchObject({ code: "PROVIDER_ACCOUNT_REFUSED", retryAfterSeconds: null });
+      expect(intentRefusal(error)).toBe("accountRefused");
+    },
+  );
+
+  it("keeps a quota that resets as the provider's limit", async () => {
+    // Gemini's free tier: the wording mentions billing, the status is a limit.
+    stubProvider(
+      () =>
+        new Response(
+          JSON.stringify([
+            {
+              error: {
+                code: 429,
+                status: "RESOURCE_EXHAUSTED",
+                message:
+                  "You exceeded your current quota, please check your plan and billing details.",
+              },
+            },
+          ]),
+          { status: 429 },
+        ),
+    );
+    expect(intentRefusal(await failure("gemini"))).toBe("providerLimited");
+  });
+
   it("reads Retry-After as seconds or as a date", () => {
     const now = Date.parse("2026-11-17T12:00:00Z");
     expect(retryAfterSeconds("30", now)).toBe(30);
@@ -307,7 +357,7 @@ describe("a provider call", () => {
 
   it("reads a reply that is not JSON as an invalid reply", async () => {
     stubProvider(() => new Response("<html>"));
-    expect(intentRefusal(await failure())).toBe("invalid");
+    expect(intentRefusal(await failure())).toBe("replyInvalid");
   });
 
   it("rejects a cancelled call as cancelled", async () => {
