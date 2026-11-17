@@ -12,6 +12,8 @@ import {
   entryBundle,
   FORWARDER_ROOT,
   isForwarderRefusal,
+  RATE_RETRIES,
+  rateBlockMs,
   type ForwarderClientOptions,
 } from "./client";
 import { createRequestBudget } from "./requestBudget";
@@ -421,6 +423,61 @@ describe("the reads' share of the rate rule", () => {
     const waiting = client.entrySeason(2, { signal: stop.signal });
     stop.abort();
     expect(await waiting).toEqual({ ok: false, reason: "aborted" });
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the zone's rate rule", () => {
+  /** The zone's 429: no forwarder mark, an optional Retry-After. */
+  const refused = (retryAfter?: string) =>
+    new Response("rate limited", {
+      status: 429,
+      headers: retryAfter === undefined ? {} : { "retry-after": retryAfter },
+    });
+
+  it("reads the block from Retry-After, else the rule's 10 seconds, never more than 30", () => {
+    expect(rateBlockMs("4")).toBe(4_000);
+    expect(rateBlockMs(null)).toBe(10_000);
+    expect(rateBlockMs("soon")).toBe(10_000);
+    expect(rateBlockMs("0")).toBe(1_000);
+    expect(rateBlockMs("600")).toBe(30_000);
+  });
+
+  it("waits out the block, holds the budget and sends the read again", async () => {
+    const answers = [refused("3"), forwarded(200, STANDINGS_EXAMPLES.first_page)];
+    const transport = vi.fn<Transport>(async () => answers.shift()!);
+    const wait = vi.fn(async () => undefined);
+    const held: number[] = [];
+    const budget = { take: () => null, hold: (ms: number) => held.push(ms) };
+    const client = createForwarderClient({ fetch: transport, wait, budget });
+    const result = await client.standings(314, 1);
+    expect(result.ok).toBe(true);
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(wait).toHaveBeenCalledWith(3_000, undefined);
+    expect(held).toEqual([3_000]);
+  });
+
+  it("says rate_limited once the rule still refuses after its retries", async () => {
+    const transport = vi.fn<Transport>(async () => refused());
+    const wait = vi.fn(async () => undefined);
+    const client = createForwarderClient({ fetch: transport, wait, budget: { take: () => null } });
+    const result = await client.standings(314, 1);
+    expect(result).toEqual({ ok: false, reason: "rate_limited" });
+    expect(transport).toHaveBeenCalledTimes(RATE_RETRIES + 1);
+    expect(wait).toHaveBeenCalledTimes(RATE_RETRIES);
+  });
+
+  it("is aborted when the caller stops the read while it waits", async () => {
+    const controller = new AbortController();
+    const transport = vi.fn<Transport>(async () => {
+      controller.abort();
+      return refused("1");
+    });
+    const client = createForwarderClient({ fetch: transport });
+    const result = await client.standings(314, 1, {
+      signal: controller.signal,
+    });
+    expect(result).toEqual({ ok: false, reason: "aborted" });
     expect(transport).toHaveBeenCalledTimes(1);
   });
 });

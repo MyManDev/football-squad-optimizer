@@ -301,7 +301,6 @@ for (const width of [320, 1280]) {
     await page.goto("/league/352490/members");
     const row = page.locator("tbody tr[aria-current]");
     await expect(row).toBeVisible();
-    await expect(page.locator("ol li[aria-current]")).toBeVisible();
     expect(await blockingSummary(page)).toEqual([]);
     await expectRingInItsInk(row.getByRole("link"));
   });
@@ -458,12 +457,13 @@ base("skip link and the sidebar's controls take keyboard focus in order", async 
   await expect(skip).toBeInViewport();
   await expect(skip).toHaveCSS("outline-style", "solid");
 
-  // Then the sidebar, in the order it stands: its collapse button, the navigation and
-  // the language switch. Before the visitor says who they are, the navigation is 'Ligini
+  // Then the sidebar, in the order it stands: the brand's link home, its collapse button,
+  // the navigation and the language switch. Before the visitor says who they are, the navigation is 'Ligini
   // bul' and the open pages.
   const sidebar = page.locator("#sidebar");
   const navigation = page.getByRole("navigation");
   const order = [
+    sidebar.getByRole("link", { name: "SquadOpt ana sayfa" }),
     sidebar.getByRole("button", { name: "Kenar çubuğunu kapat" }),
     navigation.getByRole("link", { name: "Ligini bul", exact: true }),
     navigation.getByRole("link", { name: "Fikstür", exact: true }),
@@ -492,6 +492,7 @@ base(
     const sidebar = page.locator("#sidebar");
     const navigation = page.getByRole("navigation");
     const order = [
+      sidebar.getByRole("link", { name: "SquadOpt ana sayfa" }),
       sidebar.getByRole("button", { name: "Kenar çubuğunu kapat" }),
       sidebar.getByRole("button", { name: "Değiştir" }),
       sidebar.getByRole("switch", { name: "Hatırlatma" }),

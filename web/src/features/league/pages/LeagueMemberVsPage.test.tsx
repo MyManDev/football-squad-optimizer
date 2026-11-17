@@ -135,7 +135,7 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
     expect(document.body.textContent).not.toMatch(AS_A_CAVEAT);
   });
 
-  it("shows, for a week with details, what the plan said, what the member did, the other plans and the squad", async () => {
+  it("shows, for a week with details, what the plan said, what the member did and the squad", async () => {
     open(language, history());
     await userEvent.click(within(screen.getByTestId("vs-week-strip")).getAllByRole("button")[0]!);
     // Week 4: the plan 20, the member 22, in the member's favour.
@@ -144,7 +144,9 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
     const said = within(screen.getByRole("heading", { name: copy.said }).closest("section")!);
     expect(said.getAllByText(/Player 20 →/).length).toBeGreaterThan(0);
     expect(said.getAllByText("Player 8").length).toBeGreaterThan(0);
-    expect(said.getByText(copy.planName("fark-yarat", 3))).toBeInTheDocument();
+    // The first plan is the one shown: no list of the week's other plans follows it.
+    expect(said.queryByRole("heading", { level: 3 })).toBeNull();
+    expect(said.queryByText(/Fark yarat|Make the Difference|Ortak koru|Hold the Gap/)).toBeNull();
     const did = within(screen.getByRole("heading", { name: copy.did }).closest("section")!);
     expect(did.getByText("Player 9")).toBeInTheDocument();
     expect(did.getByText("Player 3")).toBeInTheDocument();
@@ -153,6 +155,13 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
     expect(screen.getByTestId("vs-difference-bars")).toBeInTheDocument();
     const squad = screen.getByRole("region", { name: copy.squad });
     expect(within(squad).getAllByRole("row").length).toBeGreaterThan(11);
+    // The points headings and their figures share the right-aligned column class.
+    const [, points, counted] = within(squad).getAllByRole("columnheader");
+    const firstRow = within(squad).getAllByRole("row")[1]!;
+    const [realized, countedCell] = within(firstRow).getAllByRole("cell");
+    for (const cell of [points, counted, realized, countedCell]) {
+      expect(cell!.className).toMatch(/number/);
+    }
   });
 
   it("says there is no record where no week has both sides", () => {

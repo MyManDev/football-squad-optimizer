@@ -89,10 +89,18 @@ import {
   type LiveForwarder,
 } from "./liveSources";
 import styles from "./LivePage.module.css";
-import { LiveHeader, LiveState, LiveView, type HeldDuel, type LiveRivalView } from "./LiveView";
+import {
+  LiveHeader,
+  LiveState,
+  LiveView,
+  LiveWaiting,
+  type HeldDuel,
+  type LiveRivalView,
+} from "./LiveView";
 import { useBoardHold, useBoardMoments } from "./useBoardMoments";
 import { useReadAgain } from "./useReadAgain";
 import { useGoalReplay } from "./useGoalReplay";
+import { useLivePhase } from "./useLivePhase";
 import { useLiveWindow } from "./useLiveWindow";
 import { useMemberLiveScore } from "./useMemberLiveScore";
 import { useWide } from "./useWide";
@@ -120,6 +128,8 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
   const valid = /^[1-9]\d*$/.test(parameter) && Number.isSafeInteger(entryId);
   const squad = useEntrySquad(entryId, valid);
   const fixtures = useFixtures();
+  const phase = useLivePhase(fixtures.data ?? null);
+  const replaying = useSearchParams()[0].get("replay") === "1";
   const wide = useWide();
   const [head, setHead] = useState<LiveHead | null>(null);
   const [light] = useState(createLiveLight);
@@ -132,6 +142,9 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
     body = <LiveState kind={valid && !squad.isError ? "loading" : "empty"} />;
   } else if (fixtures.isPending) {
     body = <LiveState kind="loading" />;
+  } else if (!phase.on && !replaying) {
+    // LIVE follows a played week only; outside one it names the week it waits for.
+    body = <LiveWaiting gameweek={phase.nextGameweek} kickoff={phase.nextKickoff} />;
   } else {
     body = (
       <LiveMember

@@ -130,7 +130,9 @@ describe("the identified shell", () => {
 
   it("offers 'Ligini bul' to the form before any league, and the league's step after one", () => {
     const first = open("/fixtures");
-    expect(sidebar().getAllByRole("link")[0]).toHaveTextContent(TR.findLeague);
+    // The brand leads home first, then the navigation opens on 'Ligini bul'.
+    expect(sidebar().getAllByRole("link")[0]).toHaveAccessibleName(TR.home);
+    expect(sidebar().getAllByRole("link")[1]).toHaveTextContent(TR.findLeague);
     expect(sidebar().getByRole("link", { name: TR.findLeague })).toHaveAttribute("href", "/");
     first.unmount();
     writeChosenLeague(352490);

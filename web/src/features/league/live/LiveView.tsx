@@ -26,6 +26,7 @@ import {
 } from "react";
 
 import { useLanguage } from "../../../i18n/context";
+import { fixtureDay, fixtureTime } from "../../fixtures/kickoff";
 import { MODEL_POP } from "../advice/modelSwitch";
 import { ClubShirt } from "../components/ClubShirt";
 import { BoardArrow, DisclosureIcon } from "../components/memberIcons";
@@ -137,6 +138,32 @@ export function LiveState({ kind }: { kind: "loading" | "empty" }) {
     <p className={styles.state} role="status">
       {kind === "loading" ? messages.common.loading : messages.leagueMembers.toolEmpty}
     </p>
+  );
+}
+
+/** Outside a played week: the week LIVE waits for and its first kickoff. */
+export function LiveWaiting({
+  gameweek,
+  kickoff,
+}: {
+  gameweek: number | null;
+  kickoff: number | null;
+}) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.live;
+  const iso = kickoff === null ? null : new Date(kickoff).toISOString();
+  return (
+    <section className={styles.waiting} role="status" data-live-waiting>
+      <p className={styles.waitingTitle}>{copy.notStarted(gameweek)}</p>
+      {iso === null ? null : (
+        <p className={styles.waitingWhen}>
+          {copy.firstMatch}:{" "}
+          <time dateTime={iso}>
+            {fixtureDay(iso, locale)} {fixtureTime(iso, locale)}
+          </time>
+        </p>
+      )}
+    </section>
   );
 }
 

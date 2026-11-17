@@ -299,7 +299,6 @@ export function LeagueMembersView({
               race={race}
               members={view.members}
               initialEntry={viewerRow?.entry_id ?? null}
-              viewer={viewerRow?.entry_id ?? null}
             />
           </div>
         ) : null}

@@ -410,7 +410,9 @@ test("the row's name says the player, their role, group, match, points, events a
   await expect(differentials).toContainText(copy.live.shared);
 });
 
-test("the pill is absent while none of the member's matches is in its window", async ({ page }) => {
+test("outside a played week LIVE follows nothing, says the week has not started, and shows no pill", async ({
+  page,
+}) => {
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
   // The closed week's matches kicked off in 2020.
   await closedWeek(page);
@@ -424,7 +426,8 @@ test("the pill is absent while none of the member's matches is in its window", a
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/league/352490/members/${LISTED_ENTRY}/live`);
-  await expect(page.locator("[data-live-row]")).toHaveCount(15);
+  await expect(page.locator("[data-live-waiting]")).toContainText(/hafta daha başlamadı/i);
+  await expect(page.locator("[data-live-row]")).toHaveCount(0);
   await expect(page.locator("[data-live-pill]")).toHaveCount(0);
   await expect(page.locator("[data-live-page] h1 [role='img']")).toHaveCount(0);
 });

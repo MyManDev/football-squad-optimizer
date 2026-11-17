@@ -16,13 +16,20 @@ from squadopt.platform.llmopt_intent import (
     INTENT_BODY_MAX_BYTES,
     INTENT_BUDGET_FILE,
     IntentClarification,
+    IntentLimited,
     IntentRequest,
     IntentService,
+    IntentUnavailable,
     OpenAIIntentProvider,
     intent_service_from_environment,
 )
 
 URL = "/api/v1/llmopt/intent"
+
+
+@pytest.fixture(autouse=True)
+def _no_pause_between_rounds(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("squadopt.platform.llmopt_intent._ROUND_PAUSE_SECONDS", 0)
 
 
 def _request() -> dict[str, Any]:
@@ -510,9 +517,7 @@ def test_club_request_uses_canonical_name_and_keeps_both_scopes_distinct(
         {"count": 0},
         {"count": 4},
         {"count": "2"},
-        {"player_id": 1},
         {"scope": "bench"},
-        {"both": True},
     ],
 )
 def test_club_constraint_refuses_invented_or_invalid_fields(override: dict[str, Any]) -> None:
@@ -577,8 +582,6 @@ def test_model_comparison_accepts_either_side_for_a_held_player(kind: str) -> No
     [
         {"kind": "include_player", "player_id": 2, "both": True},
         {"kind": "include_player", "player_id": True, "both": False},
-        {"kind": "no_hits", "player_id": None, "both": True},
-        {"kind": "no_hits", "player_id": 1, "both": False},
         {"kind": "execute", "player_id": None, "both": False},
     ],
 )
@@ -829,7 +832,7 @@ def test_provider_sends_strict_schema_and_handles_wire_without_network(
     monkeypatch: pytest.MonkeyPatch,
     provider: str,
 ) -> None:
-    def post(_provider: OpenAIIntentProvider, payload: bytes) -> bytes:
+    def post(_provider: OpenAIIntentProvider, payload: bytes, _deadline: float) -> bytes:
         body = json.loads(payload)
         assert body["model"] == "selected-model"
         if provider == "gemini":
@@ -883,3 +886,221 @@ def test_provider_sends_strict_schema_and_handles_wire_without_network(
     }
     with TestClient(create_app(llmopt_intent=service)) as client:
         assert client.post(URL, json=body).status_code == 200
+
+
+def _answer() -> bytes:
+    return json.dumps(
+        {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(_proposed())}}]}
+    ).encode()
+
+
+def _fallback_service(
+    monkeypatch: pytest.MonkeyPatch, outcomes: dict[str, Exception | bytes]
+) -> tuple[IntentService, list[str]]:
+    asked: list[str] = []
+
+    def post(_provider: OpenAIIntentProvider, payload: bytes, _deadline: float) -> bytes:
+        model = json.loads(payload)["model"]
+        asked.append(model)
+        outcome = outcomes[model]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
+    service = intent_service_from_environment(
+        {
+            "SQUADOPT_LLMOPT_API_KEY": "server-key",
+            "SQUADOPT_LLMOPT_MODEL": "first",
+            "SQUADOPT_LLMOPT_PROVIDER": "gemini",
+            "SQUADOPT_LLMOPT_FALLBACK_MODELS": "second, third",
+        }
+    )
+    assert service is not None
+    return service, asked
+
+
+def test_a_busy_model_hands_the_call_to_the_next_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    service, asked = _fallback_service(
+        monkeypatch,
+        {
+            "first": IntentUnavailable("The intent provider did not accept the request."),
+            "second": _answer(),
+        },
+    )
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    assert response.json()["status"] == "draft"
+    assert asked == ["first", "second"]
+
+
+def test_a_limited_model_hands_the_call_to_the_next_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    service, asked = _fallback_service(
+        monkeypatch, {"first": IntentLimited(40), "second": b"not json", "third": _answer()}
+    )
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    assert asked == ["first", "second", "third"]
+
+
+def test_every_model_limited_is_a_rate_limit_with_the_shortest_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, asked = _fallback_service(
+        monkeypatch,
+        {"first": IntentLimited(40), "second": IntentLimited(15), "third": IntentLimited(90)},
+    )
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "15"
+    assert asked == ["first", "second", "third"]
+
+
+def test_no_model_answering_is_unavailable_unless_all_were_limited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    busy = IntentUnavailable("The intent provider did not accept the request.")
+    service, asked = _fallback_service(
+        monkeypatch, {"first": IntentLimited(40), "second": busy, "third": busy}
+    )
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 503
+    # The limited model is not asked again; the busy ones are, once.
+    assert asked == ["first", "second", "third", "second", "third"]
+
+
+def test_a_refusal_for_high_demand_is_asked_once_more(monkeypatch: pytest.MonkeyPatch) -> None:
+    replies: list[Exception | bytes] = [
+        IntentUnavailable("The intent provider answered 503."),
+        _answer(),
+    ]
+
+    def post(_provider: OpenAIIntentProvider, _payload: bytes, _deadline: float) -> bytes:
+        reply = replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
+    provider = OpenAIIntentProvider(api_key="k", model="only", provider="gemini")
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    assert replies == []
+
+
+@pytest.mark.parametrize("fallbacks", ["first", "a,b,c,d", "bad name"])
+def test_an_invalid_fallback_list_disables_text_interpretation(fallbacks: str) -> None:
+    assert (
+        intent_service_from_environment(
+            {
+                "SQUADOPT_LLMOPT_API_KEY": "server-key",
+                "SQUADOPT_LLMOPT_MODEL": "first",
+                "SQUADOPT_LLMOPT_FALLBACK_MODELS": fallbacks,
+            }
+        )
+        is None
+    )
+
+
+_FILLED: dict[str, Any] = {"club": None, "count": None, "scope": None, "week": None, "points": None}
+
+
+@pytest.mark.parametrize(
+    ("part", "rule", "expected"),
+    [
+        # What gemini-3.1-flash-lite sent on 17 Nov for a soft wish to hold Saka.
+        (
+            "soft",
+            {**_FILLED, "kind": "include_player", "player_id": 1, "scope": "squad"}
+            | {"max_cost_tenths": None},
+            {"kind": "include_player", "player_id": 1},
+        ),
+        ("hard", {**_FILLED, "kind": "wildcard", "player_id": 1, "week": 1}, None),
+        (
+            "hard",
+            {**_FILLED, "kind": "no_hits", "player_id": None, "club": "LIV", "count": 2},
+            None,
+        ),
+        ("hard", {**_FILLED, "kind": "keep_player", "player_id": 1, "points": 4}, None),
+        (
+            "hard",
+            {**_FILLED, "kind": "hit_budget", "player_id": None, "points": 4, "week": 1},
+            {"kind": "hit_budget", "points": 4},
+        ),
+    ],
+)
+def test_a_field_with_no_meaning_for_the_rule_is_dropped_from_a_model_reply(
+    part: str, rule: dict[str, Any], expected: dict[str, Any] | None
+) -> None:
+    def provider(_request: IntentRequest) -> object:
+        result = _proposed()
+        result["draft"]["hard"] = []
+        result["draft"]["soft"] = []
+        result["draft"]["comparison"] = None
+        result["draft"][part] = [rule]
+        return result
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    kept = {key: value for key, value in rule.items() if key in ("kind", "player_id", "week")}
+    if rule["kind"] in ("wildcard", "no_hits"):
+        kept.pop("player_id")
+    if kept.get("week") is None:
+        kept.pop("week", None)
+    assert response.json()["draft"][part] == [expected or kept]
+
+
+@pytest.mark.parametrize("kind", ["wildcard", "no_hits"])
+def test_with_and_without_a_rule_that_is_no_player_is_its_plain_comparison(kind: str) -> None:
+    # What gemini-3.1-flash-lite sent for a with-and-without-Wildcard request.
+    def provider(_request: IntentRequest) -> object:
+        result = _proposed()
+        result["draft"]["hard"] = []
+        result["draft"]["comparison"] = {**_FILLED, "kind": kind, "player_id": 1, "both": True}
+        return result
+
+    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    assert response.json()["draft"]["comparison"] == {"kind": kind}
+
+
+def test_the_page_own_request_is_still_held_to_the_exact_shape() -> None:
+    body = _request()
+    body["draft"] = {"hard": [{"kind": "no_hits", "scope": "squad"}], "soft": []}
+    with TestClient(
+        create_app(llmopt_intent=IntentService(lambda _request: _proposed()))
+    ) as client:
+        response = client.post(URL, json=body)
+    assert response.status_code == 422
+
+
+def test_a_model_gets_its_share_of_the_deadline_and_the_last_one_the_rest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = [1000.0]
+    monkeypatch.setattr("squadopt.platform.llmopt_intent.time.monotonic", lambda: clock[0])
+    allowed: list[float] = []
+
+    def post(_provider: OpenAIIntentProvider, payload: bytes, deadline: float) -> bytes:
+        allowed.append(round(deadline - clock[0], 1))
+        if len(allowed) < 3:
+            # The model hangs until its share is spent.
+            clock[0] = deadline
+            raise IntentUnavailable("The intent provider exceeded its response time.")
+        return _answer()
+
+    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
+    provider = OpenAIIntentProvider(
+        api_key="k", model="first", provider="gemini", fallback_models=["second", "third"]
+    )
+    request = IntentRequest("x", "tr", {"hard": [], "soft": []}, ())
+    assert provider(request) == _proposed()
+    # 35 seconds: a third, then half of what is left, then the rest.
+    assert allowed == [11.7, 11.7, 11.7]

@@ -7,6 +7,13 @@ import { inspectDeploymentArtifact } from "./check-deployment-assets.mjs";
 
 const temporaryDirectories = [];
 
+const POLICY =
+  "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://api.example; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+
+function headers(policy = POLICY) {
+  return `/*\n  Content-Security-Policy: ${policy}\n\n/data/*\n  Cache-Control: public, max-age=0, must-revalidate\n`;
+}
+
 async function validArtifact() {
   const root = await mkdtemp(join(tmpdir(), "squadopt-deployment-"));
   temporaryDirectories.push(root);
@@ -16,10 +23,7 @@ async function validArtifact() {
   await writeFile(join(root, "data", "404.html"), "<!doctype html><title>404</title>");
   await mkdir(join(root, "assets"), { recursive: true });
   await writeFile(join(root, "assets", "404.html"), "<!doctype html><title>404</title>");
-  await writeFile(
-    join(root, "_headers"),
-    "/data/*\n  Cache-Control: public, max-age=0, must-revalidate\n",
-  );
+  await writeFile(join(root, "_headers"), headers());
   return root;
 }
 
@@ -56,6 +60,34 @@ describe("deployment artifact preflight", () => {
       "/data/*\n  X-Content-Type-Options: nosniff\n\n/assets/*\n  Cache-Control: public, max-age=0, must-revalidate\n",
     );
     await expect(inspectDeploymentArtifact(root)).rejects.toThrow("/data/* cache rule");
+  });
+
+  it("requires the site-wide Content-Security-Policy", async () => {
+    const root = await validArtifact();
+    await writeFile(
+      join(root, "_headers"),
+      "/data/*\n  Cache-Control: public, max-age=0, must-revalidate\n",
+    );
+    await expect(inspectDeploymentArtifact(root)).rejects.toThrow("exactly one Content-Security");
+  });
+
+  it.each([
+    [POLICY.replace("https://api.example", "{advice-api-origin}"), "unfilled word"],
+    [POLICY.replace(" 'wasm-unsafe-eval'", ""), "script-src lacks 'wasm-unsafe-eval'"],
+    [POLICY.replace("object-src 'none'", "object-src 'self'"), "object-src lacks 'none'"],
+    [
+      POLICY.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'"),
+      "allows 'unsafe-inline'",
+    ],
+    [
+      POLICY.replace("script-src 'self'", "script-src 'self' https://cdn.example.net"),
+      "allows https://cdn.example.net",
+    ],
+    [POLICY.replace("https://api.example", "https:"), "connect-src allows any host"],
+  ])("refuses the policy %s", async (policy, message) => {
+    const root = await validArtifact();
+    await writeFile(join(root, "_headers"), headers(policy));
+    await expect(inspectDeploymentArtifact(root)).rejects.toThrow(message);
   });
 
   it.each(["404.html", "_worker.js"])("rejects a top-level %s", async (name) => {

@@ -105,3 +105,64 @@ export function liveWindow(
     changesIn: changes.length === 0 ? null : Math.min(...changes),
   };
 }
+
+/**
+ * Whether LIVE follows a week now (the owner's request of 2026-11-17: LIVE is for following
+ * the matches, not for reading a played week). A week is on from its first kickoff until
+ * `MATCH_WINDOW_LIMIT_MS` after its last, every club counted. Otherwise LIVE waits for the
+ * next week to start: the live week itself when its first match is still to come, else the
+ * next gameweek the calendar lists with a dated match.
+ */
+export interface LivePhase {
+  on: boolean;
+  /** The week LIVE waits for, while it is not on; null when the calendar names none. */
+  nextGameweek: number | null;
+  /** That week's first kickoff, in milliseconds since the epoch. */
+  nextKickoff: number | null;
+  /** Milliseconds until `on` can change, or null when nothing lies ahead. */
+  changesIn: number | null;
+}
+
+export function livePhase(fixtures: FixturesPayload | null, now: number): LivePhase {
+  if (fixtures === null) {
+    return { on: false, nextGameweek: null, nextKickoff: null, changesIn: null };
+  }
+  const clock = calendarClock(fixtures, now);
+  const weeks = [...fixtures.gameweeks].sort((a, b) => a.gameweek - b.gameweek);
+  const kickoffs = (week: FixturesPayload["gameweeks"][number]) =>
+    week.fixtures.flatMap((fixture) => {
+      const kickoff = instant(fixture.kickoff_utc);
+      return kickoff === null ? [] : [kickoff];
+    });
+  let live: FixturesPayload["gameweeks"][number] | null = null;
+  for (const week of weeks) {
+    const deadline = instant(week.deadline_utc);
+    if (deadline !== null && deadline <= clock) live = week;
+  }
+  if (live !== null) {
+    const times = kickoffs(live);
+    if (times.length > 0) {
+      const first = Math.min(...times);
+      const end = Math.max(...times) + MATCH_WINDOW_LIMIT_MS;
+      if (clock >= first && clock < end) {
+        return { on: true, nextGameweek: null, nextKickoff: null, changesIn: end - clock };
+      }
+      if (clock < first) {
+        return {
+          on: false,
+          nextGameweek: live.gameweek,
+          nextKickoff: first,
+          changesIn: first - clock,
+        };
+      }
+    }
+  }
+  for (const week of weeks) {
+    if (live !== null && week.gameweek <= live.gameweek) continue;
+    const times = kickoffs(week).filter((time) => time > clock);
+    if (times.length === 0) continue;
+    const first = Math.min(...times);
+    return { on: false, nextGameweek: week.gameweek, nextKickoff: first, changesIn: first - clock };
+  }
+  return { on: false, nextGameweek: null, nextKickoff: null, changesIn: null };
+}

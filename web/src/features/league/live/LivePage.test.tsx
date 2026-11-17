@@ -36,6 +36,7 @@ import {
 } from "../../../testSupport/liveWeek";
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import { MODEL_POP } from "../advice/modelSwitch";
+import type { LivePhase } from "../../liveScore/liveWindow";
 import type { WeekActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek } from "../../liveScore/weekLive";
 import type { LeagueTree } from "../data";
@@ -55,7 +56,14 @@ import { APPEAR, FLASH, forgetLiveMotion, lookKey, lookOf } from "./liveMotion";
 import type { LiveForwarder } from "./liveSources";
 import { WIDE_QUERY } from "./useWide";
 
+// The week is being played unless a test says otherwise: the gate itself is `livePhase`'s,
+// tested in liveWindow.test.ts, and the state it opens is tested under "outside a played week".
+const ON: LivePhase = { on: true, nextGameweek: null, nextKickoff: null, changesIn: null };
+const phase = vi.hoisted(() => ({ current: null as LivePhase | null }));
+vi.mock("./useLivePhase", () => ({ useLivePhase: () => phase.current ?? ON }));
+
 afterEach(() => {
+  phase.current = null;
   cleanup();
   vi.useRealTimers();
   sessionStorage.clear();
@@ -416,6 +424,30 @@ describe("the LIVE page's reads", () => {
     renderLive({ forwarder });
     expect(await screen.findByText(copy.leagueMembers.toolEmpty)).toBeInTheDocument();
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
+
+  it("follows nothing outside a played week and names the week it waits for", async () => {
+    phase.current = {
+      on: false,
+      nextGameweek: 12,
+      nextKickoff: Date.parse("2026-11-21T12:30:00Z"),
+      changesIn: 60_000,
+    };
+    const forwarder = fakeForwarder([answered(live("2026-11-21T19:30:00Z"))]);
+    renderLive({ forwarder });
+    const waiting = await screen.findByText(copy.live.notStarted(12));
+    expect(waiting.closest("[role=status]")).toHaveTextContent(copy.live.firstMatch);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(copy.live.title);
+    expect(document.querySelectorAll("[data-live-row]")).toHaveLength(0);
+    expect(forwarder.liveActivity).not.toHaveBeenCalled();
+  });
+
+  it("says the week has not started where the calendar names no next match", async () => {
+    phase.current = { on: false, nextGameweek: null, nextKickoff: null, changesIn: null };
+    renderLive({ forwarder: fakeForwarder([]) });
+    const waiting = await screen.findByText(copy.live.notStarted(null));
+    expect(waiting).toHaveTextContent("Hafta daha başlamadı");
+    expect(screen.queryByText(copy.live.firstMatch, { exact: false })).toBeNull();
   });
 
   it("reads nothing more by itself between weeks", async () => {

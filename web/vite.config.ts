@@ -4,10 +4,12 @@ import { defineConfig } from "vite";
 
 import { firstTurn } from "./vite/firstTurn.ts";
 import { pagesNotFound } from "./vite/pagesNotFound.ts";
+import { sitePolicy } from "./vite/sitePolicy.ts";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), pagesNotFound(), firstTurn()],
+  // sitePolicy comes before pagesNotFound, so the preview's 404 pages carry the headers too.
+  plugins: [react(), sitePolicy(), pagesNotFound(), firstTurn()],
   // Hosting-agnostic: set VITE_BASE_PATH (e.g. "/football-squad-optimizer/") for a
   // sub-path deployment such as GitHub Pages; "/" for a root domain.
   base: process.env.VITE_BASE_PATH ?? "/",

@@ -289,7 +289,6 @@ describe("the mark's fill", () => {
     expect(MARK_FILLS.map(({ fill }) => fill)).toEqual(
       expect.arrayContaining([
         "features/league/pages/LeagueMembersPage.module.css .viewerRow td",
-        "features/league/race/LeagueRaceCard.module.css .gaps li[aria-current]",
         "features/league/pages/MemberPicker.module.css .option:focus-visible",
         "features/league/device/WhatIfPanel.module.css .player[data-changed]",
       ]),
