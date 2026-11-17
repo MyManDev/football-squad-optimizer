@@ -22,6 +22,11 @@ export interface RequestBudget {
    * without a promise keeps a read that has room in the order it was asked in.
    */
   take(lane: RequestLane, signal?: AbortSignal): Promise<void> | null;
+  /**
+   * The rule has refused a read: no read of either lane starts for `durationMs`, so the
+   * reads already asked for wait out the block instead of each being refused in turn.
+   */
+  hold?(durationMs: number): void;
 }
 
 export interface RequestBudgetOptions {
@@ -71,6 +76,8 @@ export function createRequestBudget({
   const started: number[] = [];
   const waiting: Waiter[] = [];
   let cancelTimer: (() => void) | null = null;
+  // While the rule blocks this address, nothing starts before this time.
+  let heldUntil = 0;
 
   function inWindow(at: number): number {
     while (started.length > 0 && started[0]! <= at - windowMs) started.shift();
@@ -87,6 +94,10 @@ export function createRequestBudget({
     cancelTimer = null;
     for (;;) {
       const at = now();
+      if (waiting.length > 0 && at < heldUntil) {
+        cancelTimer = schedule(pump, Math.max(1, heldUntil - at));
+        return;
+      }
       const used = inWindow(at);
       const index = waiting.findIndex((waiter) => waiter.lane === "page");
       const next = index >= 0 ? index : waiting.length > 0 ? 0 : -1;
@@ -108,7 +119,7 @@ export function createRequestBudget({
     take(lane, signal) {
       if (signal?.aborted) return Promise.reject(abortError());
       const at = now();
-      if (waiting.length === 0 && inWindow(at) < limitOf(lane)) {
+      if (waiting.length === 0 && at >= heldUntil && inWindow(at) < limitOf(lane)) {
         started.push(at);
         return null;
       }
@@ -130,6 +141,11 @@ export function createRequestBudget({
         waiting.push(waiter);
         pump();
       });
+    },
+    hold(durationMs) {
+      if (!Number.isFinite(durationMs) || durationMs <= 0) return;
+      heldUntil = Math.max(heldUntil, now() + durationMs);
+      pump();
     },
   };
 }

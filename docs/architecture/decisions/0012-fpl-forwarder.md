@@ -115,7 +115,10 @@ recorded under 10 percent of that.
 The site's client keeps one tab under the rule: its reads start while fewer than 35 started in
 the last 10 seconds, and the scoreboard's season reads, one per member of a standings page, while
 fewer than 25 did and no page read waits (`web/src/features/league/forwarder/requestBudget.ts`).
-The rest of the 50 is the backend's.
+The rest of the 50 is the backend's. Other tabs, other devices behind the same address and the
+usage events count against the same 50, so the rule can still refuse a read with its 429. The
+client then waits out the block (`Retry-After`, else 10 s, at most 30 s), holds every read of the
+tab for that long, and sends the read again, at most twice, before it says `rate_limited`.
 
 **9. Deployment.** `.github/workflows/deploy-fpl-proxy.yml` is dispatched by hand from the
 default branch (`develop`) only, into the `cloudflare-workers` environment with its two secrets,
