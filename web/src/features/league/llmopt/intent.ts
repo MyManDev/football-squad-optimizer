@@ -504,12 +504,15 @@ export async function readIntent(
       if (!response.ok) throw await intentError(response);
       const value: unknown = await response.json();
       if (!record(value)) throw new Error("Invalid response");
+      // The question is saved with the session and sent back on the next message, so it must
+      // fit the limit both the restore check and the service hold it to.
       if (
         value.status === "clarification" &&
         typeof value.message === "string" &&
-        value.message.trim()
+        value.message.trim() &&
+        value.message.trim().length <= MAX_QUESTION_LENGTH
       )
-        return { status: "clarification" as const, message: value.message };
+        return { status: "clarification" as const, message: value.message.trim() };
       if (value.status !== "draft") throw new Error("Invalid response");
       return {
         status: "draft" as const,

@@ -16,7 +16,12 @@ import {
   holdsOpeningTransfers,
   type FrozenPlanWeek,
 } from "../advice/decisionPreferences";
-import { sameAdviceRequest, useAdviceJob, type ComputePhase } from "../advice/useAdviceJob";
+import {
+  sameAdviceRequest,
+  useAdviceJob,
+  type AdviceJob,
+  type ComputePhase,
+} from "../advice/useAdviceJob";
 import { LEAGUE_READ, useEntrySquad } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
@@ -353,6 +358,10 @@ function Session({ squad }: { squad: EntrySquad }) {
   const saved = context ? readPlanSession(context) : null;
   if (fixtures.isPending || (saved && roster.isPending))
     return <PageLoading label={messages.common.loading} />;
+  // A saved session that names a player outside the squad needs the roster to be checked.
+  // While the roster read fails, the session is held untouched until a retry reads it.
+  if (saved && roster.isError && !checkedPlanSession(saved, ownedPlayers(squad), squad.gameweek))
+    return <RosterHold squad={squad} roster={roster} />;
   return (
     <Workspace
       key={context ? `${context.key}:${context.deadline}` : undefined}
@@ -363,6 +372,67 @@ function Session({ squad }: { squad: EntrySquad }) {
       context={context}
       saved={saved}
     />
+  );
+}
+
+function ownedPlayers(squad: EntrySquad): CatalogPlayer[] {
+  return [...squad.starting_xi, ...squad.bench].map((p) => ({
+    id: p.player_id,
+    name: p.name,
+    team: p.team,
+  }));
+}
+
+function PageHeader({ squad }: { squad: EntrySquad }) {
+  const { language } = useLanguage();
+  const copy = LLMOPT_COPY[language];
+  const team = squad.entry.team_name ?? squad.entry.manager_name;
+  const teamPath =
+    squad.league_id === 0
+      ? entryAddress(squad.entry.entry_id)
+      : memberAddress(squad.league_id, squad.entry.entry_id);
+  return (
+    <header className={styles.header}>
+      <Link to={teamPath}>{copy.back}</Link>
+      <h1>{copy.title}</h1>
+      <p>
+        {team ? `${team} · ` : ""}
+        {copy.week} {squad.gameweek}
+      </p>
+    </header>
+  );
+}
+
+function RosterRetry({ roster }: { roster: UseQueryResult<CatalogPlayer[]> }) {
+  const { language } = useLanguage();
+  const copy = LLMOPT_COPY[language];
+  return (
+    <p className={styles.notice} role="status">
+      {copy.rosterUnavailable}{" "}
+      <button
+        className={styles.textButton}
+        disabled={roster.isFetching}
+        onClick={() => void roster.refetch()}
+        type="button"
+      >
+        {copy.retry}
+      </button>
+    </p>
+  );
+}
+
+function RosterHold({
+  squad,
+  roster,
+}: {
+  squad: EntrySquad;
+  roster: UseQueryResult<CatalogPlayer[]>;
+}) {
+  return (
+    <div className={styles.page} data-zone="llmopt">
+      <PageHeader squad={squad} />
+      <RosterRetry roster={roster} />
+    </div>
   );
 }
 
@@ -388,9 +458,10 @@ function Workspace({
   const closed = deadline !== null && now >= Date.parse(deadline);
   const owned = [...squad.starting_xi, ...squad.bench];
   const held = new Set(owned.map(({ player_id }) => player_id));
-  const players = (
-    roster.data ?? owned.map((p) => ({ id: p.player_id, name: p.name, team: p.team }))
-  ).map((p) => ({ ...p, held: held.has(p.id) }));
+  const players = (roster.data ?? ownedPlayers(squad)).map((p) => ({
+    ...p,
+    held: held.has(p.id),
+  }));
   const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
   const base = useAdviceJob(client, false, squad.source_snapshot_id, true);
   const first = useAdviceJob(client, false, squad.source_snapshot_id, true);
@@ -598,6 +669,22 @@ function Workspace({
       confirmation: confirmation.current,
     });
   }, [replayProof, context, draft, reference, clarification]);
+  // Once every request of the run has a job or an answer, a reload resumes or reads it.
+  // Before a restored run has started its jobs, every slot is idle and nothing is settled.
+  const phases = [base.state, first.state, second.state].map(({ phase }) => phase);
+  const settled = !phases.includes("requesting") && phases.some((phase) => phase !== "idle");
+  useEffect(() => {
+    if (!settled || !confirmation.current?.sending) return;
+    const answered = { ...confirmation.current };
+    delete answered.sending;
+    confirmation.current = answered;
+    writePlanSession(context, {
+      draft,
+      reference,
+      clarification,
+      confirmation: confirmation.current,
+    });
+  }, [settled, context, draft, reference, clarification]);
   const diagnosis = (state: ComputePhase) =>
     state.phase === "failed" && state.infeasibility ? (
       <InfeasibilityResult
@@ -610,24 +697,36 @@ function Workspace({
       />
     ) : undefined;
   const baseState = base.state;
-  const { resume: resumeBase, readCached: readBase } = base;
-  const { compute: computeFirst } = first;
-  const { resume: resumeFirst, readCached: readFirst } = first;
-  const { compute: computeSecond } = second;
-  const { resume: resumeSecond, readCached: readSecond } = second;
+  const { compute: computeBase, resume: resumeBase, readCached: readBase } = base;
+  const { compute: computeFirst, resume: resumeFirst, readCached: readFirst } = first;
+  const { compute: computeSecond, resume: resumeSecond, readCached: readSecond } = second;
   useEffect(() => {
     if (!run || run !== restoredRun) return;
     let active = true;
+    // A reload can land before a started job's id was stored, which leaves nothing to resume.
+    // Such a slot asks again while the deadline is open: the service answers a computed request
+    // from its cache and joins a request still running to its open job.
+    const askAgain = restored?.confirmation?.sending === true && deadlineOpen(deadline);
+    const restore = (
+      request: PlanRequest,
+      resume: AdviceJob["resume"],
+      read: AdviceJob["readCached"],
+      compute: AdviceJob["compute"],
+    ) => {
+      if (resume?.(request)) return;
+      if (askAgain) compute(request);
+      else read?.(request);
+    };
     // React can replay mount effects. Wait until their cleanup has completed before resuming.
     queueMicrotask(() => {
       if (!active) return;
-      if (run.baseRequest && !resumeBase?.(run.baseRequest)) readBase?.(run.baseRequest);
+      if (run.baseRequest) restore(run.baseRequest, resumeBase, readBase, computeBase);
       const followups = restored?.confirmation?.followups;
       const firstRequest = restoredSlot(run, 0, followups?.[0]);
       const secondRequest = restoredSlot(run, 1, followups?.[1]);
-      if (firstRequest && !savedReplayProof && !resumeFirst?.(firstRequest))
-        readFirst?.(firstRequest);
-      if (secondRequest && !resumeSecond?.(secondRequest)) readSecond?.(secondRequest);
+      if (firstRequest && !savedReplayProof)
+        restore(firstRequest, resumeFirst, readFirst, computeFirst);
+      if (secondRequest) restore(secondRequest, resumeSecond, readSecond, computeSecond);
     });
     return () => {
       active = false;
@@ -637,10 +736,14 @@ function Workspace({
     restoredRun,
     restored,
     savedReplayProof,
+    deadline,
+    computeBase,
     resumeBase,
     readBase,
+    computeFirst,
     resumeFirst,
     readFirst,
+    computeSecond,
     resumeSecond,
     readSecond,
   ]);
@@ -686,6 +789,7 @@ function Workspace({
     confirmation.current = {
       ...confirmation.current,
       followups: candidates.map((candidate) => candidate?.alternative ?? null),
+      ...(candidates.some(Boolean) ? { sending: true as const } : {}),
     };
     writePlanSession(context, {
       draft,
@@ -774,7 +878,7 @@ function Workspace({
       first.reset();
       second.reset();
       setRun(next);
-      confirmation.current = { wildcardNotHeld };
+      confirmation.current = { wildcardNotHeld, sending: true };
       writePlanSession(context, { draft, reference, confirmation: confirmation.current });
       if (next.baseRequest) {
         base.compute(next.baseRequest);
@@ -863,7 +967,6 @@ function Workspace({
       }
     });
   }
-  const team = squad.entry.team_name ?? squad.entry.manager_name;
   const alternative = results.find(({ state }) => state.phase === "done")?.state;
   const revisionAnswer =
     baseAnswer ?? (alternative?.phase === "done" ? alternative.envelope.payload : undefined);
@@ -878,34 +981,16 @@ function Workspace({
     (bank.week === undefined
       ? copy.minimumBank(money(bank.tenths, locale))
       : copy.minimumWeekBank(money(bank.tenths, locale), squad.gameweek + bank.week - 1));
-  const teamPath =
-    squad.league_id === 0
-      ? entryAddress(squad.entry.entry_id)
-      : memberAddress(squad.league_id, squad.entry.entry_id);
 
   return (
     <div className={styles.page} data-zone="llmopt">
-      <header className={styles.header}>
-        <Link to={teamPath}>{copy.back}</Link>
-        <h1>{copy.title}</h1>
-        <p>
-          {team ? `${team} · ` : ""}
-          {copy.week} {squad.gameweek}
-        </p>
-      </header>
+      <PageHeader squad={squad} />
       {!ORIGIN && (
         <p className={styles.notice} role="status">
           {copy.serviceUnavailable}
         </p>
       )}
-      {ORIGIN && roster.isError && (
-        <p className={styles.notice} role="status">
-          {copy.rosterUnavailable}{" "}
-          <button className={styles.textButton} onClick={() => void roster.refetch()} type="button">
-            {copy.retry}
-          </button>
-        </p>
-      )}
+      {ORIGIN && roster.isError && <RosterRetry roster={roster} />}
       <section className={styles.workspace} aria-label={copy.chat}>
         {conversation.length > 0 && (
           <ol className={styles.conversation} aria-live="polite">

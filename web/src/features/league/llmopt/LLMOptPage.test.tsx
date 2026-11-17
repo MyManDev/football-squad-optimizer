@@ -58,9 +58,13 @@ const ROSTER = [
   OUTSIDER,
 ];
 const en = LLMOPT_COPY.en;
+// One deadline for every visit in a test, so a reload finds the session it saved.
+const DEADLINE = new Date(Date.now() + 86_400_000).toISOString();
 
 let LLMOptPage: typeof Page;
-let roster: "ok" | "fail";
+let roster: "ok" | "fail" | "late";
+let releaseRoster: () => void;
+let rosterGate: Promise<void>;
 let intent: Mock<(body: Record<string, unknown>) => Response>;
 const clients: QueryClient[] = [];
 
@@ -72,6 +76,7 @@ beforeAll(async () => {
 beforeEach(() => {
   jobs.length = 0;
   roster = "ok";
+  rosterGate = new Promise<void>((resolve) => (releaseRoster = resolve));
   intent = vi.fn(
     () =>
       new Response(
@@ -83,10 +88,11 @@ beforeEach(() => {
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url === `${ORIGIN}/api/v1/contributions/players`)
-        return roster === "ok"
-          ? new Response(JSON.stringify({ season: squad.season, players: ROSTER }))
-          : new Response("{}", { status: 503 });
+      if (url === `${ORIGIN}/api/v1/contributions/players`) {
+        if (roster === "fail") return new Response("{}", { status: 503 });
+        if (roster === "late") await rosterGate;
+        return new Response(JSON.stringify({ season: squad.season, players: ROSTER }));
+      }
       if (url === `${ORIGIN}/api/v1/llmopt/intent`)
         return intent(JSON.parse(String(init?.body)) as Record<string, unknown>);
       return new Response("{}", { status: 404 });
@@ -103,7 +109,8 @@ afterEach(() => {
 
 /** Opens the page the way a visit or a reload does: a fresh query cache, the tab's storage kept. */
 function open(language: "en" | "tr" = "en") {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  // The fixtures are set, not read, so the cache keeps them while no page observes them.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
   client.setQueryData(FIXTURES_QUERY.queryKey, {
     season: squad.season,
@@ -114,7 +121,7 @@ function open(language: "en" | "tr" = "en") {
     gameweeks: [
       {
         gameweek: squad.gameweek,
-        deadline_utc: new Date(Date.now() + 86_400_000).toISOString(),
+        deadline_utc: DEADLINE,
         fixtures: [],
       },
     ],
@@ -204,5 +211,125 @@ describe("chat refusals", () => {
     expect(en.limitedFor(1)).toContain("in 1 second.");
     expect(en.limitedFor(60)).toContain("in 1 minute.");
     expect(en.limitedFor(90)).toContain("in 2 minutes.");
+  });
+});
+
+/** The tab's saved LLMOPT session for the example member. */
+function savedSession(): [string, Record<string, unknown>] {
+  const keys = Array.from({ length: sessionStorage.length }, (_, index) =>
+    sessionStorage.key(index),
+  );
+  const key = keys.find((name) => name?.startsWith("squadopt.llmopt:")) ?? undefined;
+  expect(key).toBeDefined();
+  return [key!, JSON.parse(sessionStorage.getItem(key!)!) as Record<string, unknown>];
+}
+
+async function addRule(kind: string, player?: string) {
+  const user = userEvent.setup();
+  await user.selectOptions(screen.getByLabelText(en.rule), kind);
+  if (player) {
+    const option = await screen.findByRole("option", { name: new RegExp(`^${player} · `) });
+    await user.selectOptions(screen.getByLabelText(en.player), option);
+  }
+  await user.click(screen.getByRole("button", { name: en.add }));
+}
+
+describe("a reload keeps the saved session", () => {
+  const outsiderRule = `${en.rules.include_player} · ${OUTSIDER.name}`;
+
+  it("holds the session while the roster read fails and restores it on Retry", async () => {
+    open();
+    await ready();
+    await addRule("include_player", OUTSIDER.name);
+    expect(screen.getByText(outsiderRule, { exact: true })).toBeVisible();
+    cleanup();
+
+    roster = "fail";
+    open();
+    await ready();
+    const retry = await screen.findByRole("button", { name: en.retry });
+    expect(screen.getByText(en.rosterUnavailable, { exact: false })).toBeVisible();
+    expect(screen.queryByText(outsiderRule, { exact: true })).toBeNull();
+    expect(savedSession()[1]).toMatchObject({
+      draft: { hard: [{ kind: "include_player", player_id: OUTSIDER.id }] },
+    });
+
+    roster = "ok";
+    await userEvent.click(retry);
+    expect(await screen.findByText(outsiderRule, { exact: true })).toBeVisible();
+    expect(screen.queryByText(en.rosterUnavailable, { exact: false })).toBeNull();
+  });
+
+  it("restores a session that names only squad players even while the roster fails", async () => {
+    open();
+    await ready();
+    await addRule("hold_transfers");
+    cleanup();
+
+    roster = "fail";
+    open();
+    await ready();
+    expect(
+      await screen.findByRole("button", { name: `${en.remove} · ${en.rules.hold_transfers}` }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: en.retry })).toBeVisible();
+  });
+
+  it("waits for a late roster before restoring", async () => {
+    open();
+    await ready();
+    await addRule("include_player", OUTSIDER.name);
+    cleanup();
+
+    roster = "late";
+    open();
+    expect(await screen.findByText(/loading/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    releaseRoster();
+    expect(await screen.findByText(outsiderRule, { exact: true })).toBeVisible();
+  });
+
+  async function reloadConfirmed(confirmation: Record<string, unknown>) {
+    open();
+    await ready();
+    await addRule("hold_transfers");
+    cleanup();
+    const [key, session] = savedSession();
+    sessionStorage.setItem(key, JSON.stringify({ ...session, confirmation }));
+    jobs.length = 0;
+    open();
+    await ready();
+    return jobs[0]!;
+  }
+
+  it("asks again for a slot whose job a reload right after Compute could not resume", async () => {
+    // What Compute saves before its requests are answered: the confirmed run, still sending.
+    const base = await reloadConfirmed({ wildcardNotHeld: false, sending: true });
+    await waitFor(() => expect(base.compute).toHaveBeenCalledTimes(1));
+    expect(base.resume).toHaveBeenCalledTimes(1);
+    expect(base.readCached).not.toHaveBeenCalled();
+    expect(base.compute.mock.calls[0]?.[0]).toMatchObject({
+      entryId: ENTRY,
+      preferences: { hold_transfers: true },
+    });
+    const results = screen.getByRole("region", { name: en.results });
+    expect(results).toHaveTextContent(en.computing);
+    expect(results).not.toHaveTextContent(en.resultUnavailable);
+
+    // Once the request has its job, the saved run no longer asks again on the next reload.
+    base.show({
+      phase: "waiting",
+      request: base.compute.mock.calls[0]![0],
+      jobId: "job",
+      status: null,
+      fallback: null,
+    });
+    await waitFor(() => expect(savedSession()[1]).not.toHaveProperty("confirmation.sending"));
+  });
+
+  it("reads, without sending again, a run whose requests were all answered", async () => {
+    const base = await reloadConfirmed({ wildcardNotHeld: false });
+    await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+    expect(base.compute).not.toHaveBeenCalled();
   });
 });
