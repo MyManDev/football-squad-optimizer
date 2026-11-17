@@ -5,7 +5,8 @@ import { useSyncExternalStore } from "react";
  * nowhere else: no storage, no cookie, no address, no saved session, no usage record and no
  * log. No other module reads the variable; a provider call gets the credential only as the
  * argument `withOwnKey` passes to it. Delete, 30 minutes without a request, and leaving the
- * page all clear it.
+ * LLMOPT page all clear it. The 30 minutes are read from the clock as well as timed, since a
+ * timer stands still while a laptop sleeps or a phone freezes the tab.
  */
 
 export const OWN_KEY_PROVIDERS = [
@@ -49,6 +50,7 @@ const TOKEN = /^[\x21-\x7e]+$/;
 let held: ProviderCredential | null = null;
 let shown: HeldModel | null = null;
 let idle: ReturnType<typeof setTimeout> | undefined;
+let usedAt = 0;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -57,7 +59,13 @@ function notify() {
 
 function armIdleTimer() {
   clearTimeout(idle);
+  usedAt = Date.now();
   idle = setTimeout(clearOwnKey, OWN_KEY_IDLE_MS);
+}
+
+/** Deletes a key whose 30 minutes passed while no timer could run. */
+function clearIfIdle() {
+  if (held !== null && Date.now() - usedAt >= OWN_KEY_IDLE_MS) clearOwnKey();
 }
 
 export function isOwnKeyProvider(value: string): value is OwnKeyProvider {
@@ -126,6 +134,7 @@ export function heldModel(): HeldModel | null {
  * Rejects without calling when no key is held.
  */
 export function withOwnKey<T>(call: (credential: ProviderCredential) => Promise<T>): Promise<T> {
+  clearIfIdle();
   const credential = held;
   if (!credential) return Promise.reject(new Error("No model key is held."));
   armIdleTimer();
@@ -144,5 +153,9 @@ export function useOwnKey(): HeldModel | null {
   return useSyncExternalStore(subscribe, heldModel, () => null);
 }
 
-// A page kept in the back-forward cache would otherwise come back with the key.
-if (typeof window !== "undefined") window.addEventListener("pagehide", clearOwnKey);
+if (typeof window !== "undefined") {
+  // A page kept in the back-forward cache would otherwise come back with the key.
+  window.addEventListener("pagehide", clearOwnKey);
+  // A tab that slept past the 30 minutes drops the key as soon as it is looked at again.
+  document.addEventListener("visibilitychange", clearIfIdle);
+}

@@ -236,3 +236,106 @@ def test_keyless_routes_never_log_the_member_text(caplog: pytest.LogCaptureFixtu
         client.post(CHECK, json={"request": _request(), "reply": "{not json"})
     assert "Salah" not in caplog.text
     assert _SECRET_TEXT not in caplog.text
+
+
+def _without_type(schema: object, path: str = "$") -> list[str]:
+    """Every object schema below ``schema`` that names neither a type nor alternatives."""
+    if isinstance(schema, list):
+        return [found for item in schema for found in _without_type(item, path)]
+    if not isinstance(schema, dict):
+        return []
+    missing = [] if {"type", "anyOf"} & schema.keys() else [path]
+    children = [
+        *((f"{path}.{name}", child) for name, child in schema.get("properties", {}).items()),
+        *((f"{path}[]", child) for child in [schema.get("items")] if child is not None),
+        *((f"{path}|", child) for child in schema.get("anyOf", [])),
+    ]
+    return missing + [found for where, child in children for found in _without_type(child, where)]
+
+
+def test_every_schema_in_the_prompt_names_its_type() -> None:
+    # A provider's strict mode refuses a property schema with no type (OpenAI: "schema must
+    # have a 'type' key"), and the member's own provider gets this schema as it is.
+    with TestClient(create_app()) as client:
+        schema = client.post(PROMPT, json=_request()).json()["schema"]
+    assert _without_type(schema) == []
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected"),
+    [
+        # A provider that does not enforce the schema leaves out what it has nothing for.
+        (
+            {"status": "clarification", "message": "Hangi oyuncu?"},
+            {"status": "clarification", "message": "Hangi oyuncu?"},
+        ),
+        (
+            {"status": "draft", "draft": {"hard": [{"kind": "no_hits"}]}},
+            {"status": "draft", "draft": {"hard": [{"kind": "no_hits"}], "soft": [], "window": 1}},
+        ),
+        (
+            {
+                "status": "draft",
+                "message": "Tamam.",
+                "draft": {
+                    "hard": [{"kind": "keep_player", "player_id": 1, "max_cost_tenths": None}],
+                    "soft": None,
+                    "comparison": None,
+                    "keep_weeks": None,
+                },
+            },
+            {
+                "status": "draft",
+                "draft": {
+                    "hard": [{"kind": "keep_player", "player_id": 1}],
+                    "soft": [],
+                    "window": 1,
+                },
+            },
+        ),
+        (
+            {
+                "status": "draft",
+                "draft": {"hard": [], "comparison": {"kind": "include_player", "player_id": 1}},
+            },
+            {
+                "status": "draft",
+                "draft": {
+                    "hard": [],
+                    "soft": [],
+                    "comparison": {"kind": "include_player", "player_id": 1},
+                    "window": 1,
+                },
+            },
+        ),
+    ],
+)
+def test_check_reads_a_reply_that_leaves_out_its_empty_parts(
+    reply: dict[str, Any], expected: dict[str, Any]
+) -> None:
+    with TestClient(create_app()) as client:
+        checked = client.post(CHECK, json={"request": _request(), "reply": reply})
+    assert checked.status_code == 200, checked.text
+    assert checked.json() == expected
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        {"draft": {"hard": [], "soft": []}},
+        {"status": "draft"},
+        {"status": "draft", "draft": {"hard": [], "soft": []}, "note": "extra"},
+        {"status": "draft", "draft": {"hard": [{"player_id": 1}], "soft": []}},
+        {"status": "draft", "draft": {"hard": [{"kind": "keep_player"}], "soft": []}},
+        {
+            "status": "draft",
+            "draft": {"hard": [{"kind": "no_hits", "max_cost_tenths": 15}], "soft": []},
+        },
+        {"status": "clarification"},
+    ],
+)
+def test_check_still_refuses_a_reply_without_its_meaning(reply: dict[str, Any]) -> None:
+    with TestClient(create_app()) as client:
+        checked = client.post(CHECK, json={"request": _request(), "reply": reply})
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "REPLY_REFUSED"

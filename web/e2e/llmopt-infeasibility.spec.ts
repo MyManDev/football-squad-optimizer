@@ -8,6 +8,7 @@ import {
 } from "../src/fixtures/league";
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
+import { holdModel, routeChat } from "./llmoptChat";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -70,7 +71,7 @@ for (const failure of ["proven", "witnessed", "interrupted"] as const) {
         top100: { available: false, weights: [] },
       }),
     );
-    await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+    await routeChat(page, API, (route) => {
       if (route.request().method() === "OPTIONS") return answer(route, null);
       expect(route.request().postDataJSON().message).toBe(instructions);
       return answer(route, {
@@ -143,6 +144,8 @@ for (const failure of ["proven", "witnessed", "interrupted"] as const) {
     });
 
     await page.goto(PAGE);
+
+    await holdModel(page);
     const main = page.getByRole("main");
     const compute = page.getByRole("button", { name: "Compute plans" });
     const keeperRule = main
@@ -245,7 +248,7 @@ test("LLMOPT names the player and gameweek of a local rule conflict before submi
       players: [{ id: keeper.player_id, name: keeper.name, team: keeper.team }],
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+  await routeChat(page, API, (route) =>
     answer(route, {
       status: "draft",
       draft: {
@@ -264,6 +267,8 @@ test("LLMOPT names the player and gameweek of a local rule conflict before submi
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   const main = page.getByRole("main");
   await main
     .getByRole("textbox", { name: "Plan instructions" })

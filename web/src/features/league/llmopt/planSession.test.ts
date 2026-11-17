@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { EMPTY_DRAFT, MAX_MESSAGE_LENGTH, MAX_QUESTION_LENGTH, readIntent } from "./intent";
+import { readReply } from "../../../testSupport/intentReply";
+import { EMPTY_DRAFT, MAX_MESSAGE_LENGTH, MAX_QUESTION_LENGTH } from "./intent";
 import { checkedPlanSession, createPlanSessionStore, readPlanSession } from "./planSession";
 
 const OWNED = [
@@ -68,6 +69,15 @@ describe("createPlanSessionStore", () => {
     expect(readPlanSession({ ...context, deadline: "2031-01-01T00:00:00Z" })).toBeNull();
   });
 
+  it("carries the rules, and only the rules, to a new squad when the old one changed under them", () => {
+    const confirmation = { wildcardNotHeld: false };
+    createPlanSessionStore(context).save({ draft, confirmation, carried: true });
+    expect(readPlanSession({ ...context, basis: "other" })).toEqual({ draft });
+    expect(
+      readPlanSession({ ...context, basis: "other", deadline: "2031-01-01T00:00:00Z" }),
+    ).toBeNull();
+  });
+
   it("keeps working without a context or without storage", () => {
     const detached = createPlanSessionStore(null);
     detached.save({ draft, confirmation: { wildcardNotHeld: false } });
@@ -123,24 +133,8 @@ describe("checkedPlanSession", () => {
 });
 
 describe("a clarification question", () => {
-  const ask = (question: string) => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ status: "clarification", message: question })),
-        ),
-    );
-    return readIntent(
-      "https://advice.example",
-      "Buy a striker.",
-      "en",
-      EMPTY_DRAFT,
-      ROSTER,
-      new AbortController().signal,
-    );
-  };
+  const ask = (question: string) =>
+    readReply(new Response(JSON.stringify({ status: "clarification", message: question })), ROSTER);
 
   it("is read up to the length the session restores", async () => {
     const question = "q".repeat(MAX_QUESTION_LENGTH);

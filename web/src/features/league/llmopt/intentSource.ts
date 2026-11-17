@@ -5,7 +5,6 @@ import {
   intentAnswer,
   intentBody,
   intentError,
-  readIntent,
   type CatalogPlayer,
   type Clarification,
   type PlanDraft,
@@ -29,30 +28,13 @@ export type IntentResult =
   { status: "draft"; draft: PlanDraft } | { status: "clarification"; message: string };
 
 /**
- * Where the page's chat is read. Each source returns a draft already checked against the
- * players it was given. A named refusal rejects with an `IntentError`; any other rejection
+ * Where the page's chat is read: the member's own model, or a stand-in in a test. The site
+ * has no model of its own. Each source returns a draft already checked against the players
+ * it was given. A named refusal rejects with an `IntentError`; any other rejection
  * reads on the page as the chat being unavailable.
  */
 export interface IntentSource {
   interpret(request: IntentRequest, signal: AbortSignal): Promise<IntentResult>;
-}
-
-/** The site's own intent service, `POST /api/v1/llmopt/intent`. */
-export function serverIntentSource(origin: string): IntentSource {
-  return {
-    interpret: (request, signal) =>
-      readIntent(
-        origin,
-        request.message,
-        request.locale,
-        request.draft,
-        request.players,
-        signal,
-        request.clarification,
-        request.referenceWeeks,
-        request.referenceCaptains,
-      ),
-  };
 }
 
 /** How a source reaches the held key: `withOwnKey`, or a stand-in in a test. */
