@@ -69,6 +69,15 @@ describe("createPlanSessionStore", () => {
     expect(readPlanSession({ ...context, deadline: "2031-01-01T00:00:00Z" })).toBeNull();
   });
 
+  it("carries the rules, and only the rules, to a new squad when the old one changed under them", () => {
+    const confirmation = { wildcardNotHeld: false };
+    createPlanSessionStore(context).save({ draft, confirmation, carried: true });
+    expect(readPlanSession({ ...context, basis: "other" })).toEqual({ draft });
+    expect(
+      readPlanSession({ ...context, basis: "other", deadline: "2031-01-01T00:00:00Z" }),
+    ).toBeNull();
+  });
+
   it("keeps working without a context or without storage", () => {
     const detached = createPlanSessionStore(null);
     detached.save({ draft, confirmation: { wildcardNotHeld: false } });

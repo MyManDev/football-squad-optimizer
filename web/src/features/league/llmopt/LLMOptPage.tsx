@@ -137,8 +137,14 @@ function Session({
   if (fixtures.isPending || (saved && roster.isPending))
     return <PageLoading label={messages.common.loading} />;
   // A saved session that names a player outside the squad needs the roster to be checked.
-  // While the roster read fails, the session is held untouched until a retry reads it.
-  if (saved && roster.isError && !checkedPlanSession(saved, ownedPlayers(squad), squad.gameweek))
+  // While the roster read fails, the session is held untouched until a retry reads it. A
+  // roster already read stays in use when a later refresh of it fails.
+  if (
+    saved &&
+    roster.isError &&
+    !roster.data &&
+    !checkedPlanSession(saved, ownedPlayers(squad), squad.gameweek)
+  )
     return <RosterHold squad={squad} roster={roster} />;
   return (
     <Workspace
@@ -386,7 +392,15 @@ function Workspace({
       if (answer.status === "draft") {
         change(answer.draft, previous);
         setChanges(draftChanges(draft, answer.draft));
-      } else setQuestion({ message: clarification?.message ?? text, question: answer.message });
+      } else {
+        // A second question keeps the answer to the first: what the model resolves next is
+        // the first message with every answer since, as far as one message can hold them.
+        const asked = clarification ? `${clarification.message}\n${text}` : text;
+        setQuestion({
+          message: asked.length <= MAX_MESSAGE_LENGTH ? asked : (clarification?.message ?? text),
+          question: answer.message,
+        });
+      }
       const reply = answer.status === "clarification" ? answer.message : copy.understood;
       const userLine = nextChatLine.current++;
       const replyLine = nextChatLine.current++;
@@ -589,7 +603,8 @@ function Workspace({
         setBasisChanged(true);
         setRun(null);
         setReference(undefined);
-        session.save({ draft });
+        // The reload the page asks for opens the new squad; the rules go with the member.
+        session.save({ draft, carried: true });
         return;
       }
       const request = requestFor(squad, forwarded, plans.window);
@@ -785,7 +800,7 @@ function Workspace({
           {copy.serviceUnavailable}
         </p>
       )}
-      {ORIGIN && roster.isError && <RosterRetry roster={roster} />}
+      {ORIGIN && roster.isError && !roster.data && <RosterRetry roster={roster} />}
       <section className={styles.workspace} aria-label={copy.chat}>
         {ORIGIN && (
           <OwnKeyForm
@@ -1127,7 +1142,9 @@ export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {
   const result = useEntrySquad(entryId, valid);
   if (!valid) return <EmptyState page title={messages.leagueMembers.invalidEntry} />;
   if (result.isPending) return <PageLoading label={messages.common.loading} />;
-  if (result.isError) return <EmptyState page title={copy.squadUnavailable} />;
+  // A squad already read stays on the page when a later refresh of it fails: plans may be
+  // computing, and unmounting the workspace would drop them.
+  if (!result.data) return <EmptyState page title={copy.squadUnavailable} />;
   return (
     <Session
       key={squadBasis(result.data.payload)}
