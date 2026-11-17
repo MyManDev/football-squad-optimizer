@@ -7,6 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock }
 
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { requestsCarrying, sentRequests, watchKeyLeaks } from "../../../testSupport/keyLeaks";
 import { stubTree, withLeague } from "../../../testSupport/league";
 import type { AdviceRequest } from "../advice/adviceClient";
 import type { ComputePhase } from "../advice/useAdviceJob";
@@ -14,6 +15,7 @@ import { FIXTURES_QUERY } from "../../fixtures/data";
 import { LLMOPT_COPY } from "./copy";
 import { IntentError } from "./intent";
 import type { IntentSource } from "./intentSource";
+import { clearOwnKey, heldModel } from "./ownKey";
 import { summarizeRevision } from "./planRevision";
 import type { LLMOptPage as Page } from "./LLMOptPage";
 
@@ -105,6 +107,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  clearOwnKey();
   for (const client of clients.splice(0)) client.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -621,5 +624,194 @@ describe("the plan with all preferences", () => {
     expect(jobs[3]!.compute.mock.calls[0]![0].preferences).toMatchObject({
       include_players: [OUTSIDER.id],
     });
+  });
+});
+
+describe("the member's own model key", () => {
+  const KEY = "sk-test-page-own-key-0001";
+  const PROVIDER = "https://api.openai.com/v1/chat/completions";
+  const words = en.ownKey;
+  let provider: Mock<() => Response>;
+
+  beforeEach(() => {
+    provider = vi.fn(
+      () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ finish_reason: "stop", message: { content: '{"status":"draft"}' } }],
+          }),
+        ),
+    );
+    const site = globalThis.fetch as unknown as Mock<typeof fetch>;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === `${ORIGIN}/api/v1/llmopt/prompt`)
+          return new Response(
+            JSON.stringify({
+              system: "Read the member's instructions.",
+              user: "{}",
+              schema: { type: "object" },
+              schema_name: "llmopt_intent",
+              max_output_tokens: 1200,
+            }),
+          );
+        if (url === PROVIDER) return provider();
+        if (url === `${ORIGIN}/api/v1/llmopt/check`)
+          return new Response(
+            JSON.stringify({ status: "draft", draft: { hard: [{ kind: "no_hits" }], soft: [] } }),
+          );
+        return site(input, init);
+      }),
+    );
+  });
+
+  async function saveKey(model = "gpt-5-mini") {
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("textbox", { name: words.model }), model);
+    await user.type(screen.getByLabelText(words.key), KEY);
+    await user.click(screen.getByRole("button", { name: words.save }));
+  }
+
+  it("reads the chat with the member's provider, keeps the key out of every store, and Delete deletes it", async () => {
+    const watch = watchKeyLeaks(KEY);
+    try {
+      open();
+      await ready();
+      const key = screen.getByLabelText(words.key);
+      expect(key).toHaveAttribute("type", "password");
+      expect(key).toHaveAttribute("autocomplete", "off");
+      expect(key).toHaveAttribute("spellcheck", "false");
+      expect(screen.getByRole("button", { name: words.save })).toBeDisabled();
+      await saveKey();
+
+      const group = screen.getByRole("group", { name: words.title });
+      expect(group).toHaveTextContent(words.providers.openai);
+      expect(group).toHaveTextContent("gpt-5-mini");
+      expect(screen.queryByLabelText(words.key)).toBeNull();
+      expect(document.body.innerHTML).not.toContain(KEY);
+
+      await sendMessage("No hits.");
+      expect(
+        await screen.findByRole("button", { name: `${en.remove} · ${en.rules.no_hits}` }),
+      ).toBeVisible();
+      expect(intent).not.toHaveBeenCalled();
+      expect(provider).toHaveBeenCalledTimes(1);
+      const fetch = globalThis.fetch as unknown as Mock;
+      expect(requestsCarrying(fetch, KEY)).toEqual([PROVIDER]);
+      expect(sentRequests(fetch).map(({ url }) => url)).toEqual(
+        expect.arrayContaining([
+          `${ORIGIN}/api/v1/llmopt/prompt`,
+          PROVIDER,
+          `${ORIGIN}/api/v1/llmopt/check`,
+        ]),
+      );
+      expect(sessionStorage.length).toBeGreaterThan(0);
+      expect(watch.leaks()).toEqual([]);
+
+      await userEvent.click(screen.getByRole("button", { name: words.delete }));
+      expect(heldModel()).toBeNull();
+      expect(screen.getByLabelText(words.key)).toHaveValue("");
+      expect(document.body.innerHTML).not.toContain(KEY);
+
+      await sendMessage("Roll the transfer.");
+      await waitFor(() => expect(intent).toHaveBeenCalledTimes(1));
+      expect(provider).toHaveBeenCalledTimes(1);
+      expect(watch.leaks()).toEqual([]);
+    } finally {
+      watch.restore();
+    }
+  });
+
+  it("names a key the provider refused without showing or logging the key", async () => {
+    provider.mockImplementation(
+      () =>
+        new Response(JSON.stringify({ error: { message: `Incorrect API key provided: ${KEY}` } }), {
+          status: 401,
+        }),
+    );
+    const watch = watchKeyLeaks(KEY);
+    try {
+      open();
+      await ready();
+      await saveKey();
+      await sendMessage("No hits.");
+      expect(await screen.findByText(en.refusals.keyRefused, { exact: true })).toBeVisible();
+      expect(document.body.innerHTML).not.toContain(KEY);
+      expect(watch.leaks()).toEqual([]);
+    } finally {
+      watch.restore();
+    }
+  });
+
+  it("waits out the provider's Retry-After with Send off", async () => {
+    provider.mockImplementation(
+      () => new Response("{}", { status: 429, headers: { "Retry-After": "2" } }),
+    );
+    open();
+    await ready();
+    await saveKey();
+    await sendMessage("No hits.");
+    expect(await screen.findByText(en.limitedFor(2), { exact: true })).toBeVisible();
+    expect(screen.getByRole("button", { name: en.send })).toBeDisabled();
+  });
+
+  it("asks for a base URL only for a local server, and only a loopback one", async () => {
+    const user = userEvent.setup();
+    open();
+    await ready();
+    expect(screen.queryByRole("textbox", { name: words.baseUrl })).toBeNull();
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: words.provider }),
+      words.providers.local,
+    );
+    const base = screen.getByRole("textbox", { name: words.baseUrl });
+    await user.type(screen.getByRole("textbox", { name: words.model }), "llama3.1");
+    await user.type(base, "https://example.com/v1");
+    expect(screen.getByRole("button", { name: words.save })).toBeDisabled();
+    await user.clear(base);
+    await user.type(base, "http://localhost:11434/v1");
+    await user.click(screen.getByRole("button", { name: words.save }));
+    expect(heldModel()).toEqual({ provider: "local", model: "llama3.1" });
+    expect(screen.getByRole("group", { name: words.title })).toHaveTextContent(
+      words.providers.local,
+    );
+  });
+
+  it("says once that a key it cannot hold is not valid, and clears it on the next edit", async () => {
+    const user = userEvent.setup();
+    open();
+    await ready();
+    await user.type(screen.getByRole("textbox", { name: words.model }), "two words");
+    await user.type(screen.getByLabelText(words.key), KEY);
+    await user.click(screen.getByRole("button", { name: words.save }));
+
+    expect(heldModel()).toBeNull();
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent(words.invalid);
+    expect(screen.getByRole("group", { name: words.title })).toContainElement(status);
+    expect(screen.getByLabelText(words.key)).toHaveValue("");
+    expect(document.body.innerHTML).not.toContain(KEY);
+
+    await user.type(screen.getByRole("textbox", { name: words.model }), "x");
+    expect(screen.queryByText(words.invalid)).toBeNull();
+  });
+
+  it("words the invalid key line in Turkish", () => {
+    expect(LLMOPT_COPY.tr.ownKey.invalid).toBe("Anahtar, model ya da adres geçersiz.");
+    expect(en.ownKey.invalid).toBe("The key, model or address is not valid.");
+  });
+
+  it("labels the form in Turkish", async () => {
+    open("tr");
+    await screen.findByRole("heading", { level: 1, name: LLMOPT_COPY.tr.title });
+    const tr = LLMOPT_COPY.tr.ownKey;
+    expect(screen.getByRole("group", { name: tr.title })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: tr.provider })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: tr.model })).toBeRequired();
+    expect(screen.getByLabelText(tr.key)).toHaveAttribute("type", "password");
+    expect(screen.getByRole("button", { name: tr.save })).toBeVisible();
+    expect(screen.getByRole("button", { name: tr.delete })).toBeVisible();
   });
 });
