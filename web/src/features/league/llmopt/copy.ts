@@ -1,7 +1,16 @@
 import type { Language } from "../../../i18n/messages";
-import type { CatalogPlayer, Constraint } from "./intent";
+import type { CatalogPlayer, Constraint, IntentRefusal } from "./intent";
+
+/** A wait in seconds as a whole count of the largest unit that fits, rounded up. */
+function waitUnits(seconds: number): [number, "second" | "minute" | "hour"] {
+  if (seconds < 60) return [Math.max(1, Math.ceil(seconds)), "second"];
+  if (seconds < 3600) return [Math.ceil(seconds / 60), "minute"];
+  return [Math.ceil(seconds / 3600), "hour"];
+}
 
 const en = {
+  title: "LLMOPT",
+  assistant: "LLMOPT",
   back: "Back to team",
   chat: "Plan instructions",
   placeholder: "Roll the transfer this week and buy Saka next week.",
@@ -13,10 +22,20 @@ const en = {
   interpreting: "Reading your instructions…",
   understood: "Instructions updated.",
   dismissQuestion: "Dismiss question",
-  comparisonScope: "This comparison uses the required rules.",
   user: "You",
-  limited: "The chat request limit has been reached. Wait a little and try again.",
-  intentUnavailable: "Chat is unavailable. You can still edit the rules below.",
+  refusals: {
+    disabled: "Chat is switched off. You can still edit the rules below.",
+    busy: "Chat is not answering right now. Try again shortly.",
+    limited: "The chat request limit has been reached. Wait a little and try again.",
+    tooLarge: "This request is too large to send.",
+    invalid: "The chat could not read this request.",
+    unsupported: "The chat did not accept this request.",
+    unavailable: "Chat is unavailable. You can still edit the rules below.",
+  } satisfies Record<IntentRefusal, string>,
+  limitedFor: (seconds: number) => {
+    const [count, unit] = waitUnits(seconds);
+    return `The chat request limit has been reached. You can send again in ${count} ${unit}${count === 1 ? "" : "s"}.`;
+  },
   rosterUnavailable: "The current player list could not be loaded.",
   squadUnavailable: "The current squad could not be loaded.",
   serviceUnavailable: "The planning service is unavailable.",
@@ -43,11 +62,13 @@ const en = {
   selectPlayer: "Select a player",
   club: "Club",
   selectClub: "Select a club",
-  clubCount: "Players",
+  clubCount: "Exact number of players",
+  exactCount: (count: number) => `exactly ${count}`,
   clubCountScope: "Count in",
   clubSquad: "Final squad",
   clubTransfers: "Incoming transfers",
   remove: "Remove",
+  changes: { added: "New", changed: "Changed", removed: "Removed" },
   compute: "Compute plans",
   computing: "Computing…",
   resultUnavailable: "No saved result for this plan.",
@@ -74,8 +95,6 @@ const en = {
   bankAfterWeek: (week: number) => `After GW ${week}`,
   bankShortfall: (when: string, required: string, reachable: string, difference: string) =>
     `${when}, the required budget is ${required}. The most this plan can keep is ${reachable}. The shortfall is ${difference}.`,
-  bankWitness: (when: string, required: string, reachable: string) =>
-    `${when}, the required budget is ${required}. A checked alternative leaves ${reachable}.`,
   lowerBankMinimum: (bank: string) => `Lower the minimum remaining budget to ${bank}`,
   removeBankMinimum: "Remove the minimum remaining budget",
   deferPurchase: (player: string, before: number, after: number) =>
@@ -95,7 +114,6 @@ const en = {
   priceAmount: (value: string) => `${value} expected points lost`,
   priceCeiling: (value: string) => `Up to ${value} points`,
   priceAboveCeiling: "Above your points limit.",
-  priceUnproven: "Cost is based on the plans found.",
   priceNotRun: "This preference was not evaluated in this calculation.",
   pricedPlan: (label: string) => `Preferred plan · ${label}`,
   alternative: "Alternative plan",
@@ -125,7 +143,6 @@ const en = {
   scenarioPrice: (player: string, increase: string, week: number) =>
     `${player} costs ${increase} more from GW ${week} onward`,
   scenarioUnavailable: (player: string, week: number) => `${player} is unavailable in GW ${week}`,
-  scenarioHypothetical: "Both plans use the same hypothetical change.",
   scenarioReferenceRequired:
     "Calculate a reference plan for this window before comparing the scenario.",
   scenarioFeasible: "The original transfers are feasible in this scenario.",
@@ -148,7 +165,6 @@ const en = {
   lineup: "Starting XI and bench",
   lineupUnavailable: "The lineup for this plan is unavailable.",
   bench: "Bench",
-  notProven: "Valid plan found. Search ended before proving the best plan.",
   week: "GW",
   rules: {
     hold_transfers: "Roll the transfer",
@@ -159,12 +175,14 @@ const en = {
     include_player: "Include player",
     buy_player: "Transfer in player",
     avoid_player: "Exclude player",
-    club_count: "Club player count",
+    club_count: "Exact players from a club",
     hit_budget: "Total penalty limit",
   } satisfies Record<Constraint["kind"], string>,
 };
 
 const tr: typeof en = {
+  title: "LLMOPT",
+  assistant: "LLMOPT",
   back: "Takıma dön",
   chat: "Plan talimatların",
   placeholder: "Bu hafta transferi sakla, haftaya Saka’yı al.",
@@ -176,10 +194,21 @@ const tr: typeof en = {
   interpreting: "Talimatların okunuyor…",
   understood: "Talimatlar güncellendi.",
   dismissQuestion: "Soruyu kapat",
-  comparisonScope: "Bu karşılaştırma kesin şartlara göre hesaplanır.",
   user: "Sen",
-  limited: "Sohbet istek sınırına ulaştı. Biraz bekleyip tekrar dene.",
-  intentUnavailable: "Sohbet şu anda kullanılamıyor. Kuralları aşağıdan düzenleyebilirsin.",
+  refusals: {
+    disabled: "Sohbet kapalı. Kuralları aşağıdan düzenleyebilirsin.",
+    busy: "Sohbet şu anda yanıt vermiyor. Biraz sonra tekrar dene.",
+    limited: "Sohbet istek sınırına ulaştı. Biraz bekleyip tekrar dene.",
+    tooLarge: "Bu istek gönderilemeyecek kadar büyük.",
+    invalid: "Sohbet bu isteği okuyamadı.",
+    unsupported: "Sohbet bu isteği kabul etmedi.",
+    unavailable: "Sohbet şu anda kullanılamıyor. Kuralları aşağıdan düzenleyebilirsin.",
+  },
+  limitedFor: (seconds) => {
+    const [count, unit] = waitUnits(seconds);
+    const name = { second: "saniye", minute: "dakika", hour: "saat" }[unit];
+    return `Sohbet istek sınırına ulaştı. ${count} ${name} sonra tekrar gönderebilirsin.`;
+  },
   rosterUnavailable: "Güncel oyuncu listesi yüklenemedi.",
   squadUnavailable: "Güncel kadro yüklenemedi.",
   serviceUnavailable: "Planlama hizmeti şu anda kullanılamıyor.",
@@ -206,11 +235,13 @@ const tr: typeof en = {
   selectPlayer: "Oyuncu seç",
   club: "Kulüp",
   selectClub: "Kulüp seç",
-  clubCount: "Oyuncu sayısı",
+  clubCount: "Tam olarak kaç oyuncu",
+  exactCount: (count) => `tam olarak ${count}`,
   clubCountScope: "Nerede sayılsın?",
   clubSquad: "Son kadro",
   clubTransfers: "Gelen transferler",
   remove: "Kaldır",
+  changes: { added: "Yeni", changed: "Değişti", removed: "Kaldırıldı" },
   compute: "Planları hesapla",
   computing: "Hesaplanıyor…",
   resultUnavailable: "Bu plan için kayıtlı sonuç yok.",
@@ -237,8 +268,6 @@ const tr: typeof en = {
   bankAfterWeek: (week: number) => `GW ${week} sonunda`,
   bankShortfall: (when: string, required: string, reachable: string, difference: string) =>
     `${when} en az ${required} kalması gerekiyor. Bu plan en fazla ${reachable} bırakabiliyor. Eksik tutar ${difference}.`,
-  bankWitness: (when: string, required: string, reachable: string) =>
-    `${when} en az ${required} kalması gerekiyor. Kontrol edilen bir alternatif ${reachable} bırakıyor.`,
   lowerBankMinimum: (bank: string) => `Asgari kalan bütçeyi ${bank} olarak değiştir`,
   removeBankMinimum: "Asgari kalan bütçe kuralını kaldır",
   deferPurchase: (player: string, before: number, after: number) =>
@@ -258,7 +287,6 @@ const tr: typeof en = {
   priceAmount: (value: string) => `${value} beklenen puan kaybı`,
   priceCeiling: (value: string) => `En fazla ${value} puan`,
   priceAboveCeiling: "Belirlediğin puan sınırının üzerinde.",
-  priceUnproven: "Maliyet bulunan planlara göre hesaplandı.",
   priceNotRun: "Bu tercih bu hesaplamada değerlendirilmedi.",
   pricedPlan: (label: string) => `Tercihli plan · ${label}`,
   alternative: "Alternatif plan",
@@ -289,7 +317,6 @@ const tr: typeof en = {
     `GW ${week} itibarıyla ${player} fiyatı ${increase} artıyor`,
   scenarioUnavailable: (player: string, week: number) =>
     `${player} GW ${week} haftasında oynayamıyor`,
-  scenarioHypothetical: "İki plan da aynı varsayımsal değişiklikle hesaplanır.",
   scenarioReferenceRequired:
     "Senaryoyu karşılaştırmadan önce bu süre için bir referans plan hesapla.",
   scenarioFeasible: "Önceki transferler bu senaryoda uygulanabilir.",
@@ -312,7 +339,6 @@ const tr: typeof en = {
   lineup: "İlk 11 ve yedekler",
   lineupUnavailable: "Bu planın kadrosu gösterilemiyor.",
   bench: "Yedekler",
-  notProven: "Geçerli bir plan bulundu. Arama, en iyi planı kanıtlamadan sona erdi.",
   week: "GW",
   rules: {
     hold_transfers: "Transferi sakla",
@@ -323,7 +349,7 @@ const tr: typeof en = {
     include_player: "Oyuncuyu kadroya al",
     buy_player: "Oyuncuyu transfer et",
     avoid_player: "Oyuncuyu kadro dışında tut",
-    club_count: "Kulüpten oyuncu sayısı",
+    club_count: "Kulüpten tam olarak kaç oyuncu",
     hit_budget: "Toplam ceza sınırı",
   },
 };
@@ -342,7 +368,7 @@ export function ruleLabel(
       : ` · ${rule.week === 1 ? copy.thisWeek : copy.relativeWeek(rule.week)}`;
   if (rule.kind === "club_count") {
     const scope = rule.scope === "transfers_in" ? copy.clubTransfers : copy.clubSquad;
-    return `${rule.club} · ${scope} · ${rule.count}${timing}`;
+    return `${rule.club} · ${scope} · ${copy.exactCount(rule.count)}${timing}`;
   }
   if (rule.kind === "hit_budget")
     return `${copy.rules[rule.kind]} · ${copy.hitBudgetPoints(rule.points)}`;

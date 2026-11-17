@@ -283,6 +283,21 @@
   background: var(--color-surface);
 }
 
+.changeMark {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-s);
+  color: var(--color-text);
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+.ruleGroup li[data-change="removed"] {
+  color: var(--color-text-muted);
+  min-height: 44px;
+}
+
 .remove {
   min-width: 44px;
   padding: 0;

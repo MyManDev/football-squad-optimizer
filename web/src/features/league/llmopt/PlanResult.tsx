@@ -107,7 +107,7 @@ function MetricDelta({ label, value }: { label: string; value?: string }) {
 
 export type PreferencePrice = { key: string; label: string; ceiling?: number; detail?: string } & (
   | { status: "pending" | "conflict" | "unavailable" | "skipped" }
-  | { status: "priced"; cost: number; aboveCeiling: boolean; unproven: boolean }
+  | { status: "priced"; cost: number; aboveCeiling: boolean }
 );
 
 function PreferencePrices({ prices }: { prices: PreferencePrice[] }) {
@@ -143,9 +143,6 @@ function PreferencePrices({ prices }: { prices: PreferencePrice[] }) {
             </span>
             {row.status === "priced" && row.aboveCeiling && (
               <span className={styles.muted}>{copy.priceAboveCeiling}</span>
-            )}
-            {row.status === "priced" && row.unproven && (
-              <span className={styles.muted}>{copy.priceUnproven}</span>
             )}
           </li>
         ))}
@@ -323,7 +320,6 @@ export function PlanResult({
         <p>{copy.hold}</p>
       )}
       {weeks && <UpcomingWeeks weeks={weeks.slice(1)} />}
-      {plan.solver_status === "FEASIBLE" && <p className={styles.muted}>{copy.notProven}</p>}
     </article>
   );
 }

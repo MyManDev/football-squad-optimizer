@@ -41,21 +41,19 @@ export function InfeasibilityResult({
   const after =
     bank?.week === undefined ? copy.bankAfterFinal : copy.bankAfterWeek(absolute(bank.week));
   const bankReason =
-    bank &&
-    (bank.exact
-      ? copy.bankShortfall(
-          after,
-          budget(bank.required),
-          budget(bank.reachable),
-          budget(bank.required - bank.reachable),
-        )
-      : copy.bankWitness(after, budget(bank.required), budget(bank.reachable)));
+    bank?.exact &&
+    copy.bankShortfall(
+      after,
+      budget(bank.required),
+      budget(bank.reachable),
+      budget(bank.required - bank.reachable),
+    );
   return (
     <section className={styles.infeasibility} aria-labelledby={title}>
       <h4 className={styles.lineupTitle} id={title}>
         {copy.infeasibilityTitle}
       </h4>
-      <p role="status">{bankReason ?? copy.infeasibilityProof}</p>
+      <p role="status">{bankReason || copy.infeasibilityProof}</p>
       {options.length > 0 && (
         <ul className={styles.repairOptions}>
           {options.map(({ repair, draft: next }, index) => {
