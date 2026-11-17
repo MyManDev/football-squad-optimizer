@@ -80,11 +80,8 @@ describe("deployment artifact preflight", () => {
       "allows 'unsafe-inline'",
     ],
     [
-      POLICY.replace(
-        "script-src 'self'",
-        "script-src 'self' https://static.cloudflareinsights.com",
-      ),
-      "allows https://static.cloudflareinsights.com",
+      POLICY.replace("script-src 'self'", "script-src 'self' https://cdn.example.net"),
+      "allows https://cdn.example.net",
     ],
     [POLICY.replace("https://api.example", "https:"), "connect-src allows any host"],
   ])("refuses the policy %s", async (policy, message) => {

@@ -108,8 +108,13 @@ export function verifySiteWidePolicy(headersSource) {
     }
   }
   const scripts = directives.get("script-src") ?? [];
-  const allowed = new Set(["'self'", "'wasm-unsafe-eval'"]);
-  // Hashes of the site's own inline scripts may join later; no host and no 'unsafe-*' may.
+  // Cloudflare Web Analytics is the one script from another host the owner kept (17 Nov 2026).
+  const allowed = new Set([
+    "'self'",
+    "'wasm-unsafe-eval'",
+    "https://static.cloudflareinsights.com",
+  ]);
+  // Hashes of the site's own inline scripts may join later; no other host and no 'unsafe-*' may.
   const extra = scripts.filter(
     (source) => !allowed.has(source) && !/^'sha(256|384|512)-/.test(source),
   );

@@ -55,7 +55,11 @@ test("every kind of response carries the policy and the other site-wide headers"
     const headers = response.headers();
     const policy = headers["content-security-policy"] ?? "";
     expect(directive(policy, "default-src"), address).toEqual(["'self'"]);
-    expect(directive(policy, "script-src"), address).toEqual(["'self'", "'wasm-unsafe-eval'"]);
+    expect(directive(policy, "script-src"), address).toEqual([
+      "'self'",
+      "'wasm-unsafe-eval'",
+      "https://static.cloudflareinsights.com",
+    ]);
     expect(directive(policy, "object-src"), address).toEqual(["'none'"]);
     expect(directive(policy, "base-uri"), address).toEqual(["'none'"]);
     expect(directive(policy, "frame-ancestors"), address).toEqual(["'none'"]);
@@ -114,8 +118,8 @@ test("a request to a host the policy does not name never leaves the page", async
 
 test("a script that is not the site's own does not run", async ({ page }) => {
   let beaconServed = 0;
-  // The analytics beacon Cloudflare can add to a page, served here so only the policy stops it.
-  await page.route("https://static.cloudflareinsights.com/**", (route) => {
+  // A script from a host the policy does not name, served here so only the policy stops it.
+  await page.route("https://cdn.example.net/**", (route) => {
     beaconServed += 1;
     return route.fulfill({
       body: "window.__beaconRan = true;",
@@ -133,7 +137,7 @@ test("a script that is not the site's own does not run", async ({ page }) => {
     inline.textContent = "window.__inlineRan = true;";
     document.head.append(inline);
     const foreign = document.createElement("script");
-    foreign.src = "https://static.cloudflareinsights.com/beacon.min.js?csp-probe=1";
+    foreign.src = "https://cdn.example.net/beacon.min.js?csp-probe=1";
     const settled = new Promise((resolve) => {
       foreign.onload = resolve;
       foreign.onerror = resolve;
@@ -161,7 +165,7 @@ test("a script that is not the site's own does not run", async ({ page }) => {
     .toEqual(
       expect.arrayContaining([
         "script-src-elem inline",
-        expect.stringMatching(/^script-src-elem https:\/\/static\.cloudflareinsights\.com/),
+        expect.stringMatching(/^script-src-elem https:\/\/cdn\.example\.net/),
         "script-src eval",
       ]),
     );

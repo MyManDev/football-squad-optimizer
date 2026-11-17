@@ -75,12 +75,16 @@ describe("the compute service's origin in the policy", () => {
 describe("the shipped policy", () => {
   const policy = policyOf(resolveSiteHeaders(SHIPPED, "https://squadopt-api.mymandev.com"));
 
-  it("runs only the site's own scripts, and lets the solver compile its wasm", () => {
-    expect(directive(policy, "script-src")).toEqual(["'self'", "'wasm-unsafe-eval'"]);
+  it("runs the site's own scripts and Cloudflare's analytics beacon, and lets the solver compile its wasm", () => {
+    expect(directive(policy, "script-src")).toEqual([
+      "'self'",
+      "'wasm-unsafe-eval'",
+      "https://static.cloudflareinsights.com",
+    ]);
     expect(directive(policy, "default-src")).toEqual(["'self'"]);
   });
 
-  it("sends only to the site, the compute service, the model providers and loopback", () => {
+  it("sends only to the site, the compute service, the model providers, loopback and the beacon's host", () => {
     expect(directive(policy, "connect-src")).toEqual([
       "'self'",
       "https://squadopt-api.mymandev.com",
@@ -93,6 +97,7 @@ describe("the shipped policy", () => {
       "https://api.deepseek.com",
       "http://localhost:*",
       "http://127.0.0.1:*",
+      "https://cloudflareinsights.com",
     ]);
   });
 
