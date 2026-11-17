@@ -132,7 +132,10 @@ def build_app() -> FastAPI:
     # every accepted request, every rejection reason — go nowhere.
     configure_advice_logging()
     AdviceLog("api").event("advice_forwarded_trust", **_forwarded_trust())
+    backend = backend_from_environment(metrics=AdviceMetrics(zero_counters=API_COUNTER_FAMILIES))
     return app_for_backend(
-        backend_from_environment(metrics=AdviceMetrics(zero_counters=API_COUNTER_FAMILIES)),
-        llmopt_intent=intent_service_from_environment(os.environ),
+        backend,
+        llmopt_intent=intent_service_from_environment(
+            os.environ, store_root=backend.config.store_root
+        ),
     )
