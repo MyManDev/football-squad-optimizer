@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EMPTY_DRAFT, MAX_MESSAGE_LENGTH, MAX_QUESTION_LENGTH, readIntent } from "./intent";
-import { checkedPlanSession } from "./planSession";
+import { checkedPlanSession, createPlanSessionStore, readPlanSession } from "./planSession";
 
 const OWNED = [
   { id: 1, name: "Held One", team: "Arsenal" },
@@ -12,6 +12,48 @@ const GAMEWEEK = 5;
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  sessionStorage.clear();
+});
+
+describe("createPlanSessionStore", () => {
+  const context = { key: "squadopt.llmopt:test", basis: "basis", deadline: "2030-01-01T00:00:00Z" };
+  const draft = { hard: [{ kind: "no_hits" as const }], soft: [] };
+
+  it("saves the whole session and keeps the run's confirmation beside it", () => {
+    const store = createPlanSessionStore(context);
+    expect(store.confirmation).toBeUndefined();
+    const confirmation = { wildcardNotHeld: false, sending: true as const };
+    store.save({ draft, confirmation });
+    expect(store.confirmation).toEqual(confirmation);
+    const { basis, deadline } = context;
+    expect(readPlanSession(context)).toEqual({ basis, deadline, draft, confirmation });
+  });
+
+  it("drops the confirmation when a session is saved without one", () => {
+    const store = createPlanSessionStore(context, { wildcardNotHeld: true });
+    expect(store.confirmation).toEqual({ wildcardNotHeld: true });
+    store.save({ draft });
+    expect(store.confirmation).toBeUndefined();
+    expect(readPlanSession(context)).not.toHaveProperty("confirmation");
+  });
+
+  it("reads nothing back for another squad basis or deadline", () => {
+    createPlanSessionStore(context).save({ draft });
+    expect(readPlanSession({ ...context, basis: "other" })).toBeNull();
+    expect(readPlanSession({ ...context, deadline: "2031-01-01T00:00:00Z" })).toBeNull();
+  });
+
+  it("keeps working without a context or without storage", () => {
+    const detached = createPlanSessionStore(null);
+    detached.save({ draft, confirmation: { wildcardNotHeld: false } });
+    expect(detached.confirmation).toEqual({ wildcardNotHeld: false });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("full");
+    });
+    const store = createPlanSessionStore(context);
+    expect(() => store.save({ draft })).not.toThrow();
+    vi.restoreAllMocks();
+  });
 });
 
 describe("checkedPlanSession", () => {

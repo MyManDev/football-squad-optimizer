@@ -12,6 +12,8 @@ import type { AdviceRequest } from "../advice/adviceClient";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import { LLMOPT_COPY } from "./copy";
+import { IntentError } from "./intent";
+import type { IntentSource } from "./intentSource";
 import { summarizeRevision } from "./planRevision";
 import type { LLMOptPage as Page } from "./LLMOptPage";
 
@@ -109,7 +111,7 @@ afterEach(() => {
 });
 
 /** Opens the page the way a visit or a reload does: a fresh query cache, the tab's storage kept. */
-function open(language: "en" | "tr" = "en") {
+function open(language: "en" | "tr" = "en", intentSource?: IntentSource) {
   // The fixtures are set, not read, so the cache keeps them while no page observes them.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
@@ -133,7 +135,10 @@ function open(language: "en" | "tr" = "en") {
         <MemoryRouter initialEntries={[`/entry/${ENTRY}/llmopt`]}>
           {withLeague(
             <Routes>
-              <Route path="/entry/:entryId/llmopt" element={<LLMOptPage />} />
+              <Route
+                path="/entry/:entryId/llmopt"
+                element={<LLMOptPage intentSource={intentSource} />}
+              />
             </Routes>,
           )}
         </MemoryRouter>
@@ -416,5 +421,41 @@ describe("a model answer that changes the draft", () => {
     );
     expect(screen.queryByText(en.changes.added)).toBeNull();
     expect(screen.queryByText(en.rules.hold_transfers, { selector: "del" })).toBeNull();
+  });
+});
+
+describe("the chat's intent source", () => {
+  it("reads the chat through the source the page is given, with the draft and roster", async () => {
+    const interpret = vi.fn<IntentSource["interpret"]>(async () => ({
+      status: "draft",
+      draft: { hard: [{ kind: "no_hits" }], soft: [] },
+    }));
+    open("en", { interpret });
+    await ready();
+    await sendMessage("No hits.");
+
+    expect(
+      await screen.findByRole("button", { name: `${en.remove} · ${en.rules.no_hits}` }),
+    ).toBeVisible();
+    expect(intent).not.toHaveBeenCalled();
+    expect(interpret).toHaveBeenCalledTimes(1);
+    expect(interpret.mock.calls[0]?.[0]).toMatchObject({
+      message: "No hits.",
+      locale: "en",
+      draft: { hard: [], soft: [] },
+      players: expect.arrayContaining([expect.objectContaining({ id: OUTSIDER.id })]),
+    });
+    expect(interpret.mock.calls[0]?.[1]).toBeInstanceOf(AbortSignal);
+  });
+
+  it("shows a refusal the source names in the page's own words", async () => {
+    open("en", {
+      interpret: async () => {
+        throw new IntentError(503, "LLMOPT_DISABLED");
+      },
+    });
+    await ready();
+    await sendMessage("No hits.");
+    expect(await screen.findByText(en.refusals.disabled, { exact: true })).toBeVisible();
   });
 });

@@ -21,7 +21,7 @@ export interface PlanConfirmation {
   sending?: true;
 }
 
-interface PlanSession {
+export interface PlanSession {
   draft: PlanDraft;
   clarification?: Clarification;
   confirmation?: PlanConfirmation;
@@ -45,7 +45,7 @@ export function readPlanSession(context: PlanSessionContext): unknown {
   }
 }
 
-export function writePlanSession(context: PlanSessionContext | null, session: PlanSession) {
+function writePlanSession(context: PlanSessionContext | null, session: PlanSession) {
   if (!context) return;
   const { key, basis, deadline } = context;
   try {
@@ -53,6 +53,33 @@ export function writePlanSession(context: PlanSessionContext | null, session: Pl
   } catch {
     // The planner remains usable without storage.
   }
+}
+
+/**
+ * The page's one session writer. It keeps the confirmation of the run in memory beside the
+ * saved copy, so what the page acts on and what a reload restores cannot drift apart.
+ */
+export interface PlanSessionStore {
+  /** The confirmed run as last saved; absent while the draft has not been calculated. */
+  readonly confirmation: PlanConfirmation | undefined;
+  /** Saves the whole session. A session saved without a confirmation clears the run's. */
+  save(session: PlanSession): void;
+}
+
+export function createPlanSessionStore(
+  context: PlanSessionContext | null,
+  confirmation?: PlanConfirmation,
+): PlanSessionStore {
+  let current = confirmation;
+  return {
+    get confirmation() {
+      return current;
+    },
+    save(session) {
+      current = session.confirmation;
+      writePlanSession(context, session);
+    },
+  };
 }
 
 export function checkedPlanSession(

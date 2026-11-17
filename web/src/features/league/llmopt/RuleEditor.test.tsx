@@ -49,3 +49,61 @@ describe("the club rule reads as an exact count", () => {
     });
   });
 });
+
+describe("a preferred rule", () => {
+  const copy = LLMOPT_COPY.en;
+
+  function editor(draft: PlanDraft, change = vi.fn()) {
+    render(
+      <RuleEditor draft={draft} players={PLAYERS} copy={copy} disabled={false} change={change} />,
+    );
+    return change;
+  }
+
+  it("carries its points limit in tenths", async () => {
+    const change = editor({ hard: [], soft: [] });
+    await userEvent.selectOptions(screen.getByLabelText(copy.rule), "include_player");
+    await userEvent.selectOptions(screen.getByLabelText(copy.player), "2");
+    await userEvent.selectOptions(screen.getByLabelText(copy.strength), "soft");
+    await userEvent.type(screen.getByLabelText(copy.preferenceLimit), "1,5");
+    await userEvent.click(screen.getByRole("button", { name: copy.add }));
+
+    expect(change).toHaveBeenCalledWith({
+      hard: [],
+      soft: [{ kind: "include_player", player_id: 2, max_cost_tenths: 15 }],
+    });
+  });
+
+  it("replaces the same rule held as required, and is listed with its limit", async () => {
+    const rule = { kind: "include_player", player_id: 2 } as const;
+    const change = editor({ hard: [rule], soft: [{ kind: "no_hits", max_cost_tenths: 10 }] });
+    expect(
+      screen.getByRole("button", {
+        name: `${copy.remove} · ${copy.rules.no_hits} · ${copy.preferenceLimitLabel(10)}`,
+      }),
+    ).toBeVisible();
+    await userEvent.selectOptions(screen.getByLabelText(copy.rule), "include_player");
+    await userEvent.selectOptions(screen.getByLabelText(copy.player), "2");
+    await userEvent.selectOptions(screen.getByLabelText(copy.strength), "soft");
+    await userEvent.click(screen.getByRole("button", { name: copy.add }));
+
+    expect(change).toHaveBeenCalledWith({
+      hard: [],
+      soft: [{ kind: "no_hits", max_cost_tenths: 10 }, rule],
+    });
+  });
+
+  it("is removed on its own", async () => {
+    const change = editor({
+      hard: [{ kind: "no_hits" }],
+      soft: [{ kind: "hold_transfers" }, { kind: "save_chips" }],
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: `${copy.remove} · ${copy.rules.hold_transfers}` }),
+    );
+    expect(change).toHaveBeenCalledWith({
+      hard: [{ kind: "no_hits" }],
+      soft: [{ kind: "save_chips" }],
+    });
+  });
+});
