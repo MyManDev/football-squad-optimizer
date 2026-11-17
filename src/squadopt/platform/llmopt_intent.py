@@ -41,6 +41,10 @@ _MAX_COST_TENTHS: Final = 1000
 _RESPONSE_BYTES: Final = 32 * 1024
 _TIMEOUT_SECONDS: Final = 35
 _DEFAULT_PROVIDER_RETRY_SECONDS: Final = 60
+#: The result schema's name in the provider's structured-output request.
+INTENT_SCHEMA_NAME: Final = "llmopt_intent_v1"
+#: The most output tokens the model may spend on one reply.
+INTENT_MAX_OUTPUT_TOKENS: Final = 1200
 _KINDS: Final = (
     "hold_transfers",
     "no_hits",
@@ -634,6 +638,39 @@ def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
     return tuple(player for _, player in ranked[:_MAX_CANDIDATES])
 
 
+def _validated(
+    request: IntentRequest, candidates: tuple[dict[str, Any], ...], proposal: object
+) -> dict[str, Any]:
+    """The model's proposal checked against the shortlist it was offered and the request."""
+    return _validate_result(
+        proposal,
+        candidates,
+        request.clubs,
+        previous_window=request.draft.get("window"),
+        reference_weeks=request.reference_weeks,
+        locale=request.locale,
+    )
+
+
+def check_reply(request: IntentRequest, reply: object) -> dict[str, Any]:
+    """Validate a reply the member's own model gave, as ``IntentService.prepare`` would.
+
+    The shortlist is rebuilt from the request, so no state is kept between the prompt and
+    the check. ``reply`` is the model's JSON output, parsed or as its text. A reply that
+    does not hold raises ``IntentValidationError``.
+    """
+    if isinstance(reply, str):
+        reply = read_intent_json(reply)
+    return _validated(request, _shortlist(request), reply)
+
+
+def parse_check_request(value: object) -> tuple[IntentRequest, object]:
+    """The intent request and the model's reply from a check body."""
+    if not isinstance(value, dict) or value.keys() != {"request", "reply"}:
+        raise IntentValidationError("Invalid check request.")
+    return parse_intent_request(value["request"]), value["reply"]
+
+
 class DailyIntentBudget:
     """The site-wide daily call budget, counted in a file so a restart does not reset it.
 
@@ -762,14 +799,7 @@ class IntentService:
         try:
             candidates = _shortlist(request)
             proposal = self._provider(replace(request, players=candidates))
-            return _validate_result(
-                proposal,
-                candidates,
-                request.clubs,
-                previous_window=request.draft.get("window"),
-                reference_weeks=request.reference_weeks,
-                locale=request.locale,
-            )
+            return _validated(request, candidates, proposal)
         except IntentValidationError:
             raise IntentUnavailable("The intent response could not be validated.") from None
         finally:
@@ -844,6 +874,56 @@ _RESULT_SCHEMA: Final = _schema_object(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class IntentCall:
+    """One model call in provider-neutral form: what is asked, never who is asked or how.
+
+    The site's own provider and a member's browser send the same call, so the prompt and
+    the schema have one source.
+    """
+
+    system: str
+    user: str
+    schema: Mapping[str, Any]
+    schema_name: str = INTENT_SCHEMA_NAME
+    max_output_tokens: int = INTENT_MAX_OUTPUT_TOKENS
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "system": self.system,
+            "user": self.user,
+            "schema": self.schema,
+            "schema_name": self.schema_name,
+            "max_output_tokens": self.max_output_tokens,
+        }
+
+
+def intent_call(request: IntentRequest) -> IntentCall:
+    """The call for a request whose players are already the shortlist."""
+    context: dict[str, Any] = {
+        "message": request.message,
+        "locale": request.locale,
+        "draft": request.draft,
+        "players": request.players,
+        "clubs": request.clubs,
+        "reference_weeks": request.reference_weeks,
+        "reference_captains": [
+            {"week": week, "player_id": player} for week, player in request.reference_captains
+        ],
+    }
+    if request.clarification is not None:
+        context["clarification"] = {
+            "message": request.clarification.message,
+            "question": request.clarification.question,
+        }
+    return IntentCall(_SYSTEM_PROMPT, json.dumps(context, ensure_ascii=False), _RESULT_SCHEMA)
+
+
+def prompt_for(request: IntentRequest) -> IntentCall:
+    """The call ``IntentService.prepare`` would send for this request, for any provider."""
+    return intent_call(replace(request, players=_shortlist(request)))
+
+
 def _provider_retry_after(header: str | None) -> int:
     if not header:
         return _DEFAULT_PROVIDER_RETRY_SECONDS
@@ -872,39 +952,21 @@ class OpenAIIntentProvider:
         self._provider = provider
 
     def __call__(self, request: IntentRequest) -> object:
-        context: dict[str, Any] = {
-            "message": request.message,
-            "locale": request.locale,
-            "draft": request.draft,
-            "players": request.players,
-            "clubs": request.clubs,
-            "reference_weeks": request.reference_weeks,
-            "reference_captains": [
-                {"week": week, "player_id": player} for week, player in request.reference_captains
-            ],
-        }
-        if request.clarification is not None:
-            context["clarification"] = {
-                "message": request.clarification.message,
-                "question": request.clarification.question,
-            }
+        call = intent_call(request)
         payload = {
             "model": self._model,
             **({"reasoning_effort": "minimal"} if self._provider == "gemini" else {"store": False}),
-            "max_completion_tokens": 1200,
+            "max_completion_tokens": call.max_output_tokens,
             "messages": [
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": json.dumps(context, ensure_ascii=False),
-                },
+                {"role": "system", "content": call.system},
+                {"role": "user", "content": call.user},
             ],
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "llmopt_intent_v1",
+                    "name": call.schema_name,
                     "strict": True,
-                    "schema": _RESULT_SCHEMA,
+                    "schema": call.schema,
                 },
             },
         }
