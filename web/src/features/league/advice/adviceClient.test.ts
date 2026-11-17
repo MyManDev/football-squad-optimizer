@@ -12,6 +12,7 @@ import {
   AdviceApiError,
   FallbackAdviceClient,
   HttpAdviceClient,
+  retryAfterSeconds,
   StaticOnlyAdviceClient,
   type AdviceRequest,
 } from "./adviceClient";
@@ -335,5 +336,40 @@ describe("advice response identity", () => {
   ])("rejects a mismatched job response: %j", async (body) => {
     const client = new HttpAdviceClient("https://api.example", async () => jsonResponse(200, body));
     await expect(client.readJob("job-1")).rejects.toBeInstanceOf(AdviceResponseError);
+  });
+});
+
+describe("retryAfterSeconds", () => {
+  const now = Date.parse("2026-11-17T12:00:00Z");
+
+  it.each([
+    ["30", 30],
+    ["1.2", 2],
+    [" 7 ", 7],
+    ["Tue, 17 Nov 2026 12:00:45 GMT", 45],
+    [null, null],
+    ["", null],
+    ["0", null],
+    ["-5", null],
+    ["soon", null],
+    ["Tue, 17 Nov 2026 11:59:00 GMT", null],
+  ])("reads %j as %j seconds from now", (header, seconds) => {
+    expect(retryAfterSeconds(header, now)).toBe(seconds);
+  });
+
+  it("carries an HTTP-date Retry-After on a refused job poll", async () => {
+    const client = new HttpAdviceClient(
+      "https://api.example",
+      async () =>
+        new Response(JSON.stringify({ error: { code: "RATE_LIMITED" } }), {
+          status: 429,
+          headers: { "Retry-After": new Date(Date.now() + 90_000).toUTCString() },
+        }),
+    );
+    const refusal = await client.readJob("job-1").catch((error: unknown) => error);
+    expect(refusal).toBeInstanceOf(AdviceApiError);
+    expect((refusal as AdviceApiError).status).toBe(429);
+    expect((refusal as AdviceApiError).retryAfterSeconds).toBeGreaterThanOrEqual(89);
+    expect((refusal as AdviceApiError).retryAfterSeconds).toBeLessThanOrEqual(90);
   });
 });
