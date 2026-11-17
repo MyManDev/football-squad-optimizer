@@ -166,6 +166,8 @@ function checkedRules(row: Record<string, unknown>): WeekRulePreferences {
   if (
     included.size > 15 ||
     result.avoid_players.some((id) => included.has(id)) ||
+    // A player bought in a week is not held before it, so cannot also be kept.
+    buy.some((id) => result.keep_players.includes(id)) ||
     (hold && buy.length)
   )
     throw new Error("Conflicting player preferences");
@@ -214,6 +216,9 @@ function checkedWeeks(value: unknown, global: RulePreferences, holdOpening: bool
         !hasRules(rules) ||
         included.size > 15 ||
         [...global.avoid_players, ...rules.avoid_players].some((id) => included.has(id)) ||
+        rules.buy_players?.some(
+          (id) => global.keep_players.includes(id) || rules.keep_players.includes(id),
+        ) ||
         (holdsTransfers && rules.buy_players?.length) ||
         clubCountsConflict(
           [...(global.club_counts ?? []), ...(rules.club_counts ?? [])],

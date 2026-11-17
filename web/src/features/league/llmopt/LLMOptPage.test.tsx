@@ -206,6 +206,42 @@ describe("chat refusals", () => {
       expect(screen.queryByText(other, { exact: true })).toBeNull();
   });
 
+  it("keeps every answer when the model asks a second question", async () => {
+    open();
+    await ready();
+    await sendMessage("Buy a striker.");
+    await screen.findByText("Which week should it be?");
+    await sendMessage("Next week.");
+    await waitFor(() => expect(intent).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: en.chat })).toHaveValue(""));
+    await sendMessage("Haaland.");
+    await waitFor(() => expect(intent).toHaveBeenCalledTimes(3));
+    // The third request still carries the answer to the first question.
+    expect(intent.mock.calls[2]?.[0]).toMatchObject({
+      message: "Haaland.",
+      clarification: {
+        message: "Buy a striker.\nNext week.",
+        question: "Which week should it be?",
+      },
+    });
+  });
+
+  it("keeps the workspace when a later refresh of the squad fails", async () => {
+    const entrySquad = vi.fn(async () => envelope);
+    stubTree({ entrySquad });
+    open();
+    await ready();
+    await userEvent.click(screen.getByRole("button", { name: en.add }));
+    entrySquad.mockRejectedValue(new Error("offline"));
+    await clients[0]!.refetchQueries();
+    expect(entrySquad.mock.calls.length).toBeGreaterThan(1);
+    expect(screen.getByRole("heading", { level: 1, name: en.title })).toBeVisible();
+    expect(screen.queryByText(en.squadUnavailable)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: `${en.remove} · ${en.rules.hold_transfers}` }),
+    ).toBeVisible();
+  });
+
   it("keeps Send off while Retry-After runs and turns it back on by itself", async () => {
     intent.mockImplementationOnce(
       () =>

@@ -55,6 +55,18 @@ it("canonicalizes dated rules and keeps a zero penalty limit in the cache identi
     preferencesFromUrl(new URLSearchParams({ preferences: preferencesKey(dated) })).value,
   ).toEqual(dated);
   expect(preferencesKey(checkedPreferences({ max_hit_points: 0 }))).not.toBe("");
+  // A player bought in a week is not held before it, so the service refuses keeping him too.
+  expect(() =>
+    checkedPreferences({
+      keep_players: [3],
+      week_rules: [{ week: 2, rules: { buy_players: [3] } }],
+    }),
+  ).toThrow("Conflicting week rules");
+  expect(() =>
+    checkedPreferences({
+      week_rules: [{ week: 2, rules: { keep_players: [3], buy_players: [3] } }],
+    }),
+  ).toThrow();
   expect(() =>
     checkedPreferences({ hold_transfers: true, week_rules: dated.week_rules }),
   ).toThrow();
