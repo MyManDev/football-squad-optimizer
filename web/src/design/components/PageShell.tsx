@@ -584,6 +584,11 @@ export function PageShell({
               <div className={styles.footer}>
                 <LanguageToggle vertical={rail} />
                 <ThemeToggle vertical={rail} />
+                {rail ? null : (
+                  <Link to="/privacy" className={styles.privacy} onClick={closeOverlays}>
+                    {copy.privacy}
+                  </Link>
+                )}
               </div>
             </div>
           </div>

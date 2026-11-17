@@ -275,6 +275,7 @@ describe("the app shell on a desktop", () => {
       screen.getByRole("button", { name: /^EN/ }),
       screen.getByRole("button", { name: "Gündüz" }),
       screen.getByRole("button", { name: "Gece" }),
+      screen.getByRole("link", { name: TR.privacy }),
       screen.getByRole("button", { name: "page action" }),
     ];
     for (const element of expected) {

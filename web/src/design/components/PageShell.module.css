@@ -435,12 +435,28 @@
 .footer {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   min-height: 48px;
   margin-top: auto;
   padding: var(--space-2) 0;
+}
+
+/* The privacy page's link: a quiet line of its own under the two switches. */
+.privacy {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  font-size: var(--step--2);
+  color: var(--color-text-muted);
+}
+
+.privacy:hover,
+.privacy:focus-visible {
+  color: var(--color-text);
 }
 
 /* Beside the page (open or as the rail), in a tall enough window, the footer stays at the
@@ -547,6 +563,10 @@
 
 .sidebar[data-mode="drawer"] .navItem {
   height: 44px;
+}
+
+.sidebar[data-mode="drawer"] .privacy {
+  min-height: 44px;
 }
 
 .sidebar[data-mode="drawer"] .footer {
