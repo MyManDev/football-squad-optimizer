@@ -12,14 +12,13 @@ import type { SuggestionHistory, WeekReview } from "../history/historyData";
 import { useSuggestionHistory } from "../queries";
 import { useLeague, useLeagueId } from "../useLeague";
 import styles from "./LeagueMemberVsPage.module.css";
-import { breakdown, movesOf, otherPlans, plainPlan } from "./vsBreakdown";
+import { breakdown, movesOf, plainPlan } from "./vsBreakdown";
 import { DifferenceBars, NetBars, WeekStrip } from "./VsCharts";
 
 /**
  * VS SQUADOPT: one gameweek at a time, in detail. What the member would have scored with
- * SquadOpt's plan against what they scored; what the plan said (moves, captain, chip, and
- * each other plan recorded that week) beside what the member did; where the difference came
- * from (captain, transfers, hits, the rest of the squad); and SquadOpt's squad with every
+ * SquadOpt's plan against what they scored; what the plan said (moves, captain, chip) beside
+ * what the member did; where the difference came from (captain, transfers, hits, the rest of the squad); and SquadOpt's squad with every
  * player's points. The latest settled week opens first; a selector moves between weeks. The
  * owner asked for this page to analyse, so it is the one page that says things in sentences.
  */
@@ -204,23 +203,6 @@ function WeekAnalysis({
             <dt>{copy.net}</dt>
             <dd className={styles.net}>{fmt(suggested.net_points)}</dd>
           </dl>
-          {otherPlans(week).length > 0 ? (
-            <div className={styles.otherPlans}>
-              <h3>{copy.otherPlans}</h3>
-              <ul>
-                {otherPlans(week).map((row) => (
-                  <li key={row.published_path}>
-                    <strong>{copy.planName(row.strategy, row.window)}</strong>
-                    {": "}
-                    {copy.planSaid(
-                      movesOf(row).map((move) => `${move.out} → ${move.in}`),
-                      row.captain,
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
         </Card>
 
         <Card title={copy.did}>
@@ -307,8 +289,12 @@ function WeekAnalysis({
               <thead>
                 <tr>
                   <th scope="col">{copy.player}</th>
-                  <th scope="col">{copy.points}</th>
-                  <th scope="col">{copy.counted}</th>
+                  <th scope="col" className={styles.number}>
+                    {copy.points}
+                  </th>
+                  <th scope="col" className={styles.number}>
+                    {copy.counted}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -321,8 +307,8 @@ function WeekAnalysis({
                         <span className={styles.benchWord}> {copy.bench}</span>
                       ) : null}
                     </th>
-                    <td>{fmt(player.realized_points)}</td>
-                    <td>{fmt(player.counted_points)}</td>
+                    <td className={styles.number}>{fmt(player.realized_points)}</td>
+                    <td className={styles.number}>{fmt(player.counted_points)}</td>
                   </tr>
                 ))}
               </tbody>

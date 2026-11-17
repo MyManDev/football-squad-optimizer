@@ -269,6 +269,7 @@ describe("the app shell on a desktop", () => {
     const { user } = renderShell({ page: <button type="button">page action</button> });
     const expected = [
       screen.getByRole("link", { name: TR.skip }),
+      screen.getByRole("link", { name: TR.home }),
       screen.getByRole("button", { name: TR.collapseSidebar }),
       ...navLinks(),
       screen.getByRole("button", { name: /^TR/ }),
@@ -288,6 +289,7 @@ describe("the app shell on a desktop", () => {
     const { user } = renderShell({ identity: CLAIMED });
     const expected = [
       screen.getByRole("link", { name: TR.skip }),
+      screen.getByRole("link", { name: TR.home }),
       screen.getByRole("button", { name: TR.collapseSidebar }),
       screen.getByRole("button", { name: TR.changeMember }),
       ...navLinks(),
@@ -495,6 +497,34 @@ describe("focusing the page after a step in front of it", () => {
     rerender(tree(true));
     await settle();
     expect(screen.getByRole("main")).toHaveFocus();
+  });
+});
+
+describe("the brand", () => {
+  it.each(["tr", "en"] as const)(
+    "leads the sidebar's mark and wordmark to the home page (%s)",
+    async (language) => {
+      const copy = MESSAGES[language].shell;
+      const { user } = renderShell({ path: OWN, identity: CLAIMED, language });
+      const aside = screen.getByRole("complementary", { name: copy.sidebar });
+      const brand = within(aside).getByRole("link", { name: copy.home });
+      expect(brand).toHaveAttribute("href", "/");
+      expect(brand).toHaveTextContent("SquadOpt");
+      expect(brand.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+      await user.click(brand);
+      expect(location()).toBe("/");
+    },
+  );
+
+  it("leads the phone bar's mark home and closes nothing it should not", async () => {
+    stubLayout("phone");
+    const { user } = renderShell({ path: OWN, identity: CLAIMED });
+    const brand = within(screen.getByRole("banner")).getByRole("link", { name: TR.home });
+    expect(brand).toHaveAttribute("href", "/");
+    expect(brand).toHaveTextContent("SquadOpt");
+    await user.click(brand);
+    expect(location()).toBe("/");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 
