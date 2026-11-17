@@ -21,7 +21,6 @@ const en = {
     points: "Points",
     counted: "Counted",
     bench: "bench",
-    otherPlans: "Other Plans",
     noDetails: "Your transfers and captain were not recorded for this week; only the totals are.",
     favoursSquadopt: "in SquadOpt's favour",
     favoursYou: "in your favour",
@@ -31,21 +30,6 @@ const en = {
       `You scored ${actual}; SquadOpt's plan would have scored ${suggested}.`,
     pointsOf: (value: string) => `${value} pts`,
     countedOf: (points: string, counted: string) => `${points} pts, ${counted} counted`,
-    planName: (strategy: string, window: number) => {
-      const names: Record<string, string> = {
-        "saf-puan": "Pure Points",
-        "fark-yarat": "Make the Difference",
-        "ortak-koru": "Hold the Gap",
-      };
-      return `${names[strategy] ?? strategy} (${window}w)`;
-    },
-    planSaid: (moves: string[], captain: string | null) =>
-      [
-        moves.length === 0 ? "no transfer" : moves.join(", "),
-        captain === null ? null : `captain ${captain}`,
-      ]
-        .filter((part) => part !== null)
-        .join("; "),
   },
   suggestionHistory: {
     requested: "On Request",
@@ -120,6 +104,7 @@ const en = {
     collapseSidebar: "Collapse Sidebar",
     expandSidebar: "Expand Sidebar",
     openMenu: "Open Menu",
+    home: "SquadOpt home",
     closeMenu: "Close Menu",
     closeFixtures: "Close Fixtures",
     changeMember: "Change",
@@ -537,14 +522,6 @@ const en = {
     racePlaces: "Place",
     racePoints: "Total",
     raceGameweek: "Gameweek",
-    // Each member's distance in points to the neighbours on the latest settled week's totals.
-    raceGaps: (gameweek: number) => `Point gaps after gameweek ${gameweek}`,
-    raceGapAhead: (points: string) =>
-      `${points} ${points === "1" ? "pt" : "pts"} behind the one ahead`,
-    raceGapBehind: (points: string) =>
-      `${points} ${points === "1" ? "pt" : "pts"} ahead of the one behind`,
-    raceLevelAhead: "Level with the one ahead: 0 pts",
-    raceLevelBehind: "Level with the one behind: 0 pts",
     // The what-if mode (#1132): a fifteen the member tries, read on the device.
     whatIfTitle: "Try Your Own Squad",
     whatIfStart: "Start from the Advised Squad",
@@ -719,7 +696,6 @@ const tr: MessageSchema<typeof en> = {
     points: "Puan",
     counted: "Sayılan",
     bench: "yedek",
-    otherPlans: "Diğer planlar",
     noDetails: "Bu hafta transferlerin ve kaptanın kaydı yok; yalnızca toplamlar var.",
     favoursSquadopt: "SquadOpt lehine",
     favoursYou: "senin lehine",
@@ -728,21 +704,6 @@ const tr: MessageSchema<typeof en> = {
     youBeat: (actual, suggested) => `Sen ${actual} aldın; SquadOpt'un planı ${suggested} alırdı.`,
     pointsOf: (value) => `${value} puan`,
     countedOf: (points, counted) => `${points} puan, ${counted} sayıldı`,
-    planName: (strategy, window) => {
-      const names: Record<string, string> = {
-        "saf-puan": "Saf puan",
-        "fark-yarat": "Fark yarat",
-        "ortak-koru": "Ortak koru",
-      };
-      return `${names[strategy] ?? strategy} (${window} hafta)`;
-    },
-    planSaid: (moves, captain) =>
-      [
-        moves.length === 0 ? "transfer yok" : moves.join(", "),
-        captain === null ? null : `kaptan ${captain}`,
-      ]
-        .filter((part) => part !== null)
-        .join("; "),
   },
   suggestionHistory: {
     requested: "İstek üzerine",
@@ -817,6 +778,7 @@ const tr: MessageSchema<typeof en> = {
     collapseSidebar: "Kenar çubuğunu kapat",
     expandSidebar: "Kenar çubuğunu aç",
     openMenu: "Menüyü aç",
+    home: "SquadOpt ana sayfa",
     closeMenu: "Menüyü kapat",
     closeFixtures: "Fikstürü kapat",
     changeMember: "Değiştir",
@@ -1207,11 +1169,6 @@ const tr: MessageSchema<typeof en> = {
     racePlaces: "Sıra",
     racePoints: "Toplam",
     raceGameweek: "Hafta",
-    raceGaps: (gameweek) => `${gameweek}. hafta sonunda puan farkları`,
-    raceGapAhead: (points) => `Öndekine ${points} puan`,
-    raceGapBehind: (points) => `Arkadakine ${points} puan`,
-    raceLevelAhead: "Öndekiyle berabere: 0 puan",
-    raceLevelBehind: "Arkadakiyle berabere: 0 puan",
     whatIfTitle: "Kadroyu kendin dene",
     whatIfStart: "Önerilen kadroyla başla",
     whatIfLoading: "Bu haftanın oyuncu listesi okunuyor",

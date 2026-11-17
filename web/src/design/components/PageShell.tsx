@@ -54,7 +54,8 @@ function plainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
  * bar exists only in the phone layout; everything else is rendered once in every layout.
  *
  * The sidebar holds the brand, the identity block, the navigation and a footer with the
- * language switch. The shell reads no document of its own.
+ * language switch. The brand, in the sidebar and in the phone bar, is a link to the home
+ * page, where a league is found. The shell reads no document of its own.
  *
  * `identity` is the league the visitor entered and the member they said they are in it,
  * handed in by the app (design/ reads nothing of the league feature). It decides the
@@ -401,6 +402,8 @@ export function PageShell({
     </span>
   );
   const liveHere = live !== null && location.pathname === live;
+  // The brand leads to the home page, where a league is found.
+  const homeItem: NavItem = { key: "findLeague", to: "/", active: location.pathname === "/" };
 
   return (
     <ShellContext.Provider value={shell}>
@@ -437,10 +440,16 @@ export function PageShell({
             >
               <MenuIcon />
             </button>
-            <span className={styles.phoneBrand}>
+            <Link
+              to="/"
+              className={styles.phoneBrand}
+              aria-label={copy.home}
+              data-brand
+              onClick={(event) => follow(event, homeItem)}
+            >
               <BrandMark small className={styles.mark} />
               <span className={styles.phoneWordmark}>SquadOpt</span>
-            </span>
+            </Link>
             {live !== null ? (
               <Link
                 to={live}
@@ -508,10 +517,16 @@ export function PageShell({
             aria-label={drawerOpen ? copy.menu : undefined}
           >
             <div className={styles.brandRow}>
-              <span className={styles.brand}>
+              <Link
+                to="/"
+                className={styles.brand}
+                aria-label={copy.home}
+                data-brand
+                onClick={(event) => follow(event, homeItem)}
+              >
                 <BrandMark className={styles.mark} />
                 <span className={rail ? "visually-hidden" : styles.wordmark}>SquadOpt</span>
-              </span>
+              </Link>
               {/* Open or collapse the sidebar; in the drawer the same button closes it. */}
               <button
                 ref={toggleRef}
