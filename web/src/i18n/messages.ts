@@ -152,6 +152,12 @@ const en = {
     didNotPlay: "Did Not Play",
     noMatch: "No Match",
     matchInProgress: "Match in Progress",
+    // Outside a played week LIVE follows nothing: it names the week it waits for.
+    notStarted: (gameweek: number | null) =>
+      gameweek === null
+        ? "The week has not started yet"
+        : `Gameweek ${gameweek} has not started yet`,
+    firstMatch: "First match",
     goal: "Goal",
     assist: "Assist",
     card: "Card",
@@ -848,6 +854,9 @@ const tr: MessageSchema<typeof en> = {
     didNotPlay: "Oynamadı",
     noMatch: "Maç yok",
     matchInProgress: "Maç sürüyor",
+    notStarted: (gameweek) =>
+      gameweek === null ? "Hafta daha başlamadı" : `${gameweek}. hafta daha başlamadı`,
+    firstMatch: "İlk maç",
     goal: "Gol",
     assist: "Asist",
     card: "Kart",
