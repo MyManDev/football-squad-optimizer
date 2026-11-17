@@ -7,7 +7,7 @@ export function PrivacyPage() {
   const { language } = useLanguage();
   const copy = PRIVACY_COPY[language];
   return (
-    <section className={styles.page} data-zone="privacy">
+    <section className={styles.page}>
       <h1>{copy.title}</h1>
       {copy.sections.map((section) => (
         <section key={section.title} className={styles.section}>
