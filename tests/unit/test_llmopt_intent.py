@@ -16,8 +16,10 @@ from squadopt.platform.llmopt_intent import (
     INTENT_BODY_MAX_BYTES,
     INTENT_BUDGET_FILE,
     IntentClarification,
+    IntentLimited,
     IntentRequest,
     IntentService,
+    IntentUnavailable,
     OpenAIIntentProvider,
     intent_service_from_environment,
 )
@@ -829,7 +831,7 @@ def test_provider_sends_strict_schema_and_handles_wire_without_network(
     monkeypatch: pytest.MonkeyPatch,
     provider: str,
 ) -> None:
-    def post(_provider: OpenAIIntentProvider, payload: bytes) -> bytes:
+    def post(_provider: OpenAIIntentProvider, payload: bytes, _deadline: float) -> bytes:
         body = json.loads(payload)
         assert body["model"] == "selected-model"
         if provider == "gemini":
@@ -883,3 +885,101 @@ def test_provider_sends_strict_schema_and_handles_wire_without_network(
     }
     with TestClient(create_app(llmopt_intent=service)) as client:
         assert client.post(URL, json=body).status_code == 200
+
+
+def _answer() -> bytes:
+    return json.dumps(
+        {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(_proposed())}}]}
+    ).encode()
+
+
+def _fallback_service(
+    monkeypatch: pytest.MonkeyPatch, outcomes: dict[str, Exception | bytes]
+) -> tuple[IntentService, list[str]]:
+    asked: list[str] = []
+
+    def post(_provider: OpenAIIntentProvider, payload: bytes, _deadline: float) -> bytes:
+        model = json.loads(payload)["model"]
+        asked.append(model)
+        outcome = outcomes[model]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
+    service = intent_service_from_environment(
+        {
+            "SQUADOPT_LLMOPT_API_KEY": "server-key",
+            "SQUADOPT_LLMOPT_MODEL": "first",
+            "SQUADOPT_LLMOPT_PROVIDER": "gemini",
+            "SQUADOPT_LLMOPT_FALLBACK_MODELS": "second, third",
+        }
+    )
+    assert service is not None
+    return service, asked
+
+
+def test_a_busy_model_hands_the_call_to_the_next_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    service, asked = _fallback_service(
+        monkeypatch,
+        {
+            "first": IntentUnavailable("The intent provider did not accept the request."),
+            "second": _answer(),
+        },
+    )
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    assert response.json()["status"] == "draft"
+    assert asked == ["first", "second"]
+
+
+def test_a_limited_model_hands_the_call_to_the_next_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    service, asked = _fallback_service(
+        monkeypatch, {"first": IntentLimited(40), "second": b"not json", "third": _answer()}
+    )
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 200
+    assert asked == ["first", "second", "third"]
+
+
+def test_every_model_limited_is_a_rate_limit_with_the_shortest_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, asked = _fallback_service(
+        monkeypatch,
+        {"first": IntentLimited(40), "second": IntentLimited(15), "third": IntentLimited(90)},
+    )
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "15"
+    assert asked == ["first", "second", "third"]
+
+
+def test_no_model_answering_is_unavailable_unless_all_were_limited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    busy = IntentUnavailable("The intent provider did not accept the request.")
+    service, asked = _fallback_service(
+        monkeypatch, {"first": IntentLimited(40), "second": busy, "third": busy}
+    )
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        response = client.post(URL, json=_request())
+    assert response.status_code == 503
+    assert asked == ["first", "second", "third"]
+
+
+@pytest.mark.parametrize("fallbacks", ["first", "a,b,c,d", "bad name"])
+def test_an_invalid_fallback_list_disables_text_interpretation(fallbacks: str) -> None:
+    assert (
+        intent_service_from_environment(
+            {
+                "SQUADOPT_LLMOPT_API_KEY": "server-key",
+                "SQUADOPT_LLMOPT_MODEL": "first",
+                "SQUADOPT_LLMOPT_FALLBACK_MODELS": fallbacks,
+            }
+        )
+        is None
+    )

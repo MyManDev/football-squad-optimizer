@@ -8,7 +8,7 @@ import os
 import re
 import time
 import unicodedata
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -40,6 +40,8 @@ _MAX_HIT_POINTS: Final = 60
 _MAX_COST_TENTHS: Final = 1000
 _RESPONSE_BYTES: Final = 32 * 1024
 _TIMEOUT_SECONDS: Final = 35
+#: The most models one call may ask in turn: the first and its fallbacks.
+_MAX_MODELS: Final = 4
 _DEFAULT_PROVIDER_RETRY_SECONDS: Final = 60
 #: The result schema's name in the provider's structured-output request.
 INTENT_SCHEMA_NAME: Final = "llmopt_intent_v1"
@@ -942,19 +944,57 @@ def _provider_retry_after(header: str | None) -> int:
 class OpenAIIntentProvider:
     """One bounded Chat Completions call to the selected provider's official endpoint."""
 
-    def __init__(self, *, api_key: str, model: str, provider: str = "openai") -> None:
-        if not _valid_identifier(api_key, 1024) or not _valid_identifier(model, 256):
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        provider: str = "openai",
+        fallback_models: Sequence[str] = (),
+    ) -> None:
+        models = (model, *fallback_models)
+        if (
+            not _valid_identifier(api_key, 1024)
+            or len(models) > _MAX_MODELS
+            or len(set(models)) != len(models)
+            or not all(_valid_identifier(name, 256) for name in models)
+        ):
             raise ValueError("Invalid LLMOPT provider configuration.")
         if provider not in ("openai", "gemini"):
             raise ValueError("Unsupported LLMOPT provider.")
         self._api_key = api_key
-        self._model = model
+        self._models = models
         self._provider = provider
 
     def __call__(self, request: IntentRequest) -> object:
+        """Ask the first model; ask the next only when one is busy, limited or unusable.
+
+        A provider's free tier answers 503 while a model is in high demand and counts its
+        limits per model, so the next model can answer what the first cannot. Every model
+        shares one deadline, and the order is the configured one. When none answers, the
+        refusal is ``IntentLimited`` only if every model was limited.
+        """
         call = intent_call(request)
+        deadline = time.monotonic() + _TIMEOUT_SECONDS
+        waits: list[int] = []
+        for position, model in enumerate(self._models):
+            if position and time.monotonic() >= deadline:
+                break
+            try:
+                return self._ask(call, model, deadline)
+            except IntentLimited as limited:
+                waits.append(limited.retry_after)
+            except IntentUnavailable:
+                pass
+            if position + 1 < len(self._models):
+                _LOGGER.warning("LLMOPT model %d did not answer; the next one is asked.", position)
+        if len(waits) == len(self._models):
+            raise IntentLimited(min(waits))
+        raise IntentUnavailable("The intent provider did not respond with a draft.")
+
+    def _ask(self, call: IntentCall, model: str, deadline: float) -> object:
         payload = {
-            "model": self._model,
+            "model": model,
             **({"reasoning_effort": "minimal"} if self._provider == "gemini" else {"store": False}),
             "max_completion_tokens": call.max_output_tokens,
             "messages": [
@@ -971,7 +1011,7 @@ class OpenAIIntentProvider:
             },
         }
         try:
-            reply = read_intent_json(self._post(json.dumps(payload).encode("ascii")))
+            reply = read_intent_json(self._post(json.dumps(payload).encode("ascii"), deadline))
             if not isinstance(reply, dict):
                 raise IntentValidationError("Invalid intent reply.")
             choices = reply["choices"]
@@ -991,14 +1031,13 @@ class OpenAIIntentProvider:
         except (HTTPException, KeyError, OSError, ValueError, RecursionError):
             raise IntentUnavailable("The intent provider did not respond with a draft.") from None
 
-    def _post(self, payload: bytes) -> bytes:
+    def _post(self, payload: bytes, deadline: float) -> bytes:
         host, path = (
             ("generativelanguage.googleapis.com", "/v1beta/openai/chat/completions")
             if self._provider == "gemini"
             else ("api.openai.com", "/v1/chat/completions")
         )
-        connection = HTTPSConnection(host, timeout=_TIMEOUT_SECONDS)
-        deadline = time.monotonic() + _TIMEOUT_SECONDS
+        connection = HTTPSConnection(host, timeout=max(1.0, deadline - time.monotonic()))
         try:
             connection.request(
                 "POST",
@@ -1048,11 +1087,19 @@ def intent_service_from_environment(
     api_key = env.get("SQUADOPT_LLMOPT_API_KEY", "")
     model = env.get("SQUADOPT_LLMOPT_MODEL", "")
     provider = env.get("SQUADOPT_LLMOPT_PROVIDER", "openai")
+    # Asked in this order when the model before is busy or limited; empty names none.
+    fallbacks = [
+        name.strip()
+        for name in env.get("SQUADOPT_LLMOPT_FALLBACK_MODELS", "").split(",")
+        if name.strip()
+    ]
     if not api_key or not model:
         return None
     try:
         return IntentService(
-            OpenAIIntentProvider(api_key=api_key, model=model, provider=provider),
+            OpenAIIntentProvider(
+                api_key=api_key, model=model, provider=provider, fallback_models=fallbacks
+            ),
             daily_budget_path=None if store_root is None else store_root / INTENT_BUDGET_FILE,
         )
     except ValueError:
