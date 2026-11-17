@@ -55,7 +55,7 @@ def _draft(player_id: int = 1, **extra: Any) -> dict[str, Any]:
 def test_prompt_is_the_call_the_site_provider_sends(monkeypatch: pytest.MonkeyPatch) -> None:
     sent: list[dict[str, Any]] = []
 
-    def post(_provider: OpenAIIntentProvider, payload: bytes) -> bytes:
+    def post(_provider: OpenAIIntentProvider, payload: bytes, _deadline: float) -> bytes:
         sent.append(json.loads(payload))
         content = json.dumps(_draft())
         return json.dumps(

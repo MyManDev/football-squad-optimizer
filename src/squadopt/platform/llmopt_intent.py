@@ -8,7 +8,7 @@ import os
 import re
 import time
 import unicodedata
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -40,6 +40,13 @@ _MAX_HIT_POINTS: Final = 60
 _MAX_COST_TENTHS: Final = 1000
 _RESPONSE_BYTES: Final = 32 * 1024
 _TIMEOUT_SECONDS: Final = 35
+#: The most models one call may ask in turn: the first and its fallbacks.
+_MAX_MODELS: Final = 4
+#: The least time one model gets before the next is asked, while the deadline allows it.
+_MIN_ATTEMPT_SECONDS: Final = 8
+#: How many times the models are gone through, and the pause before the second time.
+_ROUNDS: Final = 2
+_ROUND_PAUSE_SECONDS = 1.0
 _DEFAULT_PROVIDER_RETRY_SECONDS: Final = 60
 #: The result schema's name in the provider's structured-output request.
 INTENT_SCHEMA_NAME: Final = "llmopt_intent_v1"
@@ -284,7 +291,13 @@ def _constraint(
     if not isinstance(kind, str) or kind not in _KINDS:
         raise IntentValidationError("Unsupported intent constraint.")
     result: dict[str, Any] = {"kind": kind}
+    # The strict schema makes a model fill every field of every rule, and a model often
+    # writes a filler ("scope": "squad" on a player rule) where a null belongs. A field that
+    # has no meaning for the rule's kind is therefore dropped from a model's reply, never
+    # read; the page's own requests are still held to the exact shape.
     week = value.get("week")
+    if model and kind == "hit_budget":
+        week = None
     if week is not None or (not model and "week" in value):
         if type(week) is not int or week not in _WEEKS or kind == "hit_budget":
             raise IntentValidationError("Invalid intent constraint week.")
@@ -296,7 +309,7 @@ def _constraint(
         if player_id not in player_ids:
             raise IntentValidationError("Player is outside the intent roster.")
         result["player_id"] = player_id
-    elif "player_id" in value and (not model or value["player_id"] is not None):
+    elif "player_id" in value and not model:
         raise IntentValidationError("Unexpected player for this constraint.")
     if kind == "club_count":
         result["club"] = _known_club(value.get("club"), clubs)
@@ -311,17 +324,14 @@ def _constraint(
             raise IntentValidationError("Invalid club count scope.")
         if scope == "transfers_in":
             result["scope"] = scope
-    elif any(
-        field in value and (not model or value[field] is not None)
-        for field in ("club", "count", "scope")
-    ):
+    elif not model and any(field in value for field in ("club", "count", "scope")):
         raise IntentValidationError("Unexpected club fields for this constraint.")
     if kind == "hit_budget":
         points = value.get("points")
         if type(points) is not int or not 0 <= points <= _MAX_HIT_POINTS:
             raise IntentValidationError("Invalid total transfer penalty budget.")
         result["points"] = points
-    elif "points" in value and (not model or value["points"] is not None):
+    elif "points" in value and not model:
         raise IntentValidationError("Unexpected points for this constraint.")
     if "max_cost_tenths" in value:
         max_cost = value["max_cost_tenths"]
@@ -332,6 +342,10 @@ def _constraint(
     both = value.get("both", False)
     if type(both) is not bool:
         raise IntentValidationError("Invalid with-and-without comparison.")
+    if model and both and kind not in _MEMBERSHIP_KINDS:
+        # "With and without" a rule that is not a player's membership is the plain
+        # comparison of that rule: the flag only means something for a player.
+        both = False
     if both:
         if kind != "include_player" and (not model or kind not in _MEMBERSHIP_KINDS):
             raise IntentValidationError("Invalid with-and-without comparison.")
@@ -942,19 +956,77 @@ def _provider_retry_after(header: str | None) -> int:
 class OpenAIIntentProvider:
     """One bounded Chat Completions call to the selected provider's official endpoint."""
 
-    def __init__(self, *, api_key: str, model: str, provider: str = "openai") -> None:
-        if not _valid_identifier(api_key, 1024) or not _valid_identifier(model, 256):
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        provider: str = "openai",
+        fallback_models: Sequence[str] = (),
+    ) -> None:
+        models = (model, *fallback_models)
+        if (
+            not _valid_identifier(api_key, 1024)
+            or len(models) > _MAX_MODELS
+            or len(set(models)) != len(models)
+            or not all(_valid_identifier(name, 256) for name in models)
+        ):
             raise ValueError("Invalid LLMOPT provider configuration.")
         if provider not in ("openai", "gemini"):
             raise ValueError("Unsupported LLMOPT provider.")
         self._api_key = api_key
-        self._model = model
+        self._models = models
         self._provider = provider
 
     def __call__(self, request: IntentRequest) -> object:
+        """Ask the first model; ask the next only when one is busy, limited or unusable.
+
+        A provider's free tier answers 503 while a model is in high demand and counts its
+        limits per model, so the next model can answer what the first cannot. Every model
+        shares one deadline, and the order is the configured one. A model gets an equal
+        share of what is left of the deadline, at least ``_MIN_ATTEMPT_SECONDS``, so one
+        that hangs cannot spend the time of those after it. A refusal for high demand comes
+        back in under a second and passes within seconds, so when every model refused and
+        time is left, the ones that were not limited are asked once more. When none
+        answers, the refusal is ``IntentLimited`` only if every model was limited.
+        """
         call = intent_call(request)
+        deadline = time.monotonic() + _TIMEOUT_SECONDS
+        waits: dict[str, int] = {}
+        for round_number in range(_ROUNDS):
+            # A limited model stays limited for longer than this call lasts.
+            asking = [model for model in self._models if model not in waits]
+            if round_number:
+                if not asking or deadline - time.monotonic() < _MIN_ATTEMPT_SECONDS:
+                    break
+                time.sleep(_ROUND_PAUSE_SECONDS)
+            for position, model in enumerate(asking):
+                now = time.monotonic()
+                if now >= deadline:
+                    break
+                # A model that hangs must leave the ones after it their share of the deadline.
+                share = max(_MIN_ATTEMPT_SECONDS, (deadline - now) / (len(asking) - position))
+                try:
+                    return self._ask(call, model, min(deadline, now + share))
+                except IntentLimited as limited:
+                    waits[model] = limited.retry_after
+                    reason = "limited"
+                except IntentUnavailable as unavailable:
+                    reason = str(unavailable)
+                _LOGGER.warning(
+                    "LLMOPT model %d of %d gave no draft in round %d: %s",
+                    self._models.index(model) + 1,
+                    len(self._models),
+                    round_number + 1,
+                    reason,
+                )
+        if len(waits) == len(self._models):
+            raise IntentLimited(min(waits.values()))
+        raise IntentUnavailable("The intent provider did not respond with a draft.")
+
+    def _ask(self, call: IntentCall, model: str, deadline: float) -> object:
         payload = {
-            "model": self._model,
+            "model": model,
             **({"reasoning_effort": "minimal"} if self._provider == "gemini" else {"store": False}),
             "max_completion_tokens": call.max_output_tokens,
             "messages": [
@@ -971,7 +1043,7 @@ class OpenAIIntentProvider:
             },
         }
         try:
-            reply = read_intent_json(self._post(json.dumps(payload).encode("ascii")))
+            reply = read_intent_json(self._post(json.dumps(payload).encode("ascii"), deadline))
             if not isinstance(reply, dict):
                 raise IntentValidationError("Invalid intent reply.")
             choices = reply["choices"]
@@ -988,17 +1060,17 @@ class OpenAIIntentProvider:
             ):
                 raise IntentValidationError("Intent provider did not supply a draft.")
             return read_intent_json(message["content"])
-        except (HTTPException, KeyError, OSError, ValueError, RecursionError):
-            raise IntentUnavailable("The intent provider did not respond with a draft.") from None
+        except (HTTPException, KeyError, OSError, ValueError, RecursionError) as error:
+            # The kind of failure is for the log; a reply's text never reaches it.
+            raise IntentUnavailable(f"no draft ({type(error).__name__})") from None
 
-    def _post(self, payload: bytes) -> bytes:
+    def _post(self, payload: bytes, deadline: float) -> bytes:
         host, path = (
             ("generativelanguage.googleapis.com", "/v1beta/openai/chat/completions")
             if self._provider == "gemini"
             else ("api.openai.com", "/v1/chat/completions")
         )
-        connection = HTTPSConnection(host, timeout=_TIMEOUT_SECONDS)
-        deadline = time.monotonic() + _TIMEOUT_SECONDS
+        connection = HTTPSConnection(host, timeout=max(1.0, deadline - time.monotonic()))
         try:
             connection.request(
                 "POST",
@@ -1015,7 +1087,7 @@ class OpenAIIntentProvider:
                 raise IntentLimited(_provider_retry_after(response.getheader("Retry-After")))
             encoding = response.getheader("Content-Encoding", "identity")
             if response.status != 200 or encoding.lower() != "identity":
-                raise IntentUnavailable("The intent provider did not accept the request.")
+                raise IntentUnavailable(f"The intent provider answered {response.status}.")
             declared = response.getheader("Content-Length")
             if declared is not None and not 0 <= int(declared) <= _RESPONSE_BYTES:
                 raise IntentUnavailable("The intent response exceeded its size limit.")
@@ -1048,11 +1120,19 @@ def intent_service_from_environment(
     api_key = env.get("SQUADOPT_LLMOPT_API_KEY", "")
     model = env.get("SQUADOPT_LLMOPT_MODEL", "")
     provider = env.get("SQUADOPT_LLMOPT_PROVIDER", "openai")
+    # Asked in this order when the model before is busy or limited; empty names none.
+    fallbacks = [
+        name.strip()
+        for name in env.get("SQUADOPT_LLMOPT_FALLBACK_MODELS", "").split(",")
+        if name.strip()
+    ]
     if not api_key or not model:
         return None
     try:
         return IntentService(
-            OpenAIIntentProvider(api_key=api_key, model=model, provider=provider),
+            OpenAIIntentProvider(
+                api_key=api_key, model=model, provider=provider, fallback_models=fallbacks
+            ),
             daily_budget_path=None if store_root is None else store_root / INTENT_BUDGET_FILE,
         )
     except ValueError:
