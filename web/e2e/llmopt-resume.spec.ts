@@ -8,6 +8,7 @@ import {
 } from "../src/fixtures/league";
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks, openCalendar } from "./leagueMocks";
+import { holdModel, routeChat } from "./llmoptChat";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -43,7 +44,7 @@ test("a chat rate limit preserves Turkish instructions and keeps manual rules ed
       players: [{ id: player.player_id, name: player.name, team: player.team }],
     }),
   );
-  await page.route(`${API}/api/v1/llmopt/intent`, (route) => {
+  await routeChat(page, API, (route) => {
     if (route.request().method() === "POST") intentPosts += 1;
     return answer(route, { error: { code: "RATE_LIMITED" } }, 429);
   });
@@ -53,6 +54,8 @@ test("a chat rate limit preserves Turkish instructions and keeps manual rules ed
   });
 
   await page.goto(PAGE);
+
+  await holdModel(page);
   const instructions = page.getByRole("textbox", { name: "Plan talimatların" });
   const rules = page.getByRole("main").getByRole("listitem");
   const add = page.getByRole("button", { name: "Kural ekle" });
@@ -95,7 +98,7 @@ for (const reloadAt of ["base", "preferred"] as const) {
         players: [{ id: captain.player_id, name: captain.name, team: captain.team }],
       }),
     );
-    await page.route(`${API}/api/v1/llmopt/intent`, (route) =>
+    await routeChat(page, API, (route) =>
       answer(route, {
         status: "draft",
         draft: { hard: [{ kind: "no_hits" }], soft: [{ kind: "hold_transfers" }] },
@@ -145,6 +148,8 @@ for (const reloadAt of ["base", "preferred"] as const) {
     });
 
     await page.goto(PAGE);
+
+    await holdModel(page);
     await page.getByRole("textbox", { name: "Plan instructions" }).fill("No hits. Prefer to roll.");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     const rule = page.getByRole("listitem").filter({ hasText: "No transfer hits" });

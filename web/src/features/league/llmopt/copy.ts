@@ -25,7 +25,6 @@ const en = {
   dismissQuestion: "Dismiss question",
   user: "You",
   refusals: {
-    disabled: "Chat is switched off. You can still edit the rules below.",
     busy: "Chat is not answering right now. Try again shortly.",
     limited: "The chat request limit has been reached. Wait a little and try again.",
     tooLarge: "This request is too large to send.",
@@ -36,9 +35,13 @@ const en = {
     modelRefused: "The provider did not accept this model.",
     providerLimited: "Your provider's request limit has been reached. Wait a little and try again.",
     providerUnreachable: "The provider could not be reached.",
+    accountRefused: "Your provider account has no credit or quota left.",
+    replyInvalid: "The model did not give a readable answer. Try again or choose another model.",
+    replyCut: "The model stopped before it finished its answer. Try another model.",
   } satisfies Record<IntentRefusal, string>,
   ownKey: {
     title: "Your model",
+    needed: "Enter your model key to use the chat.",
     provider: "Provider",
     model: "Model",
     key: "API key",
@@ -231,7 +234,6 @@ const tr: typeof en = {
   dismissQuestion: "Soruyu kapat",
   user: "Sen",
   refusals: {
-    disabled: "Sohbet kapalı. Kuralları aşağıdan düzenleyebilirsin.",
     busy: "Sohbet şu anda yanıt vermiyor. Biraz sonra tekrar dene.",
     limited: "Sohbet istek sınırına ulaştı. Biraz bekleyip tekrar dene.",
     tooLarge: "Bu istek gönderilemeyecek kadar büyük.",
@@ -242,9 +244,13 @@ const tr: typeof en = {
     modelRefused: "Sağlayıcı bu modeli kabul etmedi.",
     providerLimited: "Sağlayıcının istek sınırına ulaşıldı. Biraz bekleyip tekrar dene.",
     providerUnreachable: "Sağlayıcıya ulaşılamadı.",
+    accountRefused: "Sağlayıcı hesabında bakiye ya da kota kalmamış.",
+    replyInvalid: "Model okunabilir bir yanıt vermedi. Tekrar dene ya da başka bir model seç.",
+    replyCut: "Model yanıtını bitirmeden durdu. Başka bir model dene.",
   },
   ownKey: {
     title: "Kendi modelin",
+    needed: "Sohbeti kullanmak için model anahtarını gir.",
     provider: "Sağlayıcı",
     model: "Model",
     key: "API anahtarı",

@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import type { LLMOptCopy } from "./copy";
 import {
@@ -16,13 +16,36 @@ import styles from "./LLMOptPage.module.css";
 /**
  * The member's provider, model and key. The key field is uncontrolled: its text is read once
  * on Save, handed to the key holder and wiped from the field, so no component state holds it.
- * There is no form element, so a browser has no submission to offer to save as a password.
+ *
+ * The field is a text field drawn as dots, not a password field. A browser offers to save
+ * what a password field held once the field leaves the page, whatever `autocomplete` says,
+ * and a saved key would outlive the tab. A text field with autocomplete off is not offered.
+ *
+ * `onSaved` runs once the key is held, so the page can move focus to the chat. `disabled`
+ * is true while a message is being read: the call under way keeps its key, so neither Save
+ * nor Delete is offered until it ends.
  */
-export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boolean }) {
+export function OwnKeyForm({
+  copy,
+  disabled,
+  onSaved,
+}: {
+  copy: LLMOptCopy;
+  disabled: boolean;
+  onSaved?: () => void;
+}) {
   const words = copy.ownKey;
   const held = useOwnKey();
   const id = useId();
   const keyField = useRef<HTMLInputElement>(null);
+  const providerField = useRef<HTMLSelectElement>(null);
+  // Delete replaces the held view, and with it the focused button: focus goes to the form.
+  const focusForm = useRef(false);
+  useEffect(() => {
+    if (held || !focusForm.current) return;
+    focusForm.current = false;
+    providerField.current?.focus();
+  }, [held]);
   const [provider, setProvider] = useState<OwnKeyProvider>("openai");
   const [model, setModel] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -48,9 +71,11 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
     wipeKeyField();
     if (saved) setBaseUrl("");
     setInvalid(!saved);
+    if (saved) onSaved?.();
   }
 
   function remove() {
+    focusForm.current = held !== null;
     clearOwnKey();
     wipeKeyField();
     setInvalid(false);
@@ -64,22 +89,26 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
 
   if (held)
     return (
-      <div className={styles.ownKey} role="group" aria-label={words.title}>
-        <p className={styles.ownKeyHeld}>
+      <div className={styles.ownKey} role="group" aria-labelledby={`${id}-title`}>
+        <h2 id={`${id}-title`}>{words.title}</h2>
+        <p className={styles.ownKeyHeld} role="status">
           <span>{words.providers[held.provider]}</span>
           <span>{held.model}</span>
         </p>
-        <button className={styles.secondary} type="button" onClick={remove}>
+        <button className={styles.secondary} type="button" disabled={disabled} onClick={remove}>
           {words.delete}
         </button>
       </div>
     );
 
   return (
-    <div className={styles.ownKey} role="group" aria-label={words.title}>
+    <div className={styles.ownKey} role="group" aria-labelledby={`${id}-title`}>
+      <h2 id={`${id}-title`}>{words.title}</h2>
+      <p className={styles.ownKeyNeeded}>{words.needed}</p>
       <label htmlFor={`${id}-provider`}>{words.provider}</label>
       <select
         id={`${id}-provider`}
+        ref={providerField}
         value={provider}
         onChange={(event) => {
           setInvalid(false);
@@ -114,8 +143,13 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
       <input
         id={`${id}-key`}
         ref={keyField}
-        type="password"
+        className={styles.ownKeySecret}
+        type="text"
         autoComplete="off"
+        data-1p-ignore
+        data-lpignore="true"
+        data-bwignore="true"
+        data-form-type="other"
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
@@ -155,7 +189,7 @@ export function OwnKeyForm({ copy, disabled }: { copy: LLMOptCopy; disabled: boo
         <button className={styles.primary} type="button" disabled={!ready} onClick={save}>
           {words.save}
         </button>
-        <button className={styles.secondary} type="button" onClick={remove}>
+        <button className={styles.secondary} type="button" disabled={!keyTyped} onClick={remove}>
           {words.delete}
         </button>
       </div>
