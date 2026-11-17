@@ -43,7 +43,8 @@ const en = {
   selectPlayer: "Select a player",
   club: "Club",
   selectClub: "Select a club",
-  clubCount: "Players",
+  clubCount: "Exact number of players",
+  exactCount: (count: number) => `exactly ${count}`,
   clubCountScope: "Count in",
   clubSquad: "Final squad",
   clubTransfers: "Incoming transfers",
@@ -159,7 +160,7 @@ const en = {
     include_player: "Include player",
     buy_player: "Transfer in player",
     avoid_player: "Exclude player",
-    club_count: "Club player count",
+    club_count: "Exact players from a club",
     hit_budget: "Total penalty limit",
   } satisfies Record<Constraint["kind"], string>,
 };
@@ -206,7 +207,8 @@ const tr: typeof en = {
   selectPlayer: "Oyuncu seç",
   club: "Kulüp",
   selectClub: "Kulüp seç",
-  clubCount: "Oyuncu sayısı",
+  clubCount: "Tam olarak kaç oyuncu",
+  exactCount: (count) => `tam olarak ${count}`,
   clubCountScope: "Nerede sayılsın?",
   clubSquad: "Son kadro",
   clubTransfers: "Gelen transferler",
@@ -323,7 +325,7 @@ const tr: typeof en = {
     include_player: "Oyuncuyu kadroya al",
     buy_player: "Oyuncuyu transfer et",
     avoid_player: "Oyuncuyu kadro dışında tut",
-    club_count: "Kulüpten oyuncu sayısı",
+    club_count: "Kulüpten tam olarak kaç oyuncu",
     hit_budget: "Toplam ceza sınırı",
   },
 };
@@ -342,7 +344,7 @@ export function ruleLabel(
       : ` · ${rule.week === 1 ? copy.thisWeek : copy.relativeWeek(rule.week)}`;
   if (rule.kind === "club_count") {
     const scope = rule.scope === "transfers_in" ? copy.clubTransfers : copy.clubSquad;
-    return `${rule.club} · ${scope} · ${rule.count}${timing}`;
+    return `${rule.club} · ${scope} · ${copy.exactCount(rule.count)}${timing}`;
   }
   if (rule.kind === "hit_budget")
     return `${copy.rules[rule.kind]} · ${copy.hitBudgetPoints(rule.points)}`;
