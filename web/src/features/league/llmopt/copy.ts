@@ -1,5 +1,12 @@
 import type { Language } from "../../../i18n/messages";
-import type { CatalogPlayer, Constraint } from "./intent";
+import type { CatalogPlayer, Constraint, IntentRefusal } from "./intent";
+
+/** A wait in seconds as a whole count of the largest unit that fits, rounded up. */
+function waitUnits(seconds: number): [number, "second" | "minute" | "hour"] {
+  if (seconds < 60) return [Math.max(1, Math.ceil(seconds)), "second"];
+  if (seconds < 3600) return [Math.ceil(seconds / 60), "minute"];
+  return [Math.ceil(seconds / 3600), "hour"];
+}
 
 const en = {
   title: "LLMOPT",
@@ -16,8 +23,19 @@ const en = {
   understood: "Instructions updated.",
   dismissQuestion: "Dismiss question",
   user: "You",
-  limited: "The chat request limit has been reached. Wait a little and try again.",
-  intentUnavailable: "Chat is unavailable. You can still edit the rules below.",
+  refusals: {
+    disabled: "Chat is switched off. You can still edit the rules below.",
+    busy: "Chat is not answering right now. Try again shortly.",
+    limited: "The chat request limit has been reached. Wait a little and try again.",
+    tooLarge: "This request is too large to send.",
+    invalid: "The chat could not read this request.",
+    unsupported: "The chat did not accept this request.",
+    unavailable: "Chat is unavailable. You can still edit the rules below.",
+  } satisfies Record<IntentRefusal, string>,
+  limitedFor: (seconds: number) => {
+    const [count, unit] = waitUnits(seconds);
+    return `The chat request limit has been reached. You can send again in ${count} ${unit}${count === 1 ? "" : "s"}.`;
+  },
   rosterUnavailable: "The current player list could not be loaded.",
   squadUnavailable: "The current squad could not be loaded.",
   serviceUnavailable: "The planning service is unavailable.",
@@ -176,8 +194,20 @@ const tr: typeof en = {
   understood: "Talimatlar güncellendi.",
   dismissQuestion: "Soruyu kapat",
   user: "Sen",
-  limited: "Sohbet istek sınırına ulaştı. Biraz bekleyip tekrar dene.",
-  intentUnavailable: "Sohbet şu anda kullanılamıyor. Kuralları aşağıdan düzenleyebilirsin.",
+  refusals: {
+    disabled: "Sohbet kapalı. Kuralları aşağıdan düzenleyebilirsin.",
+    busy: "Sohbet şu anda yanıt vermiyor. Biraz sonra tekrar dene.",
+    limited: "Sohbet istek sınırına ulaştı. Biraz bekleyip tekrar dene.",
+    tooLarge: "Bu istek gönderilemeyecek kadar büyük.",
+    invalid: "Sohbet bu isteği okuyamadı.",
+    unsupported: "Sohbet bu isteği kabul etmedi.",
+    unavailable: "Sohbet şu anda kullanılamıyor. Kuralları aşağıdan düzenleyebilirsin.",
+  },
+  limitedFor: (seconds) => {
+    const [count, unit] = waitUnits(seconds);
+    const name = { second: "saniye", minute: "dakika", hour: "saat" }[unit];
+    return `Sohbet istek sınırına ulaştı. ${count} ${name} sonra tekrar gönderebilirsin.`;
+  },
   rosterUnavailable: "Güncel oyuncu listesi yüklenemedi.",
   squadUnavailable: "Güncel kadro yüklenemedi.",
   serviceUnavailable: "Planlama hizmeti şu anda kullanılamıyor.",

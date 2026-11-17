@@ -27,6 +27,7 @@ import {
   IntentError,
   MAX_MESSAGE_LENGTH,
   constraintKey,
+  intentRefusal,
   needsThreeWeeks,
   preparePlans,
   readIntent,
@@ -435,6 +436,9 @@ function Workspace({
   const [checkingSquad, setCheckingSquad] = useState(false);
   const [basisChanged, setBasisChanged] = useState(false);
   const [reading, setReading] = useState(false);
+  // While a rate limit's Retry-After runs, Send stays off and the wait is shown.
+  const [limit, setLimit] = useState<{ seconds: number } | null>(null);
+  const [waitLeft, setWaitLeft] = useState(0);
   const [run, setRun] = useState<PlanRun | null>(restoredRun);
   const confirmation = useRef<PlanConfirmation | undefined>(restored?.confirmation);
   const chatInput = useRef<HTMLTextAreaElement>(null);
@@ -451,6 +455,17 @@ function Workspace({
       interpret.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (!limit) return;
+    const end = Date.now() + limit.seconds * 1000;
+    const timer = window.setInterval(() => {
+      const left = Math.ceil((end - Date.now()) / 1000);
+      if (left <= 0) setLimit(null);
+      else setWaitLeft(left);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [limit]);
 
   function change(next: PlanDraft, previous = revised ?? reference) {
     base.reset();
@@ -491,7 +506,7 @@ function Workspace({
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = message.trim();
-    if (!text || !ORIGIN || interpret.current || checkingSquad || roster.isPending) return;
+    if (!text || !ORIGIN || interpret.current || checkingSquad || roster.isPending || limit) return;
     const controller = new AbortController();
     const previous = revised ?? reference;
     interpret.current = controller;
@@ -522,12 +537,12 @@ function Workspace({
       ]);
       setMessage("");
     } catch (error) {
-      if (!controller.signal.aborted)
-        setFeedback(
-          error instanceof IntentError && error.status === 429
-            ? copy.limited
-            : copy.intentUnavailable,
-        );
+      if (controller.signal.aborted) return;
+      const refusal = intentRefusal(error);
+      if (refusal === "limited" && error instanceof IntentError && error.retryAfterSeconds) {
+        setWaitLeft(error.retryAfterSeconds);
+        setLimit({ seconds: error.retryAfterSeconds });
+      } else setFeedback(copy.refusals[refusal]);
     } finally {
       if (interpret.current === controller) interpret.current = null;
       if (!controller.signal.aborted) setReading(false);
@@ -917,7 +932,7 @@ function Workspace({
           <button
             className={styles.primary}
             type="submit"
-            disabled={!ORIGIN || busy || roster.isPending || !message.trim()}
+            disabled={!ORIGIN || busy || roster.isPending || limit !== null || !message.trim()}
           >
             {reading ? copy.interpreting : copy.send}
           </button>
@@ -945,6 +960,11 @@ function Workspace({
             <option value={3}>{copy.threeWeeks}</option>
           </select>
         </label>
+        {limit && (
+          <p role="status" className={styles.notice}>
+            {copy.limitedFor(waitLeft)}
+          </p>
+        )}
         {feedback && (
           <p role="status" className={styles.notice}>
             {feedback}
