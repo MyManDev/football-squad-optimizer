@@ -162,6 +162,47 @@ def test_tampered_view_is_rejected_without_exposing_its_path() -> None:
     _validate_backend(response.json(), "ApiErrorResponse")
 
 
+@pytest.mark.parametrize(
+    ("resource", "definition", "field"),
+    [
+        ("status", "StatusView", "season"),
+        ("league", "LeagueView", "season"),
+        ("ledger", "LedgerView", "season"),
+        ("recommendation", "RecommendationView", "season"),
+        ("pool", "PoolView", "season"),
+        ("recommendation", "RecommendationView", "gameweek"),
+        ("pool", "PoolView", "gameweek"),
+    ],
+)
+def test_schema_valid_view_from_another_season_or_week_is_rejected(
+    tmp_path: Path, resource: str, definition: str, field: str
+) -> None:
+    week_resource = resource in {"recommendation", "pool"}
+    relative_path = Path("2026-27") / ("gw01" if week_resource else "") / f"{resource}.json"
+    document = json.loads((SITE_DATA_ROOT / relative_path).read_text(encoding="utf-8"))
+    document["payload"][field] = "2027-28" if field == "season" else 2
+    _validate_view(document, definition)
+    private_path = tmp_path / relative_path
+    private_path.parent.mkdir(parents=True)
+    private_path.write_text(json.dumps(document), encoding="utf-8")
+
+    store = FilePublishedViewStore(tmp_path)
+    method = getattr(store, "season_status" if resource == "status" else resource)
+    arguments = ("2026-27", 1) if week_resource else ("2026-27",)
+    with pytest.raises(PublishedViewIntegrityError, match=f"{field} does not match its path"):
+        method(*arguments)
+
+    route = f"/api/v1/seasons/2026-27/{'gameweeks/1/' if week_resource else ''}{resource}"
+    with TestClient(create_app(view_store=store), raise_server_exceptions=False) as client:
+        response = client.get(route)
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+    assert response.json()["error"]["message"] == "The published view is unavailable."
+    assert str(private_path) not in response.text
+    _validate_backend(response.json(), "ApiErrorResponse")
+
+
 def test_store_rejects_non_route_identifiers_before_touching_the_filesystem() -> None:
     store = FilePublishedViewStore(SITE_DATA_ROOT)
 
