@@ -1,4 +1,4 @@
-/** Synthetic answers exported from advise_rival_with_top100, including refused bands. */
+/** Synthetic answers exported from advise_rival_with_top100, including legal rolls. */
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 

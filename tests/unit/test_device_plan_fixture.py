@@ -7,8 +7,17 @@ and the fixture is carried by rerunning ``scripts/export_device_plan_fixture.py`
 
 import json
 
+import pandas as pd
 import pytest
 from scripts.export_device_plan_fixture import FIXTURE, build_fixture
+
+from squadopt.optimization import OptimizationConfig, SolverStatus
+from squadopt.planning import (
+    FirstWeekOverlap,
+    InitialSquadState,
+    PlanningHorizon,
+    optimize_transfer_plan,
+)
 
 
 def _same(fresh: object, held: object, path: str = "") -> list[str]:
@@ -153,7 +162,7 @@ def test_the_fixture_plays_every_chip_on_its_own_basis() -> None:
         )
 
 
-def test_the_rival_cases_exercise_both_decisions_and_a_refusal() -> None:
+def test_the_rival_cases_exercise_both_decision_kinds() -> None:
     recorded = json.loads(FIXTURE.read_text(encoding="utf-8"))
     world = recorded["rivals"]
     # The producer wrote the catalogue's bands and the charge into the document.
@@ -169,7 +178,8 @@ def test_the_rival_cases_exercise_both_decisions_and_a_refusal() -> None:
         "refused" if case["reference"]["refused"] else case["reference"]["plan_kind"]
         for case in world["cases"]
     }
-    assert kinds == {"within_free_transfers", "with_hits", "refused"}
+    assert {"within_free_transfers", "with_hits"} <= kinds
+    assert kinds <= {"within_free_transfers", "with_hits", "refused"}
     # A relaxed level, an alternative beside the plan, and every proof finished.
     answered = [case["reference"] for case in world["cases"] if not case["reference"]["refused"]]
     assert any(r["overlap_applied"] != r["overlap_target"] for r in answered)
@@ -193,7 +203,6 @@ def test_the_rival_cases_exercise_both_decisions_and_a_refusal() -> None:
     assert len(weighted) == len(world["cases"]) * 2
     assert {case["weight"] for case in weighted} == {20, 50}
     answered_weighted = [case["reference"] for case in weighted if not case["reference"]["refused"]]
-    assert any(case["reference"]["refused"] for case in weighted)
     assert any(case["changed"] for case in answered_weighted)
     assert {case["plan_kind"] for case in answered_weighted} == {
         "within_free_transfers",
@@ -203,6 +212,57 @@ def test_the_rival_cases_exercise_both_decisions_and_a_refusal() -> None:
     # Every player in the world is on his own number, so no tie decides a case.
     points = [p["expected_points"] for p in world["document"]["players"]]
     assert len(set(points)) == len(points)
+
+
+def test_a_valid_disjoint_rival_cannot_be_bought_without_enough_sale_proceeds() -> None:
+    recorded = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    document = recorded["document"]
+    entry = recorded["members"][0]["entry"]
+    held = set(entry["held"])
+    proceeds = sum(
+        entry["sell_tenths"].get(str(player["id"]), player["buy_tenths"])
+        for player in document["players"]
+        if player["id"] in held
+    )
+    unaffordable = entry["bank_tenths"] + proceeds + 1
+    rival = frozenset(
+        player["id"]
+        for position, count in (("GK", 1), ("DEF", 3), ("MID", 5), ("FWD", 2))
+        for player in [
+            row
+            for row in document["players"]
+            if row["position"] == position and row["id"] not in held
+        ][:count]
+    )
+    assert len(rival) == 11
+    table = pd.DataFrame.from_records(
+        {
+            "gameweek": document["gameweek"],
+            "player_id": player["id"],
+            "name": player["name"],
+            "team_id": player["team"],
+            "position": player["position"],
+            "buy_price_tenths": player["buy_tenths"] if player["id"] in held else unaffordable,
+            "sell_price_tenths": entry["sell_tenths"].get(str(player["id"]), player["buy_tenths"]),
+            "expected_points": player["expected_points"],
+        }
+        for player in document["players"]
+    )
+    horizon = PlanningHorizon(table)
+    initial = InitialSquadState(tuple(entry["held"]), entry["bank_tenths"], entry["free_transfers"])
+    config = OptimizationConfig()
+    control = optimize_transfer_plan(horizon, initial, config)
+    assert control.solver_status is SolverStatus.OPTIMAL
+    assert control.weeks[0].transfer_count == 0
+    # Even the fully relaxed core band needs one purchase. The held squad itself is valid.
+    for minimum in (9, 1):
+        answer = optimize_transfer_plan(
+            horizon,
+            initial,
+            config,
+            first_week_overlap=FirstWeekOverlap(player_ids=rival, minimum=minimum),
+        )
+        assert answer.solver_status is SolverStatus.INFEASIBLE
 
 
 def test_weighted_preferences_publish_base_vice_and_bench_order_and_source_fields() -> None:
