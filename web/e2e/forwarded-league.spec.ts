@@ -259,6 +259,47 @@ test("a typed unlisted league opens from the forwarder, and a member opens with 
   await expect(page.getByRole("link", { name: copy.suggestionHistory.title })).toHaveCount(1);
 });
 
+test("forwarded history recovers through Retry after a transient season failure", async ({
+  page,
+}) => {
+  await serveSite(page, "up");
+  let healthy = false;
+  let reads = 0;
+  await page.route(`**/api/v1/fpl/entry/${ENTRY}/season`, (route) => {
+    reads += 1;
+    return route.fulfill({
+      status: healthy ? 200 : 502,
+      headers: MARKED,
+      body: JSON.stringify(
+        healthy
+          ? {
+              contract_version: "fpl_entry_season_v1",
+              entry_id: ENTRY,
+              source_time: "2026-10-19T17:30:00.000Z",
+              weeks: [],
+              chips: [],
+            }
+          : { error: "upstream_error" },
+      ),
+    });
+  });
+  await typeLeague(page, LEAGUE);
+  await page.getByRole("link", { name: FIRST.results[0]!.entry_name }).click();
+  await sayWhoYouAre(page);
+  await page.getByRole("link", { name: copy.suggestionHistory.title }).click();
+  await expect(
+    page.getByRole("heading", { name: copy.suggestionHistory.unreadable }),
+  ).toBeVisible();
+  const failedReads = reads;
+  healthy = true;
+  await page.getByRole("button", { name: copy.suggestionHistory.retry, exact: true }).click();
+  await expect(page.locator("[data-zone='history']")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: copy.suggestionHistory.title }),
+  ).toBeVisible();
+  expect(reads).toBe(failedReads + 1);
+});
+
 test("a typed head-to-head league opens from its own table", async ({ page }) => {
   await serveSite(page, "up");
   await typeLeague(page, HEAD_TO_HEAD);
