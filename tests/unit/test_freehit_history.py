@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+from tests.unit.test_live_transfers import _elements, _game_config
 
 from squadopt.data.errors import DataSourceError
 from squadopt.live.rules import (
@@ -15,7 +16,6 @@ from squadopt.live.rules import (
 )
 from squadopt.live.transfers import HeldSquad, plan_transfers
 from squadopt.optimization import OptimizationConfig
-from tests.unit.test_live_transfers import _elements, _game_config
 
 
 @pytest.mark.parametrize("gameweek,allowed", [(20, False), (21, True)])
@@ -36,11 +36,18 @@ def test_live_free_hit_respects_previous_week_even_when_rights_renew(
     ids = (1001, 1002, 1004, 1005, 1006, 1007, 1008, 1012, 1013, 1014, 1015, 1016, 1020, 1021, 1022)
     prices = table.set_index("player_id").price_tenths.to_dict()
     held = HeldSquad(
-        "2026-27", gameweek - 1, ids, {p: prices[p] for p in ids},
-        1000 - sum(prices[p] for p in ids), 2, {"freehit": (19,)},
+        "2026-27",
+        gameweek - 1,
+        ids,
+        {p: prices[p] for p in ids},
+        1000 - sum(prices[p] for p in ids),
+        2,
+        {"freehit": (19,)},
     )
     rules = SeasonRules(
-        SEASON_RULES_CONTRACT_VERSION, "2026-27", "capture",
+        SEASON_RULES_CONTRACT_VERSION,
+        "2026-27",
+        "capture",
         ScoringRules(**_game_config()["scoring"]),
         TransferRules(15, 11, 3, 1000, 4, 20, 0.5, False),
         (
@@ -55,9 +62,12 @@ def test_live_free_hit_respects_previous_week_even_when_rights_renew(
             plan_transfers(inputs, projection, held, rules, chip="freehit")
     else:
         plan, decision, _ = plan_transfers(
-            inputs, projection, held, rules, chip="freehit",
+            inputs,
+            projection,
+            held,
+            rules,
+            chip="freehit",
             optimization=OptimizationConfig(solver_time_limit_seconds=10),
         )
         assert decision.chip == "freehit"
         assert plan.chips_played == {gameweek: "freehit"}
-

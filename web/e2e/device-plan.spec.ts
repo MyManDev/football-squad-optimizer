@@ -100,6 +100,86 @@ test("a real club transfer does not force a sale from a held four-player club", 
   await expect(decision.getByText(MESSAGES.en.leagueMembers.noMove, { exact: true })).toBeVisible();
 });
 
+test("a late error from an interrupted device worker leaves the next real solve alive", async ({
+  page,
+}) => {
+  await installLeagueMocks(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("squadopt.language", "en");
+    const NativeWorker = window.Worker;
+    const workers: Worker[] = [];
+    const requests: { worker: Worker; message: unknown }[] = [];
+    class HeldWorker extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        workers.push(this);
+      }
+      postMessage(message: { id: number }) {
+        requests.push({ worker: this, message });
+        queueMicrotask(() =>
+          this.onmessage?.(
+            new MessageEvent("message", {
+              data: { id: message.id, kind: "ready" },
+            }),
+          ),
+        );
+      }
+    }
+    window.Worker = HeldWorker;
+    Object.assign(window, {
+      lateDeviceError: () => workers[0]!.onerror?.(new ErrorEvent("error", { message: "old run" })),
+      releaseDevice: () => {
+        const last = requests.at(-1)!;
+        NativeWorker.prototype.postMessage.call(last.worker, last.message);
+      },
+    });
+  });
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        ...squad,
+        payload: {
+          ...squad.payload,
+          source_snapshot_id: fixture.document.source_snapshot_id,
+          device_plan: member.entry,
+        },
+      },
+    }),
+  );
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-10-03T00:00:00Z",
+        source_kind: "live",
+        payload: { ...fixture.document, league_id: squad.payload.league_id },
+      },
+    }),
+  );
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`);
+  const run = page.getByRole("button", {
+    name: MESSAGES.en.leagueMembers.deviceButton,
+    exact: true,
+  });
+  await page.getByText("Advanced Settings", { exact: true }).click();
+  await page.getByRole("radio", { name: "Triple Captain", exact: true }).press("Space");
+  await expect(page.locator('input[name="chip"][value="3xc"]')).toBeChecked();
+  await run.click();
+  await expect(page.locator("[data-device-state='solving']")).toBeVisible();
+  // Browser navigation remains available while the solving overlay makes the page inert.
+  await page.goBack();
+  await expect(page).toHaveURL(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`);
+  await run.click();
+  await expect(page.locator("[data-device-state='solving']")).toBeVisible();
+  await page.evaluate(() => {
+    const controls = window as unknown as { lateDeviceError(): void; releaseDevice(): void };
+    controls.lateDeviceError();
+    controls.releaseDevice();
+  });
+  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+});
+
 test("a member's plan is solved on the device and drawn on the page", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installLeagueMocks(page);
