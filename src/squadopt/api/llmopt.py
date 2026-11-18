@@ -1,9 +1,9 @@
 """The write-free LLMOPT draft endpoints.
 
-``/intent`` calls the site's configured provider. ``/prompt`` and ``/check`` call no model:
-a member's browser sends the call ``/prompt`` returns to the member's own provider with the
-member's own key, and ``/check`` validates the reply. The backend never receives that key,
-so these two routes refuse any request that carries one.
+``/prompt`` and ``/check`` call no model, and the backend has none of its own: a member's
+browser sends the call ``/prompt`` returns to the member's own provider with the member's
+own key, and ``/check`` validates the reply (ADR 0017). The backend never receives that
+key, so both routes refuse any request that carries one.
 """
 
 from typing import Final
@@ -16,9 +16,6 @@ from squadopt.platform import ApiError, ApiErrorResponse
 from squadopt.platform.advice_submit import FixedWindowRateLimiter, client_address_bucket
 from squadopt.platform.llmopt_intent import (
     INTENT_BODY_MAX_BYTES,
-    IntentLimited,
-    IntentService,
-    IntentUnavailable,
     IntentValidationError,
     check_reply,
     parse_check_request,
@@ -86,33 +83,11 @@ async def _keyless_body(request: Request, limiter: FixedWindowRateLimiter) -> ob
     return body
 
 
-def intent_routes(
-    service: IntentService | None, *, keyless_per_minute: int = KEYLESS_PER_MINUTE
-) -> APIRouter:
+def intent_routes(*, keyless_per_minute: int = KEYLESS_PER_MINUTE) -> APIRouter:
     router = APIRouter(prefix="/api/v1/llmopt")
     # Each keyless route counts on its own: one message is one prompt and one check.
     prompt_limiter = FixedWindowRateLimiter(keyless_per_minute, 60)
     check_limiter = FixedWindowRateLimiter(keyless_per_minute, 60)
-
-    @router.post("/intent")
-    async def prepare_intent(request: Request) -> JSONResponse:
-        if service is None:
-            return _error(503, "LLMOPT_DISABLED", "LLMOPT text interpretation is not configured.")
-        try:
-            intent = parse_intent_request(await _json_body(request))
-        except _Refusal as refusal:
-            return refusal.response
-        except IntentValidationError as error:
-            return _error(422, "VALIDATION_FAILED", str(error))
-        try:
-            result = await run_in_threadpool(service.prepare, intent, _client(request))
-        except IntentLimited as error:
-            return _error(429, "RATE_LIMITED", str(error), retry_after=error.retry_after)
-        except IntentUnavailable:
-            return _error(
-                503, "LLMOPT_UNAVAILABLE", "The intent provider is temporarily unavailable."
-            )
-        return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
     @router.post("/prompt")
     async def intent_prompt(request: Request) -> JSONResponse:
