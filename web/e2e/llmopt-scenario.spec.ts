@@ -248,6 +248,17 @@ for (const kind of ["price_increase", "unavailable"] as const) {
       await compute.click();
       await expect.poll(() => polls).toBeGreaterThan(0);
 
+      if (!isPrice) {
+        // The queued main result must finish before the original-transfer replay starts.
+        expect(posts.map(({ branch }) => branch)).toEqual(["baseline", "reoptimized"]);
+        const beforeReload = polls;
+        await page.reload();
+        await expect.poll(() => polls).toBeGreaterThan(beforeReload);
+        expect(posts).toHaveLength(2);
+        completed = true;
+        await expect.poll(() => posts.length).toBe(3);
+      }
+
       const scenarioPosts = posts.slice(1);
       expect(scenarioPosts.map(({ branch }) => branch).sort()).toEqual(["original", "reoptimized"]);
       const expectedScenario = isPrice ? scenario : { kind, player_id: opening.captain.player_id };
@@ -315,11 +326,6 @@ for (const kind of ["price_increase", "unavailable"] as const) {
         return;
       }
 
-      const beforeReload = polls;
-      await page.reload();
-      await expect.poll(() => polls).toBeGreaterThan(beforeReload);
-      expect(posts).toHaveLength(3);
-      completed = true;
       await expect(comparison).toContainText(
         "The original transfers are feasible in this scenario.",
       );

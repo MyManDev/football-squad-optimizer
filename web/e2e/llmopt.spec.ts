@@ -1027,3 +1027,99 @@ test("a waiting run survives reload and an edit closes it without a follow-up", 
   await expect(page.getByRole("region", { name: "Plans" })).toHaveCount(0);
   expect(posts).toHaveLength(1);
 });
+
+for (const locale of ["tr", "en"] as const) {
+  test(`capacity keeps the completed plan with one sentence in ${locale}`, async ({ page }) => {
+    test.skip(!API, "API build required");
+    await installLeagueMocks(page);
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.addInitScript(
+      (language) => localStorage.setItem("squadopt.language", language),
+      locale,
+    );
+    const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+    const players = squad.starting_xi.slice(0, 2).map((player) => ({
+      id: player.player_id,
+      name: player.name,
+      team: player.team,
+    }));
+    const posts: { preferences: Record<string, unknown> }[] = [];
+    await page.route(`${API}/api/v1/contributions/players`, (route) =>
+      answer(route, { season: squad.season, players }),
+    );
+    await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+      answer(route, {
+        contract_version: "league_capabilities_v1",
+        league_id: LEAGUE,
+        capture_snapshot_id: squad.source_snapshot_id,
+        season: squad.season,
+        gameweek: squad.gameweek,
+        strategies: { "saf-puan": { windows: [1], requires_rival: false } },
+        preferences: { available: true },
+        top100: { available: false, weights: [] },
+        managers_word: { available: false },
+      }),
+    );
+    await routeChat(page, API, (route) =>
+      answer(route, {
+        status: "draft",
+        draft: {
+          hard: [],
+          soft: [
+            ...players.map(({ id }) => ({ kind: "keep_player", player_id: id })),
+            { kind: "no_hits" },
+          ],
+        },
+      }),
+    );
+    await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+      if (route.request().method() === "OPTIONS") return answer(route, null);
+      if (route.request().method() !== "POST") return route.fulfill({ status: 404, headers: CORS });
+      const body = route.request().postDataJSON() as (typeof posts)[number];
+      posts.push(body);
+      if (posts.length > 1)
+        return route.fulfill({
+          status: 409,
+          headers: CORS,
+          json: { error: { code: "RUN_BUDGET_EXHAUSTED" } },
+        });
+      const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+      return answer(route, {
+        ...envelope,
+        payload: {
+          ...envelope.payload,
+          preferences: body.preferences,
+          preferences_scope: "all_selected_weeks",
+        },
+      });
+    });
+    await page.goto(PAGE);
+    await holdModel(page);
+    await page
+      .getByRole("textbox", { name: locale === "tr" ? "Plan talimatların" : "Plan instructions" })
+      .fill("Keep both players if possible.");
+    await page
+      .getByRole("button", { name: locale === "tr" ? "Gönder" : "Send", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: locale === "tr" ? "Planları hesapla" : "Compute plans" })
+      .click();
+    await expect.poll(() => posts.length).toBe(3);
+    await expect(page.locator("article[data-plan-ready]")).toHaveCount(1);
+    await expect(
+      page.getByText(
+        locale === "tr" ? "Bazı planlar hesaplanamadı." : "Some plans could not be calculated.",
+        { exact: true },
+      ),
+    ).toHaveCount(1);
+    await expect(
+      page.locator("article").filter({
+        hasText: locale === "tr" ? "Tüm tercihlerle plan" : "Plan with all preferences",
+      }),
+    ).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    expect(posts).toHaveLength(3);
+  });
+}

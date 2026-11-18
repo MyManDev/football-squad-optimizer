@@ -394,8 +394,13 @@ function Workspace({
   // plan was picked, the first edit after a result compares against the plan shown.
   function change(next: PlanDraft, previous = reference ?? revised) {
     const abandoned = session.confirmation?.runId;
+    const hadOpenWork = Object.values(jobs.states).some(({ phase }) => isWorking(phase));
     if (abandoned)
-      void client.cancelRun?.(abandoned).catch(() => setFeedback(copy.serviceUnavailable));
+      void client.cancelRun?.(abandoned).catch(() => {
+        // A terminal run has nothing left to stop. Its bookkeeping must not replace
+        // the feedback for a repair or edit the member has already selected.
+        if (hadOpenWork) setFeedback(copy.serviceUnavailable);
+      });
     for (const job of Object.values(controls)) job.reset();
     setRun(null);
     setFeedback("");
