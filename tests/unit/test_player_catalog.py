@@ -9,7 +9,7 @@ from squadopt.application.player_catalog import player_catalog, validate_catalog
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 
 
-def capture(tmp_path):
+def capture(tmp_path, *, short_name=None):
     document = {
         "events": [{"id": 1, "deadline_time": "2026-08-21T10:00:00Z", "finished": True}],
         "teams": [{"id": 10, "name": "Arsenal"}],
@@ -24,6 +24,7 @@ def capture(tmp_path):
                 "minutes": 0,
                 "status": "i",
                 "now_cost": 0,
+                **({"web_name": short_name} if i == 1 and short_name is not None else {}),
             }
             for i in range(1, 5)
         ],
@@ -44,6 +45,13 @@ def test_all_positions_including_injured_zero_minute_players_keep_persistent_cod
     assert {p["id"] for p in catalog["players"]} == {1001, 1002, 1003, 1004}
     assert {p["position"] for p in catalog["players"]} == {"GK", "DEF", "MID", "FWD"}
     assert all(p["team_id"] == 10 for p in catalog["players"])
+
+
+def test_catalog_carries_the_games_short_name_and_accepts_older_rows(tmp_path):
+    catalog = player_catalog(capture(tmp_path, short_name=" Beto "))
+    assert catalog["players"][0]["short_name"] == "Beto"
+    assert "short_name" not in catalog["players"][1]
+    assert validate_catalog(catalog) == catalog
 
 
 @pytest.mark.parametrize(

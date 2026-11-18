@@ -173,8 +173,8 @@ def _validate_initial_state(
             )
     # The club limit is not checked on the held squad: a player who moved clubs after he
     # was bought can leave a manager holding four from one club, which the game allows
-    # until the next transfer. Every planned squad still satisfies the limit, so such a
-    # start forces a sale rather than a refusal.
+    # until the next transfer. A week with any transfer must satisfy the limit; rolling
+    # keeps the held squad, including a Free Hit's restored original squad.
     return initial_ids
 
 
@@ -280,6 +280,14 @@ def _build_model(
     model = cp_model.CpModel()
     player_count = len(players_by_week[0])
     week_count = len(players_by_week)
+    first_players = players_by_week[0]
+    initial_team_counts = Counter(
+        first_players.loc[first_players["player_id"].isin(initial_ids), "team_id"]
+    )
+    first_teams = first_players["team_id"].tolist()
+    conditional_club_limit = any(
+        count > optimization_config.max_players_per_team for count in initial_team_counts.values()
+    ) or any(players["team_id"].tolist() != first_teams for players in players_by_week[1:])
     horizon_gameweeks = [int(players.iloc[0]["gameweek"]) for players in players_by_week]
     # A chip is a variable only in the gameweeks it is available in; a chip available
     # only outside this horizon simply has no variable here.
@@ -372,6 +380,10 @@ def _build_model(
             model.new_bool_var(f"transfer_out_gw{gameweek}_{index}")
             for index in range(player_count)
         ]
+        # Stable clubs and an ordinary held squad need no extra search variables.
+        made_transfers = (
+            model.new_bool_var(f"made_transfers_gw{gameweek}") if conditional_club_limit else None
+        )
         _add_decision_constraints(
             model,
             players,
@@ -380,6 +392,7 @@ def _build_model(
             starters,
             captains,
             enforce_budget=False,
+            team_limit_when=made_transfers,
         )
         free_hit = chip_vars[week_index].get("freehit")
         bases: list[cp_model.LinearExpr | int] = []
@@ -415,6 +428,9 @@ def _build_model(
             f"transfer_count_gw{gameweek}",
         )
         model.add(transfer_count == cp_model.LinearExpr.sum(transfers_in))
+        if made_transfers is not None:
+            model.add(transfer_count >= 1).only_enforce_if(made_transfers)
+            model.add(transfer_count == 0).only_enforce_if(made_transfers.Not())
         free_before = model.new_int_var(
             0,
             transfer_config.max_free_transfers,
@@ -787,6 +803,7 @@ def _extract_plan(
             starter_indices,
             captain_indices,
             enforce_budget=False,
+            enforce_team_limit=bool(transfer_in_indices or transfer_out_indices),
         )
         squad_ids = set(players.iloc[squad_indices]["player_id"])
         transfer_in_ids = set(players.iloc[transfer_in_indices]["player_id"])

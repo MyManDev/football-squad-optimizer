@@ -109,7 +109,7 @@ class FilePublishedViewStore:
         definition: PayloadDefinition,
     ) -> JsonDocument:
         safe_season = _validate_season(season)
-        return self._load(PurePosixPath(safe_season, filename), definition)
+        return self._load(PurePosixPath(safe_season, filename), definition, season=safe_season)
 
     def _gameweek_view(
         self,
@@ -121,12 +121,15 @@ class FilePublishedViewStore:
         safe_season = _validate_season(season)
         safe_gameweek = _validate_gameweek(gameweek)
         relative_path = PurePosixPath(safe_season, f"gw{safe_gameweek:02d}", filename)
-        return self._load(relative_path, definition)
+        return self._load(relative_path, definition, season=safe_season, gameweek=safe_gameweek)
 
     def _load(
         self,
         relative_path: PurePosixPath,
         definition: PayloadDefinition,
+        *,
+        season: str | None = None,
+        gameweek: int | None = None,
     ) -> JsonDocument:
         if relative_path.is_absolute() or ".." in relative_path.parts:
             raise PublishedViewIntegrityError("published view path escaped its data root")
@@ -166,6 +169,13 @@ class FilePublishedViewStore:
             raise PublishedViewIntegrityError(
                 "published view does not satisfy ui_view_v1"
             ) from error
+        # A copied document can satisfy the schema while answering another URL. Bind
+        # its identity to the resource being read before it crosses the HTTP boundary.
+        payload = cast(dict[str, object], document["payload"])
+        if season is not None and payload["season"] != season:
+            raise PublishedViewIntegrityError("published view season does not match its path")
+        if gameweek is not None and payload["gameweek"] != gameweek:
+            raise PublishedViewIntegrityError("published view gameweek does not match its path")
         return document
 
 

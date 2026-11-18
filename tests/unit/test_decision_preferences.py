@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+import pandas as pd
 import pytest
 from ortools.sat.python import cp_model
 from tests.unit.test_transfer_planning import _horizon_table
@@ -113,12 +114,60 @@ def test_new_preferences_keep_legacy_canonical_identity_when_off():
         "hold_transfers": True,
     }
     assert not DecisionPreferences.parse({"hold_transfers": False, "include_players": []}).active
+
     assert DecisionPreferences.parse({"no_hits": True, "club_counts": []}).canonical() == (
         legacy.canonical()
     )
     assert legacy == DecisionPreferences.parse(legacy.payload())
     assert DecisionPreferences.parse({"no_hits": True, "hold_opening_transfers": False}) == legacy
     assert DecisionPreferences.parse({"no_hits": True, "net_points_priority": False}) == legacy
+
+
+def test_sixteen_unheld_exclusions_do_not_make_a_legal_hold_impossible(
+    known_optimum_players, small_config
+):
+    outsiders = known_optimum_players.iloc[[0] * 16].copy()
+    outsiders["player_id"] = [f"OUTSIDE_{i}" for i in range(16)]
+    outsiders["expected_points"] = 0.0
+    players = pd.concat([known_optimum_players, outsiders], ignore_index=True)
+    horizon, initial, ids = _case(players)
+    avoided = [ids[f"OUTSIDE_{i}"] for i in range(16)]
+    with pytest.raises(ValueError, match="at most 17"):
+        DecisionPreferences.parse({"avoid_players": list(range(1, 19))})
+    for name in ("keep_players", "include_players"):
+        with pytest.raises(ValueError, match="at most 15"):
+            DecisionPreferences.parse({name: avoided})
+    preferences = DecisionPreferences.parse({"avoid_players": avoided, "hold_transfers": True})
+    result = optimizer.optimize_transfer_plan(
+        horizon, initial, small_config, preferences=preferences
+    )
+    assert result.has_solution
+    assert all(week.transfer_count == 0 for week in result.weeks)
+    assert all(set(week.selected_squad.player_id).isdisjoint(avoided) for week in result.weeks)
+
+
+def test_global_and_weekly_exclusions_merge_without_a_false_squad_limit(
+    known_optimum_players, small_config
+):
+    outsiders = known_optimum_players.iloc[[0] * 34].copy()
+    outsiders["player_id"] = [f"OUTSIDE_{i}" for i in range(34)]
+    outsiders["expected_points"] = 0.0
+    horizon, initial, ids = _case(pd.concat([known_optimum_players, outsiders], ignore_index=True))
+    avoided = [ids[f"OUTSIDE_{i}"] for i in range(34)]
+    preferences = DecisionPreferences.parse(
+        {
+            "hold_transfers": True,
+            "avoid_players": avoided[:17],
+            "week_rules": [{"week": 2, "rules": {"avoid_players": avoided[17:]}}],
+        }
+    )
+    assert set(preferences.for_week(2).avoid_players) == set(avoided)
+    assert DecisionPreferences.parse(preferences.payload()) == preferences
+    result = optimizer.optimize_transfer_plan(
+        horizon, initial, small_config, preferences=preferences
+    )
+    assert result.has_solution
+    assert all(week.transfer_count == 0 for week in result.weeks)
 
 
 def test_club_counts_canonicalize_scope_and_preserve_distinct_requests():

@@ -32,6 +32,7 @@
               "type": "number"
             },
             "transfer_hit_points": {
+              "minimum": 0,
               "type": [
                 "number",
                 "null"
@@ -1713,6 +1714,7 @@
                 "type": "object"
               },
               "transfer_hit_points": {
+                "minimum": 0,
                 "type": "number"
               },
               "transfers_in": {
@@ -1853,7 +1855,7 @@
                 "minimum": 1,
                 "type": "integer"
               },
-              "maxItems": 15,
+              "maxItems": 17,
               "type": "array",
               "uniqueItems": true
             },
@@ -2083,7 +2085,7 @@
                           "minimum": 1,
                           "type": "integer"
                         },
-                        "maxItems": 15,
+                        "maxItems": 17,
                         "type": "array",
                         "uniqueItems": true
                       },
@@ -2455,6 +2457,7 @@
           "type": "number"
         },
         "transfer_hit_points": {
+          "minimum": 0,
           "type": "number"
         },
         "vice_captain": {

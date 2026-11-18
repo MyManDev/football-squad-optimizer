@@ -13,6 +13,11 @@ Once a finished record is older than the retention window, ``archive`` moves it 
 into ``archive/`` beside two small indexes (by idempotency key and by cache key). ``load``
 and ``history`` still find it there, and its id is never given to another job.
 
+Every accepted idempotency key also has an immutable binding in ``idempotency/``. A
+request that joins another client's open job keeps its own key there without changing
+the job's public schema. Bindings survive retries and archiving; the queue checks them
+under the same lock that decides which job a request joins or creates.
+
 A running job may also have ``<job_id>.progress`` beside its record: how many of its
 documents the owning attempt has solved. Only that attempt writes it, under the lock and
 after the same ownership check as its heartbeat, so a recovered attempt still computing
@@ -52,6 +57,7 @@ from squadopt.platform.queue_contracts import (
     AdviceLeaseLostError,
     AdviceQueueError,
     AdviceQueueIntegrityError,
+    IdempotencyConflictError,
     JobProgress,
     claim_order,
 )
@@ -106,6 +112,81 @@ class FileJobQueue:
         # Hashed: an idempotency key may hold characters a file name cannot.
         digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
         return self._root / "archive" / "idempotency" / f"{digest}.json"
+
+    def _idempotency_binding(self, idempotency_key: str) -> Path:
+        digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
+        return self._root / "idempotency" / f"{digest}.json"
+
+    def _check_idempotency(self, job: AdviceJob) -> bool:
+        """Check a key's durable meaning; callers hold the queue transaction lock.
+
+        Older stores recorded only the owner key on the job. Consult those records
+        until this key has a binding, including jobs that have already been archived.
+        An unreadable binding stays reserved rather than being replaced by a new meaning.
+        """
+
+        key = job.idempotency_key
+        if key is None:
+            return False
+        path = self._idempotency_binding(key)
+        try:
+            raw = path.read_bytes()
+        except FileNotFoundError:
+            raw = None
+        if raw is None:
+            previous = [record for record in self._scan() if record.idempotency_key == key]
+            for name in self._archived_ids(self._key_index(key), "idempotency_key", key):
+                record = self.load(name)
+                if record is None or record.idempotency_key != key:
+                    raise AdviceQueueIntegrityError(
+                        "Idempotency history names a missing or foreign job."
+                    )
+                previous.append(record)
+            for record in previous:
+                self._require_same_request(job, record.request_fingerprint, record.cache_key)
+            return False
+        try:
+            binding = json.loads(raw)
+            if (
+                not isinstance(binding, dict)
+                or set(binding)
+                != {"contract_version", "idempotency_key", "request_fingerprint", "cache_key"}
+                or binding["contract_version"] != "advice_idempotency_binding_v1"
+                or binding["idempotency_key"] != key
+                or any(
+                    not isinstance(binding[field], str)
+                    or re.fullmatch(r"[0-9a-f]{64}", binding[field]) is None
+                    for field in ("request_fingerprint", "cache_key")
+                )
+            ):
+                raise ValueError("Invalid idempotency binding identity.")
+        except (ValueError, UnicodeError, TypeError, RecursionError) as error:
+            self._retain_issue(path)
+            raise AdviceQueueIntegrityError("Unreadable idempotency binding.") from error
+        self._require_same_request(job, binding["request_fingerprint"], binding["cache_key"])
+        return True
+
+    @staticmethod
+    def _require_same_request(job: AdviceJob, fingerprint: str, cache_key: str) -> None:
+        if job.request_fingerprint != fingerprint or job.cache_key != cache_key:
+            raise IdempotencyConflictError(
+                "This Idempotency-Key was already used for a different request."
+            )
+
+    def _bind_idempotency(self, job: AdviceJob) -> None:
+        if job.idempotency_key is None or self._check_idempotency(job):
+            return
+        binding = {
+            "contract_version": "advice_idempotency_binding_v1",
+            "idempotency_key": job.idempotency_key,
+            "request_fingerprint": job.request_fingerprint,
+            "cache_key": job.cache_key,
+        }
+        self._publish(
+            self._idempotency_binding(job.idempotency_key),
+            (json.dumps(binding, sort_keys=True) + "\n").encode("utf-8"),
+            create=True,
+        )
 
     def _answer_index(self, cache_key: str) -> Path:
         if not re.fullmatch(r"[0-9a-f]{64}", cache_key):
@@ -351,9 +432,11 @@ class FileJobQueue:
             cached = read_cached(job.cache_key)
             if cached is not None:
                 return cached
+            self._check_idempotency(job)
             if admit is not None or prepare is not None:
                 existing = self._index_job(self._open_index(job.cache_key), repair=True)
                 if existing is not None and not existing.is_terminal:
+                    self._bind_idempotency(job)
                     return existing
             with admit() if admit is not None else contextlib.nullcontext():
                 if prepare is not None:
@@ -365,15 +448,18 @@ class FileJobQueue:
         if job.status != "queued":
             raise AdviceQueueError("Only a queued job can be submitted.")
         with self._lock.hold():
+            self._check_idempotency(job)
             index = self._open_index(job.cache_key)
             winner = self._index_job(index, repair=True)
             if winner is not None:
                 if not winner.is_terminal:
+                    self._bind_idempotency(job)
                     return winner, False
                 self._cleanup(winner)
             # Reject duplicate ids before publishing an intent pointing to another key.
             if self._path(job.job_id).exists() or self._archived_path(job.job_id).exists():
                 raise AdviceQueueError(f"Job {job.job_id!r} already exists; submit is not upsert.")
+            self._bind_idempotency(job)
             self._publish(index, _serialize(job), create=True)
             self.submit(job)
             return job, True

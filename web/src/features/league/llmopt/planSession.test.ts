@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { readReply } from "../../../testSupport/intentReply";
 import { EMPTY_DRAFT, MAX_MESSAGE_LENGTH, MAX_QUESTION_LENGTH } from "./intent";
-import { checkedPlanSession, createPlanSessionStore, readPlanSession } from "./planSession";
+import {
+  checkedPlanSession,
+  createPlanSessionMemory,
+  createPlanSessionStore,
+  readPlanSession,
+} from "./planSession";
 
 const OWNED = [
   { id: 1, name: "Held One", team: "Arsenal" },
@@ -17,7 +22,13 @@ afterEach(() => {
 });
 
 describe("createPlanSessionStore", () => {
-  const context = { key: "squadopt.llmopt:test", basis: "basis", deadline: "2030-01-01T00:00:00Z" };
+  const context = {
+    key: "squadopt.llmopt:test",
+    basis: "basis",
+    season: "2029-30",
+    gameweek: GAMEWEEK,
+    deadline: "2030-01-01T00:00:00Z",
+  };
   const draft = { hard: [{ kind: "no_hits" as const }], soft: [] };
 
   it("saves the whole session and keeps the run's confirmation beside it", () => {
@@ -26,8 +37,8 @@ describe("createPlanSessionStore", () => {
     const confirmation = { wildcardNotHeld: false, sending: true as const };
     store.save({ draft, confirmation });
     expect(store.confirmation).toEqual(confirmation);
-    const { basis, deadline } = context;
-    expect(readPlanSession(context)).toEqual({ basis, deadline, draft, confirmation });
+    const { key: _key, ...metadata } = context;
+    expect(readPlanSession(context)).toEqual({ ...metadata, draft, confirmation });
   });
 
   it("drops the confirmation when a session is saved without one", () => {
@@ -63,15 +74,73 @@ describe("createPlanSessionStore", () => {
       expect(restore(odd)).not.toHaveProperty("combined");
   });
 
-  it("reads nothing back for another squad basis or deadline", () => {
+  it("reads nothing back for another deadline", () => {
     createPlanSessionStore(context).save({ draft });
-    expect(readPlanSession({ ...context, basis: "other" })).toBeNull();
     expect(readPlanSession({ ...context, deadline: "2031-01-01T00:00:00Z" })).toBeNull();
+  });
+
+  it("reads nothing back for another season or gameweek with the same deadline", () => {
+    createPlanSessionStore(context).save({ draft });
+    expect(readPlanSession({ ...context, season: "2030-31" })).toBeNull();
+    expect(readPlanSession({ ...context, gameweek: GAMEWEEK + 1 })).toBeNull();
+  });
+
+  it("keeps the latest full session in the open page when storage becomes unavailable", () => {
+    const memory = createPlanSessionMemory();
+    const store = createPlanSessionStore(context, undefined, memory);
+    store.save({ draft });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    const latest = {
+      draft: { hard: [{ kind: "hold_transfers" as const }], soft: [] },
+      confirmation: { wildcardNotHeld: false, sending: true as const },
+      reference: { gameweek: GAMEWEEK, window: 1 as const, net: null, weeks: [] },
+      clarification: { message: "A prior instruction", question: "Which player?" },
+    };
+    store.save(latest);
+    expect(memory.read(context)).toEqual(latest);
+    expect(memory.read({ ...context, basis: "new-squad" })).toEqual({ draft: latest.draft });
+    vi.restoreAllMocks();
+  });
+
+  it("carries an undated draft into its stated deadline without a run or reference", () => {
+    const memory = createPlanSessionMemory();
+    memory.save(
+      { ...context, deadline: null },
+      { draft, confirmation: { wildcardNotHeld: false } },
+    );
+    expect(sessionStorage.length).toBe(0);
+    expect(memory.read(context)).toEqual({ draft });
+    expect(readPlanSession(context)).toBeNull();
+    createPlanSessionStore(context, undefined, memory).save({ draft });
+    expect(readPlanSession(context)).toMatchObject({ draft, deadline: context.deadline });
+  });
+
+  it("isolates live drafts by identity and week, and resets for another stated deadline", () => {
+    const memory = createPlanSessionMemory();
+    memory.save({ ...context, deadline: null }, { draft });
+    for (const other of [
+      { key: "another-origin" },
+      { key: "another-forwarded-mode" },
+      { key: "another-league" },
+      { key: "another-entry" },
+      { season: "2030-31" },
+      { gameweek: GAMEWEEK + 1 },
+    ])
+      expect(memory.read({ ...context, ...other })).toBeNull();
+    memory.save(context, { draft });
+    expect(memory.read({ ...context, deadline: "2030-01-02T00:00:00Z" })).toBeNull();
   });
 
   it("carries the rules, and only the rules, to a new squad when the old one changed under them", () => {
     const confirmation = { wildcardNotHeld: false };
-    createPlanSessionStore(context).save({ draft, confirmation, carried: true });
+    createPlanSessionStore(context).save({
+      draft,
+      confirmation,
+      clarification: { message: "A prior instruction", question: "Which player?" },
+      reference: { gameweek: GAMEWEEK, window: 1, net: null, weeks: [] },
+    });
     expect(readPlanSession({ ...context, basis: "other" })).toEqual({ draft });
     expect(
       readPlanSession({ ...context, basis: "other", deadline: "2031-01-01T00:00:00Z" }),

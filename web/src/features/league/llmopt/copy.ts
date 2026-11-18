@@ -23,6 +23,8 @@ const en = {
   interpreting: "Reading your instructions…",
   understood: "Instructions updated.",
   dismissQuestion: "Dismiss question",
+  conversationTooLong:
+    "This conversation is too long. Dismiss the question and combine your request and answers into one shorter message.",
   user: "You",
   refusals: {
     busy: "Chat is not answering right now. Try again shortly.",
@@ -232,6 +234,8 @@ const tr: typeof en = {
   interpreting: "Talimatların okunuyor…",
   understood: "Talimatlar güncellendi.",
   dismissQuestion: "Soruyu kapat",
+  conversationTooLong:
+    "Bu konuşma çok uzadı. Soruyu kapatıp talimatını ve cevaplarını daha kısa tek bir mesajda birleştir.",
   user: "Sen",
   refusals: {
     busy: "Sohbet şu anda yanıt vermiyor. Biraz sonra tekrar dene.",

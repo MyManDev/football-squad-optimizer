@@ -534,7 +534,8 @@ export function useDevicePlan(
           settle(event.data);
         };
         worker.onerror = () => {
-          solver.current?.terminate();
+          if (!alive() || solver.current !== worker) return;
+          worker.terminate();
           solver.current = null;
           settle(null);
         };
