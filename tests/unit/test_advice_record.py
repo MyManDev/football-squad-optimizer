@@ -530,21 +530,31 @@ def test_told_names_the_page_default_when_the_rule_picks_a_rival_strategy(
     weeks left, so the rule marks ``ortak-koru`` for one and ``fark-yarat`` for the other.
     The page still opens on ``saf-puan/1.json`` for both: the rule's pick is a label, never
     a preselection. ``told`` names what the page showed, and the pick is kept beside it as
-    the index published it, with the address of the file it marks. In this world 101's
-    ``ortak-koru`` solves and 202's ``fark-yarat`` does not (the index lists it as
-    unavailable), so the pick keeps its address for one and has none for the other.
+    the index published it, with the address of the file it marks. Both marked strategies
+    solve, including 202's grandfathered holding at a relaxed overlap, so the record
+    carries each marked file while keeping ``told`` on the page's pure-points default.
     """
 
     out, records = tmp_path / "site", tmp_path / "records"
     _build(world, out, record_root=records, totals=(400, 100))
-    for entry_id, picked, written in ((101, "ortak-koru", True), (202, "fark-yarat", False)):
+    for entry_id, picked in ((101, "ortak-koru"), (202, "fark-yarat")):
         index = _index(out, entry_id)
         # The premises: the rule really did pick a rival strategy for this member, and its
         # file exists exactly when the index says the strategy solved.
         assert index["suggested_strategy"]["strategy"] == picked
         marked = f"advice/{entry_id}/{picked}/1.json"
-        assert (out / marked).is_file() is written
-        assert any(row["strategy"] == picked for row in index["unavailable"]) is not written
+        assert (out / marked).is_file()
+        assert not any(row["strategy"] == picked for row in index["unavailable"])
+        marked_advice = json.loads((out / marked).read_bytes())["payload"]
+        assert marked_advice["mode"] == picked
+        assert marked_advice["rival_entry_id"] == index["suggested_strategy"]["rival_entry_id"]
+        if entry_id == 202:
+            assert marked_advice["moves"] == []
+            assert marked_advice["transfer_hit_points"] == 0
+            assert marked_advice["overlap_target"] == 5
+            assert marked_advice["overlap_applied"] == marked_advice["overlap_count"] == 10
+            held_players = [*marked_advice["starting_xi"], *marked_advice["bench"]]
+            assert {player["player_id"] for player in held_players} == set(_other_squad())
         record: dict[str, Any] = load_member_advice_record(
             records, SEASON, 2, entry_id, world["gw2_id"]
         )
@@ -559,10 +569,10 @@ def test_told_names_the_page_default_when_the_rule_picks_a_rival_strategy(
         assert documents[f"advice/{entry_id}/saf-puan/1.json"]["scoring_complete"] is True
         assert record["suggested_strategy"] == {
             **index["suggested_strategy"],
-            "published_path": marked if written else None,
+            "published_path": marked,
         }
-        # A marked file that was written is one the record carries.
-        assert (marked in documents) is written
+        # The marked file is preserved as a complete scoring document beside the default.
+        assert documents[marked]["scoring_complete"] is True
 
 
 def test_a_record_with_no_rule_pick_says_so_rather_than_leaving_the_key_out(

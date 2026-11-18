@@ -256,9 +256,15 @@ def test_a_rival_strategy_computes_against_the_named_rival(world: dict[str, Any]
     assert payload["mode"] == "fark-yarat"
     assert payload["rival_entry_id"] == 202
     assert payload["rival_label"] == "entry-202"
-    # The band held: at most five of the rival's eleven in the decided fifteen.
+    # The applied band holds; the declared target may relax to avoid paid transfers.
     overlap = payload["overlap_count"]
-    assert isinstance(overlap, int) and 0 <= overlap <= 5
+    applied = payload["overlap_applied"]
+    assert payload["overlap_target"] == 5
+    assert isinstance(applied, int) and 5 <= applied <= 11
+    assert isinstance(overlap, int) and 0 <= overlap <= applied
+    chosen = {row["player_id"] for row in [*payload["starting_xi"], *payload["bench"]]}
+    rival = provider.picks(202, "2026-27", 1)
+    assert overlap == len(chosen & set(rival.starting_xi))
     # The price tag is the control's expected points minus the banded plan's — a
     # constraint can only cost, never pay.
     cost = payload["expected_points_cost"]
@@ -377,22 +383,38 @@ def test_a_precomputed_control_gives_the_same_bytes(world: dict[str, Any]) -> No
         )
 
 
-def test_the_price_tag_and_the_gap_are_net_of_hits(world: dict[str, Any]) -> None:
-    """A band that forces paid transfers costs those hits: the tag is the control's
-    points minus its hits against the banded plan's points minus its hits, and the gap
-    against the rival subtracts the plan's own hits."""
+@pytest.mark.parametrize("paid_candidate", ["alternative", "chosen"])
+def test_the_price_tag_and_the_gap_are_net_of_hits(
+    world: dict[str, Any], paid_candidate: str
+) -> None:
+    """The target band's paid plan is priced net of hits wherever it is published.
 
-    from squadopt.application.advice import net_expected_points, solve_member_control
+    A cheap relaxed hold wins in one case; a band buying the high-scoring forwards wins
+    in the other. The gap always subtracts the chosen plan's own charge.
+    """
+
+    from squadopt.application.advice import (
+        net_expected_points,
+        solve_member_control,
+        solve_pricing_control,
+    )
     from squadopt.application.entries import held_squad_from_picks
     from squadopt.live import plan_transfers_with_overlap
     from squadopt.planning import FirstWeekOverlap
 
-    inputs, projection, rules = _world_context(world)
-    picks = _member_picks(world, 101, _legal_squad(world))
-    rival = _member_picks(world, 202, _rival_squad(world))
+    if paid_candidate == "chosen":
+        inputs, projection, rules = _margin_split_context(world)
+        squad, rival_squad = _MARGIN_SPLIT_MEMBER, _MARGIN_SPLIT_RIVAL
+        strategy, minimum, maximum = "ortak-koru", 9, None
+    else:
+        inputs, projection, rules = _world_context(world)
+        squad, rival_squad = _legal_squad(world), _rival_squad(world)
+        strategy, minimum, maximum = "fark-yarat", None, 5
+    picks = _member_picks(world, 101, squad)
+    rival = _member_picks(world, 202, rival_squad)
     provider = _Provider({101: picks, 202: rival})
     payload = advise_entry(
-        _request(strategy="fark-yarat", rival_entry_id=202),
+        _request(strategy=strategy, rival_entry_id=202),
         provider=provider,
         inputs=inputs,
         projection=projection,
@@ -404,10 +426,27 @@ def test_the_price_tag_and_the_gap_are_net_of_hits(world: dict[str, Any]) -> Non
         for _, row in inputs.players.iterrows()
     }
     held = held_squad_from_picks(picks, current_prices=prices)
-    band = FirstWeekOverlap(player_ids=frozenset(rival.starting_xi), minimum=None, maximum=5)
+    pricing = solve_pricing_control(inputs, projection, held, rules, control)
+    band = FirstWeekOverlap(
+        player_ids=frozenset(rival.starting_xi), minimum=minimum, maximum=maximum
+    )
     plan, _decision, _config = plan_transfers_with_overlap(inputs, projection, held, rules, band)
+    assert float(plan.total_transfer_hit_points or 0.0) > 0.0
+    if paid_candidate == "chosen":
+        assert payload["plan_kind"] == "with_hits"
+        paid = payload
+    else:
+        assert payload["plan_kind"] == "within_free_transfers"
+        assert payload["transfer_hit_points"] == 0.0
+        paid = payload["alternative_plan"]
+        assert isinstance(paid, dict) and paid["kind"] == "with_hits"
+    assert paid["transfer_hit_points"] == plan.total_transfer_hit_points
+    assert paid["expected_points_cost"] == pytest.approx(
+        net_expected_points(pricing) - net_expected_points(plan)
+    )
     assert payload["expected_points_cost"] == pytest.approx(
-        net_expected_points(control.plan) - net_expected_points(plan)
+        net_expected_points(pricing)
+        - (float(str(payload["expected_own_points"])) - float(str(payload["transfer_hit_points"])))
     )
     expected = {
         int(str(row["player_id"])): float(str(row["expected_points"]))
@@ -417,7 +456,7 @@ def test_the_price_tag_and_the_gap_are_net_of_hits(world: dict[str, Any]) -> Non
     own = payload["expected_own_points"]
     assert isinstance(own, float)
     assert payload["expected_gap_vs_rival"] == pytest.approx(
-        own - float(plan.total_transfer_hit_points or 0.0) - rival_expected
+        own - float(str(payload["transfer_hit_points"])) - rival_expected
     )
 
 
@@ -542,12 +581,14 @@ def test_a_rival_strategy_spends_the_free_transfers_before_it_spends_hits(
         assert alternative is None or alternative["kind"] == "within_free_transfers"
 
 
-def test_a_squad_that_needs_transfers_to_be_legal_falls_back_to_the_hit_plan(
+def test_a_grandfathered_squad_can_roll_instead_of_buying_the_target_band(
     world: dict[str, Any],
 ) -> None:
-    """This world's shared 'legal' fifteen holds four from one club: the planner needs two
-    transfers before any band applies, so nothing is reachable within one free transfer
-    and the with-hits plan is the only candidate — stated as such, not refused."""
+    """Four held from each of two clubs can roll until the next actual transfer.
+
+    Reaching the target needs paid corrective transfers, so the better net plan keeps
+    the held squad and states its relaxed band beside the paid alternative.
+    """
 
     inputs, projection, rules = _world_context(world)
     provider = _Provider(
@@ -563,9 +604,17 @@ def test_a_squad_that_needs_transfers_to_be_legal_falls_back_to_the_hit_plan(
         projection=projection,
         rules=rules,
     )
-    assert payload["plan_kind"] == "with_hits"
-    assert payload["overlap_applied"] == payload["overlap_target"] == 5
-    assert payload["alternative_plan"] is None
+    assert payload["plan_kind"] == "within_free_transfers"
+    assert payload["overlap_target"] == 5
+    assert payload["overlap_applied"] == payload["overlap_count"] == 6
+    assert payload["moves"] == []
+    assert payload["transfer_hit_points"] == 0.0
+    held = {row["player_id"] for row in [*payload["starting_xi"], *payload["bench"]]}
+    assert held == set(_legal_squad(world))
+    alternative = payload["alternative_plan"]
+    assert isinstance(alternative, dict) and alternative["kind"] == "with_hits"
+    assert alternative["overlap_applied"] == 5
+    assert alternative["transfer_hit_points"] > 0.0
 
 
 def test_the_rival_changes_labels_not_the_baseline(world: dict[str, Any]) -> None:
