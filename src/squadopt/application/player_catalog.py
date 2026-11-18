@@ -19,12 +19,14 @@ def validate_catalog(document: Any) -> dict[str, Any]:
     positive = {"type": "integer", "minimum": 1}
     text = {"type": "string", "minLength": 1}
 
-    def closed(properties: dict[str, Any]) -> dict[str, Any]:
+    def closed(
+        properties: dict[str, Any], optional: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         return {
             "type": "object",
             "required": list(properties),
             "additionalProperties": False,
-            "properties": properties,
+            "properties": {**properties, **(optional or {})},
         }
 
     schema = closed(
@@ -48,7 +50,8 @@ def validate_catalog(document: Any) -> dict[str, Any]:
                         "team_id": positive,
                         "team": text,
                         "position": {"enum": list(POSITIONS.values())},
-                    }
+                    },
+                    {"short_name": {"type": "string", "minLength": 1, "maxLength": 120}},
                 ),
             },
         }
@@ -74,8 +77,9 @@ def player_catalog(snapshot: CapturedSnapshot) -> dict[str, Any]:
     bootstrap = json.loads(snapshot.payloads[BOOTSTRAP_PAYLOAD])
     teams = [{"id": row["id"], "name": row["name"]} for row in bootstrap["teams"]]
     names = {row["id"]: row["name"] for row in teams}
-    players = [
-        {
+    players = []
+    for row in bootstrap["elements"]:
+        player = {
             # Persist the cross-season player code used by existing comments, not element id.
             "id": row["code"],
             "name": f"{row['first_name']} {row['second_name']}".strip(),
@@ -83,8 +87,10 @@ def player_catalog(snapshot: CapturedSnapshot) -> dict[str, Any]:
             "team": names[row["team"]],
             "position": POSITIONS[row["element_type"]],
         }
-        for row in bootstrap["elements"]
-    ]
+        short_name = row.get("web_name")
+        if isinstance(short_name, str) and short_name.strip():
+            player["short_name"] = short_name.strip()
+        players.append(player)
     return validate_catalog(
         {
             "contract_version": "player_catalog_v1",

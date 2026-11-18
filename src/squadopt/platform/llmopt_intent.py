@@ -20,6 +20,7 @@ from typing import Any, Final, Protocol
 
 from squadopt.contracts.preferences import PlanScenario
 from squadopt.data.atomic import replace_retrying
+from squadopt.data.claim_identity import normalise_claim_name
 from squadopt.platform.advice_submit import FixedWindowRateLimiter
 
 INTENT_BODY_MAX_BYTES: Final = 128 * 1024
@@ -251,10 +252,12 @@ def _player(value: object) -> dict[str, Any]:
     if (
         not isinstance(value, dict)
         or not {"id", "name"} <= value.keys()
-        or value.keys() - {"id", "name", "team", "held"}
+        or value.keys() - {"id", "name", "short_name", "team", "held"}
     ):
         raise IntentValidationError("Invalid roster player.")
     result: dict[str, Any] = {"id": _player_id(value["id"]), "name": _text(value["name"], 120)}
+    if "short_name" in value:
+        result["short_name"] = _text(value["short_name"], 120)
     if "team" in value:
         result["team"] = _text(value["team"], 80)
     if "held" in value:
@@ -630,7 +633,7 @@ def _known_club(value: object, clubs: tuple[str, ...]) -> str:
 
 
 def _tokens(value: str) -> tuple[str, ...]:
-    return tuple(re.findall(r"[^\W_]+", _fold_text(value)))
+    return tuple(re.findall(r"[^\W_]+", normalise_claim_name(value).replace("\u0131", "i")))
 
 
 def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
@@ -645,25 +648,29 @@ def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
     original = _tokens(request.clarification.message) if request.clarification else ()
     words = set((*text, *original))
     # Informal Turkish often joins the object suffix to a name without an apostrophe.
-    joined_name_stems = (
-        {
-            word[: -len(suffix)]
-            for word in words
-            for suffix in _TURKISH_ACCUSATIVE_SUFFIXES
-            if len(word) >= 4 + len(suffix) and word.endswith(suffix)
-        }
-        if request.locale == "tr"
-        else set()
-    )
+    # The interface locale controls reply language, not the member's freeform input.
+    joined_name_stems = {
+        word[: -len(suffix)]
+        for word in words
+        for suffix in _TURKISH_ACCUSATIVE_SUFFIXES
+        if len(word) >= 4 + len(suffix) and word.endswith(suffix)
+    }
     phrases = tuple(f" {' '.join(tokens)} " for tokens in (text, original))
     ranked = []
     for player in request.players:
-        name = _tokens(player["name"])
-        named = bool(name) and any(f" {' '.join(name)} " in phrase for phrase in phrases)
-        name_hits = words.intersection(word for word in name if len(word) >= 3)
-        joined_hits = joined_name_stems.intersection(name)
+        names = [_tokens(player["name"])]
+        if "short_name" in player:
+            names.append(_tokens(player["short_name"]))
+        named = any(
+            name and any(f" {' '.join(name)} " in phrase for phrase in phrases) for name in names
+        )
+        name_words = {word for name in names for word in name}
+        name_hits = words.intersection(word for word in name_words if len(word) >= 3)
+        joined_hits = joined_name_stems.intersection(name_words)
         team_hits = words.intersection(_tokens(player.get("team", "")))
-        if player["id"] not in retained and not (name_hits or joined_hits or player.get("held")):
+        if player["id"] not in retained and not (
+            named or name_hits or joined_hits or player.get("held")
+        ):
             continue
         rank = (
             player["id"] in retained,

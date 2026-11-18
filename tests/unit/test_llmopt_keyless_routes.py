@@ -52,6 +52,122 @@ def _draft(player_id: int = 1, **extra: Any) -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize(
+    ("name", "message", "locale"),
+    [
+        ("Martin Ødegaard", "Buy Odegaard", "en"),
+        ("Martin Ødegaard", "Odegaardi al", "tr"),
+        ("Martin Ødegaard", "Odegaardi al", "en"),
+        ("Đorđe Petrović", "Buy Dorde", "en"),
+        ("Łukasz Fabiański", "Buy Lukasz", "en"),
+    ],
+)
+def test_unaccented_player_names_remain_available_to_prompt_and_check(
+    name: str, message: str, locale: str
+) -> None:
+    body = _request(roster=300)
+    body.pop("clarification")
+    body.update(message=message, locale=locale, draft={"hard": [], "soft": []})
+    body["players"][-1] = {"id": 1, "name": name, "team": "Arsenal", "held": False}
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        assert prompt.status_code == 200
+        assert [row["id"] for row in json.loads(prompt.json()["user"])["players"]] == [1]
+        checked = client.post(CHECK, json={"request": body, "reply": _draft(1)})
+    assert checked.status_code == 200
+    assert checked.json()["draft"]["comparison"]["player_id"] == 1
+
+
+@pytest.mark.parametrize("locale", ["en", "tr"])
+@pytest.mark.parametrize(
+    ("name", "short_name", "message"),
+    [
+        ("Norberto Bercique Gomes Betuncal", "Beto", "Buy Beto"),
+        ("Norberto Bercique Gomes Betuncal", "Beto", "Betoyu al"),
+        ("Felipe Rodrigues da Silva", "Morato", "Buy Morato"),
+        ("Sávio Moreira de Oliveira", "Savinho", "Buy Savinho"),
+    ],
+)
+def test_published_player_short_names_reach_prompt_and_checked_draft(
+    name: str, short_name: str, message: str, locale: str
+) -> None:
+    body = _request(roster=300)
+    body.pop("clarification")
+    body.update(message=message, locale=locale, draft={"hard": [], "soft": []})
+    body["players"][-1] = {
+        "id": 1,
+        "name": name,
+        "short_name": short_name,
+        "team": "Everton",
+        "held": False,
+    }
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        assert prompt.status_code == 200
+        candidates = json.loads(prompt.json()["user"])["players"]
+        assert candidates == [body["players"][-1]]
+        checked = client.post(CHECK, json={"request": body, "reply": _draft(1)})
+    assert checked.status_code == 200
+    assert checked.json()["draft"]["comparison"]["player_id"] == 1
+
+
+@pytest.mark.parametrize(
+    ("players", "message"),
+    [
+        (
+            [
+                {"id": 1, "name": "Norberto Betuncal", "short_name": "Beto"},
+                {"id": 1001, "name": "Another Player", "short_name": "Beto"},
+            ],
+            "Betoyu al",
+        ),
+        (
+            [
+                {"id": 1, "name": "Martin Ødegaard"},
+                {"id": 1001, "name": "Another Odegaard"},
+            ],
+            "Buy Odegaard",
+        ),
+    ],
+)
+def test_name_collisions_keep_all_candidates_for_model_clarification(
+    players: list[dict[str, Any]], message: str
+) -> None:
+    body = _request(roster=300)
+    body.pop("clarification")
+    body.update(message=message, locale="en", draft={"hard": [], "soft": []})
+    body["players"][-1:] = players
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+    assert prompt.status_code == 200
+    candidates = json.loads(prompt.json()["user"])["players"]
+    assert {row["id"] for row in candidates} == {1, 1001}
+
+
+def test_clarification_keeps_original_name_when_the_interface_language_changes() -> None:
+    body = _request(roster=300)
+    body.update(
+        message="Everton",
+        locale="en",
+        draft={"hard": [], "soft": []},
+        clarification={"message": "Betoyu al", "question": "Hangi tak\u0131mdaki oyuncu?"},
+    )
+    body["players"][-1] = {
+        "id": 1,
+        "name": "Norberto Bercique Gomes Betuncal",
+        "short_name": "Beto",
+        "team": "Everton",
+        "held": False,
+    }
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        assert prompt.status_code == 200
+        assert json.loads(prompt.json()["user"])["players"] == [body["players"][-1]]
+        checked = client.post(CHECK, json={"request": body, "reply": _draft(1)})
+    assert checked.status_code == 200
+    assert checked.json()["draft"]["comparison"]["player_id"] == 1
+
+
 def test_prompt_is_the_call_the_site_provider_sends(monkeypatch: pytest.MonkeyPatch) -> None:
     sent: list[dict[str, Any]] = []
 

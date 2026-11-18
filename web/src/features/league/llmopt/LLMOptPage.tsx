@@ -168,6 +168,7 @@ function ownedPlayers(squad: EntrySquad): CatalogPlayer[] {
   return [...squad.starting_xi, ...squad.bench].map((p) => ({
     id: p.player_id,
     name: p.name,
+    short_name: p.short_name,
     team: p.team,
   }));
 }

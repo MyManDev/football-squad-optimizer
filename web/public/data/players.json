@@ -6,6 +6,7 @@
       "id": 622758,
       "name": "Aaron Anselmino",
       "position": "DEF",
+      "short_name": "Anselmino",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -13,6 +14,7 @@
       "id": 472713,
       "name": "Aaron Hickey",
       "position": "DEF",
+      "short_name": "Hickey",
       "team": "Brentford",
       "team_id": 4
     },
@@ -20,6 +22,7 @@
       "id": 214590,
       "name": "Aaron Wan-Bissaka",
       "position": "DEF",
+      "short_name": "Wan-Bissaka",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -27,6 +30,7 @@
       "id": 572584,
       "name": "Abdoul Ouattara",
       "position": "DEF",
+      "short_name": "Ouattara",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -34,6 +38,7 @@
       "id": 578153,
       "name": "Abdukodir Khusanov",
       "position": "DEF",
+      "short_name": "Khusanov",
       "team": "Man City",
       "team_id": 15
     },
@@ -41,6 +46,7 @@
       "id": 531442,
       "name": "Abdul Fatawu",
       "position": "MID",
+      "short_name": "Fatawu",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -48,6 +54,7 @@
       "id": 208481,
       "name": "Abdülkadir Ömür",
       "position": "MID",
+      "short_name": "Ömür",
       "team": "Hull City",
       "team_id": 11
     },
@@ -55,6 +62,7 @@
       "id": 490161,
       "name": "Abu Kamara",
       "position": "MID",
+      "short_name": "Kamara",
       "team": "Hull City",
       "team_id": 11
     },
@@ -62,6 +70,7 @@
       "id": 499300,
       "name": "Adam Aznou",
       "position": "DEF",
+      "short_name": "Aznou",
       "team": "Everton",
       "team_id": 9
     },
@@ -69,6 +78,7 @@
       "id": 54469,
       "name": "Adam Smith",
       "position": "DEF",
+      "short_name": "Smith",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -76,6 +86,7 @@
       "id": 496221,
       "name": "Adam Wharton",
       "position": "MID",
+      "short_name": "Wharton",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -83,6 +94,7 @@
       "id": 494521,
       "name": "Adrien Truffert",
       "position": "DEF",
+      "short_name": "Truffert",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -90,6 +102,7 @@
       "id": 154043,
       "name": "Ainsley Maitland-Niles",
       "position": "DEF",
+      "short_name": "Maitland-Niles",
       "team": "Everton",
       "team_id": 9
     },
@@ -97,6 +110,7 @@
       "id": 632794,
       "name": "Aladji Bamba",
       "position": "MID",
+      "short_name": "Bamba",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -104,6 +118,7 @@
       "id": 493105,
       "name": "Alejandro Garnacho Ferreyra",
       "position": "MID",
+      "short_name": "Garnacho",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -111,6 +126,7 @@
       "id": 97846,
       "name": "Alex Cairns",
       "position": "GK",
+      "short_name": "Cairns",
       "team": "Leeds",
       "team_id": 13
     },
@@ -118,6 +134,7 @@
       "id": 153133,
       "name": "Alex Iwobi",
       "position": "MID",
+      "short_name": "Iwobi",
       "team": "Fulham",
       "team_id": 10
     },
@@ -125,6 +142,7 @@
       "id": 545477,
       "name": "Alex Murphy",
       "position": "DEF",
+      "short_name": "A.Murphy",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -132,6 +150,7 @@
       "id": 112520,
       "name": "Alex Palmer",
       "position": "GK",
+      "short_name": "Palmer",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -139,6 +158,7 @@
       "id": 503139,
       "name": "Alex Scott",
       "position": "MID",
+      "short_name": "Scott",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -146,6 +166,7 @@
       "id": 614574,
       "name": "Alex Tóth",
       "position": "MID",
+      "short_name": "Tóth.A",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -153,6 +174,7 @@
       "id": 219168,
       "name": "Alexander Isak",
       "position": "FWD",
+      "short_name": "Isak",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -160,6 +182,7 @@
       "id": 243016,
       "name": "Alexis Mac Allister",
       "position": "MID",
+      "short_name": "Mac Allister",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -167,6 +190,7 @@
       "id": 592740,
       "name": "Alfie Cresswell",
       "position": "MID",
+      "short_name": "Cresswell",
       "team": "Leeds",
       "team_id": 13
     },
@@ -174,6 +198,7 @@
       "id": 505079,
       "name": "Alfie McNally",
       "position": "GK",
+      "short_name": "McNally",
       "team": "Fulham",
       "team_id": 10
     },
@@ -181,6 +206,7 @@
       "id": 462387,
       "name": "Ali Al-Hamadi",
       "position": "FWD",
+      "short_name": "Al-Hamadi",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -188,6 +214,7 @@
       "id": 116535,
       "name": "Alisson Becker",
       "position": "GK",
+      "short_name": "A.Becker",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -195,6 +222,7 @@
       "id": 624777,
       "name": "Allan Andrade Elias",
       "position": "MID",
+      "short_name": "Allan",
       "team": "Man City",
       "team_id": 15
     },
@@ -202,6 +230,7 @@
       "id": 451302,
       "name": "Altay Bayındır",
       "position": "GK",
+      "short_name": "Bayindir",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -209,6 +238,7 @@
       "id": 653481,
       "name": "Alysson Edward Franco da Rocha dos Santos",
       "position": "MID",
+      "short_name": "Alysson",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -216,6 +246,7 @@
       "id": 493250,
       "name": "Amad Diallo",
       "position": "MID",
+      "short_name": "Amad",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -223,6 +254,7 @@
       "id": 449871,
       "name": "Amadou Onana",
       "position": "MID",
+      "short_name": "Onana",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -230,6 +262,7 @@
       "id": 463726,
       "name": "Amar Dedic",
       "position": "DEF",
+      "short_name": "Dedić",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -237,6 +270,7 @@
       "id": 519324,
       "name": "Amario Cozier-Duberry",
       "position": "MID",
+      "short_name": "Cozier-Duberry",
       "team": "Brighton",
       "team_id": 5
     },
@@ -244,6 +278,7 @@
       "id": 489888,
       "name": "Amine Adli",
       "position": "MID",
+      "short_name": "Adli",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -251,6 +286,7 @@
       "id": 570794,
       "name": "Anan Khalaili",
       "position": "DEF",
+      "short_name": "Khalaili",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -258,6 +294,7 @@
       "id": 122798,
       "name": "Andrew Robertson",
       "position": "DEF",
+      "short_name": "Robertson",
       "team": "Spurs",
       "team_id": 19
     },
@@ -265,6 +302,7 @@
       "id": 532605,
       "name": "Andrey Nascimento dos Santos",
       "position": "MID",
+      "short_name": "Andrey Santos",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -272,6 +310,7 @@
       "id": 606798,
       "name": "Andrés García",
       "position": "DEF",
+      "short_name": "A.García",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -279,6 +318,7 @@
       "id": 232457,
       "name": "Anis Mehmeti",
       "position": "MID",
+      "short_name": "Mehmeti",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -286,6 +326,7 @@
       "id": 449434,
       "name": "Anthony Elanga",
       "position": "MID",
+      "short_name": "Elanga",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -293,6 +334,7 @@
       "id": 232571,
       "name": "Anthony Patterson",
       "position": "GK",
+      "short_name": "Patterson",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -300,6 +342,7 @@
       "id": 437730,
       "name": "Antoine Semenyo",
       "position": "MID",
+      "short_name": "Semenyo",
       "team": "Man City",
       "team_id": 15
     },
@@ -307,6 +350,7 @@
       "id": 466525,
       "name": "Anton Stach",
       "position": "MID",
+      "short_name": "Stach",
       "team": "Leeds",
       "team_id": 13
     },
@@ -314,6 +358,7 @@
       "id": 169528,
       "name": "Antonee Robinson",
       "position": "DEF",
+      "short_name": "Robinson",
       "team": "Fulham",
       "team_id": 10
     },
@@ -321,6 +366,7 @@
       "id": 543295,
       "name": "Antoni Milambo",
       "position": "MID",
+      "short_name": "Milambo",
       "team": "Brentford",
       "team_id": 4
     },
@@ -328,6 +374,7 @@
       "id": 485055,
       "name": "Antonín Kinský",
       "position": "GK",
+      "short_name": "Kinsky",
       "team": "Spurs",
       "team_id": 19
     },
@@ -335,6 +382,7 @@
       "id": 483067,
       "name": "António João Pereira de Albuquerque Tavares da Silva",
       "position": "DEF",
+      "short_name": "Silva",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -342,6 +390,7 @@
       "id": 547701,
       "name": "Archie Gray",
       "position": "MID",
+      "short_name": "Gray",
       "team": "Spurs",
       "team_id": 19
     },
@@ -349,6 +398,7 @@
       "id": 586268,
       "name": "Armin Pecsi",
       "position": "GK",
+      "short_name": "Pecsi",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -356,6 +406,7 @@
       "id": 465680,
       "name": "Arnaud Kalimuendo",
       "position": "FWD",
+      "short_name": "Kalimuendo",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -363,6 +414,7 @@
       "id": 105717,
       "name": "Arthur Masuaku",
       "position": "DEF",
+      "short_name": "Masuaku",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -370,6 +422,7 @@
       "id": 548308,
       "name": "Ashley Phillips",
       "position": "DEF",
+      "short_name": "Phillips",
       "team": "Spurs",
       "team_id": 19
     },
@@ -377,6 +430,7 @@
       "id": 539142,
       "name": "Aurèle Amenda",
       "position": "DEF",
+      "short_name": "Amenda",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -384,6 +438,7 @@
       "id": 220362,
       "name": "Axel Disasi",
       "position": "DEF",
+      "short_name": "Disasi",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -391,6 +446,7 @@
       "id": 606745,
       "name": "Ayden Heaven",
       "position": "DEF",
+      "short_name": "Heaven",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -398,6 +454,7 @@
       "id": 637238,
       "name": "Ayyoub Bouaddi",
       "position": "MID",
+      "short_name": "Bouaddi",
       "team": "Man City",
       "team_id": 15
     },
@@ -405,6 +462,7 @@
       "id": 241117,
       "name": "Azor Matusiwa",
       "position": "MID",
+      "short_name": "Matusiwa",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -412,6 +470,7 @@
       "id": 242882,
       "name": "Bafodé Diakité",
       "position": "DEF",
+      "short_name": "Diakité",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -419,6 +478,7 @@
       "id": 489639,
       "name": "Bart Verbruggen",
       "position": "GK",
+      "short_name": "Verbruggen",
       "team": "Brighton",
       "team_id": 5
     },
@@ -426,6 +486,7 @@
       "id": 611665,
       "name": "Bazoumana Touré",
       "position": "MID",
+      "short_name": "Touré",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -433,6 +494,7 @@
       "id": 172850,
       "name": "Ben Chilwell",
       "position": "DEF",
+      "short_name": "Chilwell",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -440,6 +502,7 @@
       "id": 115556,
       "name": "Ben Davies",
       "position": "DEF",
+      "short_name": "Davies",
       "team": "Spurs",
       "team_id": 19
     },
@@ -447,6 +510,7 @@
       "id": 496208,
       "name": "Ben Gannon-Doak",
       "position": "MID",
+      "short_name": "Gannon-Doak",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -454,6 +518,7 @@
       "id": 222018,
       "name": "Ben Johnson",
       "position": "DEF",
+      "short_name": "Johnson",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -461,6 +526,7 @@
       "id": 110690,
       "name": "Ben Wilson",
       "position": "GK",
+      "short_name": "Wilson",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -468,6 +534,7 @@
       "id": 576620,
       "name": "Bendito Mantato",
       "position": "MID",
+      "short_name": "Bendito Mantato",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -475,6 +542,7 @@
       "id": 612534,
       "name": "Benjamin Fredrick",
       "position": "DEF",
+      "short_name": "Fredrick",
       "team": "Brentford",
       "team_id": 4
     },
@@ -482,6 +550,7 @@
       "id": 86873,
       "name": "Benjamin Lecomte",
       "position": "GK",
+      "short_name": "Lecomte",
       "team": "Fulham",
       "team_id": 10
     },
@@ -489,6 +558,7 @@
       "id": 485711,
       "name": "Benjamin Sesko",
       "position": "FWD",
+      "short_name": "Šeško",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -496,6 +566,7 @@
       "id": 198869,
       "name": "Benjamin White",
       "position": "DEF",
+      "short_name": "White",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -503,6 +574,7 @@
       "id": 242880,
       "name": "Benoît Badiashile Mukinayi",
       "position": "DEF",
+      "short_name": "B.Badiashile",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -510,6 +582,7 @@
       "id": 80201,
       "name": "Bernd Leno",
       "position": "GK",
+      "short_name": "Leno",
       "team": "Fulham",
       "team_id": 10
     },
@@ -517,6 +590,7 @@
       "id": 461102,
       "name": "Bobby Thomas",
       "position": "DEF",
+      "short_name": "Thomas",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -524,6 +598,7 @@
       "id": 218364,
       "name": "Borna Sosa",
       "position": "DEF",
+      "short_name": "Sosa",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -531,6 +606,7 @@
       "id": 226944,
       "name": "Boubacar Kamara",
       "position": "MID",
+      "short_name": "Kamara",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -538,6 +614,7 @@
       "id": 482616,
       "name": "Bradley Barcola",
       "position": "MID",
+      "short_name": "Barcola",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -545,6 +622,7 @@
       "id": 645618,
       "name": "Bradley Burrowes",
       "position": "MID",
+      "short_name": "Burrowes",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -552,6 +630,7 @@
       "id": 629068,
       "name": "Braiden Graham",
       "position": "MID",
+      "short_name": "Graham",
       "team": "Everton",
       "team_id": 9
     },
@@ -559,6 +638,7 @@
       "id": 214572,
       "name": "Brandon Austin",
       "position": "GK",
+      "short_name": "Austin",
       "team": "Spurs",
       "team_id": 19
     },
@@ -566,6 +646,7 @@
       "id": 230730,
       "name": "Brandon Thomas-Asante",
       "position": "FWD",
+      "short_name": "Thomas-Asante",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -573,6 +654,7 @@
       "id": 427637,
       "name": "Brenden Aaronson",
       "position": "MID",
+      "short_name": "Aaronson",
       "team": "Leeds",
       "team_id": 13
     },
@@ -580,6 +662,7 @@
       "id": 242898,
       "name": "Brennan Johnson",
       "position": "MID",
+      "short_name": "Johnson",
       "team": "Everton",
       "team_id": 9
     },
@@ -587,6 +670,7 @@
       "id": 441264,
       "name": "Brian Brobbey",
       "position": "FWD",
+      "short_name": "Brobbey",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -594,6 +678,7 @@
       "id": 690838,
       "name": "Brian Madjo",
       "position": "FWD",
+      "short_name": "Madjo",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -601,6 +686,7 @@
       "id": 496181,
       "name": "Brooke Norton-Cuffy",
       "position": "DEF",
+      "short_name": "Norton-Cuffy",
       "team": "Hull City",
       "team_id": 11
     },
@@ -608,6 +694,7 @@
       "id": 141746,
       "name": "Bruno Borges Fernandes",
       "position": "MID",
+      "short_name": "B.Fernandes",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -615,6 +702,7 @@
       "id": 208706,
       "name": "Bruno Guimarães Rodriguez Moura",
       "position": "MID",
+      "short_name": "Bruno G.",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -622,6 +710,7 @@
       "id": 446008,
       "name": "Bryan Mbeumo",
       "position": "MID",
+      "short_name": "Mbeumo",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -629,6 +718,7 @@
       "id": 223340,
       "name": "Bukayo Saka",
       "position": "MID",
+      "short_name": "Saka",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -636,6 +726,7 @@
       "id": 661888,
       "name": "Caleb Yirenkyi",
       "position": "MID",
+      "short_name": "Yirenkyi",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -643,6 +734,7 @@
       "id": 209046,
       "name": "Callum Hudson-Odoi",
       "position": "MID",
+      "short_name": "Hudson-Odoi",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -650,6 +742,7 @@
       "id": 499726,
       "name": "Callum Olusesi",
       "position": "MID",
+      "short_name": "Olusesi",
       "team": "Spurs",
       "team_id": 19
     },
@@ -657,6 +750,7 @@
       "id": 75115,
       "name": "Callum Wilson",
       "position": "FWD",
+      "short_name": "Wilson",
       "team": "Brentford",
       "team_id": 4
     },
@@ -664,6 +758,7 @@
       "id": 232892,
       "name": "Calvin Bassey",
       "position": "DEF",
+      "short_name": "Bassey",
       "team": "Fulham",
       "team_id": 10
     },
@@ -671,6 +766,7 @@
       "id": 489580,
       "name": "Calvin Ramsay",
       "position": "DEF",
+      "short_name": "Ramsay",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -678,6 +774,7 @@
       "id": 524180,
       "name": "Cameron Humphreys",
       "position": "MID",
+      "short_name": "Humphreys",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -685,6 +782,7 @@
       "id": 200720,
       "name": "Caoimhín Kelleher",
       "position": "GK",
+      "short_name": "Kelleher",
       "team": "Brentford",
       "team_id": 4
     },
@@ -692,6 +790,7 @@
       "id": 472739,
       "name": "Carl Rushworth",
       "position": "GK",
+      "short_name": "Rushworth",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -699,6 +798,7 @@
       "id": 502697,
       "name": "Carlos Alcaraz Durán",
       "position": "MID",
+      "short_name": "Alcaraz",
       "team": "Everton",
       "team_id": 9
     },
@@ -706,6 +806,7 @@
       "id": 535301,
       "name": "Carlos Baleba",
       "position": "MID",
+      "short_name": "Baleba",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -713,6 +814,7 @@
       "id": 661800,
       "name": "Cathal McCarthy",
       "position": "DEF",
+      "short_name": "McCarthy",
       "team": "Hull City",
       "team_id": 11
     },
@@ -720,6 +822,7 @@
       "id": 515621,
       "name": "Chadi Riad Dnanou",
       "position": "DEF",
+      "short_name": "Chadi Riad",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -727,6 +830,7 @@
       "id": 647850,
       "name": "Charalampos Kostoulas",
       "position": "FWD",
+      "short_name": "Kostoulas",
       "team": "Brighton",
       "team_id": 5
     },
@@ -734,6 +838,7 @@
       "id": 501902,
       "name": "Charlie Hughes",
       "position": "DEF",
+      "short_name": "Hughes",
       "team": "Hull City",
       "team_id": 11
     },
@@ -741,6 +846,7 @@
       "id": 438464,
       "name": "Cheick Doucouré",
       "position": "MID",
+      "short_name": "Doucouré",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -748,6 +854,7 @@
       "id": 549912,
       "name": "Chemsdine Talbi",
       "position": "MID",
+      "short_name": "Talbi",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -755,6 +862,7 @@
       "id": 596047,
       "name": "Chido Obi",
       "position": "FWD",
+      "short_name": "Obi",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -762,6 +870,7 @@
       "id": 229164,
       "name": "Chiedozie Ogbene",
       "position": "MID",
+      "short_name": "Ogbene",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -769,6 +878,7 @@
       "id": 427623,
       "name": "Chris Richards",
       "position": "DEF",
+      "short_name": "Richards",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -776,6 +886,7 @@
       "id": 554197,
       "name": "Chris Rigg",
       "position": "MID",
+      "short_name": "Rigg",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -783,6 +894,7 @@
       "id": 60689,
       "name": "Chris Wood",
       "position": "FWD",
+      "short_name": "Wood",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -790,6 +902,7 @@
       "id": 660392,
       "name": "Christantus Uche",
       "position": "FWD",
+      "short_name": "Uche",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -797,6 +910,7 @@
       "id": 128295,
       "name": "Christian Nørgaard",
       "position": "MID",
+      "short_name": "Nørgaard",
       "team": "Everton",
       "team_id": 9
     },
@@ -804,6 +918,7 @@
       "id": 108813,
       "name": "Christian Walton",
       "position": "GK",
+      "short_name": "Walton",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -811,6 +926,7 @@
       "id": 647839,
       "name": "Christos Mouzakitis",
       "position": "MID",
+      "short_name": "Mouzakitis",
       "team": "Hull City",
       "team_id": 11
     },
@@ -818,6 +934,7 @@
       "id": 439509,
       "name": "Christos Tzolis",
       "position": "MID",
+      "short_name": "Tzolis",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -825,6 +942,7 @@
       "id": 147675,
       "name": "Chuba Akpom",
       "position": "FWD",
+      "short_name": "Akpom",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -832,6 +950,7 @@
       "id": 575204,
       "name": "Claudio Echeverri",
       "position": "MID",
+      "short_name": "Echeverri",
       "team": "Man City",
       "team_id": 15
     },
@@ -839,6 +958,7 @@
       "id": 433590,
       "name": "Cody Drameh",
       "position": "DEF",
+      "short_name": "Drameh",
       "team": "Hull City",
       "team_id": 11
     },
@@ -846,6 +966,7 @@
       "id": 243298,
       "name": "Cody Gakpo",
       "position": "MID",
+      "short_name": "Gakpo",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -853,6 +974,7 @@
       "id": 244851,
       "name": "Cole Palmer",
       "position": "MID",
+      "short_name": "Palmer",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -860,6 +982,7 @@
       "id": 492777,
       "name": "Conor Bradley",
       "position": "DEF",
+      "short_name": "Bradley",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -867,6 +990,7 @@
       "id": 232787,
       "name": "Conor Gallagher",
       "position": "MID",
+      "short_name": "Gallagher",
       "team": "Spurs",
       "team_id": 19
     },
@@ -874,6 +998,7 @@
       "id": 500040,
       "name": "Cristhian Mosquera",
       "position": "DEF",
+      "short_name": "Mosquera",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -881,6 +1006,7 @@
       "id": 221632,
       "name": "Cristian Romero",
       "position": "DEF",
+      "short_name": "Romero",
       "team": "Spurs",
       "team_id": 19
     },
@@ -888,6 +1014,7 @@
       "id": 206915,
       "name": "Curtis Jones",
       "position": "MID",
+      "short_name": "C.Jones",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -895,6 +1022,7 @@
       "id": 183015,
       "name": "Cédric Kipré",
       "position": "DEF",
+      "short_name": "Kipré",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -902,6 +1030,7 @@
       "id": 571779,
       "name": "César Palacios",
       "position": "MID",
+      "short_name": "Palacios",
       "team": "Fulham",
       "team_id": 10
     },
@@ -909,6 +1038,7 @@
       "id": 209400,
       "name": "Daichi Kamada",
       "position": "MID",
+      "short_name": "Kamada",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -916,6 +1046,7 @@
       "id": 442967,
       "name": "Daizen Maeda",
       "position": "MID",
+      "short_name": "Maeda",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -923,6 +1054,7 @@
       "id": 79602,
       "name": "Dan Bentley",
       "position": "GK",
+      "short_name": "Bentley",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -930,6 +1062,7 @@
       "id": 78916,
       "name": "Dan Burn",
       "position": "DEF",
+      "short_name": "Burn",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -937,6 +1070,7 @@
       "id": 456512,
       "name": "Dan Ndoye",
       "position": "MID",
+      "short_name": "Ndoye",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -944,6 +1078,7 @@
       "id": 490145,
       "name": "Dane Scarlett",
       "position": "FWD",
+      "short_name": "Scarlett",
       "team": "Spurs",
       "team_id": 19
     },
@@ -951,6 +1086,7 @@
       "id": 533463,
       "name": "Dango Ouattara",
       "position": "MID",
+      "short_name": "O.Dango",
       "team": "Brentford",
       "team_id": 4
     },
@@ -958,6 +1094,7 @@
       "id": 223827,
       "name": "Daniel Ballard",
       "position": "DEF",
+      "short_name": "Ballard",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -965,6 +1102,7 @@
       "id": 200617,
       "name": "Daniel James",
       "position": "MID",
+      "short_name": "James",
       "team": "Leeds",
       "team_id": 13
     },
@@ -972,6 +1110,7 @@
       "id": 523700,
       "name": "Daniel Jebbison",
       "position": "FWD",
+      "short_name": "Jebbison",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -979,6 +1118,7 @@
       "id": 247348,
       "name": "Daniel Muñoz Mejía",
       "position": "DEF",
+      "short_name": "Muñoz",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -986,6 +1126,7 @@
       "id": 50175,
       "name": "Danny Welbeck",
       "position": "FWD",
+      "short_name": "Welbeck",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -993,6 +1134,7 @@
       "id": 216616,
       "name": "Dara O'Shea",
       "position": "DEF",
+      "short_name": "O'Shea",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1000,6 +1142,7 @@
       "id": 470294,
       "name": "Darko Gyabi",
       "position": "MID",
+      "short_name": "Gyabi",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1007,6 +1150,7 @@
       "id": 176420,
       "name": "Darnell Furlong",
       "position": "DEF",
+      "short_name": "Furlong",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1014,6 +1158,7 @@
       "id": 533646,
       "name": "Darío Osorio",
       "position": "MID",
+      "short_name": "Osorio",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -1021,6 +1166,7 @@
       "id": 442299,
       "name": "David Affengruber",
       "position": "DEF",
+      "short_name": "Affengruber",
       "team": "Fulham",
       "team_id": 10
     },
@@ -1028,6 +1174,7 @@
       "id": 213292,
       "name": "David Akintola",
       "position": "MID",
+      "short_name": "Akintola",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1035,6 +1182,7 @@
       "id": 111317,
       "name": "David Brooks",
       "position": "MID",
+      "short_name": "Brooks",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -1042,6 +1190,7 @@
       "id": 50093,
       "name": "David Button",
       "position": "GK",
+      "short_name": "Button",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1049,6 +1198,7 @@
       "id": 154561,
       "name": "David Raya Martín",
       "position": "GK",
+      "short_name": "Raya",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1056,6 +1206,7 @@
       "id": 638411,
       "name": "Dayann Méthalie",
       "position": "DEF",
+      "short_name": "Methalie",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -1063,6 +1214,7 @@
       "id": 172649,
       "name": "Dean Henderson",
       "position": "GK",
+      "short_name": "Henderson",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -1070,6 +1222,7 @@
       "id": 204480,
       "name": "Declan Rice",
       "position": "MID",
+      "short_name": "Rice",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1077,6 +1230,7 @@
       "id": 445044,
       "name": "Dejan Kulusevski",
       "position": "MID",
+      "short_name": "Kulusevski",
       "team": "Spurs",
       "team_id": 19
     },
@@ -1084,6 +1238,7 @@
       "id": 487053,
       "name": "Destiny Udogie",
       "position": "DEF",
+      "short_name": "Udogie",
       "team": "Spurs",
       "team_id": 19
     },
@@ -1091,6 +1246,7 @@
       "id": 550090,
       "name": "Diego Coppola",
       "position": "DEF",
+      "short_name": "Coppola",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1098,6 +1254,7 @@
       "id": 514254,
       "name": "Diego Gómez Amarilla",
       "position": "MID",
+      "short_name": "Gomez",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1105,6 +1262,7 @@
       "id": 476887,
       "name": "Dilane Bakwa",
       "position": "MID",
+      "short_name": "Bakwa",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -1112,6 +1270,7 @@
       "id": 167825,
       "name": "Dillon Phillips",
       "position": "GK",
+      "short_name": "Phillips",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1119,6 +1278,7 @@
       "id": 216051,
       "name": "Diogo Dalot Teixeira",
       "position": "DEF",
+      "short_name": "Dalot",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -1126,6 +1286,7 @@
       "id": 590039,
       "name": "Divine Mukasa",
       "position": "MID",
+      "short_name": "Mukasa",
       "team": "Man City",
       "team_id": 15
     },
@@ -1133,6 +1294,7 @@
       "id": 232859,
       "name": "Djed Spence",
       "position": "DEF",
+      "short_name": "Spence",
       "team": "Spurs",
       "team_id": 19
     },
@@ -1140,6 +1302,7 @@
       "id": 699989,
       "name": "Djiamgone Jocelin Ta Bi",
       "position": "MID",
+      "short_name": "Jocelin.T",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -1147,6 +1310,7 @@
       "id": 177815,
       "name": "Dominic Calvert-Lewin",
       "position": "FWD",
+      "short_name": "Calvert-Lewin",
       "team": "Leeds",
       "team_id": 13
     },
@@ -1154,6 +1318,7 @@
       "id": 154566,
       "name": "Dominic Solanke-Mitchell",
       "position": "FWD",
+      "short_name": "Solanke",
       "team": "Spurs",
       "team_id": 19
     },
@@ -1161,6 +1326,7 @@
       "id": 424876,
       "name": "Dominik Szoboszlai",
       "position": "MID",
+      "short_name": "Szoboszlai",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1168,6 +1334,7 @@
       "id": 433154,
       "name": "Dwight McNeil",
       "position": "MID",
+      "short_name": "McNeil",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -1175,6 +1342,7 @@
       "id": 491007,
       "name": "Dário Luís Essugo",
       "position": "MID",
+      "short_name": "D.Essugo",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -1182,6 +1350,7 @@
       "id": 232413,
       "name": "Eberechi Eze",
       "position": "MID",
+      "short_name": "Eze",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1189,6 +1358,7 @@
       "id": 205533,
       "name": "Eddie Nketiah",
       "position": "FWD",
+      "short_name": "Nketiah",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -1196,6 +1366,7 @@
       "id": 613804,
       "name": "El Hadji Malick Diouf",
       "position": "DEF",
+      "short_name": "Diouf",
       "team": "Brentford",
       "team_id": 4
     },
@@ -1203,6 +1374,7 @@
       "id": 465525,
       "name": "Eliot Matazo",
       "position": "MID",
+      "short_name": "Matazo",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1210,6 +1382,7 @@
       "id": 235448,
       "name": "Ellery Balcombe",
       "position": "GK",
+      "short_name": "Balcombe",
       "team": "Brentford",
       "team_id": 4
     },
@@ -1217,6 +1390,7 @@
       "id": 215379,
       "name": "Elliot Anderson",
       "position": "MID",
+      "short_name": "Anderson",
       "team": "Man City",
       "team_id": 15
     },
@@ -1224,6 +1398,7 @@
       "id": 608227,
       "name": "Elliot Stroud",
       "position": "MID",
+      "short_name": "Stroud",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1231,6 +1406,7 @@
       "id": 218997,
       "name": "Ellis Simms",
       "position": "FWD",
+      "short_name": "Simms",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1238,6 +1414,7 @@
       "id": 543968,
       "name": "Emersonn Correia da Silva",
       "position": "FWD",
+      "short_name": "Emersonn",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1245,6 +1422,7 @@
       "id": 209289,
       "name": "Emile Smith Rowe",
       "position": "MID",
+      "short_name": "Smith Rowe",
       "team": "Fulham",
       "team_id": 10
     },
@@ -1252,6 +1430,7 @@
       "id": 195546,
       "name": "Emiliano Buendía Stati",
       "position": "MID",
+      "short_name": "Buendía",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -1259,6 +1438,7 @@
       "id": 98980,
       "name": "Emiliano Martínez Romero",
       "position": "GK",
+      "short_name": "Martinez",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -1266,6 +1446,7 @@
       "id": 503037,
       "name": "Emmanuel Emegha",
       "position": "FWD",
+      "short_name": "Emegha",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -1273,6 +1454,7 @@
       "id": 158983,
       "name": "Endo Wataru",
       "position": "MID",
+      "short_name": "Endo",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1280,6 +1462,7 @@
       "id": 168636,
       "name": "Enes Ünal",
       "position": "FWD",
+      "short_name": "Enes Ünal",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -1287,6 +1470,7 @@
       "id": 500957,
       "name": "Enis Destan",
       "position": "FWD",
+      "short_name": "Destan",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1294,6 +1478,7 @@
       "id": 448047,
       "name": "Enzo Fernández",
       "position": "MID",
+      "short_name": "Enzo",
       "team": "Man City",
       "team_id": 15
     },
@@ -1301,6 +1486,7 @@
       "id": 484420,
       "name": "Enzo Le Fée",
       "position": "MID",
+      "short_name": "E.Le Fée",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -1308,6 +1494,7 @@
       "id": 241293,
       "name": "Ephron Mason-Clark",
       "position": "MID",
+      "short_name": "Mason-Clark",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1315,6 +1502,7 @@
       "id": 223094,
       "name": "Erling Haaland",
       "position": "FWD",
+      "short_name": "Haaland",
       "team": "Man City",
       "team_id": 15
     },
@@ -1322,6 +1510,7 @@
       "id": 624773,
       "name": "Estêvão Almeida de Oliveira Gonçalves",
       "position": "MID",
+      "short_name": "Estêvão",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -1329,6 +1518,7 @@
       "id": 199598,
       "name": "Ethan Ampadu",
       "position": "MID",
+      "short_name": "Ampadu",
       "team": "Leeds",
       "team_id": 13
     },
@@ -1336,6 +1526,7 @@
       "id": 499175,
       "name": "Ethan Nwaneri",
       "position": "MID",
+      "short_name": "Nwaneri",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1343,6 +1534,7 @@
       "id": 231065,
       "name": "Ethan Pinnock",
       "position": "DEF",
+      "short_name": "Pinnock",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1350,6 +1542,7 @@
       "id": 487117,
       "name": "Evan Ferguson",
       "position": "FWD",
+      "short_name": "Ferguson",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1357,6 +1550,7 @@
       "id": 485337,
       "name": "Evann Guessand",
       "position": "MID",
+      "short_name": "Guessand",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -1364,6 +1558,7 @@
       "id": 554578,
       "name": "Ewen Jaouen",
       "position": "GK",
+      "short_name": "Jaouen",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -1371,6 +1566,7 @@
       "id": 218543,
       "name": "Exequiel Palacios",
       "position": "MID",
+      "short_name": "Palacios",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1378,6 +1574,7 @@
       "id": 199798,
       "name": "Ezri Konsa Ngoyo",
       "position": "DEF",
+      "short_name": "Konsa",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1385,6 +1582,7 @@
       "id": 119471,
       "name": "Fabian Schär",
       "position": "DEF",
+      "short_name": "Schär",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -1392,6 +1590,7 @@
       "id": 536916,
       "name": "Facundo Buonanotte",
       "position": "MID",
+      "short_name": "Buonanotte",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1399,6 +1598,7 @@
       "id": 223541,
       "name": "Federico Chiesa",
       "position": "MID",
+      "short_name": "Chiesa",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1406,6 +1606,7 @@
       "id": 485047,
       "name": "Felipe Rodrigues da Silva",
       "position": "DEF",
+      "short_name": "Morato",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -1413,6 +1614,7 @@
       "id": 471551,
       "name": "Femi Azeez",
       "position": "MID",
+      "short_name": "Azeez",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1420,6 +1622,7 @@
       "id": 231416,
       "name": "Ferdi Kadıoğlu",
       "position": "DEF",
+      "short_name": "F.Kadıoğlu",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1427,6 +1630,7 @@
       "id": 508479,
       "name": "Filip Jörgensen",
       "position": "GK",
+      "short_name": "Jörgensen",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -1434,6 +1638,7 @@
       "id": 216055,
       "name": "Florentino Ibrain Morris Luís",
       "position": "MID",
+      "short_name": "Florentino",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1441,6 +1646,7 @@
       "id": 494595,
       "name": "Florian Wirtz",
       "position": "MID",
+      "short_name": "Wirtz",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1448,6 +1654,7 @@
       "id": 595480,
       "name": "Floyd Samba",
       "position": "MID",
+      "short_name": "Samba",
       "team": "Man City",
       "team_id": 15
     },
@@ -1455,6 +1662,7 @@
       "id": 444102,
       "name": "Francisco Evanilson de Lima Barbosa",
       "position": "FWD",
+      "short_name": "Evanilson",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -1462,6 +1670,7 @@
       "id": 428580,
       "name": "Frank Onyeka",
       "position": "MID",
+      "short_name": "Onyeka",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1469,6 +1678,7 @@
       "id": 40383,
       "name": "Fraser Forster",
       "position": "GK",
+      "short_name": "Forster",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -1476,6 +1686,7 @@
       "id": 155503,
       "name": "Freddie Woodman",
       "position": "GK",
+      "short_name": "Woodman",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1483,6 +1694,7 @@
       "id": 438098,
       "name": "Fábio Ferreira Vieira",
       "position": "MID",
+      "short_name": "Fábio Vieira",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1490,6 +1702,7 @@
       "id": 244858,
       "name": "Fábio Freitas Gouveia Carvalho",
       "position": "MID",
+      "short_name": "Carvalho",
       "team": "Brentford",
       "team_id": 4
     },
@@ -1497,6 +1710,7 @@
       "id": 205651,
       "name": "Gabriel Fernando de Jesus",
       "position": "FWD",
+      "short_name": "G.Jesus",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1504,6 +1718,7 @@
       "id": 243526,
       "name": "Gabriel Gudmundsson",
       "position": "DEF",
+      "short_name": "Gudmundsson",
       "team": "Leeds",
       "team_id": 13
     },
@@ -1511,6 +1726,7 @@
       "id": 444145,
       "name": "Gabriel Martinelli Silva",
       "position": "MID",
+      "short_name": "Martinelli",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1518,6 +1734,7 @@
       "id": 226597,
       "name": "Gabriel dos Santos Magalhães",
       "position": "DEF",
+      "short_name": "Gabriel",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1525,6 +1742,7 @@
       "id": 577285,
       "name": "George Hemmings",
       "position": "MID",
+      "short_name": "George Hemmings",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -1532,6 +1750,7 @@
       "id": 222625,
       "name": "George Hirst",
       "position": "FWD",
+      "short_name": "Hirst",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1539,6 +1758,7 @@
       "id": 684268,
       "name": "George Shepherd",
       "position": "MID",
+      "short_name": "Shepherd",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1546,6 +1766,7 @@
       "id": 463067,
       "name": "Georginio Rutter",
       "position": "FWD",
+      "short_name": "Georginio",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1553,6 +1774,7 @@
       "id": 593117,
       "name": "Geovany Quenda",
       "position": "MID",
+      "short_name": "Quenda",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -1560,6 +1782,7 @@
       "id": 106921,
       "name": "Gerónimo Rulli",
       "position": "GK",
+      "short_name": "Rulli",
       "team": "Man City",
       "team_id": 15
     },
@@ -1567,6 +1790,7 @@
       "id": 204936,
       "name": "Gianluigi Donnarumma",
       "position": "GK",
+      "short_name": "Donnarumma",
       "team": "Man City",
       "team_id": 15
     },
@@ -1574,6 +1798,7 @@
       "id": 449027,
       "name": "Giorgi Mamardashvili",
       "position": "GK",
+      "short_name": "Mamardashvili",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1581,6 +1806,7 @@
       "id": 647681,
       "name": "Giovanni Leoni",
       "position": "DEF",
+      "short_name": "Leoni",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1588,6 +1814,7 @@
       "id": 551466,
       "name": "Gonzalo García",
       "position": "FWD",
+      "short_name": "Gonzalo",
       "team": "Fulham",
       "team_id": 10
     },
@@ -1595,6 +1822,7 @@
       "id": 84450,
       "name": "Granit Xhaka",
       "position": "MID",
+      "short_name": "Xhaka",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -1602,6 +1830,7 @@
       "id": 184254,
       "name": "Guglielmo Vicario",
       "position": "GK",
+      "short_name": "Vicario",
       "team": "Spurs",
       "team_id": 19
     },
@@ -1609,6 +1838,7 @@
       "id": 196100,
       "name": "Gustavo Hamer",
       "position": "MID",
+      "short_name": "Hamer",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1616,6 +1846,7 @@
       "id": 626464,
       "name": "Gustavo Nunes Fernandes Gomes",
       "position": "MID",
+      "short_name": "Nunes",
       "team": "Brentford",
       "team_id": 4
     },
@@ -1623,6 +1854,7 @@
       "id": 547027,
       "name": "Habib Diarra",
       "position": "MID",
+      "short_name": "Diarra",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -1630,6 +1862,7 @@
       "id": 176412,
       "name": "Haji Wright",
       "position": "FWD",
+      "short_name": "Wright",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1637,6 +1870,7 @@
       "id": 609873,
       "name": "Harrison Armstrong",
       "position": "MID",
+      "short_name": "Armstrong",
       "team": "Everton",
       "team_id": 9
     },
@@ -1644,6 +1878,7 @@
       "id": 153366,
       "name": "Harrison Reed",
       "position": "MID",
+      "short_name": "Reed",
       "team": "Fulham",
       "team_id": 10
     },
@@ -1651,6 +1886,7 @@
       "id": 577974,
       "name": "Harry Amass",
       "position": "DEF",
+      "short_name": "Amass",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -1658,6 +1894,7 @@
       "id": 597320,
       "name": "Harry Howell",
       "position": "MID",
+      "short_name": "Howell",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1665,6 +1902,7 @@
       "id": 95658,
       "name": "Harry Maguire",
       "position": "DEF",
+      "short_name": "Maguire",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -1672,6 +1910,7 @@
       "id": 153682,
       "name": "Harry Wilson",
       "position": "MID",
+      "short_name": "Wilson",
       "team": "Leeds",
       "team_id": 13
     },
@@ -1679,6 +1918,7 @@
       "id": 201666,
       "name": "Harvey Barnes",
       "position": "MID",
+      "short_name": "Barnes",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -1686,6 +1926,7 @@
       "id": 494950,
       "name": "Harvey Cartwright",
       "position": "GK",
+      "short_name": "Cartwright",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1693,6 +1934,7 @@
       "id": 464353,
       "name": "Harvey Davies",
       "position": "GK",
+      "short_name": "Davies",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1700,6 +1942,7 @@
       "id": 444884,
       "name": "Harvey Elliott",
       "position": "MID",
+      "short_name": "Elliott",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1707,6 +1950,7 @@
       "id": 244860,
       "name": "Hayden Hackney",
       "position": "MID",
+      "short_name": "Hackney",
       "team": "Everton",
       "team_id": 9
     },
@@ -1714,6 +1958,7 @@
       "id": 445028,
       "name": "Hidemasa Morita",
       "position": "MID",
+      "short_name": "Morita",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1721,6 +1966,7 @@
       "id": 605972,
       "name": "Honest Ahanor",
       "position": "DEF",
+      "short_name": "Ahanor",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -1728,6 +1974,7 @@
       "id": 510663,
       "name": "Hugo Ekitiké",
       "position": "FWD",
+      "short_name": "Ekitiké",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -1735,6 +1982,7 @@
       "id": 551050,
       "name": "Hugo Larsson",
       "position": "MID",
+      "short_name": "Larsson",
       "team": "Fulham",
       "team_id": 10
     },
@@ -1742,6 +1990,7 @@
       "id": 507433,
       "name": "Hákon Rafn Valdimarsson",
       "position": "GK",
+      "short_name": "Valdimarsson",
       "team": "Brentford",
       "team_id": 4
     },
@@ -1749,6 +1998,7 @@
       "id": 441302,
       "name": "Ian Maatsen",
       "position": "DEF",
+      "short_name": "Maatsen",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -1756,6 +2006,7 @@
       "id": 638987,
       "name": "Ibrahim Mbaye",
       "position": "MID",
+      "short_name": "Mbaye",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -1763,6 +2014,7 @@
       "id": 612855,
       "name": "Ibrahim Osman",
       "position": "MID",
+      "short_name": "Osman",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1770,6 +2022,7 @@
       "id": 210462,
       "name": "Ibrahim Sangaré",
       "position": "MID",
+      "short_name": "I.Sangaré",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -1777,6 +2030,7 @@
       "id": 482973,
       "name": "Igor Jesus Maciel da Cruz",
       "position": "FWD",
+      "short_name": "Igor Jesus",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -1784,6 +2038,7 @@
       "id": 223434,
       "name": "Igor Julio dos Santos de Paulo",
       "position": "DEF",
+      "short_name": "Igor",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1791,6 +2046,7 @@
       "id": 502500,
       "name": "Igor Thiago Nascimento Rodrigues",
       "position": "FWD",
+      "short_name": "Thiago",
       "team": "Brentford",
       "team_id": 4
     },
@@ -1798,6 +2054,7 @@
       "id": 486520,
       "name": "Ilia Gruev",
       "position": "MID",
+      "short_name": "Gruev",
       "team": "Leeds",
       "team_id": 13
     },
@@ -1805,6 +2062,7 @@
       "id": 440993,
       "name": "Iliman Ndiaye",
       "position": "MID",
+      "short_name": "Ndiaye",
       "team": "Man City",
       "team_id": 15
     },
@@ -1812,6 +2070,7 @@
       "id": 437495,
       "name": "Illan Meslier",
       "position": "GK",
+      "short_name": "Meslier",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -1819,6 +2078,7 @@
       "id": 626751,
       "name": "Ilyas Ansah",
       "position": "FWD",
+      "short_name": "Ansah",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1826,6 +2086,7 @@
       "id": 232185,
       "name": "Ismaïla Sarr",
       "position": "MID",
+      "short_name": "Sarr",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -1833,6 +2094,7 @@
       "id": 219924,
       "name": "Issa Diop",
       "position": "DEF",
+      "short_name": "Diop",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1840,6 +2102,7 @@
       "id": 105666,
       "name": "Jack Butland",
       "position": "GK",
+      "short_name": "Butland",
       "team": "Hull City",
       "team_id": 11
     },
@@ -1847,6 +2110,7 @@
       "id": 443261,
       "name": "Jack Clarke",
       "position": "MID",
+      "short_name": "Clarke",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1854,6 +2118,7 @@
       "id": 547037,
       "name": "Jack Fletcher",
       "position": "MID",
+      "short_name": "J.Fletcher",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -1861,6 +2126,7 @@
       "id": 114283,
       "name": "Jack Grealish",
       "position": "MID",
+      "short_name": "Grealish",
       "team": "Everton",
       "team_id": 9
     },
@@ -1868,6 +2134,7 @@
       "id": 221399,
       "name": "Jack Harrison",
       "position": "MID",
+      "short_name": "Harrison",
       "team": "Leeds",
       "team_id": 13
     },
@@ -1875,6 +2142,7 @@
       "id": 532529,
       "name": "Jack Hinshelwood",
       "position": "MID",
+      "short_name": "Hinshelwood",
       "team": "Brighton",
       "team_id": 5
     },
@@ -1882,6 +2150,7 @@
       "id": 480457,
       "name": "Jack Rudoni",
       "position": "MID",
+      "short_name": "Rudoni",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1889,6 +2158,7 @@
       "id": 231899,
       "name": "Jack Taylor",
       "position": "MID",
+      "short_name": "Taylor",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1896,6 +2166,7 @@
       "id": 449429,
       "name": "Jacob Greaves",
       "position": "DEF",
+      "short_name": "Greaves",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1903,6 +2174,7 @@
       "id": 114243,
       "name": "Jacob Murphy",
       "position": "MID",
+      "short_name": "J.Murphy",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -1910,6 +2182,7 @@
       "id": 232653,
       "name": "Jacob Ramsey",
       "position": "MID",
+      "short_name": "J.Ramsey",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -1917,6 +2190,7 @@
       "id": 481624,
       "name": "Jaden Philogene",
       "position": "MID",
+      "short_name": "Philogene",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -1924,6 +2198,7 @@
       "id": 551262,
       "name": "Jahnoah Markelo",
       "position": "FWD",
+      "short_name": "Markelo",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1931,6 +2206,7 @@
       "id": 444180,
       "name": "Jaidon Anthony",
       "position": "MID",
+      "short_name": "Anthony",
       "team": "Brentford",
       "team_id": 4
     },
@@ -1938,6 +2214,7 @@
       "id": 575458,
       "name": "Jair Paula da Cunha Filho",
       "position": "DEF",
+      "short_name": "Jair Cunha",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -1945,6 +2222,7 @@
       "id": 434752,
       "name": "Jaka Bijol",
       "position": "DEF",
+      "short_name": "Bijol",
       "team": "Leeds",
       "team_id": 13
     },
@@ -1952,6 +2230,7 @@
       "id": 80178,
       "name": "Jake Bidwell",
       "position": "DEF",
+      "short_name": "Bidwell",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -1959,6 +2238,7 @@
       "id": 512462,
       "name": "Jake O'Brien",
       "position": "DEF",
+      "short_name": "O'Brien",
       "team": "Everton",
       "team_id": 9
     },
@@ -1966,6 +2246,7 @@
       "id": 232928,
       "name": "James Garner",
       "position": "MID",
+      "short_name": "Garner",
       "team": "Everton",
       "team_id": 9
     },
@@ -1973,6 +2254,7 @@
       "id": 463981,
       "name": "James Hill",
       "position": "DEF",
+      "short_name": "Hill",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -1980,6 +2262,7 @@
       "id": 220627,
       "name": "James Justin",
       "position": "DEF",
+      "short_name": "Justin",
       "team": "Leeds",
       "team_id": 13
     },
@@ -1987,6 +2270,7 @@
       "id": 172780,
       "name": "James Maddison",
       "position": "MID",
+      "short_name": "Maddison",
       "team": "Spurs",
       "team_id": 19
     },
@@ -1994,6 +2278,7 @@
       "id": 432714,
       "name": "James McAtee",
       "position": "MID",
+      "short_name": "McAtee",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -2001,6 +2286,7 @@
       "id": 491501,
       "name": "James McConnell",
       "position": "MID",
+      "short_name": "McConnell",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -2008,6 +2294,7 @@
       "id": 499716,
       "name": "James Rowswell",
       "position": "DEF",
+      "short_name": "Rowswell",
       "team": "Spurs",
       "team_id": 19
     },
@@ -2015,6 +2302,7 @@
       "id": 17761,
       "name": "James Tarkowski",
       "position": "DEF",
+      "short_name": "Tarkowski",
       "team": "Everton",
       "team_id": 9
     },
@@ -2022,6 +2310,7 @@
       "id": 432720,
       "name": "James Trafford",
       "position": "GK",
+      "short_name": "Trafford",
       "team": "Leeds",
       "team_id": 13
     },
@@ -2029,6 +2318,7 @@
       "id": 481283,
       "name": "James Wright",
       "position": "GK",
+      "short_name": "Wright",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2036,6 +2326,7 @@
       "id": 463936,
       "name": "Jamie Bynoe-Gittens",
       "position": "MID",
+      "short_name": "Gittens",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2043,6 +2334,7 @@
       "id": 469142,
       "name": "Jan Paul van Hecke",
       "position": "DEF",
+      "short_name": "Van Hecke",
       "team": "Spurs",
       "team_id": 19
     },
@@ -2050,6 +2342,7 @@
       "id": 513086,
       "name": "Jannik Schuster",
       "position": "DEF",
+      "short_name": "Schuster",
       "team": "Brentford",
       "team_id": 4
     },
@@ -2057,6 +2350,7 @@
       "id": 512123,
       "name": "Jaouen Hadjam",
       "position": "DEF",
+      "short_name": "Hadjam",
       "team": "Brighton",
       "team_id": 5
     },
@@ -2064,6 +2358,7 @@
       "id": 480455,
       "name": "Jarrad Branthwaite",
       "position": "DEF",
+      "short_name": "Branthwaite",
       "team": "Everton",
       "team_id": 9
     },
@@ -2071,6 +2366,7 @@
       "id": 49262,
       "name": "Jason Steele",
       "position": "GK",
+      "short_name": "Steele",
       "team": "Brighton",
       "team_id": 5
     },
@@ -2078,6 +2374,7 @@
       "id": 173878,
       "name": "Jay Dasilva",
       "position": "DEF",
+      "short_name": "Dasilva",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -2085,6 +2382,7 @@
       "id": 651426,
       "name": "Jaydee Canvot",
       "position": "DEF",
+      "short_name": "Canvot",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -2092,6 +2390,7 @@
       "id": 226182,
       "name": "Jayden Bogle",
       "position": "DEF",
+      "short_name": "Bogle",
       "team": "Leeds",
       "team_id": 13
     },
@@ -2099,6 +2398,7 @@
       "id": 500058,
       "name": "Jayden Danns",
       "position": "FWD",
+      "short_name": "Danns",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -2106,6 +2406,7 @@
       "id": 643970,
       "name": "Jayden Lienou",
       "position": "DEF",
+      "short_name": "Lienou",
       "team": "Leeds",
       "team_id": 13
     },
@@ -2113,6 +2414,7 @@
       "id": 587982,
       "name": "Jean-Mattéo Bahoya",
       "position": "MID",
+      "short_name": "Bahoya",
       "team": "Leeds",
       "team_id": 13
     },
@@ -2120,6 +2422,7 @@
       "id": 231747,
       "name": "Jean-Philippe Mateta",
       "position": "FWD",
+      "short_name": "Mateta",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -2127,6 +2430,7 @@
       "id": 152551,
       "name": "Jefferson Lerma Solís",
       "position": "MID",
+      "short_name": "Lerma",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -2134,6 +2438,7 @@
       "id": 552946,
       "name": "Jens Hjertø-Dahl",
       "position": "MID",
+      "short_name": "Hjertø-Dahl",
       "team": "Hull City",
       "team_id": 11
     },
@@ -2141,6 +2446,7 @@
       "id": 519634,
       "name": "Jenson Seelt",
       "position": "DEF",
+      "short_name": "Seelt",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -2148,6 +2454,7 @@
       "id": 216094,
       "name": "Jeremie Frimpong",
       "position": "DEF",
+      "short_name": "Frimpong",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -2155,6 +2462,7 @@
       "id": 606702,
       "name": "Jeremy Jacquet",
       "position": "DEF",
+      "short_name": "Jacquet",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -2162,6 +2470,7 @@
       "id": 649208,
       "name": "Jeremy Monga",
       "position": "MID",
+      "short_name": "Monga",
       "team": "Man City",
       "team_id": 15
     },
@@ -2169,6 +2478,7 @@
       "id": 450542,
       "name": "Jesurun Rak-Sakyi",
       "position": "MID",
+      "short_name": "J.Rak-Sakyi",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -2176,6 +2486,7 @@
       "id": 174874,
       "name": "Joachim Andersen",
       "position": "DEF",
+      "short_name": "Andersen",
       "team": "Fulham",
       "team_id": 10
     },
@@ -2183,6 +2494,7 @@
       "id": 448089,
       "name": "Joao Gomes",
       "position": "MID",
+      "short_name": "Gomes",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2190,6 +2502,7 @@
       "id": 462635,
       "name": "Joe Gelhardt",
       "position": "MID",
+      "short_name": "Gelhardt",
       "team": "Hull City",
       "team_id": 11
     },
@@ -2197,6 +2510,7 @@
       "id": 171287,
       "name": "Joe Gomez",
       "position": "DEF",
+      "short_name": "Gomez",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -2204,6 +2518,7 @@
       "id": 214225,
       "name": "Joe Rodon",
       "position": "DEF",
+      "short_name": "Rodon",
       "team": "Leeds",
       "team_id": 13
     },
@@ -2211,6 +2526,7 @@
       "id": 200089,
       "name": "Joe Willock",
       "position": "MID",
+      "short_name": "Willock",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -2218,6 +2534,7 @@
       "id": 204813,
       "name": "Joel Latibeaudiere",
       "position": "DEF",
+      "short_name": "Latibeaudiere",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -2225,6 +2542,7 @@
       "id": 180974,
       "name": "Joelinton Cássio Apolinário de Lira",
       "position": "MID",
+      "short_name": "Joelinton",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -2232,6 +2550,7 @@
       "id": 614071,
       "name": "Johan Manzambi",
       "position": "MID",
+      "short_name": "Manzambi",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2239,6 +2558,7 @@
       "id": 108416,
       "name": "John Egan",
       "position": "DEF",
+      "short_name": "Egan",
       "team": "Hull City",
       "team_id": 11
     },
@@ -2246,6 +2566,7 @@
       "id": 122806,
       "name": "John McGinn",
       "position": "MID",
+      "short_name": "McGinn",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2253,6 +2574,7 @@
       "id": 221389,
       "name": "John Victor Maciel Furtado",
       "position": "GK",
+      "short_name": "John",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -2260,6 +2582,7 @@
       "id": 631786,
       "name": "Jonah Kusi-Asare",
       "position": "FWD",
+      "short_name": "Kusi-Asare",
       "team": "Fulham",
       "team_id": 10
     },
@@ -2267,6 +2590,7 @@
       "id": 56979,
       "name": "Jordan Henderson",
       "position": "MID",
+      "short_name": "Henderson",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2274,6 +2598,7 @@
       "id": 111234,
       "name": "Jordan Pickford",
       "position": "GK",
+      "short_name": "Pickford",
       "team": "Everton",
       "team_id": 9
     },
@@ -2281,6 +2606,7 @@
       "id": 246301,
       "name": "Jorge Cuenca Barreno",
       "position": "DEF",
+      "short_name": "J.Cuenca",
       "team": "Fulham",
       "team_id": 10
     },
@@ -2288,6 +2614,7 @@
       "id": 551210,
       "name": "Jorrel Hato",
       "position": "DEF",
+      "short_name": "Hato",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2295,6 +2622,7 @@
       "id": 577016,
       "name": "Josh Acheampong",
       "position": "DEF",
+      "short_name": "Acheampong",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2302,6 +2630,7 @@
       "id": 183656,
       "name": "Josh Dasilva",
       "position": "MID",
+      "short_name": "Dasilva",
       "team": "Brentford",
       "team_id": 4
     },
@@ -2309,6 +2638,7 @@
       "id": 439668,
       "name": "Josh Eccles",
       "position": "MID",
+      "short_name": "Eccles",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -2316,6 +2646,7 @@
       "id": 577725,
       "name": "Josh King",
       "position": "MID",
+      "short_name": "King",
       "team": "Fulham",
       "team_id": 10
     },
@@ -2323,6 +2654,7 @@
       "id": 458249,
       "name": "Joshua Zirkzee",
       "position": "FWD",
+      "short_name": "Zirkzee",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -2330,6 +2662,7 @@
       "id": 592984,
       "name": "José María Andrés Baixauli",
       "position": "MID",
+      "short_name": "Andrés",
       "team": "Brighton",
       "team_id": 5
     },
@@ -2337,6 +2670,7 @@
       "id": 475168,
       "name": "João Pedro Junqueira de Jesus",
       "position": "FWD",
+      "short_name": "João Pedro",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2344,6 +2678,7 @@
       "id": 451490,
       "name": "João Pedro Loureiro da Costa",
       "position": "DEF",
+      "short_name": "Costinha",
       "team": "Brighton",
       "team_id": 5
     },
@@ -2351,6 +2686,7 @@
       "id": 616221,
       "name": "João Victor de Souza Menezes",
       "position": "DEF",
+      "short_name": "Souza",
       "team": "Spurs",
       "team_id": 19
     },
@@ -2358,6 +2694,7 @@
       "id": 672492,
       "name": "Joél Drakes-Thomas",
       "position": "MID",
+      "short_name": "Drakes-Thomas",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -2365,6 +2702,7 @@
       "id": 235826,
       "name": "Joël Piroe",
       "position": "FWD",
+      "short_name": "Piroe",
       "team": "Leeds",
       "team_id": 13
     },
@@ -2372,6 +2710,7 @@
       "id": 477424,
       "name": "Joško Gvardiol",
       "position": "DEF",
+      "short_name": "Gvardiol",
       "team": "Man City",
       "team_id": 15
     },
@@ -2379,6 +2718,7 @@
       "id": 661313,
       "name": "Juan Angulo",
       "position": "FWD",
+      "short_name": "J.Angulo",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -2386,6 +2726,7 @@
       "id": 494928,
       "name": "Juanlu Sánchez",
       "position": "DEF",
+      "short_name": "Sanchez",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -2393,6 +2734,7 @@
       "id": 696104,
       "name": "Jules Ahoka",
       "position": "MID",
+      "short_name": "Ahoka",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -2400,6 +2742,7 @@
       "id": 474120,
       "name": "Julio Enciso",
       "position": "MID",
+      "short_name": "Enciso",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -2407,6 +2750,7 @@
       "id": 575901,
       "name": "Julio Soler Barreto",
       "position": "DEF",
+      "short_name": "Soler",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -2414,6 +2758,7 @@
       "id": 436893,
       "name": "Julián Araujo Zúñiga",
       "position": "DEF",
+      "short_name": "J.Araujo",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -2421,6 +2766,7 @@
       "id": 640419,
       "name": "Jun'ai Byfield",
       "position": "DEF",
+      "short_name": "Byfield",
       "team": "Spurs",
       "team_id": 19
     },
@@ -2428,6 +2774,7 @@
       "id": 560262,
       "name": "Junior Kroupi",
       "position": "MID",
+      "short_name": "Kroupi.Jr",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -2435,6 +2782,7 @@
       "id": 445122,
       "name": "Jurriën Timber",
       "position": "DEF",
+      "short_name": "J.Timber",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -2442,6 +2790,7 @@
       "id": 489706,
       "name": "Justin Devenny",
       "position": "MID",
+      "short_name": "Devenny",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -2449,6 +2798,7 @@
       "id": 222683,
       "name": "Justin Kluivert",
       "position": "MID",
+      "short_name": "Kluivert",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -2456,6 +2806,7 @@
       "id": 248875,
       "name": "Jérémy Doku",
       "position": "MID",
+      "short_name": "Doku",
       "team": "Man City",
       "team_id": 15
     },
@@ -2463,6 +2814,7 @@
       "id": 247412,
       "name": "Jørgen Strand Larsen",
       "position": "FWD",
+      "short_name": "Strand Larsen",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -2470,6 +2822,7 @@
       "id": 554054,
       "name": "Kaden Braithwaite",
       "position": "DEF",
+      "short_name": "Braithwaite",
       "team": "Man City",
       "team_id": 15
     },
@@ -2477,6 +2830,7 @@
       "id": 629397,
       "name": "Kai Andrews",
       "position": "MID",
+      "short_name": "Andrews",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -2484,6 +2838,7 @@
       "id": 219847,
       "name": "Kai Havertz",
       "position": "FWD",
+      "short_name": "Havertz",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -2491,6 +2846,7 @@
       "id": 465390,
       "name": "Kaine Kesler-Hayden",
       "position": "DEF",
+      "short_name": "Kesler-Hayden",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -2498,6 +2854,7 @@
       "id": 155405,
       "name": "Kalvin Phillips",
       "position": "MID",
+      "short_name": "Phillips",
       "team": "Man City",
       "team_id": 15
     },
@@ -2505,6 +2862,7 @@
       "id": 59735,
       "name": "Karl Darlow",
       "position": "GK",
+      "short_name": "Darlow",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -2512,6 +2870,7 @@
       "id": 461587,
       "name": "Kasey McAteer",
       "position": "MID",
+      "short_name": "McAteer",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -2519,6 +2878,7 @@
       "id": 593174,
       "name": "Kaye Furo",
       "position": "FWD",
+      "short_name": "Furo",
       "team": "Brentford",
       "team_id": 4
     },
@@ -2526,6 +2886,7 @@
       "id": 546600,
       "name": "Kayne van Oevelen",
       "position": "GK",
+      "short_name": "Van Oevelen",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -2533,6 +2894,7 @@
       "id": 249231,
       "name": "Keane Lewis-Potter",
       "position": "MID",
+      "short_name": "Lewis-Potter",
       "team": "Brentford",
       "team_id": 4
     },
@@ -2540,6 +2902,7 @@
       "id": 167074,
       "name": "Kenny Tete",
       "position": "DEF",
+      "short_name": "Tete",
       "team": "Fulham",
       "team_id": 10
     },
@@ -2547,6 +2910,7 @@
       "id": 109745,
       "name": "Kepa Arrizabalaga Revuelta",
       "position": "GK",
+      "short_name": "Arrizabalaga",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -2554,6 +2918,7 @@
       "id": 135720,
       "name": "Kevin Danso",
       "position": "DEF",
+      "short_name": "Danso",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -2561,6 +2926,7 @@
       "id": 560552,
       "name": "Kevin Santos Lopes de Macedo",
       "position": "MID",
+      "short_name": "Kevin",
       "team": "Fulham",
       "team_id": 10
     },
@@ -2568,6 +2934,7 @@
       "id": 513418,
       "name": "Kevin Schade",
       "position": "MID",
+      "short_name": "Schade",
       "team": "Brentford",
       "team_id": 4
     },
@@ -2575,6 +2942,7 @@
       "id": 171270,
       "name": "Kieran Dowell",
       "position": "MID",
+      "short_name": "Dowell",
       "team": "Hull City",
       "team_id": 11
     },
@@ -2582,6 +2950,7 @@
       "id": 215413,
       "name": "Kiernan Dewsbury-Hall",
       "position": "MID",
+      "short_name": "Dewsbury-Hall",
       "team": "Everton",
       "team_id": 9
     },
@@ -2589,6 +2958,7 @@
       "id": 570241,
       "name": "Kim Ji-soo",
       "position": "DEF",
+      "short_name": "Ji-soo",
       "team": "Brentford",
       "team_id": 4
     },
@@ -2596,6 +2966,7 @@
       "id": 240514,
       "name": "Kjell Scherpen",
       "position": "GK",
+      "short_name": "Scherpen",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -2603,6 +2974,7 @@
       "id": 516895,
       "name": "Kobbie Mainoo",
       "position": "MID",
+      "short_name": "Mainoo",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -2610,6 +2982,7 @@
       "id": 473284,
       "name": "Konstantinos Tzolakis",
       "position": "GK",
+      "short_name": "Tzolakis",
       "team": "Hull City",
       "team_id": 11
     },
@@ -2617,6 +2990,7 @@
       "id": 578545,
       "name": "Kosta Nedeljkovic",
       "position": "DEF",
+      "short_name": "Nedeljkovic",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2624,6 +2998,7 @@
       "id": 214285,
       "name": "Kostas Tsimikas",
       "position": "DEF",
+      "short_name": "Tsimikas",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -2631,6 +3006,7 @@
       "id": 191866,
       "name": "Kristoffer Ajer",
       "position": "DEF",
+      "short_name": "Ajer",
       "team": "Brentford",
       "team_id": 4
     },
@@ -2638,6 +3014,7 @@
       "id": 671875,
       "name": "Kyran Thompson",
       "position": "MID",
+      "short_name": "Thompson",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -2645,6 +3022,7 @@
       "id": 515597,
       "name": "Lamare Bogarde",
       "position": "MID",
+      "short_name": "Bogarde",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2652,6 +3030,7 @@
       "id": 455084,
       "name": "Leif Davis",
       "position": "DEF",
+      "short_name": "Davis",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -2659,6 +3038,7 @@
       "id": 550864,
       "name": "Leny Yoro",
       "position": "DEF",
+      "short_name": "Yoro",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -2666,6 +3046,7 @@
       "id": 477547,
       "name": "Leo Fuhr Hjelde",
       "position": "DEF",
+      "short_name": "Hjelde",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -2673,6 +3054,7 @@
       "id": 553746,
       "name": "Leo Shahar",
       "position": "DEF",
+      "short_name": "Shahar",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -2680,6 +3062,7 @@
       "id": 215711,
       "name": "Leon Bailey",
       "position": "MID",
+      "short_name": "Bailey",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2687,6 +3070,7 @@
       "id": 119090,
       "name": "Leon Goretzka",
       "position": "MID",
+      "short_name": "Goretzka",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2694,6 +3078,7 @@
       "id": 460028,
       "name": "Levi Samuels Colwill",
       "position": "DEF",
+      "short_name": "Colwill",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2701,6 +3086,7 @@
       "id": 193278,
       "name": "Lewie Coyle",
       "position": "DEF",
+      "short_name": "Coyle",
       "team": "Hull City",
       "team_id": 11
     },
@@ -2708,6 +3094,7 @@
       "id": 155408,
       "name": "Lewis Cook",
       "position": "MID",
+      "short_name": "Cook",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -2715,6 +3102,7 @@
       "id": 83299,
       "name": "Lewis Dunk",
       "position": "DEF",
+      "short_name": "Dunk",
       "team": "Brighton",
       "team_id": 5
     },
@@ -2722,6 +3110,7 @@
       "id": 487838,
       "name": "Lewis Hall",
       "position": "DEF",
+      "short_name": "Hall",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -2729,6 +3118,7 @@
       "id": 514514,
       "name": "Lewis Koumas",
       "position": "MID",
+      "short_name": "Koumas",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -2736,6 +3126,7 @@
       "id": 547719,
       "name": "Lewis Miley",
       "position": "MID",
+      "short_name": "L.Miley",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -2743,6 +3134,7 @@
       "id": 463034,
       "name": "Liam Delap",
       "position": "FWD",
+      "short_name": "Delap",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -2750,6 +3142,7 @@
       "id": 436761,
       "name": "Liam Kitching",
       "position": "DEF",
+      "short_name": "Kitching",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -2757,6 +3150,7 @@
       "id": 232905,
       "name": "Liam Millar",
       "position": "MID",
+      "short_name": "Millar",
       "team": "Hull City",
       "team_id": 11
     },
@@ -2764,6 +3158,7 @@
       "id": 221820,
       "name": "Lisandro Martínez",
       "position": "DEF",
+      "short_name": "Martinez",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -2771,6 +3166,7 @@
       "id": 469272,
       "name": "Loum Tchaouna",
       "position": "MID",
+      "short_name": "Tchaouna",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -2778,6 +3174,7 @@
       "id": 547686,
       "name": "Luc De Fougerolles",
       "position": "DEF",
+      "short_name": "De Fougerolles",
       "team": "Fulham",
       "team_id": 10
     },
@@ -2785,6 +3182,7 @@
       "id": 470315,
       "name": "Luca Netz",
       "position": "DEF",
+      "short_name": "Netz",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -2792,6 +3190,7 @@
       "id": 611917,
       "name": "Luca Williams-Barnett",
       "position": "MID",
+      "short_name": "Williams-Barnett",
       "team": "Spurs",
       "team_id": 19
     },
@@ -2799,6 +3198,7 @@
       "id": 570526,
       "name": "Lucas Bergvall",
       "position": "MID",
+      "short_name": "Bergvall",
       "team": "Spurs",
       "team_id": 19
     },
@@ -2806,6 +3206,7 @@
       "id": 101188,
       "name": "Lucas Digne",
       "position": "DEF",
+      "short_name": "Digne",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2813,6 +3214,7 @@
       "id": 201595,
       "name": "Lucas Estella Perri",
       "position": "GK",
+      "short_name": "Perri",
       "team": "Leeds",
       "team_id": 13
     },
@@ -2820,6 +3222,7 @@
       "id": 469266,
       "name": "Lucas Gourna-Douath",
       "position": "MID",
+      "short_name": "Gourna-Douath",
       "team": "Hull City",
       "team_id": 11
     },
@@ -2827,6 +3230,7 @@
       "id": 597462,
       "name": "Lucas Herrington",
       "position": "DEF",
+      "short_name": "Herrington",
       "team": "Hull City",
       "team_id": 11
     },
@@ -2834,6 +3238,7 @@
       "id": 571380,
       "name": "Luka Lynch",
       "position": "MID",
+      "short_name": "Lynch",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2841,6 +3246,7 @@
       "id": 610799,
       "name": "Luka Vušković",
       "position": "DEF",
+      "short_name": "Vuskovic",
       "team": "Brighton",
       "team_id": 5
     },
@@ -2848,6 +3254,7 @@
       "id": 174594,
       "name": "Lukas Nmecha",
       "position": "FWD",
+      "short_name": "Nmecha",
       "team": "Leeds",
       "team_id": 13
     },
@@ -2855,6 +3262,7 @@
       "id": 167512,
       "name": "Luke O'Nien",
       "position": "DEF",
+      "short_name": "O'Nien",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -2862,6 +3270,7 @@
       "id": 106760,
       "name": "Luke Shaw",
       "position": "DEF",
+      "short_name": "Shaw",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -2869,6 +3278,7 @@
       "id": 220583,
       "name": "Luke Woolfenden",
       "position": "DEF",
+      "short_name": "Woolfenden",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -2876,6 +3286,7 @@
       "id": 470551,
       "name": "Lukás Hornícek",
       "position": "GK",
+      "short_name": "Horníček",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -2883,6 +3294,7 @@
       "id": 616069,
       "name": "Macaulay Zepa",
       "position": "MID",
+      "short_name": "Zepa",
       "team": "Fulham",
       "team_id": 10
     },
@@ -2890,6 +3302,7 @@
       "id": 636846,
       "name": "Mahdi Nicoll-Jazuli",
       "position": "MID",
+      "short_name": "Nicoll-Jazuli",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2897,6 +3310,7 @@
       "id": 549940,
       "name": "Malick Fofana",
       "position": "MID",
+      "short_name": "Fofana",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -2904,6 +3318,7 @@
       "id": 465642,
       "name": "Malick Thiaw",
       "position": "DEF",
+      "short_name": "Thiaw",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -2911,6 +3326,7 @@
       "id": 611695,
       "name": "Malick Yalcouyé",
       "position": "MID",
+      "short_name": "Yalcouyé",
       "team": "Brighton",
       "team_id": 5
     },
@@ -2918,6 +3334,7 @@
       "id": 482609,
       "name": "Malo Gusto",
       "position": "DEF",
+      "short_name": "Gusto",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2925,6 +3342,7 @@
       "id": 513545,
       "name": "Mamadou Sangaré",
       "position": "MID",
+      "short_name": "M.Sangaré",
       "team": "Brentford",
       "team_id": 4
     },
@@ -2932,6 +3350,7 @@
       "id": 574458,
       "name": "Mamadou Sarr",
       "position": "DEF",
+      "short_name": "M.Sarr",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2939,6 +3358,7 @@
       "id": 232112,
       "name": "Manuel Ugarte Ribeiro",
       "position": "MID",
+      "short_name": "Ugarte",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -2946,6 +3366,7 @@
       "id": 500033,
       "name": "Manuel Ángel Morán Ibáñez",
       "position": "MID",
+      "short_name": "Ángel",
       "team": "Fulham",
       "team_id": 10
     },
@@ -2953,6 +3374,7 @@
       "id": 499309,
       "name": "Marc Guiu Paz",
       "position": "FWD",
+      "short_name": "Marc Guiu",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2960,6 +3382,7 @@
       "id": 209036,
       "name": "Marc Guéhi",
       "position": "DEF",
+      "short_name": "Guéhi",
       "team": "Man City",
       "team_id": 15
     },
@@ -2967,6 +3390,7 @@
       "id": 501390,
       "name": "Marcelino Núñez",
       "position": "MID",
+      "short_name": "Núñez",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -2974,6 +3398,7 @@
       "id": 72147,
       "name": "Marco Bizot",
       "position": "GK",
+      "short_name": "M.Bizot",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -2981,6 +3406,7 @@
       "id": 620109,
       "name": "Marco Palestra",
       "position": "DEF",
+      "short_name": "Palestra",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -2988,6 +3414,7 @@
       "id": 221466,
       "name": "Marcos Senesi Barón",
       "position": "DEF",
+      "short_name": "Senesi",
       "team": "Spurs",
       "team_id": 19
     },
@@ -2995,6 +3422,7 @@
       "id": 122074,
       "name": "Marcus Bettinelli",
       "position": "GK",
+      "short_name": "Bettinelli",
       "team": "Man City",
       "team_id": 15
     },
@@ -3002,6 +3430,7 @@
       "id": 176297,
       "name": "Marcus Rashford",
       "position": "MID",
+      "short_name": "Rashford",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -3009,6 +3438,7 @@
       "id": 201658,
       "name": "Marcus Tavernier",
       "position": "MID",
+      "short_name": "Tavernier",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -3016,6 +3446,7 @@
       "id": 81441,
       "name": "Mark Gillespie",
       "position": "GK",
+      "short_name": "Gillespie",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -3023,6 +3454,7 @@
       "id": 229600,
       "name": "Mark Travers",
       "position": "GK",
+      "short_name": "Travers",
       "team": "Everton",
       "team_id": 9
     },
@@ -3030,6 +3462,7 @@
       "id": 67089,
       "name": "Martin Dubravka",
       "position": "GK",
+      "short_name": "Dubravka",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3037,6 +3470,7 @@
       "id": 184029,
       "name": "Martin Ødegaard",
       "position": "MID",
+      "short_name": "Ødegaard",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -3044,6 +3478,7 @@
       "id": 481655,
       "name": "Martín Zubimendi Ibáñez",
       "position": "MID",
+      "short_name": "Zubimendi",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -3051,6 +3486,7 @@
       "id": 534392,
       "name": "Mason Burstow",
       "position": "FWD",
+      "short_name": "Burstow",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3058,6 +3494,7 @@
       "id": 665243,
       "name": "Mason Miley",
       "position": "MID",
+      "short_name": "Miley",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -3065,6 +3502,7 @@
       "id": 184341,
       "name": "Mason Mount",
       "position": "MID",
+      "short_name": "Mount",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -3072,6 +3510,7 @@
       "id": 565297,
       "name": "Mateo Joseph Fernández-Regatillo",
       "position": "FWD",
+      "short_name": "Mateo Joseph",
       "team": "Leeds",
       "team_id": 13
     },
@@ -3079,6 +3518,7 @@
       "id": 91651,
       "name": "Mateo Kovačić",
       "position": "MID",
+      "short_name": "Kovačić",
       "team": "Man City",
       "team_id": 15
     },
@@ -3086,6 +3526,7 @@
       "id": 551226,
       "name": "Mateus Fernandes",
       "position": "MID",
+      "short_name": "Fernandes",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3093,6 +3534,7 @@
       "id": 536694,
       "name": "Matheus França de Oliveira",
       "position": "MID",
+      "short_name": "M.França",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -3100,6 +3542,7 @@
       "id": 465351,
       "name": "Matheus Nunes",
       "position": "DEF",
+      "short_name": "Matheus N.",
       "team": "Man City",
       "team_id": 15
     },
@@ -3107,6 +3550,7 @@
       "id": 430871,
       "name": "Matheus Santos Carneiro da Cunha",
       "position": "MID",
+      "short_name": "Cunha",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -3114,6 +3558,7 @@
       "id": 207283,
       "name": "Mathias Jensen",
       "position": "MID",
+      "short_name": "Jensen",
       "team": "Brentford",
       "team_id": 4
     },
@@ -3121,6 +3566,7 @@
       "id": 511499,
       "name": "Mathys Tel",
       "position": "MID",
+      "short_name": "Tel",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3128,6 +3574,7 @@
       "id": 613221,
       "name": "Matias Fernandez-Pardo",
       "position": "FWD",
+      "short_name": "Fernandez-Pardo",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -3135,6 +3582,7 @@
       "id": 467779,
       "name": "Mats Wieffer",
       "position": "DEF",
+      "short_name": "Wieffer",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3142,6 +3590,7 @@
       "id": 101282,
       "name": "Matt Crooks",
       "position": "MID",
+      "short_name": "Crooks",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3149,6 +3598,7 @@
       "id": 168144,
       "name": "Matt Grimes",
       "position": "MID",
+      "short_name": "Grimes",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -3156,6 +3606,7 @@
       "id": 219249,
       "name": "Matt O'Riley",
       "position": "MID",
+      "short_name": "O'Riley",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3163,6 +3614,7 @@
       "id": 169359,
       "name": "Matt Targett",
       "position": "DEF",
+      "short_name": "Targett",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3170,6 +3622,7 @@
       "id": 487992,
       "name": "Matteo Ruggeri",
       "position": "DEF",
+      "short_name": "Ruggeri",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -3177,6 +3630,7 @@
       "id": 209365,
       "name": "Matthijs de Ligt",
       "position": "DEF",
+      "short_name": "De Ligt",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -3184,6 +3638,7 @@
       "id": 199796,
       "name": "Matty Cash",
       "position": "DEF",
+      "short_name": "Cash",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -3191,6 +3646,7 @@
       "id": 449428,
       "name": "Matty Jacob",
       "position": "DEF",
+      "short_name": "Jacob",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3198,6 +3654,7 @@
       "id": 85633,
       "name": "Matz Sels",
       "position": "GK",
+      "short_name": "Sels",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3205,6 +3662,7 @@
       "id": 494307,
       "name": "Max Alleyne",
       "position": "DEF",
+      "short_name": "Alleyne",
       "team": "Man City",
       "team_id": 15
     },
@@ -3212,6 +3670,7 @@
       "id": 616077,
       "name": "Max Dowman",
       "position": "MID",
+      "short_name": "Dowman",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -3219,6 +3678,7 @@
       "id": 437499,
       "name": "Maxence Lacroix",
       "position": "DEF",
+      "short_name": "Lacroix",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -3226,6 +3686,7 @@
       "id": 465730,
       "name": "Maxim De Cuyper",
       "position": "DEF",
+      "short_name": "De Cuyper",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3233,6 +3694,7 @@
       "id": 515046,
       "name": "Melker Ellborg",
       "position": "GK",
+      "short_name": "Ellborg",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -3240,6 +3702,7 @@
       "id": 437497,
       "name": "Melvin Bard",
       "position": "DEF",
+      "short_name": "Bard",
       "team": "Leeds",
       "team_id": 13
     },
@@ -3247,6 +3710,7 @@
       "id": 513466,
       "name": "Merlin Röhl",
       "position": "MID",
+      "short_name": "Röhl",
       "team": "Everton",
       "team_id": 9
     },
@@ -3254,6 +3718,7 @@
       "id": 607464,
       "name": "Michael Kayode",
       "position": "DEF",
+      "short_name": "Kayode",
       "team": "Brentford",
       "team_id": 4
     },
@@ -3261,6 +3726,7 @@
       "id": 106611,
       "name": "Michael Keane",
       "position": "DEF",
+      "short_name": "Keane",
       "team": "Everton",
       "team_id": 9
     },
@@ -3268,6 +3734,7 @@
       "id": 655585,
       "name": "Michael Mills",
       "position": "MID",
+      "short_name": "Mills",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -3275,6 +3742,7 @@
       "id": 454490,
       "name": "Michael Svoboda",
       "position": "DEF",
+      "short_name": "Svoboda",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3282,6 +3750,7 @@
       "id": 155465,
       "name": "Michael Zetterer",
       "position": "GK",
+      "short_name": "Zetterer",
       "team": "Leeds",
       "team_id": 13
     },
@@ -3289,6 +3758,7 @@
       "id": 230650,
       "name": "Michele Di Gregorio",
       "position": "GK",
+      "short_name": "Di Gregorio",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -3296,6 +3766,7 @@
       "id": 491279,
       "name": "Micky van de Ven",
       "position": "DEF",
+      "short_name": "Van de Ven",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3303,6 +3774,7 @@
       "id": 577411,
       "name": "Miguel Brau",
       "position": "DEF",
+      "short_name": "Brau",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -3310,6 +3782,7 @@
       "id": 549939,
       "name": "Mike Penders",
       "position": "GK",
+      "short_name": "Penders",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -3317,6 +3790,7 @@
       "id": 195384,
       "name": "Mikel Merino Zazón",
       "position": "MID",
+      "short_name": "Merino",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -3324,6 +3798,7 @@
       "id": 499721,
       "name": "Mikey Moore",
       "position": "MID",
+      "short_name": "Moore",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3331,6 +3806,7 @@
       "id": 440089,
       "name": "Mikkel Damsgaard",
       "position": "MID",
+      "short_name": "Damsgaard",
       "team": "Brentford",
       "team_id": 4
     },
@@ -3338,6 +3814,7 @@
       "id": 451284,
       "name": "Milan van Ewijk",
       "position": "DEF",
+      "short_name": "van Ewijk",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -3345,6 +3822,7 @@
       "id": 544877,
       "name": "Milos Kerkez",
       "position": "DEF",
+      "short_name": "Kerkez",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -3352,6 +3830,7 @@
       "id": 578512,
       "name": "Miodrag Pivas",
       "position": "DEF",
+      "short_name": "Pivas",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -3359,6 +3838,7 @@
       "id": 451340,
       "name": "Mitoma Kaoru",
       "position": "MID",
+      "short_name": "Mitoma",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3366,6 +3846,7 @@
       "id": 540324,
       "name": "Mohamed Belloumi",
       "position": "MID",
+      "short_name": "Belloumi",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3373,6 +3854,7 @@
       "id": 490884,
       "name": "Mohamed-Ali Cho",
       "position": "MID",
+      "short_name": "Cho",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3380,6 +3862,7 @@
       "id": 460842,
       "name": "Mohammed Kudus",
       "position": "MID",
+      "short_name": "Kudus",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3387,6 +3870,7 @@
       "id": 486672,
       "name": "Moisés Caicedo Corozo",
       "position": "MID",
+      "short_name": "Caicedo",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -3394,6 +3878,7 @@
       "id": 222531,
       "name": "Morgan Gibbs-White",
       "position": "MID",
+      "short_name": "Gibbs-White",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3401,6 +3886,7 @@
       "id": 244850,
       "name": "Morgan Rogers",
       "position": "MID",
+      "short_name": "Rogers",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -3408,6 +3894,7 @@
       "id": 575476,
       "name": "Murillo Costa dos Santos",
       "position": "DEF",
+      "short_name": "Murillo",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3415,6 +3902,7 @@
       "id": 465920,
       "name": "Mykhailo Mudryk",
       "position": "MID",
+      "short_name": "Mudryk",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3422,6 +3910,7 @@
       "id": 499169,
       "name": "Myles Lewis-Skelly",
       "position": "MID",
+      "short_name": "Lewis-Skelly",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -3429,6 +3918,7 @@
       "id": 432830,
       "name": "Nathan Collins",
       "position": "DEF",
+      "short_name": "Collins",
       "team": "Brentford",
       "team_id": 4
     },
@@ -3436,6 +3926,7 @@
       "id": 243571,
       "name": "Nathan Patterson",
       "position": "DEF",
+      "short_name": "Patterson",
       "team": "Everton",
       "team_id": 9
     },
@@ -3443,6 +3934,7 @@
       "id": 215136,
       "name": "Neco Williams",
       "position": "DEF",
+      "short_name": "N.Williams",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3450,6 +3942,7 @@
       "id": 556637,
       "name": "Nehemiah Oriola",
       "position": "MID",
+      "short_name": "Oriola",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3457,6 +3950,7 @@
       "id": 98747,
       "name": "Nick Pope",
       "position": "GK",
+      "short_name": "Pope",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -3464,6 +3958,7 @@
       "id": 470313,
       "name": "Nick Woltemade",
       "position": "FWD",
+      "short_name": "Woltemade",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -3471,6 +3966,7 @@
       "id": 173774,
       "name": "Nico Elvedi",
       "position": "DEF",
+      "short_name": "Elvedi",
       "team": "Leeds",
       "team_id": 13
     },
@@ -3478,6 +3974,7 @@
       "id": 465694,
       "name": "Nico González Iglesias",
       "position": "MID",
+      "short_name": "N.Gonzalez",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -3485,6 +3982,7 @@
       "id": 472769,
       "name": "Nico O'Reilly",
       "position": "DEF",
+      "short_name": "O'Reilly",
       "team": "Man City",
       "team_id": 15
     },
@@ -3492,6 +3990,7 @@
       "id": 517052,
       "name": "Nicolas Jackson",
       "position": "FWD",
+      "short_name": "N.Jackson",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -3499,6 +3998,7 @@
       "id": 250199,
       "name": "Nicolás Domínguez",
       "position": "MID",
+      "short_name": "Dominguez",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3506,6 +4006,7 @@
       "id": 500151,
       "name": "Nicolò Savona",
       "position": "DEF",
+      "short_name": "Savona",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3513,6 +4014,7 @@
       "id": 227444,
       "name": "Nikola Milenković",
       "position": "DEF",
+      "short_name": "Milenković",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3520,6 +4022,7 @@
       "id": 536661,
       "name": "Nilson Angulo",
       "position": "MID",
+      "short_name": "N.Angulo",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -3527,6 +4030,7 @@
       "id": 435997,
       "name": "Noah Okafor",
       "position": "MID",
+      "short_name": "Okafor",
       "team": "Leeds",
       "team_id": 13
     },
@@ -3534,6 +4038,7 @@
       "id": 577669,
       "name": "Noah Sadiki",
       "position": "MID",
+      "short_name": "Sadiki",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -3541,6 +4046,7 @@
       "id": 606930,
       "name": "Nobel Mendy",
       "position": "DEF",
+      "short_name": "Mendy",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3548,6 +4054,7 @@
       "id": 248857,
       "name": "Noni Madueke",
       "position": "MID",
+      "short_name": "Madueke",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -3555,6 +4062,7 @@
       "id": 486385,
       "name": "Norberto Bercique Gomes Betuncal",
       "position": "FWD",
+      "short_name": "Beto",
       "team": "Everton",
       "team_id": 9
     },
@@ -3562,6 +4070,7 @@
       "id": 200834,
       "name": "Nordi Mukiele",
       "position": "DEF",
+      "short_name": "Mukiele",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -3569,6 +4078,7 @@
       "id": 549653,
       "name": "Norman Bassette",
       "position": "FWD",
+      "short_name": "Bassette",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -3576,6 +4086,7 @@
       "id": 230001,
       "name": "Noussair Mazraoui",
       "position": "DEF",
+      "short_name": "Mazraoui",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -3583,6 +4094,7 @@
       "id": 159506,
       "name": "Ola Aina",
       "position": "DEF",
+      "short_name": "Aina",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3590,6 +4102,7 @@
       "id": 169432,
       "name": "Oli McBurnie",
       "position": "FWD",
+      "short_name": "McBurnie",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3597,6 +4110,7 @@
       "id": 484389,
       "name": "Oliver Dovin",
       "position": "GK",
+      "short_name": "Dovin",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -3604,6 +4118,7 @@
       "id": 204120,
       "name": "Olivier Boscagli",
       "position": "DEF",
+      "short_name": "Boscagli",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3611,6 +4126,7 @@
       "id": 178301,
       "name": "Ollie Watkins",
       "position": "FWD",
+      "short_name": "Watkins",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -3618,6 +4134,7 @@
       "id": 201895,
       "name": "Omar Alderete",
       "position": "DEF",
+      "short_name": "Alderete",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -3625,6 +4142,7 @@
       "id": 438234,
       "name": "Omar Marmoush",
       "position": "FWD",
+      "short_name": "Marmoush",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3632,6 +4150,7 @@
       "id": 204822,
       "name": "Omar Richards",
       "position": "DEF",
+      "short_name": "O.Richards",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3639,6 +4158,7 @@
       "id": 503301,
       "name": "Omari Hutchinson",
       "position": "MID",
+      "short_name": "Hutchinson",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3646,6 +4166,7 @@
       "id": 477555,
       "name": "Oscar Bobb",
       "position": "MID",
+      "short_name": "Bobb",
       "team": "Fulham",
       "team_id": 10
     },
@@ -3653,6 +4174,7 @@
       "id": 242313,
       "name": "Oscar Mingueza",
       "position": "DEF",
+      "short_name": "Mingueza",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -3660,6 +4182,7 @@
       "id": 568420,
       "name": "Ousmane Diomande",
       "position": "DEF",
+      "short_name": "Diomande",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3667,6 +4190,7 @@
       "id": 160817,
       "name": "Paddy McNair",
       "position": "DEF",
+      "short_name": "McNair",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3674,6 +4198,7 @@
       "id": 482442,
       "name": "Pape Matar Sarr",
       "position": "MID",
+      "short_name": "P.M.Sarr",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3681,6 +4206,7 @@
       "id": 60307,
       "name": "Pascal Groß",
       "position": "MID",
+      "short_name": "Groß",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3688,6 +4214,7 @@
       "id": 222694,
       "name": "Pascal Struijk",
       "position": "DEF",
+      "short_name": "Struijk",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3695,6 +4222,7 @@
       "id": 596777,
       "name": "Patrick Dorgu",
       "position": "MID",
+      "short_name": "Dorgu",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -3702,6 +4230,7 @@
       "id": 244954,
       "name": "Pau Torres",
       "position": "DEF",
+      "short_name": "Pau",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -3709,6 +4238,7 @@
       "id": 247632,
       "name": "Pedro Lomba Neto",
       "position": "MID",
+      "short_name": "Neto",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -3716,6 +4246,7 @@
       "id": 441164,
       "name": "Pedro Porro Sauceda",
       "position": "DEF",
+      "short_name": "Pedro Porro",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3723,6 +4254,7 @@
       "id": 498444,
       "name": "Pep Chavarría",
       "position": "DEF",
+      "short_name": "Chavarria",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -3730,6 +4262,7 @@
       "id": 209244,
       "name": "Phil Foden",
       "position": "MID",
+      "short_name": "Foden",
       "team": "Man City",
       "team_id": 15
     },
@@ -3737,6 +4270,7 @@
       "id": 448104,
       "name": "Piero Hincapié",
       "position": "DEF",
+      "short_name": "Hincapie",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -3744,6 +4278,7 @@
       "id": 538007,
       "name": "Promise David",
       "position": "FWD",
+      "short_name": "David",
       "team": "Brighton",
       "team_id": 5
     },
@@ -3751,6 +4286,7 @@
       "id": 450063,
       "name": "Quinten Timber",
       "position": "MID",
+      "short_name": "Timber",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -3758,6 +4294,7 @@
       "id": 492498,
       "name": "Raphael Borges Rodrigues",
       "position": "MID",
+      "short_name": "Borges Rodrigues",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -3765,6 +4302,7 @@
       "id": 448514,
       "name": "Rayan Aït-Nouri",
       "position": "DEF",
+      "short_name": "Aït-Nouri",
       "team": "Man City",
       "team_id": 15
     },
@@ -3772,6 +4310,7 @@
       "id": 466052,
       "name": "Rayan Cherki",
       "position": "MID",
+      "short_name": "Cherki",
       "team": "Man City",
       "team_id": 15
     },
@@ -3779,6 +4318,7 @@
       "id": 499604,
       "name": "Rayan Vitor Simplício Rocha",
       "position": "MID",
+      "short_name": "Rayan",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -3786,6 +4326,7 @@
       "id": 225796,
       "name": "Reece James",
       "position": "DEF",
+      "short_name": "James",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -3793,6 +4334,7 @@
       "id": 243413,
       "name": "Regan Slater",
       "position": "MID",
+      "short_name": "Slater",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3800,6 +4342,7 @@
       "id": 434399,
       "name": "Reinildo Mandava",
       "position": "DEF",
+      "short_name": "Reinildo",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -3807,6 +4350,7 @@
       "id": 200641,
       "name": "Reiss Nelson",
       "position": "MID",
+      "short_name": "Nelson",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -3814,6 +4358,7 @@
       "id": 169593,
       "name": "Remi Matthews",
       "position": "GK",
+      "short_name": "Matthews",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -3821,6 +4366,7 @@
       "id": 466075,
       "name": "Riccardo Calafiori",
       "position": "DEF",
+      "short_name": "Calafiori",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -3828,6 +4374,7 @@
       "id": 212319,
       "name": "Richarlison de Andrade",
       "position": "FWD",
+      "short_name": "Richarlison",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3835,6 +4382,7 @@
       "id": 194010,
       "name": "Rico Henry",
       "position": "DEF",
+      "short_name": "Henry",
       "team": "Brentford",
       "team_id": 4
     },
@@ -3842,6 +4390,7 @@
       "id": 477064,
       "name": "Rico Lewis",
       "position": "DEF",
+      "short_name": "Lewis",
       "team": "Man City",
       "team_id": 15
     },
@@ -3849,6 +4398,7 @@
       "id": 590014,
       "name": "Rio Cardines",
       "position": "DEF",
+      "short_name": "Cardines",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -3856,6 +4406,7 @@
       "id": 611922,
       "name": "Rio Ngumoha",
       "position": "MID",
+      "short_name": "Ngumoha",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -3863,6 +4414,7 @@
       "id": 215059,
       "name": "Robert Lynch Sánchez",
       "position": "GK",
+      "short_name": "Sánchez",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -3870,6 +4422,7 @@
       "id": 498016,
       "name": "Robin Roefs",
       "position": "GK",
+      "short_name": "Roefs",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -3877,6 +4430,7 @@
       "id": 631000,
       "name": "Robinio Vaz",
       "position": "FWD",
+      "short_name": "Vaz",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3884,6 +4438,7 @@
       "id": 220566,
       "name": "Rodrigo 'Rodri' Hernandez Cascante",
       "position": "MID",
+      "short_name": "Rodrigo",
       "team": "Man City",
       "team_id": 15
     },
@@ -3891,6 +4446,7 @@
       "id": 202993,
       "name": "Rodrigo Bentancur",
       "position": "MID",
+      "short_name": "Bentancur",
       "team": "Spurs",
       "team_id": 19
     },
@@ -3898,6 +4454,7 @@
       "id": 244042,
       "name": "Rodrigo Muniz Carvalho",
       "position": "FWD",
+      "short_name": "Muniz",
       "team": "Fulham",
       "team_id": 10
     },
@@ -3905,6 +4462,7 @@
       "id": 606921,
       "name": "Romain Esse",
       "position": "MID",
+      "short_name": "Esse",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -3912,6 +4470,7 @@
       "id": 461199,
       "name": "Romaine Mundle",
       "position": "MID",
+      "short_name": "Mundle",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -3919,6 +4478,7 @@
       "id": 514356,
       "name": "Roméo Lavia",
       "position": "MID",
+      "short_name": "Lavia",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -3926,6 +4486,7 @@
       "id": 445087,
       "name": "Ronald Araujo",
       "position": "DEF",
+      "short_name": "Araujo",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -3933,6 +4494,7 @@
       "id": 88894,
       "name": "Ross Barkley",
       "position": "MID",
+      "short_name": "Barkley",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -3940,6 +4502,7 @@
       "id": 158499,
       "name": "Ryan Christie",
       "position": "MID",
+      "short_name": "Christie",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -3947,6 +4510,7 @@
       "id": 232351,
       "name": "Ryan Giles",
       "position": "DEF",
+      "short_name": "Giles",
       "team": "Hull City",
       "team_id": 11
     },
@@ -3954,6 +4518,7 @@
       "id": 441266,
       "name": "Ryan Gravenberch",
       "position": "MID",
+      "short_name": "Gravenberch",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -3961,6 +4526,7 @@
       "id": 616288,
       "name": "Ryan McAidoo",
       "position": "MID",
+      "short_name": "McAidoo",
       "team": "Man City",
       "team_id": 15
     },
@@ -3968,6 +4534,7 @@
       "id": 184349,
       "name": "Ryan Sessegnon",
       "position": "DEF",
+      "short_name": "Sessegnon",
       "team": "Fulham",
       "team_id": 10
     },
@@ -3975,6 +4542,7 @@
       "id": 204968,
       "name": "Ryan Yates",
       "position": "MID",
+      "short_name": "Yates",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -3982,6 +4550,7 @@
       "id": 171314,
       "name": "Rúben dos Santos Gato Alves Dias",
       "position": "DEF",
+      "short_name": "Rúben",
       "team": "Man City",
       "team_id": 15
     },
@@ -3989,6 +4558,7 @@
       "id": 172453,
       "name": "Sam Szmodics",
       "position": "MID",
+      "short_name": "Szmodics",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -3996,6 +4566,7 @@
       "id": 469247,
       "name": "Samuel Iling-Junior",
       "position": "MID",
+      "short_name": "Iling Jr",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -4003,6 +4574,7 @@
       "id": 207189,
       "name": "Sander Berge",
       "position": "MID",
+      "short_name": "Berge",
       "team": "Fulham",
       "team_id": 10
     },
@@ -4010,6 +4582,7 @@
       "id": 432422,
       "name": "Sandro Tonali",
       "position": "MID",
+      "short_name": "Tonali",
       "team": "Spurs",
       "team_id": 19
     },
@@ -4017,6 +4590,7 @@
       "id": 212314,
       "name": "Saša Lukić",
       "position": "MID",
+      "short_name": "Lukić",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -4024,6 +4598,7 @@
       "id": 180135,
       "name": "Sean Longstaff",
       "position": "MID",
+      "short_name": "Longstaff",
       "team": "Leeds",
       "team_id": 13
     },
@@ -4031,6 +4606,7 @@
       "id": 599303,
       "name": "Sean Neave",
       "position": "FWD",
+      "short_name": "Neave",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -4038,6 +4614,7 @@
       "id": 636852,
       "name": "Sean Steur",
       "position": "MID",
+      "short_name": "Steur",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -4045,6 +4622,7 @@
       "id": 437738,
       "name": "Sebastiaan Bornauw",
       "position": "DEF",
+      "short_name": "Bornauw",
       "team": "Leeds",
       "team_id": 13
     },
@@ -4052,6 +4630,7 @@
       "id": 146426,
       "name": "Semi Ajayi",
       "position": "DEF",
+      "short_name": "Ajayi",
       "team": "Hull City",
       "team_id": 11
     },
@@ -4059,6 +4638,7 @@
       "id": 465247,
       "name": "Senne Lammens",
       "position": "GK",
+      "short_name": "Lammens",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -4066,6 +4646,7 @@
       "id": 444765,
       "name": "Sepp van den Berg",
       "position": "DEF",
+      "short_name": "Van den Berg",
       "team": "Brentford",
       "team_id": 4
     },
@@ -4073,6 +4654,7 @@
       "id": 463210,
       "name": "Shea Charles",
       "position": "MID",
+      "short_name": "Charles",
       "team": "Fulham",
       "team_id": 10
     },
@@ -4080,6 +4662,7 @@
       "id": 576628,
       "name": "Shea Lacey",
       "position": "MID",
+      "short_name": "Lacey",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -4087,6 +4670,7 @@
       "id": 567119,
       "name": "Shumaira Mheuka",
       "position": "FWD",
+      "short_name": "Mheuka",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -4094,6 +4678,7 @@
       "id": 627221,
       "name": "Sidiki Cherif",
       "position": "FWD",
+      "short_name": "Cherif",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -4101,6 +4686,7 @@
       "id": 535818,
       "name": "Simon Adingra",
       "position": "MID",
+      "short_name": "Adingra",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -4108,6 +4694,7 @@
       "id": 557012,
       "name": "Sindre Walle Egeli",
       "position": "FWD",
+      "short_name": "Walle Egeli",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -4115,6 +4702,7 @@
       "id": 243951,
       "name": "Sorba Thomas",
       "position": "MID",
+      "short_name": "Thomas",
       "team": "Hull City",
       "team_id": 11
     },
@@ -4122,6 +4710,7 @@
       "id": 535928,
       "name": "Stefan Bajčetić Maquieira",
       "position": "MID",
+      "short_name": "Bajcetic",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -4129,6 +4718,7 @@
       "id": 608181,
       "name": "Stefanos Tzimas",
       "position": "FWD",
+      "short_name": "Tzimas",
       "team": "Brighton",
       "team_id": 5
     },
@@ -4136,6 +4726,7 @@
       "id": 566213,
       "name": "Stephen Mfuni",
       "position": "DEF",
+      "short_name": "Mfuni",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -4143,6 +4734,7 @@
       "id": 428971,
       "name": "Steven Benda",
       "position": "GK",
+      "short_name": "Benda",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -4150,6 +4742,7 @@
       "id": 220237,
       "name": "Sven Botman",
       "position": "DEF",
+      "short_name": "Botman",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -4157,6 +4750,7 @@
       "id": 510281,
       "name": "Sávio Moreira de Oliveira",
       "position": "MID",
+      "short_name": "Sávio",
       "team": "Spurs",
       "team_id": 19
     },
@@ -4164,6 +4758,7 @@
       "id": 210156,
       "name": "Taiwo Awoniyi",
       "position": "FWD",
+      "short_name": "Awoniyi",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -4171,6 +4766,7 @@
       "id": 223723,
       "name": "Takehiro Tomiyasu",
       "position": "DEF",
+      "short_name": "Tomiyasu",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -4178,6 +4774,7 @@
       "id": 173879,
       "name": "Tammy Abraham",
       "position": "FWD",
+      "short_name": "Abraham",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -4185,6 +4782,7 @@
       "id": 248056,
       "name": "Tanaka Ao",
       "position": "MID",
+      "short_name": "Tanaka",
       "team": "Leeds",
       "team_id": 13
     },
@@ -4192,6 +4790,7 @@
       "id": 522047,
       "name": "Tarik Muharemović",
       "position": "DEF",
+      "short_name": "Muharemović",
       "team": "Leeds",
       "team_id": 13
     },
@@ -4199,6 +4798,7 @@
       "id": 501459,
       "name": "Tatsuhiro Sakamoto",
       "position": "MID",
+      "short_name": "Sakamoto",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -4206,6 +4806,7 @@
       "id": 245719,
       "name": "Taylor Harwood-Bellis",
       "position": "DEF",
+      "short_name": "Harwood-Bellis",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -4213,6 +4814,7 @@
       "id": 586309,
       "name": "Thierno Barry",
       "position": "FWD",
+      "short_name": "Barry",
       "team": "Everton",
       "team_id": 9
     },
@@ -4220,6 +4822,7 @@
       "id": 444307,
       "name": "Thimothée Lo-Tutala",
       "position": "GK",
+      "short_name": "Lo-Tutala",
       "team": "Hull City",
       "team_id": 11
     },
@@ -4227,6 +4830,7 @@
       "id": 93605,
       "name": "Thomas Meunier",
       "position": "DEF",
+      "short_name": "Meunier",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -4234,6 +4838,7 @@
       "id": 433036,
       "name": "Tijjani Reijnders",
       "position": "MID",
+      "short_name": "Reijnders",
       "team": "Man City",
       "team_id": 15
     },
@@ -4241,6 +4846,7 @@
       "id": 490094,
       "name": "Tim Iroegbunam",
       "position": "MID",
+      "short_name": "Iroegbunam",
       "team": "Hull City",
       "team_id": 11
     },
@@ -4248,6 +4854,7 @@
       "id": 166477,
       "name": "Timothy Castagne",
       "position": "DEF",
+      "short_name": "Castagne",
       "team": "Fulham",
       "team_id": 10
     },
@@ -4255,6 +4862,7 @@
       "id": 441191,
       "name": "Tino Livramento",
       "position": "DEF",
+      "short_name": "Livramento",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -4262,6 +4870,7 @@
       "id": 490881,
       "name": "Toby Collyer",
       "position": "MID",
+      "short_name": "Collyer",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -4269,6 +4878,7 @@
       "id": 76357,
       "name": "Tom Cairney",
       "position": "MID",
+      "short_name": "Cairney",
       "team": "Fulham",
       "team_id": 10
     },
@@ -4276,6 +4886,7 @@
       "id": 21205,
       "name": "Tom Heaton",
       "position": "GK",
+      "short_name": "Heaton",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -4283,6 +4894,7 @@
       "id": 138001,
       "name": "Tom King",
       "position": "GK",
+      "short_name": "King",
       "team": "Everton",
       "team_id": 9
     },
@@ -4290,6 +4902,7 @@
       "id": 549074,
       "name": "Tom Watson",
       "position": "MID",
+      "short_name": "Watson",
       "team": "Brighton",
       "team_id": 5
     },
@@ -4297,6 +4910,7 @@
       "id": 109646,
       "name": "Tosin Adarabioyo",
       "position": "DEF",
+      "short_name": "Tosin",
       "team": "Spurs",
       "team_id": 19
     },
@@ -4304,6 +4918,7 @@
       "id": 487676,
       "name": "Trai Hume",
       "position": "DEF",
+      "short_name": "Hume",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -4311,6 +4926,7 @@
       "id": 180736,
       "name": "Trevoh Chalobah",
       "position": "DEF",
+      "short_name": "Chalobah",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -4318,6 +4934,7 @@
       "id": 591386,
       "name": "Trey Nyoni",
       "position": "MID",
+      "short_name": "Nyoni",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -4325,6 +4942,7 @@
       "id": 569577,
       "name": "Triston Rowe",
       "position": "DEF",
+      "short_name": "Rowe",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -4332,6 +4950,7 @@
       "id": 200785,
       "name": "Tyler Adams",
       "position": "MID",
+      "short_name": "Adams",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -4339,6 +4958,7 @@
       "id": 538638,
       "name": "Tyler Bindon",
       "position": "DEF",
+      "short_name": "Bindon",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -4346,6 +4966,7 @@
       "id": 496661,
       "name": "Tyler Dibling",
       "position": "MID",
+      "short_name": "Dibling",
       "team": "Everton",
       "team_id": 9
     },
@@ -4353,6 +4974,7 @@
       "id": 519913,
       "name": "Tyler Fletcher",
       "position": "MID",
+      "short_name": "Fletcher",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -4360,6 +4982,7 @@
       "id": 547676,
       "name": "Tyler Fredricson",
       "position": "DEF",
+      "short_name": "Fredricson",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -4367,6 +4990,7 @@
       "id": 244723,
       "name": "Tyrick Mitchell",
       "position": "DEF",
+      "short_name": "Mitchell",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -4374,6 +4998,7 @@
       "id": 550615,
       "name": "Tyrique George",
       "position": "MID",
+      "short_name": "George",
       "team": "Everton",
       "team_id": 9
     },
@@ -4381,6 +5006,7 @@
       "id": 149484,
       "name": "Tyrone Mings",
       "position": "DEF",
+      "short_name": "Mings",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -4388,6 +5014,7 @@
       "id": 601767,
       "name": "Vakhtang Salia",
       "position": "FWD",
+      "short_name": "Salia",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -4395,6 +5022,7 @@
       "id": 543158,
       "name": "Valentín Barco",
       "position": "MID",
+      "short_name": "Barco",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -4402,6 +5030,7 @@
       "id": 620487,
       "name": "Veljko Milosavljevic",
       "position": "DEF",
+      "short_name": "Milosavljević",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -4409,6 +5038,7 @@
       "id": 184667,
       "name": "Victor Lindelöf",
       "position": "DEF",
+      "short_name": "Lindelöf",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -4416,6 +5046,7 @@
       "id": 551499,
       "name": "Victor Munoz",
       "position": "MID",
+      "short_name": "Munoz",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -4423,6 +5054,7 @@
       "id": 226965,
       "name": "Victor Torp",
       "position": "MID",
+      "short_name": "Torp",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -4430,6 +5062,7 @@
       "id": 224117,
       "name": "Viktor Gyökeres",
       "position": "FWD",
+      "short_name": "Gyökeres",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -4437,6 +5070,7 @@
       "id": 97032,
       "name": "Virgil van Dijk",
       "position": "DEF",
+      "short_name": "Virgil",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -4444,6 +5078,7 @@
       "id": 224967,
       "name": "Vitalii Mykolenko",
       "position": "DEF",
+      "short_name": "Mykolenko",
       "team": "Everton",
       "team_id": 9
     },
@@ -4451,6 +5086,7 @@
       "id": 204580,
       "name": "Vitaly Janelt",
       "position": "MID",
+      "short_name": "Janelt",
       "team": "Brentford",
       "team_id": 4
     },
@@ -4458,6 +5094,7 @@
       "id": 432987,
       "name": "Vitezslav Jaros",
       "position": "GK",
+      "short_name": "Jaros",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -4465,6 +5102,7 @@
       "id": 616222,
       "name": "Vitor de Oliveira Nunes dos Reis",
       "position": "DEF",
+      "short_name": "Vitor Reis",
       "team": "Man City",
       "team_id": 15
     },
@@ -4472,6 +5110,7 @@
       "id": 121709,
       "name": "Walter Benítez",
       "position": "GK",
+      "short_name": "Benitez",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -4479,6 +5118,7 @@
       "id": 519440,
       "name": "Wellity Lucky",
       "position": "DEF",
+      "short_name": "Lucky",
       "team": "Liverpool",
       "team_id": 14
     },
@@ -4486,6 +5126,7 @@
       "id": 149929,
       "name": "Wes Burns",
       "position": "MID",
+      "short_name": "Burns",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -4493,6 +5134,7 @@
       "id": 444463,
       "name": "Wesley Fofana",
       "position": "DEF",
+      "short_name": "Fofana",
       "team": "Chelsea",
       "team_id": 6
     },
@@ -4500,6 +5142,7 @@
       "id": 492859,
       "name": "Wilfried Gnonto",
       "position": "MID",
+      "short_name": "Gnonto",
       "team": "Leeds",
       "team_id": 13
     },
@@ -4507,6 +5150,7 @@
       "id": 444172,
       "name": "Will Dennis",
       "position": "GK",
+      "short_name": "Dennis",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -4514,6 +5158,7 @@
       "id": 108413,
       "name": "Will Hughes",
       "position": "MID",
+      "short_name": "Hughes",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -4521,6 +5166,7 @@
       "id": 538207,
       "name": "William Osula",
       "position": "FWD",
+      "short_name": "Osula",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -4528,6 +5174,7 @@
       "id": 462424,
       "name": "William Saliba",
       "position": "DEF",
+      "short_name": "Saliba",
       "team": "Arsenal",
       "team_id": 1
     },
@@ -4535,6 +5182,7 @@
       "id": 437505,
       "name": "Wilson Isidor",
       "position": "FWD",
+      "short_name": "Isidor",
       "team": "Sunderland",
       "team_id": 20
     },
@@ -4542,6 +5190,7 @@
       "id": 550839,
       "name": "Wilson Odobert",
       "position": "MID",
+      "short_name": "Odobert",
       "team": "Spurs",
       "team_id": 19
     },
@@ -4549,6 +5198,7 @@
       "id": 204561,
       "name": "Xaver Schlager",
       "position": "MID",
+      "short_name": "Schlager",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -4556,6 +5206,7 @@
       "id": 493362,
       "name": "Xavi Simons",
       "position": "MID",
+      "short_name": "Xavi",
       "team": "Spurs",
       "team_id": 19
     },
@@ -4563,6 +5214,7 @@
       "id": 592031,
       "name": "Yankuba Minteh",
       "position": "MID",
+      "short_name": "Minteh",
       "team": "Brighton",
       "team_id": 5
     },
@@ -4570,6 +5222,7 @@
       "id": 242893,
       "name": "Yann Gboho",
       "position": "MID",
+      "short_name": "Gboho",
       "team": "Coventry City",
       "team_id": 7
     },
@@ -4577,6 +5230,7 @@
       "id": 509416,
       "name": "Yasin Ayari",
       "position": "MID",
+      "short_name": "Ayari",
       "team": "Brighton",
       "team_id": 5
     },
@@ -4584,6 +5238,7 @@
       "id": 508395,
       "name": "Yehor Yarmoliuk",
       "position": "MID",
+      "short_name": "Yarmoliuk",
       "team": "Brentford",
       "team_id": 4
     },
@@ -4591,6 +5246,7 @@
       "id": 216646,
       "name": "Yoane Wissa",
       "position": "FWD",
+      "short_name": "Wissa",
       "team": "Newcastle",
       "team_id": 17
     },
@@ -4598,6 +5254,7 @@
       "id": 661016,
       "name": "Younes Ibrahim",
       "position": "MID",
+      "short_name": "Ibrahim",
       "team": "Brighton",
       "team_id": 5
     },
@@ -4605,6 +5262,7 @@
       "id": 166989,
       "name": "Youri Tielemans",
       "position": "MID",
+      "short_name": "Tielemans",
       "team": "Man Utd",
       "team_id": 16
     },
@@ -4612,6 +5270,7 @@
       "id": 488024,
       "name": "Yéremy Pino Santos",
       "position": "MID",
+      "short_name": "Yeremy",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -4619,6 +5278,7 @@
       "id": 549067,
       "name": "Zach Abbott",
       "position": "DEF",
+      "short_name": "Abbott",
       "team": "Nott'm Forest",
       "team_id": 18
     },
@@ -4626,6 +5286,7 @@
       "id": 700308,
       "name": "Zadok Yohanna",
       "position": "MID",
+      "short_name": "Yohanna",
       "team": "Brighton",
       "team_id": 5
     },
@@ -4633,6 +5294,7 @@
       "id": 559152,
       "name": "Zavier Gozo",
       "position": "MID",
+      "short_name": "Gozo",
       "team": "Crystal Palace",
       "team_id": 8
     },
@@ -4640,6 +5302,7 @@
       "id": 431639,
       "name": "Zian Flemming",
       "position": "FWD",
+      "short_name": "Flemming",
       "team": "Ipswich Town",
       "team_id": 12
     },
@@ -4647,6 +5310,7 @@
       "id": 433969,
       "name": "Zion Suzuki",
       "position": "GK",
+      "short_name": "Suzuki",
       "team": "Aston Villa",
       "team_id": 2
     },
@@ -4654,6 +5318,7 @@
       "id": 561245,
       "name": "Álvaro Rodríguez",
       "position": "FWD",
+      "short_name": "Rodríguez",
       "team": "Bournemouth",
       "team_id": 3
     },
@@ -4661,6 +5326,7 @@
       "id": 553783,
       "name": "Óscar Zambrano",
       "position": "MID",
+      "short_name": "Zambrano",
       "team": "Hull City",
       "team_id": 11
     },
@@ -4668,6 +5334,7 @@
       "id": 457569,
       "name": "Đorđe Petrović",
       "position": "GK",
+      "short_name": "Petrović",
       "team": "Bournemouth",
       "team_id": 3
     }

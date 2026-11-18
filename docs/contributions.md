@@ -28,6 +28,12 @@ both the site and backend checkout. Missing or invalid catalogs return 503; the 
 silently falls back to the restricted optimizer pool. Refresh it when publishing a new
 capture, including transfers and new registrations. Comment storage remains separate.
 
+The catalog also carries each element's published `web_name` as optional `short_name`.
+LLMOPT uses it alongside the full name, so instructions such as "buy Beto" reach the
+correct player candidates. Older catalogs remain readable. Release an enriched catalog
+with the backend version that accepts `short_name`; do not copy it into an older active
+backend's data directory, whose closed catalog validator rejects the extra field.
+
 The existing backend composition creates `contributions.sqlite3` under its configured store
 root on first access. SQLite is in the Python standard library; no additional dependency or
 service is required. This file is separate from prediction artifacts and advice queues.
