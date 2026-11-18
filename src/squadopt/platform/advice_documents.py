@@ -229,7 +229,7 @@ def advice_read_schema() -> dict[str, Any]:
             "gameweek": {"type": "integer", "minimum": 1},
             "transfers_in": {"type": "array", "items": player},
             "transfers_out": {"type": "array", "items": player},
-            "transfer_hit_points": {"type": "number"},
+            "transfer_hit_points": {"type": "number", "minimum": 0},
             "chip": chip,
             "free_transfers_before": {"type": "integer", "minimum": 0},
             "free_transfers_after": {"type": "integer", "minimum": 0},
@@ -253,7 +253,6 @@ def advice_read_schema() -> dict[str, Any]:
     optional_fields: dict[str, Any] = {
         name: {"type": "number"}
         for name in (
-            "transfer_hit_points",
             "expected_points_cost",
             "expected_points_cost_ceiling",
             "overlap_count",
@@ -265,6 +264,7 @@ def advice_read_schema() -> dict[str, Any]:
     }
     optional_fields.update(
         {
+            "transfer_hit_points": {"type": "number", "minimum": 0},
             "source_snapshot_id": {"type": ["string", "null"]},
             "bank_after_tenths": {"type": "integer", "minimum": 0},
             "free_transfers_after": {"type": "integer", "minimum": 0},
@@ -474,7 +474,7 @@ def advice_read_schema() -> dict[str, Any]:
                 "properties": {
                     "kind": {"enum": ["within_free_transfers", "with_hits"]},
                     "overlap_applied": {"type": "number"},
-                    "transfer_hit_points": nullable_number,
+                    "transfer_hit_points": {**nullable_number, "minimum": 0},
                     "expected_points_cost": {"type": "number"},
                     "expected_points_cost_ceiling": {"type": "number"},
                 },

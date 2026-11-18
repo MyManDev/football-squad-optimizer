@@ -225,11 +225,17 @@ export function forwardedTree({
   /** The pages handed in, else page 1 read once; a standalone entry has no league to read. */
   async function knownPages(): Promise<readonly ForwardedTable[]> {
     if (standingsPages.length > 0 || league.leagueId <= 0) return standingsPages;
-    firstPage ??= sources.standings(league.leagueId, 1).then((read) => {
-      if (!read.ok) throw new LeagueDataError(`The standings could not be read: ${read.reason}.`);
-      standingsPages.push(read.document);
-      return read.document;
-    });
+    firstPage ??= sources
+      .standings(league.leagueId, 1)
+      .then((read) => {
+        if (!read.ok) throw new LeagueDataError(`The standings could not be read: ${read.reason}.`);
+        standingsPages.push(read.document);
+        return read.document;
+      })
+      .catch((error: unknown) => {
+        firstPage = null;
+        throw error;
+      });
     await firstPage;
     return standingsPages;
   }
@@ -262,6 +268,11 @@ export function forwardedTree({
           throw new LeagueDataMissing(`entries/${entryId}.json`);
         }
         throw new LeagueDataError(`The bundle of ${entryId} could not be read: ${read.reason}.`);
+      });
+      const pending = squad;
+      squad = pending.catch((error: unknown) => {
+        if (squads.get(entryId) === squad) squads.delete(entryId);
+        throw error;
       });
       squads.set(entryId, squad);
     }
@@ -338,6 +349,11 @@ export function forwardedTree({
         if (read.reason === "entry_not_found" || read.reason === "not_found") return null;
         throw new LeagueDataError(`The season of ${entryId} could not be read: ${read.reason}.`);
       });
+      const pending = season;
+      season = pending.catch((error: unknown) => {
+        if (seasons.get(entryId) === season) seasons.delete(entryId);
+        throw error;
+      });
       seasons.set(entryId, season);
     }
     return season;
@@ -372,7 +388,10 @@ export function forwardedTree({
         events: calendar.document,
         fixtures,
       });
-    })();
+    })().catch((error: unknown) => {
+      board = null;
+      throw error;
+    });
     return board;
   }
 

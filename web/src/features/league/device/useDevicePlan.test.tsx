@@ -882,6 +882,26 @@ describe("a solve that runs too long, or is no longer wanted", () => {
     expect(created[1]!.terminated).toBe(false);
   });
 
+  it("ignores a late error from a reset worker and still handles the current worker's error", async () => {
+    const timers = new HandTimers();
+    const created: SilentSolver[] = [];
+    await solving(timers, created);
+    await act(async () => screen.getByText("reset").click());
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(created).toHaveLength(2));
+    await act(async () => created[0]!.onerror?.(new Error("old worker")));
+    expect(created[1]!.terminated).toBe(false);
+    expect(screen.getByTestId("phase")).toHaveTextContent("solving");
+    expect(timers.waiting.size).toBe(1);
+    await act(async () => created[1]!.onerror?.(new Error("current worker")));
+    expect(created[1]!.terminated).toBe(true);
+    expect(screen.getByTestId("phase")).toHaveTextContent("failed");
+    expect(timers.waiting.size).toBe(0);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(created).toHaveLength(3));
+    expect(created[2]!.terminated).toBe(false);
+  });
+
   it("ends the worker of a solve that a new selection interrupts", async () => {
     const timers = new HandTimers();
     const created: SilentSolver[] = [];

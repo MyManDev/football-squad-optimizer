@@ -66,13 +66,11 @@ def _world_context(world: dict[str, Any]) -> tuple[Any, Any, Any]:
 
 def _legal_squad(world: dict[str, Any]) -> list[int]:
     # The world's shape is 3 GK / 8 DEF / 8 MID / 5 FWD with codes 1001..1024 in
-    # position blocks. "Legal" here means the 2-5-5-3 *shape* only: this fifteen holds
-    # four from Club 1 and four from Club 2, which the game's three-per-club rule
-    # forbids, and it holds the injured 1005. Both are deliberate — the member's first
-    # decision is a repair, which is what ``test_a_squad_that_needs_transfers_to_be_legal_
-    # falls_back_to_the_hit_plan`` (test_advise_entry.py) exists to cover. It is also why
-    # this world's plan cannot respond to MEMBER_PLANNING_POLICY's caution margin: use
-    # ``DISCRETIONARY_SQUAD`` below for a member whose transfers are a choice.
+    # position blocks. "Legal" here means the 2-5-5-3 *shape*: this fifteen deliberately
+    # holds four from Club 1, four from Club 2 and the injured 1005. The excess holdings
+    # may be kept after a real club move; any fantasy transfer must correct both clubs.
+    # Holding alone does not force a repair. Use ``DISCRETIONARY_SQUAD`` below for a
+    # member whose transfers can respond to MEMBER_PLANNING_POLICY's caution margin.
     codes = [1001, 1002]  # GK
     codes += [1004, 1005, 1006, 1007, 1008]  # DEF
     codes += [1012, 1013, 1014, 1015, 1016]  # MID
@@ -1313,8 +1311,8 @@ def test_paths_for_the_wrong_gameweek_are_refused(world: dict[str, Any], tmp_pat
 
 
 def _squad_b(world: dict[str, Any]) -> list[int]:
-    # A second legal fifteen sharing few players with `_legal_squad`, so the overlap
-    # bands bind rather than being satisfied for free.
+    # A second fifteen with the same positional shape and excess club holdings,
+    # sharing few players with `_legal_squad`, so the overlap bands bind.
     return [
         1001,
         1003,
@@ -1455,9 +1453,20 @@ def test_the_rival_menu_is_published_per_strategy_and_rival(
                 assert isinstance(payload["captain"], dict)
             else:
                 assert not plain_path.exists()
-    # This world holds one pair no plan can satisfy — squad B cannot drop to five of
-    # member 101's eleven within its budget — and it is a recorded reason, not a crash.
-    assert unavailable_seen == [(202, "fark-yarat", 101)]
+    # Squad B cannot reach five shared players, but its grandfathered holding is a
+    # valid free plan at the nearest reachable overlap. That pair is published too.
+    assert unavailable_seen == []
+    held = json.loads(
+        (tmp_path / "menu" / "advice" / "202" / "fark-yarat" / "1" / "vs-101.json").read_bytes()
+    )["payload"]
+    assert held["moves"] == []
+    assert held["transfer_hit_points"] == 0
+    assert held["plan_kind"] == "within_free_transfers"
+    assert held["overlap_target"] == 5
+    assert held["overlap_applied"] == held["overlap_count"] == 6
+    held_players = [*held["starting_xi"], *held["bench"]]
+    assert {player["player_id"] for player in held_players} == set(_squad_b(world))
+    assert sum(player["team"] == "Club 1" for player in held_players) > 3
 
 
 def test_the_menu_does_not_move_the_baseline_bytes(world: dict[str, Any], tmp_path: Path) -> None:

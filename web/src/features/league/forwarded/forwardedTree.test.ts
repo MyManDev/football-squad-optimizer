@@ -90,6 +90,82 @@ function sources(overrides: Partial<ForwardedSources> = {}): ForwardedSources {
   };
 }
 
+describe("retrying transient forwarded failures", () => {
+  it("evicts a failed history read, coalesces its retry and retains the recovered season", async () => {
+    const entrySeason = vi
+      .fn<ForwardedSources["entrySeason"]>()
+      .mockResolvedValueOnce({ ok: false, reason: "network" })
+      .mockResolvedValue({
+        ok: true,
+        document: {
+          contract_version: "fpl_entry_season_v1",
+          entry_id: ENTRY,
+          source_time: "2026-10-19T17:30:00.000Z",
+          weeks: [],
+          chips: [],
+        },
+        copy: "hit",
+      });
+    const tree = forwardedTree({
+      league: LEAGUE,
+      table: TABLE_ENVELOPE,
+      fixtures: null,
+      sources: sources({ entrySeason }),
+    });
+    await expect(tree.raw(`history/${ENTRY}.json`)).rejects.toBeInstanceOf(LeagueDataError);
+    const answers = await Promise.all([
+      tree.raw(`history/${ENTRY}.json`),
+      tree.raw(`history/${ENTRY}.json`),
+    ]);
+    expect(answers).toHaveLength(2);
+    expect(answers[0]).toMatchObject({ payload: { entry_id: ENTRY, weeks: [] } });
+    await tree.raw(`history/${ENTRY}.json`);
+    expect(entrySeason).toHaveBeenCalledTimes(2);
+  });
+
+  it("evicts failed squad reads and keeps a successful retry shared", async () => {
+    const entryBundle = vi
+      .fn<ForwardedSources["entryBundle"]>()
+      .mockResolvedValueOnce({ ok: false, reason: "network" })
+      .mockResolvedValue(ok(bundleFor(ENTRY)));
+    const tree = forwardedTree({
+      league: LEAGUE,
+      table: TABLE_ENVELOPE,
+      fixtures: null,
+      sources: sources({ entryBundle }),
+    });
+    await expect(tree.entrySquad(ENTRY)).rejects.toBeInstanceOf(LeagueDataError);
+    const [first, second] = await Promise.all([tree.entrySquad(ENTRY), tree.entrySquad(ENTRY)]);
+    expect(first).toBe(second);
+    expect(first.payload.entry.entry_id).toBe(ENTRY);
+    expect(entryBundle).toHaveBeenCalledTimes(2);
+    expect(await tree.entrySquad(ENTRY)).toBe(first);
+  });
+
+  it("retries both the standings and scoreboard after transient failures", async () => {
+    const standings = vi
+      .fn<ForwardedSources["standings"]>()
+      .mockResolvedValueOnce({ ok: false, reason: "network" })
+      .mockResolvedValue(ok(page()));
+    const reads = sources({ standings });
+    const tree = forwardedTree({
+      league: LEAGUE,
+      table: TABLE_ENVELOPE,
+      fixtures: null,
+      sources: reads,
+    });
+    await expect(tree.members()).rejects.toBeInstanceOf(LeagueDataError);
+    await expect(tree.members()).resolves.toMatchObject({
+      payload: { league_id: LEAGUE.leagueId },
+    });
+    expect(standings).toHaveBeenCalledTimes(2);
+    await expect(tree.scoreboard()).rejects.toBeInstanceOf(LeagueDataError);
+    await expect(tree.scoreboard()).rejects.toBeInstanceOf(LeagueDataError);
+    expect(reads.events).toHaveBeenCalledTimes(2);
+    expect(standings).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("the member list", () => {
   it("is the standings rows in the published shape, with the movement the standings state", () => {
     const members = standingsMembers([page()]);

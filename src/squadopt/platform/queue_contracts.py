@@ -28,6 +28,10 @@ class AdviceQueueIntegrityError(AdviceQueueError):
     """A retained queue record cannot be trusted; its identity stays reserved."""
 
 
+class IdempotencyConflictError(ValueError):
+    """One idempotency key was reused for a different normalized request or answer."""
+
+
 def claim_order(job: AdviceJob) -> tuple[str, str]:
     """Where a queued job stands in line: by arrival, then by id.
 

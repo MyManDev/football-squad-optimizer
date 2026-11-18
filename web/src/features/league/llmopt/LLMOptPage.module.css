@@ -51,13 +51,15 @@
 
 .chat textarea,
 .editor select,
-.editor input[type="number"],
+.editor input:not([type="checkbox"]),
 .windowChoice select {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
   color: var(--color-text);
   background: var(--color-bg);
   min-height: 44px;
+  min-width: 0;
+  max-width: 100%;
   padding: var(--space-2) var(--space-3);
   font: inherit;
   font-size: 1rem;
@@ -122,7 +124,7 @@
 
 .chat textarea:focus-visible,
 .editor select:focus-visible,
-.editor input[type="number"]:focus-visible,
+.editor input:not([type="checkbox"]):focus-visible,
 .windowChoice select:focus-visible,
 .workspace button:focus-visible {
   outline: 2px solid var(--color-focus);

@@ -6,6 +6,7 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import type { EntrySquad } from "../types";
 import {
+  MAX_AVOID_PLAYERS,
   checkedPreferences,
   preferencesFromUrl,
   preferencesKey,
@@ -196,7 +197,7 @@ export function DecisionPreferencesPanel({
           {tr ? "Kadroya alma" : "Avoid player"}
           <select
             value=""
-            disabled={!position || preferences.avoid_players.length >= 15}
+            disabled={!position || preferences.avoid_players.length >= MAX_AVOID_PLAYERS}
             onChange={(e) =>
               update({ avoid_players: [...preferences.avoid_players, Number(e.target.value)] })
             }

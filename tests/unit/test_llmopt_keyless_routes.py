@@ -49,6 +49,131 @@ def _draft(player_id: int = 1, **extra: Any) -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize(
+    ("name", "message", "locale"),
+    [
+        ("Martin Ødegaard", "Buy Odegaard", "en"),
+        ("Martin Ødegaard", "Odegaardi al", "tr"),
+        ("Martin Ødegaard", "Odegaardi al", "en"),
+        ("Đorđe Petrović", "Buy Dorde", "en"),
+        ("Łukasz Fabiański", "Buy Lukasz", "en"),
+    ],
+)
+def test_unaccented_player_names_remain_available_to_prompt_and_check(
+    name: str, message: str, locale: str
+) -> None:
+    body = _request(roster=300)
+    body.pop("clarification")
+    body.update(message=message, locale=locale, draft={"hard": [], "soft": []})
+    body["players"][-1] = {"id": 1, "name": name, "team": "Arsenal", "held": False}
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        assert prompt.status_code == 200
+        assert [row["id"] for row in json.loads(prompt.json()["user"])["players"]] == [1]
+        checked = client.post(CHECK, json={"request": body, "reply": _draft(1)})
+    assert checked.status_code == 200
+    assert checked.json()["draft"]["comparison"]["player_id"] == 1
+
+
+@pytest.mark.parametrize("locale", ["en", "tr"])
+@pytest.mark.parametrize(
+    ("name", "short_name", "message"),
+    [
+        ("Norberto Bercique Gomes Betuncal", "Beto", "Buy Beto"),
+        ("Norberto Bercique Gomes Betuncal", "Beto", "Betoyu al"),
+        ("Felipe Rodrigues da Silva", "Morato", "Buy Morato"),
+        ("Sávio Moreira de Oliveira", "Savinho", "Buy Savinho"),
+        ("Eberechi Eze", "Eze", "Ezeyi al"),
+        ("Eberechi Eze", "Eze", "Eze'yi al"),
+        ("Bukayo Saka", "Saka", "Sakasiz ve Sakali karsilastir"),
+        ("Norberto Bercique Gomes Betuncal", "Beto", "Betosuz kadro istiyorum"),
+        ("Eberechi Eze", "Eze", "Ezeye yer ac"),
+        ("Bukayo Saka", "Saka", "Sakadan vazgec"),
+        ("Bukayo Saka", "Saka", "Sakanin maliyetini karsilastir"),
+        ("Norberto Bercique Gomes Betuncal", "Beto", "Betoyla kadro istiyorum"),
+        ("Eberechi Eze", "Eze", "Ezeyle kadro istiyorum"),
+    ],
+)
+def test_published_player_short_names_reach_prompt_and_checked_draft(
+    name: str, short_name: str, message: str, locale: str
+) -> None:
+    body = _request(roster=300)
+    body.pop("clarification")
+    body.update(message=message, locale=locale, draft={"hard": [], "soft": []})
+    body["players"][-1] = {
+        "id": 1,
+        "name": name,
+        "short_name": short_name,
+        "team": "Everton",
+        "held": False,
+    }
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        assert prompt.status_code == 200
+        candidates = json.loads(prompt.json()["user"])["players"]
+        assert candidates == [body["players"][-1]]
+        checked = client.post(CHECK, json={"request": body, "reply": _draft(1)})
+    assert checked.status_code == 200
+    assert checked.json()["draft"]["comparison"]["player_id"] == 1
+
+
+@pytest.mark.parametrize(
+    ("players", "message"),
+    [
+        (
+            [
+                {"id": 1, "name": "Norberto Betuncal", "short_name": "Beto"},
+                {"id": 1001, "name": "Another Player", "short_name": "Beto"},
+            ],
+            "Betoyu al",
+        ),
+        (
+            [
+                {"id": 1, "name": "Martin Ødegaard"},
+                {"id": 1001, "name": "Another Odegaard"},
+            ],
+            "Buy Odegaard",
+        ),
+    ],
+)
+def test_name_collisions_keep_all_candidates_for_model_clarification(
+    players: list[dict[str, Any]], message: str
+) -> None:
+    body = _request(roster=300)
+    body.pop("clarification")
+    body.update(message=message, locale="en", draft={"hard": [], "soft": []})
+    body["players"][-1:] = players
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+    assert prompt.status_code == 200
+    candidates = json.loads(prompt.json()["user"])["players"]
+    assert {row["id"] for row in candidates} == {1, 1001}
+
+
+def test_clarification_keeps_original_name_when_the_interface_language_changes() -> None:
+    body = _request(roster=300)
+    body.update(
+        message="Everton",
+        locale="en",
+        draft={"hard": [], "soft": []},
+        clarification={"message": "Betoyu al", "question": "Hangi tak\u0131mdaki oyuncu?"},
+    )
+    body["players"][-1] = {
+        "id": 1,
+        "name": "Norberto Bercique Gomes Betuncal",
+        "short_name": "Beto",
+        "team": "Everton",
+        "held": False,
+    }
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        assert prompt.status_code == 200
+        assert json.loads(prompt.json()["user"])["players"] == [body["players"][-1]]
+        checked = client.post(CHECK, json={"request": body, "reply": _draft(1)})
+    assert checked.status_code == 200
+    assert checked.json()["draft"]["comparison"]["player_id"] == 1
+
+
 def test_prompt_is_the_neutral_call_with_the_shortlist() -> None:
     body = _request(roster=300)
     with TestClient(create_app()) as client:
@@ -280,6 +405,229 @@ def test_check_reads_a_reply_that_leaves_out_its_empty_parts(
         checked = client.post(CHECK, json={"request": _request(), "reply": reply})
     assert checked.status_code == 200, checked.text
     assert checked.json() == expected
+
+
+@pytest.mark.parametrize("as_text", [False, True])
+@pytest.mark.parametrize("hard_mode", ["omitted", "null", "clear", "replace"])
+def test_model_reply_preserves_omitted_required_rules_and_allows_explicit_edits(
+    hard_mode: str, as_text: bool
+) -> None:
+    required = [
+        {"kind": "wildcard"},
+        {"kind": "no_hits"},
+        {"kind": "club_count", "club": "Brighton", "count": 3, "scope": "transfers_in"},
+    ]
+    body: dict[str, Any] = {
+        "message": "Mümkünse Salah da olsun.",
+        "locale": "tr",
+        "draft": {"hard": required, "soft": [], "window": 3},
+        "players": [{"id": 1, "name": "Mohamed Salah", "team": "Brighton", "held": True}],
+    }
+    revised: dict[str, Any] = {"soft": [{"kind": "include_player", "player_id": 1}]}
+    expected_hard = required
+    if hard_mode == "null":
+        revised["hard"] = None
+    elif hard_mode == "clear":
+        body["message"] = (
+            "Kesin kurallar\u0131n tamam\u0131n\u0131 kald\u0131r. Mümkünse Salah olsun."
+        )
+        revised["hard"] = expected_hard = []
+    elif hard_mode == "replace":
+        body["message"] = "Wildcard ve Brighton şartlar\u0131n\u0131 kald\u0131r, ceza alma."
+        revised["hard"] = expected_hard = [{"kind": "no_hits"}]
+    reply = {"status": "draft", "draft": revised}
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        checked = client.post(
+            CHECK,
+            json={"request": body, "reply": json.dumps(reply) if as_text else reply},
+        )
+    assert prompt.status_code == checked.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
+    assert checked.json() == {
+        "status": "draft",
+        "draft": {
+            "hard": expected_hard,
+            "soft": [{"kind": "include_player", "player_id": 1}],
+            "window": 3,
+        },
+    }
+    assert body["draft"]["hard"] == required
+
+
+@pytest.mark.parametrize("hard", [None, "keep the rules", {}])
+def test_confirmed_request_still_needs_a_valid_required_rule_list(hard: object) -> None:
+    body = _request()
+    body["draft"]["hard"] = hard
+    with TestClient(create_app()) as client:
+        checked = client.post(CHECK, json={"request": body, "reply": _draft()})
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "VALIDATION_FAILED"
+
+
+def test_confirmed_request_cannot_omit_its_required_rule_list() -> None:
+    body = _request()
+    del body["draft"]["hard"]
+    with TestClient(create_app()) as client:
+        checked = client.post(CHECK, json={"request": body, "reply": _draft()})
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "VALIDATION_FAILED"
+
+
+@pytest.mark.parametrize("null_lists", [False, True])
+def test_partial_hard_rule_edit_preserves_wish_cost_bank_floor_and_frozen_weeks(
+    null_lists: bool,
+) -> None:
+    original = {
+        "hard": [{"kind": "no_hits"}],
+        "soft": [{"kind": "keep_player", "player_id": 1, "max_cost_tenths": 15}],
+        "keep_weeks": [1],
+        "min_bank": {"tenths": 5, "week": 2},
+        "window": 3,
+    }
+    hard = [*original["hard"], {"kind": "include_player", "player_id": 2}]
+    revised = {"hard": hard}
+    if null_lists:
+        revised.update({"soft": None, "keep_weeks": None})
+    body = {
+        **_request(roster=2),
+        "message": "Also require Other 2 in the squad.",
+        "draft": original,
+        "reference_weeks": [1, 2, 3],
+    }
+    reply = {"status": "draft", "draft": revised}
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+    assert prompt.status_code == checked.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
+    expected = {"status": "draft", "draft": {**original, "hard": hard}}
+    assert checked.json() == expected
+
+
+def test_explicit_empty_lists_clear_reviewed_wishes_and_frozen_weeks() -> None:
+    body = {
+        **_request(),
+        "message": "Remove the wish and release the frozen week.",
+        "draft": {
+            "hard": [{"kind": "no_hits"}],
+            "soft": [{"kind": "keep_player", "player_id": 1, "max_cost_tenths": 15}],
+            "keep_weeks": [1],
+            "window": 3,
+        },
+        "reference_weeks": [1],
+    }
+    reply = {"status": "draft", "draft": {"soft": [], "keep_weeks": []}}
+    with TestClient(create_app()) as client:
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+    assert checked.status_code == 200
+    assert checked.json() == {
+        "status": "draft",
+        "draft": {"hard": [{"kind": "no_hits"}], "soft": [], "window": 3},
+    }
+
+
+@pytest.mark.parametrize("clear", [False, True])
+@pytest.mark.parametrize(
+    ("field", "selection"),
+    [
+        ("comparison", {"kind": "include_player", "player_id": 1, "both": True}),
+        ("min_bank", {"tenths": 12, "week": 2}),
+        ("scenario", {"kind": "unavailable", "player_id": 1, "week": 2}),
+    ],
+)
+def test_partial_reply_keeps_optional_selection_until_explicit_null(
+    field: str, selection: dict[str, Any], clear: bool
+) -> None:
+    original = {"hard": [{"kind": "no_hits"}], "soft": [], "window": 3, field: selection}
+    body = {
+        **_request(),
+        "message": "Remove that selection." if clear else "Keep the same requirements.",
+        "draft": original,
+        "reference_weeks": [1, 2, 3],
+    }
+    reply = {
+        "status": "draft",
+        "draft": {"hard": [{"kind": "no_hits"}], **({field: None} if clear else {})},
+    }
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+    assert prompt.status_code == checked.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
+    expected = {key: value for key, value in original.items() if not clear or key != field}
+    assert checked.json() == {"status": "draft", "draft": expected}
+
+
+def test_retained_frozen_week_still_requires_a_solved_reference() -> None:
+    body = {
+        **_request(),
+        "message": "Keep the reviewed plan.",
+        "draft": {"hard": [{"kind": "no_hits"}], "soft": [], "keep_weeks": [2], "window": 3},
+        "reference_weeks": [1],
+    }
+    with TestClient(create_app()) as client:
+        checked = client.post(
+            CHECK,
+            json={"request": body, "reply": {"status": "draft", "draft": {"hard": []}}},
+        )
+    assert checked.status_code == 200
+    assert checked.json()["status"] == "clarification"
+
+
+@pytest.mark.parametrize("scope", ["squad", "transfers_in"])
+@pytest.mark.parametrize("clarify", [False, True])
+def test_conflicting_editable_club_counts_can_be_corrected_through_chat(
+    scope: str, clarify: bool
+) -> None:
+    general = {"kind": "club_count", "club": "LIV", "count": 3}
+    if scope == "transfers_in":
+        general["scope"] = scope
+    conflicting = {**general, "count": 2, "week": 2}
+    body = {
+        **_request(),
+        "message": "Remove the second-week count and keep three players in every week.",
+        "draft": {"hard": [general, conflicting], "soft": [], "window": 3},
+    }
+    reply = (
+        {"status": "clarification", "message": "Which of the two counts should I keep?"}
+        if clarify
+        else {"status": "draft", "draft": {"hard": [general]}}
+    )
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+    assert prompt.status_code == checked.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
+    if clarify:
+        assert checked.json() == reply
+    else:
+        assert checked.json() == {
+            "status": "draft",
+            "draft": {"hard": [general], "soft": [], "window": 3},
+        }
+
+
+@pytest.mark.parametrize("scope", ["squad", "transfers_in"])
+def test_a_model_must_resolve_conflicting_club_counts_before_the_draft_is_accepted(
+    scope: str,
+) -> None:
+    general = {"kind": "club_count", "club": "LIV", "count": 3}
+    if scope == "transfers_in":
+        general["scope"] = scope
+    body = {
+        **_request(),
+        "message": "Help me fix the conflicting club rules.",
+        "draft": {"hard": [general, {**general, "count": 2, "week": 2}], "soft": [], "window": 3},
+    }
+    reply = {"status": "draft", "draft": {"hard": body["draft"]["hard"]}}
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+    assert prompt.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "REPLY_REFUSED"
 
 
 @pytest.mark.parametrize(

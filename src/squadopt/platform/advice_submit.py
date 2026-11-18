@@ -61,14 +61,11 @@ from squadopt.platform.api_contract import (
     validate_idempotency_key,
 )
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.queue_contracts import IdempotencyConflictError as IdempotencyConflictError
 from squadopt.platform.queue_contracts import JobProgress
 from squadopt.platform.worker_heartbeat import LivenessLook
 
 _DEFAULT_IDEMPOTENCY_PREFIX: Final = "auto"
-
-
-class IdempotencyConflictError(ValueError):
-    """One idempotency key was reused for a different normalized request."""
 
 
 class RateLimitedError(ValueError):
@@ -321,8 +318,8 @@ class AdviceSubmitService:
         few times was refused the one request that needed a solve. Only a miss, which
         is a request for work, consults the limiter: the client's address bucket at once,
         the member's entry bucket only once the job is admitted. Deduplication scans open
-        jobs by fingerprint: at most one open job exists per normalized request, however
-        many keys or clients ask.
+        jobs by the complete answer key: at most one open job exists per answer, however
+        many keys or clients ask. The queue retains each joining key's request identity.
         """
 
         client_bucket = client_address_bucket(client_bucket)
@@ -417,7 +414,8 @@ class AdviceSubmitService:
         # lock but by cache key only. Two submissions from the api's thread pool could both
         # read a history without the other's job, so one key was accepted for two requests.
         # One lock per process holds the read through the write; resolving, the cache read
-        # and the rate limit stay outside it. Separate api processes are not serialized.
+        # and the rate limit stay outside it. Separate API processes also check durable
+        # key bindings inside the queue's final transaction.
         with self._admission:
             # Read before entering the queue transaction: jobs() takes that same lock.
             # Admission is serialized in this API process; duplicate jobs never call admit.

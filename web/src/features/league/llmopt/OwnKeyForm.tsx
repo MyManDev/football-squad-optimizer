@@ -55,6 +55,16 @@ export function OwnKeyForm({
   const ready =
     model.trim() !== "" && (local ? localBaseUrl(baseUrl) !== null : keyTyped) && !disabled;
 
+  useEffect(() => {
+    // An unsaved key is still in the DOM when the browser caches the departing document.
+    function wipeOnPageHide() {
+      if (keyField.current) keyField.current.value = "";
+      setKeyTyped(false);
+    }
+    window.addEventListener("pagehide", wipeOnPageHide);
+    return () => window.removeEventListener("pagehide", wipeOnPageHide);
+  }, []);
+
   function wipeKeyField() {
     if (keyField.current) keyField.current.value = "";
     setKeyTyped(false);

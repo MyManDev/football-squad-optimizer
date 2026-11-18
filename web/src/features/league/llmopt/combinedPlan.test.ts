@@ -72,6 +72,18 @@ describe("combinedCandidates", () => {
     expect(combinedCandidates(three, review(three, ["above", "above", "skipped"]))).toEqual([2]);
   });
 
+  it("requires a bounded rule's own price before adding it to a combined plan", () => {
+    const bounded = run({
+      hard: [],
+      soft: [include(901), include(902), { ...include(903), max_cost_tenths: 0 }],
+    });
+    expect(bounded.prices.map(({ outcome }) => outcome)).toEqual([0, 1, "skipped"]);
+    expect(
+      combinedCandidates(bounded, review(bounded, ["accepted", "accepted", "skipped"])),
+    ).toEqual([0, 1]);
+    expect(combinedCandidates(bounded, review(bounded, ["above", "above", "skipped"]))).toBeNull();
+  });
+
   it("leaves a conflicting rule out of the candidates", () => {
     const heldId = squad.starting_xi[0]!.player_id;
     const mixed = run({
@@ -139,5 +151,20 @@ describe("prepareCombined", () => {
     const three = run({ hard: [], soft: [include(901), include(902), include(903)] });
     const first = prepareCombined(three, [0, 1, 2]);
     expect(prepareCombined(three, first.applied)).toEqual(first);
+  });
+
+  it("filters an unpriced bounded rule from a previously saved combined selection", () => {
+    const bounded = run({
+      hard: [],
+      soft: [
+        { ...include(901), max_cost_tenths: 15 },
+        include(902),
+        { ...include(903), max_cost_tenths: 0 },
+      ],
+    });
+    const combined = prepareCombined(bounded, [0, 1, 2]);
+    expect(combined.applied).toEqual([0, 1]);
+    expect(combined.request?.preferences.include_players).toEqual([901, 902]);
+    expect(prepareCombined(bounded, [2])).toEqual({ applied: [], request: null });
   });
 });
