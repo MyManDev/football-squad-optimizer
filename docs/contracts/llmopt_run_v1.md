@@ -19,6 +19,11 @@ gets a tombstone so cancellation can win a race with first submission. An unshar
 job is cancelled; a running solve retains its lease and its result is discarded for the
 closed run. A shared job remains available to its active consumers.
 
+A pre-existing V1 job keeps its original consumer and execution policy when a run joins
+it. Joining starts no additional server work; abandoning the join cannot cancel or fence
+that original work. The run conservatively reserves capacity for the join, while the new
+execution budget and result fence apply to newly admitted V2 jobs.
+
 Run-owned jobs use [`backend_jobs_v2.schema.json`](backend_jobs_v2.schema.json). V2 adds
 terminal `cancelled` and the edges `queued -> cancelled`, `running -> cancelled`; the
 running edge is used only when computation returns, never to interrupt the solver.

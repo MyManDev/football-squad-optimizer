@@ -641,7 +641,13 @@ def build_advice_compute(
 
     def admitted_compute(job: AdviceJob) -> bytes:
         try:
-            budget = None if runs is None else runs.allocation(job.job_id)
+            # Joining an existing V1 job does not transfer its original consumer's
+            # ownership. Only run-owned V2 work receives this allocation and fence.
+            budget = (
+                runs.allocation(job.job_id)
+                if runs is not None and job.contract_version == "backend_jobs_v2"
+                else None
+            )
             if budget is None and job.contract_version == "backend_jobs_v2":
                 raise RunAdmissionError(
                     "RUN_STORE_UNAVAILABLE", "The admitted work is unavailable."

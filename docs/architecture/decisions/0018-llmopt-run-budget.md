@@ -46,6 +46,9 @@ four jobs and makes twelve internal calls at one week, sixteen at three weeks.
    killed: its result is ignored for the abandoned run and cannot start another request.
    Shared jobs are retained for other active consumers. `backend_jobs_v1` remains readable;
    run-owned jobs use `backend_jobs_v2` with the explicit queued-to-cancelled transition.
+   Joining a pre-existing V1 job is read-only: it creates no work, and does not transfer its
+   original consumer's ownership or execution policy. A joined run still reserves capacity
+   conservatively, but only newly admitted V2 work receives the run's execution fence.
 8. A capacity refusal shows completed plans and one bilingual sentence for unfinished
    work. Internal solver/budget/proof details do not become page explanation text.
 9. Advice-cache identity and immutable job-spec identity exclude run metadata: the same
