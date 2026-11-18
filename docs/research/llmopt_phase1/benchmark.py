@@ -43,7 +43,21 @@ SCENARIOS = ("normal", "wildcard", "freehit", "tight_bank", "conflicting_instruc
 
 def write(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def provenance():
+    return dict(
+        repository_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        source_sha256={
+            p.name: hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+            for p in sorted(HERE.iterdir())
+            if p.suffix in (".py", ".mjs", ".ts")
+        },
+        input_manifest_sha256=digest(json.loads((HERE / "inputs.json").read_text())),
+    )
 
 
 def snapshots():
@@ -89,7 +103,22 @@ def capture_solves():
 
     def native(packet, seconds):
         started = perf_counter()
-        result = execute_native_window(packet, seconds)
+        try:
+            result = execute_native_window(packet, seconds)
+        except (RuntimeError, OSError, ValueError) as error:
+            calls.append(
+                dict(
+                    backend="highs-native",
+                    status="ERROR",
+                    error=type(error).__name__,
+                    seconds=perf_counter() - started,
+                    objective_raw=None,
+                    best_bound_raw=None,
+                    threads=1,
+                    wall_cap_seconds=seconds,
+                )
+            )
+            raise
         calls.append(
             dict(
                 backend="highs-native",
@@ -310,8 +339,9 @@ def expected_comparison(call, frozen):
     )
 
 
-def measure(output, limit):
+def measure(output, limit, resume=False):
     output.mkdir(parents=True, exist_ok=True)
+    stamp = provenance()
     count = 0
     for frozen, inputs in snapshots():
         for member_index, entry_id in enumerate(sorted(inputs.members)):
@@ -320,8 +350,16 @@ def measure(output, limit):
             case = f"gw{inputs.gameweek}-{entry_id}"
             scenario = SCENARIOS[count % len(SCENARIOS)]
             target = output / f"{case}.json"
-            receipt = dict(case=case, scenario=scenario, capture=inputs.capture, windows={})
+            receipt = dict(
+                case=case, scenario=scenario, capture=inputs.capture, windows={}, provenance=stamp
+            )
+            if resume and target.exists():
+                receipt = json.loads(target.read_text())
+                if receipt.get("provenance") != stamp:
+                    raise ValueError("Resume requires the identical committed runner and inputs.")
             for window in (1, 3):
+                if str(window) in receipt["windows"]:
+                    continue
                 call = (
                     one_week_call(inputs, entry_id)
                     if window == 1
@@ -342,9 +380,10 @@ def measure(output, limit):
                 write(target, receipt)
             print(f"{case} expected-window comparison", flush=True)
             # Keep the member policy's discount and resource utility in the separate experiment.
-            receipt["expected_comparison"] = expected_comparison(
-                window_call(inputs, entry_id, 3), frozen
-            )
+            if "expected_comparison" not in receipt:
+                receipt["expected_comparison"] = expected_comparison(
+                    window_call(inputs, entry_id, 3), frozen
+                )
             write(target, receipt)
             count += 1
             print(f"{case} complete", flush=True)
@@ -352,20 +391,20 @@ def measure(output, limit):
 
 def aggregate(output):
     rows = [json.loads(p.read_text()) for p in sorted(output.glob("gw*.json"))]
+    if not rows or any("expected_comparison" not in row for row in rows):
+        raise ValueError("Only completed cases can be aggregated.")
+    stamp = rows[0]["provenance"]
+    if any(row["provenance"] != stamp for row in rows):
+        raise ValueError("Do not aggregate different measurement code or inputs.")
     record = dict(
         kind="llmopt_phase1_offline_replay",
-        repository_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        **stamp,
         measured_at_utc=datetime.now(UTC).isoformat(),
         python=sys.version,
         platform=platform.platform(),
         ortools=ortools.__version__,
         highs=native_window_version(),
         execution="sequential local queue admissions and planner replay; not production latency",
-        input_manifest_sha256=digest(json.loads((HERE / "inputs.json").read_text())),
-        runner_sha256={
-            p.name: hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
-            for p in sorted(HERE.glob("*.py"))
-        },
         member_weeks=len(rows),
         rows=[],
     )
@@ -419,15 +458,21 @@ def aggregate(output):
                 optional_reason=review["optional_swap"].get("reason"),
             )
         record["rows"].append(item)
-    write(HERE.parent / "llmopt_phase1_baseline.json", record)
+    target = (
+        HERE.parent / "llmopt_phase1_baseline.json"
+        if output.resolve() == (ROOT / "artifacts/llmopt_phase1").resolve()
+        else output / "summary.json"
+    )
+    write(target, record)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int)
-    parser.add_argument("--output", type=Path, default=HERE / "receipts")
+    parser.add_argument("--output", type=Path, default=ROOT / "artifacts/llmopt_phase1")
     parser.add_argument("--aggregate-only", action="store_true")
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     if not args.aggregate_only:
-        measure(args.output, args.limit)
+        measure(args.output, args.limit, args.resume)
     aggregate(args.output)

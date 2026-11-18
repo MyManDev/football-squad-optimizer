@@ -93,8 +93,24 @@ the input snapshots. The file and normalized content hashes are preserved.
 the queue's atomic hardlink writes require a process that is allowed to create hardlinks.
 
 The [result record](llmopt_phase1_baseline.json) carries code commit, runner digests and input
-digest. [Detailed receipts](llmopt_phase1/receipts/) carry plans, resource transitions, raw
-solver status/bounds and per-call counts. Wall times naturally vary between repetitions.
+digest. Detailed receipts in ignored `artifacts/llmopt_phase1/` carry plans, resource transitions,
+raw solver status/bounds and per-call counts. They are regenerated evidence, not the committed
+record (ADR 0003). Alternate `--output` paths write their own `summary.json` and cannot replace
+the committed summary. `--resume` accepts only identical committed code and input digests;
+partial cases are never aggregated. Wall times naturally vary between repetitions.
+
+After the first three full-pool pilot cases all skipped optional refinement because their
+sequential seeds did not complete, a separate diagnostic was added before its own measurement.
+[neighborhood.py](llmopt_phase1/neighborhood.py) fixes a smaller pool: all held players plus
+the top four forecast players and cheapest two players of each position, ID ties. It retains
+the same captured points/probabilities, 60-unit budget, original wrapper and two experimental
+arms. Its [separate record](llmopt_phase1_neighborhood.json) never replaces a full-pool result.
+This is a development diagnostic of proposal coverage, not a held-out result or a tuned
+operational candidate pool. Reproduce it after the full-pool run, without overlapping CPU work:
+
+```powershell
+python -m docs.research.llmopt_phase1.neighborhood
+```
 
 ## Questions reserved for the later ADR
 

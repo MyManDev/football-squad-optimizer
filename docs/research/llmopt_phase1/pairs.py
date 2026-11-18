@@ -11,6 +11,7 @@ from itertools import combinations
 from time import perf_counter
 
 from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.optimization import wall_clock_stopped_the_search
 from squadopt.planning.expected_swap import checked_work
 from squadopt.planning.lineup_utility import improve_plan_lineups
 from squadopt.planning.optimizer import optimize_transfer_plan
@@ -159,7 +160,7 @@ def propose_pairs(
             - max(0, len(package) - initial.free_transfers) * transfer.transfer_hit_cost_points
         )
         candidate = (proxy, tuple(sorted(ids)), outgoing, incoming)
-        if proxy > 0 and (best is None or candidate > best):
+        if proxy > 0 and (best is None or proxy > best[0]):
             best = candidate
     if best is None:
         return skip("no_distinct_legal_positive_package")
@@ -195,8 +196,16 @@ def propose_pairs(
         status=candidate.solver_status.name,
         actual=checked_work(candidate.diagnostics["deterministic_time_used"], deterministic_slack),
     )
+    if wall_clock_stopped_the_search(candidate.solver_status, candidate.diagnostics):
+        return skip("optional_wall_clock_truncation")
     if not candidate.has_solution:
         return skip("optional_no_solution")
+    if tuple(w.gameweek for w in candidate.weeks) != horizon.gameweeks:
+        raise ValueError("The optional path omitted a planning week.")
+    if frozenset(candidate.weeks[0].selected_squad.player_id) != frozenset(best[1]):
+        raise ValueError("The optional path changed its fixed first squad.")
+    if candidate.weeks[0].chip in {"wildcard", "freehit"}:
+        return skip("optional_first_week_rebuild")
     result = improve_plan_lineups(
         candidate, settings, transfer, preferences=preferences, max_evaluations=128
     )

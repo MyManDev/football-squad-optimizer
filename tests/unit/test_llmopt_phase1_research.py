@@ -5,6 +5,8 @@ from dataclasses import replace
 import pytest
 from docs.research.llmopt_phase1 import benchmark, pairs
 from docs.research.llmopt_phase1.freeze import digest
+from docs.research.llmopt_phase1.neighborhood import candidate_ids
+from scripts.measure_window_solver_highs import window_call
 from tests.unit.test_expected_swap import world
 
 from squadopt.contracts.preferences import DecisionPreferences
@@ -109,3 +111,32 @@ def test_hold_does_not_open_an_optional_solver_call(monkeypatch):
     )
     assert candidate is None
     assert record["solver_calls"] == 0
+
+
+def test_native_failure_still_counts_as_a_solver_attempt(monkeypatch):
+    def fail(*args):
+        raise RuntimeError("isolated child failed")
+
+    monkeypatch.setattr(benchmark, "execute_native_window", fail)
+    with (
+        benchmark.capture_solves() as calls,
+        pytest.raises(RuntimeError, match="isolated child failed"),
+    ):
+        from squadopt.planning.native_highs import _EXECUTOR
+
+        _EXECUTOR.get()({}, 1)
+    assert len(calls) == 1
+    assert calls[0]["backend"] == "highs-native"
+    assert calls[0]["status"] == "ERROR"
+
+
+def test_restricted_diagnostic_keeps_all_held_players_and_is_order_independent():
+    frozen, inputs = next(benchmark.snapshots())
+    call = window_call(inputs, min(inputs.members), 3)
+    ids = candidate_ids(call, frozen)
+    assert set(call.state.squad_player_ids) <= set(ids)
+    assert len(ids) <= 39
+    from squadopt.planning import PlanningHorizon
+
+    reversed_call = replace(call, horizon=PlanningHorizon(call.horizon.table.iloc[::-1]))
+    assert ids == candidate_ids(reversed_call, frozen)
