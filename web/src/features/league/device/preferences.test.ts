@@ -120,6 +120,48 @@ describe("hard one-week rules", () => {
 });
 
 describe("independent transfer-package oracle", () => {
+  it.each([0, 1, 4, 5])("matches hit and carry transitions with %i free transfers", (free) => {
+    const entry = { ...tinyEntry, free_transfers: free };
+    const choices = solveAlternatives(solver, tinyDocument, entry, p({ keep_players: [1, 5, 7] }));
+    const all: { squad: number[]; vector: number[] }[] = [];
+    for (let mask = 0; mask < 16; mask++) {
+      const squad = [0, 1, 2, 3].map((k) => 2 * k + 1 + ((mask >> k) & 1));
+      if (![1, 5, 7].every((id) => squad.includes(id))) continue;
+      const pts = (id: number) => tinyDocument.players[id - 1]!.expected_points;
+      const gross = Math.max(
+        ...[1, 2].map((third) => {
+          const xi = [squad[0]!, squad[third]!, squad[3]!];
+          return xi.reduce((sum, id) => sum + pts(id), 0) + Math.max(...xi.map(pts));
+        }),
+      );
+      const moves = squad.filter((id) => !entry.held.includes(id)).length;
+      const hit = 4 * Math.max(0, moves - free);
+      all.push({
+        squad,
+        vector: [gross - hit, 10 * moves, -hit, Math.min(5, Math.max(0, free - moves) + 1)],
+      });
+    }
+    const expected = all.filter(
+      (a) =>
+        !all.some(
+          (b) =>
+            b.vector.every((v, i) => v >= a.vector[i]!) &&
+            b.vector.some((v, i) => v > a.vector[i]!),
+        ),
+    );
+    expect(choices.map((a) => a.squad.join(",")).sort()).toEqual(
+      expected.map((a) => a.squad.join(",")).sort(),
+    );
+    for (const choice of choices) {
+      const state = all.find((a) => a.squad.join(",") === choice.squad.join(","))!;
+      expect([
+        choice.netPoints,
+        choice.bankTenths,
+        -choice.hitPoints,
+        choice.freeTransfersAfter,
+      ]).toEqual(state.vector);
+    }
+  });
   it("matches every Pareto package, preserves hard rules and never repeats a decision", () => {
     const preferences = p({ keep_players: [1, 5, 7], no_hits: true });
     const choices = solveAlternatives(solver, tinyDocument, tinyEntry, preferences, { gap: 0 });
