@@ -162,3 +162,7 @@ Each step is its own PR, reviewed before it is enqueued:
    chat on, since a chat that is off needs that much said. A chat-completions provider is
    given room to think (8192 reply tokens), because a reasoning model counts its thinking
    against the limit and the answer's own 1200 stopped such a model before it wrote.
+7. **No model code in the backend (2026-11-18).** `/intent`, its provider, the daily budget
+   and the `SQUADOPT_LLMOPT_*` settings are removed. `llmopt_intent.py` keeps the prompt,
+   the schema, the shortlist and the validator, which `/prompt` and `/check` use. The
+   Context above describes the backend as it was when this was decided.

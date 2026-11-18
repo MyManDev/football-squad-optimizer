@@ -64,7 +64,7 @@ from squadopt.platform.advice_read import AdviceRequestContext
 from squadopt.platform.advice_worker import build_advice_compute, run_advice_worker
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 from squadopt.platform.jobs_contract import AdviceJob
-from squadopt.platform.llmopt_intent import IntentRequest, IntentService
+from squadopt.platform.llmopt_intent import IntentRequest, parse_intent_request
 from squadopt.platform.queue_contracts import AdviceLeaseLostError, QueueLockTimeout
 
 SEASON = deployment_module.SEASON
@@ -2103,17 +2103,17 @@ def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_pa
         }
 
     captured = datetime.fromisoformat(world_module.GW2_CAPTURED_AT)
-    client = TestClient(
-        app_for_backend(backend, utc_now=lambda: captured, llmopt_intent=IntentService(interpret))
-    )
+    client = TestClient(app_for_backend(backend, utc_now=lambda: captured))
+    asked = {
+        "message": message,
+        "locale": "tr",
+        "draft": {"hard": [], "soft": []},
+        "players": [{"id": 1002, "name": "Player 1002", "team": "Club 2"}],
+    }
+    # The member's own model answers the prompt; the backend only checks the reply.
     drafted = client.post(
-        "/api/v1/llmopt/intent",
-        json={
-            "message": message,
-            "locale": "tr",
-            "draft": {"hard": [], "soft": []},
-            "players": [{"id": 1002, "name": "Player 1002", "team": "Club 2"}],
-        },
+        "/api/v1/llmopt/check",
+        json={"request": asked, "reply": interpret(parse_intent_request(asked))},
     )
     assert drafted.status_code == 200, drafted.text
     draft = drafted.json()["draft"]
