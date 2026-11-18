@@ -33,7 +33,12 @@ def probe(data_root, snapshot_id, entry_id):
         projection=project(inputs, in_season=handoff),
     )
     result = dict(
-        code_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        producer_repository_commit=subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True
+        ).strip(),
+        runner_sha256=hashlib.sha256(
+            Path(__file__).read_bytes().replace(b"\r\n", b"\n")
+        ).hexdigest(),
         snapshot_id=snapshot_id,
         entry_id=entry_id,
         football_selected=switches.football is not None,

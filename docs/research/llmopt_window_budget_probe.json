@@ -1,5 +1,4 @@
 {
-  "code_commit": "0078a43c6207026cfb506d94806101bdf7c6dc50",
   "snapshot_id": "fpl-live-20261002T104314Z-8b70515b9b31",
   "entry_id": 3832237,
   "football_selected": true,
@@ -25,5 +24,8 @@
   "has_solution": true,
   "conclusion": "accounting_error_not_reproduced",
   "seconds": 62.739835300002596,
-  "runner_sha256": "52020bf937587bfff963e1e9f9ca0241736eab5b0011ae5fab66e5a6955c73b0"
+  "runner_sha256": "52020bf937587bfff963e1e9f9ca0241736eab5b0011ae5fab66e5a6955c73b0",
+  "measured_checkout_commit": "0078a43c6207026cfb506d94806101bdf7c6dc50",
+  "producer_repository_commit": "c9821a4873cf248c41d45a7006d40bae35c3bf8d",
+  "provenance_note": "Producer commit identifies the exact measured runner bytes; the product tree was unchanged from measured_checkout_commit. Only metadata is reconciled, not a new measurement."
 }
