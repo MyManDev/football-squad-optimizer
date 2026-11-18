@@ -43,13 +43,50 @@ floor**. The 3-week call supplies **60 units** and **1,800 seconds**. Compact re
 requested/effective limits, actual work, budget exhaustion and clock-stop flags; per-call
 receipts retain each solve's parameters. Times are sequential local elapsed seconds,
 not production service or queue latency.
+The replay retains the helpers' numerical solver settings: one-week linearization is
+unspecified, whereas the served preference route uses level 2 and an explicit 20-unit,
+1,800-second limit. Three-week replay settings already match that route's 60-unit/level-2
+configuration. The one-week timings and incumbent/gap are therefore controls under the
+declared replay settings, not exact served-preference search traces.
+
+### Dispatch and policy mapping
+
+The generic replay helper's `one_week_call.protect_hold=False` describes ordinary
+`plan_transfers`, not the active-preference LLMOPT route. This harness deliberately overrides
+it with `protect_hold=True`. `net_points_priority` makes preferences active in
+[preferences.py](../../src/squadopt/contracts/preferences.py); the branch in
+[advice_menu.py](../../src/squadopt/application/advice_menu.py) calls `advise_chip_strategy`
+even for one week. That function calls `plan_transfer_horizon` in
+[advice_chip_strategy.py](../../src/squadopt/application/advice_chip_strategy.py), whose
+no-named-chip branch passes `protect_hold=True` in
+[transfers.py](../../src/squadopt/live/transfers.py). Thus the measured 12 one-week internal
+calls include a hold probe for each pricing plan, consistently with this LLMOPT route.
+They are not the generic helper's unprotected one-week call count. Forced-chip stress calls
+still bypass named-chip dispatch as stated above.
+
+The expected-window experiment also makes an explicit route-specific override:
+`allow_two_free_transfers=True` in both arms. The generic helper leaves the dataclass's
+default **False** unchanged. The served eligible bounded-football route sets it **True**
+in `plan_transfer_horizon` when there is no explicit transfer policy and no game-limit
+override: model `fixture_football_candidate`, 3/5 weeks, sufficient deterministic budget
+and no first-week overlap, transfer-cap or exclusion override. The captured baseline forecast
+does not itself
+trigger that dispatch. This experiment deliberately combines captured forecasts with the
+eligible football route's two-free-transfer exception; it is not an unchanged generic
+baseline-forecast dispatch. Both arms have the same flag and still reject paid two-move
+packages under the member one-transfer cap. The three restricted gains depend on this
+explicit exception.
+
 Conflicting controls deliberately reach the solver. The current web preparation can reject
 hold plus an unheld include before admission; an `INFEASIBLE` stress solve is not a claim
 that the page opens a backend job for that draft.
 Only the first member of each capture additionally replays a full three-soft-rule run at
 both horizons: base, two individually priced keep rules and the combined plan that also tries
 the unslotted no-hit rule. All preferences in that workload are unbounded. Its generated
-requests come from the actual web `prepareRun`, `combinedCandidates` and `prepareCombined`.
+base is also the first member's normal control. Other normal controls add `save_chips=True`;
+this has no effect here because no chip is offered, but the preference objects are not
+identical. Requests come from the actual web `prepareRun`, `combinedCandidates` and
+`prepareCombined`.
 Admissions use an empty isolated `FileJobQueue`; this measures cold local queue job creation,
 not the API's complete cache/idempotency or cancellation behaviour. Local model execution
 is serial and its total is the sum of these jobs, excluding HTTP, polling and orchestration.
@@ -72,7 +109,10 @@ a bounded algorithm diagnostic on captured inputs, not an operational football-q
 The baseline calls the unchanged `optimize_expected_window`. The experimental arm replaces
 only its optional proposal inside the research process. Original 40/60 proposals, original
 transaction state, configured 60 CP units, wall safety ceiling, one optional fixed-first-squad
-solve and 1,153 lineup-evaluation ceiling are shared. HiGHS has a wall ceiling rather than a
+planner invocation and 1,153 lineup-evaluation ceiling are shared. Its `optional.solver_calls`
+counts planner invocations, not internal solves: a single optional invocation can account
+for 13 additional solver invocations here (12 CP-SAT and one native). Arm-level counters
+include all of them. HiGHS has a wall ceiling rather than a
 CP deterministic budget; its time is recorded separately. Equal configured ceilings do not
 claim equal realised CPU work. Clock-truncated/incomplete proposals must be read as such.
 The unchanged work-accounting check permits a 0.01-unit tolerance. Slight overruns within
@@ -89,11 +129,15 @@ are recorded. This remains a bounded prefix, not an exhaustive pair enumeration.
 whole-package bank, club, required players, hit and transfer limits, then validates one
 selected first squad with the
 full horizon planner. Cash-releasing moves can enter even if individually unattractive.
-The member policy is preserved: the second move requires two banked free transfers. This
-experiment does not relax the one-transfer policy to admit paid two-move packages.
+Their inclusion in the move pool does not ensure inclusion in the checked prefix: combined
+proxy ranking can push a funding pair beyond the cap. The explicit two-free exception
+requires two banked free transfers and does not admit paid two-move packages.
 It is a proxy shortlist, not exhaustive package search. Actual candidate checks and lineup
 work are disclosed. A failed package can lose an optional opportunity; neither arm is silently
-given the other arm's extra solve. Three paired metrics are recorded separately:
+given the other arm's extra solve. The cheap-check counters have different units: the
+baseline counts held-by-outsider visits including position mismatches; the experimental
+counter counts position-matched single/two-move packages. They are not equal-work measures.
+Three paired metrics are recorded separately:
 
 - `raw_xi_net_points`: the sum of `projected_score - transfer_hit_points`, a raw XI and
   captain projection which omits appearance, autosubs and vice-captain effects.
@@ -140,10 +184,19 @@ field name. Revision 2 ranks pairs before truncation, separates the three point 
 effective budgets and failure accounting at every imported alias, and avoids solving duplicate
 queue admissions. All 20 cases in both experiments are rerun from the same frozen inputs;
 revision-1 cases are not reused. `--reuse-completed` now requires identical protocol, input
-and all research source hashes, plus unchanged product/replay-builder code. Known accounting
-and wall-limit refusals have status `ERROR` and null gain; other exceptions stop the run.
+and all research source hashes, plus unchanged product/replay-builder code. Accounting
+refusals and every `SolverExecutionError` from the planner boundary, including certificate
+or hold-incumbent contradictions, have status `ERROR`, the original message and null gain.
+Other exceptions stop the run.
 Pilot runs require a separate output path and cannot overwrite the primary compact record or
 its raw evidence. Wall times naturally vary between repetitions.
+The full-population receipts were produced at `4233b78e75865a6186970fe4f32c3c8e6edf40f3`;
+the baseline record's top-level `9dfbf04b5afaa221a1d6a8555c399f06d70b922d` is the aggregation
+commit. Only a test fixture changed between those commits: product/replay-builder code and
+all research source hashes are identical. Each row names its producing program through
+`measurement_programs`. The restricted run was produced at `9dfbf04b5`; it shares the same
+interpreter, platform, dependencies and frozen inputs as the baseline record. Its compact
+record does not independently repeat environment versions or a measurement timestamp.
 
 After the first three full-pool pilot cases all skipped optional refinement because their
 sequential seeds did not complete, a separate diagnostic was added before its own measurement.
@@ -172,8 +225,9 @@ python -m docs.research.llmopt_phase1.neighborhood
    orchestration? Current device advice support does not establish that capability.
 5. Which complete run, including reloads, joins, explicit branches and cancellations, owns
    the four-job and total-work budget? Mounted slots alone do not define that contract.
-6. Would a future package search preserve the member's two-free-transfer exception or admit
-   paid two-move packages too? This measurement keeps the existing policy in both arms.
+6. Would a future package search preserve the eligible football route's two-free-transfer
+   exception or admit paid two-move packages too? This diagnostic explicitly enables that
+   exception in both arms; it does not inherit it from the generic replay helper.
 7. How should Phase 6 qualification relate raw XI points, expected-lineup net points and
    selection utility when their directions differ? These metrics must not be silently
    substituted for one another, or for a full-pool operational benefit.
@@ -227,6 +281,9 @@ The other two cases fail the unchanged wrapper's phase-work check in both arms:
 `gw8-3832237` records **24.0587449622 / 24.0** units and `gw9-3832237` records
 **24.2239097074 / 24.0**. These are phase-cap refusals, not evidence that the full 60-unit
 budget was spent. Their gains are **null**, not zero. No production tolerance was changed.
+Handoff finding: the unchanged expected/guarded allocator raises for this five-free-transfer
+state on both frozen forecast captures. Investigate its phase-work overshoot separately.
+The served forecast and dispatch were not replayed, so this is not an observed live incident.
 
 ### Restricted-pool diagnostic
 
