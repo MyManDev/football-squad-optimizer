@@ -61,7 +61,7 @@ def replay(root, inputs, entry, window, producer):
                 "contract_version": "provisional_league_ui_v1",
                 "payload": {
                     "league_id": 352490,
-                "league_name": "Phase 1 admission fixture",
+                    "league_name": "Phase 1 admission fixture",
                     "season": context.season,
                     "gameweek": context.gameweek,
                     "members": [{"member_kind": "human", "entry_id": entry}],

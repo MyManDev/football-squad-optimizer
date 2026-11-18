@@ -1,5 +1,10 @@
 # Measurements Index
 
+- 2026-11-18: [LLMOPT shared admission](research/llmopt_phase2_admission.md),
+  [record](research/llmopt_phase2_admission.json): 20 frozen member-weeks, 40 runs,
+  maximum four server jobs, zero additional jobs from 240 reconstructed-service repeats;
+  synthetic completions, no solver-quality or latency claim.
+
 One line per committed real-data measurement artifact: what it is, what it found, and
 where it came from. Every artifact here is measurement-only in the sense that matters —
 **nothing in this index promoted a model or changed the operational control** — but one row

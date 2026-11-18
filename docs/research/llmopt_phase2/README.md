@@ -1,5 +1,8 @@
 # Durable run admission replay
 
+The [readout](../llmopt_phase2_admission.md) and [record](../llmopt_phase2_admission.json)
+retain the admission counts, scope and producing commit.
+
 `python -m docs.research.llmopt_phase2.measure_admission` replays the actual local submission,
 queue and run-ledger adapters for the 20 immutable Phase 1 member-weeks, at both windows.
 Each replay completes a synthetic base, admits three distinct preference requests, repeats
