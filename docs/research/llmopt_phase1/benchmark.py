@@ -25,6 +25,7 @@ from ortools.sat.python import cp_model
 from scripts.measure_window_solver_highs import PublishedInputs, one_week_call, window_call
 
 from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.optimization import SolverExecutionError
 from squadopt.planning import (
     ChipAvailability,
     PlanningHorizon,
@@ -183,10 +184,38 @@ def summary(plan, seconds, calls):
     )
 
 
-def timed(function):
+def timed(function, *, capture_expected_failure=False):
     started = perf_counter()
     with capture_solves() as calls:
-        plan = function()
+        try:
+            plan = function()
+        except (ValueError, SolverExecutionError) as error:
+            known = isinstance(error, SolverExecutionError) or str(error) == (
+                "Invalid deterministic-work accounting for expected windows."
+            )
+            if not capture_expected_failure or not known:
+                raise
+            return dict(
+                seconds=perf_counter() - started,
+                has_solution=False,
+                solver_status="ERROR",
+                proof="not_proven",
+                objective=None,
+                best_bound=None,
+                absolute_gap_points=None,
+                expected_net_points=None,
+                solver_calls=len(calls),
+                cp_sat_calls=sum(c["backend"] == "cp-sat" for c in calls),
+                native_calls=sum(c["backend"] == "highs-native" for c in calls),
+                calls=calls,
+                error=dict(type=type(error).__name__, message=str(error)),
+                expected_window=dict(
+                    chosen=None,
+                    candidates=[],
+                    actual_total=None,
+                    optional_swap=dict(status="not_run", reason="expected_window_failed"),
+                ),
+            )
     return summary(plan, perf_counter() - started, calls)
 
 
@@ -313,9 +342,26 @@ def expected_comparison(call, frozen):
     def run():
         return expected_window.optimize_expected_window(horizon, call.state, settings, policy)
 
-    single = timed(run)
-    with patch.object(expected_window, "propose_expected_swap", propose_pairs):
-        pair = timed(run)
+    checks = []
+    original_check = expected_window.checked_work
+
+    def check(value, cap):
+        try:
+            return original_check(value, cap)
+        except ValueError:
+            checks.append(dict(actual=value, cap=cap))
+            raise
+
+    with patch.object(expected_window, "checked_work", check):
+        single = timed(run, capture_expected_failure=True)
+    single["accounting_failures"] = checks.copy()
+    checks.clear()
+    with (
+        patch.object(expected_window, "propose_expected_swap", propose_pairs),
+        patch.object(expected_window, "checked_work", check),
+    ):
+        pair = timed(run, capture_expected_failure=True)
+    pair["accounting_failures"] = checks.copy()
     a, b = single["expected_window"], pair["expected_window"]
     selected_a = next((p["utility"] for p in a["candidates"] if p["proposal"] == a["chosen"]), None)
     selected_b = next((p["utility"] for p in b["candidates"] if p["proposal"] == b["chosen"]), None)
@@ -339,7 +385,7 @@ def expected_comparison(call, frozen):
     )
 
 
-def measure(output, limit, resume=False):
+def measure(output, limit, resume=False, reuse_completed=False):
     output.mkdir(parents=True, exist_ok=True)
     stamp = provenance()
     count = 0
@@ -353,6 +399,32 @@ def measure(output, limit, resume=False):
             receipt = dict(
                 case=case, scenario=scenario, capture=inputs.capture, windows={}, provenance=stamp
             )
+            if reuse_completed and target.exists():
+                prior = json.loads(target.read_text())
+                prior_stamp = prior.get("provenance", {})
+                if "expected_comparison" in prior:
+                    if prior_stamp.get("input_manifest_sha256") != stamp["input_manifest_sha256"]:
+                        raise ValueError("Completed-case reuse requires identical frozen inputs.")
+                    subprocess.run(
+                        [
+                            "git",
+                            "diff",
+                            "--exit-code",
+                            prior_stamp["repository_commit"],
+                            "--",
+                            "src",
+                            "web",
+                            "scripts/measure_window_solver_highs.py",
+                        ],
+                        check=True,
+                        capture_output=True,
+                    )
+                    print(
+                        f"{case} reuse completed case at {prior_stamp['repository_commit']}",
+                        flush=True,
+                    )
+                    count += 1
+                    continue
             if resume and target.exists():
                 receipt = json.loads(target.read_text())
                 if receipt.get("provenance") != stamp:
@@ -393,9 +465,11 @@ def aggregate(output):
     rows = [json.loads(p.read_text()) for p in sorted(output.glob("gw*.json"))]
     if not rows or any("expected_comparison" not in row for row in rows):
         raise ValueError("Only completed cases can be aggregated.")
-    stamp = rows[0]["provenance"]
-    if any(row["provenance"] != stamp for row in rows):
-        raise ValueError("Do not aggregate different measurement code or inputs.")
+    stamp = provenance()
+    if any(
+        row["provenance"]["input_manifest_sha256"] != stamp["input_manifest_sha256"] for row in rows
+    ):
+        raise ValueError("Do not aggregate different frozen inputs.")
     record = dict(
         kind="llmopt_phase1_offline_replay",
         **stamp,
@@ -406,10 +480,16 @@ def aggregate(output):
         highs=native_window_version(),
         execution="sequential local queue admissions and planner replay; not production latency",
         member_weeks=len(rows),
+        measurement_programs={digest(row["provenance"]): row["provenance"] for row in rows},
         rows=[],
     )
     for row in rows:
-        item = dict(case=row["case"], scenario=row["scenario"], windows={})
+        item = dict(
+            case=row["case"],
+            scenario=row["scenario"],
+            windows={},
+            measurement_program=digest(row["provenance"]),
+        )
         for window, value in row["windows"].items():
             pricing_result = value["pricing"]
             item["windows"][window] = dict(
@@ -456,6 +536,8 @@ def aggregate(output):
                 actual_units=review["actual_total"],
                 optional_status=review["optional_swap"]["status"],
                 optional_reason=review["optional_swap"].get("reason"),
+                error=result.get("error"),
+                accounting_failures=result.get("accounting_failures", []),
             )
         record["rows"].append(item)
     target = (
@@ -472,7 +554,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, default=ROOT / "artifacts/llmopt_phase1")
     parser.add_argument("--aggregate-only", action="store_true")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--reuse-completed", action="store_true")
     args = parser.parse_args()
     if not args.aggregate_only:
-        measure(args.output, args.limit, args.resume)
+        measure(args.output, args.limit, args.resume, args.reuse_completed)
     aggregate(args.output)

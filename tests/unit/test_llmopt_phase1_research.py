@@ -140,3 +140,19 @@ def test_restricted_diagnostic_keeps_all_held_players_and_is_order_independent()
 
     reversed_call = replace(call, horizon=PlanningHorizon(call.horizon.table.iloc[::-1]))
     assert ids == candidate_ids(reversed_call, frozen)
+
+
+def test_existing_accounting_refusal_is_recorded_without_fabricating_a_gain():
+    def refusal():
+        raise ValueError("Invalid deterministic-work accounting for expected windows.")
+
+    result = benchmark.timed(refusal, capture_expected_failure=True)
+    assert result["solver_status"] == "ERROR"
+    assert result["expected_net_points"] is None
+    assert result["absolute_gap_points"] is None
+    assert result["expected_window"]["candidates"] == []
+    with pytest.raises(ValueError):
+        benchmark.timed(
+            lambda: (_ for _ in ()).throw(ValueError("unexpected input")),
+            capture_expected_failure=True,
+        )

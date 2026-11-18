@@ -97,7 +97,15 @@ digest. Detailed receipts in ignored `artifacts/llmopt_phase1/` carry plans, res
 raw solver status/bounds and per-call counts. They are regenerated evidence, not the committed
 record (ADR 0003). Alternate `--output` paths write their own `summary.json` and cannot replace
 the committed summary. `--resume` accepts only identical committed code and input digests;
-partial cases are never aggregated. Wall times naturally vary between repetitions.
+partial cases are never aggregated. After an existing expected-window accounting refusal
+halted the first complete run at the fourth case, the harness gained explicit failure
+recording. `--reuse-completed` preserves the first three complete cases from `a5e308d5e`
+without rerunning or selecting them by score; it requires the same input digest and unchanged
+product/replay-builder code. Each case names its actual producing program in the summary's
+`measurement_programs` map. The other cases run with the failure-recording revision. The
+solver, candidate rules and configured budgets did not change. Known accounting and wall-limit
+refusals have status `ERROR` and null gain; other exceptions still stop the measurement.
+Wall times naturally vary between repetitions.
 
 After the first three full-pool pilot cases all skipped optional refinement because their
 sequential seeds did not complete, a separate diagnostic was added before its own measurement.
