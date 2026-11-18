@@ -86,6 +86,15 @@ def test_unaccented_player_names_remain_available_to_prompt_and_check(
         ("Norberto Bercique Gomes Betuncal", "Beto", "Betoyu al"),
         ("Felipe Rodrigues da Silva", "Morato", "Buy Morato"),
         ("Sávio Moreira de Oliveira", "Savinho", "Buy Savinho"),
+        ("Eberechi Eze", "Eze", "Ezeyi al"),
+        ("Eberechi Eze", "Eze", "Eze'yi al"),
+        ("Bukayo Saka", "Saka", "Sakasiz ve Sakali karsilastir"),
+        ("Norberto Bercique Gomes Betuncal", "Beto", "Betosuz kadro istiyorum"),
+        ("Eberechi Eze", "Eze", "Ezeye yer ac"),
+        ("Bukayo Saka", "Saka", "Sakadan vazgec"),
+        ("Bukayo Saka", "Saka", "Sakanin maliyetini karsilastir"),
+        ("Norberto Bercique Gomes Betuncal", "Beto", "Betoyla kadro istiyorum"),
+        ("Eberechi Eze", "Eze", "Ezeyle kadro istiyorum"),
     ],
 )
 def test_published_player_short_names_reach_prompt_and_checked_draft(

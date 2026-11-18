@@ -67,7 +67,36 @@ _KINDS: Final = (
 )
 _MEMBERSHIP_KINDS: Final = frozenset({"keep_player", "include_player", "avoid_player"})
 _PLAYER_KINDS: Final = _MEMBERSHIP_KINDS | {"buy_player"}
-_TURKISH_ACCUSATIVE_SUFFIXES: Final = ("i", "u", "yi", "yu")
+_TURKISH_NAME_SUFFIXES: Final = (
+    "i",
+    "u",
+    "yi",
+    "yu",  # object: Sakayi, Choyu
+    "li",
+    "lu",
+    "siz",
+    "suz",  # with/without: Sakali, Betosuz
+    "la",
+    "le",
+    "yla",
+    "yle",  # with: Betoyla, Ezeyle
+    "a",
+    "e",
+    "ya",
+    "ye",  # to: Ezeye
+    "da",
+    "de",
+    "ta",
+    "te",  # in/on
+    "dan",
+    "den",
+    "tan",
+    "ten",  # from
+    "in",
+    "un",
+    "nin",
+    "nun",  # of
+)
 _LOGGER = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT: Final = """Translate an FPL manager's request into an editable LLMOPT draft.
@@ -647,13 +676,13 @@ def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
     text = _tokens(request.message)
     original = _tokens(request.clarification.message) if request.clarification else ()
     words = set((*text, *original))
-    # Informal Turkish often joins the object suffix to a name without an apostrophe.
+    # Informal Turkish often joins a case or with/without suffix without an apostrophe.
     # The interface locale controls reply language, not the member's freeform input.
     joined_name_stems = {
         word[: -len(suffix)]
         for word in words
-        for suffix in _TURKISH_ACCUSATIVE_SUFFIXES
-        if len(word) >= 4 + len(suffix) and word.endswith(suffix)
+        for suffix in _TURKISH_NAME_SUFFIXES
+        if len(word) >= 3 + len(suffix) and word.endswith(suffix)
     }
     phrases = tuple(f" {' '.join(tokens)} " for tokens in (text, original))
     ranked = []
