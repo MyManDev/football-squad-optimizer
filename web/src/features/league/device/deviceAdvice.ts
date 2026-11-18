@@ -107,8 +107,12 @@ export function deviceAdviceEnvelope(
       {
         gameweek,
         chip: answer.chip,
-        transfers_in: document.players.filter((p) => incoming.has(p.id)).map(advicePlayer),
-        transfers_out: document.players.filter((p) => outgoing.has(p.id)).map(advicePlayer),
+        transfers_in: document.players
+          .filter((p) => incoming.has(p.id))
+          .map((p) => advicePlayer(byId.get(p.id)!)),
+        transfers_out: document.players
+          .filter((p) => outgoing.has(p.id))
+          .map((p) => advicePlayer(byId.get(p.id)!)),
         transfer_hit_points: answer.transfer_hit_points,
         free_transfers_before: answer.free_transfers_before ?? 0,
         free_transfers_after: answer.free_transfers_after ?? 0,
