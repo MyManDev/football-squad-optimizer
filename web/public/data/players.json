@@ -1,5 +1,5 @@
 {
-  "captured_at_utc": "2026-09-22T15:12:16.749186Z",
+  "captured_at_utc": "2026-11-18T02:00:54.870328Z",
   "contract_version": "player_catalog_v1",
   "players": [
     {
@@ -3179,6 +3179,14 @@
       "team_id": 10
     },
     {
+      "id": 536108,
+      "name": "Luca Gunter",
+      "position": "GK",
+      "short_name": "Gunter",
+      "team": "Spurs",
+      "team_id": 19
+    },
+    {
       "id": 470315,
       "name": "Luca Netz",
       "position": "DEF",
@@ -3843,6 +3851,14 @@
       "team_id": 5
     },
     {
+      "id": 671103,
+      "name": "Modou Kéba Cissé",
+      "position": "DEF",
+      "short_name": "Cissé",
+      "team": "Aston Villa",
+      "team_id": 2
+    },
+    {
       "id": 540324,
       "name": "Mohamed Belloumi",
       "position": "MID",
@@ -4129,6 +4145,14 @@
       "short_name": "Watkins",
       "team": "Aston Villa",
       "team_id": 2
+    },
+    {
+      "id": 616109,
+      "name": "Olutayo Subuloye",
+      "position": "DEF",
+      "short_name": "Subuloye",
+      "team": "Chelsea",
+      "team_id": 6
     },
     {
       "id": 201895,
@@ -4811,6 +4835,14 @@
       "team_id": 2
     },
     {
+      "id": 499857,
+      "name": "Teddy Sharman-Lowe",
+      "position": "GK",
+      "short_name": "Sharman-Lowe",
+      "team": "Chelsea",
+      "team_id": 6
+    },
+    {
       "id": 586309,
       "name": "Thierno Barry",
       "position": "FWD",
@@ -4985,6 +5017,14 @@
       "short_name": "Fredricson",
       "team": "Man Utd",
       "team_id": 16
+    },
+    {
+      "id": 604211,
+      "name": "Tymur Tutierov",
+      "position": "MID",
+      "short_name": "Tutierov",
+      "team": "Sunderland",
+      "team_id": 20
     },
     {
       "id": 244723,
@@ -5340,7 +5380,7 @@
     }
   ],
   "season": "2026-27",
-  "source_snapshot_id": "fpl-live-20260922T151216Z-974899b97250",
+  "source_snapshot_id": "fpl-live-20261118T020054Z-f374b2958d5a",
   "teams": [
     {
       "id": 1,
