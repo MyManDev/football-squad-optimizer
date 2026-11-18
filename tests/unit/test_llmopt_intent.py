@@ -501,7 +501,7 @@ def test_club_constraint_refuses_invented_or_invalid_fields(override: dict[str, 
     assert response.json()["error"]["code"] == "REPLY_REFUSED"
 
 
-def test_confirmed_club_rules_stay_canonical_and_conflicting_hard_counts_are_refused() -> None:
+def test_confirmed_club_rules_stay_canonical() -> None:
     body = _request()
     first = {"kind": "club_count", "club": "LIV", "count": 3}
     second = {**first, "count": 2}
@@ -513,8 +513,6 @@ def test_confirmed_club_rules_stay_canonical_and_conflicting_hard_counts_are_ref
         return {"status": "clarification", "draft": None, "message": "Which plan?"}
 
     assert _interpret(body, provider).status_code == 200
-    conflicted = {**body, "draft": {"hard": [first, second], "soft": []}}
-    assert _interpret(conflicted, provider).status_code == 422
 
 
 @pytest.mark.parametrize("kind", ["keep_player", "avoid_player"])

@@ -31,41 +31,78 @@ export interface PlanSession {
   clarification?: Clarification;
   confirmation?: PlanConfirmation;
   reference?: PlanRevision;
-  /**
-   * Set when the squad changed under the draft. The rules then outlive the squad they were
-   * written for: a reload under the new squad restores them, and nothing else.
-   */
-  carried?: true;
 }
 
 export interface PlanSessionContext {
   key: string;
   basis: string;
-  deadline: string;
+  season: string;
+  gameweek: number;
+  deadline: string | null;
 }
 
 export function readPlanSession(context: PlanSessionContext): unknown {
+  if (context.deadline === null) return null;
   try {
     const raw = sessionStorage.getItem(context.key);
     if (!raw) return null;
     const saved = JSON.parse(raw);
     if (saved?.deadline !== context.deadline) return null;
+    if (
+      (saved.season !== undefined && saved.season !== context.season) ||
+      (saved.gameweek !== undefined && saved.gameweek !== context.gameweek)
+    )
+      return null;
     if (saved.basis === context.basis) return saved;
     // The plans and the reference belonged to the old squad; the rules are the member's.
-    return saved.carried === true ? { draft: saved.draft } : null;
+    return { draft: saved.draft };
   } catch {
     return null;
   }
 }
 
 function writePlanSession(context: PlanSessionContext | null, session: PlanSession) {
-  if (!context) return;
-  const { key, basis, deadline } = context;
+  if (!context || context.deadline === null) return;
+  const { key, basis, season, gameweek, deadline } = context;
   try {
-    sessionStorage.setItem(key, JSON.stringify({ basis, deadline, ...session }));
+    sessionStorage.setItem(key, JSON.stringify({ basis, season, gameweek, deadline, ...session }));
   } catch {
     // The planner remains usable without storage.
   }
+}
+
+export interface PlanSessionMemory {
+  read(context: PlanSessionContext): unknown;
+  save(context: PlanSessionContext, session: PlanSession): void;
+}
+
+/** The open page's latest session, even when storage fails or its deadline is not known yet. */
+export function createPlanSessionMemory(): PlanSessionMemory {
+  let current: { context: PlanSessionContext; session: PlanSession } | undefined;
+  return {
+    read(context) {
+      if (
+        !current ||
+        current.context.key !== context.key ||
+        current.context.season !== context.season ||
+        current.context.gameweek !== context.gameweek
+      )
+        return readPlanSession(context);
+      if (current.context.deadline === context.deadline)
+        return current.context.basis === context.basis
+          ? current.session
+          : { draft: current.session.draft };
+      // Rules edited without a calendar survive its arrival. A different stated deadline
+      // starts a new session, and neither transition carries a computed run or reference.
+      return current.context.deadline === null || context.deadline === null
+        ? { draft: current.session.draft }
+        : null;
+    },
+    save(context, session) {
+      current = { context, session };
+      writePlanSession(context, session);
+    },
+  };
 }
 
 /**
@@ -84,6 +121,7 @@ export interface PlanSessionStore {
 export function createPlanSessionStore(
   context: PlanSessionContext | null,
   confirmation?: PlanConfirmation,
+  memory?: PlanSessionMemory,
 ): PlanSessionStore {
   let current = confirmation;
   const listeners = new Set<() => void>();
@@ -93,7 +131,8 @@ export function createPlanSessionStore(
     },
     save(session) {
       current = session.confirmation;
-      writePlanSession(context, session);
+      if (memory && context) memory.save(context, session);
+      else writePlanSession(context, session);
       for (const listener of listeners) listener();
     },
     subscribe(listener) {

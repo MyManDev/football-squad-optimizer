@@ -2,9 +2,90 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
 import { readReply } from "../../../testSupport/intentReply";
-import { EMPTY_DRAFT, IntentError, intentBody, intentRefusal, preparePlans } from "./intent";
+import {
+  EMPTY_DRAFT,
+  IntentError,
+  checkedDraft,
+  intentBody,
+  intentRefusal,
+  preparePlans,
+  readIntentCatalog,
+} from "./intent";
 
 afterEach(() => vi.unstubAllGlobals());
+
+it("compiles sixteen valid exclusions without treating them as required squad members", () => {
+  const players = Array.from({ length: 31 }, (_, index) => ({
+    id: index + 1,
+    name: `Player ${index + 1}`,
+    team: "Club",
+  }));
+  const draft = checkedDraft(
+    {
+      hard: players.slice(0, 16).map(({ id }) => ({ kind: "avoid_player", player_id: id })),
+      soft: [],
+    },
+    players,
+  );
+  const plans = preparePlans(draft, new Set(players.slice(16).map(({ id }) => id)));
+  expect(plans.hardConflict).toBe(false);
+  expect(plans.base?.preferences.avoid_players).toEqual(players.slice(0, 16).map(({ id }) => id));
+  expect(() =>
+    checkedPreferences({ avoid_players: players.slice(0, 18).map(({ id }) => id) }),
+  ).toThrow();
+  expect(() =>
+    checkedPreferences({ include_players: players.slice(0, 16).map(({ id }) => id) }),
+  ).toThrow();
+});
+
+it("keeps the without branch feasible when a comparison adds the seventeenth exclusion", () => {
+  const players = Array.from({ length: 32 }, (_, index) => ({
+    id: index + 1,
+    name: `Player ${index + 1}`,
+    team: "Club",
+  }));
+  const draft = checkedDraft(
+    {
+      hard: players.slice(0, 16).map(({ id }) => ({ kind: "avoid_player", player_id: id })),
+      soft: [],
+      comparison: { kind: "include_player", player_id: 17, both: true },
+    },
+    players,
+  );
+  const plans = preparePlans(draft, new Set(players.slice(17).map(({ id }) => id)));
+  expect(plans.baseConflict).toBe(false);
+  expect(plans.alternativeConflict).toBe(false);
+  expect(plans.base?.preferences.avoid_players).toEqual(players.slice(0, 17).map(({ id }) => id));
+  expect(plans.alternative?.preferences.include_players).toEqual([17]);
+});
+
+it("carries published short names from the roster into the intent request", async () => {
+  const player = {
+    id: 486385,
+    name: "Norberto Bercique Gomes Betuncal",
+    short_name: "Beto",
+    team: "Everton",
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            season: "2026-27",
+            players: [player],
+          }),
+        ),
+    ),
+  );
+  const players = await readIntentCatalog(
+    "https://advice.example",
+    "2026-27",
+    new AbortController().signal,
+  );
+  expect(players).toEqual([player]);
+  expect(intentBody("Buy Beto", "en", EMPTY_DRAFT, players)).toMatchObject({ players: [player] });
+});
 
 describe("confirmed LLMOPT rules", () => {
   const held = new Set([7, 11, 15]);

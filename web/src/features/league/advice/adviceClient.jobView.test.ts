@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { HttpAdviceClient, type AdviceJobStatus } from "./adviceClient";
+import { AdviceResponseError } from "./adviceResponse";
 
 /** The committed examples the service's own test holds its job view to. */
 const EXAMPLES = JSON.parse(
@@ -20,6 +21,14 @@ const EXAMPLES = JSON.parse(
 ) as Record<string, { job_id: string; status: AdviceJobStatus["status"] }>;
 
 const JOB = "advice-0123456789abcdef-1";
+
+it("identifies a successful job response with malformed JSON as unreadable", async () => {
+  const client = new HttpAdviceClient(
+    "https://api.example",
+    async () => new Response("<html>", { status: 200 }),
+  );
+  await expect(client.readJob(JOB)).rejects.toBeInstanceOf(AdviceResponseError);
+});
 
 function readView(view: object, jobId = JOB): Promise<AdviceJobStatus> {
   const client = new HttpAdviceClient(

@@ -7,6 +7,42 @@ import { checkedPreferences } from "./decisionPreferences";
 const request = { leagueId: 352490, entryId: 101, strategy: "saf-puan", window: 3 } as const;
 
 describe("nested published advice", () => {
+  it.each(["opening", "later", "alternative"] as const)(
+    "refuses negative %s transfer hits before they can inflate net points",
+    (where) => {
+      const envelope = mockEntryAdviceEnvelope(101, "saf-puan", 3);
+      if (where === "opening") envelope.payload.transfer_hit_points = -4;
+      if (where === "later")
+        envelope.payload.plan_weeks = [0, 1, 2].map((offset) => ({
+          gameweek: envelope.payload.gameweek + offset,
+          transfers_in: [],
+          transfers_out: [],
+          chip: null,
+          free_transfers_before: 1,
+          free_transfers_after: 2,
+          expected_points: 50,
+          transfer_hit_points: offset === 1 ? -4 : 0,
+        }));
+      if (where === "alternative")
+        envelope.payload.alternative_plan = {
+          kind: "with_hits",
+          overlap_applied: 0,
+          transfer_hit_points: -4,
+          expected_points_cost: 0,
+        };
+      expect(() => checkedAdvice(envelope, request)).toThrow(AdviceResponseError);
+    },
+  );
+
+  it("keeps legitimate signed point differences while accepting zero hit charges", () => {
+    const envelope = mockEntryAdviceEnvelope(35249001, "saf-puan", 3);
+    envelope.payload.transfer_hit_points = 0;
+    envelope.payload.expected_gain_vs_hold = -3;
+    expect(envelope.payload.moves.length).toBeGreaterThan(0);
+    for (const move of envelope.payload.moves) move.expected_points_delta = -3;
+    expect(checkedAdvice(envelope, { ...request, entryId: 35249001 })).toBe(envelope);
+  });
+
   it("never serves the other model or an unidentified experimental result", () => {
     const old = mockEntryAdviceEnvelope(101, "saf-puan", 3);
     const football = {

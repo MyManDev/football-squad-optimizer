@@ -7,6 +7,10 @@ from dataclasses import dataclass
 from typing import Literal
 
 _PLAYER_FIELDS = ("keep_players", "avoid_players", "include_players", "buy_players")
+# All 16 draft rules plus the comparison's "without" branch may exclude players.
+MAX_AVOID_PLAYERS = 17
+# A week's effective exclusions merge the global and that week's bounded wire lists.
+_MAX_COMBINED_AVOID_PLAYERS = 2 * MAX_AVOID_PLAYERS
 _LEGACY_FIELDS = {*_PLAYER_FIELDS[:3], "no_hits", "save_chips", "hold_transfers", "club_counts"}
 _WINDOW_FIELDS = {
     "week_rules",
@@ -199,8 +203,9 @@ class DecisionPreferences:
     def __post_init__(self) -> None:
         for name in _PLAYER_FIELDS:
             raw = getattr(self, name)
-            if not isinstance(raw, (list, tuple)) or len(raw) > 15:
-                raise ValueError(f"{name} must contain at most 15 player ids.")
+            limit = _MAX_COMBINED_AVOID_PLAYERS if name == "avoid_players" else 15
+            if not isinstance(raw, (list, tuple)) or len(raw) > limit:
+                raise ValueError(f"{name} must contain at most {limit} player ids.")
             if any(isinstance(v, bool) or not isinstance(v, int) or v < 1 for v in raw):
                 raise ValueError(f"{name} must contain positive integer player ids.")
             if len(set(raw)) != len(raw):
@@ -514,6 +519,9 @@ class DecisionPreferences:
             or ("week" in bank and bank["week"] is None)
         ):
             raise ValueError("Invalid minimum bank.")
+        avoided = value.get("avoid_players", [])
+        if not isinstance(avoided, (list, tuple)) or len(avoided) > MAX_AVOID_PLAYERS:
+            raise ValueError(f"avoid_players must contain at most {MAX_AVOID_PLAYERS} player ids.")
         return cls(
             **(
                 value
@@ -542,7 +550,7 @@ def preferences_schema() -> dict[str, object]:
     }
     legacy: dict[str, object] = {
         "keep_players": ids,
-        "avoid_players": ids,
+        "avoid_players": {**ids, "maxItems": MAX_AVOID_PLAYERS},
         "no_hits": {"type": "boolean"},
         "save_chips": {"type": "boolean"},
         "include_players": ids,

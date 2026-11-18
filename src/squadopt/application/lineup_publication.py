@@ -15,6 +15,7 @@ import pandas as pd
 from squadopt.application.entries import EntryError
 from squadopt.contracts import POSITIONS, Position, order_outfield_bench
 from squadopt.optimization import OptimizationConfig
+from squadopt.optimization.coefficients import objective_coefficients
 from squadopt.planning import PlanningWeekResult
 
 #: Pitch order for the published eleven and the outfield bench.
@@ -97,6 +98,69 @@ def best_eleven_points(squad: Iterable[tuple[str, float]]) -> float | None:
     return best_basis
 
 
+def _identified_eleven_basis(
+    players: list[tuple[str, float, float, bool, bool, int]],
+    chip: str | None,
+) -> float | None:
+    """Use the solver's integer objective and the held-lineup rank tie break."""
+
+    ordered = sorted(players, key=lambda player: player[5])
+    coefficients = objective_coefficients([player[1] for player in ordered], _LINEUP_DEFAULTS)
+    # Each row holds starter contribution, captain contribution, published points and rank.
+    starters: dict[str, list[tuple[int, int, float, int, bool]]] = {
+        str(position): [] for position in _POSITION_ORDER
+    }
+    constant = 0
+    for rank, (player, (bench, starter, captain)) in enumerate(
+        zip(ordered, coefficients, strict=True)
+    ):
+        position, _choice, basis, may_start, may_captain, _identity = player
+        if chip == "bboost":
+            # Chip auxiliaries in the planner are bounded above, so a negative
+            # contribution is never boosted. The device uses the same coefficients.
+            constant += bench + max(starter, 0)
+            starter = min(starter, 0)
+        else:
+            constant += bench
+        if chip == "3xc":
+            captain += max(captain, 0)
+        if may_start and position in starters:
+            starters[position].append((starter, captain, basis, rank, may_captain))
+    for rows in starters.values():
+        rows.sort(key=lambda row: (-row[0], row[3]))
+    best_key: tuple[int, int, int] | None = None
+    best_basis: float | None = None
+    for shape in _LEGAL_SHAPES:
+        if any(len(starters[position]) < count for position, count in shape):
+            continue
+        for captain_position, _count in shape:
+            for captain_row in starters[captain_position]:
+                if not captain_row[4]:
+                    continue
+                chosen: list[tuple[int, int, float, int, bool]] = []
+                for position, count in shape:
+                    pool = starters[position]
+                    if position == captain_position:
+                        chosen.extend(
+                            [
+                                captain_row,
+                                *[row for row in pool if row[3] != captain_row[3]][: count - 1],
+                            ]
+                        )
+                    else:
+                        chosen.extend(pool[:count])
+                objective = constant + sum(row[0] for row in chosen) + captain_row[1]
+                key = (objective, -sum(row[3] for row in chosen), -captain_row[3])
+                if best_key is None or key > best_key:
+                    best_key = key
+                    best_basis = (
+                        sum(row[2] for row in ordered)
+                        if chip == "bboost"
+                        else sum(row[2] for row in chosen)
+                    ) + captain_row[2] * (2 if chip == "3xc" else 1)
+    return best_basis
+
+
 def best_eleven_basis(
     squad: Iterable[
         tuple[str, float, float, bool, bool] | tuple[str, float, float, bool, bool, int]
@@ -114,15 +178,33 @@ def best_eleven_basis(
     and its total describe the eleven it actually fields.
 
     A player may carry his id as a sixth element. The choice is then made the way the
-    solver makes it, so the eleven read here is the eleven the plan fields: on points
-    rounded to the solver's thousandths, ties falling to the lowest id. Without ids the
+    device's held-lineup helper makes it: on the solver's exact integer coefficients,
+    ties minimising the starters' id-rank sum and then the captain's rank. Its choice is
+    read on ``basis_points`` without rounding those published points. Without ids the
     order handed in breaks ties, as ``best_eleven_points_under`` always did.
 
     ``None`` when no legal eleven with an eligible captain exists.
     """
 
+    items = list(squad)
+    if items and all(len(item) == 6 for item in items):
+        return _identified_eleven_basis(
+            [
+                (
+                    str(item[0]),
+                    float(item[1]),
+                    float(item[2]),
+                    bool(item[3]),
+                    bool(item[4]),
+                    int(item[5]),
+                )
+                for item in items
+                if len(item) == 6
+            ],
+            chip,
+        )
     players = []
-    for item in squad:
+    for item in items:
         position, choice, basis, may_start, may_captain = item[:5]
         identity = int(item[5]) if len(item) > 5 else None
         chosen_on = float(choice) if identity is None else round(float(choice) * 1000) / 1000

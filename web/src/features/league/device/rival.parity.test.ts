@@ -4,7 +4,7 @@
  * blocks likewise, and every case answered by `advise_entry` itself under each rival
  * strategy against each rival (scripts/export_device_plan_fixture.py). The Python drift
  * guard holds those answers to the service; this holds the device to them, including the
- * case the service refuses.
+ * plans that can retain excess club holdings without a transfer.
  */
 
 import { readFileSync } from "node:fs";
@@ -15,7 +15,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import fixture from "../../../fixtures/device-plan/instances.json";
 import type { LpSolver } from "./lp/problem";
 import { solveRequest } from "./requests";
-import { DevicePlanRefused } from "./solve/week";
+import { DevicePlanRefused, solvePlan } from "./solve/week";
 import { CATALOGUE_BANDS } from "./strategies/rival";
 import {
   isDevicePlanDocument,
@@ -49,11 +49,57 @@ describe("the rival world", () => {
     expect(document.rules.hit_charged_scaled).toBe(
       Math.round(document.rules.hit_points_charged * document.rules.expected_points_scale),
     );
-    // Both decisions and a refusal are among the cases, so the whole rule is exercised.
+    // Both decision kinds remain covered when a legal roll replaces an old refusal.
     const kinds = new Set(
       world.cases.map((c) => (c.reference.refused ? "refused" : c.reference.plan_kind)),
     );
-    expect(kinds).toEqual(new Set(["within_free_transfers", "with_hits", "refused"]));
+    expect(kinds.has("within_free_transfers")).toBe(true);
+    expect(kinds.has("with_hits")).toBe(true);
+    for (const kind of kinds)
+      expect(["within_free_transfers", "with_hits", "refused"]).toContain(kind);
+  });
+
+  it("refuses an unaffordable disjoint rival while the held squad remains solvable", () => {
+    const published = fixture.document as unknown as DevicePlanDocument;
+    const entry = fixture.members[0]!.entry as unknown as DevicePlanEntry;
+    const held = new Set(entry.held);
+    const proceeds = published.players
+      .filter((player) => held.has(player.id))
+      .reduce(
+        (sum, player) => sum + (entry.sell_tenths[String(player.id)] ?? player.buy_tenths),
+        0,
+      );
+    const unavailablePrice = entry.bank_tenths + proceeds + 1;
+    const document = {
+      ...published,
+      players: published.players.map((player) => ({
+        ...player,
+        buy_tenths: held.has(player.id) ? player.buy_tenths : unavailablePrice,
+      })),
+    };
+    const startingXi = Object.entries({ GK: 1, DEF: 3, MID: 5, FWD: 2 }).flatMap(
+      ([position, count]) =>
+        document.players
+          .filter((player) => player.position === position && !held.has(player.id))
+          .slice(0, count)
+          .map((player) => player.id),
+    );
+    expect(startingXi).toHaveLength(11);
+    expect(solvePlan(solver, document, entry, () => 0).transfers_in).toEqual([]);
+    expect(() =>
+      solveRequest(
+        solver,
+        {
+          document,
+          entry,
+          strategy: {
+            name: "ortak-koru",
+            rival: { entry_id: 999, starting_xi: startingXi, captain: startingXi[0]! },
+          },
+        },
+        () => 0,
+      ),
+    ).toThrow("band unsatisfiable");
   });
 });
 

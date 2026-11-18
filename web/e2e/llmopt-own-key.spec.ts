@@ -24,6 +24,37 @@ function answer(route: Route, json: unknown) {
     : route.fulfill({ json, headers: CORS });
 }
 
+test("leaving the document wipes an unsaved key before a return can restore the form", async ({
+  page,
+}) => {
+  test.skip(!API, "API build required");
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+  await page.goto(PAGE);
+  const main = page.getByRole("main");
+  const key = main.getByLabel(en.ownKey.key, { exact: true });
+  const save = main.getByRole("button", { name: en.ownKey.save });
+  await main.getByRole("textbox", { name: en.ownKey.model }).fill("gpt-5-mini");
+  await key.fill(KEY);
+  await expect(save).toBeEnabled();
+
+  // Observe the departing document itself: a fresh page would have an empty field even
+  // without the wipe, and browser test runners can disable the back-forward cache.
+  await key.evaluate((field: HTMLInputElement) => {
+    window.addEventListener(
+      "pagehide",
+      () => sessionStorage.setItem("test.unsavedKeyWiped", String(field.value === "")),
+      { once: true },
+    );
+  });
+  await page.goto("/privacy");
+  expect(await page.evaluate(() => sessionStorage.getItem("test.unsavedKeyWiped"))).toBe("true");
+  await page.goBack();
+  await expect(key).toHaveValue("");
+  await expect(save).toBeDisabled();
+  await expect(main.getByRole("button", { name: en.ownKey.delete })).toBeDisabled();
+});
+
 test("a member's own key reads the chat at the provider, never reaches the site, and Delete deletes it", async ({
   page,
 }) => {

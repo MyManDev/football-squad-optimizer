@@ -35,9 +35,18 @@ export function whatIfDocument(published: DevicePlanDocument): DevicePlanDocumen
 }
 
 /** A row's left side with each squad variable set by whether its player is in the fifteen. */
-function evaluated(row: LpRow, document: DevicePlanDocument, chosen: ReadonlySet<number>) {
+function evaluated(
+  row: LpRow,
+  document: DevicePlanDocument,
+  chosen: ReadonlySet<number>,
+  moved = false,
+) {
   let total = 0;
   for (const { coefficient, variable } of row.terms) {
+    if (variable === "moved") {
+      total += coefficient * Number(moved);
+      continue;
+    }
     if (!variable.startsWith("s")) continue;
     const player = document.players[Number(variable.slice(1))];
     if (player && chosen.has(player.id)) total += coefficient;
@@ -56,6 +65,7 @@ export function whatIfAccount(
 ): WhatIfAccount {
   const problem = memberWeekProblem(document, entry);
   const chosen = new Set(squad);
+  const moved = squad.some((id) => !entry.held.includes(id));
   const rows = new Map(problem.rows.map((row) => [row.name, row]));
   const breaks: WhatIfBreak[] = [];
 
@@ -70,10 +80,16 @@ export function whatIfAccount(
   }
   for (const row of problem.rows) {
     if (!row.name.startsWith("club")) continue;
-    const held = evaluated(row, document, chosen);
+    const held = evaluated(row, document, chosen, moved);
     if (held > row.rhs) {
       const first = document.players[Number(row.terms[0]!.variable.slice(1))]!;
-      breaks.push({ rule: "club", team: first.team, count: held, limit: row.rhs });
+      const excess = row.terms.find(({ variable }) => variable === "moved")?.coefficient ?? 0;
+      breaks.push({
+        rule: "club",
+        team: first.team,
+        count: held - (moved ? excess : 0),
+        limit: row.rhs - excess,
+      });
     }
   }
   const bank = rows.get("bank")!;

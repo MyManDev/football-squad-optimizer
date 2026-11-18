@@ -286,6 +286,19 @@ function isRequestRejection(error: unknown): boolean {
   return error instanceof AdviceApiError && error.status >= 400 && error.status < 500;
 }
 
+async function adviceJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (error) {
+    if (
+      error instanceof SyntaxError ||
+      (error instanceof DOMException && error.name === "SyntaxError")
+    )
+      throw new AdviceResponseError("Advice response is not JSON.");
+    throw error;
+  }
+}
+
 /** Talks to the advice backend; understands 200 (hit), 202 (job), and 404 (not computed). */
 export class HttpAdviceClient implements AdviceClient {
   private readonly origin: string;
@@ -334,7 +347,7 @@ export class HttpAdviceClient implements AdviceClient {
         );
       }
       if (!response.ok) throw await apiError(response);
-      const envelope = checkedAdvice(await response.json(), request);
+      const envelope = checkedAdvice(await adviceJson(response), request);
       return { kind: "advice", envelope, source: "api-cache" };
     }, options);
   }
@@ -388,7 +401,7 @@ export class HttpAdviceClient implements AdviceClient {
         }),
       });
       if (response.status === 202) {
-        const body = (await response.json()) as { job_id: string; status?: unknown };
+        const body = (await adviceJson(response)) as { job_id: string; status?: unknown };
         if (typeof body?.job_id !== "string" || !body.job_id.trim()) {
           throw new AdviceResponseError("Accepted advice request has no job identity.");
         }
@@ -399,7 +412,7 @@ export class HttpAdviceClient implements AdviceClient {
         };
       }
       if (!response.ok) throw await apiError(response);
-      const envelope = checkedAdvice(await response.json(), request);
+      const envelope = checkedAdvice(await adviceJson(response), request);
       return { kind: "advice", envelope, source: "api-cache" };
     }, options);
   }
@@ -411,7 +424,7 @@ export class HttpAdviceClient implements AdviceClient {
         { cache: "no-cache", signal },
       );
       if (!response.ok) throw await apiError(response);
-      const body = (await response.json()) as {
+      const body = (await adviceJson(response)) as {
         job_id: string;
         status: AdviceJobStatus["status"];
         error_code?: unknown;
@@ -504,6 +517,7 @@ export class FallbackAdviceClient implements AdviceClient {
 
   async readAdvice(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult> {
     let primaryResult: AdviceReadResult | null = null;
+    let primaryError: unknown;
     try {
       primaryResult = await this.primary.readAdvice(request, options);
     } catch (error) {
@@ -514,6 +528,7 @@ export class FallbackAdviceClient implements AdviceClient {
         options?.signal?.aborted
       )
         throw error;
+      primaryError = error;
       primaryResult = null;
     }
     if (primaryResult && primaryResult.kind === "advice") return primaryResult;
@@ -524,6 +539,7 @@ export class FallbackAdviceClient implements AdviceClient {
         ? { ...fallbackResult, source: "static-fallback" }
         : fallbackResult;
     }
+    if (primaryError instanceof AdviceResponseError) throw primaryError;
     return primaryResult ?? fallbackResult;
   }
 
@@ -537,6 +553,7 @@ export class FallbackAdviceClient implements AdviceClient {
       if (isRequestRejection(error) || isAbortError(error) || options?.signal?.aborted) throw error;
       const read = await this.fallback.readAdvice(request, options);
       if (read.kind === "advice") return { ...read, source: "static-fallback" };
+      if (error instanceof AdviceResponseError) throw error;
       // Nothing published to fall back on: say why the service could not help.
       const code = error instanceof AdviceApiError ? error.code : null;
       return { kind: "unavailable", reason: code ?? SERVICE_UNREACHABLE };

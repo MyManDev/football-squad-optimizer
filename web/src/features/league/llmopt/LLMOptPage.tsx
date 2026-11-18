@@ -1,5 +1,13 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import { Link, useParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -59,9 +67,10 @@ import {
 import { frozenForDraft, matchingScenarioReference, scenarioLabel } from "./planScenario";
 import {
   checkedPlanSession,
+  createPlanSessionMemory,
   createPlanSessionStore,
-  readPlanSession,
   type PlanSessionContext,
+  type PlanSessionMemory,
 } from "./planSession";
 import {
   ALTERNATIVE_SLOTS,
@@ -108,32 +117,36 @@ interface ChatLine {
 
 function Session({
   squad,
+  fixtures,
+  deadline,
   intentSource,
   chatReady,
+  memory,
 }: {
   squad: EntrySquad;
+  fixtures: ReturnType<typeof useFixtures>;
+  deadline: string | null;
   intentSource: IntentSource;
   chatReady: boolean;
+  memory: PlanSessionMemory;
 }) {
   const { messages } = useLanguage();
   const { forwarded } = useLeague();
-  const fixtures = useFixtures();
-  const deadline = gameweekDeadline(fixtures.data, squad.season, squad.gameweek);
+  const publishedDeadline = gameweekDeadline(fixtures.data, squad.season, squad.gameweek);
   const roster = useQuery({
     queryKey: ["llmopt-roster", ORIGIN, squad.season, squad.source_snapshot_id],
     queryFn: ({ signal }) => readIntentCatalog(ORIGIN, squad.season, signal),
     enabled: !!ORIGIN,
     ...LEAGUE_READ,
   });
-  const context =
-    ORIGIN && deadline && squad.source_snapshot_id
-      ? {
-          key: `squadopt.llmopt:${JSON.stringify([ORIGIN, forwarded === true, squad.league_id, squad.entry.entry_id])}`,
-          basis: squadBasis(squad),
-          deadline,
-        }
-      : null;
-  const saved = context ? readPlanSession(context) : null;
+  const context: PlanSessionContext = {
+    key: `squadopt.llmopt:${JSON.stringify([ORIGIN, forwarded === true, squad.league_id, squad.entry.entry_id])}`,
+    basis: squadBasis(squad),
+    season: squad.season,
+    gameweek: squad.gameweek,
+    deadline,
+  };
+  const saved = memory.read(context);
   if (fixtures.isPending || (saved && roster.isPending))
     return <PageLoading label={messages.common.loading} />;
   // A saved session that names a player outside the squad needs the roster to be checked.
@@ -148,12 +161,13 @@ function Session({
     return <RosterHold squad={squad} roster={roster} />;
   return (
     <Workspace
-      key={context ? `${context.key}:${context.deadline}` : undefined}
+      key={`${context.key}:${context.deadline}`}
       squad={squad}
       deadline={deadline}
-      fixturesUnavailable={fixtures.isError}
+      fixturesUnavailable={publishedDeadline === null}
       roster={roster}
       context={context}
+      memory={memory}
       saved={saved}
       intentSource={intentSource}
       chatReady={chatReady}
@@ -165,6 +179,7 @@ function ownedPlayers(squad: EntrySquad): CatalogPlayer[] {
   return [...squad.starting_xi, ...squad.bench].map((p) => ({
     id: p.player_id,
     name: p.name,
+    short_name: p.short_name,
     team: p.team,
   }));
 }
@@ -228,6 +243,7 @@ function Workspace({
   fixturesUnavailable,
   roster,
   context,
+  memory,
   saved,
   intentSource,
   chatReady,
@@ -237,6 +253,7 @@ function Workspace({
   fixturesUnavailable: boolean;
   roster: UseQueryResult<CatalogPlayer[]>;
   context: PlanSessionContext | null;
+  memory: PlanSessionMemory;
   saved: unknown;
   intentSource: IntentSource;
   /** A model is there to read the chat: the member's key is held. */
@@ -297,15 +314,61 @@ function Workspace({
   }, [heldModel]);
   const [run, setRun] = useState<PlanRun | null>(restoredRun);
   const [changes, setChanges] = useState<DraftChanges | null>(null);
-  const [session] = useState(() => createPlanSessionStore(context, restored?.confirmation));
+  const [session] = useState(() => createPlanSessionStore(context, restored?.confirmation, memory));
   // The saved run, read again after each save.
   const savedRun = useSyncExternalStore(session.subscribe, () => session.confirmation);
+  // Keep a validated restore above the keyed workspace too. This also records a draft
+  // edited before the calendar was available as soon as its deadline becomes known.
+  useEffect(() => {
+    if (restored) session.save(restored);
+  }, [restored, session]);
   const chatInput = useRef<HTMLTextAreaElement>(null);
+  const chatForm = useRef<HTMLFormElement>(null);
+  const restoreChatFocus = useRef(false);
+  const conversationList = useRef<HTMLOListElement>(null);
+  const followConversation = useRef(true);
+  const latestChatLine = conversation.at(-1)?.id;
+  const previousChatLine = useRef(latestChatLine);
   const computeButton = useRef<HTMLButtonElement>(null);
   const interpret = useRef<AbortController | null>(null);
   const nextChatLine = useRef(conversation.length);
   const confirming = useRef(false);
   const mounted = useRef(true);
+
+  // Follow new replies within the list, without moving the page or taking an older
+  // question away from someone reading it. A restored conversation starts where it is.
+  useLayoutEffect(() => {
+    const appended = previousChatLine.current !== latestChatLine;
+    previousChatLine.current = latestChatLine;
+    const list = conversationList.current;
+    if (appended && followConversation.current && list) list.scrollTop = list.scrollHeight;
+  }, [latestChatLine]);
+
+  // Disabling Send can leave the keyboard on the document body. Return it to the chat
+  // after the answer, unless the member moved elsewhere while the model was reading.
+  useEffect(() => {
+    if (reading) {
+      const movedElsewhere = (event: FocusEvent | PointerEvent) => {
+        if (
+          event.target instanceof Node &&
+          !(event.type === "focusin" && event.target === document.body) &&
+          !chatForm.current?.contains(event.target)
+        )
+          restoreChatFocus.current = false;
+      };
+      document.addEventListener("focusin", movedElsewhere);
+      document.addEventListener("pointerdown", movedElsewhere);
+      return () => {
+        document.removeEventListener("focusin", movedElsewhere);
+        document.removeEventListener("pointerdown", movedElsewhere);
+      };
+    }
+    if (!restoreChatFocus.current) return;
+    restoreChatFocus.current = false;
+    const active = document.activeElement;
+    if (chatReady && (active === document.body || chatForm.current?.contains(active)))
+      chatInput.current?.focus({ preventScroll: true });
+  }, [reading, chatReady, conversation, feedback, limit]);
 
   useEffect(() => {
     mounted.current = true;
@@ -373,6 +436,7 @@ function Workspace({
     const controller = new AbortController();
     const previous = reference ?? revised;
     interpret.current = controller;
+    restoreChatFocus.current = event.currentTarget.contains(document.activeElement);
     setReading(true);
     setFeedback("");
     try {
@@ -393,11 +457,14 @@ function Workspace({
         change(answer.draft, previous);
         setChanges(draftChanges(draft, answer.draft));
       } else {
-        // A second question keeps the answer to the first: what the model resolves next is
-        // the first message with every answer since, as far as one message can hold them.
+        // A second question must keep every earlier answer in the next request's context.
         const asked = clarification ? `${clarification.message}\n${text}` : text;
+        if (asked.length > MAX_MESSAGE_LENGTH) {
+          setFeedback(copy.conversationTooLong);
+          return;
+        }
         setQuestion({
-          message: asked.length <= MAX_MESSAGE_LENGTH ? asked : (clarification?.message ?? text),
+          message: asked,
           question: answer.message,
         });
       }
@@ -604,7 +671,7 @@ function Workspace({
         setRun(null);
         setReference(undefined);
         // The reload the page asks for opens the new squad; the rules go with the member.
-        session.save({ draft, carried: true });
+        session.save({ draft });
         return;
       }
       const request = requestFor(squad, forwarded, plans.window);
@@ -717,7 +784,8 @@ function Workspace({
   ]);
   // A rule with no slot of its own is priced in the plan with all preferences, or named as
   // left out of it.
-  const combined = run ? savedRun?.combined : undefined;
+  const combined =
+    run && savedRun?.combined ? prepareCombined(run, savedRun.combined).applied : undefined;
   const combinedPending =
     !closed &&
     (isWorking(baseState.phase) ||
@@ -812,7 +880,16 @@ function Workspace({
           />
         )}
         {conversation.length > 0 && (
-          <ol className={styles.conversation} aria-live="polite">
+          <ol
+            className={styles.conversation}
+            ref={conversationList}
+            aria-live="polite"
+            onScroll={(event) => {
+              const list = event.currentTarget;
+              followConversation.current =
+                list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+            }}
+          >
             {conversation.map(({ id, role, message }) => (
               <li key={id} data-role={role}>
                 <strong>{role === "user" ? copy.user : copy.assistant}</strong>
@@ -821,7 +898,7 @@ function Workspace({
             ))}
           </ol>
         )}
-        <form className={styles.chat} onSubmit={(event) => void send(event)}>
+        <form className={styles.chat} ref={chatForm} onSubmit={(event) => void send(event)}>
           <label htmlFor="llmopt-message">{copy.chat}</label>
           <textarea
             id="llmopt-message"
@@ -1140,6 +1217,32 @@ export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {
   const entryId = Number(entryParam);
   const valid = Number.isSafeInteger(entryId) && entryId > 0;
   const result = useEntrySquad(entryId, valid);
+  const [memory] = useState(createPlanSessionMemory);
+  const fixtures = useFixtures();
+  const squad = result.data?.payload;
+  const publishedDeadline = gameweekDeadline(fixtures.data, squad?.season, squad?.gameweek);
+  const [knownDeadline, setKnownDeadline] = useState<{
+    season: string;
+    gameweek: number;
+    deadline: string;
+  } | null>(null);
+  const sameWeek =
+    squad !== undefined &&
+    knownDeadline?.season === squad.season &&
+    knownDeadline.gameweek === squad.gameweek;
+  if (
+    squad &&
+    publishedDeadline !== null &&
+    (!sameWeek || knownDeadline?.deadline !== publishedDeadline)
+  )
+    setKnownDeadline({
+      season: squad.season,
+      gameweek: squad.gameweek,
+      deadline: publishedDeadline,
+    });
+  // Keep the recorded deadline across squad refreshes while the calendar is unavailable.
+  // Another season or gameweek needs its own calendar, and the deadline clock still closes.
+  const deadline = fixtures.data == null && sameWeek ? knownDeadline.deadline : publishedDeadline;
   if (!valid) return <EmptyState page title={messages.leagueMembers.invalidEntry} />;
   if (result.isPending) return <PageLoading label={messages.common.loading} />;
   // A squad already read stays on the page when a later refresh of it fails: plans may be
@@ -1149,8 +1252,11 @@ export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {
     <Session
       key={squadBasis(result.data.payload)}
       squad={result.data.payload}
+      fixtures={fixtures}
+      deadline={deadline}
       intentSource={source}
       chatReady={intentSource !== undefined || ownKey}
+      memory={memory}
     />
   );
 }

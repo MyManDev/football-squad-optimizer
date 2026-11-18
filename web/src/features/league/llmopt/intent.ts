@@ -61,6 +61,7 @@ interface PreparedPlan {
 export interface CatalogPlayer {
   id: number;
   name: string;
+  short_name?: string;
   team: string;
   held?: boolean;
 }
@@ -394,11 +395,22 @@ export async function readIntentCatalog(origin: string, season: string, signal: 
           seen.has(player.id) ||
           typeof player.name !== "string" ||
           !player.name.trim() ||
-          typeof player.team !== "string"
+          typeof player.team !== "string" ||
+          (player.short_name !== undefined &&
+            (typeof player.short_name !== "string" ||
+              !player.short_name.trim() ||
+              player.short_name.trim().length > 120))
         )
           throw new Error("Invalid player");
         seen.add(player.id);
-        return { id: player.id, name: player.name, team: player.team };
+        return {
+          id: player.id,
+          name: player.name,
+          ...(typeof player.short_name === "string"
+            ? { short_name: player.short_name.trim() }
+            : {}),
+          team: player.team,
+        };
       });
     },
     { signal },

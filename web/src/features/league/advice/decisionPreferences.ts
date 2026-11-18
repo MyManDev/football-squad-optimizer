@@ -130,10 +130,13 @@ function expectKeys(row: Record<string, unknown>, extra: string[]) {
     throw new Error("Unknown preference");
 }
 
-function checkedIds(value: unknown): number[] {
+/** All 16 draft rules plus one comparison exclusion, without occupying squad places. */
+export const MAX_AVOID_PLAYERS = 17;
+
+function checkedIds(value: unknown, limit = 15): number[] {
   if (
     !Array.isArray(value) ||
-    value.length > 15 ||
+    value.length > limit ||
     value.some((id) => !Number.isSafeInteger(id) || id < 1) ||
     new Set(value).size !== value.length
   )
@@ -142,7 +145,7 @@ function checkedIds(value: unknown): number[] {
 }
 
 function checkedRules(row: Record<string, unknown>): WeekRulePreferences {
-  const ids = (value: unknown) => (value === undefined ? [] : checkedIds(value));
+  const ids = (value: unknown, limit = 15) => (value === undefined ? [] : checkedIds(value, limit));
   const flag = (v: unknown): boolean => {
     if (v === undefined) return false;
     if (typeof v !== "boolean") throw new Error("Invalid preference flag");
@@ -154,7 +157,7 @@ function checkedRules(row: Record<string, unknown>): WeekRulePreferences {
   const clubCounts = checkedClubCounts(row.club_counts, hold);
   const result: WeekRulePreferences = {
     keep_players: ids(row.keep_players),
-    avoid_players: ids(row.avoid_players),
+    avoid_players: ids(row.avoid_players, MAX_AVOID_PLAYERS),
     no_hits: flag(row.no_hits),
     save_chips: flag(row.save_chips),
     ...(hold ? { hold_transfers: true } : {}),

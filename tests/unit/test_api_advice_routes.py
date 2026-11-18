@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from squadopt.api.app import create_app
@@ -158,8 +159,12 @@ def test_without_a_store_the_routes_say_disabled_and_the_old_app_is_untouched(
     assert health.status_code == 200  # the read-only app is exactly what it was
 
 
+@pytest.mark.parametrize(
+    "corruption", ["unversioned", "opening_hit", "later_hit", "alternative_hit"]
+)
 def test_corrupted_cache_bytes_are_an_internal_error_not_a_published_document(
     tmp_path: Path,
+    corruption: str,
 ) -> None:
     """The review's exact risk: bytes that do not carry the versioned shape must not
     travel out under the route's claim."""
@@ -178,7 +183,32 @@ def test_corrupted_cache_bytes_are_an_internal_error_not_a_published_document(
         repository_commit=CONTEXT.repository_commit,
         configuration_fingerprint=CONTEXT.configuration_fingerprint,
     )
-    cache.put(key, b'{"anything": "at all"}')
+    document = json.loads(_valid_advice_document())
+    if corruption == "opening_hit":
+        document["payload"]["transfer_hit_points"] = -4
+    elif corruption == "later_hit":
+        document["payload"]["plan_weeks"] = [
+            {
+                "gameweek": 3,
+                "transfers_in": [],
+                "transfers_out": [],
+                "transfer_hit_points": -4,
+                "chip": None,
+                "free_transfers_before": 1,
+                "free_transfers_after": 2,
+                "expected_points": 50,
+            }
+        ]
+    elif corruption == "alternative_hit":
+        document["payload"]["alternative_plan"] = {
+            "kind": "with_hits",
+            "overlap_applied": 0,
+            "transfer_hit_points": -4,
+            "expected_points_cost": 0,
+        }
+    else:
+        document = {"anything": "at all"}
+    cache.put(key, json.dumps(document).encode())
 
     response = client.get(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/313686/advice?strategy=saf-puan&window=1"
