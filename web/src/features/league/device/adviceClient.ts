@@ -33,6 +33,7 @@ export function deviceAdviceClient(
   const memory = new Map<string, AdviceReadResult>();
   const pending = new Map<string, Promise<AdviceReadResult>>();
   const localRuns = new Set<string>();
+  const closedLocalRuns = new Set<string>();
   const block = squad.device_plan;
   const owned = new Set([...squad.starting_xi, ...squad.bench].map((player) => player.player_id));
   const consistentBlock =
@@ -143,7 +144,14 @@ export function deviceAdviceClient(
     readPublicCapabilities: async (id, entry, options) =>
       withLocal((await remote.readPublicCapabilities?.(id, entry, options)) ?? null),
     cancelRun: async (id) => {
-      if (!closeDeviceWork(id) && !localRuns.has(id)) await remote.cancelRun?.(id);
+      let local = localRuns.has(id);
+      try {
+        local = closeDeviceWork(id) || local;
+      } catch {
+        // An unavailable local receipt must not prevent cancelling a server job.
+      }
+      if (local) closedLocalRuns.add(id);
+      else await remote.cancelRun?.(id);
     },
     readAdvice: async (request, options) => {
       if (!eligible(request)) return remote.readAdvice(request, options);
@@ -154,11 +162,23 @@ export function deviceAdviceClient(
       }
     },
     requestAdvice: async (request, options) => {
+      if (request.run && closedLocalRuns.has(request.run.run_id))
+        return { kind: "unavailable", reason: "RUN_CANCELLED" };
       if (!eligible(request)) {
         if (request.deviceRun === true)
           return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
-        if (request.run && deviceWorkReceipt(request.run.run_id))
-          return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
+        if (request.run) {
+          if (localRuns.has(request.run.run_id))
+            return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
+          if (request.deviceRun !== false) {
+            try {
+              if (deviceWorkReceipt(request.run.run_id))
+                return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
+            } catch {
+              /* Unavailable device storage does not disable server work. */
+            }
+          }
+        }
         return remote.requestAdvice(request, options);
       }
       if (options?.signal?.aborted) throw abort();
@@ -231,7 +251,11 @@ export function deviceAdviceClient(
               });
             },
           );
-          if (request.run && deviceWorkReceipt(request.run.run_id)?.closed)
+          if (
+            request.run &&
+            (closedLocalRuns.has(request.run.run_id) ||
+              deviceWorkReceipt(request.run.run_id)?.closed)
+          )
             throw new DeviceWorkRefused("RUN_CANCELLED");
           const envelope = checkedAdvice(
             deviceAdviceEnvelope(document, squad, answer, new Date(), request.leagueId),

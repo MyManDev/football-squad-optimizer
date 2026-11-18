@@ -184,4 +184,21 @@ describe("one-week advice transport with a real solver", () => {
     expect(posts).not.toHaveBeenCalled();
     expect(remote.requestAdvice).not.toHaveBeenCalled();
   });
+  it("keeps server work and cancellation usable when session storage is blocked", async () => {
+    const { client, remote, posts } = setup();
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const server = {
+      ...request,
+      window: 3 as const,
+      deviceRun: false,
+      run: { ...request.run!, run_id: "e".repeat(32) },
+    };
+    await expect(client.requestAdvice(server)).resolves.toEqual({ kind: "unavailable" });
+    expect(remote.requestAdvice).toHaveBeenCalledTimes(1);
+    await client.cancelRun?.(server.run.run_id);
+    expect(remote.cancelRun).toHaveBeenCalledWith(server.run.run_id);
+    expect(posts).not.toHaveBeenCalled();
+  });
 });
