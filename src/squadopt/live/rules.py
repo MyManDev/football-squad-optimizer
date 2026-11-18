@@ -351,6 +351,9 @@ def chip_availability_for(
         if spent:
             continue
         covered = {week for week in horizon if window.covers(week)}
+        if window.name == "freehit":
+            # Renewed rights do not waive the ban on consecutive Free Hits.
+            covered = {week for week in covered if week - 1 not in played.get("freehit", set())}
         if covered:
             available.setdefault(window.name, set()).update(covered)
     return ChipAvailability(

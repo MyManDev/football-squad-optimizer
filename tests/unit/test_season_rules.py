@@ -272,3 +272,15 @@ def test_a_forced_chip_passes_through_the_bridge(tmp_path: Path) -> None:
     availability = chip_availability_for(rules, (10, 11), forced={11: "wildcard"})
 
     assert dict(availability.forced) == {11: "wildcard"}
+
+
+@pytest.mark.parametrize("last_played,expected", [(19, {21}), (18, {20, 21})])
+def test_renewed_free_hit_cannot_follow_a_historical_free_hit(
+    tmp_path: Path, last_played: int, expected: set[int]
+) -> None:
+    rules = read_season_rules(_capture(tmp_path), season=SEASON)
+
+    availability = chip_availability_for(rules, (20, 21), used={"freehit": [last_played]})
+
+    assert availability.gameweeks_for("freehit") == frozenset(expected)
+    assert availability.gameweeks_for("wildcard") == frozenset({20, 21})
