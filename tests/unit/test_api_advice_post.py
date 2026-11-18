@@ -29,6 +29,7 @@ from squadopt.platform.advice_read import (
     FileLeagueDirectory,
     PreferencePlayers,
 )
+from squadopt.platform.advice_runs import FileRunStore, RunAdmissionError
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     FixedWindowRateLimiter,
@@ -50,6 +51,163 @@ CONTEXT = AdviceRequestContext(
 )
 ADVICE_URL = f"/api/v1/leagues/{LEAGUE_ID}/entries/313686/advice"
 BODY = {"strategy": "saf-puan", "window": 1}
+
+
+def _run_ref(identifier="a" * 32, stage="base"):
+    return {"contract_version": "llmopt_run_v1", "run_id": identifier, "stage": stage}
+
+
+def test_new_preference_work_requires_identity_but_legacy_cached_answers_remain_readable(tmp_path):
+    client, cache, queue = _world(tmp_path, runs=FileRunStore(tmp_path / "runs"))
+    body = {**BODY, "preferences": {"no_hits": True}}
+    missing = client.post(ADVICE_URL, json=body)
+    assert missing.status_code == 409
+    assert missing.json()["error"]["code"] == "RUN_ID_REQUIRED"
+    assert queue.jobs() == ()
+    assert client.post(ADVICE_URL, json={**body, "run": _run_ref()}).status_code == 202
+    document = json.loads(_valid_advice_document())
+    document["payload"].update(
+        preferences={"keep_players": [], "avoid_players": [], "no_hits": True},
+        preferences_scope="all_selected_weeks",
+    )
+    run_advice_worker_once(
+        queue, cache, lambda _: json.dumps(document).encode(), at_utc="2026-08-27T12:01:00Z"
+    )
+    assert client.post(ADVICE_URL, json=body).status_code == 200
+    assert len(queue.jobs()) == 1
+
+
+def test_five_week_advice_cannot_claim_the_one_three_week_run_budget(tmp_path):
+    client, _, queue = _world(tmp_path, runs=FileRunStore(tmp_path / "runs"))
+    refused = client.post(ADVICE_URL, json={**BODY, "window": 5, "run": _run_ref()})
+    assert refused.status_code == 422
+    assert queue.jobs() == ()
+
+
+@pytest.mark.parametrize("window,capacity", [(1, 84), (3, 488)])
+def test_llmopt_run_has_four_lifetime_jobs_across_terminal_retries_and_restart(
+    tmp_path, window, capacity
+):
+    root = tmp_path / "runs"
+    client, cache, queue = _world(tmp_path, runs=FileRunStore(root), preference_players=_players)
+    base = {**BODY, "window": window, "run": _run_ref()}
+    first = client.post(ADVICE_URL, json=base)
+    assert first.status_code == 202, first.text
+    assert (
+        client.post(
+            ADVICE_URL,
+            json={
+                **base,
+                "run": _run_ref(stage="followup"),
+                "preferences": {"avoid_players": [100]},
+            },
+        ).json()["error"]["code"]
+        == "RUN_BASE_REQUIRED"
+    )
+    document = json.loads(_valid_advice_document())
+    document["payload"]["window"] = window
+    run_advice_worker_once(
+        queue, cache, lambda _: json.dumps(document).encode(), at_utc="2026-08-27T12:01:00Z"
+    )
+    for index in range(3):
+        request = {
+            **base,
+            "run": _run_ref(stage="followup"),
+            "preferences": {"avoid_players": [100 + index]},
+        }
+        accepted = client.post(ADVICE_URL, json=request)
+        assert accepted.status_code == 202, accepted.text
+        claimed = queue.claim(at_utc="2026-08-27T12:01:00Z")
+        queue.store(
+            claimed.transition(
+                "failed", at_utc="2026-08-27T12:01:00Z", error=JobError("ADVICE_FAILED", "Stopped.")
+            )
+        )
+        restarted, _, _ = _world(tmp_path, runs=FileRunStore(root), preference_players=_players)
+        repeated = restarted.post(ADVICE_URL, json=request)
+        assert repeated.json()["job_id"] == accepted.json()["job_id"]
+    refused = client.post(
+        ADVICE_URL,
+        json={**base, "run": _run_ref(stage="followup"), "preferences": {"avoid_players": [200]}},
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == "RUN_BUDGET_EXHAUSTED"
+    assert len(queue.jobs()) == 4
+    state = json.loads((root / "ledger.json").read_text())
+    assert state["runs"]["a" * 32]["reserved"] == capacity
+    assert client.post(ADVICE_URL, json=base).status_code == 200
+
+
+def test_llmopt_concurrent_reconstructed_services_cannot_admit_a_fifth_job(tmp_path):
+    root = tmp_path / "runs"
+    client, cache, queue = _world(
+        tmp_path, runs=FileRunStore(root), preference_players=_players, max_open_jobs_per_client=100
+    )
+    base = {**BODY, "run": _run_ref()}
+    assert client.post(ADVICE_URL, json=base).status_code == 202
+    run_advice_worker_once(
+        queue, cache, lambda _: _valid_advice_document(), at_utc="2026-08-27T12:01:00Z"
+    )
+    clients = [
+        _world(
+            tmp_path,
+            runs=FileRunStore(root),
+            preference_players=_players,
+            max_open_jobs_per_client=100,
+        )[0]
+        for _ in range(8)
+    ]
+
+    def ask(index):
+        return (
+            clients[index % len(clients)]
+            .post(
+                ADVICE_URL,
+                json={
+                    **BODY,
+                    "run": _run_ref(stage="followup"),
+                    "preferences": {"avoid_players": [100 + index]},
+                },
+            )
+            .status_code
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        statuses = list(pool.map(ask, range(16)))
+    assert statuses.count(202) == 3
+    assert statuses.count(409) == 13
+    assert len(queue.jobs()) == 4
+
+
+def test_llmopt_edit_cancels_unshared_queue_and_fences_running_results(tmp_path):
+    runs = FileRunStore(tmp_path / "runs")
+    client, _, queue = _world(tmp_path, runs=runs)
+    request = {**BODY, "run": _run_ref()}
+    posted = client.post(ADVICE_URL, json=request)
+    identifier = posted.json()["job_id"]
+    claimed = queue.claim(at_utc="2026-08-27T12:01:00Z")
+    budget = runs.allocation(identifier)
+    assert budget.limit == 21
+    closed = client.post(f"/api/v1/llmopt/runs/{'a' * 32}/cancel", json={})
+    assert closed.status_code == 200
+    assert queue.load(identifier).status == "running"
+    with pytest.raises(RunAdmissionError, match="ended"):
+        runs.finish(identifier, budget)
+    assert client.post(ADVICE_URL, json=request).status_code == 409
+    assert claimed.job_id == identifier
+
+
+def test_llmopt_shared_queued_job_survives_until_its_last_consumer_leaves(tmp_path):
+    runs = FileRunStore(tmp_path / "runs")
+    client, _, queue = _world(tmp_path, runs=runs)
+    first = client.post(ADVICE_URL, json={**BODY, "run": _run_ref()})
+    joined = client.post(ADVICE_URL, json={**BODY, "run": _run_ref("b" * 32)})
+    assert first.json()["job_id"] == joined.json()["job_id"]
+    assert client.post(f"/api/v1/llmopt/runs/{'a' * 32}/cancel", json={}).status_code == 200
+    assert queue.jobs()[0].status == "queued"
+    assert client.post(f"/api/v1/llmopt/runs/{'b' * 32}/cancel", json={}).status_code == 200
+    assert queue.jobs()[0].status == "cancelled"
+    assert queue.claim(at_utc="2026-08-27T12:01:00Z") is None
 
 
 def _valid_advice_document() -> bytes:

@@ -52,6 +52,8 @@ from squadopt.platform.advice_submit import (
     MalformedIdempotencyKeyError,
     OpenJobLimitedError,
     RateLimitedError,
+    RunAdmissionError,
+    RunReference,
 )
 from squadopt.platform.api_contract import (
     ADVISE_CHIPS,
@@ -116,6 +118,7 @@ class AdviceSelection:
     chip: str | None
     model: str
     preferences: DecisionPreferences
+    run: RunReference | None = None
 
 
 def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
@@ -146,6 +149,7 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
         "chip",
         "model",
         "preferences",
+        "run",
     }
     unexpected = set(fields) - allowed
     if unexpected:
@@ -182,9 +186,12 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
     try:
         preferences = DecisionPreferences.parse(fields.get("preferences", {}))
         preferences.validate_selection(strategy, word, chip, top100_weight=weight)
+        run = RunReference.parse(fields["run"]) if "run" in fields else None
+        if run is not None and window not in (1, 3):
+            raise ValueError("Planning runs support one or three weeks.")
     except ValueError as error:
         raise BackendApiContractError(str(error)) from error
-    return AdviceSelection(strategy, window, rival, weight, word, chip, model, preferences)
+    return AdviceSelection(strategy, window, rival, weight, word, chip, model, preferences, run)
 
 
 def create_app(
@@ -217,6 +224,27 @@ def create_app(
         version=BACKEND_API_VERSION,
     )
     application.include_router(intent_routes())
+
+    @application.exception_handler(RunAdmissionError)
+    async def planning_run_error(_request: Request, error: RunAdmissionError) -> JSONResponse:
+        return _contract_error(409, error.code, str(error))
+
+    @application.post("/api/v1/llmopt/runs/{run_id}/cancel")
+    def cancel_planning_run(run_id: str) -> JSONResponse:
+        if advice_submit is None:
+            return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
+        current = datetime.now(UTC) if utc_now is None else utc_now()
+        try:
+            advice_submit.cancel_run(run_id, at_utc=current.astimezone(UTC).isoformat())
+        except ValueError as error:
+            if isinstance(error, RunAdmissionError):
+                raise
+            return _contract_error(422, "VALIDATION_FAILED", str(error))
+        return JSONResponse(
+            {"contract_version": "llmopt_run_v1", "run_id": run_id, "closed": True},
+            headers={"Cache-Control": "no-store"},
+        )
+
     if contributions is not None:
         from squadopt.api.contributions import ContributionError, contribution_routes
 
@@ -624,6 +652,7 @@ def create_app(
             chip=selection.chip,
             model=selection.model,
             preferences=selection.preferences,
+            run=selection.run,
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             if metrics is not None:

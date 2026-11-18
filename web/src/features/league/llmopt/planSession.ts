@@ -13,6 +13,7 @@ export const ALTERNATIVE_COUNT = 2;
 export type StartedAlternative = { kind: "priced" | "roll" } | { kind: "bank"; floor: number };
 
 export interface PlanConfirmation {
+  runId?: string;
   wildcardNotHeld: boolean;
   /** Absent until the confirmed baseline has been checked for follow-up requests. */
   followups?: (StartedAlternative | null)[];
@@ -44,7 +45,14 @@ export interface PlanSessionContext {
 export function readPlanSession(context: PlanSessionContext): unknown {
   if (context.deadline === null) return null;
   try {
-    const raw = sessionStorage.getItem(context.key);
+    const fallback = history.state?.llmoptSession;
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem(context.key);
+    } catch {
+      /* History retains the same safe session when session storage is blocked. */
+    }
+    if (fallback?.key === context.key && typeof fallback.raw === "string") raw = fallback.raw;
     if (!raw) return null;
     const saved = JSON.parse(raw);
     if (saved?.deadline !== context.deadline) return null;
@@ -61,14 +69,30 @@ export function readPlanSession(context: PlanSessionContext): unknown {
   }
 }
 
-function writePlanSession(context: PlanSessionContext | null, session: PlanSession) {
-  if (!context || context.deadline === null) return;
+export function writePlanSession(
+  context: PlanSessionContext | null,
+  session: PlanSession,
+): boolean {
+  if (!context || context.deadline === null) return false;
   const { key, basis, season, gameweek, deadline } = context;
+  const raw = JSON.stringify({ basis, season, gameweek, deadline, ...session });
+  let retained = false;
   try {
-    sessionStorage.setItem(key, JSON.stringify({ basis, season, gameweek, deadline, ...session }));
+    sessionStorage.setItem(key, raw);
+    retained = true;
   } catch {
-    // The planner remains usable without storage.
+    /* Try history below. */
   }
+  try {
+    history.replaceState(
+      { ...history.state, llmoptSession: retained ? undefined : { key, raw } },
+      "",
+    );
+    retained = true;
+  } catch {
+    /* Refuse new work if neither store can retain its identity. */
+  }
+  return retained;
 }
 
 export interface PlanSessionMemory {
@@ -187,6 +211,9 @@ export function checkedPlanSession(
           confirmation.followups.length <= ALTERNATIVE_COUNT))
     ) {
       session.confirmation = {
+        ...(typeof confirmation.runId === "string" && /^[0-9a-f]{32}$/.test(confirmation.runId)
+          ? { runId: confirmation.runId }
+          : {}),
         wildcardNotHeld: confirmation.wildcardNotHeld,
         ...(session.draft.scenario && confirmation.scenarioReplayInfeasible === true
           ? { scenarioReplayInfeasible: true as const }

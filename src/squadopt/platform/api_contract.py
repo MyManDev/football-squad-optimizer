@@ -19,6 +19,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final, Literal, Protocol, TypeAlias
 
+from squadopt.contracts.llmopt_run import run_reference_schema
 from squadopt.contracts.preferences import NO_PREFERENCES, preferences_schema
 from squadopt.contracts.preferences import DecisionPreferences as DecisionPreferences
 from squadopt.contracts.schema_paths import contract_schema_path
@@ -826,6 +827,7 @@ def backend_api_schema() -> dict[str, Any]:
     )
     advise_body = _object(
         {
+            "run": run_reference_schema(),
             "strategy": {"type": "string", "pattern": _NAME_PATTERN.pattern},
             "window": {"type": "integer", "enum": list(windows)},
             "rival_entry_id": _nullable({"type": "integer", "minimum": 1}),

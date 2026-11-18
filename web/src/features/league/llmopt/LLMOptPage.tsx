@@ -69,6 +69,7 @@ import {
   checkedPlanSession,
   createPlanSessionMemory,
   createPlanSessionStore,
+  writePlanSession,
   type PlanSessionContext,
   type PlanSessionMemory,
 } from "./planSession";
@@ -392,6 +393,9 @@ function Workspace({
   // An edit keeps the plan the member compares against; only Revise picks another. Before any
   // plan was picked, the first edit after a result compares against the plan shown.
   function change(next: PlanDraft, previous = reference ?? revised) {
+    const abandoned = session.confirmation?.runId;
+    if (abandoned)
+      void client.cancelRun?.(abandoned).catch(() => setFeedback(copy.serviceUnavailable));
     for (const job of Object.values(controls)) job.reset();
     setRun(null);
     setFeedback("");
@@ -527,8 +531,13 @@ function Workspace({
   }
 
   const { states } = jobs;
+  const capacityRefused = (state: ComputePhase) =>
+    (state.phase === "failed" || state.phase === "unavailable") &&
+    (state.reason === "RUN_BUDGET_EXHAUSTED" || state.reason === "RUN_CANCELLED");
+  const incompleteRun = Object.values(states).some(capacityRefused);
   const computing = Object.values(states).some(({ phase }) => isWorking(phase));
-  const busy = checkingSquad || reading || computing;
+  const editingLocked = checkingSquad || reading;
+  const busy = editingLocked || computing;
   const replayProof =
     run?.scenario && states.first.phase === "failed" && states.first.infeasibility !== undefined;
   const savedReplayProof =
@@ -546,7 +555,19 @@ function Workspace({
   // Once every request of the run has a job or an answer, a reload resumes or reads it.
   // Before a restored run has started its jobs, every slot is idle and nothing is settled.
   const phases = Object.values(states).map(({ phase }) => phase);
-  const settled = !phases.includes("requesting") && phases.some((phase) => phase !== "idle");
+  const knownRequestsStarted =
+    !run ||
+    (ALTERNATIVE_SLOTS.every(
+      (slot, index) =>
+        (run.slots[index]?.kind !== "explicit" && !savedRun?.followups?.[index]) ||
+        (run.scenario && savedReplayProof) ||
+        states[slot].phase !== "idle",
+    ) &&
+      (!savedRun?.combined?.length || states.combined.phase !== "idle"));
+  const settled =
+    knownRequestsStarted &&
+    !phases.includes("requesting") &&
+    phases.some((phase) => phase !== "idle");
   useEffect(() => {
     if (!settled || !session.confirmation?.sending) return;
     const answered = { ...session.confirmation };
@@ -560,7 +581,7 @@ function Workspace({
         request={state.request}
         draft={draft}
         players={players}
-        disabled={busy}
+        disabled={editingLocked}
         change={applyRepair}
       />
     ) : undefined;
@@ -571,7 +592,10 @@ function Workspace({
     // A reload can land before a started job's id was stored, which leaves nothing to resume.
     // Such a slot asks again while the deadline is open: the service answers a computed request
     // from its cache and joins a request still running to its open job.
-    const askAgain = restored?.confirmation?.sending === true && deadlineOpen(deadline);
+    const askAgain =
+      !!run.inputs.request.run &&
+      restored?.confirmation?.sending === true &&
+      deadlineOpen(deadline);
     const restore = (request: PlanRequest, job: JobControls) => {
       if (job.resume?.(request)) return;
       if (askAgain) job.compute(request);
@@ -581,17 +605,6 @@ function Workspace({
     queueMicrotask(() => {
       if (!active) return;
       if (run.baseRequest) restore(run.baseRequest, controls.base);
-      const followups = restored?.confirmation?.followups;
-      ALTERNATIVE_SLOTS.forEach((slot, index) => {
-        const request = restoredSlot(run, index, followups?.[index]);
-        // A replay the saved run proved infeasible is shown from that proof, not asked again.
-        if (request && !(run.scenario && savedReplayProof)) restore(request, controls[slot]);
-      });
-      const savedCombined = restored?.confirmation?.combined;
-      if (savedCombined?.length) {
-        const { request } = prepareCombined(run, savedCombined);
-        if (request) restore(request, controls.combined);
-      }
     });
     return () => {
       active = false;
@@ -599,9 +612,38 @@ function Workspace({
   }, [run, restoredRun, restored, savedReplayProof, deadline, controls]);
 
   useEffect(() => {
+    if (
+      !run ||
+      incompleteRun ||
+      baseState.phase !== "done" ||
+      baseState.request !== run.baseRequest
+    )
+      return;
+    const confirmed = session.confirmation;
+    const restoring = run === restoredRun;
+    const restore = (request: PlanRequest, slot: JobControls) => {
+      if (slot.resume?.(request)) return;
+      if (request.run && confirmed?.sending && deadlineOpen(deadline)) slot.compute(request);
+      else slot.readCached?.(request);
+    };
+    ALTERNATIVE_SLOTS.forEach((name, index) => {
+      const slot = run.slots[index];
+      if (restoring) {
+        const request = restoredSlot(run, index, confirmed?.followups?.[index]);
+        if (request && !(run.scenario && savedReplayProof)) restore(request, controls[name]);
+      } else if (slot?.kind === "explicit" && slot.request) controls[name].compute(slot.request);
+    });
+    if (restoring && confirmed?.combined?.length) {
+      const { request } = prepareCombined(run, confirmed.combined);
+      if (request) restore(request, controls.combined);
+    }
+  }, [run, restoredRun, baseState, session, savedReplayProof, deadline, controls, incompleteRun]);
+
+  useEffect(() => {
     const confirmed = session.confirmation;
     if (
       !run?.automaticBasis ||
+      incompleteRun ||
       baseState.phase !== "done" ||
       baseState.request !== run.baseRequest ||
       !confirmed ||
@@ -624,7 +666,7 @@ function Workspace({
       const followup = followups[index];
       if (followup) controls[slot].compute(followup.request);
     });
-  }, [baseState, run, deadline, controls, session, draft, reference, clarification]);
+  }, [baseState, run, deadline, controls, session, draft, reference, clarification, incompleteRun]);
 
   async function compute() {
     if (
@@ -674,7 +716,15 @@ function Workspace({
         session.save({ draft });
         return;
       }
-      const request = requestFor(squad, forwarded, plans.window);
+      const runId = crypto.randomUUID().replaceAll("-", "");
+      const request = {
+        ...requestFor(squad, forwarded, plans.window),
+        run: {
+          contract_version: "llmopt_run_v1" as const,
+          run_id: runId,
+          stage: "base" as const,
+        },
+      };
       // A public team may have no chip list until its FPL inputs are pinned.
       const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
       const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
@@ -698,15 +748,20 @@ function Workspace({
       }
       for (const slot of ALTERNATIVE_SLOTS) controls[slot].reset();
       controls.combined.reset();
+      const confirmed = {
+        draft,
+        reference,
+        confirmation: { runId, wildcardNotHeld, sending: true as const },
+      };
+      if (!writePlanSession(context, confirmed)) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
       setRun(next);
-      session.save({ draft, reference, confirmation: { wildcardNotHeld, sending: true } });
+      session.save(confirmed);
       if (next.baseRequest) {
         controls.base.compute(next.baseRequest);
       } else controls.base.reset();
-      ALTERNATIVE_SLOTS.forEach((name, index) => {
-        const slot = next.slots[index];
-        if (slot?.kind === "explicit" && slot.request) controls[name].compute(slot.request);
-      });
     } catch {
       if (mounted.current) setFeedback(copy.squadUnavailable);
     } finally {
@@ -750,6 +805,7 @@ function Workspace({
     const confirmed = session.confirmation;
     if (
       !run ||
+      incompleteRun ||
       !singlesIn ||
       !confirmed ||
       confirmed.followups === undefined ||
@@ -781,6 +837,7 @@ function Workspace({
     draft,
     reference,
     clarification,
+    incompleteRun,
   ]);
   // A rule with no slot of its own is priced in the plan with all preferences, or named as
   // left out of it.
@@ -914,7 +971,12 @@ function Workspace({
             className={styles.primary}
             type="submit"
             disabled={
-              !ORIGIN || !chatReady || busy || roster.isPending || limit !== null || !message.trim()
+              !ORIGIN ||
+              !chatReady ||
+              editingLocked ||
+              roster.isPending ||
+              limit !== null ||
+              !message.trim()
             }
           >
             {reading ? copy.interpreting : copy.send}
@@ -923,7 +985,7 @@ function Workspace({
             <button
               className={styles.secondary}
               type="button"
-              disabled={busy}
+              disabled={editingLocked}
               onClick={() => setQuestion()}
             >
               {copy.dismissQuestion}
@@ -934,7 +996,7 @@ function Workspace({
           {copy.window}
           <select
             value={plans.window}
-            disabled={busy}
+            disabled={editingLocked}
             onChange={(event) => change({ ...draft, window: event.target.value === "3" ? 3 : 1 })}
           >
             <option value={1} disabled={needsThreeWeeks(draft)}>
@@ -957,7 +1019,7 @@ function Workspace({
           draft={draft}
           players={players}
           copy={copy}
-          disabled={busy}
+          disabled={editingLocked}
           change={change}
           changes={changes}
         />
@@ -976,7 +1038,7 @@ function Workspace({
                     <button
                       className={styles.remove}
                       type="button"
-                      disabled={busy}
+                      disabled={editingLocked}
                       aria-label={`${copy.remove} · ${label}`}
                       onClick={() => {
                         const keep = draft.keep_weeks?.filter((item) => item !== week);
@@ -997,7 +1059,7 @@ function Workspace({
                   <button
                     className={styles.remove}
                     type="button"
-                    disabled={busy}
+                    disabled={editingLocked}
                     aria-label={`${copy.remove} · ${bankRule}`}
                     onClick={() => change({ ...draft, min_bank: undefined })}
                   >
@@ -1024,7 +1086,7 @@ function Workspace({
                   <button
                     className={styles.remove}
                     type="button"
-                    disabled={busy}
+                    disabled={editingLocked}
                     aria-label={`${copy.remove} · ${scenarioDescription}`}
                     onClick={() => change({ ...draft, scenario: undefined })}
                   >
@@ -1136,7 +1198,7 @@ function Workspace({
         >
           <h2>{copy.results}</h2>
           <div className={styles.planGrid}>
-            {(run.baseRequest || run.baseConflict) && (
+            {(run.baseRequest || run.baseConflict) && !capacityRefused(baseState) && (
               <PlanResult
                 title={copy[run.baseTitle]}
                 state={baseState}
@@ -1146,28 +1208,32 @@ function Workspace({
                   run.baseConflict ? explainBranchConflict(run.baseTitle) : undefined
                 }
                 diagnosis={diagnosis(baseState)}
-                prices={priceRows}
+                prices={
+                  incompleteRun ? priceRows.filter(({ status }) => status === "priced") : priceRows
+                }
                 onRevise={baseAnswer ? () => revisePlan(baseAnswer) : undefined}
-                reviseDisabled={busy}
+                reviseDisabled={editingLocked}
               />
             )}
-            {results.map(({ title, state, conflict, conflictMessage }) => (
-              <PlanResult
-                key={title}
-                title={title}
-                state={state}
-                squad={squad}
-                baseline={baseAnswer}
-                conflict={conflict}
-                conflictMessage={conflictMessage}
-                diagnosis={diagnosis(state)}
-                onRevise={
-                  state.phase === "done" ? () => revisePlan(state.envelope.payload) : undefined
-                }
-                reviseDisabled={busy}
-              />
-            ))}
-            {combined && combined.length > 0 && (
+            {results
+              .filter(({ state }) => !capacityRefused(state))
+              .map(({ title, state, conflict, conflictMessage }) => (
+                <PlanResult
+                  key={title}
+                  title={title}
+                  state={state}
+                  squad={squad}
+                  baseline={baseAnswer}
+                  conflict={conflict}
+                  conflictMessage={conflictMessage}
+                  diagnosis={diagnosis(state)}
+                  onRevise={
+                    state.phase === "done" ? () => revisePlan(state.envelope.payload) : undefined
+                  }
+                  reviseDisabled={editingLocked}
+                />
+              ))}
+            {combined && combined.length > 0 && !capacityRefused(combinedState) && (
               <PlanResult
                 title={copy.combinedPlan}
                 state={combinedState}
@@ -1179,7 +1245,7 @@ function Workspace({
                     ? () => revisePlan(combinedState.envelope.payload)
                     : undefined
                 }
-                reviseDisabled={busy}
+                reviseDisabled={editingLocked}
               >
                 <CombinedRules
                   applied={combinedRules(true)}
@@ -1190,6 +1256,7 @@ function Workspace({
               </PlanResult>
             )}
           </div>
+          {incompleteRun && <p role="status">{copy.unfinishedPlans}</p>}
           {same && (
             <p role="status" className={styles.muted}>
               {copy.same}

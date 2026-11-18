@@ -155,6 +155,8 @@ export interface AdviceJob {
 export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): boolean {
   return (
     adviceRequestKey(left) === adviceRequestKey(right) &&
+    left.run?.run_id === right.run?.run_id &&
+    left.run?.stage === right.run?.stage &&
     left.leagueId === right.leagueId &&
     left.entryId === right.entryId &&
     left.strategy === right.strategy &&
@@ -458,7 +460,7 @@ export function useAdviceJob(
             }
             return;
           }
-          if (job.status === "failed") {
+          if (job.status === "failed" || job.status === "cancelled") {
             forgetJob(request);
             fail(undefined, job.errorCode ?? undefined, job.infeasibility);
             return;

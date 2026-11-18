@@ -76,6 +76,11 @@ from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
 from squadopt.live.transfers import HorizonNoSolutionError
 from squadopt.optimization import SolverStatus
+from squadopt.optimization.work_budget import (
+    WorkBudgetExhausted,
+    current_work_budget,
+    work_budget,
+)
 from squadopt.planning.native_highs import (
     NativeWindowOutcome,
     native_window_executor,
@@ -96,6 +101,7 @@ from squadopt.platform.advice_queue import (
     JobQueue,
     run_advice_worker_once,
 )
+from squadopt.platform.advice_runs import FileRunStore, RunAdmissionError
 from squadopt.platform.advice_switches import (
     CHIP_SWITCH,
     MANAGERS_WORD_SWITCH,
@@ -318,6 +324,7 @@ def build_advice_compute(
     job_log_fields: dict[str, object] | None = None,
     progress: ProgressRecorder | None = None,
     public_inputs: PublicEntryInputs | None = None,
+    runs: FileRunStore | None = None,
 ) -> Callable[[AdviceJob], bytes]:
     """Return the callback that turns one claimed job into the bytes it will be served as.
 
@@ -374,6 +381,16 @@ def build_advice_compute(
             return None  # an entry the read side would refuse is not a prerequisite
         payload = json.loads(held).get("payload")
         return payload if isinstance(payload, dict) else None
+
+    def bounded_native(model: Mapping[str, object], seconds: float) -> Mapping[str, object]:
+        budget = current_work_budget()
+        if budget is not None:
+            try:
+                budget.reserve_native(seconds)
+            except WorkBudgetExhausted as error:
+                # This public boundary already falls back to the bounded CP path.
+                raise RuntimeError(str(error)) from error
+        return execute_native_window(model, seconds)
 
     def compute(job: AdviceJob) -> bytes:
         # One worker computes one job at a time. Share only the validated spec's
@@ -490,7 +507,7 @@ def build_advice_compute(
         native_windows: list[NativeWindowOutcome] = []
         try:
             with (
-                native_window_executor(execute_native_window),
+                native_window_executor(bounded_native),
                 native_window_outcomes() as native_windows,
             ):
                 advice = advise_menu_entry(
@@ -507,6 +524,8 @@ def build_advice_compute(
                     on_document=None if count is None else count.solved,
                     include_resource_state=True,
                 )
+        except WorkBudgetExhausted:
+            raise
         except ChipUnavailable as error:
             raise AdviceComputeRefused(error.code, str(error)) from error
         except ManagersWordNotSolved as error:
@@ -620,7 +639,28 @@ def build_advice_compute(
         validate_advice_document(payload)
         return payload
 
-    return compute
+    def admitted_compute(job: AdviceJob) -> bytes:
+        try:
+            budget = None if runs is None else runs.allocation(job.job_id)
+            if budget is None and job.contract_version == "backend_jobs_v2":
+                raise RunAdmissionError(
+                    "RUN_STORE_UNAVAILABLE", "The admitted work is unavailable."
+                )
+            try:
+                with work_budget(budget):
+                    return compute(job)
+            finally:
+                if budget is not None:
+                    assert runs is not None
+                    runs.finish(job.job_id, budget)
+        except RunAdmissionError as error:
+            raise AdviceComputeRefused(error.code, str(error)) from error
+        except WorkBudgetExhausted as error:
+            raise AdviceComputeRefused(
+                "RUN_BUDGET_EXHAUSTED", "The completed plans are available."
+            ) from error
+
+    return admitted_compute
 
 
 def run_advice_worker(
@@ -1023,6 +1063,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 job_log_fields=job_log_fields,
                 progress=running.queue.record_progress,
                 public_inputs=running.public_inputs,
+                runs=running.runs,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.

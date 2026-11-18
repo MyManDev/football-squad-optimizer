@@ -23,7 +23,7 @@ import tests.unit.test_live_transfers as world_module
 import tests.unit.test_source_fpl_live as payload_module
 import tests.unit.test_top100_weight as top100_tests
 from fastapi.testclient import TestClient
-from tests.fixtures.backend_app import app_for_capture
+from tests.fixtures.backend_app import app_for_capture, confirmed_request
 from tests.unit.test_projection_horizon_builder import _calendar
 
 import squadopt.application.top100_weight as switches_module_top100
@@ -547,7 +547,7 @@ def test_a_missing_spec_is_a_named_refusal_not_a_crash(tmp_path: Path) -> None:
             handoff_root=tmp_path / "handoffs",
         )
     )
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    compute = build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs)
     with pytest.raises(AdviceComputeRefused) as refusal:
         compute(_job("c" * 64))
     assert refusal.value.code == "REQUEST_UNREADABLE"
@@ -564,7 +564,9 @@ def test_a_job_retried_past_the_limit_is_failed_rather_than_repeated(tmp_path: P
             handoff_root=tmp_path / "handoffs",
         )
     )
-    compute = build_advice_compute(backend.contexts, backend.job_specs, max_attempts=2)
+    compute = build_advice_compute(
+        backend.contexts, backend.job_specs, runs=backend.runs, max_attempts=2
+    )
     with pytest.raises(AdviceComputeRefused) as refusal:
         compute(_job("d" * 64, attempt=3))
     assert refusal.value.code == "TOO_MANY_ATTEMPTS"
@@ -579,7 +581,9 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     key = "e" * 64
     backend.job_specs.put(key, _spec(context=_context("fpl-live-20250101T000000Z-deadbeef1234")))
     fields: dict[str, object] = {}
-    compute = build_advice_compute(backend.contexts, backend.job_specs, job_log_fields=fields)
+    compute = build_advice_compute(
+        backend.contexts, backend.job_specs, runs=backend.runs, job_log_fields=fields
+    )
 
     with pytest.raises(AdviceComputeRefused) as refusal:
         compute(_job(key))
@@ -623,7 +627,9 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     processed = run_advice_worker(
         backend.queue,
         backend.cache,
-        build_advice_compute(backend.contexts, backend.job_specs, job_log_fields=fields),
+        build_advice_compute(
+            backend.contexts, backend.job_specs, runs=backend.runs, job_log_fields=fields
+        ),
         should_stop=_stop_after(3),
         max_jobs=1,
         metrics=backend.metrics,
@@ -676,7 +682,7 @@ def test_recomputing_one_job_produces_the_same_bytes(running: dict[str, Any]) ->
     accepted = client.post(route, json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW})
     assert accepted.status_code == 202
 
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    compute = build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs)
     job = backend.queue.jobs()[0]
     first = compute(job)
     second = compute(job)
@@ -846,7 +852,7 @@ def test_a_rival_free_request_refuses_a_rival_without_changing_the_spec(
     processed = run_advice_worker(
         backend.queue,
         backend.cache,
-        build_advice_compute(backend.contexts, backend.job_specs),
+        build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs),
         should_stop=_stop_after(2 * len(jobs) + 2),
         idle_seconds=0.0,
         max_jobs=len(jobs),
@@ -870,7 +876,7 @@ def test_a_changed_commit_under_the_same_capture_is_refused(running: dict[str, A
     key = "1" * 64
     backend.job_specs.put(key, _spec(context=stale))
 
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    compute = build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs)
     with pytest.raises(AdviceComputeRefused) as refusal:
         compute(_job(key))
     assert refusal.value.code == "CONTEXT_UNAVAILABLE"
@@ -887,7 +893,7 @@ def test_a_changed_configuration_under_the_same_capture_is_refused(
     key = "3" * 64
     backend.job_specs.put(key, _spec(context=stale))
 
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    compute = build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs)
     with pytest.raises(AdviceComputeRefused) as refusal:
         compute(_job(key))
     assert refusal.value.code == "CONTEXT_UNAVAILABLE"
@@ -1456,7 +1462,7 @@ def test_an_interrupt_still_ends_the_worker(tmp_path: Path, stop: type[BaseExcep
 
 def test_an_unreadable_spec_is_a_request_unreadable_refusal(running: dict[str, Any]) -> None:
     backend = running["backend"]
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    compute = build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs)
     store = running["backend"].config.spec_root
     for key, stored in (
         ("a" * 64, b"not json at all"),
@@ -1478,7 +1484,7 @@ def test_a_member_the_capture_does_not_hold_is_named_not_a_generic_failure(
 
     backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    compute = build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs)
     for entry, body in (
         (RIVAL_ID, {"strategy": COMPUTED_MODE, "window": 1}),
         (ENTRY_ID, {"strategy": "ortak-koru", "window": 1, "rival_entry_id": RIVAL_ID}),
@@ -1509,7 +1515,7 @@ def test_a_word_not_solved_for_one_member_is_named_not_a_generic_failure(
         json={"strategy": COMPUTED_MODE, "window": 1},
     )
     assert accepted.status_code == 202, accepted.text
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    compute = build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs)
     job = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
     assert job is not None and job.status == "failed"
     assert job.error is not None and job.error.code == "MANAGERS_WORD_NOT_SOLVED"
@@ -1554,7 +1560,9 @@ def test_disabled_central_injuries_cannot_reach_advice_or_cache(running, monkeyp
     request = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
     accepted = client.post(route, json=request)
     assert accepted.status_code == 202, accepted.text
-    compute = build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache)
+    compute = build_advice_compute(
+        backend.contexts, backend.job_specs, runs=backend.runs, cache=backend.cache
+    )
     queued = backend.queue.load(accepted.json()["job_id"])
     assert queued is not None
     with pytest.raises(ValueError, match="central official injury source is disabled"):
@@ -1715,7 +1723,9 @@ def test_worker_publishes_official_facts_for_decisions_and_statement_outcomes(
     job = run_advice_worker_once(
         backend.queue,
         backend.cache,
-        build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache),
+        build_advice_compute(
+            backend.contexts, backend.job_specs, runs=backend.runs, cache=backend.cache
+        ),
         at_utc="2026-09-01T10:01:00Z",
     )
     assert job is not None and job.status == "completed", None if job is None else job.error
@@ -1762,7 +1772,9 @@ def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str,
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
     job_id = client.post(route, json=body).json()["job_id"]
-    compute = build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache)
+    compute = build_advice_compute(
+        backend.contexts, backend.job_specs, runs=backend.runs, cache=backend.cache
+    )
     done = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
     assert done is not None and done.status == "completed", done
 
@@ -1794,7 +1806,9 @@ def _work(backend: Any, jobs: int = 1) -> int:
     return run_advice_worker(
         backend.queue,
         backend.cache,
-        build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache),
+        build_advice_compute(
+            backend.contexts, backend.job_specs, runs=backend.runs, cache=backend.cache
+        ),
         should_stop=_stop_after(3 * jobs + 3),
         max_jobs=jobs,
         idle_seconds=0.0,
@@ -1840,7 +1854,7 @@ def test_three_week_plan_can_buy_a_player_back_and_include_a_captured_blank(tmp_
         ]
     }
     selection = {"strategy": "saf-puan", "window": 3}
-    accepted = client.post(route, json={**selection, "preferences": preferences})
+    accepted = client.post(route, json=confirmed_request({**selection, "preferences": preferences}))
     assert accepted.status_code == 202, accepted.text
     assert _work(backend) == 1
     result = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
@@ -1860,7 +1874,7 @@ def test_an_opening_buy_of_an_owned_player_is_refused_before_queueing(running):
     preferences = {"week_rules": [{"week": 1, "rules": {"buy_players": [STARTING_ELEVEN[0]]}}]}
     for response in (
         client.get(route, params={**selection, "preferences": json.dumps(preferences)}),
-        client.post(route, json={**selection, "preferences": preferences}),
+        client.post(route, json=confirmed_request({**selection, "preferences": preferences})),
     ):
         assert response.status_code == 422, response.text
         assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
@@ -1878,7 +1892,7 @@ def test_llmopt_replans_after_a_frozen_wildcard_and_keeps_the_following_lineup(
     preferences = {"week_rules": [{"week": 1, "rules": {"buy_players": [1007]}}]}
 
     def solve(rules):
-        accepted = client.post(route, json={**selection, "preferences": rules})
+        accepted = client.post(route, json=confirmed_request({**selection, "preferences": rules}))
         assert accepted.status_code == 202, accepted.text
         assert _work(backend) == 1
         served = client.get(route, params={**selection, "preferences": json.dumps(rules)})
@@ -1918,7 +1932,7 @@ def test_frozen_paid_moves_can_exceed_the_default_advice_cap_only_in_that_week(
         ]
     }
     selection = {"strategy": "saf-puan", "window": 3}
-    accepted = client.post(route, json={**selection, "preferences": preferences})
+    accepted = client.post(route, json=confirmed_request({**selection, "preferences": preferences}))
     assert accepted.status_code == 202, accepted.text
     assert _work(backend) == 1
     served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
@@ -1943,7 +1957,9 @@ def test_price_scenario_refuses_the_unfunded_old_transfer_and_can_reoptimize(run
     }
 
     def run(preferences):
-        accepted = client.post(route, json={**selection, "preferences": preferences})
+        accepted = client.post(
+            route, json=confirmed_request({**selection, "preferences": preferences})
+        )
         assert accepted.status_code == 202, accepted.text
         assert _work(backend) == 1
         job = client.get(f"/api/v1/advice-jobs/{accepted.json()['job_id']}").json()
@@ -1994,7 +2010,9 @@ def test_preferences_round_trip_through_http_worker_cache(running):
         "save_chips": True,
     }
     body = {"strategy": "saf-puan", "window": 1, "preferences": preferences}
-    response = client.post(route, json=body, headers={"Idempotency-Key": "preferences:one"})
+    response = client.post(
+        route, json=confirmed_request(body), headers={"Idempotency-Key": "preferences:one"}
+    )
     assert response.status_code == 202, response.text
     assert _work(backend) == 1
     result = client.get(
@@ -2008,12 +2026,15 @@ def test_preferences_round_trip_through_http_worker_cache(running):
     assert client.get(route, params={"strategy": "saf-puan", "window": 1}).status_code == 404
     conflict = client.post(
         route,
-        json={**body, "preferences": {"no_hits": False}},
+        json=confirmed_request({**body, "preferences": {"no_hits": False}}),
         headers={"Idempotency-Key": "preferences:one"},
     )
     assert conflict.status_code == 409
     invalid = client.post(
-        route, json={**body, "preferences": {"keep_players": [1], "avoid_players": [1]}}
+        route,
+        json=confirmed_request(
+            {**body, "preferences": {"keep_players": [1], "avoid_players": [1]}}
+        ),
     )
     assert invalid.status_code == 422
     # Ids the capture does not have for this member are refused before a job exists:
@@ -2025,12 +2046,12 @@ def test_preferences_round_trip_through_http_worker_cache(running):
         {"include_players": [1025]},
         {"club_counts": [{"club": "Unknown Club", "count": 2}]},
     ):
-        refused = client.post(route, json={**body, "preferences": unknown})
+        refused = client.post(route, json=confirmed_request({**body, "preferences": unknown}))
         assert refused.status_code == 422, refused.text
         assert refused.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
     assert backend.queue.jobs() == jobs_before
     for malformed in (None, "", []):
-        invalid = client.post(route, json={**body, "preferences": malformed})
+        invalid = client.post(route, json=confirmed_request({**body, "preferences": malformed}))
         assert invalid.status_code == 422
         invalid_read = client.get(
             route,
@@ -2058,7 +2079,9 @@ def test_llmopt_constraints_round_trip_through_the_advice_worker(running, new_pr
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     preferences = {"no_hits": True, "save_chips": True, **new_preferences}
     selection = {"strategy": "saf-puan", "window": 1}
-    submitted = client.post(route, json={**selection, "preferences": preferences})
+    submitted = client.post(
+        route, json=confirmed_request({**selection, "preferences": preferences})
+    )
     assert submitted.status_code == 202, submitted.text
     assert _work(backend) == 1
     served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
@@ -2133,13 +2156,16 @@ def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_pa
         "max_hit_points": 4,
     }
     too_short = client.post(
-        route, json={"strategy": "saf-puan", "window": 1, "preferences": preferences}
+        route,
+        json=confirmed_request({"strategy": "saf-puan", "window": 1, "preferences": preferences}),
     )
     assert too_short.status_code == 422
     assert not backend.queue.jobs()
 
     selection = {"strategy": "saf-puan", "window": draft["window"]}
-    submitted = client.post(route, json={**selection, "preferences": preferences})
+    submitted = client.post(
+        route, json=confirmed_request({**selection, "preferences": preferences})
+    )
     assert submitted.status_code == 202, submitted.text
     assert _work(backend) == 1
     served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
@@ -2165,7 +2191,9 @@ def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, 
     required = {"keep_players": [1001], "no_hits": True}
 
     def ask(preferences):
-        queued = client.post(route, json={**selection, "preferences": preferences})
+        queued = client.post(
+            route, json=confirmed_request({**selection, "preferences": preferences})
+        )
         assert queued.status_code == 202, queued.text
         assert _work(backend) == 1
         response = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
@@ -2207,7 +2235,9 @@ def test_llmopt_prices_a_preference_on_the_same_three_week_net_points_basis(tmp_
     hard = {"net_points_priority": True, "no_hits": True, "week_rules": [first_week]}
 
     def solve(preferences):
-        queued = client.post(route, json={**selection, "preferences": preferences})
+        queued = client.post(
+            route, json=confirmed_request({**selection, "preferences": preferences})
+        )
         assert queued.status_code == 202, queued.text
         assert _work(backend) == 1
         response = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
@@ -2241,7 +2271,9 @@ def test_llmopt_wildcard_rebuilds_the_squad_under_player_preferences(running):
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 1, "chip": "wildcard"}
     preferences = {"include_players": [1007], "no_hits": True}
-    submitted = client.post(route, json={**selection, "preferences": preferences})
+    submitted = client.post(
+        route, json=confirmed_request({**selection, "preferences": preferences})
+    )
     assert submitted.status_code == 202, submitted.text
     assert _work(backend) == 1
     served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
@@ -2269,7 +2301,9 @@ def test_llmopt_wildcard_chooses_club_signings_without_player_ids(running):
         ],
         "no_hits": True,
     }
-    submitted = client.post(route, json={**selection, "preferences": preferences})
+    submitted = client.post(
+        route, json=confirmed_request({**selection, "preferences": preferences})
+    )
     assert submitted.status_code == 202, submitted.text
     assert _work(backend) == 1
     served = client.get(route, params={**selection, "preferences": json.dumps(preferences)})
@@ -2301,11 +2335,13 @@ def test_impossible_llmopt_plan_returns_the_public_no_plan_code(running, dated_p
     )
     submitted = client.post(
         route,
-        json={
-            "strategy": "saf-puan",
-            "window": 1,
-            "preferences": {**requirement, "no_hits": True},
-        },
+        json=confirmed_request(
+            {
+                "strategy": "saf-puan",
+                "window": 1,
+                "preferences": {**requirement, "no_hits": True},
+            }
+        ),
     )
     assert submitted.status_code == 202, submitted.text
     assert _work(backend) == 1
@@ -2326,7 +2362,9 @@ def test_llmopt_proves_bank_shortfall_and_the_lower_floor_can_be_solved(running)
     common = {"hold_transfers": True, "no_hits": True}
 
     def submit(preferences):
-        accepted = client.post(route, json={**selection, "preferences": preferences})
+        accepted = client.post(
+            route, json=confirmed_request({**selection, "preferences": preferences})
+        )
         assert accepted.status_code == 202, accepted.text
         assert _work(backend) == 1
         return client.get(f"/api/v1/advice-jobs/{accepted.json()['job_id']}").json()
@@ -2354,7 +2392,7 @@ def test_llmopt_only_offers_a_deferral_witness_with_other_rules_preserved(tmp_pa
     selection = {"strategy": "saf-puan", "window": 3}
     common = {"no_hits": True, "keep_players": [1003]}
     original = {**common, "week_rules": [{"week": 1, "rules": {"buy_players": [1002, 1007]}}]}
-    accepted = client.post(route, json={**selection, "preferences": original})
+    accepted = client.post(route, json=confirmed_request({**selection, "preferences": original}))
     assert accepted.status_code == 202, accepted.text
     assert _work(backend) == 1
     failed = client.get(f"/api/v1/advice-jobs/{accepted.json()['job_id']}").json()
@@ -2370,7 +2408,7 @@ def test_llmopt_only_offers_a_deferral_witness_with_other_rules_preserved(tmp_pa
             {"week": 2, "rules": {"buy_players": [1002]}},
         ],
     }
-    accepted = client.post(route, json={**selection, "preferences": repaired})
+    accepted = client.post(route, json=confirmed_request({**selection, "preferences": repaired}))
     assert accepted.status_code == 202, accepted.text
     assert _work(backend) == 1
     solved = client.get(route, params={**selection, "preferences": json.dumps(repaired)})
@@ -2400,7 +2438,9 @@ def test_unfinished_llmopt_search_has_no_preference_diagnosis(running, monkeypat
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     accepted = client.post(
         route,
-        json={"strategy": "saf-puan", "window": 1, "preferences": {"min_bank": {"tenths": 90}}},
+        json=confirmed_request(
+            {"strategy": "saf-puan", "window": 1, "preferences": {"min_bank": {"tenths": 90}}}
+        ),
     )
     assert accepted.status_code == 202, accepted.text
     assert _work(backend) == 1
@@ -2492,7 +2532,11 @@ def test_a_job_counts_the_documents_it_solves_and_the_view_serves_the_count(
             seen.append((view["status"], view["progress"], view["queue_position"]))
 
         compute = build_advice_compute(
-            backend.contexts, backend.job_specs, cache=backend.cache, progress=record
+            backend.contexts,
+            backend.job_specs,
+            runs=backend.runs,
+            cache=backend.cache,
+            progress=record,
         )
         done = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
         assert done is not None and done.status == "completed", done
@@ -2730,7 +2774,7 @@ def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not
         json={"strategy": COMPUTED_MODE, "window": 1, **({"chip": chip} if chip else {})},
     )
     assert accepted.status_code == 202, accepted.text
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    compute = build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs)
     job = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
     assert job is not None and job.status == "failed"
     assert job.error is not None and job.error.code == "PLAN_NOT_FOUND"
@@ -2766,7 +2810,7 @@ def test_chip_entry_error_is_private_through_the_real_menu_branch(
         job = run_advice_worker_once(
             backend.queue,
             backend.cache,
-            build_advice_compute(backend.contexts, backend.job_specs),
+            build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs),
             at_utc=_now_stamp(),
             log=AdviceLog("worker", logger=logger),
         )

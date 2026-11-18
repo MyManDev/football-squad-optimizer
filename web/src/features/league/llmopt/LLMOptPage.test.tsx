@@ -119,6 +119,7 @@ afterEach(() => {
   for (const client of clients.splice(0)) client.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  history.replaceState(null, "");
 });
 
 /** Stands in for a held model: `intent` answers the body the page would send to be checked. */
@@ -562,7 +563,7 @@ describe("a reload keeps the saved session", () => {
         JSON.stringify({
           ...saved,
           reference: summarizeRevision(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1).payload),
-          confirmation: { wildcardNotHeld: false, sending: true },
+          confirmation: { runId: "a".repeat(32), wildcardNotHeld: false, sending: true },
         }),
       );
       jobs.length = 0;
@@ -668,7 +669,10 @@ describe("a reload keeps the saved session", () => {
     await addRule("hold_transfers");
     cleanup();
     const [key, session] = savedSession();
-    sessionStorage.setItem(key, JSON.stringify({ ...session, confirmation }));
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({ ...session, confirmation: { runId: "a".repeat(32), ...confirmation } }),
+    );
     jobs.length = 0;
     open();
     await ready();
@@ -686,7 +690,7 @@ describe("a reload keeps the saved session", () => {
       JSON.stringify({
         ...session,
         draft: { ...(session.draft as Record<string, unknown>), window: 3 },
-        confirmation: { wildcardNotHeld: false, sending: true },
+        confirmation: { runId: "a".repeat(32), wildcardNotHeld: false, sending: true },
       }),
     );
     jobs.length = 0;
@@ -890,7 +894,14 @@ describe("the plan with all preferences", () => {
     await addRule("save_chips");
     cleanup();
     const [key, session] = savedSession();
-    sessionStorage.setItem(key, JSON.stringify({ ...session, draft, confirmation }));
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        ...session,
+        draft,
+        confirmation: { runId: "a".repeat(32), ...confirmation },
+      }),
+    );
     jobs.length = 0;
     open();
     await ready();
@@ -906,6 +917,26 @@ describe("the plan with all preferences", () => {
     expect(jobs[3]!.compute).not.toHaveBeenCalled();
     answer(second, second.compute.mock.calls[0]![0], net[1]);
   }
+
+  it("keeps the main plan and one sentence when the shared capacity refuses follow-ups", async () => {
+    await reloadWith({ hard: [], soft }, { wildcardNotHeld: false });
+    const [base, first, second, combined] = jobs as [FakeJob, FakeJob, FakeJob, FakeJob];
+    await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+    answer(base, base.readCached.mock.calls[0]![0], 50, []);
+    await waitFor(() => expect(second.compute).toHaveBeenCalledTimes(1));
+    act(() => {
+      for (const job of [first, second])
+        job.show({
+          phase: "failed",
+          request: job.compute.mock.calls[0]![0],
+          reason: "RUN_BUDGET_EXHAUSTED",
+        });
+    });
+    expect(await screen.findAllByText(en.unfinishedPlans)).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: en.base })).toBeVisible();
+    expect(combined.compute).not.toHaveBeenCalled();
+    expect(screen.queryByText(en.priceUnavailable)).toBeNull();
+  });
 
   it("starts once the single prices are in and applies every accepted rule and the one without a slot", async () => {
     await reloadWith({ hard: [], soft }, { wildcardNotHeld: false });
@@ -983,12 +1014,16 @@ describe("the plan with all preferences", () => {
 
   it("comes back after a reload, read when it was answered and asked again while sending", async () => {
     const saved = {
+      runId: "a".repeat(32),
       wildcardNotHeld: false,
       followups: [{ kind: "priced" }, { kind: "priced" }],
       combined: [0, 1, 2],
     };
     await reloadWith({ hard: [], soft }, saved);
     const combined = jobs[3]!;
+    expect(combined.readCached).not.toHaveBeenCalled();
+    await waitFor(() => expect(jobs[0]!.readCached).toHaveBeenCalledTimes(1));
+    answer(jobs[0]!, jobs[0]!.readCached.mock.calls[0]![0], 50, []);
     await waitFor(() => expect(combined.readCached).toHaveBeenCalledTimes(1));
     expect(combined.compute).not.toHaveBeenCalled();
     expect(combined.readCached.mock.calls[0]![0].preferences).toMatchObject({
@@ -1006,6 +1041,9 @@ describe("the plan with all preferences", () => {
     jobs.length = 0;
     open();
     await ready();
+    await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+    expect(jobs[3]!.compute).not.toHaveBeenCalled();
+    answer(jobs[0]!, jobs[0]!.compute.mock.calls[0]![0], 50, []);
     await waitFor(() => expect(jobs[3]!.compute).toHaveBeenCalledTimes(1));
     expect(jobs[3]!.resume).toHaveBeenCalledTimes(1);
     expect(jobs[3]!.compute.mock.calls[0]![0].preferences).toMatchObject({

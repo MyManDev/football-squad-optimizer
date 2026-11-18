@@ -62,6 +62,7 @@ from squadopt.platform.advice_read import (
     FileLeagueDirectory,
     PreferencePlayers,
 )
+from squadopt.platform.advice_runs import FileRunStore
 from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRateLimiter
 from squadopt.platform.advice_switches import (
     AdviceSwitchInputs,
@@ -765,6 +766,7 @@ class AdviceBackend:
     public_inputs: PublicEntryInputs | None = None
     public_reader: PublicEntryAdviceReader | None = None
     public_submit: AdviceSubmitService | None = None
+    runs: FileRunStore | None = None
 
     def queue_depth(self) -> int:
         """Open work, not history: a terminal job is not something a member waits for."""
@@ -773,7 +775,7 @@ class AdviceBackend:
 
     def jobs_by_status(self) -> dict[str, int]:
         """One current store read inside the owning API, never in the status script."""
-        counts = dict.fromkeys(("queued", "running", "completed", "failed"), 0)
+        counts = dict.fromkeys(("queued", "running", "completed", "failed", "cancelled"), 0)
         for job in self.queue.jobs():
             counts[job.status] += 1
         return counts
@@ -818,6 +820,7 @@ def build_backend(
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
     specs = FileAdviceJobSpecStore(config.spec_root)
+    runs = FileRunStore(config.store_root / "runs")
     liveness = WorkerLiveness(config.worker_root, queue)
     gate = probe if probe is not None else StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
@@ -851,6 +854,7 @@ def build_backend(
         # The job view's place in line and worker counts come from the look /ready holds.
         job_look=liveness.look,
         job_progress=queue.progress,
+        runs=runs,
     )
     public_inputs = None
     public_reader = None
@@ -877,6 +881,7 @@ def build_backend(
             job_progress=queue.progress,
             prepare_inputs=public_inputs.prepare,
             max_open_jobs=config.public_queue_limit,
+            runs=runs,
         )
     return AdviceBackend(
         config=config,
@@ -893,6 +898,7 @@ def build_backend(
         public_inputs=public_inputs,
         public_reader=public_reader,
         public_submit=public_submit,
+        runs=runs,
     )
 
 

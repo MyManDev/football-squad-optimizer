@@ -7,6 +7,7 @@ import {
   createPlanSessionMemory,
   createPlanSessionStore,
   readPlanSession,
+  writePlanSession,
 } from "./planSession";
 
 const OWNED = [
@@ -19,6 +20,7 @@ const GAMEWEEK = 5;
 afterEach(() => {
   vi.unstubAllGlobals();
   sessionStorage.clear();
+  history.replaceState(null, "");
 });
 
 describe("createPlanSessionStore", () => {
@@ -30,6 +32,43 @@ describe("createPlanSessionStore", () => {
     deadline: "2030-01-01T00:00:00Z",
   };
   const draft = { hard: [{ kind: "no_hits" as const }], soft: [] };
+
+  it("retains the same run through history when session storage is blocked", () => {
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const read = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const confirmation = { runId: "c".repeat(32), wildcardNotHeld: false, sending: true as const };
+    try {
+      expect(writePlanSession(context, { draft, confirmation })).toBe(true);
+      expect(readPlanSession(context)).toMatchObject({ draft, confirmation });
+    } finally {
+      write.mockRestore();
+      read.mockRestore();
+    }
+  });
+
+  it("refuses a new run when neither store can retain its identity", () => {
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const fallback = vi.spyOn(history, "replaceState").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    try {
+      expect(
+        writePlanSession(context, {
+          draft,
+          confirmation: { runId: "d".repeat(32), wildcardNotHeld: false },
+        }),
+      ).toBe(false);
+    } finally {
+      write.mockRestore();
+      fallback.mockRestore();
+    }
+  });
 
   it("saves the whole session and keeps the run's confirmation beside it", () => {
     const store = createPlanSessionStore(context);

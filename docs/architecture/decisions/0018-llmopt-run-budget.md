@@ -63,6 +63,11 @@ Session storage has a history-state fallback containing only the already-safe pl
 If neither can retain run identity, new server work is refused rather than making reloads
 create another run. Confirm that usability choice before release.
 
+Five-week advice is outside the one/three-week planning page and retains its legacy
+transport. Run metadata explicitly rejects that window. The new durable adapter is
+registered beside the existing flat backend modules until their unit move; the existing
+dependency rules and architecture tests remain in force.
+
 The work ceiling is an admission-capacity ceiling with disclosed engine stop granularity,
 not a hard operating-system CPU-time kill. Keeping a non-interruptible solve fenced is safer
 than terminating the single worker while it may publish an answer.

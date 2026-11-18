@@ -6,7 +6,7 @@ from dataclasses import replace
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
-from tests.fixtures.backend_app import app_for_capture
+from tests.fixtures.backend_app import app_for_capture, confirmed_request
 from tests.unit.test_advice_worker import (
     ENTRY_ID,
     LEAGUE_ID,
@@ -117,7 +117,9 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
     job = run_advice_worker_once(
         backend.queue,
         backend.cache,
-        build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache),
+        build_advice_compute(
+            backend.contexts, backend.job_specs, runs=backend.runs, cache=backend.cache
+        ),
         at_utc="2026-09-01T10:01:00Z",
     )
     assert job.status == "completed", job.error
@@ -277,13 +279,16 @@ def test_public_football_plan_keeps_a_frozen_second_week_lineup(tmp_path, monkey
             },
         ]
     }
-    accepted = client.post(route, json={**selection, "preferences": preferences})
+    accepted = client.post(route, json=confirmed_request({**selection, "preferences": preferences}))
     assert accepted.status_code == 202, accepted.text
     outcome = run_advice_worker_once(
         backend.queue,
         backend.cache,
         build_advice_compute(
-            backend.contexts, backend.job_specs, public_inputs=backend.public_inputs
+            backend.contexts,
+            backend.job_specs,
+            runs=backend.runs,
+            public_inputs=backend.public_inputs,
         ),
         at_utc=world_module.GW2_CAPTURED_AT,
     )
@@ -321,12 +326,14 @@ def test_absence_scenario_benches_the_player_only_in_its_target_week(tmp_path, m
     ]
     for frozen in ({"frozen_weeks": transfers}, {}):
         preferences = {"keep_players": [player], "scenario": scenario, **frozen}
-        accepted = client.post(route, json={**selection, "preferences": preferences})
+        accepted = client.post(
+            route, json=confirmed_request({**selection, "preferences": preferences})
+        )
         assert accepted.status_code == 202, accepted.text
         outcome = run_advice_worker_once(
             backend.queue,
             backend.cache,
-            build_advice_compute(backend.contexts, backend.job_specs),
+            build_advice_compute(backend.contexts, backend.job_specs, runs=backend.runs),
             at_utc=world_module.GW2_CAPTURED_AT,
         )
         assert outcome.status == "completed", outcome.error
