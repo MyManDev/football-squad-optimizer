@@ -397,11 +397,14 @@ function Workspace({
         change(answer.draft, previous);
         setChanges(draftChanges(draft, answer.draft));
       } else {
-        // A second question keeps the answer to the first: what the model resolves next is
-        // the first message with every answer since, as far as one message can hold them.
+        // A second question must keep every earlier answer in the next request's context.
         const asked = clarification ? `${clarification.message}\n${text}` : text;
+        if (asked.length > MAX_MESSAGE_LENGTH) {
+          setFeedback(copy.conversationTooLong);
+          return;
+        }
         setQuestion({
-          message: asked.length <= MAX_MESSAGE_LENGTH ? asked : (clarification?.message ?? text),
+          message: asked,
           question: answer.message,
         });
       }

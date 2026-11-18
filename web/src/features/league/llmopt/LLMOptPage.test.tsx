@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -15,7 +15,7 @@ import type { ComputePhase } from "../advice/useAdviceJob";
 import { leagueKeys } from "../queries";
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import { LLMOPT_COPY } from "./copy";
-import { IntentError, intentBody } from "./intent";
+import { IntentError, MAX_MESSAGE_LENGTH, intentBody } from "./intent";
 import type { IntentSource } from "./intentSource";
 import { clearOwnKey, heldModel } from "./ownKey";
 import { summarizeRevision } from "./planRevision";
@@ -225,6 +225,34 @@ describe("chat refusals", () => {
         question: "Which week should it be?",
       },
     });
+  });
+
+  it("preserves the answer and asks for a shorter request when another question cannot keep the context", async () => {
+    open();
+    await ready();
+    const input = screen.getByRole("textbox", { name: en.chat });
+    const first = "Buy a striker.".padEnd(MAX_MESSAGE_LENGTH, ".");
+    fireEvent.change(input, { target: { value: first } });
+    await userEvent.click(screen.getByRole("button", { name: en.send }));
+    await screen.findByText("Which week should it be?");
+    await sendMessage("Next week.");
+    await waitFor(() => expect(intent).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(input).toHaveValue("Next week."));
+    expect(screen.getByText(en.conversationTooLong)).toBeVisible();
+    expect(screen.getByRole("button", { name: en.dismissQuestion })).toBeVisible();
+    expect(screen.getByRole("button", { name: en.compute })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: en.dismissQuestion }));
+    intent.mockReturnValue(
+      new Response(
+        JSON.stringify({ status: "draft", draft: { hard: [{ kind: "no_hits" }], soft: [] } }),
+      ),
+    );
+    fireEvent.change(input, { target: { value: "Buy a striker next week. No hits." } });
+    await userEvent.click(screen.getByRole("button", { name: en.send }));
+    await waitFor(() => expect(intent).toHaveBeenCalledTimes(3));
+    expect(intent.mock.calls[2]?.[0].clarification).toBeUndefined();
+    await waitFor(() => expect(screen.getByRole("button", { name: en.compute })).toBeEnabled());
   });
 
   it("keeps the workspace when a later refresh of the squad fails", async () => {
