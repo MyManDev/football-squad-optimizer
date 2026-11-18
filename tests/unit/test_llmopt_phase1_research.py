@@ -190,10 +190,14 @@ def test_accounting_refusal_records_every_imported_alias(module):
     assert checks == [{"actual": 3, "cap": 1}]
 
 
-def test_pricing_join_reuses_the_completed_result_without_another_solve(monkeypatch):
+def test_pricing_join_reuses_the_completed_result_without_another_solve(monkeypatch, tmp_path):
     from types import SimpleNamespace
 
     horizon, state, settings, policy, plan = world()
+    # A clean CI checkout has no bundled probe or scratch directory. Keep this
+    # queue stub isolated from both the checkout and a concurrent measurement.
+    monkeypatch.setattr(benchmark, "ROOT", tmp_path)
+    (tmp_path / ".codex-tmp").mkdir()
     call = SimpleNamespace(horizon=horizon, state=state, settings=settings, policy=policy)
     request = {"preferences": {}}
     run = {"base": request, "slots": [{"request": request}], "combined": None, "prices": []}
