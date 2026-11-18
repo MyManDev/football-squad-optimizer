@@ -226,3 +226,92 @@ for (const failure of ["offline", "unavailable", "unreadable", "snapshot-offline
     expect(posts).toBe(1);
   });
 }
+
+for (const availability of ["disabled-storage", "full-storage", "missing-calendar"] as const) {
+  test(`the latest editable rules survive ${availability} recovery and squad refresh`, async ({
+    page,
+  }) => {
+    test.skip(!API, "API build required");
+    await installLeagueMocks(page);
+    await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+    const original = mockEntrySquadEnvelopes[entryId]!;
+    let currentSquad = original;
+    let squadReads = 0;
+    let calendarReads = 0;
+    let calendarAvailable = availability !== "missing-calendar";
+    await page.route(`**/data/league/entries/${entryId}.json`, (route) => {
+      squadReads += 1;
+      return route.fulfill({ json: currentSquad });
+    });
+    await page.route("**/data/fixtures.json", (route) => {
+      calendarReads += 1;
+      return calendarAvailable
+        ? route.fulfill({ json: openCalendar() })
+        : route.fulfill({ status: 503, json: {} });
+    });
+    await page.route(`${API}/api/v1/contributions/players`, (route) =>
+      reply(route, {
+        season: original.payload.season,
+        players: [...original.payload.starting_xi, ...original.payload.bench].map(
+          ({ player_id, name, team }) => ({ id: player_id, name, team }),
+        ),
+      }),
+    );
+    await page.goto(`/league/${leagueId}/members/${entryId}/llmopt`);
+    const add = page.getByRole("button", { name: "Add rule", exact: true });
+    const rolled = page.getByRole("button", { name: "Remove · Roll the transfer", exact: true });
+    if (availability === "full-storage") {
+      await add.click();
+      await expect(rolled).toBeVisible();
+    }
+    if (availability !== "missing-calendar")
+      await page.evaluate((failure) => {
+        const setItem = Storage.prototype.setItem;
+        const getItem = Storage.prototype.getItem;
+        Storage.prototype.setItem = function (key, value) {
+          if (key.startsWith("squadopt.llmopt:"))
+            throw new DOMException(
+              "Storage unavailable",
+              failure === "full-storage" ? "QuotaExceededError" : "SecurityError",
+            );
+          return setItem.call(this, key, value);
+        };
+        if (failure === "disabled-storage")
+          Storage.prototype.getItem = function (key) {
+            if (key.startsWith("squadopt.llmopt:"))
+              throw new DOMException("Storage unavailable", "SecurityError");
+            return getItem.call(this, key);
+          };
+      }, availability);
+    await page.getByRole("combobox", { name: "Rule", exact: true }).selectOption("no_hits");
+    await add.click();
+    const noHits = page.getByRole("button", { name: "Remove · No transfer hits", exact: true });
+    await expect(noHits).toBeVisible();
+    if (availability === "missing-calendar")
+      await expect(page.getByRole("button", { name: "Compute plans", exact: true })).toBeDisabled();
+
+    currentSquad = {
+      ...original,
+      payload: { ...original.payload, source_snapshot_id: "new-capture-with-unsaved-rules" },
+    };
+    calendarAvailable = true;
+    const previousSquadReads = squadReads;
+    const previousCalendarReads = calendarReads;
+    await page.clock.install();
+    await page.clock.fastForward(61_000);
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event("offline"));
+      window.dispatchEvent(new Event("online"));
+    });
+    await expect.poll(() => squadReads).toBeGreaterThan(previousSquadReads);
+    await expect.poll(() => calendarReads).toBeGreaterThan(previousCalendarReads);
+    await expect(noHits).toBeVisible();
+    if (availability === "full-storage") await expect(rolled).toBeVisible();
+    await expect(page.getByRole("region", { name: "Plans" })).toHaveCount(0);
+    if (availability === "missing-calendar") {
+      await expect(page.getByRole("button", { name: "Compute plans", exact: true })).toBeEnabled();
+      await page.reload();
+      await expect(noHits).toBeVisible();
+    }
+  });
+}

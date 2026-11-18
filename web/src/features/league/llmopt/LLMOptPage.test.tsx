@@ -67,6 +67,14 @@ const ROSTER = [
 const en = LLMOPT_COPY.en;
 // One deadline for every visit in a test, so a reload finds the session it saved.
 const DEADLINE = new Date(Date.now() + 86_400_000).toISOString();
+const CALENDAR = {
+  season: squad.season,
+  source_snapshot_id: "fixtures",
+  captured_at_utc: "2026-01-01T00:00:00Z",
+  current_gameweek: squad.gameweek,
+  unscheduled_count: 0,
+  gameweeks: [{ gameweek: squad.gameweek, deadline_utc: DEADLINE, fixtures: [] }],
+};
 
 let LLMOptPage: typeof Page;
 let roster: "ok" | "fail" | "late";
@@ -136,24 +144,15 @@ const model: IntentSource = {
  * Opens the page the way a visit or a reload does: a fresh query cache, the tab's storage kept.
  * The chat is read by `intentSource`; null leaves it to the member's own key, as on the site.
  */
-function open(language: "en" | "tr" = "en", intentSource: IntentSource | null = model) {
+function open(
+  language: "en" | "tr" = "en",
+  intentSource: IntentSource | null = model,
+  calendar: typeof CALENDAR | null = CALENDAR,
+) {
   // The fixtures are set, not read, so the cache keeps them while no page observes them.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
-  client.setQueryData(FIXTURES_QUERY.queryKey, {
-    season: squad.season,
-    source_snapshot_id: "fixtures",
-    captured_at_utc: "2026-01-01T00:00:00Z",
-    current_gameweek: squad.gameweek,
-    unscheduled_count: 0,
-    gameweeks: [
-      {
-        gameweek: squad.gameweek,
-        deadline_utc: DEADLINE,
-        fixtures: [],
-      },
-    ],
-  });
+  client.setQueryData(FIXTURES_QUERY.queryKey, calendar);
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider initialLanguage={language}>
@@ -183,6 +182,46 @@ async function sendMessage(text: string) {
   await waitFor(() => expect(send).toBeEnabled());
   await user.click(send);
 }
+
+describe("chat keyboard focus", () => {
+  it.each(["clarification", "refusal"])("returns to the chat after a %s", async (outcome) => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => (release = resolve));
+    open("en", {
+      interpret: async () => {
+        await pending;
+        if (outcome === "refusal") throw new Error("Provider unavailable");
+        return { status: "clarification", message: "Which week?" };
+      },
+    });
+    await ready();
+    const input = screen.getByRole("textbox", { name: en.chat });
+    await sendMessage("Buy a striker.");
+    expect(input).toBeDisabled();
+    await act(async () => release());
+    await waitFor(() => expect(input).toBeEnabled());
+    expect(input).toHaveFocus();
+  });
+
+  it("keeps focus where the member moved while an answer was pending", async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => (release = resolve));
+    open("en", {
+      interpret: async () => {
+        await pending;
+        return { status: "clarification", message: "Which week?" };
+      },
+    });
+    await ready();
+    await sendMessage("Buy a striker.");
+    const rule = screen.getByRole("combobox", { name: en.rule });
+    await userEvent.click(rule);
+    expect(rule).toHaveFocus();
+    await act(async () => release());
+    await waitFor(() => expect(screen.getByRole("textbox", { name: en.chat })).toBeEnabled());
+    expect(rule).toHaveFocus();
+  });
+});
 
 describe("chat refusals", () => {
   it.each([
@@ -375,6 +414,71 @@ async function addRule(kind: string, player?: string) {
 
 describe("a reload keeps the saved session", () => {
   const outsiderRule = `${en.rules.include_player} · ${OUTSIDER.name}`;
+
+  it.each(["disabled", "full"] as const)(
+    "keeps the latest rules after a basis refresh when storage is %s",
+    async (failure) => {
+      const entrySquad = vi.fn(async () => envelope);
+      stubTree({ entrySquad });
+      open();
+      await ready();
+      if (failure === "full") await addRule("hold_transfers");
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new DOMException(
+          "Storage unavailable",
+          failure === "full" ? "QuotaExceededError" : "SecurityError",
+        );
+      });
+      if (failure === "disabled")
+        vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+          throw new DOMException("Storage unavailable", "SecurityError");
+        });
+      await addRule("no_hits");
+      const noHits = `${en.remove} · ${en.rules.no_hits}`;
+      expect(screen.getByRole("button", { name: noHits })).toBeVisible();
+      entrySquad.mockResolvedValue({
+        ...envelope,
+        payload: { ...squad, bank_tenths: squad.bank_tenths + 1 },
+      });
+      await act(async () => {
+        await clients.at(-1)!.refetchQueries({
+          queryKey: leagueKeys.entrySquad(squad.league_id, ENTRY),
+          exact: true,
+        });
+      });
+      await waitFor(() => expect(jobs).toHaveLength(8));
+      expect(screen.getByRole("button", { name: noHits })).toBeVisible();
+      expect(screen.queryByRole("region", { name: en.results })).toBeNull();
+      for (const job of jobs.slice(4)) {
+        expect(job.compute).not.toHaveBeenCalled();
+        expect(job.resume).not.toHaveBeenCalled();
+        expect(job.readCached).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it("keeps rules edited before the initially missing deadline is published", async () => {
+    open("en", model, null);
+    await ready();
+    await addRule("include_player", OUTSIDER.name);
+    expect(screen.getByText(outsiderRule, { exact: true })).toBeVisible();
+    expect(screen.getByRole("button", { name: en.compute })).toBeDisabled();
+    await act(async () => {
+      clients.at(-1)!.setQueryData(FIXTURES_QUERY.queryKey, CALENDAR);
+    });
+    await waitFor(() => {
+      expect(screen.getByText(outsiderRule, { exact: true })).toBeVisible();
+      expect(screen.getByRole("button", { name: en.compute })).toBeEnabled();
+    });
+    await waitFor(() =>
+      expect(savedSession()[1]).toMatchObject({
+        draft: { hard: [{ kind: "include_player", player_id: OUTSIDER.id }] },
+      }),
+    );
+    cleanup();
+    open();
+    expect(await screen.findByText(outsiderRule, { exact: true })).toBeVisible();
+  });
 
   it.each(["bank", "snapshot"] as const)(
     "keeps the draft when a successful %s refresh follows an unavailable calendar",

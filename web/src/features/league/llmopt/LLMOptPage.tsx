@@ -1,5 +1,13 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import { Link, useParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -59,9 +67,10 @@ import {
 import { frozenForDraft, matchingScenarioReference, scenarioLabel } from "./planScenario";
 import {
   checkedPlanSession,
+  createPlanSessionMemory,
   createPlanSessionStore,
-  readPlanSession,
   type PlanSessionContext,
+  type PlanSessionMemory,
 } from "./planSession";
 import {
   ALTERNATIVE_SLOTS,
@@ -112,12 +121,14 @@ function Session({
   deadline,
   intentSource,
   chatReady,
+  memory,
 }: {
   squad: EntrySquad;
   fixtures: ReturnType<typeof useFixtures>;
   deadline: string | null;
   intentSource: IntentSource;
   chatReady: boolean;
+  memory: PlanSessionMemory;
 }) {
   const { messages } = useLanguage();
   const { forwarded } = useLeague();
@@ -128,15 +139,14 @@ function Session({
     enabled: !!ORIGIN,
     ...LEAGUE_READ,
   });
-  const context =
-    ORIGIN && deadline && squad.source_snapshot_id
-      ? {
-          key: `squadopt.llmopt:${JSON.stringify([ORIGIN, forwarded === true, squad.league_id, squad.entry.entry_id])}`,
-          basis: squadBasis(squad),
-          deadline,
-        }
-      : null;
-  const saved = context ? readPlanSession(context) : null;
+  const context: PlanSessionContext = {
+    key: `squadopt.llmopt:${JSON.stringify([ORIGIN, forwarded === true, squad.league_id, squad.entry.entry_id])}`,
+    basis: squadBasis(squad),
+    season: squad.season,
+    gameweek: squad.gameweek,
+    deadline,
+  };
+  const saved = memory.read(context);
   if (fixtures.isPending || (saved && roster.isPending))
     return <PageLoading label={messages.common.loading} />;
   // A saved session that names a player outside the squad needs the roster to be checked.
@@ -151,12 +161,13 @@ function Session({
     return <RosterHold squad={squad} roster={roster} />;
   return (
     <Workspace
-      key={context ? `${context.key}:${context.deadline}` : undefined}
+      key={`${context.key}:${context.deadline}`}
       squad={squad}
       deadline={deadline}
       fixturesUnavailable={publishedDeadline === null}
       roster={roster}
       context={context}
+      memory={memory}
       saved={saved}
       intentSource={intentSource}
       chatReady={chatReady}
@@ -232,6 +243,7 @@ function Workspace({
   fixturesUnavailable,
   roster,
   context,
+  memory,
   saved,
   intentSource,
   chatReady,
@@ -241,6 +253,7 @@ function Workspace({
   fixturesUnavailable: boolean;
   roster: UseQueryResult<CatalogPlayer[]>;
   context: PlanSessionContext | null;
+  memory: PlanSessionMemory;
   saved: unknown;
   intentSource: IntentSource;
   /** A model is there to read the chat: the member's key is held. */
@@ -301,15 +314,61 @@ function Workspace({
   }, [heldModel]);
   const [run, setRun] = useState<PlanRun | null>(restoredRun);
   const [changes, setChanges] = useState<DraftChanges | null>(null);
-  const [session] = useState(() => createPlanSessionStore(context, restored?.confirmation));
+  const [session] = useState(() => createPlanSessionStore(context, restored?.confirmation, memory));
   // The saved run, read again after each save.
   const savedRun = useSyncExternalStore(session.subscribe, () => session.confirmation);
+  // Keep a validated restore above the keyed workspace too. This also records a draft
+  // edited before the calendar was available as soon as its deadline becomes known.
+  useEffect(() => {
+    if (restored) session.save(restored);
+  }, [restored, session]);
   const chatInput = useRef<HTMLTextAreaElement>(null);
+  const chatForm = useRef<HTMLFormElement>(null);
+  const restoreChatFocus = useRef(false);
+  const conversationList = useRef<HTMLOListElement>(null);
+  const followConversation = useRef(true);
+  const latestChatLine = conversation.at(-1)?.id;
+  const previousChatLine = useRef(latestChatLine);
   const computeButton = useRef<HTMLButtonElement>(null);
   const interpret = useRef<AbortController | null>(null);
   const nextChatLine = useRef(conversation.length);
   const confirming = useRef(false);
   const mounted = useRef(true);
+
+  // Follow new replies within the list, without moving the page or taking an older
+  // question away from someone reading it. A restored conversation starts where it is.
+  useLayoutEffect(() => {
+    const appended = previousChatLine.current !== latestChatLine;
+    previousChatLine.current = latestChatLine;
+    const list = conversationList.current;
+    if (appended && followConversation.current && list) list.scrollTop = list.scrollHeight;
+  }, [latestChatLine]);
+
+  // Disabling Send can leave the keyboard on the document body. Return it to the chat
+  // after the answer, unless the member moved elsewhere while the model was reading.
+  useEffect(() => {
+    if (reading) {
+      const movedElsewhere = (event: FocusEvent | PointerEvent) => {
+        if (
+          event.target instanceof Node &&
+          !(event.type === "focusin" && event.target === document.body) &&
+          !chatForm.current?.contains(event.target)
+        )
+          restoreChatFocus.current = false;
+      };
+      document.addEventListener("focusin", movedElsewhere);
+      document.addEventListener("pointerdown", movedElsewhere);
+      return () => {
+        document.removeEventListener("focusin", movedElsewhere);
+        document.removeEventListener("pointerdown", movedElsewhere);
+      };
+    }
+    if (!restoreChatFocus.current) return;
+    restoreChatFocus.current = false;
+    const active = document.activeElement;
+    if (chatReady && (active === document.body || chatForm.current?.contains(active)))
+      chatInput.current?.focus({ preventScroll: true });
+  }, [reading, chatReady, conversation, feedback, limit]);
 
   useEffect(() => {
     mounted.current = true;
@@ -377,6 +436,7 @@ function Workspace({
     const controller = new AbortController();
     const previous = reference ?? revised;
     interpret.current = controller;
+    restoreChatFocus.current = event.currentTarget.contains(document.activeElement);
     setReading(true);
     setFeedback("");
     try {
@@ -820,7 +880,16 @@ function Workspace({
           />
         )}
         {conversation.length > 0 && (
-          <ol className={styles.conversation} aria-live="polite">
+          <ol
+            className={styles.conversation}
+            ref={conversationList}
+            aria-live="polite"
+            onScroll={(event) => {
+              const list = event.currentTarget;
+              followConversation.current =
+                list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+            }}
+          >
             {conversation.map(({ id, role, message }) => (
               <li key={id} data-role={role}>
                 <strong>{role === "user" ? copy.user : copy.assistant}</strong>
@@ -829,7 +898,7 @@ function Workspace({
             ))}
           </ol>
         )}
-        <form className={styles.chat} onSubmit={(event) => void send(event)}>
+        <form className={styles.chat} ref={chatForm} onSubmit={(event) => void send(event)}>
           <label htmlFor="llmopt-message">{copy.chat}</label>
           <textarea
             id="llmopt-message"
@@ -1148,6 +1217,7 @@ export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {
   const entryId = Number(entryParam);
   const valid = Number.isSafeInteger(entryId) && entryId > 0;
   const result = useEntrySquad(entryId, valid);
+  const [memory] = useState(createPlanSessionMemory);
   const fixtures = useFixtures();
   const squad = result.data?.payload;
   const publishedDeadline = gameweekDeadline(fixtures.data, squad?.season, squad?.gameweek);
@@ -1186,6 +1256,7 @@ export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {
       deadline={deadline}
       intentSource={source}
       chatReady={intentSource !== undefined || ownKey}
+      memory={memory}
     />
   );
 }
