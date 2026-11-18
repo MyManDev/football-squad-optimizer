@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "snapshots": [
+    {
+      "path": "gw8.json",
+      "sha256": "3d35c8b34c391aa6adddc294d1201729974a28fd37887bbbd8a81fb963a217a6"
+    },
+    {
+      "path": "gw9.json",
+      "sha256": "7d23bbd0273f4c551853c9b692cd31b4b8826969b6fb0de96af05f927e6a3e2a"
+    }
+  ],
+  "member_weeks": 20
+}
