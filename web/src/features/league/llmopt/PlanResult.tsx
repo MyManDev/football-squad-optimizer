@@ -234,7 +234,16 @@ export function PlanResult({
   const moves = plan.moves.filter((move) => move.player_in || move.player_out);
 
   return (
-    <article className={styles.result} data-plan-ready="">
+    <article
+      className={styles.result}
+      data-plan-ready=""
+      data-transfer-decision={JSON.stringify([
+        plan.chip ?? null,
+        [...(plan.starting_xi ?? []), ...(plan.bench ?? [])]
+          .map((player) => player.player_id)
+          .sort((a, b) => a - b),
+      ])}
+    >
       <h3 className={styles.resultTitle}>{title}</h3>
       {onRevise && (
         <button

@@ -3,6 +3,8 @@
  * and the answer the solve returns. Shapes mirror `squadopt.application.device_plan`.
  */
 
+import type { DecisionPreferences } from "../advice/decisionPreferences";
+
 export const DEVICE_PLAN_CONTRACT_VERSION = "league_device_plan_v1";
 /**
  * The capture's own table (#981 step 1): the same document once per capture, under
@@ -155,6 +157,12 @@ export interface DevicePlanEntry {
 
 /** What the device's solve proved, in player ids. */
 export interface DevicePlanAnswer {
+  restricted?: boolean;
+  alternatives?: DevicePlanAnswer[];
+  preferences?: DecisionPreferences;
+  free_transfers_before?: number;
+  bank_after_tenths?: number;
+  free_transfers_after?: number;
   /** The objective on the integer scale, and the same divided by the scale. */
   objective_scaled: number;
   objective: number;

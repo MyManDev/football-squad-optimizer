@@ -1,5 +1,10 @@
 # Measurements Index
 
+- 2026-11-19: [LLMOPT device parity and scope](research/llmopt_phase4/README.md),
+  [record](research/llmopt_phase4_parity.json): twenty frozen member-weeks, forty local
+  comparisons, forty equal model and published objectives, forty identical transfer
+  decisions; no server jobs or live measurements.
+
 - 2026-11-18: [LLMOPT shared admission](research/llmopt_phase2_admission.md),
   [record](research/llmopt_phase2_admission.json): 20 frozen member-weeks, 40 runs,
   maximum four server jobs, zero additional jobs from 240 reconstructed-service repeats;

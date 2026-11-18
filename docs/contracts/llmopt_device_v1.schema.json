@@ -1,0 +1,445 @@
+{
+  "type": "object",
+  "$defs": {
+    "work_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binding",
+        "units",
+        "closed"
+      ],
+      "properties": {
+        "binding": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 84,
+          "multipleOf": 4
+        },
+        "closed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "confirmation_extension": {
+      "type": "object",
+      "properties": {
+        "deviceRun": {
+          "type": "boolean"
+        },
+        "deviceAlternatives": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "description": "Extension fields only; core device input and advice validation still applies.",
+  "properties": {
+    "preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keep_players": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxItems": 15,
+          "uniqueItems": true
+        },
+        "avoid_players": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxItems": 17,
+          "uniqueItems": true
+        },
+        "no_hits": {
+          "type": "boolean"
+        },
+        "save_chips": {
+          "type": "boolean"
+        },
+        "include_players": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxItems": 15,
+          "uniqueItems": true
+        },
+        "hold_transfers": {
+          "type": "boolean"
+        },
+        "club_counts": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "club",
+              "count"
+            ],
+            "properties": {
+              "club": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "scope": {
+                "enum": [
+                  "squad",
+                  "transfers_in"
+                ]
+              }
+            }
+          }
+        },
+        "max_hit_points": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60
+        },
+        "wildcard_week": {
+          "enum": [
+            2,
+            3
+          ]
+        },
+        "hold_opening_transfers": {
+          "type": "boolean"
+        },
+        "min_opening_bank_tenths": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "net_points_priority": {
+          "type": "boolean"
+        },
+        "frozen_weeks": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "week",
+              "transfers_in",
+              "transfers_out",
+              "chip"
+            ],
+            "dependentRequired": {
+              "starting_xi": [
+                "captain"
+              ],
+              "captain": [
+                "starting_xi"
+              ]
+            },
+            "properties": {
+              "week": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "transfers_in": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "maxItems": 15,
+                "uniqueItems": true
+              },
+              "transfers_out": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "maxItems": 15,
+                "uniqueItems": true
+              },
+              "chip": {
+                "enum": [
+                  null,
+                  "wildcard",
+                  "freehit",
+                  "bboost",
+                  "3xc"
+                ]
+              },
+              "starting_xi": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "maxItems": 11,
+                "uniqueItems": true,
+                "minItems": 11
+              },
+              "captain": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "min_bank": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tenths"
+          ],
+          "properties": {
+            "tenths": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "week": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
+            }
+          }
+        },
+        "scenario": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "player_id"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "price_increase",
+                "unavailable"
+              ]
+            },
+            "player_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "week": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
+            },
+            "tenths": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            }
+          },
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "price_increase"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "tenths"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "tenths"
+              ]
+            }
+          }
+        },
+        "week_rules": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "week",
+              "rules"
+            ],
+            "properties": {
+              "week": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "rules": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "keep_players": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "maxItems": 15,
+                    "uniqueItems": true
+                  },
+                  "avoid_players": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "maxItems": 17,
+                    "uniqueItems": true
+                  },
+                  "no_hits": {
+                    "type": "boolean"
+                  },
+                  "save_chips": {
+                    "type": "boolean"
+                  },
+                  "include_players": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "maxItems": 15,
+                    "uniqueItems": true
+                  },
+                  "hold_transfers": {
+                    "type": "boolean"
+                  },
+                  "club_counts": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "club",
+                        "count"
+                      ],
+                      "properties": {
+                        "club": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "scope": {
+                          "enum": [
+                            "squad",
+                            "transfers_in"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "buy_players": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "maxItems": 15,
+                    "uniqueItems": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "alternatives": {
+      "type": [
+        "boolean",
+        "array"
+      ],
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "alternatives"
+              ]
+            },
+            {
+              "required": [
+                "device_alternatives"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "restricted": {
+      "type": "boolean"
+    },
+    "bank_after_tenths": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "free_transfers_before": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "free_transfers_after": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "device_alternatives": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "alternatives"
+              ]
+            },
+            {
+              "required": [
+                "device_alternatives"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "device_input_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

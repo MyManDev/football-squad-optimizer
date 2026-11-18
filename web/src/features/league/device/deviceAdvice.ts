@@ -7,6 +7,7 @@
  */
 
 import type { AdvicePlayer, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
+import { preferenceScope } from "../advice/decisionPreferences";
 import type { DevicePlanAnswer, DevicePlanDocument, DevicePlanPlayer } from "./types";
 
 /** The server's name for how a chip's gain is measured: this gameweek's expected points. */
@@ -45,7 +46,17 @@ export function deviceAdviceEnvelope(
   const missing: string[] = [];
   if (!squad.free_transfers_known) missing.push("free_transfers");
   if (!squad.purchase_prices_known) missing.push("purchase_prices");
-  const byId = new Map(document.players.map((player) => [player.id, player]));
+  const byId = new Map(
+    document.players.map((player) => [
+      player.id,
+      answer.preferences?.net_points_priority
+        ? {
+            ...player,
+            expected_points: player.coefficients[2] / document.rules.expected_points_scale,
+          }
+        : player,
+    ]),
+  );
   const player = (id: number | null): AdvicePlayer | null => {
     const row = id === null ? undefined : byId.get(id);
     return row === undefined ? null : advicePlayer(row);
@@ -78,11 +89,45 @@ export function deviceAdviceEnvelope(
       .filter((p): p is AdvicePlayer => p !== null),
     bench: answer.bench.map((id) => player(id)).filter((p): p is AdvicePlayer => p !== null),
     chip: answer.chip,
-    solver_status: "OPTIMAL",
-    optimality_gap: 0,
+    solver_status: answer.restricted ? "FEASIBLE" : "OPTIMAL",
+    optimality_gap: answer.restricted ? null : 0,
     data_quality: missing.length ? "partial" : "complete",
     missing_fields: missing,
   };
+  if (answer.preferences) {
+    Object.assign(payload, {
+      preferences: answer.preferences,
+      preferences_scope: preferenceScope(answer.preferences),
+    });
+    payload.bank_after_tenths = answer.bank_after_tenths;
+    payload.free_transfers_after = answer.free_transfers_after;
+    const incoming = new Set(answer.transfers_in),
+      outgoing = new Set(answer.transfers_out);
+    payload.plan_weeks = [
+      {
+        gameweek,
+        chip: answer.chip,
+        transfers_in: document.players.filter((p) => incoming.has(p.id)).map(advicePlayer),
+        transfers_out: document.players.filter((p) => outgoing.has(p.id)).map(advicePlayer),
+        transfer_hit_points: answer.transfer_hit_points,
+        free_transfers_before: answer.free_transfers_before ?? 0,
+        free_transfers_after: answer.free_transfers_after ?? 0,
+        expected_points: answer.expected_own_points,
+        bank_after_tenths: answer.bank_after_tenths,
+        lineup: {
+          starting_xi: payload.starting_xi!,
+          captain: payload.captain!,
+          vice_captain: payload.vice_captain!,
+          bench: payload.bench!,
+        },
+      },
+    ];
+  }
+  if (answer.alternatives)
+    payload.device_alternatives = answer.alternatives.map(
+      (alternative) =>
+        deviceAdviceEnvelope(document, squad, alternative, generatedAt, leagueId).payload,
+    );
   if (answer.top100 !== undefined) {
     // The weight's account: the price on base points against the member's own plan, the
     // rows' reasons, and the counts' source as the document states it.

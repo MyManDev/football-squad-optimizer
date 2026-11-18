@@ -89,6 +89,7 @@ export interface Followup {
  * nothing is priced and a slot is free, a plan that rolls the transfer or keeps more budget.
  */
 export function followupRequests(run: PlanRun, basePlan: EntryAdvice): (Followup | null)[] {
+  if (basePlan.device_alternatives || run.inputs.request.deviceAlternatives) return [];
   const basis = run.automaticBasis;
   if (!basis) return [];
   const followups = run.slots.map((slot): Followup | null =>

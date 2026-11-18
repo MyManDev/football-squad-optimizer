@@ -443,6 +443,8 @@ export interface AdviceRolePointComponents {
 }
 
 export interface EntryAdvice {
+  /** At most two further proved device choices, without nested menus. */
+  device_alternatives?: EntryAdvice[];
   bank_after_tenths?: number;
   free_transfers_after?: number;
   role_forecast?: {

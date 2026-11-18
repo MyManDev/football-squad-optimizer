@@ -27,6 +27,7 @@ its header.
 | [0017](0017-llmopt-own-key.md) | LLMOPT with the member's own model key, which the site never receives | 2026-11-17 | Accepted (owner, 2026-11-17) | None |
 | [0018](0018-llmopt-run-budget.md) | One durable job and work budget per LLMOPT run | 2026-11-18 | Proposed | None |
 | [0019](0019-llmopt-priority-budget.md) | Priority layers within one preference job | 2026-11-19 | Proposed | None |
+| [0020](0020-llmopt-device-alternatives.md) | One-week device equivalence and Pareto transfer decisions | 2026-11-19 | Proposed | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.

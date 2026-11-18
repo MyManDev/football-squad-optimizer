@@ -179,11 +179,50 @@ export function solvePlan(
   entry: DevicePlanEntry,
   now: () => number = () => performance.now(),
   chip: DevicePlanAnswer["chip"] = null,
+  extra: Pick<MemberWeekOptions, "preferences"> = {},
 ): DevicePlanAnswer {
   const started = now();
-  const document = inSolverOrder(published);
-  const solution = solveWeek(solver, document, entry, { chip });
+  const ordered = inSolverOrder(published);
+  const document = extra.preferences?.net_points_priority
+    ? {
+        ...ordered,
+        players: ordered.players.map((player) => ({
+          ...player,
+          expected_points: player.coefficients[2] / ordered.rules.expected_points_scale,
+        })),
+      }
+    : ordered;
+  const solution = solveWeek(solver, document, entry, { chip, ...extra });
   if (solution === null) throw new DevicePlanRefused("Infeasible", "plan");
   const answer = answerFrom(solver, document, entry, solution, { chip });
-  return { ...answer, seconds: (now() - started) / 1000 };
+  const sold = new Set(answer.transfers_out),
+    bought = new Set(answer.transfers_in);
+  const proceeds = document.players.reduce(
+    (total, player) =>
+      total +
+      (sold.has(player.id) ? (entry.sell_tenths[String(player.id)] ?? player.buy_tenths) : 0),
+    0,
+  );
+  const cost = document.players.reduce(
+    (total, player) => total + (bought.has(player.id) ? player.buy_tenths : 0),
+    0,
+  );
+  return {
+    ...answer,
+    seconds: (now() - started) / 1000,
+    ...(extra.preferences
+      ? {
+          preferences: extra.preferences,
+          free_transfers_before: entry.free_transfers,
+          bank_after_tenths:
+            chip === "freehit" ? entry.bank_tenths : entry.bank_tenths + proceeds - cost,
+          free_transfers_after: Math.min(
+            document.rules.max_free_transfers,
+            (rebuilds(chip)
+              ? entry.free_transfers
+              : Math.max(0, entry.free_transfers - bought.size)) + 1,
+          ),
+        }
+      : {}),
+  };
 }

@@ -18,6 +18,7 @@ import { entryAddress, memberAddress } from "../../../lib/leagueAddresses";
 import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
+import { deviceAdviceClient } from "../device/adviceClient";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { LEAGUE_READ, useEntrySquad } from "../queries";
@@ -271,7 +272,13 @@ function Workspace({
     ...p,
     held: held.has(p.id),
   }));
-  const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
+  const client = useMemo(
+    () =>
+      deviceAdviceClient(createAdviceClient(tree.entryAdvice), squad, () =>
+        tree.devicePlan(squad.source_snapshot_id),
+      ),
+    [tree, squad],
+  );
   const jobs = usePlanJobs(client, squad.source_snapshot_id);
   const { controls } = jobs;
   const [restored] = useState(() => checkedPlanSession(saved, players, squad.gameweek));
@@ -756,7 +763,13 @@ function Workspace({
       const confirmed = {
         draft,
         reference,
-        confirmation: { runId, wildcardNotHeld, sending: true as const },
+        confirmation: {
+          runId,
+          wildcardNotHeld,
+          sending: true as const,
+          deviceRun: next.baseRequest?.deviceRun ?? false,
+          deviceAlternatives: next.baseRequest?.deviceAlternatives ?? false,
+        },
       };
       if (!writePlanSession(context, confirmed)) {
         setFeedback(copy.serviceUnavailable);

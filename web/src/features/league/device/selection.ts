@@ -8,6 +8,7 @@
 
 import type { AdviceRequest } from "../advice/adviceClient";
 import type { EntrySquad } from "../types";
+import { oneWeekPreferences } from "./preferences";
 import {
   hasCompleteStartingXi,
   isDeviceChip,
@@ -59,13 +60,22 @@ export function deviceSelection(
   if (
     request.window !== 1 ||
     (request.managersWord ?? false) ||
-    (request.model ?? "current") !== "current" ||
-    request.preferences
+    (request.model ?? "current") !== "current"
   ) {
     return null;
   }
   const chip = deviceChip(request, squad);
   if (chip === undefined) return null;
+  if (request.preferences) {
+    try {
+      oneWeekPreferences(request.preferences);
+    } catch {
+      return null;
+    }
+    // These combinations have not passed the frozen twenty-member parity gate.
+    if (chip !== null || request.strategy !== "saf-puan" || (request.top100Weight ?? 0) !== 0)
+      return null;
+  }
   const rivalEntryId = request.rivalEntryId ?? null;
   const weight = request.top100Weight ?? 0;
   if (weight !== 0) {

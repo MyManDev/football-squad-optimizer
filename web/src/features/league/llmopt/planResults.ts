@@ -120,6 +120,15 @@ export function planResults({
   let same = false;
   if (run.scenario) return { results, same };
   const baseAnswer = base.phase === "done" ? base.envelope.payload : undefined;
+  if (base.phase === "done" && baseAnswer?.device_alternatives && run.prices.length === 0) {
+    return {
+      same: false,
+      results: baseAnswer.device_alternatives.slice(0, 2).map((payload, i) => ({
+        title: `${copy.alternative} ${i + 2}`,
+        state: { ...base, envelope: { ...base.envelope, payload } },
+      })),
+    };
+  }
   alternatives.forEach((state, index) => {
     const slot = run.slots[index];
     if (slot?.kind === "explicit") {

@@ -24,6 +24,7 @@ import { recordUsage } from "../../../data/usage";
 import { useLeague } from "../useLeague";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "../advice/adviceClient";
+import { preferencesKey } from "../advice/decisionPreferences";
 import { LeagueDataMissing } from "../dataErrors";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
 import {
@@ -338,6 +339,7 @@ export function useDevicePlan(
     request.managersWord ?? false,
     request.chip ?? null,
     request.model ?? "current",
+    preferencesKey(request.preferences),
   ]);
 
   const state: DevicePlanPhase = held.key === requestKey ? held.state : { phase: "idle" };
@@ -454,7 +456,9 @@ export function useDevicePlan(
       // The plain one-week plan also solves each chip the member holds once beside it, for
       // the chip timing (#1003): 1 + n solves in the one request, under its one ceiling.
       const chipGains =
-        selection.kind === "plain" ? (heldChips(squad.chips, document.gameweek) ?? []) : [];
+        selection.kind === "plain" && !request.preferences
+          ? (heldChips(squad.chips, document.gameweek) ?? [])
+          : [];
       const total = STAGES_BEFORE_CHIPS + chipGains.length;
       setState({ phase: "loading", progress: { step: "solver", done: 1, total } });
       // A worker that cannot be created, load or evaluate answers as a failure, and the
@@ -545,6 +549,7 @@ export function useDevicePlan(
             id: run,
             document,
             entry,
+            ...(request.preferences ? { preferences: request.preferences } : {}),
             chip,
             strategy,
             top100Weight: "weight" in selection ? (selection.weight ?? 0) : 0,
@@ -594,6 +599,7 @@ export function useDevicePlan(
     });
   }, [
     available,
+    request.preferences,
     entry,
     selection,
     loadDocument,

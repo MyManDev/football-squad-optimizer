@@ -7,6 +7,10 @@
 
 ## Decision
 
+Hard-rule-only one-week menus explicitly use the existing `net_points_priority`
+objective for both main and alternatives. The local request marker is not serialized to
+the service. Legacy preferred-rule pricing keeps its existing objective and ceilings.
+
 First add explicit hard-rule constraints to the one-week device model. Keep the page's
 server routing until twenty frozen Phase 1 member-weeks agree with the server objective.
 Different decisions require an equal objective, not an assertion that they look similar.
@@ -27,3 +31,10 @@ bound, not measured evidence that alternative plans improve football outcomes.
 Device alternatives create no server jobs. An unproved device search cannot be called
 an equivalent solution. Preserve the main answer and report incomplete integration
 instead of opening an unbudgeted fallback alternative job.
+
+Pin the execution location in the confirmation. A run containing an unsupported rule
+stays entirely on the service. Before each worker attempt reserve four native units
+durably from the existing 84-unit one-week capacity; a completed cache hit reserves none.
+Refuse a new worker if the capacity receipt cannot be read or written. This intentionally
+requires session storage for new device work, even when the run identity alone could
+survive in history state. Review that conservative storage choice before release.

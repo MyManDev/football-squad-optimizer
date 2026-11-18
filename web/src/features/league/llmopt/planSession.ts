@@ -13,6 +13,8 @@ export const ALTERNATIVE_COUNT = 2;
 export type StartedAlternative = { kind: "priced" | "roll" } | { kind: "bank"; floor: number };
 
 export interface PlanConfirmation {
+  deviceRun?: boolean;
+  deviceAlternatives?: boolean;
   runId?: string;
   wildcardNotHeld: boolean;
   /** Absent until the confirmed baseline has been checked for follow-up requests. */
@@ -215,6 +217,12 @@ export function checkedPlanSession(
           ? { runId: confirmation.runId }
           : {}),
         wildcardNotHeld: confirmation.wildcardNotHeld,
+        ...(typeof confirmation.deviceRun === "boolean"
+          ? { deviceRun: confirmation.deviceRun }
+          : {}),
+        ...(typeof confirmation.deviceAlternatives === "boolean"
+          ? { deviceAlternatives: confirmation.deviceAlternatives }
+          : {}),
         ...(session.draft.scenario && confirmation.scenarioReplayInfeasible === true
           ? { scenarioReplayInfeasible: true as const }
           : {}),

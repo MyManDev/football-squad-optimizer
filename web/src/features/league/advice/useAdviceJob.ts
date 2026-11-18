@@ -157,6 +157,8 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
     adviceRequestKey(left) === adviceRequestKey(right) &&
     left.run?.run_id === right.run?.run_id &&
     left.run?.stage === right.run?.stage &&
+    (left.deviceAlternatives ?? false) === (right.deviceAlternatives ?? false) &&
+    (left.deviceRun ?? false) === (right.deviceRun ?? false) &&
     left.leagueId === right.leagueId &&
     left.entryId === right.entryId &&
     left.strategy === right.strategy &&
@@ -278,8 +280,10 @@ export function useAdviceJob(
       const controller = new AbortController();
       active.current = controller;
       const { signal } = controller;
-      const call = <T>(operation: (signal: AbortSignal) => Promise<T>) =>
-        withRequestDeadline(operation, { signal, timeoutMs: REQUEST_ALLOWANCE_MS });
+      const call = <T>(
+        operation: (signal: AbortSignal) => Promise<T>,
+        timeoutMs = REQUEST_ALLOWANCE_MS,
+      ) => withRequestDeadline(operation, { signal, timeoutMs });
       let readAfterMissingJob = false;
       const alive = () => generation.current === run && !signal.aborted;
       const fail = (error?: unknown, reason?: string, infeasibility?: PlanInfeasibility) => {
@@ -308,8 +312,10 @@ export function useAdviceJob(
           let outcome;
           try {
             // One key for this click, whatever the transport retries underneath it.
-            outcome = await call((signal) =>
-              client.requestAdvice(request, { signal, idempotencyKey: newIdempotencyKey() }),
+            outcome = await call(
+              (signal) =>
+                client.requestAdvice(request, { signal, idempotencyKey: newIdempotencyKey() }),
+              client.localRequestAllowanceMs?.(request),
             );
             if (outcome.kind === "advice") checkedAdvice(outcome.envelope, request);
           } catch (error) {

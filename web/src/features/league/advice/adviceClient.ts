@@ -28,6 +28,10 @@ import { preferencesKey, type DecisionPreferences } from "./decisionPreferences"
 import { checkedPlanInfeasibility, type PlanInfeasibility } from "./planInfeasibility";
 
 export interface AdviceRequest {
+  /** Local plan menu; never serialized to the advice service. */
+  deviceAlternatives?: boolean;
+  /** A run with an unsupported rule remains entirely on the service. */
+  deviceRun?: boolean;
   run?: { contract_version: "llmopt_run_v1"; run_id: string; stage: "base" | "followup" };
   /** Fetch and pin this public team's inputs only when computation is requested. */
   publicEntry?: boolean;
@@ -76,6 +80,8 @@ export interface AdviceReadOptions extends RequestOptions {
 }
 
 export interface AdviceClient {
+  /** Local computation waits for its worker ceiling; network transports keep their own deadline. */
+  localRequestAllowanceMs?(request: AdviceRequest): number | undefined;
   cancelRun?(runId: string): Promise<void>;
   /** Read an already-computed answer; never triggers computation. */
   readAdvice(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult>;

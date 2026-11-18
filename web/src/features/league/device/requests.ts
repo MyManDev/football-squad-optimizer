@@ -3,10 +3,13 @@
  * come through here; nothing else knows which module solves which selection.
  */
 
+import type { DecisionPreferences } from "../advice/decisionPreferences";
+import { solveAlternatives } from "./alternatives";
+import { orderedBench, viceCaptain } from "./publication/rows";
 import { solveChipGains } from "./chipForecast/gains";
 import type { LpSolver } from "./lp/problem";
 import { DevicePlanRefused, solvePlan } from "./solve/week";
-import { gainVsNoChip } from "./strategies/chips";
+import { gainVsNoChip, weekPoints } from "./strategies/chips";
 import { solveRival } from "./strategies/rival";
 import { solveRivalWithTop100, solveTop100 } from "./strategies/top100";
 import type {
@@ -19,6 +22,8 @@ import type {
 } from "./types";
 
 export interface DevicePlanRequest {
+  alternatives?: boolean;
+  preferences?: DecisionPreferences;
   id: number;
   document: DevicePlanDocument;
   entry: DevicePlanEntry;
@@ -53,11 +58,80 @@ export function solveRequest(
     strategy = null,
     top100Weight = 0,
     chipGains = [],
+    preferences,
+    alternatives = false,
   }: Omit<DevicePlanRequest, "id">,
   now: () => number = () => performance.now(),
   onPlan?: (plan: DevicePlanAnswer) => void,
   onChip?: (done: number, total: number) => void,
 ): DevicePlanAnswer {
+  if (alternatives) {
+    if (
+      chip !== null ||
+      strategy ||
+      top100Weight ||
+      chipGains.length ||
+      !preferences?.net_points_priority
+    )
+      throw new DevicePlanRefused("unsupported alternative combination", "plan");
+    const baseline = solvePlan(solver, document, entry, now, null, { preferences });
+    try {
+      const choices = solveAlternatives(solver, document, entry, preferences);
+      const held = new Set(entry.held);
+      const quantized = {
+        ...document,
+        players: document.players.map((player) => ({
+          ...player,
+          expected_points: player.coefficients[2] / document.rules.expected_points_scale,
+        })),
+      };
+      const answers = choices.map((choice, index): DevicePlanAnswer => {
+        const selected = new Set(choice.squad);
+        const incoming = choice.squad.filter((id) => !held.has(id));
+        const outgoing = entry.held.filter((id) => !selected.has(id));
+        const moves: DevicePlanAnswer["moves"] = [];
+        for (const position of Object.keys(document.rules.squad_position_limits)) {
+          const matches = (ids: number[]) =>
+            ids
+              .filter((id) =>
+                document.players.some((player) => player.id === id && player.position === position),
+              )
+              .sort((a, b) => a - b);
+          const ins = matches(incoming),
+            outs = matches(outgoing);
+          if (ins.length !== outs.length) throw new Error("Transfer positions do not balance.");
+          ins.forEach((id, i) => moves.push({ in: id, out: outs[i]!, gain: null }));
+        }
+        const own = weekPoints(quantized, choice.squad, choice.startingXi, choice.captain, null);
+        return {
+          ...baseline,
+          ...(index > 0 ? { restricted: true } : {}),
+          objective_scaled: choice.objectiveScaled,
+          objective: choice.netPoints,
+          squad: choice.squad,
+          starting_xi: choice.startingXi,
+          captain: choice.captain,
+          vice_captain: viceCaptain(quantized, choice.startingXi, choice.captain),
+          bench: orderedBench(quantized, choice.squad, choice.startingXi),
+          transfers_in: incoming,
+          transfers_out: outgoing,
+          transfer_hit_points: choice.hitPoints,
+          expected_own_points: own,
+          moves,
+          expected_gain_vs_hold: own - baseline.hold_points,
+          bank_after_tenths: choice.bankTenths,
+          free_transfers_after: choice.freeTransfersAfter,
+        };
+      });
+      const [main, ...rest] = answers;
+      return { ...(main ?? baseline), alternatives: rest };
+    } catch (error) {
+      if (!(error instanceof DevicePlanRefused)) throw error;
+      return { ...baseline, alternatives: [] };
+    }
+  }
+  if (preferences && (chipGains.length || top100Weight || strategy))
+    throw new DevicePlanRefused("unsupported preference combination", "plan");
   if (chipGains.length > 0) {
     if (chip !== null || strategy !== null || top100Weight !== 0) {
       throw new DevicePlanRefused("chip gains with a chip, a rival strategy or a weight", "plan");
@@ -82,10 +156,10 @@ export function solveRequest(
     if (chip !== null) throw new DevicePlanRefused("a chip with a rival strategy", "plan");
     return solveRival(solver, document, entry, strategy.rival, strategy.name, now);
   }
-  if (chip === null) return solvePlan(solver, document, entry, now);
+  if (chip === null) return solvePlan(solver, document, entry, now, null, { preferences });
   const started = now();
-  const without = solvePlan(solver, document, entry, now);
-  const answer = solvePlan(solver, document, entry, now, chip);
+  const without = solvePlan(solver, document, entry, now, null, { preferences });
+  const answer = solvePlan(solver, document, entry, now, chip, { preferences });
   return {
     ...answer,
     gain_vs_no_chip: gainVsNoChip(answer, without),
