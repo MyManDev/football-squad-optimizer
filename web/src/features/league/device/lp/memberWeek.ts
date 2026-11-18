@@ -111,14 +111,37 @@ export function memberWeekProblem(
   }
   const clubs = new Map<string, number[]>();
   for (const i of indices) clubs.set(players[i]!.team, [...(clubs.get(players[i]!.team) ?? []), i]);
+  const hasExcess = [...clubs.values()].some(
+    (members) =>
+      members.filter((i) => heldSet.has(players[i]!.id)).length > rules.max_players_per_team,
+  );
   [...clubs.values()].forEach((members, k) => {
-    rows.push(row(`club${k}`, ones(members.map(s)), "<=", rules.max_players_per_team));
+    // A real club move can leave a held squad above the cap. It may roll, but any
+    // transfer (including a free one or a chip rebuild) must restore every club's cap.
+    const excess = Math.max(
+      0,
+      members.filter((i) => heldSet.has(players[i]!.id)).length - rules.max_players_per_team,
+    );
+    rows.push(
+      row(
+        `club${k}`,
+        [...ones(members.map(s)), ...(excess ? [term(excess, "moved")] : [])],
+        "<=",
+        rules.max_players_per_team + excess,
+      ),
+    );
   });
 
   // A held player can only leave and anyone else can only arrive, so the squad variable
   // itself is the transfer: arriving is s = 1 off the squad, leaving is s = 0 on it.
   const arrivals = indices.filter((i) => !heldSet.has(players[i]!.id));
   const holders = indices.filter((i) => heldSet.has(players[i]!.id));
+  if (hasExcess) {
+    rows.push(row("moves_lo", [...ones(arrivals.map(s)), term(-1, "moved")], ">=", 0));
+    rows.push(
+      row("moves_hi", [...ones(arrivals.map(s)), term(-rules.squad_size, "moved")], "<=", 0),
+    );
+  }
   rows.push(
     row(
       "paid",
@@ -171,6 +194,6 @@ export function memberWeekProblem(
     objective,
     rows,
     generals: [{ variable: "paid", lower: 0, upper: rules.squad_size }],
-    binaries: indices.flatMap((i) => [s(i), x(i), c(i)]),
+    binaries: [...indices.flatMap((i) => [s(i), x(i), c(i)]), ...(hasExcess ? ["moved"] : [])],
   };
 }

@@ -10,6 +10,7 @@ import {
   mockEntrySquadEnvelopes,
   mockLeagueMembersEnvelope,
 } from "../src/fixtures/league";
+import { MESSAGES } from "../src/i18n/messages";
 import { installLeagueMocks } from "./leagueMocks";
 
 // The whole device path in a real browser: the published inputs, the worker, the wasm
@@ -51,6 +52,52 @@ async function printDeviceTimings(page: Page, testInfo: TestInfo): Promise<void>
 
 test.afterEach(async ({ page }, testInfo) => {
   await printDeviceTimings(page, testInfo);
+});
+
+test("a real club transfer does not force a sale from a held four-player club", async ({
+  page,
+}) => {
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  const held = new Set(member.entry.held);
+  const excess = new Set(member.entry.held.slice(0, 4));
+  const scale = fixture.document.rules.expected_points_scale;
+  const players = fixture.document.players.map((player) => ({
+    ...player,
+    team: excess.has(player.id) ? "Excess Club" : player.team,
+    expected_points: held.has(player.id) ? 10 : 0,
+    coefficients: held.has(player.id) ? [scale, 9 * scale, 10 * scale] : [0, 0, 0],
+  }));
+  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        ...squad,
+        payload: {
+          ...squad.payload,
+          source_snapshot_id: fixture.document.source_snapshot_id,
+          device_plan: member.entry,
+        },
+      },
+    }),
+  );
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-10-03T00:00:00Z",
+        source_kind: "live",
+        payload: { ...fixture.document, league_id: squad.payload.league_id, players },
+      },
+    }),
+  );
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`);
+  await page
+    .getByRole("button", { name: MESSAGES.en.leagueMembers.deviceButton, exact: true })
+    .click();
+  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+  const decision = page.getByRole("region", { name: MESSAGES.en.leagueMembers.decisionTitle });
+  await expect(decision.getByText(MESSAGES.en.leagueMembers.noMove, { exact: true })).toBeVisible();
 });
 
 test("a member's plan is solved on the device and drawn on the page", async ({ page }) => {

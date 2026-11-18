@@ -25,6 +25,7 @@ def add_decision_constraints(
     captain_vars: list[cp_model.IntVar],
     *,
     enforce_budget: bool = True,
+    team_limit_when: cp_model.IntVar | None = None,
 ) -> None:
     """Add shared squad constraints, optionally leaving affordability to state accounting."""
 
@@ -53,10 +54,12 @@ def add_decision_constraints(
     for index, team_id in enumerate(players["team_id"].tolist()):
         team_indices[team_id].append(index)
     for indices in team_indices.values():
-        model.add(
+        constraint = model.add(
             cp_model.LinearExpr.sum([squad_vars[index] for index in indices])
             <= config.max_players_per_team
         )
+        if team_limit_when is not None:
+            constraint.only_enforce_if(team_limit_when)
 
     if enforce_budget:
         prices = [int(value) for value in players["price_tenths"].tolist()]
@@ -78,6 +81,7 @@ def verify_solution(
     captain_indices: list[int],
     *,
     enforce_budget: bool = True,
+    enforce_team_limit: bool = True,
 ) -> None:
     squad_set = set(squad_indices)
     starter_set = set(starter_indices)
@@ -115,7 +119,9 @@ def verify_solution(
             failures.append("budget")
 
     team_counts = Counter(players.iloc[index]["team_id"] for index in squad_indices)
-    if any(count > config.max_players_per_team for count in team_counts.values()):
+    if enforce_team_limit and any(
+        count > config.max_players_per_team for count in team_counts.values()
+    ):
         failures.append("team limit")
 
     if failures:
