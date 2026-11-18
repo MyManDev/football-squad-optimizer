@@ -54,6 +54,7 @@ def main():
                     objective_kind="net_points" if net else "selection_utility",
                     server_status=plan.solver_status.name,
                     server_objective=plan.objective_value,
+                    server_model_objective=plan.diagnostics.get("scaled_model_objective_value"),
                     server_seconds=perf_counter() - started,
                     server_squad=sorted(int(v) for v in plan.weeks[0].selected_squad.player_id)
                     if plan.weeks
@@ -79,7 +80,7 @@ def main():
         check=True,
     )
     device = {row["id"]: row for row in json.loads(completed.stdout)}
-    for row in rows:
+    for row, case in zip(rows, cases, strict=True):
         result = device[row["id"]]
         answer = result.get("answer")
         value = (
@@ -87,11 +88,28 @@ def main():
             if answer
             else None
         )
+        published = {p["id"]: p["expected_points"] for p in case["document"]["players"]}
+        if answer and row["objective_kind"] == "selection_utility":
+            starters, squad = set(answer["startingXi"]), set(answer["squad"])
+            paid = max(0, len(squad - set(case["entry"]["held"])) - case["entry"]["free_transfers"])
+            reported = (
+                sum(published[p] for p in starters)
+                + published[answer["captain"]]
+                + 0.1 * sum(published[p] for p in squad - starters)
+                - 8 * paid
+            )
+        else:
+            reported = value
+        model_equal = value is not None and abs(value - row["server_model_objective"]) < 1e-8
+        reported_equal = reported is not None and abs(reported - row["server_objective"]) < 1e-8
         row.update(
             device_status=result["status"],
             device_seconds=result["seconds"],
             device_objective=value,
-            objective_equal=value is not None and abs(value - row["server_objective"]) < 1e-8,
+            device_reported_objective=reported,
+            model_objective_equal=model_equal,
+            reported_objective_equal=reported_equal,
+            objective_equal=model_equal and reported_equal,
             same_decision=answer is not None and answer["squad"] == row["server_squad"],
             device_error=result.get("error"),
         )
@@ -105,15 +123,17 @@ def main():
             Path(__file__).read_bytes().replace(b"\r\n", b"\n")
         ).hexdigest(),
         input_manifest_sha256=hashlib.sha256(
-            (ROOT / "docs/research/llmopt_phase1/inputs.json")
-            .read_bytes()
-            .replace(b"\r\n", b"\n")
+            (ROOT / "docs/research/llmopt_phase1/inputs.json").read_bytes().replace(b"\r\n", b"\n")
         ).hexdigest(),
         member_weeks=20,
         comparisons=len(rows),
         equal_objectives=sum(row["objective_equal"] for row in rows),
         local_only=True,
         server_jobs_opened=0,
+        comparison_scope=(
+            "Integer model values and independently reconstructed published values must both "
+            "agree; raw and scaled values are never compared to one another."
+        ),
         rows=rows,
     )
     output = ROOT / "docs/research/llmopt_phase4_parity.json"
