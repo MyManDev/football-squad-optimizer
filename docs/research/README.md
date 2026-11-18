@@ -32,6 +32,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 
 | Topic | Entry point |
 | --- | --- |
+| LLMOPT priority core and remaining integration | [Phase 3 status](llmopt_phase3_status.md) |
 | LLMOPT shared run admission | [Local admission replay](llmopt_phase2/README.md) |
 | Fixture football candidate and observed planning | [Implementation and evidence contract](football_candidate_development.md) |
 | Private set-piece duties candidate | [Source, learned allocation, synthetic checks and real-use gates](football_set_piece_duties.md) |
