@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -243,6 +243,48 @@ describe("chat refusals", () => {
     ).toBeVisible();
   });
 
+  it.each(["offline", "unavailable", "unreadable"] as const)(
+    "keeps the draft and running jobs when the fixture refresh is %s",
+    async (failure) => {
+      open();
+      await ready();
+      await addRule("include_player", OUTSIDER.name);
+      await act(async () => {
+        jobs[0]!.show({
+          phase: "waiting",
+          request: { leagueId: squad.league_id, entryId: ENTRY, strategy: "saf-puan", window: 1 },
+          jobId: "fixtures-running-job",
+          status: null,
+          fallback: null,
+        });
+      });
+      const input = screen.getByRole("textbox", { name: en.chat });
+      const existingJobs = [...jobs];
+      const originalFetch = fetch;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+          if (!String(input).endsWith("data/fixtures.json")) return originalFetch(input, init);
+          if (failure === "offline") throw new TypeError("offline");
+          if (failure === "unavailable") return new Response("unavailable", { status: 503 });
+          return new Response("<html>temporary error</html>", { status: 200 });
+        }),
+      );
+      await act(async () => {
+        await clients[0]!.refetchQueries({ queryKey: FIXTURES_QUERY.queryKey, exact: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(clients[0]!.getQueryData(FIXTURES_QUERY.queryKey)).toBeNull();
+      expect(screen.getByRole("textbox", { name: en.chat })).toBe(input);
+      expect(
+        screen.getByRole("button", {
+          name: `${en.remove} · ${en.rules.include_player} · ${OUTSIDER.name}`,
+        }),
+      ).toBeVisible();
+      expect(jobs).toEqual(existingJobs);
+    },
+  );
+
   it("keeps Send off while Retry-After runs and turns it back on by itself", async () => {
     intent.mockImplementationOnce(
       () =>
@@ -305,6 +347,73 @@ async function addRule(kind: string, player?: string) {
 
 describe("a reload keeps the saved session", () => {
   const outsiderRule = `${en.rules.include_player} · ${OUTSIDER.name}`;
+
+  it.each(["bank", "snapshot"] as const)(
+    "keeps the draft when a successful %s refresh follows an unavailable calendar",
+    async (changed) => {
+      const entrySquad = vi.fn(async () => envelope);
+      stubTree({ entrySquad });
+      open();
+      await ready();
+      await addRule("include_player", OUTSIDER.name);
+      await act(async () => {
+        clients.at(-1)!.setQueryData(FIXTURES_QUERY.queryKey, null);
+      });
+      expect(screen.getByText(outsiderRule, { exact: true })).toBeVisible();
+      expect(jobs).toHaveLength(4);
+
+      entrySquad.mockResolvedValue({
+        ...envelope,
+        payload: {
+          ...squad,
+          ...(changed === "bank"
+            ? { bank_tenths: squad.bank_tenths + 1 }
+            : { source_snapshot_id: "fresh-capture-with-calendar-offline" }),
+        },
+      });
+      await act(async () => {
+        await clients.at(-1)!.refetchQueries({
+          queryKey: leagueKeys.entrySquad(squad.league_id, ENTRY),
+          exact: true,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      await waitFor(() => expect(jobs).toHaveLength(8));
+      expect(screen.getByText(outsiderRule, { exact: true })).toBeVisible();
+      expect(screen.queryByRole("region", { name: en.results })).toBeNull();
+    },
+  );
+
+  it.each(["gameweek", "season"] as const)(
+    "does not reuse an unavailable calendar's old deadline for another %s",
+    async (changed) => {
+      const entrySquad = vi.fn(async () => envelope);
+      stubTree({ entrySquad });
+      open();
+      await ready();
+      await addRule("include_player", OUTSIDER.name);
+      await act(async () => {
+        clients.at(-1)!.setQueryData(FIXTURES_QUERY.queryKey, null);
+      });
+      entrySquad.mockResolvedValue({
+        ...envelope,
+        payload: {
+          ...squad,
+          ...(changed === "gameweek" ? { gameweek: squad.gameweek + 1 } : { season: "2027-28" }),
+        },
+      });
+      await act(async () => {
+        await clients.at(-1)!.refetchQueries({
+          queryKey: leagueKeys.entrySquad(squad.league_id, ENTRY),
+          exact: true,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      await waitFor(() => expect(jobs).toHaveLength(8));
+      expect(screen.queryByText(outsiderRule, { exact: true })).toBeNull();
+      expect(screen.getByRole("button", { name: en.compute })).toBeDisabled();
+    },
+  );
 
   it.each(["bank", "snapshot"] as const)(
     "keeps the latest rules and drops the old run after a successful %s refresh",

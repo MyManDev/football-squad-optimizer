@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import { exampleTree } from "../../../testSupport/league";
 import { LeagueDataMissing } from "../data";
-import { AdviceResponseError } from "./adviceResponse";
+import { AdviceContextError, AdviceResponseError } from "./adviceResponse";
 import { adviceRequestKey } from "./adviceJobStore";
 import {
   createAdviceClient,
@@ -103,6 +103,40 @@ describe("StaticOnlyAdviceClient", () => {
 });
 
 describe("HttpAdviceClient", () => {
+  it.each([
+    [new DOMException("The string did not match the expected pattern.", "SyntaxError"), true],
+    [new DOMException("The operation was aborted.", "AbortError"), false],
+    [new TypeError("The network connection was lost."), false],
+  ])(
+    "classifies a response body rejection by its JSON error type: %s",
+    async (error, unreadable) => {
+      const response = jsonResponse(200, {});
+      vi.spyOn(response, "json").mockRejectedValue(error);
+      const client = new HttpAdviceClient("https://api.example", async () => response);
+      if (unreadable) {
+        await expect(client.readAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceResponseError);
+        await expect(client.requestAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceResponseError);
+        await expect(client.readJob("json-body")).rejects.toBeInstanceOf(AdviceResponseError);
+      } else {
+        await expect(client.readAdvice(REQUEST)).rejects.toBe(error);
+        await expect(client.requestAdvice(REQUEST)).rejects.toBe(error);
+        await expect(client.readJob("json-body")).rejects.toBe(error);
+      }
+    },
+  );
+
+  it("identifies malformed successful advice and acceptance bodies as unreadable responses", async () => {
+    for (const status of [200, 202]) {
+      const client = new HttpAdviceClient(
+        "https://api.example",
+        async () => new Response("<html>", { status }),
+      );
+      await expect(client.requestAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceResponseError);
+      if (status === 200)
+        await expect(client.readAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceResponseError);
+    }
+  });
+
   it.each([239, 0])(
     "addresses public league %s separately for reads, writes and resume",
     async (leagueId) => {
@@ -212,6 +246,39 @@ describe("HttpAdviceClient", () => {
 });
 
 describe("FallbackAdviceClient", () => {
+  it.each([
+    ["a different member", mockEntryAdviceEnvelope(999, "saf-puan", 1), AdviceContextError],
+    ["an unreadable plan", {}, AdviceResponseError],
+  ])(
+    "preserves the validation error for %s when the static tree has no answer",
+    async (_name, body, error) => {
+      const client = new FallbackAdviceClient(
+        new HttpAdviceClient("https://api.example", async () => jsonResponse(200, body)),
+        new StaticOnlyAdviceClient(async () => missingLoader()),
+      );
+      await expect(client.readAdvice(REQUEST)).rejects.toBeInstanceOf(error);
+      await expect(client.requestAdvice(REQUEST)).rejects.toBeInstanceOf(error);
+    },
+  );
+
+  it.each([
+    ["a different member", mockEntryAdviceEnvelope(999, "saf-puan", 1)],
+    ["an unreadable plan", {}],
+  ])("still serves a matching published plan after the service returns %s", async (_name, body) => {
+    const client = new FallbackAdviceClient(
+      new HttpAdviceClient("https://api.example", async () => jsonResponse(200, body)),
+      new StaticOnlyAdviceClient(exampleTree.entryAdvice),
+    );
+    await expect(client.readAdvice(REQUEST)).resolves.toMatchObject({
+      kind: "advice",
+      source: "static-fallback",
+    });
+    await expect(client.requestAdvice(REQUEST)).resolves.toMatchObject({
+      kind: "advice",
+      source: "static-fallback",
+    });
+  });
+
   it.each([404, 503])(
     "an on-open read never guesses a static file after HTTP %s",
     async (status) => {

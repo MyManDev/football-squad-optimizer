@@ -132,3 +132,97 @@ for (const change of ["bank", "snapshot", "compute"] as const) {
     expect(advicePosts).toBe(expectedPosts);
   });
 }
+
+for (const failure of ["offline", "unavailable", "unreadable", "snapshot-offline"] as const) {
+  test(`a ${failure} calendar refresh keeps the draft and active computation`, async ({ page }) => {
+    test.skip(!API, "API build required");
+    await installLeagueMocks(page);
+    await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+    const original = mockEntrySquadEnvelopes[entryId]!;
+    const squad = original.payload;
+    let currentSquad = original;
+    await page.route(`**/data/league/entries/${entryId}.json`, (route) =>
+      route.fulfill({ json: currentSquad }),
+    );
+    const calendar = openCalendar();
+    calendar.payload.gameweeks[0]!.deadline_utc = new Date(Date.now() + 90_000).toISOString();
+    let failCalendar = false;
+    let calendarReads = 0;
+    let posts = 0;
+    let polls = 0;
+    await page.route("**/data/fixtures.json", (route) => {
+      calendarReads += 1;
+      if (!failCalendar) return route.fulfill({ json: calendar });
+      if (failure === "offline" || failure === "snapshot-offline")
+        return route.abort("connectionrefused");
+      return route.fulfill({
+        status: failure === "unavailable" ? 503 : 200,
+        body: "<html>temporary error</html>",
+        contentType: "text/html",
+      });
+    });
+    await page.route(`${API}/api/v1/contributions/players`, (route) =>
+      reply(route, {
+        season: squad.season,
+        players: [...squad.starting_xi, ...squad.bench].map(({ player_id, name, team }) => ({
+          id: player_id,
+          name,
+          team,
+        })),
+      }),
+    );
+    await page.route(`${API}/api/v1/leagues/${leagueId}/capabilities`, (route) =>
+      reply(route, {
+        contract_version: "league_capabilities_v1",
+        league_id: leagueId,
+        season: squad.season,
+        gameweek: squad.gameweek,
+        capture_snapshot_id: squad.source_snapshot_id,
+        strategies: { "saf-puan": { windows: [1], requires_rival: false } },
+        preferences: { available: true },
+        top100: { available: false, weights: [] },
+        managers_word: { available: false },
+      }),
+    );
+    await page.route(`${API}/api/v1/leagues/${leagueId}/entries/${entryId}/advice**`, (route) => {
+      if (route.request().method() === "POST") posts += 1;
+      return reply(route, { job_id: "calendar-active-plan", status: "queued" }, 202);
+    });
+    await page.route(`${API}/api/v1/advice-jobs/calendar-active-plan`, (route) => {
+      if (route.request().method() === "GET") polls += 1;
+      return reply(route, { job_id: "calendar-active-plan", status: "queued" });
+    });
+    await page.goto(`/league/${leagueId}/members/${entryId}/llmopt`);
+    await page.getByRole("button", { name: "Add rule", exact: true }).click();
+    const rolled = page.getByRole("button", { name: "Remove · Roll the transfer", exact: true });
+    const compute = page.getByRole("button", { name: /^(Compute plans|Computing…)$/ });
+    const results = page.getByRole("region", { name: "Plans" });
+    await compute.click();
+    await expect.poll(() => polls).toBeGreaterThan(0);
+    await expect(results).toBeVisible();
+    failCalendar = true;
+    if (failure === "snapshot-offline")
+      currentSquad = {
+        ...original,
+        payload: { ...squad, source_snapshot_id: "updated-during-calendar-failure" },
+      };
+    const before = calendarReads;
+    await page.clock.install();
+    await page.clock.fastForward(61_000);
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event("offline"));
+      window.dispatchEvent(new Event("online"));
+    });
+    await expect.poll(() => calendarReads).toBeGreaterThan(before);
+    await expect(rolled).toBeVisible();
+    if (failure === "snapshot-offline") await expect(results).toHaveCount(0);
+    else await expect(results).toBeVisible();
+    expect(posts).toBe(1);
+    await page.clock.fastForward(31_000);
+    await expect(
+      page.getByText("This gameweek’s deadline has passed.", { exact: true }),
+    ).toBeVisible();
+    await expect(compute).toBeDisabled();
+    expect(posts).toBe(1);
+  });
+}

@@ -359,15 +359,18 @@ def _draft(
     *,
     model: bool = False,
     previous_window: int | None = None,
-    previous_hard: Sequence[dict[str, Any]] = (),
+    previous_draft: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if model and isinstance(value, dict):
-        # An omitted or null hard list leaves the reviewed requirements in place. An
-        # explicit list replaces them, including [] when the manager clears the rules.
+        # A partial reply retains reviewed rules and selections. Lists use [] to clear;
+        # the optional comparison, bank floor and scenario use null to clear.
+        previous = previous_draft or {}
+        optional = ("comparison", "min_bank", "scenario")
         value = {
-            "hard": list(previous_hard),
-            "soft": [],
-            **{k: v for k, v in value.items() if v is not None},
+            "hard": previous.get("hard", []),
+            "soft": previous.get("soft", []),
+            **{key: previous[key] for key in ("keep_weeks", *optional) if key in previous},
+            **{key: item for key, item in value.items() if item is not None or key in optional},
         }
     if (
         not isinstance(value, dict)
@@ -470,6 +473,10 @@ def _draft(
         window = previous_window
     if window is not None:
         result["window"] = window
+    # The incoming editable draft may contain the conflict the manager wants to repair.
+    # The proposed result must resolve it before it can become a confirmed draft.
+    if not model:
+        return result
     club_counts: dict[tuple[int, str, str], int] = {}
     for item in result["hard"]:
         if item["kind"] != "club_count":
@@ -563,7 +570,7 @@ def _validate_result(
     clubs: tuple[str, ...],
     *,
     previous_window: int | None,
-    previous_hard: Sequence[dict[str, Any]] = (),
+    previous_draft: Mapping[str, Any] | None = None,
     reference_weeks: tuple[int, ...] = (),
     locale: str = "en",
 ) -> dict[str, Any]:
@@ -586,7 +593,7 @@ def _validate_result(
         clubs,
         model=True,
         previous_window=previous_window,
-        previous_hard=previous_hard,
+        previous_draft=previous_draft,
     )
     scenario = draft.get("scenario")
     if scenario is not None and scenario.get("week", 1) not in reference_weeks:
@@ -680,7 +687,7 @@ def _validated(
         candidates,
         request.clubs,
         previous_window=request.draft.get("window"),
-        previous_hard=request.draft["hard"],
+        previous_draft=request.draft,
         reference_weeks=request.reference_weeks,
         locale=request.locale,
     )

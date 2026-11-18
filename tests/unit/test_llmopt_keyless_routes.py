@@ -390,6 +390,162 @@ def test_confirmed_request_cannot_omit_its_required_rule_list() -> None:
     assert checked.json()["error"]["code"] == "VALIDATION_FAILED"
 
 
+@pytest.mark.parametrize("null_lists", [False, True])
+def test_partial_hard_rule_edit_preserves_wish_cost_bank_floor_and_frozen_weeks(
+    null_lists: bool,
+) -> None:
+    original = {
+        "hard": [{"kind": "no_hits"}],
+        "soft": [{"kind": "keep_player", "player_id": 1, "max_cost_tenths": 15}],
+        "keep_weeks": [1],
+        "min_bank": {"tenths": 5, "week": 2},
+        "window": 3,
+    }
+    hard = [*original["hard"], {"kind": "include_player", "player_id": 2}]
+    revised = {"hard": hard}
+    if null_lists:
+        revised.update({"soft": None, "keep_weeks": None})
+    body = {
+        **_request(roster=2),
+        "message": "Also require Other 2 in the squad.",
+        "draft": original,
+        "reference_weeks": [1, 2, 3],
+    }
+    reply = {"status": "draft", "draft": revised}
+    with TestClient(create_app(llmopt_intent=IntentService(lambda _request: reply))) as client:
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+        prepared = client.post(INTENT, json=body)
+    assert checked.status_code == prepared.status_code == 200
+    expected = {"status": "draft", "draft": {**original, "hard": hard}}
+    assert checked.json() == prepared.json() == expected
+
+
+def test_explicit_empty_lists_clear_reviewed_wishes_and_frozen_weeks() -> None:
+    body = {
+        **_request(),
+        "message": "Remove the wish and release the frozen week.",
+        "draft": {
+            "hard": [{"kind": "no_hits"}],
+            "soft": [{"kind": "keep_player", "player_id": 1, "max_cost_tenths": 15}],
+            "keep_weeks": [1],
+            "window": 3,
+        },
+        "reference_weeks": [1],
+    }
+    reply = {"status": "draft", "draft": {"soft": [], "keep_weeks": []}}
+    with TestClient(create_app()) as client:
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+    assert checked.status_code == 200
+    assert checked.json() == {
+        "status": "draft",
+        "draft": {"hard": [{"kind": "no_hits"}], "soft": [], "window": 3},
+    }
+
+
+@pytest.mark.parametrize("clear", [False, True])
+@pytest.mark.parametrize(
+    ("field", "selection"),
+    [
+        ("comparison", {"kind": "include_player", "player_id": 1, "both": True}),
+        ("min_bank", {"tenths": 12, "week": 2}),
+        ("scenario", {"kind": "unavailable", "player_id": 1, "week": 2}),
+    ],
+)
+def test_partial_reply_keeps_optional_selection_until_explicit_null(
+    field: str, selection: dict[str, Any], clear: bool
+) -> None:
+    original = {"hard": [{"kind": "no_hits"}], "soft": [], "window": 3, field: selection}
+    body = {
+        **_request(),
+        "message": "Remove that selection." if clear else "Keep the same requirements.",
+        "draft": original,
+        "reference_weeks": [1, 2, 3],
+    }
+    reply = {
+        "status": "draft",
+        "draft": {"hard": [{"kind": "no_hits"}], **({field: None} if clear else {})},
+    }
+    with TestClient(create_app(llmopt_intent=IntentService(lambda _request: reply))) as client:
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+        prepared = client.post(INTENT, json=body)
+    assert checked.status_code == prepared.status_code == 200
+    expected = {key: value for key, value in original.items() if not clear or key != field}
+    assert checked.json() == prepared.json() == {"status": "draft", "draft": expected}
+
+
+def test_retained_frozen_week_still_requires_a_solved_reference() -> None:
+    body = {
+        **_request(),
+        "message": "Keep the reviewed plan.",
+        "draft": {"hard": [{"kind": "no_hits"}], "soft": [], "keep_weeks": [2], "window": 3},
+        "reference_weeks": [1],
+    }
+    with TestClient(create_app()) as client:
+        checked = client.post(
+            CHECK,
+            json={"request": body, "reply": {"status": "draft", "draft": {"hard": []}}},
+        )
+    assert checked.status_code == 200
+    assert checked.json()["status"] == "clarification"
+
+
+@pytest.mark.parametrize("scope", ["squad", "transfers_in"])
+@pytest.mark.parametrize("clarify", [False, True])
+def test_conflicting_editable_club_counts_can_be_corrected_through_chat(
+    scope: str, clarify: bool
+) -> None:
+    general = {"kind": "club_count", "club": "LIV", "count": 3}
+    if scope == "transfers_in":
+        general["scope"] = scope
+    conflicting = {**general, "count": 2, "week": 2}
+    body = {
+        **_request(),
+        "message": "Remove the second-week count and keep three players in every week.",
+        "draft": {"hard": [general, conflicting], "soft": [], "window": 3},
+    }
+    reply = (
+        {"status": "clarification", "message": "Which of the two counts should I keep?"}
+        if clarify
+        else {"status": "draft", "draft": {"hard": [general]}}
+    )
+    with TestClient(create_app(llmopt_intent=IntentService(lambda _request: reply))) as client:
+        prompt = client.post(PROMPT, json=body)
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+        prepared = client.post(INTENT, json=body)
+    assert prompt.status_code == checked.status_code == prepared.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
+    assert checked.json() == prepared.json()
+    if clarify:
+        assert checked.json() == reply
+    else:
+        assert checked.json() == {
+            "status": "draft",
+            "draft": {"hard": [general], "soft": [], "window": 3},
+        }
+
+
+@pytest.mark.parametrize("scope", ["squad", "transfers_in"])
+def test_a_model_must_resolve_conflicting_club_counts_before_the_draft_is_accepted(
+    scope: str,
+) -> None:
+    general = {"kind": "club_count", "club": "LIV", "count": 3}
+    if scope == "transfers_in":
+        general["scope"] = scope
+    body = {
+        **_request(),
+        "message": "Help me fix the conflicting club rules.",
+        "draft": {"hard": [general, {**general, "count": 2, "week": 2}], "soft": [], "window": 3},
+    }
+    reply = {"status": "draft", "draft": {"hard": body["draft"]["hard"]}}
+    with TestClient(create_app(llmopt_intent=IntentService(lambda _request: reply))) as client:
+        checked = client.post(CHECK, json={"request": body, "reply": reply})
+        prepared = client.post(INTENT, json=body)
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "REPLY_REFUSED"
+    assert prepared.status_code == 503
+    assert prepared.json()["error"]["code"] == "LLMOPT_UNAVAILABLE"
+
+
 @pytest.mark.parametrize(
     "reply",
     [

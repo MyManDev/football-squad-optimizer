@@ -108,17 +108,20 @@ interface ChatLine {
 
 function Session({
   squad,
+  fixtures,
+  deadline,
   intentSource,
   chatReady,
 }: {
   squad: EntrySquad;
+  fixtures: ReturnType<typeof useFixtures>;
+  deadline: string | null;
   intentSource: IntentSource;
   chatReady: boolean;
 }) {
   const { messages } = useLanguage();
   const { forwarded } = useLeague();
-  const fixtures = useFixtures();
-  const deadline = gameweekDeadline(fixtures.data, squad.season, squad.gameweek);
+  const publishedDeadline = gameweekDeadline(fixtures.data, squad.season, squad.gameweek);
   const roster = useQuery({
     queryKey: ["llmopt-roster", ORIGIN, squad.season, squad.source_snapshot_id],
     queryFn: ({ signal }) => readIntentCatalog(ORIGIN, squad.season, signal),
@@ -151,7 +154,7 @@ function Session({
       key={context ? `${context.key}:${context.deadline}` : undefined}
       squad={squad}
       deadline={deadline}
-      fixturesUnavailable={fixtures.isError}
+      fixturesUnavailable={publishedDeadline === null}
       roster={roster}
       context={context}
       saved={saved}
@@ -1141,6 +1144,31 @@ export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {
   const entryId = Number(entryParam);
   const valid = Number.isSafeInteger(entryId) && entryId > 0;
   const result = useEntrySquad(entryId, valid);
+  const fixtures = useFixtures();
+  const squad = result.data?.payload;
+  const publishedDeadline = gameweekDeadline(fixtures.data, squad?.season, squad?.gameweek);
+  const [knownDeadline, setKnownDeadline] = useState<{
+    season: string;
+    gameweek: number;
+    deadline: string;
+  } | null>(null);
+  const sameWeek =
+    squad !== undefined &&
+    knownDeadline?.season === squad.season &&
+    knownDeadline.gameweek === squad.gameweek;
+  if (
+    squad &&
+    publishedDeadline !== null &&
+    (!sameWeek || knownDeadline?.deadline !== publishedDeadline)
+  )
+    setKnownDeadline({
+      season: squad.season,
+      gameweek: squad.gameweek,
+      deadline: publishedDeadline,
+    });
+  // Keep the recorded deadline across squad refreshes while the calendar is unavailable.
+  // Another season or gameweek needs its own calendar, and the deadline clock still closes.
+  const deadline = fixtures.data == null && sameWeek ? knownDeadline.deadline : publishedDeadline;
   if (!valid) return <EmptyState page title={messages.leagueMembers.invalidEntry} />;
   if (result.isPending) return <PageLoading label={messages.common.loading} />;
   // A squad already read stays on the page when a later refresh of it fails: plans may be
@@ -1150,6 +1178,8 @@ export function LLMOptPage({ intentSource }: { intentSource?: IntentSource } = {
     <Session
       key={squadBasis(result.data.payload)}
       squad={result.data.payload}
+      fixtures={fixtures}
+      deadline={deadline}
       intentSource={source}
       chatReady={intentSource !== undefined || ownKey}
     />
