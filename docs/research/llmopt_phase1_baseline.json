@@ -1,0 +1,1204 @@
+{
+  "kind": "llmopt_phase1_offline_replay",
+  "repository_commit": "2885715741cb6bd4d2966206f56aa94394a93c1e",
+  "source_sha256": {
+    "benchmark.py": "cbd34e773a64353cbabeb4b8c00af8cd559a97fe0e22c6c72f64a74b993ec82a",
+    "bundle.mjs": "471da272e4f34e59281e404abe3cd3b8123469acae8b63a8d0e4be7dbbd33e50",
+    "freeze.py": "47777ce28a435addeaaaa6584bb4c51f13b2363c54865f9aff46c3a7731a9fae",
+    "neighborhood.py": "64d46ad6ffd96af3cb955ddad0793328eb8a48b65c32643d00c26982fb88a5f9",
+    "pairs.py": "e26ecc54e065cb56c2796b2fa3916ac05b90c7696adcdca7ac8009d787d55b24",
+    "schedule.ts": "55a99d09ea7e92bf06ad374e903b04b0fc84fdcaedbe4573283058a88ffed40e"
+  },
+  "input_manifest_sha256": "6657f32ba8b06f9a08c620092228aa3b07cd966ba6f480780046f2860be87ac9",
+  "measured_at_utc": "2026-11-18T15:26:56.193611+00:00",
+  "python": "3.13.5 | packaged by Anaconda, Inc. | (main, Jun 12 2025, 16:37:03) [MSC v.1929 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "ortools": "9.15.6755",
+  "highs": "1.15.1",
+  "execution": "sequential local queue admissions and planner replay; not production latency",
+  "member_weeks": 20,
+  "measurement_programs": {
+    "a79d2e008e94e7561c72387df6d3e1b4638e6f7e385f80918e24e97be4f54652": {
+      "repository_commit": "a5e308d5e7fc99b2aae5a95b82a356b00ab35926",
+      "source_sha256": {
+        "benchmark.py": "9e360c3ea3f1816235ef4c09a57f99880ea14aa6740acca74db11092639bd6e6",
+        "bundle.mjs": "471da272e4f34e59281e404abe3cd3b8123469acae8b63a8d0e4be7dbbd33e50",
+        "freeze.py": "47777ce28a435addeaaaa6584bb4c51f13b2363c54865f9aff46c3a7731a9fae",
+        "neighborhood.py": "64d46ad6ffd96af3cb955ddad0793328eb8a48b65c32643d00c26982fb88a5f9",
+        "pairs.py": "e26ecc54e065cb56c2796b2fa3916ac05b90c7696adcdca7ac8009d787d55b24",
+        "schedule.ts": "55a99d09ea7e92bf06ad374e903b04b0fc84fdcaedbe4573283058a88ffed40e"
+      },
+      "input_manifest_sha256": "6657f32ba8b06f9a08c620092228aa3b07cd966ba6f480780046f2860be87ac9"
+    },
+    "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae": {
+      "repository_commit": "2885715741cb6bd4d2966206f56aa94394a93c1e",
+      "source_sha256": {
+        "benchmark.py": "cbd34e773a64353cbabeb4b8c00af8cd559a97fe0e22c6c72f64a74b993ec82a",
+        "bundle.mjs": "471da272e4f34e59281e404abe3cd3b8123469acae8b63a8d0e4be7dbbd33e50",
+        "freeze.py": "47777ce28a435addeaaaa6584bb4c51f13b2363c54865f9aff46c3a7731a9fae",
+        "neighborhood.py": "64d46ad6ffd96af3cb955ddad0793328eb8a48b65c32643d00c26982fb88a5f9",
+        "pairs.py": "e26ecc54e065cb56c2796b2fa3916ac05b90c7696adcdca7ac8009d787d55b24",
+        "schedule.ts": "55a99d09ea7e92bf06ad374e903b04b0fc84fdcaedbe4573283058a88ffed40e"
+      },
+      "input_manifest_sha256": "6657f32ba8b06f9a08c620092228aa3b07cd966ba6f480780046f2860be87ac9"
+    }
+  },
+  "rows": [
+    {
+      "case": "gw8-2199732",
+      "scenario": "wildcard",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 5.092967299991869,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 58.52700000000001,
+            "best_bound": 58.527,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 18.785571100001107,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 175.58100000000002,
+            "best_bound": 175.581,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "a79d2e008e94e7561c72387df6d3e1b4638e6f7e385f80918e24e97be4f54652",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 35.965125899994746,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 28.791220242198218,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 36.06220059999032,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 28.791220242198218,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw8-2281624",
+      "scenario": "freehit",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 16.27621120000549,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 58.214000000000006,
+            "best_bound": 58.214,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 19.257215999998152,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 167.869,
+            "best_bound": 167.869,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "a79d2e008e94e7561c72387df6d3e1b4638e6f7e385f80918e24e97be4f54652",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 40.60574379999889,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 38.31049681688567,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 40.52503640000941,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 38.31049681688567,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw8-313686",
+      "scenario": "normal",
+      "windows": {
+        "1": {
+          "pricing": {
+            "backend_jobs": 4,
+            "solver_calls": 12,
+            "cp_sat_calls": 12,
+            "native_calls": 0,
+            "total_seconds": 7.604032599978382
+          },
+          "control": {
+            "seconds": 2.2190065999893704,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 55.488,
+            "best_bound": 55.488,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": {
+            "backend_jobs": 4,
+            "solver_calls": 16,
+            "cp_sat_calls": 12,
+            "native_calls": 4,
+            "total_seconds": 45.17978820001008
+          },
+          "control": {
+            "seconds": 9.488211200005026,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 168.86900000000003,
+            "best_bound": 168.869,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "a79d2e008e94e7561c72387df6d3e1b4638e6f7e385f80918e24e97be4f54652",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 37.145798400000785,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 33.921018848171954,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 37.19004459999269,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 33.921018848171954,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw8-3832237",
+      "scenario": "tight_bank",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 29.92140870000003,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 53.335,
+            "best_bound": 53.335,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 29.22537650000595,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 161.907,
+            "best_bound": 161.907,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": null,
+        "expected_net_gain_points": null,
+        "single": {
+          "seconds": 30.175342199989245,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": null,
+          "actual_units": null,
+          "optional_status": "not_run",
+          "optional_reason": "expected_window_failed",
+          "error": {
+            "type": "ValueError",
+            "message": "Invalid deterministic-work accounting for expected windows."
+          },
+          "accounting_failures": [
+            {
+              "actual": 24.058744962167573,
+              "cap": 24.0
+            }
+          ]
+        },
+        "up_to_two": {
+          "seconds": 30.151945399993565,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": null,
+          "actual_units": null,
+          "optional_status": "not_run",
+          "optional_reason": "expected_window_failed",
+          "error": {
+            "type": "ValueError",
+            "message": "Invalid deterministic-work accounting for expected windows."
+          },
+          "accounting_failures": [
+            {
+              "actual": 24.058744962167573,
+              "cap": 24.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "case": "gw8-4287206",
+      "scenario": "conflicting_instructions",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 0.08159739999973681,
+            "solver_status": "INFEASIBLE",
+            "proof": "infeasible",
+            "objective": null,
+            "best_bound": null,
+            "absolute_gap_points": null
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 0.8106600999890361,
+            "solver_status": "INFEASIBLE",
+            "proof": "infeasible",
+            "objective": null,
+            "best_bound": null,
+            "absolute_gap_points": null
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 43.87212200000067,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 43.367386286575005,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 43.61311399999249,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 43.367386286575005,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw8-5081114",
+      "scenario": "normal",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 3.5024435999948764,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 53.179,
+            "best_bound": 53.179,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 13.048548799997661,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 162.454,
+            "best_bound": 162.454,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 46.07677960000001,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 47.62785259805248,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 46.03810029999295,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 47.62785259805248,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw8-5349883",
+      "scenario": "wildcard",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 24.745551799991517,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 57.443000000000005,
+            "best_bound": 57.443,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 25.973814599987236,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 172.329,
+            "best_bound": 172.329,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 42.79750829999102,
+          "proof": "not_proven",
+          "solver_calls": 23,
+          "chosen": "legacy_proposal",
+          "actual_units": 39.86560728681611,
+          "optional_status": "OPTIMAL",
+          "optional_reason": "retained",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 42.938602599999285,
+          "proof": "not_proven",
+          "solver_calls": 23,
+          "chosen": "legacy_proposal",
+          "actual_units": 39.86560728681611,
+          "optional_status": "OPTIMAL",
+          "optional_reason": "retained",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw8-5662073",
+      "scenario": "freehit",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 20.829959100010456,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 57.89200000000001,
+            "best_bound": 57.892,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 8.094311499997275,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 166.56200000000004,
+            "best_bound": 166.562,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 42.49581490000128,
+          "proof": "not_proven",
+          "solver_calls": 17,
+          "chosen": "legacy_proposal",
+          "actual_units": 45.37919338814576,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 42.415144499987946,
+          "proof": "not_proven",
+          "solver_calls": 17,
+          "chosen": "legacy_proposal",
+          "actual_units": 45.379193388145765,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw8-6654210",
+      "scenario": "tight_bank",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 3.905413200001931,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 53.826,
+            "best_bound": 53.826,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 20.07110620000458,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 164.072,
+            "best_bound": 164.072,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 52.90529070000048,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 49.75550847640038,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 52.466902400003164,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 49.75550847640038,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw8-6879786",
+      "scenario": "conflicting_instructions",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 0.08176539999840315,
+            "solver_status": "INFEASIBLE",
+            "proof": "infeasible",
+            "objective": null,
+            "best_bound": null,
+            "absolute_gap_points": null
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 0.7913319000072079,
+            "solver_status": "INFEASIBLE",
+            "proof": "infeasible",
+            "objective": null,
+            "best_bound": null,
+            "absolute_gap_points": null
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 50.67943319999904,
+          "proof": "not_proven",
+          "solver_calls": 14,
+          "chosen": "legacy_proposal",
+          "actual_units": 41.60482577636819,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 50.73798040000838,
+          "proof": "not_proven",
+          "solver_calls": 14,
+          "chosen": "legacy_proposal",
+          "actual_units": 41.60482577636819,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw9-2199732",
+      "scenario": "wildcard",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 2.3554961000045296,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 58.778000000000006,
+            "best_bound": 58.778,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 40.01667029999953,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 176.334,
+            "best_bound": 176.334,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 39.84725370000524,
+          "proof": "not_proven",
+          "solver_calls": 14,
+          "chosen": "legacy_proposal",
+          "actual_units": 28.52718715110514,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 39.636591699993005,
+          "proof": "not_proven",
+          "solver_calls": 14,
+          "chosen": "legacy_proposal",
+          "actual_units": 28.52718715110514,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw9-2281624",
+      "scenario": "freehit",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 3.158514100010507,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 58.643000000000015,
+            "best_bound": 58.643,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 9.179343299998436,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 167.73600000000002,
+            "best_bound": 167.736,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 33.65579699999944,
+          "proof": "not_proven",
+          "solver_calls": 16,
+          "chosen": "legacy_proposal",
+          "actual_units": 30.208943763419374,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 33.824056899989955,
+          "proof": "not_proven",
+          "solver_calls": 16,
+          "chosen": "legacy_proposal",
+          "actual_units": 30.208943763419374,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw9-313686",
+      "scenario": "normal",
+      "windows": {
+        "1": {
+          "pricing": {
+            "backend_jobs": 4,
+            "solver_calls": 12,
+            "cp_sat_calls": 12,
+            "native_calls": 0,
+            "total_seconds": 8.599171099995147
+          },
+          "control": {
+            "seconds": 2.4985384000028716,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 54.285,
+            "best_bound": 54.285,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": {
+            "backend_jobs": 4,
+            "solver_calls": 16,
+            "cp_sat_calls": 12,
+            "native_calls": 4,
+            "total_seconds": 99.38404989997798
+          },
+          "control": {
+            "seconds": 20.12387630000012,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 165.899,
+            "best_bound": 165.899,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 45.886288399997284,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "zero_bonus_proposal",
+          "actual_units": 38.889034441528,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 45.90763479999441,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "zero_bonus_proposal",
+          "actual_units": 38.889034441528,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw9-3832237",
+      "scenario": "tight_bank",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 26.333432600004016,
+            "solver_status": "FEASIBLE",
+            "proof": "not_proven",
+            "objective": 52.31,
+            "best_bound": 58.561,
+            "absolute_gap_points": 6.250999999999998
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 36.17573600000469,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 161.675,
+            "best_bound": 161.675,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": null,
+        "expected_net_gain_points": null,
+        "single": {
+          "seconds": 31.611578299998655,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": null,
+          "actual_units": null,
+          "optional_status": "not_run",
+          "optional_reason": "expected_window_failed",
+          "error": {
+            "type": "ValueError",
+            "message": "Invalid deterministic-work accounting for expected windows."
+          },
+          "accounting_failures": [
+            {
+              "actual": 24.223909707394814,
+              "cap": 24.0
+            }
+          ]
+        },
+        "up_to_two": {
+          "seconds": 31.610784999997122,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": null,
+          "actual_units": null,
+          "optional_status": "not_run",
+          "optional_reason": "expected_window_failed",
+          "error": {
+            "type": "ValueError",
+            "message": "Invalid deterministic-work accounting for expected windows."
+          },
+          "accounting_failures": [
+            {
+              "actual": 24.223909707394814,
+              "cap": 24.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "case": "gw9-4287206",
+      "scenario": "conflicting_instructions",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 0.08307510000304319,
+            "solver_status": "INFEASIBLE",
+            "proof": "infeasible",
+            "objective": null,
+            "best_bound": null,
+            "absolute_gap_points": null
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 0.7963691999902949,
+            "solver_status": "INFEASIBLE",
+            "proof": "infeasible",
+            "objective": null,
+            "best_bound": null,
+            "absolute_gap_points": null
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 31.157576400000835,
+          "proof": "not_proven",
+          "solver_calls": 14,
+          "chosen": "legacy_proposal",
+          "actual_units": 19.99782404651208,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 31.556990900004166,
+          "proof": "not_proven",
+          "solver_calls": 14,
+          "chosen": "legacy_proposal",
+          "actual_units": 19.99782404651208,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw9-5081114",
+      "scenario": "normal",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 3.469129700009944,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 52.676,
+            "best_bound": 52.676,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 11.002501800001482,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 162.246,
+            "best_bound": 162.246,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 47.662094999992405,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 39.0166946624147,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 47.554196500001126,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 39.0166946624147,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw9-5349883",
+      "scenario": "wildcard",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 8.01276909999433,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 57.80800000000001,
+            "best_bound": 57.808,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 19.634850400005234,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 173.42400000000004,
+            "best_bound": 173.424,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 63.35404180000478,
+          "proof": "not_proven",
+          "solver_calls": 23,
+          "chosen": "legacy_proposal",
+          "actual_units": 60.000389678396985,
+          "optional_status": "OPTIMAL",
+          "optional_reason": "retained",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 63.25654859999486,
+          "proof": "not_proven",
+          "solver_calls": 23,
+          "chosen": "legacy_proposal",
+          "actual_units": 60.00098632411187,
+          "optional_status": "OPTIMAL",
+          "optional_reason": "retained",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw9-5662073",
+      "scenario": "freehit",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 4.266100599998026,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 58.285,
+            "best_bound": 58.285,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 23.898023300003842,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 159.686,
+            "best_bound": 159.686,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 66.0402008999954,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 45.55221959677294,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 66.49026449999656,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 45.55221959677294,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw9-6654210",
+      "scenario": "tight_bank",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 4.405476699990686,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 52.0,
+            "best_bound": 52.0,
+            "absolute_gap_points": 0.0
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 15.331415199994808,
+            "solver_status": "OPTIMAL",
+            "proof": "optimal",
+            "objective": 159.909,
+            "best_bound": 159.909,
+            "absolute_gap_points": 0.0
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 56.87050499999896,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 50.13914732689982,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 56.31168610000168,
+          "proof": "not_proven",
+          "solver_calls": 10,
+          "chosen": "legacy_proposal",
+          "actual_units": 50.13914732689982,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    },
+    {
+      "case": "gw9-6879786",
+      "scenario": "conflicting_instructions",
+      "windows": {
+        "1": {
+          "pricing": null,
+          "control": {
+            "seconds": 0.08356939999794122,
+            "solver_status": "INFEASIBLE",
+            "proof": "infeasible",
+            "objective": null,
+            "best_bound": null,
+            "absolute_gap_points": null
+          }
+        },
+        "3": {
+          "pricing": null,
+          "control": {
+            "seconds": 0.8096007999993162,
+            "solver_status": "INFEASIBLE",
+            "proof": "infeasible",
+            "objective": null,
+            "best_bound": null,
+            "absolute_gap_points": null
+          }
+        }
+      },
+      "measurement_program": "3a1561fe22e07a2fbe7a1743115590d9278b494625a0e8f270521cdbe0541fae",
+      "expected_comparison": {
+        "selection_utility_gain_points": 0.0,
+        "expected_net_gain_points": 0.0,
+        "single": {
+          "seconds": 67.67446319998999,
+          "proof": "not_proven",
+          "solver_calls": 18,
+          "chosen": "legacy_proposal",
+          "actual_units": 51.68759449837961,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        },
+        "up_to_two": {
+          "seconds": 68.00548459999845,
+          "proof": "not_proven",
+          "solver_calls": 18,
+          "chosen": "legacy_proposal",
+          "actual_units": 51.68759449837961,
+          "optional_status": "skipped",
+          "optional_reason": "original_routes_incomplete",
+          "error": null,
+          "accounting_failures": []
+        }
+      }
+    }
+  ]
+}
