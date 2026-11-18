@@ -60,7 +60,6 @@ from squadopt.platform.api_contract import (
     DecisionPreferences,
 )
 from squadopt.platform.contributions import ContributionStore
-from squadopt.platform.llmopt_intent import IntentService
 from squadopt.platform.public_entry_advice import PublicEntryAdviceReader
 from squadopt.platform.queue_contracts import (
     AdviceQueueError,
@@ -203,7 +202,6 @@ def create_app(
     readiness: Callable[[], tuple[bool, Mapping[str, bool]]] | None = None,
     utc_now: Callable[[], datetime] | None = None,
     contributions: ContributionStore | None = None,
-    llmopt_intent: IntentService | None = None,
 ) -> FastAPI:
     """Build the API with an injectable read adapter and no solver startup work.
 
@@ -218,7 +216,7 @@ def create_app(
         description="Read-only access to published SquadOpt application views.",
         version=BACKEND_API_VERSION,
     )
-    application.include_router(intent_routes(llmopt_intent))
+    application.include_router(intent_routes())
     if contributions is not None:
         from squadopt.api.contributions import ContributionError, contribution_routes
 

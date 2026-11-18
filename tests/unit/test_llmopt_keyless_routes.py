@@ -1,4 +1,4 @@
-"""The keyless LLMOPT routes send the site provider's call and give prepare()'s verdict."""
+"""The keyless LLMOPT routes write the call for a member's model and check its reply."""
 
 import json
 import logging
@@ -10,11 +10,8 @@ from fastapi.testclient import TestClient
 from squadopt.api.app import create_app
 from squadopt.platform.llmopt_intent import (
     INTENT_BODY_MAX_BYTES,
-    IntentRequest,
-    IntentService,
-    IntentUnavailable,
-    OpenAIIntentProvider,
-    intent_service_from_environment,
+    IntentValidationError,
+    check_reply,
     parse_intent_request,
 )
 
@@ -52,44 +49,29 @@ def _draft(player_id: int = 1, **extra: Any) -> dict[str, Any]:
     }
 
 
-def test_prompt_is_the_call_the_site_provider_sends(monkeypatch: pytest.MonkeyPatch) -> None:
-    sent: list[dict[str, Any]] = []
-
-    def post(_provider: OpenAIIntentProvider, payload: bytes, _deadline: float) -> bytes:
-        sent.append(json.loads(payload))
-        content = json.dumps(_draft())
-        return json.dumps(
-            {"choices": [{"finish_reason": "stop", "message": {"content": content}}]}
-        ).encode()
-
-    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
-    service = intent_service_from_environment(
-        {"SQUADOPT_LLMOPT_API_KEY": "server-key", "SQUADOPT_LLMOPT_MODEL": "m"}
-    )
+def test_prompt_is_the_neutral_call_with_the_shortlist() -> None:
     body = _request(roster=300)
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        assert client.post(INTENT, json=body).status_code == 200
+    with TestClient(create_app()) as client:
         prompt = client.post(PROMPT, json=body)
     assert prompt.status_code == 200
     assert prompt.headers["cache-control"] == "no-store"
     call = prompt.json()
     assert set(call) == {"system", "user", "schema", "schema_name", "max_output_tokens"}
-    wire = sent[0]
-    assert call["system"] == wire["messages"][0]["content"]
-    assert call["user"] == wire["messages"][1]["content"]
-    assert call["schema"] == wire["response_format"]["json_schema"]["schema"]
-    assert call["schema_name"] == wire["response_format"]["json_schema"]["name"]
     assert call["schema_name"] == "llmopt_intent_v1"
-    assert call["max_output_tokens"] == wire["max_completion_tokens"]
+    assert call["max_output_tokens"] == 1200
+    assert call["schema"]["required"] == ["status", "draft", "message"]
+    asked = json.loads(call["user"])
+    assert asked["message"] == body["message"]
+    assert asked["clarification"] == body["clarification"]
     # The user message carries the shortlist, not the full roster.
-    assert [player["id"] for player in json.loads(call["user"])["players"]] == [1]
+    assert [player["id"] for player in asked["players"]] == [1]
 
 
-def _verdict_from_prepare(body: dict[str, Any], reply: object) -> dict[str, Any] | None:
-    service = IntentService(lambda _request: reply)
+def _verdict(body: dict[str, Any], reply: object) -> dict[str, Any] | None:
+    """What the validator makes of the reply, or None when it refuses it."""
     try:
-        return service.prepare(parse_intent_request(body), "visitor")
-    except IntentUnavailable:
+        return check_reply(parse_intent_request(body), reply)
+    except IntentValidationError:
         return None
 
 
@@ -108,9 +90,11 @@ def _verdict_from_prepare(body: dict[str, Any], reply: object) -> dict[str, Any]
     ],
 )
 @pytest.mark.parametrize("as_text", [False, True])
-def test_check_gives_the_same_verdict_as_prepare(name: str, reply: object, as_text: bool) -> None:
+def test_check_gives_the_validator_verdict_for_text_and_for_json(
+    name: str, reply: object, as_text: bool
+) -> None:
     body = _request(roster=300)
-    expected = _verdict_from_prepare(body, reply)
+    expected = _verdict(body, reply)
     with TestClient(create_app()) as client:
         checked = client.post(
             CHECK, json={"request": body, "reply": json.dumps(reply) if as_text else reply}
@@ -168,10 +152,10 @@ def test_a_request_carrying_a_key_is_refused(route: str, header: dict[str, str])
     assert "test" not in refused.text
 
 
-def test_keyless_routes_work_without_a_site_key_and_leave_intent_disabled() -> None:
-    assert intent_service_from_environment({}) is None
-    with TestClient(create_app(llmopt_intent=intent_service_from_environment({}))) as client:
-        assert client.post(INTENT, json=_request()).json()["error"]["code"] == "LLMOPT_DISABLED"
+def test_keyless_routes_need_no_setting_and_the_backend_has_no_model_route() -> None:
+    with TestClient(create_app()) as client:
+        # The site calls no model: the route that did is gone, not switched off.
+        assert client.post(INTENT, json=_request()).status_code == 404
         assert client.post(PROMPT, json=_request()).status_code == 200
         checked = client.post(CHECK, json={"request": _request(), "reply": _draft()})
     assert checked.status_code == 200
@@ -205,27 +189,6 @@ def test_each_keyless_route_has_its_own_per_visitor_minute() -> None:
         assert limited.headers["retry-after"] == "60"
         check = {"request": _request(), "reply": _draft()}
         assert client.post(CHECK, json=check).status_code == 200
-
-
-def test_keyless_routes_never_use_the_site_budget_or_provider() -> None:
-    calls = 0
-
-    def provider(request: IntentRequest) -> object:
-        nonlocal calls
-        calls += 1
-        assert request.locale == "tr"
-        return _draft()
-
-    service = IntentService(provider, per_minute=1, per_day=1)
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        for _ in range(5):
-            assert client.post(PROMPT, json=_request()).status_code == 200
-            check = {"request": _request(), "reply": _draft()}
-            assert client.post(CHECK, json=check).status_code == 200
-        assert calls == 0
-        assert client.post(INTENT, json=_request()).status_code == 200
-        assert client.post(INTENT, json=_request()).status_code == 429
-    assert calls == 1
 
 
 def test_keyless_routes_never_log_the_member_text(caplog: pytest.LogCaptureFixture) -> None:
