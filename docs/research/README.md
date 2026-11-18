@@ -42,6 +42,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Private projected club units and replacement quality | [Model and integration boundaries](football_projected_unit_strength.md) |
 | Football Manager source and training feasibility | [Sources, schemas and admission gates](football_fm_source_feasibility.md) |
 | Registered findings and evidence | [Measurements index](../measurements_index.md) |
+| LLMOPT job counts, solver calls and swap-search baseline | [Phase 1 capabilities, fixed inputs and measured results](llmopt_phase1_baseline.md) |
 | Operational component model | [Component policy](../phase_c_operational_component.md) |
 | Operational component and Top-100 composition | [Elite policy](../phase_c_operational_elite_policy.md) |
 | Deadline-safe evidence | [Phase B contract](../phase_b_evidence_contract.md) |
