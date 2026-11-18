@@ -8,6 +8,7 @@ const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 const text: Predicate = (value) => typeof value === "string";
 const finite: Predicate = (value) => typeof value === "number" && Number.isFinite(value);
+const nonnegative: Predicate = (value) => finite(value) && Number(value) >= 0;
 const integer: Predicate = (value) => Number.isSafeInteger(value) && Number(value) >= 0;
 const identity: Predicate = (value) => integer(value) && Number(value) > 0;
 const oneOf =
@@ -138,7 +139,7 @@ const planWeek: Predicate = (value) =>
       gameweek: identity,
       transfers_in: array(player),
       transfers_out: array(player),
-      transfer_hit_points: finite,
+      transfer_hit_points: nonnegative,
       chip,
       free_transfers_before: integer,
       free_transfers_after: integer,
@@ -187,7 +188,7 @@ const alternative: Predicate = (value) =>
     {
       kind: planKind,
       overlap_applied: finite,
-      transfer_hit_points: nullable(finite),
+      transfer_hit_points: nullable(nonnegative),
       expected_points_cost: finite,
     },
     { expected_points_cost_ceiling: finite },
@@ -257,7 +258,6 @@ const chipStrategy: Predicate = (value) =>
   });
 
 const probability: Predicate = (value) => finite(value) && Number(value) >= 0 && Number(value) <= 1;
-const nonnegative: Predicate = (value) => finite(value) && Number(value) >= 0;
 const rolePointComponents: Predicate = (value) =>
   closedFields(value, {
     appearance: nonnegative,
@@ -409,7 +409,7 @@ export function isAdvicePayload(value: unknown): boolean {
       selection_top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),
       rival_entry_id: identity,
       rival_label: nullable(text),
-      transfer_hit_points: finite,
+      transfer_hit_points: nonnegative,
       expected_gain_vs_hold: nullable(finite),
       expected_points_cost: finite,
       expected_points_cost_ceiling: finite,

@@ -19,7 +19,14 @@ function answer(route: Route, json: unknown, status = 200) {
     : route.fulfill({ json, status, headers: HEADERS });
 }
 
-for (const stage of ["immediate", "completed", "corrupt-poll"] as const) {
+for (const stage of [
+  "immediate",
+  "completed",
+  "corrupt-poll",
+  "negative-opening",
+  "negative-later",
+  "negative-alternative",
+] as const) {
   test(`LLMOPT rejects a ${stage} response without reporting a network failure`, async ({
     page,
   }) => {
@@ -28,12 +35,18 @@ for (const stage of ["immediate", "completed", "corrupt-poll"] as const) {
     await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
     const squad = mockEntrySquadEnvelopes[entryId]!.payload;
     const player = squad.starting_xi[0]!;
+    const negative = stage.startsWith("negative-");
+    const window = stage === "negative-later" ? 3 : 1;
+    let preferences: Record<string, unknown> | undefined;
     let posts = 0;
     let polls = 0;
     await page.route(`${API}/api/v1/contributions/players`, (route) =>
       answer(route, {
         season: squad.season,
-        players: [{ id: player.player_id, name: player.name, team: player.team }],
+        players: [
+          { id: player.player_id, name: player.name, team: player.team },
+          { id: 990001, name: "Excluded Signing", team: "Brighton" },
+        ],
       }),
     );
     await page.route(`${API}/api/v1/leagues/${leagueId}/capabilities`, (route) =>
@@ -52,17 +65,41 @@ for (const stage of ["immediate", "completed", "corrupt-poll"] as const) {
     await routeChat(page, API, (route) =>
       answer(route, {
         status: "draft",
-        draft: { hard: [{ kind: "no_hits" }], soft: [] },
+        draft: {
+          hard: negative ? [{ kind: "avoid_player", player_id: 990001 }] : [{ kind: "no_hits" }],
+          soft: [],
+          window,
+        },
       }),
     );
     await page.route(`${API}/api/v1/leagues/${leagueId}/entries/${entryId}/advice**`, (route) => {
       if (route.request().method() === "OPTIONS") return answer(route, null);
       if (route.request().method() === "POST") {
         posts += 1;
-        if (stage !== "immediate")
+        preferences = route.request().postDataJSON().preferences;
+        if (stage !== "immediate" && !negative)
           return answer(route, { job_id: "invalid-plan", status: "queued" }, 202);
       }
-      const envelope = mockEntryAdviceEnvelope(entryId, "saf-puan", 1);
+      const envelope = mockEntryAdviceEnvelope(entryId, "saf-puan", window);
+      if (negative) {
+        if (stage === "negative-opening") envelope.payload.transfer_hit_points = -4;
+        if (stage === "negative-later") envelope.payload.plan_weeks![1]!.transfer_hit_points = -4;
+        if (stage === "negative-alternative")
+          envelope.payload.alternative_plan = {
+            kind: "with_hits",
+            overlap_applied: 0,
+            transfer_hit_points: -4,
+            expected_points_cost: 0,
+          };
+        return answer(route, {
+          ...envelope,
+          payload: {
+            ...envelope.payload,
+            preferences,
+            preferences_scope: "all_selected_weeks",
+          },
+        });
+      }
       return answer(route, {
         ...envelope,
         payload: { ...envelope.payload, entry_id: entryId + 1 },
@@ -82,7 +119,9 @@ for (const stage of ["immediate", "completed", "corrupt-poll"] as const) {
 
     await page.goto(`/league/${leagueId}/members/${entryId}/llmopt`);
     await holdModel(page);
-    await page.getByRole("textbox", { name: "Plan instructions" }).fill("No hits.");
+    await page
+      .getByRole("textbox", { name: "Plan instructions" })
+      .fill(negative ? "Avoid Excluded Signing." : "No hits.");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     const compute = page.getByRole("button", { name: "Compute plans" });
     await compute.click();
@@ -95,6 +134,6 @@ for (const stage of ["immediate", "completed", "corrupt-poll"] as const) {
     await expect(page.locator("article[data-plan-ready]")).toHaveCount(0);
     await expect(compute).toBeEnabled();
     expect(posts).toBe(1);
-    expect(polls).toBe(stage === "immediate" ? 0 : 1);
+    expect(polls).toBe(stage === "immediate" || negative ? 0 : 1);
   });
 }
