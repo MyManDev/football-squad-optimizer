@@ -2164,6 +2164,10 @@ def optimize_priority_preferences(
             if not feasible:
                 exhausted = True
                 break
+            if not priority and int(candidate.value(objective)) < int(selected.value(objective)):
+                # A truncated points tie break cannot discard a better completed witness.
+                exhausted = True
+                break
             selected = candidate
             if priority:
                 artifacts.model.add(objective == int(selected.value(objective)))
