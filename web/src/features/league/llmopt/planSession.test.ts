@@ -63,15 +63,19 @@ describe("createPlanSessionStore", () => {
       expect(restore(odd)).not.toHaveProperty("combined");
   });
 
-  it("reads nothing back for another squad basis or deadline", () => {
+  it("reads nothing back for another deadline", () => {
     createPlanSessionStore(context).save({ draft });
-    expect(readPlanSession({ ...context, basis: "other" })).toBeNull();
     expect(readPlanSession({ ...context, deadline: "2031-01-01T00:00:00Z" })).toBeNull();
   });
 
   it("carries the rules, and only the rules, to a new squad when the old one changed under them", () => {
     const confirmation = { wildcardNotHeld: false };
-    createPlanSessionStore(context).save({ draft, confirmation, carried: true });
+    createPlanSessionStore(context).save({
+      draft,
+      confirmation,
+      clarification: { message: "A prior instruction", question: "Which player?" },
+      reference: { gameweek: GAMEWEEK, window: 1, net: null, weeks: [] },
+    });
     expect(readPlanSession({ ...context, basis: "other" })).toEqual({ draft });
     expect(
       readPlanSession({ ...context, basis: "other", deadline: "2031-01-01T00:00:00Z" }),

@@ -862,10 +862,10 @@ test("accepted preferred players are combined into one plan after their single p
       draft: {
         window: 3,
         hard: [{ kind: "no_hits" }],
-        soft: players.map(({ player_id }) => ({
+        soft: players.map(({ player_id }, index) => ({
           kind: "include_player",
           player_id,
-          max_cost_tenths: 15,
+          ...(index < 2 ? { max_cost_tenths: 15 } : {}),
         })),
       },
     }),
@@ -907,7 +907,7 @@ test("accepted preferred players are combined into one plan after their single p
   await holdModel(page);
   await page
     .getByRole("textbox", { name: "Plan instructions" })
-    .fill("No hits. Each of these three is worth up to 1.5 points.");
+    .fill("No hits. The first two are worth up to 1.5 points each. Also prefer the third player.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await page.getByRole("button", { name: "Compute plans" }).click();
 
@@ -919,7 +919,7 @@ test("accepted preferred players are combined into one plan after their single p
     await expect(combined.getByText(`Include player · ${name}`, { exact: true })).toBeVisible();
   await expect(combined.locator("[data-combined=applied]")).toHaveCount(3);
   await expect(
-    page.getByText(/^Applied in the plan with all preferences\. · Up to 1\.5 points$/),
+    page.getByText("Applied in the plan with all preferences.", { exact: true }),
   ).toBeVisible();
   expect(posts).toHaveLength(4);
   expect(posts[3]?.preferences).toMatchObject({

@@ -604,7 +604,7 @@ function Workspace({
         setRun(null);
         setReference(undefined);
         // The reload the page asks for opens the new squad; the rules go with the member.
-        session.save({ draft, carried: true });
+        session.save({ draft });
         return;
       }
       const request = requestFor(squad, forwarded, plans.window);
@@ -717,7 +717,8 @@ function Workspace({
   ]);
   // A rule with no slot of its own is priced in the plan with all preferences, or named as
   // left out of it.
-  const combined = run ? savedRun?.combined : undefined;
+  const combined =
+    run && savedRun?.combined ? prepareCombined(run, savedRun.combined).applied : undefined;
   const combinedPending =
     !closed &&
     (isWorking(baseState.phase) ||

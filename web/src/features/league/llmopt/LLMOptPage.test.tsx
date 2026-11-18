@@ -12,6 +12,7 @@ import { requestsCarrying, sentRequests, watchKeyLeaks } from "../../../testSupp
 import { stubTree, withLeague } from "../../../testSupport/league";
 import type { AdviceRequest } from "../advice/adviceClient";
 import type { ComputePhase } from "../advice/useAdviceJob";
+import { leagueKeys } from "../queries";
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import { LLMOPT_COPY } from "./copy";
 import { IntentError, intentBody } from "./intent";
@@ -304,6 +305,69 @@ async function addRule(kind: string, player?: string) {
 
 describe("a reload keeps the saved session", () => {
   const outsiderRule = `${en.rules.include_player} · ${OUTSIDER.name}`;
+
+  it.each(["bank", "snapshot"] as const)(
+    "keeps the latest rules and drops the old run after a successful %s refresh",
+    async (changed) => {
+      const entrySquad = vi.fn(async () => envelope);
+      stubTree({ entrySquad });
+      open();
+      await ready();
+      await addRule("include_player", OUTSIDER.name);
+      cleanup();
+      const [key, saved] = savedSession();
+      sessionStorage.setItem(
+        key,
+        JSON.stringify({
+          ...saved,
+          reference: summarizeRevision(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1).payload),
+          confirmation: { wildcardNotHeld: false, sending: true },
+        }),
+      );
+      jobs.length = 0;
+      open();
+      await ready();
+      await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+
+      entrySquad.mockResolvedValue({
+        ...envelope,
+        payload: {
+          ...squad,
+          ...(changed === "bank"
+            ? { bank_tenths: squad.bank_tenths + 1 }
+            : { source_snapshot_id: "fresh-squad-capture" }),
+        },
+      });
+      await clients.at(-1)!.refetchQueries({
+        queryKey: leagueKeys.entrySquad(squad.league_id, ENTRY),
+        exact: true,
+      });
+      await waitFor(() => expect(jobs).toHaveLength(8));
+      await waitFor(() => expect(screen.getByText(outsiderRule, { exact: true })).toBeVisible());
+      expect(screen.queryByRole("region", { name: en.results })).toBeNull();
+      for (const job of jobs.slice(4)) {
+        expect(job.compute).not.toHaveBeenCalled();
+        expect(job.resume).not.toHaveBeenCalled();
+        expect(job.readCached).not.toHaveBeenCalled();
+      }
+
+      await addRule("no_hits");
+      expect(savedSession()[1]).toMatchObject({
+        draft: { hard: [{ kind: "include_player", player_id: OUTSIDER.id }, { kind: "no_hits" }] },
+      });
+      expect(savedSession()[1]).not.toHaveProperty("confirmation");
+      expect(savedSession()[1]).not.toHaveProperty("reference");
+      cleanup();
+      open();
+      await ready();
+      expect(await screen.findByText(outsiderRule, { exact: true })).toBeVisible();
+      expect(
+        screen.getByRole("button", {
+          name: `${en.remove} · ${en.rules.no_hits}`,
+        }),
+      ).toBeVisible();
+    },
+  );
 
   it("holds the session while the roster read fails and restores it on Retry", async () => {
     open();

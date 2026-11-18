@@ -359,10 +359,16 @@ def _draft(
     *,
     model: bool = False,
     previous_window: int | None = None,
+    previous_hard: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     if model and isinstance(value, dict):
-        # As for a rule: a part a model left out, or wrote as null, is an empty part.
-        value = {"hard": [], "soft": [], **{k: v for k, v in value.items() if v is not None}}
+        # An omitted or null hard list leaves the reviewed requirements in place. An
+        # explicit list replaces them, including [] when the manager clears the rules.
+        value = {
+            "hard": list(previous_hard),
+            "soft": [],
+            **{k: v for k, v in value.items() if v is not None},
+        }
     if (
         not isinstance(value, dict)
         or not {"hard", "soft"} <= value.keys()
@@ -557,6 +563,7 @@ def _validate_result(
     clubs: tuple[str, ...],
     *,
     previous_window: int | None,
+    previous_hard: Sequence[dict[str, Any]] = (),
     reference_weeks: tuple[int, ...] = (),
     locale: str = "en",
 ) -> dict[str, Any]:
@@ -574,7 +581,12 @@ def _validate_result(
         raise IntentValidationError("Invalid draft status.")
     player_ids = {player["id"] for player in candidates}
     draft = _draft(
-        value.get("draft"), player_ids, clubs, model=True, previous_window=previous_window
+        value.get("draft"),
+        player_ids,
+        clubs,
+        model=True,
+        previous_window=previous_window,
+        previous_hard=previous_hard,
     )
     scenario = draft.get("scenario")
     if scenario is not None and scenario.get("week", 1) not in reference_weeks:
@@ -668,6 +680,7 @@ def _validated(
         candidates,
         request.clubs,
         previous_window=request.draft.get("window"),
+        previous_hard=request.draft["hard"],
         reference_weeks=request.reference_weeks,
         locale=request.locale,
     )

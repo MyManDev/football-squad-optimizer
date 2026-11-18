@@ -319,6 +319,77 @@ def test_check_reads_a_reply_that_leaves_out_its_empty_parts(
     assert checked.json() == expected
 
 
+@pytest.mark.parametrize("as_text", [False, True])
+@pytest.mark.parametrize("hard_mode", ["omitted", "null", "clear", "replace"])
+def test_model_reply_preserves_omitted_required_rules_and_allows_explicit_edits(
+    hard_mode: str, as_text: bool
+) -> None:
+    required = [
+        {"kind": "wildcard"},
+        {"kind": "no_hits"},
+        {"kind": "club_count", "club": "Brighton", "count": 3, "scope": "transfers_in"},
+    ]
+    body: dict[str, Any] = {
+        "message": "Mümkünse Salah da olsun.",
+        "locale": "tr",
+        "draft": {"hard": required, "soft": [], "window": 3},
+        "players": [{"id": 1, "name": "Mohamed Salah", "team": "Brighton", "held": True}],
+    }
+    revised: dict[str, Any] = {"soft": [{"kind": "include_player", "player_id": 1}]}
+    expected_hard = required
+    if hard_mode == "null":
+        revised["hard"] = None
+    elif hard_mode == "clear":
+        body["message"] = (
+            "Kesin kurallar\u0131n tamam\u0131n\u0131 kald\u0131r. Mümkünse Salah olsun."
+        )
+        revised["hard"] = expected_hard = []
+    elif hard_mode == "replace":
+        body["message"] = "Wildcard ve Brighton şartlar\u0131n\u0131 kald\u0131r, ceza alma."
+        revised["hard"] = expected_hard = [{"kind": "no_hits"}]
+    reply = {"status": "draft", "draft": revised}
+    service = IntentService(lambda _request: reply)
+    with TestClient(create_app(llmopt_intent=service)) as client:
+        checked = client.post(
+            CHECK,
+            json={"request": body, "reply": json.dumps(reply) if as_text else reply},
+        )
+        prepared = client.post(INTENT, json=body)
+    assert checked.status_code == prepared.status_code == 200
+    assert (
+        checked.json()
+        == prepared.json()
+        == {
+            "status": "draft",
+            "draft": {
+                "hard": expected_hard,
+                "soft": [{"kind": "include_player", "player_id": 1}],
+                "window": 3,
+            },
+        }
+    )
+    assert body["draft"]["hard"] == required
+
+
+@pytest.mark.parametrize("hard", [None, "keep the rules", {}])
+def test_confirmed_request_still_needs_a_valid_required_rule_list(hard: object) -> None:
+    body = _request()
+    body["draft"]["hard"] = hard
+    with TestClient(create_app()) as client:
+        checked = client.post(CHECK, json={"request": body, "reply": _draft()})
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "VALIDATION_FAILED"
+
+
+def test_confirmed_request_cannot_omit_its_required_rule_list() -> None:
+    body = _request()
+    del body["draft"]["hard"]
+    with TestClient(create_app()) as client:
+        checked = client.post(CHECK, json={"request": body, "reply": _draft()})
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "VALIDATION_FAILED"
+
+
 @pytest.mark.parametrize(
     "reply",
     [

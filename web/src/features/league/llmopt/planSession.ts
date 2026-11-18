@@ -31,11 +31,6 @@ export interface PlanSession {
   clarification?: Clarification;
   confirmation?: PlanConfirmation;
   reference?: PlanRevision;
-  /**
-   * Set when the squad changed under the draft. The rules then outlive the squad they were
-   * written for: a reload under the new squad restores them, and nothing else.
-   */
-  carried?: true;
 }
 
 export interface PlanSessionContext {
@@ -52,7 +47,7 @@ export function readPlanSession(context: PlanSessionContext): unknown {
     if (saved?.deadline !== context.deadline) return null;
     if (saved.basis === context.basis) return saved;
     // The plans and the reference belonged to the old squad; the rules are the member's.
-    return saved.carried === true ? { draft: saved.draft } : null;
+    return { draft: saved.draft };
   } catch {
     return null;
   }

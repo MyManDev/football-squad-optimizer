@@ -15,8 +15,9 @@ export interface CombinedPlan {
  * is due.
  *
  * It is due once at least two accepted rules each priced a plan of their own, or when a rule
- * had no slot of its own. It tries every accepted rule (priced within its limit) and every rule
- * that had no slot. The single prices must be in: a review still pending gives null.
+ * had no slot of its own and has no point-loss limit. It tries every accepted rule (priced
+ * within its limit) and every unbounded rule that had no slot. A bounded rule needs its own
+ * verified price. The single prices must be in: a review still pending gives null.
  */
 export function combinedCandidates(run: PlanRun, review: readonly PriceReview[]): number[] | null {
   if (run.scenario || !run.prices.length || review.length !== run.prices.length) return null;
@@ -26,7 +27,9 @@ export function combinedCandidates(run: PlanRun, review: readonly PriceReview[])
   const accepted = review.flatMap(({ price }, index) =>
     price.status === "priced" && !price.aboveCeiling ? [index] : [],
   );
-  const unslotted = outcomes.flatMap((outcome, index) => (outcome === "skipped" ? [index] : []));
+  const unslotted = outcomes.flatMap((outcome, index) =>
+    outcome === "skipped" && run.prices[index]?.rule.max_cost_tenths === undefined ? [index] : [],
+  );
   const ownPlans = new Set(
     accepted.flatMap((index) => {
       const outcome = outcomes[index];
@@ -70,6 +73,8 @@ export function prepareCombined(run: PlanRun, candidates: readonly number[]): Co
   let combined: PlanRequest | null = null;
   for (const index of candidates) {
     if (applied.includes(index)) continue;
+    const target = run.prices[index];
+    if (target?.outcome === "skipped" && target.rule.max_cost_tenths !== undefined) continue;
     const next = fit([...applied, index]);
     if (!next) continue;
     applied = [...applied, index];
