@@ -1,4 +1,4 @@
-"""The keyless LLMOPT routes send the site provider's call and give prepare()'s verdict."""
+"""The keyless LLMOPT routes write the call for a member's model and check its reply."""
 
 import json
 import logging
@@ -10,11 +10,8 @@ from fastapi.testclient import TestClient
 from squadopt.api.app import create_app
 from squadopt.platform.llmopt_intent import (
     INTENT_BODY_MAX_BYTES,
-    IntentRequest,
-    IntentService,
-    IntentUnavailable,
-    OpenAIIntentProvider,
-    intent_service_from_environment,
+    IntentValidationError,
+    check_reply,
     parse_intent_request,
 )
 
@@ -177,44 +174,29 @@ def test_clarification_keeps_original_name_when_the_interface_language_changes()
     assert checked.json()["draft"]["comparison"]["player_id"] == 1
 
 
-def test_prompt_is_the_call_the_site_provider_sends(monkeypatch: pytest.MonkeyPatch) -> None:
-    sent: list[dict[str, Any]] = []
-
-    def post(_provider: OpenAIIntentProvider, payload: bytes, _deadline: float) -> bytes:
-        sent.append(json.loads(payload))
-        content = json.dumps(_draft())
-        return json.dumps(
-            {"choices": [{"finish_reason": "stop", "message": {"content": content}}]}
-        ).encode()
-
-    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
-    service = intent_service_from_environment(
-        {"SQUADOPT_LLMOPT_API_KEY": "server-key", "SQUADOPT_LLMOPT_MODEL": "m"}
-    )
+def test_prompt_is_the_neutral_call_with_the_shortlist() -> None:
     body = _request(roster=300)
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        assert client.post(INTENT, json=body).status_code == 200
+    with TestClient(create_app()) as client:
         prompt = client.post(PROMPT, json=body)
     assert prompt.status_code == 200
     assert prompt.headers["cache-control"] == "no-store"
     call = prompt.json()
     assert set(call) == {"system", "user", "schema", "schema_name", "max_output_tokens"}
-    wire = sent[0]
-    assert call["system"] == wire["messages"][0]["content"]
-    assert call["user"] == wire["messages"][1]["content"]
-    assert call["schema"] == wire["response_format"]["json_schema"]["schema"]
-    assert call["schema_name"] == wire["response_format"]["json_schema"]["name"]
     assert call["schema_name"] == "llmopt_intent_v1"
-    assert call["max_output_tokens"] == wire["max_completion_tokens"]
+    assert call["max_output_tokens"] == 1200
+    assert call["schema"]["required"] == ["status", "draft", "message"]
+    asked = json.loads(call["user"])
+    assert asked["message"] == body["message"]
+    assert asked["clarification"] == body["clarification"]
     # The user message carries the shortlist, not the full roster.
-    assert [player["id"] for player in json.loads(call["user"])["players"]] == [1]
+    assert [player["id"] for player in asked["players"]] == [1]
 
 
-def _verdict_from_prepare(body: dict[str, Any], reply: object) -> dict[str, Any] | None:
-    service = IntentService(lambda _request: reply)
+def _verdict(body: dict[str, Any], reply: object) -> dict[str, Any] | None:
+    """What the validator makes of the reply, or None when it refuses it."""
     try:
-        return service.prepare(parse_intent_request(body), "visitor")
-    except IntentUnavailable:
+        return check_reply(parse_intent_request(body), reply)
+    except IntentValidationError:
         return None
 
 
@@ -233,9 +215,11 @@ def _verdict_from_prepare(body: dict[str, Any], reply: object) -> dict[str, Any]
     ],
 )
 @pytest.mark.parametrize("as_text", [False, True])
-def test_check_gives_the_same_verdict_as_prepare(name: str, reply: object, as_text: bool) -> None:
+def test_check_gives_the_validator_verdict_for_text_and_for_json(
+    name: str, reply: object, as_text: bool
+) -> None:
     body = _request(roster=300)
-    expected = _verdict_from_prepare(body, reply)
+    expected = _verdict(body, reply)
     with TestClient(create_app()) as client:
         checked = client.post(
             CHECK, json={"request": body, "reply": json.dumps(reply) if as_text else reply}
@@ -293,10 +277,10 @@ def test_a_request_carrying_a_key_is_refused(route: str, header: dict[str, str])
     assert "test" not in refused.text
 
 
-def test_keyless_routes_work_without_a_site_key_and_leave_intent_disabled() -> None:
-    assert intent_service_from_environment({}) is None
-    with TestClient(create_app(llmopt_intent=intent_service_from_environment({}))) as client:
-        assert client.post(INTENT, json=_request()).json()["error"]["code"] == "LLMOPT_DISABLED"
+def test_keyless_routes_need_no_setting_and_the_backend_has_no_model_route() -> None:
+    with TestClient(create_app()) as client:
+        # The site calls no model: the route that did is gone, not switched off.
+        assert client.post(INTENT, json=_request()).status_code == 404
         assert client.post(PROMPT, json=_request()).status_code == 200
         checked = client.post(CHECK, json={"request": _request(), "reply": _draft()})
     assert checked.status_code == 200
@@ -330,27 +314,6 @@ def test_each_keyless_route_has_its_own_per_visitor_minute() -> None:
         assert limited.headers["retry-after"] == "60"
         check = {"request": _request(), "reply": _draft()}
         assert client.post(CHECK, json=check).status_code == 200
-
-
-def test_keyless_routes_never_use_the_site_budget_or_provider() -> None:
-    calls = 0
-
-    def provider(request: IntentRequest) -> object:
-        nonlocal calls
-        calls += 1
-        assert request.locale == "tr"
-        return _draft()
-
-    service = IntentService(provider, per_minute=1, per_day=1)
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        for _ in range(5):
-            assert client.post(PROMPT, json=_request()).status_code == 200
-            check = {"request": _request(), "reply": _draft()}
-            assert client.post(CHECK, json=check).status_code == 200
-        assert calls == 0
-        assert client.post(INTENT, json=_request()).status_code == 200
-        assert client.post(INTENT, json=_request()).status_code == 429
-    assert calls == 1
 
 
 def test_keyless_routes_never_log_the_member_text(caplog: pytest.LogCaptureFixture) -> None:
@@ -473,26 +436,22 @@ def test_model_reply_preserves_omitted_required_rules_and_allows_explicit_edits(
         body["message"] = "Wildcard ve Brighton şartlar\u0131n\u0131 kald\u0131r, ceza alma."
         revised["hard"] = expected_hard = [{"kind": "no_hits"}]
     reply = {"status": "draft", "draft": revised}
-    service = IntentService(lambda _request: reply)
-    with TestClient(create_app(llmopt_intent=service)) as client:
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
         checked = client.post(
             CHECK,
             json={"request": body, "reply": json.dumps(reply) if as_text else reply},
         )
-        prepared = client.post(INTENT, json=body)
-    assert checked.status_code == prepared.status_code == 200
-    assert (
-        checked.json()
-        == prepared.json()
-        == {
-            "status": "draft",
-            "draft": {
-                "hard": expected_hard,
-                "soft": [{"kind": "include_player", "player_id": 1}],
-                "window": 3,
-            },
-        }
-    )
+    assert prompt.status_code == checked.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
+    assert checked.json() == {
+        "status": "draft",
+        "draft": {
+            "hard": expected_hard,
+            "soft": [{"kind": "include_player", "player_id": 1}],
+            "window": 3,
+        },
+    }
     assert body["draft"]["hard"] == required
 
 
@@ -537,12 +496,13 @@ def test_partial_hard_rule_edit_preserves_wish_cost_bank_floor_and_frozen_weeks(
         "reference_weeks": [1, 2, 3],
     }
     reply = {"status": "draft", "draft": revised}
-    with TestClient(create_app(llmopt_intent=IntentService(lambda _request: reply))) as client:
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
         checked = client.post(CHECK, json={"request": body, "reply": reply})
-        prepared = client.post(INTENT, json=body)
-    assert checked.status_code == prepared.status_code == 200
+    assert prompt.status_code == checked.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
     expected = {"status": "draft", "draft": {**original, "hard": hard}}
-    assert checked.json() == prepared.json() == expected
+    assert checked.json() == expected
 
 
 def test_explicit_empty_lists_clear_reviewed_wishes_and_frozen_weeks() -> None:
@@ -590,12 +550,13 @@ def test_partial_reply_keeps_optional_selection_until_explicit_null(
         "status": "draft",
         "draft": {"hard": [{"kind": "no_hits"}], **({field: None} if clear else {})},
     }
-    with TestClient(create_app(llmopt_intent=IntentService(lambda _request: reply))) as client:
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
         checked = client.post(CHECK, json={"request": body, "reply": reply})
-        prepared = client.post(INTENT, json=body)
-    assert checked.status_code == prepared.status_code == 200
+    assert prompt.status_code == checked.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
     expected = {key: value for key, value in original.items() if not clear or key != field}
-    assert checked.json() == prepared.json() == {"status": "draft", "draft": expected}
+    assert checked.json() == {"status": "draft", "draft": expected}
 
 
 def test_retained_frozen_week_still_requires_a_solved_reference() -> None:
@@ -633,13 +594,11 @@ def test_conflicting_editable_club_counts_can_be_corrected_through_chat(
         if clarify
         else {"status": "draft", "draft": {"hard": [general]}}
     )
-    with TestClient(create_app(llmopt_intent=IntentService(lambda _request: reply))) as client:
+    with TestClient(create_app()) as client:
         prompt = client.post(PROMPT, json=body)
         checked = client.post(CHECK, json={"request": body, "reply": reply})
-        prepared = client.post(INTENT, json=body)
-    assert prompt.status_code == checked.status_code == prepared.status_code == 200
+    assert prompt.status_code == checked.status_code == 200
     assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
-    assert checked.json() == prepared.json()
     if clarify:
         assert checked.json() == reply
     else:
@@ -662,13 +621,13 @@ def test_a_model_must_resolve_conflicting_club_counts_before_the_draft_is_accept
         "draft": {"hard": [general, {**general, "count": 2, "week": 2}], "soft": [], "window": 3},
     }
     reply = {"status": "draft", "draft": {"hard": body["draft"]["hard"]}}
-    with TestClient(create_app(llmopt_intent=IntentService(lambda _request: reply))) as client:
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
         checked = client.post(CHECK, json={"request": body, "reply": reply})
-        prepared = client.post(INTENT, json=body)
+    assert prompt.status_code == 200
+    assert json.loads(prompt.json()["user"])["draft"] == body["draft"]
     assert checked.status_code == 422
     assert checked.json()["error"]["code"] == "REPLY_REFUSED"
-    assert prepared.status_code == 503
-    assert prepared.json()["error"]["code"] == "LLMOPT_UNAVAILABLE"
 
 
 @pytest.mark.parametrize(

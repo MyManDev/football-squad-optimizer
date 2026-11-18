@@ -1,35 +1,44 @@
-"""Intent preparation validates the model output without submitting a solve."""
+"""A model's reply becomes a draft only through the check, which submits no solve.
+
+Each test speaks as the page does: it asks for the prompt, lets a stand-in model answer the
+request that prompt carries, and has the reply checked.
+"""
 
 import json
-from datetime import UTC, datetime, timedelta
-from email.utils import format_datetime
-from pathlib import Path
-from types import SimpleNamespace
+from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from squadopt.api.app import create_app
+from squadopt.api.llmopt import intent_routes
 from squadopt.platform.llmopt_intent import (
-    INTENT_BODY_MAX_BYTES,
-    INTENT_BUDGET_FILE,
     IntentClarification,
-    IntentLimited,
     IntentRequest,
-    IntentService,
-    IntentUnavailable,
-    OpenAIIntentProvider,
-    intent_service_from_environment,
+    parse_intent_request,
 )
 
-URL = "/api/v1/llmopt/intent"
+PROMPT = "/api/v1/llmopt/prompt"
+CHECK = "/api/v1/llmopt/check"
 
 
-@pytest.fixture(autouse=True)
-def _no_pause_between_rounds(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("squadopt.platform.llmopt_intent._ROUND_PAUSE_SECONDS", 0)
+def _interpret(body: dict[str, Any], model: Callable[[IntentRequest], object]) -> Any:
+    """One message as the page sends it: the prompt, the model's reply to it, the check.
+
+    ``model`` gets the request as the prompt carries it, its players the shortlist. A body
+    the prompt refuses never reaches the model, and that refusal is the answer.
+    """
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=body)
+        if prompt.status_code != 200:
+            return prompt
+        shortlist = tuple(json.loads(prompt.json()["user"])["players"])
+        asked = replace(parse_intent_request(body), players=shortlist)
+        return client.post(CHECK, json={"request": body, "reply": model(asked)})
 
 
 def _request() -> dict[str, Any]:
@@ -39,42 +48,6 @@ def _request() -> dict[str, Any]:
         "draft": {"hard": [{"kind": "no_hits"}], "soft": []},
         "players": [{"id": 1, "name": "Mohamed Salah", "team": "LIV", "held": True}],
     }
-
-
-@pytest.mark.parametrize(
-    ("header", "expected"),
-    [("27", 27), (None, 60), ("invalid", 60), ("http-date", 90)],
-)
-def test_upstream_rate_limit_returns_retry_after(
-    monkeypatch: pytest.MonkeyPatch, header: str | None, expected: int
-) -> None:
-    retry_after = (
-        format_datetime(datetime.now(UTC) + timedelta(seconds=expected), usegmt=True)
-        if header == "http-date"
-        else header
-    )
-
-    def connection(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
-        return SimpleNamespace(
-            request=lambda *_args, **_kwargs: None,
-            getresponse=lambda: SimpleNamespace(
-                status=429, getheader={"Retry-After": retry_after}.get
-            ),
-            close=lambda: None,
-        )
-
-    monkeypatch.setattr("squadopt.platform.llmopt_intent.HTTPSConnection", connection)
-    provider = OpenAIIntentProvider(api_key="test-key", model="test-model", provider="gemini")
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 429
-    assert response.json()["error"]["code"] == "RATE_LIMITED"
-    assert response.headers["cache-control"] == "no-store"
-    seconds = int(response.headers["retry-after"])
-    if header == "http-date":
-        assert expected - 5 <= seconds <= expected
-    else:
-        assert seconds == expected
 
 
 def _proposed(player_id: int = 1) -> dict[str, Any]:
@@ -96,8 +69,7 @@ def test_prepares_comparison_and_preserves_hard_constraints() -> None:
         assert request.players == tuple(_request()["players"])
         return _proposed()
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
+    response = _interpret(_request(), provider)
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
     assert response.json() == {
@@ -114,8 +86,7 @@ def test_response_asks_a_question_instead_of_returning_a_partial_draft() -> None
     def provider(_request: IntentRequest) -> object:
         return {"status": "clarification", "draft": None, "message": "Hangi oyuncu?"}
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
+    response = _interpret(_request(), provider)
     assert response.status_code == 200
     assert response.json() == {"status": "clarification", "message": "Hangi oyuncu?"}
 
@@ -142,8 +113,7 @@ def test_revision_interprets_a_frozen_week_and_a_bank_floor(reference_weeks: lis
         "message": "İlk haftay\u0131 koru, ikinci hafta sonunda £0,5m kals\u0131n.",
         "reference_weeks": reference_weeks,
     }
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=body)
+    response = _interpret(body, provider)
     assert response.status_code == 200
     if 1 in reference_weeks:
         assert response.json() == {
@@ -195,12 +165,11 @@ def test_interprets_a_scenario_using_the_captured_reference(
         "reference_weeks": [1, 2, 3],
         "reference_captains": [{"week": 1, "player_id": 1}],
     }
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=body)
-        assert response.status_code == 200
-        assert response.json()["draft"]["scenario"] == canonical
-        unknown = body | {"reference_captains": [{"week": 1, "player_id": 2}]}
-        assert client.post(URL, json=unknown).status_code == 422
+    response = _interpret(body, provider)
+    assert response.status_code == 200
+    assert response.json()["draft"]["scenario"] == canonical
+    unknown = body | {"reference_captains": [{"week": 1, "player_id": 2}]}
+    assert _interpret(unknown, provider).status_code == 422
 
 
 def test_wildcard_is_a_chip_instruction_with_no_player_id() -> None:
@@ -221,8 +190,7 @@ def test_wildcard_is_a_chip_instruction_with_no_player_id() -> None:
 
     body = _request()
     body["message"] = "Wildcard kullan, Salah kadroda kals\u0131n."
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=body)
+    response = _interpret(body, provider)
     assert response.status_code == 200
     assert response.json()["draft"]["hard"] == [
         {"kind": "wildcard"},
@@ -269,23 +237,22 @@ def test_three_week_draft_preserves_exact_transfer_and_membership_intents(
         "draft": {"hard": [], "soft": [], "window": 1},
         "players": [*_request()["players"], {"id": 2, "name": "Bukayo Saka", "team": "Arsenal"}],
     }
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=body)
-        assert response.status_code == 200
-        assert response.json() == {"status": "draft", "draft": expected}
-        follow_up = client.post(
-            URL,
-            json={
-                **body,
-                "message": "Üçüncü hafta chip kullanma",
-                "draft": response.json()["draft"],
-            },
-        )
-        assert follow_up.status_code == 200
-        assert follow_up.json()["draft"] == {
-            **expected,
-            "hard": [*expected["hard"], {"kind": "save_chips", "week": 3}],
-        }
+    response = _interpret(body, provider)
+    assert response.status_code == 200
+    assert response.json() == {"status": "draft", "draft": expected}
+    follow_up = _interpret(
+        {
+            **body,
+            "message": "Üçüncü hafta chip kullanma",
+            "draft": response.json()["draft"],
+        },
+        provider,
+    )
+    assert follow_up.status_code == 200
+    assert follow_up.json()["draft"] == {
+        **expected,
+        "hard": [*expected["hard"], {"kind": "save_chips", "week": 3}],
+    }
 
 
 @pytest.mark.parametrize(
@@ -308,8 +275,7 @@ def test_invalid_week_or_penalty_budget_never_reaches_provider(draft: dict[str, 
     def provider(_request: IntentRequest) -> object:
         pytest.fail("Invalid scheduled draft reached the provider.")
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json={**_request(), "draft": {"soft": [], **draft}})
+    response = _interpret({**_request(), "draft": {"soft": [], **draft}}, provider)
     assert response.status_code == 422
 
 
@@ -336,8 +302,7 @@ def test_same_rule_in_two_weeks_and_zero_total_budget_are_preserved() -> None:
             "message": None,
         }
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json={**_request(), "draft": draft})
+    response = _interpret({**_request(), "draft": draft}, provider)
     assert response.status_code == 200
     assert response.json() == {"status": "draft", "draft": draft}
 
@@ -393,23 +358,22 @@ def test_prices_one_named_soft_rule_without_weakening_hard_wildcard_and_club_req
             {"id": 3, "name": "Brighton Player", "team": "Brighton"},
         ],
     }
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=body)
-        assert response.status_code == 200
-        assert response.json() == {"status": "draft", "draft": expected}
-        follow_up = client.post(
-            URL,
-            json={
-                **body,
-                "message": "Saka için hiç puan kaybetme, diğer tercihler ayn\u0131.",
-                "draft": response.json()["draft"],
-            },
-        )
-        assert follow_up.status_code == 200
-        assert follow_up.json()["draft"] == {
-            **expected,
-            "soft": [{**expected["soft"][0], "max_cost_tenths": 0}, expected["soft"][1]],
-        }
+    response = _interpret(body, provider)
+    assert response.status_code == 200
+    assert response.json() == {"status": "draft", "draft": expected}
+    follow_up = _interpret(
+        {
+            **body,
+            "message": "Saka için hiç puan kaybetme, diğer tercihler ayn\u0131.",
+            "draft": response.json()["draft"],
+        },
+        provider,
+    )
+    assert follow_up.status_code == 200
+    assert follow_up.json()["draft"] == {
+        **expected,
+        "soft": [{**expected["soft"][0], "max_cost_tenths": 0}, expected["soft"][1]],
+    }
 
 
 @pytest.mark.parametrize(
@@ -434,8 +398,7 @@ def test_refuses_misplaced_or_invalid_wish_cost_in_confirmed_draft(
     preference = {"kind": "keep_player", "player_id": 1, "max_cost_tenths": allowance}
     draft: dict[str, Any] = {"hard": [], "soft": []}
     draft[section] = preference if section == "comparison" else [preference]
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json={**_request(), "draft": draft})
+    response = _interpret({**_request(), "draft": draft}, provider)
     assert response.status_code == 422
 
 
@@ -448,9 +411,9 @@ def test_provider_must_not_attach_cost_to_a_requirement_or_comparison(section: s
         rule["max_cost_tenths"] = 15
         return result
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 503
+    response = _interpret(_request(), provider)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "REPLY_REFUSED"
 
 
 @pytest.mark.parametrize(
@@ -500,8 +463,7 @@ def test_club_request_uses_canonical_name_and_keeps_both_scopes_distinct(
             "message": None,
         }
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=body)
+    response = _interpret(body, provider)
     assert response.status_code == 200
     assert response.json()["draft"]["hard"] == [
         {"kind": "no_hits"},
@@ -534,10 +496,9 @@ def test_club_constraint_refuses_invented_or_invalid_fields(override: dict[str, 
         }
         return result
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "LLMOPT_UNAVAILABLE"
+    response = _interpret(_request(), provider)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "REPLY_REFUSED"
 
 
 def test_confirmed_club_rules_stay_canonical() -> None:
@@ -551,8 +512,7 @@ def test_confirmed_club_rules_stay_canonical() -> None:
         assert request.draft == body["draft"]
         return {"status": "clarification", "draft": None, "message": "Which plan?"}
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        assert client.post(URL, json=body).status_code == 200
+    assert _interpret(body, provider).status_code == 200
 
 
 @pytest.mark.parametrize("kind", ["keep_player", "avoid_player"])
@@ -562,17 +522,16 @@ def test_model_comparison_accepts_either_side_for_a_held_player(kind: str) -> No
         result["draft"]["comparison"]["kind"] = kind
         return result
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
-        assert response.status_code == 200
-        assert response.json()["draft"] == {
-            "hard": [{"kind": "no_hits"}],
-            "soft": [],
-            "comparison": {"kind": "include_player", "player_id": 1, "both": True},
-        }
-        invalid = _request()
-        invalid["draft"]["comparison"] = {"kind": kind, "player_id": 1, "both": True}
-        assert client.post(URL, json=invalid).status_code == 422
+    response = _interpret(_request(), provider)
+    assert response.status_code == 200
+    assert response.json()["draft"] == {
+        "hard": [{"kind": "no_hits"}],
+        "soft": [],
+        "comparison": {"kind": "include_player", "player_id": 1, "both": True},
+    }
+    invalid = _request()
+    invalid["draft"]["comparison"] = {"kind": kind, "player_id": 1, "both": True}
+    assert _interpret(invalid, provider).status_code == 422
 
 
 @pytest.mark.parametrize(
@@ -589,10 +548,9 @@ def test_rejects_invalid_provider_draft(comparison: dict[str, Any]) -> None:
         result["draft"]["comparison"] = comparison
         return result
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "LLMOPT_UNAVAILABLE"
+    response = _interpret(_request(), provider)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "REPLY_REFUSED"
 
 
 def test_full_roster_is_shortlisted_before_provider_call() -> None:
@@ -607,8 +565,7 @@ def test_full_roster_is_shortlisted_before_provider_call() -> None:
         assert tuple(player["id"] for player in request.players) == (1,)
         return _proposed()
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=body)
+    response = _interpret(body, provider)
     assert response.status_code == 200
 
 
@@ -627,8 +584,7 @@ def test_full_roster_includes_unheld_player_with_turkish_object_suffix(message: 
         assert tuple(player["id"] for player in request.players) == (1,)
         return _proposed()
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=body)
+    response = _interpret(body, provider)
     assert response.status_code == 200
 
 
@@ -652,8 +608,7 @@ def test_answer_uses_original_request_and_reply_in_shortlist() -> None:
         assert tuple(player["id"] for player in request.players) == (2, 1)
         return _proposed(2)
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=body)
+    response = _interpret(body, provider)
     assert response.status_code == 200
     assert response.json()["draft"]["comparison"]["player_id"] == 2
 
@@ -672,8 +627,7 @@ def test_rejects_oversized_or_undeclared_clarification(clarification: object) ->
     def provider(_request: IntentRequest) -> object:
         pytest.fail("Malformed clarification reached the provider.")
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json={**_request(), "clarification": clarification})
+    response = _interpret({**_request(), "clarification": clarification}, provider)
     assert response.status_code == 422
 
 
@@ -683,94 +637,18 @@ def test_refuses_constraint_repeated_across_strengths() -> None:
         proposal["draft"]["soft"] = list(proposal["draft"]["hard"])
         return proposal
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "LLMOPT_UNAVAILABLE"
+    response = _interpret(_request(), provider)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "REPLY_REFUSED"
 
 
-def test_validation_and_rate_limits_do_not_call_provider() -> None:
-    calls = 0
-
-    def provider(_request: IntentRequest) -> object:
-        nonlocal calls
-        calls += 1
-        return _proposed()
-
-    with TestClient(create_app(llmopt_intent=IntentService(provider, per_minute=1))) as client:
-        assert client.post(URL, content="{}").status_code == 415
-        headers = {"Content-Type": "application/json"}
-        assert (
-            client.post(
-                URL, content=b"x" * (INTENT_BODY_MAX_BYTES + 1), headers=headers
-            ).status_code
-            == 413
-        )
-        assert (
-            client.post(URL, content='{"draft":{},"draft":{}}', headers=headers).status_code == 422
-        )
-        assert client.post(URL, json={**_request(), "model": "arbitrary"}).status_code == 422
-        assert calls == 0
-        assert client.post(URL, json=_request()).status_code == 200
-        limited = client.post(URL, json=_request())
-        assert limited.status_code == 429
-        assert limited.headers["retry-after"] == "60"
-        assert calls == 1
-
-
-def test_daily_budget_survives_a_restart_and_waits_only_to_the_window_end(
-    tmp_path: Path,
-) -> None:
-    now = [1_800_000_000.0]
-    path = tmp_path / INTENT_BUDGET_FILE
-
-    def service() -> IntentService:
-        return IntentService(
-            lambda _request: _proposed(), per_day=2, daily_budget_path=path, clock=lambda: now[0]
-        )
-
-    with TestClient(create_app(llmopt_intent=service())) as client:
-        assert client.post(URL, json=_request()).status_code == 200
-        now[0] += 3600
-        assert client.post(URL, json=_request()).status_code == 200
-        now[0] += 1800
-        limited = client.post(URL, json=_request())
-    assert limited.status_code == 429
-    assert limited.headers["retry-after"] == str(86400 - 5400)
-    stored = json.loads(path.read_text(encoding="utf-8"))
-    assert stored == {"count": 2, "version": 1, "window_started_unix": 1_800_000_000.0}
-
-    now[0] += 600
-    with TestClient(create_app(llmopt_intent=service())) as restarted:
-        limited = restarted.post(URL, json=_request())
-        assert limited.status_code == 429
-        assert limited.headers["retry-after"] == str(86400 - 6000)
-        now[0] = 1_800_000_000.0 + 86400
-        assert restarted.post(URL, json=_request()).status_code == 200
-    assert json.loads(path.read_text(encoding="utf-8"))["count"] == 1
-
-
-def test_unreadable_daily_budget_file_starts_a_new_window(tmp_path: Path) -> None:
-    path = tmp_path / INTENT_BUDGET_FILE
-    path.write_text('{"version": 1, "count": "many"}', encoding="utf-8")
-    service = IntentService(lambda _request: _proposed(), per_day=1, daily_budget_path=path)
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        assert client.post(URL, json=_request()).status_code == 200
-        assert client.post(URL, json=_request()).status_code == 429
-    assert json.loads(path.read_text(encoding="utf-8"))["count"] == 1
-
-
-def test_environment_service_counts_the_day_under_the_store_root(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setattr(OpenAIIntentProvider, "__call__", lambda _self, _request: _proposed())
-    service = intent_service_from_environment(
-        {"SQUADOPT_LLMOPT_API_KEY": "server-key", "SQUADOPT_LLMOPT_MODEL": "m"},
-        store_root=tmp_path,
-    )
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        assert client.post(URL, json=_request()).status_code == 200
-    assert json.loads((tmp_path / INTENT_BUDGET_FILE).read_text(encoding="utf-8"))["count"] == 1
+def test_a_request_that_does_not_hold_gets_no_prompt() -> None:
+    headers = {"Content-Type": "application/json"}
+    with TestClient(create_app()) as client:
+        repeated = client.post(PROMPT, content='{"draft":{},"draft":{}}', headers=headers)
+        assert repeated.status_code == 422
+        assert client.post(PROMPT, json={**_request(), "model": "arbitrary"}).status_code == 422
+        assert client.post(PROMPT, json=_request()).status_code == 200
 
 
 # Cloudflare appends the visitor's address to X-Forwarded-For, cloudflared passes it on,
@@ -780,14 +658,19 @@ def test_environment_service_counts_the_day_under_the_store_root(
 _GATEWAY = "172.18.0.1"
 
 
+def _one_a_minute(peer: str) -> TestClient:
+    """The keyless routes at one request a minute per visitor, behind the trusted gateway."""
+    routes = FastAPI()
+    routes.include_router(intent_routes(keyless_per_minute=1))
+    return TestClient(ProxyHeadersMiddleware(routes, trusted_hosts=_GATEWAY), client=(peer, 43210))
+
+
 def test_visitors_behind_the_trusted_proxy_get_separate_buckets() -> None:
-    service = IntentService(lambda _request: _proposed(), per_minute=1)
-    app = ProxyHeadersMiddleware(create_app(llmopt_intent=service), trusted_hosts=_GATEWAY)
-    with TestClient(app, client=(_GATEWAY, 43210)) as proxy:
+    with _one_a_minute(_GATEWAY) as proxy:
 
         def post(forwarded_for: str) -> int:
             return proxy.post(
-                URL, json=_request(), headers={"X-Forwarded-For": forwarded_for}
+                PROMPT, json=_request(), headers={"X-Forwarded-For": forwarded_for}
             ).status_code
 
         assert post("198.51.100.7") == 200
@@ -801,208 +684,11 @@ def test_visitors_behind_the_trusted_proxy_get_separate_buckets() -> None:
 
 
 def test_forwarded_header_from_an_untrusted_peer_is_ignored() -> None:
-    service = IntentService(lambda _request: _proposed(), per_minute=1)
-    app = ProxyHeadersMiddleware(create_app(llmopt_intent=service), trusted_hosts=_GATEWAY)
-    with TestClient(app, client=("192.0.2.50", 43210)) as direct:
-        first = direct.post(URL, json=_request(), headers={"X-Forwarded-For": "198.51.100.60"})
-        spoofed = direct.post(URL, json=_request(), headers={"X-Forwarded-For": "198.51.100.61"})
+    with _one_a_minute("192.0.2.50") as direct:
+        first = direct.post(PROMPT, json=_request(), headers={"X-Forwarded-For": "198.51.100.60"})
+        spoofed = direct.post(PROMPT, json=_request(), headers={"X-Forwarded-For": "198.51.100.61"})
     assert first.status_code == 200
     assert spoofed.status_code == 429
-
-
-def test_unconfigured_endpoint_leaves_backend_healthy() -> None:
-    assert intent_service_from_environment({"OPENAI_API_KEY": "ambient-key"}) is None
-    assert (
-        intent_service_from_environment(
-            {"SQUADOPT_LLMOPT_API_KEY": "invalid\nkey", "SQUADOPT_LLMOPT_MODEL": "test"}
-        )
-        is None
-    )
-    with TestClient(create_app()) as client:
-        response = client.post(URL, json=_request())
-        assert response.status_code == 503
-        assert response.json()["error"]["code"] == "LLMOPT_DISABLED"
-        assert client.get("/health").status_code == 200
-
-
-@pytest.mark.parametrize("provider", ["openai", "gemini"])
-def test_provider_sends_strict_schema_and_handles_wire_without_network(
-    monkeypatch: pytest.MonkeyPatch,
-    provider: str,
-) -> None:
-    def post(_provider: OpenAIIntentProvider, payload: bytes, _deadline: float) -> bytes:
-        body = json.loads(payload)
-        assert body["model"] == "selected-model"
-        if provider == "gemini":
-            assert body["reasoning_effort"] == "minimal"
-            assert "store" not in body
-        else:
-            assert body["store"] is False
-            assert "reasoning_effort" not in body
-        schema = body["response_format"]["json_schema"]
-        assert schema["strict"] is True
-        assert "oneOf" not in schema["schema"]
-        draft_properties = schema["schema"]["properties"]["draft"]["anyOf"][0]["properties"]
-        assert draft_properties["window"]["enum"] == [1, 3, None]
-        constraint = draft_properties["hard"]["items"]
-        assert {"club_count", "buy_player", "hit_budget"} <= set(
-            constraint["properties"]["kind"]["enum"]
-        )
-        assert {"club", "count", "scope", "week", "points"} <= set(constraint["required"])
-        soft_constraint = draft_properties["soft"]["items"]
-        assert soft_constraint["properties"]["max_cost_tenths"] == {"type": ["integer", "null"]}
-        assert "max_cost_tenths" in soft_constraint["required"]
-        assert "max_cost_tenths" not in constraint["properties"]
-        assert "max_cost_tenths" not in draft_properties["comparison"]["anyOf"][0]["properties"]
-        context = json.loads(body["messages"][1]["content"])
-        assert context["message"] == "The Liverpool player"
-        assert context["clubs"] == ["LIV"]
-        assert context["clarification"] == {
-            "message": "Compare Salah in and out",
-            "question": "Which player?",
-        }
-        return json.dumps(
-            {
-                "choices": [
-                    {"finish_reason": "stop", "message": {"content": json.dumps(_proposed())}}
-                ]
-            }
-        ).encode()
-
-    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
-    service = intent_service_from_environment(
-        {
-            "SQUADOPT_LLMOPT_API_KEY": "server-key",
-            "SQUADOPT_LLMOPT_MODEL": "selected-model",
-            "SQUADOPT_LLMOPT_PROVIDER": provider,
-        }
-    )
-    body = {
-        **_request(),
-        "message": "The Liverpool player",
-        "clarification": {"message": "Compare Salah in and out", "question": "Which player?"},
-    }
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        assert client.post(URL, json=body).status_code == 200
-
-
-def _answer() -> bytes:
-    return json.dumps(
-        {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(_proposed())}}]}
-    ).encode()
-
-
-def _fallback_service(
-    monkeypatch: pytest.MonkeyPatch, outcomes: dict[str, Exception | bytes]
-) -> tuple[IntentService, list[str]]:
-    asked: list[str] = []
-
-    def post(_provider: OpenAIIntentProvider, payload: bytes, _deadline: float) -> bytes:
-        model = json.loads(payload)["model"]
-        asked.append(model)
-        outcome = outcomes[model]
-        if isinstance(outcome, Exception):
-            raise outcome
-        return outcome
-
-    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
-    service = intent_service_from_environment(
-        {
-            "SQUADOPT_LLMOPT_API_KEY": "server-key",
-            "SQUADOPT_LLMOPT_MODEL": "first",
-            "SQUADOPT_LLMOPT_PROVIDER": "gemini",
-            "SQUADOPT_LLMOPT_FALLBACK_MODELS": "second, third",
-        }
-    )
-    assert service is not None
-    return service, asked
-
-
-def test_a_busy_model_hands_the_call_to_the_next_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    service, asked = _fallback_service(
-        monkeypatch,
-        {
-            "first": IntentUnavailable("The intent provider did not accept the request."),
-            "second": _answer(),
-        },
-    )
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 200
-    assert response.json()["status"] == "draft"
-    assert asked == ["first", "second"]
-
-
-def test_a_limited_model_hands_the_call_to_the_next_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    service, asked = _fallback_service(
-        monkeypatch, {"first": IntentLimited(40), "second": b"not json", "third": _answer()}
-    )
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 200
-    assert asked == ["first", "second", "third"]
-
-
-def test_every_model_limited_is_a_rate_limit_with_the_shortest_wait(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    service, asked = _fallback_service(
-        monkeypatch,
-        {"first": IntentLimited(40), "second": IntentLimited(15), "third": IntentLimited(90)},
-    )
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 429
-    assert response.headers["retry-after"] == "15"
-    assert asked == ["first", "second", "third"]
-
-
-def test_no_model_answering_is_unavailable_unless_all_were_limited(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    busy = IntentUnavailable("The intent provider did not accept the request.")
-    service, asked = _fallback_service(
-        monkeypatch, {"first": IntentLimited(40), "second": busy, "third": busy}
-    )
-    with TestClient(create_app(llmopt_intent=service)) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 503
-    # The limited model is not asked again; the busy ones are, once.
-    assert asked == ["first", "second", "third", "second", "third"]
-
-
-def test_a_refusal_for_high_demand_is_asked_once_more(monkeypatch: pytest.MonkeyPatch) -> None:
-    replies: list[Exception | bytes] = [
-        IntentUnavailable("The intent provider answered 503."),
-        _answer(),
-    ]
-
-    def post(_provider: OpenAIIntentProvider, _payload: bytes, _deadline: float) -> bytes:
-        reply = replies.pop(0)
-        if isinstance(reply, Exception):
-            raise reply
-        return reply
-
-    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
-    provider = OpenAIIntentProvider(api_key="k", model="only", provider="gemini")
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
-    assert response.status_code == 200
-    assert replies == []
-
-
-@pytest.mark.parametrize("fallbacks", ["first", "a,b,c,d", "bad name"])
-def test_an_invalid_fallback_list_disables_text_interpretation(fallbacks: str) -> None:
-    assert (
-        intent_service_from_environment(
-            {
-                "SQUADOPT_LLMOPT_API_KEY": "server-key",
-                "SQUADOPT_LLMOPT_MODEL": "first",
-                "SQUADOPT_LLMOPT_FALLBACK_MODELS": fallbacks,
-            }
-        )
-        is None
-    )
 
 
 _FILLED: dict[str, Any] = {"club": None, "count": None, "scope": None, "week": None, "points": None}
@@ -1043,8 +729,7 @@ def test_a_field_with_no_meaning_for_the_rule_is_dropped_from_a_model_reply(
         result["draft"][part] = [rule]
         return result
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
+    response = _interpret(_request(), provider)
     assert response.status_code == 200
     kept = {key: value for key, value in rule.items() if key in ("kind", "player_id", "week")}
     if rule["kind"] in ("wildcard", "no_hits"):
@@ -1063,8 +748,7 @@ def test_with_and_without_a_rule_that_is_no_player_is_its_plain_comparison(kind:
         result["draft"]["comparison"] = {**_FILLED, "kind": kind, "player_id": 1, "both": True}
         return result
 
-    with TestClient(create_app(llmopt_intent=IntentService(provider))) as client:
-        response = client.post(URL, json=_request())
+    response = _interpret(_request(), provider)
     assert response.status_code == 200
     assert response.json()["draft"]["comparison"] == {"kind": kind}
 
@@ -1072,33 +756,6 @@ def test_with_and_without_a_rule_that_is_no_player_is_its_plain_comparison(kind:
 def test_the_page_own_request_is_still_held_to_the_exact_shape() -> None:
     body = _request()
     body["draft"] = {"hard": [{"kind": "no_hits", "scope": "squad"}], "soft": []}
-    with TestClient(
-        create_app(llmopt_intent=IntentService(lambda _request: _proposed()))
-    ) as client:
-        response = client.post(URL, json=body)
+    response = _interpret(body, lambda _request: _proposed())
     assert response.status_code == 422
-
-
-def test_a_model_gets_its_share_of_the_deadline_and_the_last_one_the_rest(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    clock = [1000.0]
-    monkeypatch.setattr("squadopt.platform.llmopt_intent.time.monotonic", lambda: clock[0])
-    allowed: list[float] = []
-
-    def post(_provider: OpenAIIntentProvider, payload: bytes, deadline: float) -> bytes:
-        allowed.append(round(deadline - clock[0], 1))
-        if len(allowed) < 3:
-            # The model hangs until its share is spent.
-            clock[0] = deadline
-            raise IntentUnavailable("The intent provider exceeded its response time.")
-        return _answer()
-
-    monkeypatch.setattr(OpenAIIntentProvider, "_post", post)
-    provider = OpenAIIntentProvider(
-        api_key="k", model="first", provider="gemini", fallback_models=["second", "third"]
-    )
-    request = IntentRequest("x", "tr", {"hard": [], "soft": []}, ())
-    assert provider(request) == _proposed()
-    # 35 seconds: a third, then half of what is left, then the rest.
-    assert allowed == [11.7, 11.7, 11.7]
+    assert response.json()["error"]["code"] == "VALIDATION_FAILED"

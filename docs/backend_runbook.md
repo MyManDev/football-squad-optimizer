@@ -104,56 +104,22 @@ SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json
 
 ### LLMOPT text interpretation
 
-Production runs without a site model since 17 November 2026 (ADR 0017): LLMOPT's chat is
-read by each member's own model, the page calls only `/api/v1/llmopt/prompt` and
-`/api/v1/llmopt/check`, and neither needs any setting below. `/etc/squadopt/llmopt.env`
-holds no key. The settings below remain for a deployment that wants `/intent` answered by
-a key of its own.
+The backend calls no model and holds no model key (ADR 0017). LLMOPT's chat is read by each
+member's own model: the member's browser makes the call with the member's key, and the
+backend only writes the call and checks the reply. There is nothing to configure, and the
+API reads no LLMOPT setting. A host that still has `/etc/squadopt/llmopt.env` from before
+18 November 2026 can delete it; the Compose file no longer reads it.
 
-Set both `SQUADOPT_LLMOPT_API_KEY` and `SQUADOPT_LLMOPT_MODEL` in the API process's
-private environment before starting the Uvicorn factory. The configured model must
-support strict Structured Outputs with Chat Completions. The default provider is OpenAI.
-Set `SQUADOPT_LLMOPT_PROVIDER=gemini` to use Google's Gemini endpoint and a Gemini key.
-`SQUADOPT_LLMOPT_FALLBACK_MODELS` names up to three more models of the same provider,
-separated by commas. They are asked in that order when the model before answers that it
-is busy (a 5xx), limited (a 429) or with a reply that is not a draft. Every model shares
-the one 35 second deadline. A free tier answers 503 while a model is in high demand, so
-name at least one fallback there. A list that repeats a model or names more than three
-disables text interpretation, as an invalid model does.
-A native Windows launch via
-`scripts/run_backend_local.ps1` inherits the shell's process environment. Without both
-values the intent endpoint reports `LLMOPT_DISABLED`, and manual plan preferences
-remain available. The advice worker needs neither setting.
+`POST /api/v1/llmopt/prompt` takes the member's message, the draft and the players, and
+returns the call the browser sends to the member's provider: `system`, `user`, `schema`,
+`schema_name` and `max_output_tokens`. The `user` text carries a shortlist of the players,
+not the whole roster. `POST /api/v1/llmopt/check` takes `{"request": ..., "reply": ...}`,
+rebuilds the shortlist and validates the model's reply, answering a draft or one question
+back, or 422 `REPLY_REFUSED`. Neither submits an advice job.
 
-The Compose API service reads `/etc/squadopt/llmopt.env` when present. This
-requires Docker Compose 2.24 or later. On the managed VM, give the file root
-ownership and mode `0600`. Put `SQUADOPT_LLMOPT_API_KEY`, `SQUADOPT_LLMOPT_MODEL`,
-and the optional `SQUADOPT_LLMOPT_PROVIDER` and `SQUADOPT_LLMOPT_FALLBACK_MODELS` in it,
-one assignment per line. A standalone Compose
-launch can set `SQUADOPT_LLMOPT_ENV_FILE` to an absolute path to a different
-private file. The worker does not read this file.
-
-Managed VM candidates and production both load the checked-in Compose API
-service. The release tool regenerates the artifact override and copies its
-release `.env` into candidate and rollback records. Keep the API key in the
-private LLMOPT file. Use `docker compose config --quiet` for a syntax check,
-since printing the full config can display the resolved API environment.
-Recreate the API container after the file changes.
-
-`POST /api/v1/llmopt/intent` sends the submitted text and a limited player shortlist
-to the configured provider. It prepares structured constraints for review and
-does not submit an advice job. Its limits apply per API process. Turning off text
-interpretation requires removing either setting and restarting the API.
-
-`POST /api/v1/llmopt/prompt` and `POST /api/v1/llmopt/check` call no model and need
-neither setting (ADR 0017). `/prompt` takes the same body as `/intent` and returns the
-call a member's browser sends to the member's own provider: `system`, `user`, `schema`,
-`schema_name` and `max_output_tokens`. `/check` takes `{"request": ..., "reply": ...}`,
-rebuilds the shortlist and validates the model's reply as `/intent` does, answering the
-same draft or clarification, or 422 `REPLY_REFUSED`. Both refuse with 400
-`CREDENTIAL_REFUSED` any request carrying an `Authorization`, `x-api-key` or
-`x-goog-api-key` header, allow 20 requests a minute per visitor each, and do not count
-against the daily budget.
+Both routes refuse with 400 `CREDENTIAL_REFUSED` any request carrying an `Authorization`,
+`x-api-key` or `x-goog-api-key` header, and allow 20 requests a minute per visitor each.
+The counts are per API process and are not kept across a restart.
 
 ### VM data root selection
 
