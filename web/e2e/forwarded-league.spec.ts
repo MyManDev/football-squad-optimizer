@@ -224,6 +224,18 @@ test("a typed unlisted league opens from the forwarder, and a member opens with 
   page,
 }) => {
   const asked = await serveSite(page, "up");
+  // This test measures successful read caching. Transient failures may now be retried.
+  await page.route("**/api/v1/fpl/events", (route) => {
+    asked.push("/api/v1/fpl/events");
+    return route.fulfill({
+      headers: MARKED,
+      json: {
+        contract_version: "fpl_events_v1",
+        source_time: "2026-10-19T17:30:00.000Z",
+        events: [],
+      },
+    });
+  });
   await typeLeague(page, LEAGUE);
   await expect(page).toHaveURL(`/league/${LEAGUE}`);
   await expect(page.getByRole("heading", { level: 1, name: FIRST.league.name! })).toBeVisible();
