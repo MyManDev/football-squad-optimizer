@@ -23,7 +23,7 @@ Run-owned jobs use [`backend_jobs_v2.schema.json`](backend_jobs_v2.schema.json).
 terminal `cancelled` and the edges `queued -> cancelled`, `running -> cancelled`; the
 running edge is used only when computation returns, never to interrupt the solver.
 Cancellation carries neither result nor error. V1 records and transitions are unchanged.
-The public view is `advice_job_view_v2` for these jobs: the fields of
+The public view is [`advice_job_view_v2`](advice_job_view_v2.schema.json) for these jobs: the fields of
 [`advice_job_view_v1`](advice_job_view_v1.md), with the additional status `cancelled`.
 The browser treats cancellation as terminal and displays no server diagnostic text.
 

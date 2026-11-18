@@ -54,6 +54,7 @@ it.
 
 | File | Contract | Producer or subject | Tests |
 | --- | --- | --- | --- |
+| `advice_job_view_v2.schema.json`, [run lifecycle](llmopt_run_v1.md) | Run-owned public job views, including terminal cancellation | `AdviceSubmitService.public_job_view` | `tests/unit/test_api_advice_post.py::test_run_owned_public_job_views_conform_in_every_lifecycle_state` |
 | [member_baseline_record_v1.md](member_baseline_record_v1.md) | One independent server baseline per entry and capture, shared by tracked leagues | `src/squadopt/application/advice_record.py`, `src/squadopt/application/league_publication.py` | `tests/unit/test_tracked_baselines.py`, `tests/unit/test_advice_record.py` |
 | `league_member_movement_v1.schema.json` | A member's captured rank movement in the league views | `src/squadopt/application/league_views.py` | `tests/unit/test_league_views.py` |
 | `member_week_horizon_v1.md`, `member_week_horizon_v1.schema.json` | The optional `series-horizon.json` beside a league's scoreboard; published, no page reads it | `src/squadopt/application/weekly_suggestion_eval.py` | `tests/unit/test_member_week_horizon_contract.py`, `tests/unit/test_weekly_suggestion_eval.py` |

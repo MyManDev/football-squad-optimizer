@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from jsonschema import Draft202012Validator
 
 from squadopt.api.app import ADVICE_BODY_MAX_BYTES, create_app
 from squadopt.contracts.plan_infeasibility import PlanInfeasibility
@@ -55,6 +56,45 @@ BODY = {"strategy": "saf-puan", "window": 1}
 
 def _run_ref(identifier="a" * 32, stage="base"):
     return {"contract_version": "llmopt_run_v1", "run_id": identifier, "stage": stage}
+
+
+def test_run_owned_public_job_views_conform_in_every_lifecycle_state(tmp_path):
+    schema = json.loads(
+        Path("docs/contracts/advice_job_view_v2.schema.json").read_text(encoding="utf-8")
+    )
+    validator = Draft202012Validator(schema)
+    client, cache, queue = _world(tmp_path, runs=FileRunStore(tmp_path / "runs"))
+
+    def check(identifier, status):
+        response = client.get(f"/api/v1/advice-jobs/{identifier}")
+        assert response.status_code == 200
+        view = response.json()
+        validator.validate(view)
+        assert view["status"] == status
+        assert "idempotency_key" not in view and "message" not in view
+
+    first = client.post(ADVICE_URL, json={**BODY, "run": _run_ref()}).json()["job_id"]
+    check(first, "queued")
+    job = queue.claim(at_utc="2026-08-27T12:01:00Z")
+    check(first, "running")
+    queue.store(
+        job.transition(
+            "failed",
+            at_utc="2026-08-27T12:01:00Z",
+            error=JobError("ADVICE_FAILED", "Internal detail."),
+        )
+    )
+    check(first, "failed")
+    second = client.post(ADVICE_URL, json={**BODY, "run": _run_ref("b" * 32)}).json()["job_id"]
+    run_advice_worker_once(
+        queue, cache, lambda _: _valid_advice_document(), at_utc="2026-08-27T12:01:00Z"
+    )
+    check(second, "completed")
+    third = client.post(
+        ADVICE_URL, json={**BODY, "preferences": {"no_hits": True}, "run": _run_ref("c" * 32)}
+    ).json()["job_id"]
+    assert client.post(f"/api/v1/llmopt/runs/{'c' * 32}/cancel", json={}).status_code == 200
+    check(third, "cancelled")
 
 
 def test_new_preference_work_requires_identity_but_legacy_cached_answers_remain_readable(tmp_path):
