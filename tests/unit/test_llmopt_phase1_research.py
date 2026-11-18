@@ -1,6 +1,7 @@
 """Research accounting, frozen population and full-resource package validation."""
 
 from dataclasses import replace
+from itertools import combinations
 
 import pytest
 from docs.research.llmopt_phase1 import benchmark, pairs
@@ -28,7 +29,10 @@ def test_rescored_expected_utility_never_inherits_the_surrogate_proof():
     plan = replace(
         plan,
         diagnostics={
-            "expected_lineup_window": {"chosen": "legacy_proposal"},
+            "expected_lineup_window": {
+                "chosen": "legacy_proposal",
+                "candidates": [{"proposal": "legacy_proposal", "utility": 100}],
+            },
             "best_objective_bound": 100,
             "absolute_optimality_gap": 0,
         },
@@ -148,7 +152,8 @@ def test_existing_accounting_refusal_is_recorded_without_fabricating_a_gain():
 
     result = benchmark.timed(refusal, capture_expected_failure=True)
     assert result["solver_status"] == "ERROR"
-    assert result["expected_net_points"] is None
+    assert result["raw_xi_net_points"] is None
+    assert result["expected_lineup_net_points"] is None
     assert result["absolute_gap_points"] is None
     assert result["expected_window"]["candidates"] == []
     with pytest.raises(ValueError):
@@ -156,3 +161,93 @@ def test_existing_accounting_refusal_is_recorded_without_fabricating_a_gain():
             lambda: (_ for _ in ()).throw(ValueError("unexpected input")),
             capture_expected_failure=True,
         )
+
+
+def test_capped_pair_prefix_starts_with_the_highest_disjoint_proxy():
+    # The old ascending combination order put the strongest pair beyond the cap.
+    moves = [(float(i), 0, i, i + 100) for i in range(1, 33)]
+    menu = pairs.package_menu(moves)
+    assert menu[: len(moves)] == [(move,) for move in moves]
+    brute_best = max(sum(m[0] for m in p) for p in combinations(moves, 2))
+    assert sum(m[0] for m in menu[len(moves)]) == brute_best
+    assert menu == pairs.package_menu(moves.copy())
+
+
+def test_summary_keeps_raw_points_scored_net_and_selection_utility_distinct():
+    *_, plan = world()
+    weeks = tuple(replace(w, lineup_expectation={"expected_net_points": 3.5}) for w in plan.weeks)
+    plan = replace(plan, weeks=weeks)
+    result = benchmark.summary(plan, 1, [])
+    assert result["expected_lineup_net_points"] == 10.5
+    assert result["raw_xi_net_points"] == sum(w.projected_score for w in weeks)
+    assert result["selection_utility"] is None
+
+
+@pytest.mark.parametrize("module", [benchmark.expected_window, benchmark.expected_swap, pairs])
+def test_accounting_refusal_records_every_imported_alias(module):
+    with benchmark.accounting_checks() as checks, pytest.raises(ValueError):
+        module.checked_work(3, 1)
+    assert checks == [{"actual": 3, "cap": 1}]
+
+
+def test_pricing_join_reuses_the_completed_result_without_another_solve(monkeypatch):
+    from types import SimpleNamespace
+
+    horizon, state, settings, policy, plan = world()
+    call = SimpleNamespace(horizon=horizon, state=state, settings=settings, policy=policy)
+    request = {"preferences": {}}
+    run = {"base": request, "slots": [{"request": request}], "combined": None, "prices": []}
+    monkeypatch.setattr(benchmark, "schedule", lambda payload: run)
+    executions = []
+
+    def execute(*args, **kwargs):
+        executions.append(True)
+        return benchmark.summary(plan, 1, [])
+
+    monkeypatch.setattr(benchmark, "timed", execute)
+
+    class Queue:
+        def __init__(self, path):
+            self.seen = set()
+
+        def submit_unique(self, job):
+            identity = job.request_fingerprint
+            created = identity not in self.seen
+            self.seen.add(identity)
+            return job, created
+
+    monkeypatch.setattr(benchmark, "FileJobQueue", Queue)
+    result = benchmark.pricing(call, SimpleNamespace(gameweek=1), 1)
+    assert len(executions) == result["backend_jobs"] == 1
+    assert result["job_requests"] == 2
+    assert result["deduplicated_requests"] == 1
+
+
+def test_missing_appearance_data_cannot_silently_remove_a_held_player():
+    frozen, inputs = next(benchmark.snapshots())
+    call = window_call(inputs, min(inputs.members), 3)
+    projection = dict(frozen["projection"])
+    probabilities = dict(projection["appearance_probability"])
+    probabilities.pop(str(call.state.squad_player_ids[0]))
+    projection["appearance_probability"] = probabilities
+    with pytest.raises(ValueError, match="retain every held player"):
+        benchmark.expected_comparison(call, {**frozen, "projection": projection})
+
+
+def test_compact_evidence_keeps_budget_and_thread_disclosures():
+    *_, plan = world()
+    plan = replace(
+        plan,
+        diagnostics={
+            "solver_deterministic_time_limit": 20,
+            "wall_time_limit_seconds": 300,
+            "deterministic_time_budget_exhausted": True,
+        },
+    )
+    calls = [{"backend": "cp-sat", "threads": 1}, {"backend": "highs-native", "threads": None}]
+    compact = benchmark.compact_plan(benchmark.summary(plan, 1, calls))
+    assert compact["solver_limits"]["wall_time_limit_seconds"] == 300
+    assert compact["solver_limits"]["deterministic_time_budget_exhausted"] is True
+    assert compact["reported_thread_counts"] == [1]
+    assert compact["unknown_thread_calls"] == 1
+    assert len(compact["decision_sha256"]) == 64

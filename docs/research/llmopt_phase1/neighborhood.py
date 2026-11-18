@@ -11,8 +11,10 @@ from dataclasses import replace
 from pathlib import Path
 
 from docs.research.llmopt_phase1.benchmark import (
+    GAIN_KEYS,
     HERE,
     ROOT,
+    compact_plan,
     expected_comparison,
     provenance,
     snapshots,
@@ -21,6 +23,16 @@ from docs.research.llmopt_phase1.benchmark import (
 from scripts.measure_window_solver_highs import window_call
 
 from squadopt.planning import PlanningHorizon
+
+DEFAULT_RECORD = HERE.parent / "llmopt_phase1_neighborhood.json"
+
+
+def evidence_directory(output):
+    return (
+        ROOT / "artifacts/llmopt_phase1_neighborhood_v2"
+        if output.resolve() == DEFAULT_RECORD.resolve()
+        else output.parent / (output.stem + "-receipts")
+    )
 
 
 def candidate_ids(call, frozen):
@@ -59,55 +71,42 @@ def measure(output, limit):
             case = f"gw{inputs.gameweek}-{entry}"
             print(f"restricted {case} players={len(ids)}", flush=True)
             result = expected_comparison(call, frozen)
-            write(ROOT / "artifacts/llmopt_phase1_neighborhood" / f"{case}.json", result)
+            write(evidence_directory(output) / f"{case}.json", result)
             row = dict(
                 case=case,
                 candidate_ids=ids,
-                selection_utility_gain_points=result["selection_utility_gain_points"],
-                expected_net_gain_points=result["expected_net_gain_points"],
+                **{
+                    key: result[key]
+                    for key in (
+                        *GAIN_KEYS,
+                        "configured_deterministic_units",
+                        "wall_safety_seconds",
+                        "lineup_evaluation_cap",
+                        "excluded_missing_appearance_ids",
+                    )
+                },
             )
             for arm in ("single", "up_to_two"):
-                plan = result[arm]
-                review = plan["expected_window"]
-                row[arm] = {
-                    k: plan[k]
-                    for k in (
-                        "seconds",
-                        "proof",
-                        "solver_status",
-                        "best_bound",
-                        "absolute_gap_points",
-                        "expected_net_points",
-                        "solver_calls",
-                    )
-                }
-                row[arm].update(
-                    chosen=review["chosen"],
-                    actual_units=review["actual_total"],
-                    optional=review["optional_swap"],
-                    lineup_evaluations=review.get("lineup_evaluations"),
-                )
+                row[arm] = compact_plan(result[arm])
             results.append(row)
-            write(
-                output,
-                dict(
-                    kind="llmopt_phase1_restricted_neighborhood",
-                    **provenance(),
-                    population="same 20 member-weeks, separate restricted universe",
-                    protocol="held + top four forecast + cheapest two per position; ID ties",
-                    configured_deterministic_units=60,
-                    wall_safety_seconds=1800,
-                    lineup_evaluation_cap=1153,
-                    rows=results,
-                ),
-            )
+    # Publish a compact record only after the selected population completes.
+    write(
+        output,
+        dict(
+            kind="llmopt_phase1_restricted_neighborhood",
+            **provenance(),
+            population="same 20 member-weeks, separate restricted universe",
+            protocol="held + top four forecast + cheapest two per position; ID ties",
+            rows=results,
+        ),
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int)
-    parser.add_argument(
-        "--output", type=Path, default=HERE.parent / "llmopt_phase1_neighborhood.json"
-    )
+    parser.add_argument("--output", type=Path, default=DEFAULT_RECORD)
     args = parser.parse_args()
+    if args.limit is not None and args.output.resolve() == DEFAULT_RECORD.resolve():
+        parser.error("A pilot requires a separate --output record.")
     measure(args.output, args.limit)

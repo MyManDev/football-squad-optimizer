@@ -18,6 +18,20 @@ from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.scenarios.expected_lineup import expected_lineup_score
 
 
+def package_menu(moves):
+    """Keep all singles, then rank disjoint pairs by proxy before applying any check cap."""
+    pool = sorted(
+        set(
+            sorted(moves, reverse=True)[:24]
+            + sorted(moves, key=lambda m: (-m[1], -m[0], m[2:]))[:8]
+        ),
+        reverse=True,
+    )
+    pairs = [(a, b) for a, b in combinations(pool, 2) if a[2] != b[2] and a[3] != b[3]]
+    pairs.sort(key=lambda p: (-sum(m[0] for m in p), tuple((m[2], m[3]) for m in p)))
+    return [(move,) for move in moves] + pairs
+
+
 def legal_package(first, initial, optimization, transfer, preferences, outgoing, incoming):
     ids = set(initial.squad_player_ids) - set(outgoing) | set(incoming)
     rules = preferences.for_week(1)
@@ -117,7 +131,12 @@ def propose_pairs(
         multipliers = template.lineup_expectation["scoring_multipliers"]
     else:
         score = expected_lineup_score(
-            first.loc[list(initial.squad_player_ids)], xi, bench, captain, vice
+            first.loc[list(initial.squad_player_ids)],
+            xi,
+            bench,
+            captain,
+            vice,
+            chip=template.chip,
         )
         multipliers = score.scoring_multipliers
         record.update(hold_score_calls=1, hold_score_states=score.states_evaluated)
@@ -137,17 +156,20 @@ def propose_pairs(
             )
             moves.append((gain, cash, outgoing, incoming))
     # Include funding moves even when their individual point proxy is negative.
-    pool = sorted(
-        set(
-            sorted(moves, reverse=True)[:24]
-            + sorted(moves, key=lambda m: (-m[1], -m[0], m[2:]))[:8]
-        )
+    packages = package_menu(moves)
+    record.update(
+        generated_packages=len(packages),
+        generated_singles=len(moves),
+        generated_pairs=len(packages) - len(moves),
+        truncated_packages=max(0, len(packages) - record["cheap_pair_cap"]),
+        checked_single_packages=0,
+        checked_pair_packages=0,
+        enumeration_policy="all_singles_then_pairs_by_descending_proxy_stable_id_ties",
     )
-    packages = [(move,) for move in moves]
-    packages.extend((a, b) for a, b in combinations(pool, 2) if a[2] != b[2] and a[3] != b[3])
     best = None
     for package in packages[: record["cheap_pair_cap"]]:
         record["cheap_pair_checks"] += 1
+        record["checked_single_packages" if len(package) == 1 else "checked_pair_packages"] += 1
         outgoing = tuple(m[2] for m in package)
         incoming = tuple(m[3] for m in package)
         ids = frozenset(held - set(outgoing) | set(incoming))

@@ -19,16 +19,18 @@ from time import perf_counter
 from unittest.mock import patch
 
 import ortools
+from docs.research.llmopt_phase1 import pairs as pair_module
 from docs.research.llmopt_phase1.freeze import digest
 from docs.research.llmopt_phase1.pairs import propose_pairs
 from ortools.sat.python import cp_model
 from scripts.measure_window_solver_highs import PublishedInputs, one_week_call, window_call
 
 from squadopt.contracts.preferences import DecisionPreferences
-from squadopt.optimization import SolverExecutionError
+from squadopt.optimization import SolverExecutionError, wall_clock_stopped_the_search
 from squadopt.planning import (
     ChipAvailability,
     PlanningHorizon,
+    expected_swap,
     expected_window,
     optimize_transfer_plan,
 )
@@ -40,6 +42,42 @@ from squadopt.platform.native_windows import execute_native_window, native_windo
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 SCENARIOS = ("normal", "wildcard", "freehit", "tight_bank", "conflicting_instructions")
+DEFAULT_OUTPUT = ROOT / "artifacts/llmopt_phase1_v2"
+GAIN_KEYS = (
+    "raw_xi_net_gain_points",
+    "expected_lineup_net_gain_points",
+    "selection_utility_gain_points",
+)
+
+
+@contextmanager
+def accounting_checks():
+    checks = []
+    original = expected_swap.checked_work
+
+    def checked(value, cap):
+        try:
+            return original(value, cap)
+        except ValueError:
+            checks.append(dict(actual=value, cap=cap))
+            raise
+
+    with (
+        patch.object(expected_window, "checked_work", checked),
+        patch.object(expected_swap, "checked_work", checked),
+        patch.object(pair_module, "checked_work", checked),
+    ):
+        yield checks
+
+
+def call_counts(calls):
+    return dict(
+        solver_calls=len(calls),
+        cp_sat_calls=sum(c["backend"] == "cp-sat" for c in calls),
+        native_calls=sum(c["backend"] == "highs-native" for c in calls),
+        reported_thread_counts=sorted({c["threads"] for c in calls if c["threads"] is not None}),
+        unknown_thread_calls=sum(c["threads"] is None for c in calls),
+    )
 
 
 def write(path, value):
@@ -58,6 +96,7 @@ def provenance():
             if p.suffix in (".py", ".mjs", ".ts")
         },
         input_manifest_sha256=digest(json.loads((HERE / "inputs.json").read_text())),
+        protocol_revision=2,
     )
 
 
@@ -98,6 +137,8 @@ def capture_solves():
                 objective_raw=float(response.objective_value) if found else None,
                 best_bound_raw=float(response.best_objective_bound) if found else None,
                 threads=int(solver.parameters.num_search_workers),
+                configured_deterministic_units=float(solver.parameters.max_deterministic_time),
+                configured_wall_seconds=float(solver.parameters.max_time_in_seconds),
             )
         )
         return status
@@ -115,7 +156,7 @@ def capture_solves():
                     seconds=perf_counter() - started,
                     objective_raw=None,
                     best_bound_raw=None,
-                    threads=1,
+                    threads=None,
                     wall_cap_seconds=seconds,
                 )
             )
@@ -160,12 +201,34 @@ def summary(plan, seconds, calls):
         best_bound=bound,
         absolute_gap_points=gap,
         bound_scope="no_global_expected_lineup_bound" if expected else "planner_model",
-        expected_net_points=sum(w.projected_score - w.transfer_hit_points for w in plan.weeks)
+        raw_xi_net_points=sum(w.projected_score - w.transfer_hit_points for w in plan.weeks)
         if plan.has_solution
         else None,
-        solver_calls=len(calls),
-        cp_sat_calls=sum(c["backend"] == "cp-sat" for c in calls),
-        native_calls=sum(c["backend"] == "highs-native" for c in calls),
+        expected_lineup_net_points=sum(
+            float(w.lineup_expectation["expected_net_points"]) for w in plan.weeks
+        )
+        if plan.has_solution and all(w.lineup_expectation is not None for w in plan.weeks)
+        else None,
+        selection_utility=next(
+            (c["utility"] for c in expected["candidates"] if c["proposal"] == expected["chosen"]),
+            None,
+        )
+        if expected
+        else None,
+        solver_limits={
+            key: diagnostics.get(key)
+            for key in (
+                "solver_time_limit_seconds",
+                "wall_time_limit_seconds",
+                "solver_deterministic_time_limit",
+                "deterministic_budget_source",
+                "deterministic_time_used",
+                "deterministic_time_budget_exhausted",
+                "primary_deterministic_time",
+            )
+        },
+        wall_clock_stopped=wall_clock_stopped_the_search(plan.solver_status, diagnostics),
+        **call_counts(calls),
         calls=calls,
         weeks=[
             dict(
@@ -177,6 +240,14 @@ def summary(plan, seconds, calls):
                 hit=w.transfer_hit_points,
                 next_free_transfers=w.free_transfers_for_next_gameweek,
                 chip=w.chip,
+                starting_xi=sorted(int(p) for p in w.starting_xi.player_id),
+                bench=[int(p) for p in w.bench.player_id],
+                captain=int(w.captain.player_id),
+                vice_captain=None if w.vice_captain_id is None else int(w.vice_captain_id),
+                raw_xi_net_points=w.projected_score - w.transfer_hit_points,
+                expected_lineup_net_points=None
+                if w.lineup_expectation is None
+                else float(w.lineup_expectation["expected_net_points"]),
             )
             for w in plan.weeks
         ],
@@ -203,10 +274,12 @@ def timed(function, *, capture_expected_failure=False):
                 objective=None,
                 best_bound=None,
                 absolute_gap_points=None,
-                expected_net_points=None,
-                solver_calls=len(calls),
-                cp_sat_calls=sum(c["backend"] == "cp-sat" for c in calls),
-                native_calls=sum(c["backend"] == "highs-native" for c in calls),
+                raw_xi_net_points=None,
+                expected_lineup_net_points=None,
+                selection_utility=None,
+                solver_limits=None,
+                wall_clock_stopped=None,
+                **call_counts(calls),
                 calls=calls,
                 error=dict(type=type(error).__name__, message=str(error)),
                 expected_window=dict(
@@ -217,6 +290,69 @@ def timed(function, *, capture_expected_failure=False):
                 ),
             )
     return summary(plan, perf_counter() - started, calls)
+
+
+def compact_plan(result):
+    """Enough committed evidence to check every reported difference without raw receipts."""
+    keys = (
+        "seconds",
+        "has_solution",
+        "solver_status",
+        "proof",
+        "objective",
+        "best_bound",
+        "absolute_gap_points",
+        "bound_scope",
+        "raw_xi_net_points",
+        "expected_lineup_net_points",
+        "selection_utility",
+        "solver_limits",
+        "wall_clock_stopped",
+        "solver_calls",
+        "cp_sat_calls",
+        "native_calls",
+        "reported_thread_counts",
+        "unknown_thread_calls",
+        "error",
+        "accounting_failures",
+    )
+    compact = {key: result.get(key) for key in keys}
+    compact["decision_sha256"] = digest(result.get("weeks", []))
+    compact["weekly_points"] = [
+        {
+            key: w[key]
+            for key in (
+                "gameweek",
+                "raw_xi_net_points",
+                "expected_lineup_net_points",
+                "bank",
+                "hit",
+                "next_free_transfers",
+                "chip",
+            )
+        }
+        for w in result.get("weeks", [])
+    ]
+    review = result.get("expected_window")
+    if review:
+        optional = dict(review["optional_swap"])
+        search = optional.pop("lineup_search", None)
+        if search:
+            optional["lineup_summary"] = dict(
+                evaluations=search["evaluations"],
+                budget_exhausted_weeks=[
+                    w["gameweek"] for w in search["weeks"] if w["budget_exhausted"]
+                ],
+            )
+        compact.update(
+            chosen=review["chosen"],
+            actual_units=review["actual_total"],
+            optional=optional,
+            lineup_evaluations=review.get("lineup_evaluations"),
+            lineup_evaluation_cap=review.get("lineup_evaluation_cap"),
+            selection_policy=review.get("selection_policy"),
+        )
+    return compact
 
 
 def planner(call, request, *, state=None):
@@ -275,6 +411,8 @@ def pricing(call, inputs, entry_id):
     run = schedule(payload)
     jobs = []
     admissions = []
+    requests = []
+    computed = {}
     with TemporaryDirectory(prefix="llmopt-phase1-", dir=ROOT / ".codex-tmp") as temporary:
         queue = FileJobQueue(Path(temporary))
 
@@ -284,7 +422,13 @@ def pricing(call, inputs, entry_id):
             job = AdviceJob(f"phase1-{len(jobs)}", "queued", identity, identity, stamp, stamp)
             _, created = queue.submit_unique(job)
             admissions.append(created)
+            requests.append(dict(slot=label, fingerprint=identity, created=created))
+            if not created:
+                if identity not in computed:
+                    raise ValueError("A cold queue join has no completed local result.")
+                return computed[identity]
             result = timed(lambda: planner(call, request))
+            computed[identity] = result
             jobs.append(dict(slot=label, request=request, created=created, **result))
             return result
 
@@ -299,12 +443,14 @@ def pricing(call, inputs, entry_id):
     return dict(
         backend_jobs=sum(admissions),
         job_requests=len(admissions),
+        deduplicated_requests=len(admissions) - sum(admissions),
         solver_calls=sum(j["solver_calls"] for j in jobs),
         cp_sat_calls=sum(j["cp_sat_calls"] for j in jobs),
         native_calls=sum(j["native_calls"] for j in jobs),
         total_seconds=sum(j["seconds"] for j in jobs),
         prices=run["prices"],
         jobs=jobs,
+        requests=requests,
     )
 
 
@@ -327,6 +473,8 @@ def expected_comparison(call, frozen):
     table = call.horizon.table.loc[
         call.horizon.table.player_id.map(str).isin(projection["appearance_probability"])
     ].copy()
+    if not set(call.state.squad_player_ids) <= set(table.player_id):
+        raise ValueError("Expected-window support must retain every held player.")
     # Matching capture's saved forecast, not the later publication's different model.
     first_counts = frozen["fixture_counts"][str(call.horizon.gameweeks[0])]
     for index, row in table.iterrows():
@@ -342,44 +490,39 @@ def expected_comparison(call, frozen):
     def run():
         return expected_window.optimize_expected_window(horizon, call.state, settings, policy)
 
-    checks = []
-    original_check = expected_window.checked_work
-
-    def check(value, cap):
-        try:
-            return original_check(value, cap)
-        except ValueError:
-            checks.append(dict(actual=value, cap=cap))
-            raise
-
-    with patch.object(expected_window, "checked_work", check):
+    with accounting_checks() as checks:
         single = timed(run, capture_expected_failure=True)
     single["accounting_failures"] = checks.copy()
-    checks.clear()
     with (
         patch.object(expected_window, "propose_expected_swap", propose_pairs),
-        patch.object(expected_window, "checked_work", check),
+        accounting_checks() as checks,
     ):
         pair = timed(run, capture_expected_failure=True)
     pair["accounting_failures"] = checks.copy()
-    a, b = single["expected_window"], pair["expected_window"]
-    selected_a = next((p["utility"] for p in a["candidates"] if p["proposal"] == a["chosen"]), None)
-    selected_b = next((p["utility"] for p in b["candidates"] if p["proposal"] == b["chosen"]), None)
+
+    def difference(key):
+        a, b = single.get(key), pair.get(key)
+        return None if a is None or b is None else b - a
+
     return dict(
         configured_deterministic_units=settings.solver_deterministic_time_limit,
         wall_safety_seconds=settings.solver_time_limit_seconds,
         excluded_missing_appearance_ids=sorted(
             set(call.horizon.table.player_id) - set(table.player_id)
         ),
-        lineup_evaluation_cap=1153,
+        lineup_evaluation_cap=next(
+            (
+                p["expected_window"]["lineup_evaluation_cap"]
+                for p in (single, pair)
+                if "lineup_evaluation_cap" in p["expected_window"]
+            ),
+            None,
+        ),
         forecast_model=projection["model_name"],
         forecast_fingerprint=projection["fingerprint"],
-        selection_utility_gain_points=None
-        if selected_a is None or selected_b is None
-        else selected_b - selected_a,
-        expected_net_gain_points=None
-        if not single["has_solution"] or not pair["has_solution"]
-        else pair["expected_net_points"] - single["expected_net_points"],
+        selection_utility_gain_points=difference("selection_utility"),
+        raw_xi_net_gain_points=difference("raw_xi_net_points"),
+        expected_lineup_net_gain_points=difference("expected_lineup_net_points"),
         single=single,
         up_to_two=pair,
     )
@@ -403,8 +546,18 @@ def measure(output, limit, resume=False, reuse_completed=False):
                 prior = json.loads(target.read_text())
                 prior_stamp = prior.get("provenance", {})
                 if "expected_comparison" in prior:
+                    if prior_stamp.get("protocol_revision") != stamp["protocol_revision"]:
+                        raise ValueError(
+                            "Completed-case reuse requires the same protocol revision."
+                        )
                     if prior_stamp.get("input_manifest_sha256") != stamp["input_manifest_sha256"]:
                         raise ValueError("Completed-case reuse requires identical frozen inputs.")
+                    prior_sources = prior_stamp["source_sha256"]
+                    new_sources = stamp["source_sha256"]
+                    if prior_sources != new_sources:
+                        raise ValueError(
+                            "Completed-case reuse changed a proposal, probe or input runner."
+                        )
                     subprocess.run(
                         [
                             "git",
@@ -467,7 +620,9 @@ def aggregate(output):
         raise ValueError("Only completed cases can be aggregated.")
     stamp = provenance()
     if any(
-        row["provenance"]["input_manifest_sha256"] != stamp["input_manifest_sha256"] for row in rows
+        row["provenance"]["input_manifest_sha256"] != stamp["input_manifest_sha256"]
+        or row["provenance"].get("protocol_revision") != stamp["protocol_revision"]
+        for row in rows
     ):
         raise ValueError("Do not aggregate different frozen inputs.")
     record = dict(
@@ -503,46 +658,30 @@ def aggregate(output):
                         "cp_sat_calls",
                         "native_calls",
                         "total_seconds",
+                        "job_requests",
+                        "deduplicated_requests",
                     )
                 },
-                control={
-                    k: value["control"][k]
-                    for k in (
-                        "seconds",
-                        "solver_status",
-                        "proof",
-                        "objective",
-                        "best_bound",
-                        "absolute_gap_points",
-                    )
-                },
+                control=compact_plan(value["control"]),
             )
         comparison = row["expected_comparison"]
         item["expected_comparison"] = {
             k: comparison[k]
             for k in (
-                "selection_utility_gain_points",
-                "expected_net_gain_points",
+                *GAIN_KEYS,
+                "configured_deterministic_units",
+                "wall_safety_seconds",
+                "lineup_evaluation_cap",
+                "excluded_missing_appearance_ids",
             )
         }
         for arm in ("single", "up_to_two"):
             result = comparison[arm]
-            review = result["expected_window"]
-            item["expected_comparison"][arm] = dict(
-                seconds=result["seconds"],
-                proof=result["proof"],
-                solver_calls=result["solver_calls"],
-                chosen=review["chosen"],
-                actual_units=review["actual_total"],
-                optional_status=review["optional_swap"]["status"],
-                optional_reason=review["optional_swap"].get("reason"),
-                error=result.get("error"),
-                accounting_failures=result.get("accounting_failures", []),
-            )
+            item["expected_comparison"][arm] = compact_plan(result)
         record["rows"].append(item)
     target = (
         HERE.parent / "llmopt_phase1_baseline.json"
-        if output.resolve() == (ROOT / "artifacts/llmopt_phase1").resolve()
+        if output.resolve() == DEFAULT_OUTPUT.resolve()
         else output / "summary.json"
     )
     write(target, record)
@@ -551,11 +690,13 @@ def aggregate(output):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int)
-    parser.add_argument("--output", type=Path, default=ROOT / "artifacts/llmopt_phase1")
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--aggregate-only", action="store_true")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--reuse-completed", action="store_true")
     args = parser.parse_args()
+    if args.limit is not None and args.output.resolve() == DEFAULT_OUTPUT.resolve():
+        parser.error("A pilot requires a separate --output directory.")
     if not args.aggregate_only:
         measure(args.output, args.limit, args.resume, args.reuse_completed)
     aggregate(args.output)
