@@ -30,7 +30,7 @@ from squadopt.platform.advice_read import (
     FileLeagueDirectory,
     PreferencePlayers,
 )
-from squadopt.platform.advice_runs import FileRunStore, RunAdmissionError
+from squadopt.platform.advice_runs import FileRunStore
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     FixedWindowRateLimiter,
@@ -97,16 +97,17 @@ def test_run_owned_public_job_views_conform_in_every_lifecycle_state(tmp_path):
     check(third, "cancelled")
 
 
-def test_new_preference_work_requires_identity_but_legacy_cached_answers_remain_readable(tmp_path):
+@pytest.mark.parametrize("window", [1, 3])
+def test_new_preference_work_without_identity_keeps_legacy_admission(tmp_path, window):
     client, cache, queue = _world(tmp_path, runs=FileRunStore(tmp_path / "runs"))
-    body = {**BODY, "preferences": {"no_hits": True}}
+    body = {**BODY, "window": window, "preferences": {"no_hits": True}}
     missing = client.post(ADVICE_URL, json=body)
-    assert missing.status_code == 409
-    assert missing.json()["error"]["code"] == "RUN_ID_REQUIRED"
-    assert queue.jobs() == ()
-    assert client.post(ADVICE_URL, json={**body, "run": _run_ref()}).status_code == 202
+    assert missing.status_code == 202, missing.text
+    assert queue.jobs()[0].contract_version == "backend_jobs_v1"
+    assert not (tmp_path / "runs/ledger.json").exists()
     document = json.loads(_valid_advice_document())
     document["payload"].update(
+        window=window,
         preferences={"keep_players": [], "avoid_players": [], "no_hits": True},
         preferences_scope="all_selected_weeks",
     )
@@ -219,7 +220,7 @@ def test_llmopt_concurrent_reconstructed_services_cannot_admit_a_fifth_job(tmp_p
     assert len(queue.jobs()) == 4
 
 
-def test_llmopt_edit_cancels_unshared_queue_and_fences_running_results(tmp_path):
+def test_llmopt_edit_closes_admission_without_discarding_running_accounting(tmp_path):
     runs = FileRunStore(tmp_path / "runs")
     client, _, queue = _world(tmp_path, runs=runs)
     request = {**BODY, "run": _run_ref()}
@@ -231,8 +232,7 @@ def test_llmopt_edit_cancels_unshared_queue_and_fences_running_results(tmp_path)
     closed = client.post(f"/api/v1/llmopt/runs/{'a' * 32}/cancel", json={})
     assert closed.status_code == 200
     assert queue.load(identifier).status == "running"
-    with pytest.raises(RunAdmissionError, match="ended"):
-        runs.finish(identifier, budget)
+    runs.finish(identifier, budget)
     assert client.post(ADVICE_URL, json=request).status_code == 409
     assert claimed.job_id == identifier
 

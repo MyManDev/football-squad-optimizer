@@ -68,6 +68,8 @@ four jobs and makes twelve internal calls at one week, sixteen at three weeks.
     existing reservations and receipts; old capture identity is recovered from immutable
     job specs where possible. Unidentifiable old rows remain a fixed migration debt until
     their context can be verified, rather than resetting a live run's budget.
+    Old allocations conservatively retain a possible anonymous consumer because v1 did
+    not record those joins; new allocations record ownership explicitly.
 
 ## Compatibility
 
