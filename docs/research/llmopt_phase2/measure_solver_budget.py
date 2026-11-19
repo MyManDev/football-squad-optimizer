@@ -19,6 +19,7 @@ from scripts.measure_window_solver_highs import one_week_call, window_call
 
 from squadopt.contracts.llmopt_run import RunReference, job_capacity
 from squadopt.optimization.work_budget import work_budget
+from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_runs import FileRunStore
 from squadopt.platform.jobs_contract import AdviceJob
@@ -76,7 +77,12 @@ def run_case(root, inputs, entry, original, window):
             result = benchmark.scenario_control(call, original["scenario"])
     finally:
         runs.finish(job.job_id, budget)
-    queue.store(claimed.transition("completed", at_utc=STAMP))
+    queue.complete(
+        claimed,
+        cache=FileAdviceCache(root / "answers"),
+        payload=json.dumps(result, allow_nan=False).encode(),
+        at_utc=STAMP,
+    )
     expected = original["windows"][str(window)]["control"]
     compact = benchmark.compact_plan(result)
     feasible = result["has_solution"]
