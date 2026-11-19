@@ -610,6 +610,12 @@ def league_capabilities_schema() -> dict[str, Any]:
             "league_id": {"type": "integer", "minimum": 0},
             "capture_snapshot_id": {"type": "string", "minLength": 1},
             "plan_data_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "transfer_packages": {
+                "type": "boolean",
+                "description": (
+                    "Optional disabled-by-default three-week package and path capability."
+                ),
+            },
             "preferences": {
                 "type": "object",
                 "properties": {"available": {"type": "boolean"}},

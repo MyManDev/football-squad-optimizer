@@ -523,3 +523,18 @@ def test_a_reader_wired_as_before_offers_no_switch(tmp_path: Path) -> None:
 def test_the_committed_capabilities_schema_matches_its_generator() -> None:
     committed = json.loads(LEAGUE_CAPABILITIES_SCHEMA_PATH.read_text(encoding="utf-8"))
     assert committed == league_capabilities_schema()
+
+
+def test_enabled_package_capability_passes_runtime_and_committed_schema(tmp_path):
+    _publish_members(tmp_path / "site")
+    reader = AdviceReadStore(
+        FileLeagueDirectory(tmp_path / "site"),
+        FileAdviceCache(tmp_path / "cache"),
+        _Context(),
+        {"saf-puan": False},
+        transfer_packages=True,
+    )
+    document = reader.league_capabilities(LEAGUE_ID)
+    assert document["transfer_packages"] is True
+    committed = json.loads(LEAGUE_CAPABILITIES_SCHEMA_PATH.read_text(encoding="utf-8"))
+    jsonschema.validate(document, committed)
