@@ -36,6 +36,15 @@ timestamps are replay controls, without claims about a live member's entitlement
 deadline. The priority arm reuses a completed main answer when available, explicitly
 reported. Run separately from tests and CI.
 
-The full twenty-member measurement and final CI remain required before acceptance.
+The [complete replay](llmopt_phase3_jobs.md) records all twenty member-weeks,
+both windows and both modes: eighty real API/worker run records, a maximum of two
+server jobs, all job receipts within allocation, and no extra jobs from 192 repeats
+after service reconstruction. Total mode explicitly reuses the completed main when
+feasible. All sixteen feasible one-week programs complete three priority layers;
+at three weeks nine complete all three, one completes two, five complete one and
+one retains the main. These stops reflect the declared inner 20/60-unit kernel
+ceiling rather than consumption of the enclosing 63/366-unit reservation. Actual
+work stays visible; no allowance or accounting tolerance changed.
+
 Frozen Phase 1 artifacts are unchanged. Counterfactual scenarios keep their existing
 transport; a new total allowance on that path is refused before starting work.

@@ -1,5 +1,12 @@
 # Measurements Index
 
+- 2026-11-19: [LLMOPT one preference job](research/llmopt_phase3_jobs.md),
+  [record](research/llmopt_phase3_jobs.json): twenty frozen member-weeks, both windows
+  and both modes, 80 real API/worker run records. Maximum two server jobs, every
+  receipt within allocation, zero extra jobs from 192 reconstructed-service repeats.
+  Total mode explicitly reuses a feasible main answer; priority layers retain their
+  inner 20/60-unit ceiling. No latency, realized-score or global-quality claim. #1467.
+
 - 2026-11-19: [LLMOPT real solver budget controls](research/llmopt_phase2_solver_budget.md),
   [record](research/llmopt_phase2_solver_budget.json): twenty frozen member-weeks at
   both windows; 40/40 original statuses and decisions, 32 equal numeric objectives

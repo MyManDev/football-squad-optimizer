@@ -1,0 +1,4655 @@
+{
+  "contract_version": "llmopt_phase3_jobs_v1",
+  "producer_repository_commit": "89e380b9d30e481324dce90a51a168038593b3e5",
+  "source_sha256": {
+    "docs/research/llmopt_phase3/measure.py": "0ff5306dce3f81fcde4144d32d91690050fbd2bb61c4e11c8f8cc320930bd71e",
+    "src/squadopt/api/app.py": "134bec71de052c666a14188acab37e975f5d2b7a55b6aafb5d260d55371e9b03",
+    "src/squadopt/contracts/preference_bundle.py": "7317125adeb0e6a7811bfd536fb37b12015ec44b8da834777771db67246fca92",
+    "src/squadopt/contracts/priority_preferences.py": "c17c430febfc9a9e22ecbde4afd7d1e858b78460590ec85c7689be857f673e2b",
+    "src/squadopt/platform/advice_read.py": "e2b5777660d5cedf187406356bcbbdeb12614c77f8983af73a830f5cf4015c08",
+    "src/squadopt/platform/advice_submit.py": "fe61c06d4c726681a519be389c3f86b9de43c9a20d6cc8459b9b6f0f6221b843",
+    "src/squadopt/platform/advice_runs.py": "5d9b221358c26bf6f84ca3df3f467715e4ee6d41af92a229788178549fff7af4",
+    "src/squadopt/platform/advice_worker.py": "82627b8ab1227ab5f80c5665a5963a614363911e07ce2858b2ec5e22bb1d4a51",
+    "src/squadopt/platform/advice_preference_bundle.py": "532140ba0ac2570b8c8bdfb7264cb8c7f832a0218ae56d907856cbaabf117df1",
+    "src/squadopt/application/advice_menu.py": "6dd8d1777fa011f13af0ad5e8dcd07c6b81cff5c0bd47eeb82800bcf39e955c5",
+    "src/squadopt/application/advice_chip_strategy.py": "827694d7faf20fac4283be762bbb1b3414e43b11e148a7e5f714662c13650a64",
+    "src/squadopt/live/transfers.py": "ef44ac4aefd72ea42696050d9d45c3c6cc681989930a3e80c57b4cd1ba2f072e",
+    "src/squadopt/planning/optimizer.py": "0bd2be3fe61abde34f74a57deae527db7d95824147a1f8bafa6bd95d4523418a",
+    "src/squadopt/optimization/work_budget.py": "739db997f8bc89a266785ffb10fea7fc103d27dc6679fd4cc7ea6eb53a3f5f8e"
+  },
+  "frozen_manifest_sha256": "fdbd303a04679d1b866f366c56b72cf0fe056b6e9f52c2ed752f0ae88d0032fc",
+  "member_weeks": 20,
+  "windows": [
+    1,
+    3
+  ],
+  "maximum_server_jobs": 2,
+  "all_expected_main_outcomes": true,
+  "all_work_within_allocation": true,
+  "live_network_requests": 0,
+  "execution": "Sequential local API and real worker; frozen precomputed points, no scoring, forecasting, live requests or concurrent tests. Total arm reuses the completed main answer when feasible.",
+  "rows": [
+    {
+      "case": "gw8-313686",
+      "scenario": "normal",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-2622d66aab38e42e-1",
+        "advice-667a8854c147fece-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.9050621264826666,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.783827342283613,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 55.488,
+            "decision_sha256": "dc862fb5fec4333773e127fa2ae86500634f9b7ca5780ef8b62a938b1539b7b6",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 54.172000000000004,
+            "decision_sha256": "43eeb9946234bbb9a924a8a123f1ad7c33f21e956db47c45446ea8efbc1cb038",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 54.172000000000004,
+          "decision_sha256": "43eeb9946234bbb9a924a8a123f1ad7c33f21e956db47c45446ea8efbc1cb038",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-313686",
+      "scenario": "normal",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-cfef6fb04275f1f4-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.7360262595826548,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 54.172000000000004,
+          "decision_sha256": "43eeb9946234bbb9a924a8a123f1ad7c33f21e956db47c45446ea8efbc1cb038",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 1.316
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-313686",
+      "scenario": "normal",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-34387c8f1e035dd6-1",
+        "advice-5fddde5427e7603b-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 4,
+          "cp_used": 4.162897981251791,
+          "native_reserved": 60.0
+        },
+        {
+          "calls": 12,
+          "cp_used": 10.7486392625224,
+          "native_reserved": 180.0
+        }
+      ],
+      "allocations": [
+        122.0,
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 168.869,
+            "decision_sha256": "55844edc5c22a3f97b9932f9a73ee841113b3781cea0f88ebe718a787489597a",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 165.985,
+            "decision_sha256": "9347280eed025004214a5099f4aa8012044989de4f34ff127a2c22fd1dbe2ee2",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 165.985,
+          "decision_sha256": "9347280eed025004214a5099f4aa8012044989de4f34ff127a2c22fd1dbe2ee2",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-313686",
+      "scenario": "normal",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-db70bf4028ac72dd-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 8,
+          "cp_used": 46.072852849168726,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 168.869,
+          "decision_sha256": "55844edc5c22a3f97b9932f9a73ee841113b3781cea0f88ebe718a787489597a",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-2199732",
+      "scenario": "wildcard",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-5393cd2a76ae4133-1",
+        "advice-8be0e7449a7c1298-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.9046362625700242,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.3900821433560613,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 58.52700000000001,
+            "decision_sha256": "9e67c9252f903c228a4b6447d2972aa68915ef9f4220c5529239843cea6798be",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 58.52700000000001,
+            "decision_sha256": "9e67c9252f903c228a4b6447d2972aa68915ef9f4220c5529239843cea6798be",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 58.03000000000001,
+          "decision_sha256": "1c833398230ac7c7e9f2026a6e14d18c25419aa4e3923b64bb13ace23897e97d",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-2199732",
+      "scenario": "wildcard",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-7748abfc01326308-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.274870543397975,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 58.03000000000001,
+          "decision_sha256": "2db9f581e249e66fb5c25e714089c2d2e2cd69df24f32977ce1f1fb501ddebe5",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[209036],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.497
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-2199732",
+      "scenario": "wildcard",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-6dbd73432c3fcec5-1",
+        "advice-b2022f94ac1a0abc-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 4,
+          "cp_used": 20.985609221191122,
+          "native_reserved": 60.0
+        },
+        {
+          "calls": 12,
+          "cp_used": 117.35232578114358,
+          "native_reserved": 180.0
+        }
+      ],
+      "allocations": [
+        122.0,
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 175.58100000000002,
+            "decision_sha256": "05ac3ad45e813955b73b64216215e917dd66b2242b5ea087212ac79923f614ef",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 175.58100000000002,
+            "decision_sha256": "05ac3ad45e813955b73b64216215e917dd66b2242b5ea087212ac79923f614ef",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 174.09000000000003,
+          "decision_sha256": "f3e1a8aedd8f5f1f39f435bac5397b18f1ea0d45fc3d07d1a82149e78e6cf88c",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-2199732",
+      "scenario": "wildcard",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-1f1bf77115230f52-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 60.00515669881229,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 175.58100000000002,
+          "decision_sha256": "05ac3ad45e813955b73b64216215e917dd66b2242b5ea087212ac79923f614ef",
+          "priority": {
+            "budget_exhausted": true,
+            "completed_priorities": [
+              1,
+              2
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[],\"keep_players\":[209036],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-2281624",
+      "scenario": "freehit",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-01375f9c54ab016c-1",
+        "advice-cd7400f3d8986c25-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.9290230131623006,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.6099873430740326,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 57.93600000000001,
+            "decision_sha256": "a59eac860b533014739e2cf517c26f332fcaaa4ce42c9ae4a5fad2d5561f26f3",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 58.214000000000006,
+            "decision_sha256": "14729bf4c4b2a9aaa05011be7f1ba3a7a6139e25235d6ec07cea3e83b06ee15b",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.93600000000001,
+          "decision_sha256": "a59eac860b533014739e2cf517c26f332fcaaa4ce42c9ae4a5fad2d5561f26f3",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-2281624",
+      "scenario": "freehit",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-b7090968036f0d14-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.4095718536976276,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.93600000000001,
+          "decision_sha256": "0b8e92714db8169454a33c7ad9e0a2083f8edf489d69616374aeacc184f515b3",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[477424],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.278
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-2281624",
+      "scenario": "freehit",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-2c4d855ba9657ef6-1",
+        "advice-9ada7d4d3510cd73-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 4,
+          "cp_used": 12.250623116921888,
+          "native_reserved": 60.0
+        },
+        {
+          "calls": 12,
+          "cp_used": 15.676082405587916,
+          "native_reserved": 180.0
+        }
+      ],
+      "allocations": [
+        122.0,
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 167.591,
+            "decision_sha256": "4d23a69652aaa9ec92fae7376851f61ae84b4146a9ac87f9bce1531d11f9f894",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 167.547,
+            "decision_sha256": "dc713d1348d95c11406d0afd243f7281bd5ec0dac62133519f557a14542bc8e2",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 167.269,
+          "decision_sha256": "5491da5287a44db9c1f838ad50f8cbbf90a9804b38bae4830900c4e9f8993224",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-2281624",
+      "scenario": "freehit",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-0ff591588b605ea9-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 8,
+          "cp_used": 47.16049672540994,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 167.269,
+          "decision_sha256": "fcd5274855400319f0be825e740574fda560f0cb8622f7fa79b535c3f7a3e36d",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[477424],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.6
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-3832237",
+      "scenario": "tight_bank",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-16600826f7725d82-1",
+        "advice-4d83b6582b6913ea-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 9,
+          "cp_used": 2.7995787193288972,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 3,
+          "cp_used": 1.1624191525727947,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0,
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 53.335,
+            "decision_sha256": "634d0b1a3919593d93754df4538ef307b2e818f1e72aba05b5614e20396deeb6",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 53.06200000000001,
+            "decision_sha256": "f3bac2ebf00f10bae681062b60130a57b0e1d1b38b363ade065597f28e04753c",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 52.58500000000001,
+          "decision_sha256": "df35e13a7a7a6b360fb49bb0286888d168ab6c2bf751e7c19cb64aefde2f0ac7",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-3832237",
+      "scenario": "tight_bank",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-585037a44f504727-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.4153288151104821,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 52.58500000000001,
+          "decision_sha256": "b208a95585c51bb9074e5de4cb458b46dd03469cc39b7767cdb541380d0d645e",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[226597],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[472769],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.75
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-3832237",
+      "scenario": "tight_bank",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-3e19e73cb8841e07-1",
+        "advice-4f14c932773ea357-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 4,
+          "cp_used": 33.73308989588725,
+          "native_reserved": 60.0
+        },
+        {
+          "calls": 12,
+          "cp_used": 108.60341861861659,
+          "native_reserved": 180.0
+        }
+      ],
+      "allocations": [
+        122.0,
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 161.907,
+            "decision_sha256": "4be3d4e3a7541b1b13cbcd117ab3997acf04c4acece22d09fcfa2b4a17f1367f",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 160.72600000000003,
+            "decision_sha256": "3784a9decd950af00e8b7af6f5b7fb984c4c7aeada280919ed8ca47f75405d4c",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 158.82500000000002,
+          "decision_sha256": "c0793456f775461e80d036225281e6f34dc11f16fe2c5974a7c1d8c9d73b6450",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-3832237",
+      "scenario": "tight_bank",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-4e62ff2de24c3f00-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 6,
+          "cp_used": 60.00521363787334,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 161.907,
+          "decision_sha256": "4be3d4e3a7541b1b13cbcd117ab3997acf04c4acece22d09fcfa2b4a17f1367f",
+          "priority": {
+            "budget_exhausted": true,
+            "completed_priorities": [
+              1
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[226597],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[472769],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-4287206",
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 21.0,
+      "job_ids": [
+        "advice-d41f6f64d50344e9-1"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 2,
+          "cp_used": 0.0,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw8-4287206",
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 21.0,
+      "job_ids": [
+        "advice-d41f6f64d50344e9-2"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 2,
+          "cp_used": 0.0,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw8-4287206",
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 122.0,
+      "job_ids": [
+        "advice-bb54c9213aef702d-1"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.0,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw8-4287206",
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 122.0,
+      "job_ids": [
+        "advice-bb54c9213aef702d-2"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.0,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw8-5081114",
+      "scenario": "normal",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-df89282de3afd2d7-1",
+        "advice-fd0afcdaaf15162d-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.9184519909941418,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.5527813365770418,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 53.179,
+            "decision_sha256": "2487deca7ee29d7285081aa2dd2e5cd2a58669760dcd93038b9ebc0f8a802109",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 51.097,
+            "decision_sha256": "5a3fa89340dfdb65ca58d727c58152c31d78f9d99f0295557427306312d4ccc3",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 51.097,
+          "decision_sha256": "5a3fa89340dfdb65ca58d727c58152c31d78f9d99f0295557427306312d4ccc3",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5081114",
+      "scenario": "normal",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-96d0823111141b51-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.3999028213919102,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 53.179,
+          "decision_sha256": "2487deca7ee29d7285081aa2dd2e5cd2a58669760dcd93038b9ebc0f8a802109",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[146426],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5081114",
+      "scenario": "normal",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-7fcd4f121ebf25d6-1",
+        "advice-e11b8f46e7f3cf30-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 12,
+          "cp_used": 59.59870313423068,
+          "native_reserved": 180.0
+        },
+        {
+          "calls": 4,
+          "cp_used": 10.102308019917816,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        366.0,
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 162.454,
+            "decision_sha256": "b1e3ea59d59bded6e3aa2ef43176d30be95199fe005746f4db3b65156f5b97a8",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 160.32800000000003,
+            "decision_sha256": "ddce8795fb6be92be9423a076082f256eee9ced739270ad664593c20680e60b9",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 160.32800000000003,
+          "decision_sha256": "ddce8795fb6be92be9423a076082f256eee9ced739270ad664593c20680e60b9",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5081114",
+      "scenario": "normal",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-8b886616dd2ce315-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 8,
+          "cp_used": 58.87490283976479,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 162.454,
+          "decision_sha256": "b1e3ea59d59bded6e3aa2ef43176d30be95199fe005746f4db3b65156f5b97a8",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[146426],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5349883",
+      "scenario": "wildcard",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-3f16591a5a2e3a7f-1",
+        "advice-dda690ab4bbbc9b6-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.9377549121952697,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.4955599775996404,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 57.022000000000006,
+            "decision_sha256": "febdd5c946eb64d2ea1abb3033382bdd5cead6667d086e5f8bc2cf9f10cb14d3",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 57.373000000000005,
+            "decision_sha256": "d631ab301cb78e4e007e385a0400e50175102b8de585640b138943b035a57c8a",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 56.73800000000001,
+          "decision_sha256": "1111f17fec70bc65f9ffd750d04013c1b8d9157d2bb106c062a484b02ae6f4bb",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5349883",
+      "scenario": "wildcard",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-c002624fa6688ba4-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.5027349483880232,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 56.73800000000001,
+          "decision_sha256": "97dad4b1f9a0112bc76238a8ce3d26fd2b933481b2a145dad0c7da26b00f421c",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[191866],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.705
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5349883",
+      "scenario": "wildcard",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-15ebd44bb1c23b0c-1",
+        "advice-5ad5ca921b1a3c37-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 12,
+          "cp_used": 150.5099355775034,
+          "native_reserved": 180.0
+        },
+        {
+          "calls": 4,
+          "cp_used": 30.027935178129404,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        366.0,
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 171.06600000000003,
+            "decision_sha256": "bbc5c503182d6ed0cf96d1aa8fddcb1e9374388500648f5f656b9c09bb98c996",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 172.11900000000003,
+            "decision_sha256": "1f7f712c138e2c30cb5eba649f2436563129b4f84ec9bbc6d89c4fa42cd2462a",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 170.21400000000003,
+          "decision_sha256": "aab266d846493ff80d0034b6f9d83dd32d7316848e8e9f5539d31dc915331316",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5349883",
+      "scenario": "wildcard",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-3aa58f85b0dcf323-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 5,
+          "cp_used": 60.002622646889826,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 172.329,
+          "decision_sha256": "60e1e72e0e2396f3524dd5412a23dfb2d67180750ae3028e3ed8504bc291fa51",
+          "priority": {
+            "budget_exhausted": true,
+            "completed_priorities": [],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[191866],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5662073",
+      "scenario": "freehit",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-38b3f9b7b7152d13-1",
+        "advice-c99c954604f5038a-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.9511555286444318,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.5073452474438334,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 57.373000000000005,
+            "decision_sha256": "3cf8a8c2ca19c1cb31e1a35cf4c0d55724f2e9d01c03bc9f0b0eb433902af500",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 57.724,
+            "decision_sha256": "93ae4cf43281bef44c70b143a5a903b8d4c5843f046ceabec33d2f9849703e60",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.278000000000006,
+          "decision_sha256": "87d5812e1c82232ee0fae4bfcca3e93ec7ebe7e8c3d0c733b99a56a78ae4709d",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5662073",
+      "scenario": "freehit",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-7db8c03c152f34fd-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.51856756348737,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.278000000000006,
+          "decision_sha256": "20e3ca3720aaaecba672dd711458a8c3b9972f91c98050a6c9d580fcd70b5fa4",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[465730],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.614
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5662073",
+      "scenario": "freehit",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-46d5b3a2d5429194-1",
+        "advice-9c78fb4b539cfa2d-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 4,
+          "cp_used": 3.5178175592441607,
+          "native_reserved": 60.0
+        },
+        {
+          "calls": 12,
+          "cp_used": 16.17849267500349,
+          "native_reserved": 180.0
+        }
+      ],
+      "allocations": [
+        122.0,
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 166.043,
+            "decision_sha256": "221dfd56beb86f6f0c77e137f1756ee719f94a4b184fd72c3d419429011c3e2f",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 162.454,
+            "decision_sha256": "2b0678e0a0904e0927bc1f89ff2b220715ae1b7c4b1c7f5b7d71f35316e8e0cc",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 162.00800000000004,
+          "decision_sha256": "7baaa9368cccc08936b3b24e4412ccf5f54d70d4de32fbfa2525a6bb2b2552b8",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-5662073",
+      "scenario": "freehit",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-3d740f22ac1083b4-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 8,
+          "cp_used": 11.627703102754676,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 165.98800000000003,
+          "decision_sha256": "f29adff6d5a30f4ba615920c73a0ec178f9f1990475c0c6431eb601f5281e757",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[465730],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.574
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-6654210",
+      "scenario": "tight_bank",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-2325828298480f8a-1",
+        "advice-39877f104368dd8f-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 9,
+          "cp_used": 2.8096195107229804,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 3,
+          "cp_used": 0.9924455759921582,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0,
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 53.826,
+            "decision_sha256": "5f088aa1d3451cf1c92f62d3b07438b8dea87dc51b799771d11d083cd8e06d79",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 51.516999999999996,
+            "decision_sha256": "65cb6e48d6f2ab833c2002be19f85db67ae795fcb1be4f54471371f0e25bd78d",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 51.516999999999996,
+          "decision_sha256": "65cb6e48d6f2ab833c2002be19f85db67ae795fcb1be4f54471371f0e25bd78d",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-6654210",
+      "scenario": "tight_bank",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-57222366f9e9928e-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.4825106350961634,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 53.826,
+          "decision_sha256": "5f088aa1d3451cf1c92f62d3b07438b8dea87dc51b799771d11d083cd8e06d79",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[154043],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-6654210",
+      "scenario": "tight_bank",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-04801218483ad12f-1",
+        "advice-416e5e7bff97913f-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 12,
+          "cp_used": 155.9017007839344,
+          "native_reserved": 180.0
+        },
+        {
+          "calls": 4,
+          "cp_used": 26.097242577793892,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        366.0,
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 164.072,
+            "decision_sha256": "43a2627617ac6f0ec21b2cad7a1bf4b53fcdd1bf28ee97c4efd38ea474b7b166",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 162.60500000000002,
+            "decision_sha256": "d1468d8517495fd84565ad98e5ee42e13edc9b66c067193da8b39b887727fb5f",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 162.28500000000003,
+          "decision_sha256": "39e82173c9f590e297b8af9b443cfb3e7d876378ecc437ce80f27550686c711d",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-6654210",
+      "scenario": "tight_bank",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-ee9402b9809f3e9b-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 6,
+          "cp_used": 60.002517997484645,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 164.072,
+          "decision_sha256": "43a2627617ac6f0ec21b2cad7a1bf4b53fcdd1bf28ee97c4efd38ea474b7b166",
+          "priority": {
+            "budget_exhausted": true,
+            "completed_priorities": [
+              1
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[154043],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw8-6879786",
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 21.0,
+      "job_ids": [
+        "advice-ceed8bd61b8eb9d2-1"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 2,
+          "cp_used": 0.0,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw8-6879786",
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 21.0,
+      "job_ids": [
+        "advice-ceed8bd61b8eb9d2-2"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 2,
+          "cp_used": 0.0,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw8-6879786",
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 122.0,
+      "job_ids": [
+        "advice-f50bb6637911ada6-1"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.0,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw8-6879786",
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 122.0,
+      "job_ids": [
+        "advice-f50bb6637911ada6-2"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.0,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw9-313686",
+      "scenario": "normal",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-54ef3ee9321c2811-1",
+        "advice-7dbed26f8adcb5d5-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.9233647287110588,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.795085385479805,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 54.285,
+            "decision_sha256": "88bfd6c9c96775fbe0aece6427ccacc8bbc7f9a424c0917ef7aac5f4bb2f1f7d",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 54.285,
+            "decision_sha256": "a60ba483ea73420361d9f9a0744305af48cc245029fa9feed1284d4f18ea5bb4",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 54.285,
+          "decision_sha256": "a60ba483ea73420361d9f9a0744305af48cc245029fa9feed1284d4f18ea5bb4",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-313686",
+      "scenario": "normal",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-fa8458cbd15ae21f-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.3721509621279406,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 54.285,
+          "decision_sha256": "a60ba483ea73420361d9f9a0744305af48cc245029fa9feed1284d4f18ea5bb4",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-313686",
+      "scenario": "normal",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-35082740712ca31e-1",
+        "advice-f912b9989fe44165-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 12,
+          "cp_used": 122.22913217276592,
+          "native_reserved": 180.0
+        },
+        {
+          "calls": 4,
+          "cp_used": 15.046582220272171,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        366.0,
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 165.899,
+            "decision_sha256": "344e1f5f85b4767f9e9b724d5d4f2879087fc29b795c1ac1b337303be965f9d2",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 165.899,
+            "decision_sha256": "344e1f5f85b4767f9e9b724d5d4f2879087fc29b795c1ac1b337303be965f9d2",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 165.899,
+          "decision_sha256": "344e1f5f85b4767f9e9b724d5d4f2879087fc29b795c1ac1b337303be965f9d2",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-313686",
+      "scenario": "normal",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-16e02d7b08c51eb1-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 8,
+          "cp_used": 8.268180279174283,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 165.899,
+          "decision_sha256": "344e1f5f85b4767f9e9b724d5d4f2879087fc29b795c1ac1b337303be965f9d2",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-2199732",
+      "scenario": "wildcard",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-42a3f285340ed901-1",
+        "advice-cebb94223dde5ac9-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 9,
+          "cp_used": 2.4276352218840587,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 3,
+          "cp_used": 0.9185238948159411,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0,
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 58.778000000000006,
+            "decision_sha256": "312b65da05f42fc40026c43a70a275fe623cce99f6d16f3c8991c17e40d399ce",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 58.778000000000006,
+            "decision_sha256": "312b65da05f42fc40026c43a70a275fe623cce99f6d16f3c8991c17e40d399ce",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 58.667,
+          "decision_sha256": "248f3535daba992c122a7ae687bb606827a202cbe8e784fc1fa5371927e9c670",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-2199732",
+      "scenario": "wildcard",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-2cc3098ee971dd9a-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.2790154913796112,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 58.667,
+          "decision_sha256": "953ba2f9f8f9475f9aa4d763dc390cb5adc8d68a82b2317d82cc6bc277b3035e",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[465730],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.111
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-2199732",
+      "scenario": "wildcard",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-86c4aa230add1fca-1",
+        "advice-b1d6fca971874503-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 4,
+          "cp_used": 60.00555450856191,
+          "native_reserved": 60.0
+        },
+        {
+          "calls": 12,
+          "cp_used": 135.5337783097193,
+          "native_reserved": 180.0
+        }
+      ],
+      "allocations": [
+        122.0,
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 176.334,
+            "decision_sha256": "d2e90a68b1450619b3954330f7a8da21de6d0c541b604a2b1da5d792388ef3cd",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 176.334,
+            "decision_sha256": "d2e90a68b1450619b3954330f7a8da21de6d0c541b604a2b1da5d792388ef3cd",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 176.001,
+          "decision_sha256": "a79588c0e3426ab2f43c8fbcd0c8feae2bc8141f2dc1b1b2344508a662c6fe2a",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-2199732",
+      "scenario": "wildcard",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-fed7f330af9bc631-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 8,
+          "cp_used": 60.0026814585876,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 176.001,
+          "decision_sha256": "098db78ed8fbd08eea8eb5e2af6bdf3393e8ee4c667e28b629d73bf87d55d50a",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[465730],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.333
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-2281624",
+      "scenario": "freehit",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-438478dec4ef0ef5-1",
+        "advice-ef0c1b7a35c9994f-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 9,
+          "cp_used": 2.6191996295836786,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 3,
+          "cp_used": 0.894839867090103,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0,
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 58.43300000000001,
+            "decision_sha256": "9a977105978b73e9655d325d94ca2bfb0061b8c59f4c6d166950b2afce0f3681",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 58.643000000000015,
+            "decision_sha256": "a9ec5bd8448cc9007571769cfbf7c00857503e63942d3afafb0e880e53a71320",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.703,
+          "decision_sha256": "c31b65a8561559195c5f4bf5fe180e945417c576af44657bda8f1507cf66209d",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-2281624",
+      "scenario": "freehit",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-0080f4fd52355857-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.5560327014088666,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.703,
+          "decision_sha256": "7ed63db7dcf72fb081d1178f07eacb51256a0b7ea6c366cda2cc769279ad95bd",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[477424],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[473284],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.94
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-2281624",
+      "scenario": "freehit",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-b868c1b2bc09aa94-1",
+        "advice-e82f30a903f31355-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 4,
+          "cp_used": 3.2914445559929395,
+          "native_reserved": 60.0
+        },
+        {
+          "calls": 12,
+          "cp_used": 9.824840255533864,
+          "native_reserved": 180.0
+        }
+      ],
+      "allocations": [
+        122.0,
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 167.526,
+            "decision_sha256": "6b76231c240b0b3d784c96e3669c93d522c340bb27ffe53c33caf482da3cb051",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 167.19,
+            "decision_sha256": "df3166c981b2319b99f7e21fa1cbbeeac4c996273081ef8fd0f807bef0a71c0d",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 166.25,
+          "decision_sha256": "5637d514f851e5f8243e06d2ae65c46b004673999ee1ac62e9406ce57bdbb107",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-2281624",
+      "scenario": "freehit",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-f6f31f64bc9df69d-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 8,
+          "cp_used": 55.129250918797105,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 166.25,
+          "decision_sha256": "a679c01d815e2021cb7aa0fafae0b2658955da1a25859f3f14458dcde5534b62",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[477424],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[473284],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 1.486
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-3832237",
+      "scenario": "tight_bank",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-4bb9a08187a76a5c-1",
+        "advice-f0c3ad57850634b3-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 9,
+          "cp_used": 2.670340610923429,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 3,
+          "cp_used": 1.113468222682841,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0,
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 52.977999999999994,
+            "decision_sha256": "1ddba8176ae1aa6fe52e68ea3ecb5653da25546be05b5058bd4a9f2ef30fb620",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 52.051,
+            "decision_sha256": "0c4f4a3276e9e12477178c444a0ae6b74677fc1e952b11a6a375d3153a13f8f3",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 51.723,
+          "decision_sha256": "4deb06e4e33ac2d51225e886a460f9ae3e678715f041c042d1811f3882567db2",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-3832237",
+      "scenario": "tight_bank",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-629b3e96945c582b-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.6683159564598906,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 51.723,
+          "decision_sha256": "4deb06e4e33ac2d51225e886a460f9ae3e678715f041c042d1811f3882567db2",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[226597],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[441164],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 1.255
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-3832237",
+      "scenario": "tight_bank",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-5882a03b26e1d200-1",
+        "advice-a438a37c0d4984d2-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 12,
+          "cp_used": 100.39418357088115,
+          "native_reserved": 180.0
+        },
+        {
+          "calls": 4,
+          "cp_used": 48.05614708793889,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        366.0,
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 161.675,
+            "decision_sha256": "ab169199830354881960d5692520bc3914a674e9c65b96b742a2b0e6e9db9907",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 159.507,
+            "decision_sha256": "dfe4ab243a501bebedb28b7f708f0df9b3b64e06687f00635172d36b0fa6b0a4",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 158.293,
+          "decision_sha256": "261bb80655217832a53add8d8830b425c2e1361024ab7b1062838487d3de7937",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-3832237",
+      "scenario": "tight_bank",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-20bc25c2db27f84e-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 6,
+          "cp_used": 60.19715922704569,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 161.675,
+          "decision_sha256": "ab169199830354881960d5692520bc3914a674e9c65b96b742a2b0e6e9db9907",
+          "priority": {
+            "budget_exhausted": true,
+            "completed_priorities": [
+              1
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[226597],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[441164],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-4287206",
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 21.0,
+      "job_ids": [
+        "advice-331778f25413f176-1"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 2,
+          "cp_used": 0.0,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw9-4287206",
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 21.0,
+      "job_ids": [
+        "advice-331778f25413f176-2"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 2,
+          "cp_used": 0.0,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw9-4287206",
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 122.0,
+      "job_ids": [
+        "advice-6aeee91931718e28-1"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.0,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw9-4287206",
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 122.0,
+      "job_ids": [
+        "advice-6aeee91931718e28-2"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.0,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw9-5081114",
+      "scenario": "normal",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-9d6758bb9ea2899a-1",
+        "advice-b44426113ce74807-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 1.2899780664064495,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.7277549441112123,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 52.676,
+            "decision_sha256": "a9eedd449ccd9eab5989212e16bacdb41052435452fb745a83f0216b600b6843",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 51.97500000000001,
+            "decision_sha256": "e81c04de6089e857280eb4a6fa7a5aac88e36ce7aa120b2c23921d35959cb52e",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 51.97500000000001,
+          "decision_sha256": "e81c04de6089e857280eb4a6fa7a5aac88e36ce7aa120b2c23921d35959cb52e",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5081114",
+      "scenario": "normal",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-88fc792ca61d0762-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.4593346740252224,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 51.97500000000001,
+          "decision_sha256": "e81c04de6089e857280eb4a6fa7a5aac88e36ce7aa120b2c23921d35959cb52e",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[247348],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[465730],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.701
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5081114",
+      "scenario": "normal",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-cbff34457325dbff-1",
+        "advice-fa095ca25a51345f-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 4,
+          "cp_used": 4.254685003038962,
+          "native_reserved": 60.0
+        },
+        {
+          "calls": 12,
+          "cp_used": 72.00603763350139,
+          "native_reserved": 180.0
+        }
+      ],
+      "allocations": [
+        122.0,
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 162.246,
+            "decision_sha256": "4709d2fe1f0c7783040cc794f2d6099c986adb0688f364348e12b8582936b87a",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 161.763,
+            "decision_sha256": "b5f4a7576eebed3af05b0dc734d1b2c4557cb32e2b6ae10fad58d61885d0e4a5",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 161.763,
+          "decision_sha256": "b5f4a7576eebed3af05b0dc734d1b2c4557cb32e2b6ae10fad58d61885d0e4a5",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5081114",
+      "scenario": "normal",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-f6de82ed07d6af39-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 6,
+          "cp_used": 60.00362221147133,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 162.246,
+          "decision_sha256": "4709d2fe1f0c7783040cc794f2d6099c986adb0688f364348e12b8582936b87a",
+          "priority": {
+            "budget_exhausted": true,
+            "completed_priorities": [
+              1
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[247348],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[465730],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5349883",
+      "scenario": "wildcard",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-06bc5134bf9c8163-1",
+        "advice-747a211aeefe177a-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.9224618172787626,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.5556631645456607,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 57.572,
+            "decision_sha256": "9f52676bd7e76339c0ae59cdb3641ac649cf495c2f77ea265a971792485c3374",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 57.80800000000001,
+            "decision_sha256": "4fbedd27d87ad0ca953a6d371533f6a7b31c3d80fb97fb846c2f8df370733c58",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.46600000000001,
+          "decision_sha256": "2cd6c6695a1652b8e5bab5d0feab437eef7851f1e0c2b3240de0e0416cd27223",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5349883",
+      "scenario": "wildcard",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-342fd73f5e30f12b-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.4254165854712335,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.46600000000001,
+          "decision_sha256": "d37bedbdbf71b88a8d9e3b3db460698c1b83c52ef4cda09c7573dc4224ac4523",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[469142],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.342
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5349883",
+      "scenario": "wildcard",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-0ac6b654a47f1bfc-1",
+        "advice-de428d85048c4b01-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 4,
+          "cp_used": 21.90305302794982,
+          "native_reserved": 60.0
+        },
+        {
+          "calls": 12,
+          "cp_used": 95.67616356852145,
+          "native_reserved": 180.0
+        }
+      ],
+      "allocations": [
+        122.0,
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 172.716,
+            "decision_sha256": "c5c803ff45d513bc1c8987798a1e957c553330f49eeaa4dd92dc9c87234db921",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 173.42400000000004,
+            "decision_sha256": "024ed5ad5b0a4b4eb55a45b6da8193ee6f90942145a65edc34f212122c1da469",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 172.39800000000002,
+          "decision_sha256": "ce43356dc37f9020f7afea1e3c0dffc4b041932c370bad901515068b2ebf0f57",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5349883",
+      "scenario": "wildcard",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-2ed3ed1eb75dd52b-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 8,
+          "cp_used": 60.00217624567188,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 172.27400000000003,
+          "decision_sha256": "3ad583f41b58c58a4beec59839c07127fee9528f13e38d8957e4a6578fdc7027",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[469142],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 1.15
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5662073",
+      "scenario": "freehit",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-2f541dc4fa4f8eca-1",
+        "advice-ced9cbb273aa649f-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 9,
+          "cp_used": 2.5439632986335328,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 3,
+          "cp_used": 0.9110799963061327,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0,
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 58.062,
+            "decision_sha256": "f1c1ddb4c1b31e31d0d8f5c8f057b975bf18a88391fe362f89cb65e8f4a53a63",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 58.285,
+            "decision_sha256": "1c541e2ef4b216fa7f008c2902efb7a934cab865838d42a4d81e139db1c6220e",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.33800000000001,
+          "decision_sha256": "d5c531d188fcdbabeb8721e84e9ba2d3760beda62da40f27192913333c7441ab",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5662073",
+      "scenario": "freehit",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-b61307339dc4b9cc-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.4764757405621292,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 57.33800000000001,
+          "decision_sha256": "007cff2d29b3552e403e14888a1d612d4bff0a4c2022e199a29a76a2054833c1",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[477424],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.947
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5662073",
+      "scenario": "freehit",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-3d4395536ec1d97d-1",
+        "advice-445b4ae4720c5365-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 12,
+          "cp_used": 27.25258707467044,
+          "native_reserved": 180.0
+        },
+        {
+          "calls": 4,
+          "cp_used": 15.721509557337548,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        366.0,
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 159.46300000000002,
+            "decision_sha256": "577b8a29b80da0b4c35add0dbc56505452e944c29229b2f8f192cefc24ec6d62",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 158.508,
+            "decision_sha256": "ce2dc9ee364fc1aaa37cae123b257cbb50d231b1d04a1ac0d3e5cdedac3aa094",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 157.56100000000004,
+          "decision_sha256": "c3b4e305061c0f7fdfcb105544d046de15f85894b53622f6604fbf31ced7edc9",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-5662073",
+      "scenario": "freehit",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-50381654aa8054b9-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 8,
+          "cp_used": 55.42059193116975,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 158.28500000000003,
+          "decision_sha256": "21f3bcfbd77a0b825205e868957d3971001484928d09acac3d157022c815210b",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[],\"keep_players\":[477424],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 1.401
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-6654210",
+      "scenario": "tight_bank",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 84.0,
+      "job_ids": [
+        "advice-67ee954501195c3e-1",
+        "advice-6ed01872223981d3-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.9991719182695553,
+          "native_reserved": 0.0
+        },
+        {
+          "calls": 9,
+          "cp_used": 2.816995632335012,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0,
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 52.0,
+            "decision_sha256": "df20ee778e88b8d642e2837cb323d41ba56e009fa1390b4d835d063d8a3822f3",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 49.394999999999996,
+            "decision_sha256": "0336962d629a279a259ca0291fcb315510ca248a999617d5847a7b98067b208f",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 49.394999999999996,
+          "decision_sha256": "0336962d629a279a259ca0291fcb315510ca248a999617d5847a7b98067b208f",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-6654210",
+      "scenario": "tight_bank",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 63.0,
+      "job_ids": [
+        "advice-779ebcdf6c4118e8-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 7,
+          "cp_used": 1.510570751094323,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        63.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 52.0,
+          "decision_sha256": "df20ee778e88b8d642e2837cb323d41ba56e009fa1390b4d835d063d8a3822f3",
+          "priority": {
+            "budget_exhausted": false,
+            "completed_priorities": [
+              1,
+              2,
+              3
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[191866],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-6654210",
+      "scenario": "tight_bank",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 2,
+      "reserved_units": 488.0,
+      "job_ids": [
+        "advice-024ad94fd97abae5-1",
+        "advice-460b59d59c235dad-1"
+      ],
+      "terminal_statuses": [
+        "completed",
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 12,
+          "cp_used": 132.13286774646116,
+          "native_reserved": 180.0
+        },
+        {
+          "calls": 4,
+          "cp_used": 12.101159214363149,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        366.0,
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 159.909,
+            "decision_sha256": "5724b0ae72314fad382a8ea2c82f10cbfb78173b926f986f6535c4c813238ab4",
+            "priority": null
+          },
+          {
+            "status": "done",
+            "error_code": null,
+            "expected_net_points": 157.031,
+            "decision_sha256": "87c4640ee19fdb406f4857260431d146864f02425641e76bda7c01b29387727e",
+            "priority": null
+          }
+        ],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 156.601,
+          "decision_sha256": "f2c29f74f22c5f2508a6b00a646595d542448588406e771dc80e37533d312c57",
+          "priority": null
+        },
+        "applied": [
+          0,
+          1,
+          2
+        ],
+        "accepted": 3,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-6654210",
+      "scenario": "tight_bank",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": true,
+      "main_status": "OPTIMAL",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 366.0,
+      "job_ids": [
+        "advice-4906df197e81c36d-1"
+      ],
+      "terminal_statuses": [
+        "completed"
+      ],
+      "receipts": [
+        {
+          "calls": 6,
+          "cp_used": 60.17122422788566,
+          "native_reserved": 1.0
+        }
+      ],
+      "allocations": [
+        366.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 3,
+      "extra_jobs_from_repeats": 0,
+      "result": {
+        "components": [],
+        "selected": {
+          "status": "done",
+          "error_code": null,
+          "expected_net_points": 159.909,
+          "decision_sha256": "5724b0ae72314fad382a8ea2c82f10cbfb78173b926f986f6535c4c813238ab4",
+          "priority": {
+            "budget_exhausted": true,
+            "completed_priorities": [
+              1
+            ],
+            "contract_version": "llmopt_priority_result_v1",
+            "left_out": [
+              "{\"avoid_players\":[191866],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "reference_proved": true,
+            "satisfied": [
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}"
+            ],
+            "total_cost": 0.0
+          }
+        },
+        "applied": [],
+        "accepted": 0,
+        "budget_exhausted": false
+      }
+    },
+    {
+      "case": "gw9-6879786",
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 21.0,
+      "job_ids": [
+        "advice-079fc97b1845cdca-1"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 2,
+          "cp_used": 0.0,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw9-6879786",
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "mode": "priority_total",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 21.0,
+      "job_ids": [
+        "advice-079fc97b1845cdca-2"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 2,
+          "cp_used": 0.0,
+          "native_reserved": 0.0
+        }
+      ],
+      "allocations": [
+        21.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw9-6879786",
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "mode": "legacy_prices",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 122.0,
+      "job_ids": [
+        "advice-d5d85758d9ffb361-1"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.0,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    },
+    {
+      "case": "gw9-6879786",
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "mode": "priority_total",
+      "main_cache_hit": false,
+      "main_status": "PLAN_NOT_FOUND",
+      "expected_main_outcome": true,
+      "admitted_server_jobs": 1,
+      "reserved_units": 122.0,
+      "job_ids": [
+        "advice-d5d85758d9ffb361-2"
+      ],
+      "terminal_statuses": [
+        "failed"
+      ],
+      "receipts": [
+        {
+          "calls": 3,
+          "cp_used": 0.0,
+          "native_reserved": 60.0
+        }
+      ],
+      "allocations": [
+        122.0
+      ],
+      "within_allocation": true,
+      "repeated_requests": 0,
+      "extra_jobs_from_repeats": 0,
+      "result": null
+    }
+  ]
+}
