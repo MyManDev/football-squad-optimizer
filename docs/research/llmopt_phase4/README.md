@@ -47,6 +47,10 @@ hard-player preservation, reload identity, zero server POST jobs and no horizont
 
 ## Original-control scope audit
 
+The [audit result](../llmopt_phase4_scope_audit.md) reports all sixty comparisons,
+including the original incumbent mismatch. The historical 40/40 result above is not
+substituted for that finding.
+
 The historical 40/40 record adds a keep-first-held-player constraint to every case.
 It cannot establish parity for the original Phase 1 controls or an unrestricted run.
 Keep that record unchanged and audit those scopes separately:
