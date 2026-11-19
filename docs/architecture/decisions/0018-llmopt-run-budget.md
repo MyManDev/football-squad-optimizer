@@ -41,6 +41,16 @@ four jobs and makes twelve internal calls at one week, sixteen at three weeks.
    remains visible and no further call starts after exhaustion. No accounting tolerance is
    enlarged or observed work clamped. Reservation totals, observed work and elapsed time
    remain distinct. Unused job reservations are not silently recycled into more jobs.
+   A named-chip request under this allocation solves the requested chip-constrained model
+   directly, with the existing hold protection. It does not first solve a separate no-chip
+   plan and replay multiple warm starts: those auxiliary searches are not included in the
+   21/122-unit job allocation and must not consume the capacity needed by the requested
+   model. The unbound legacy path keeps its existing additional seed protection. This
+   changes neither the requested objective and hard rules nor any allowance or tolerance;
+   an unproved direct result remains unproved. The Phase 1 named-chip controls already
+   use this direct optimizer path. A local public-worker replay exposed the difference:
+   GW8 member 2199732 used 62 native units plus 60.003530500722654 CP units after the
+   auxiliary seeds prevented the final native reservation from fitting.
 7. Cancellation closes the run before touching the queue. Unshared queued jobs become
    terminal `cancelled` jobs and are removed from the open queue. A running solver is not
    killed: its valid answer is cached and the job completes, even after the run closes.
