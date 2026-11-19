@@ -467,6 +467,8 @@ def main():
         rows, cases = previous["rows"], previous["completed_member_weeks"]
         if type(cases) is not int or not 0 <= cases <= 20 or len(rows) != cases * 4:
             raise ValueError("The checkpoint does not contain complete member-weeks.")
+        if any(not row["expected_main_outcome"] or not row["within_allocation"] for row in rows):
+            raise ValueError("A failed checkpoint cannot be resumed as acceptance evidence.")
     skip = cases
     visited = 0
     with TemporaryDirectory(prefix="lp3-api-") as directory:
@@ -515,6 +517,13 @@ def main():
                     newline="\n",
                 )
                 pending.replace(args.checkpoint)
+                if any(
+                    not row["expected_main_outcome"] or not row["within_allocation"]
+                    for row in rows[-4:]
+                ):
+                    raise RuntimeError(
+                        f"{case} failed its outcome or work contract; see {args.checkpoint}."
+                    )
     report = dict(
         contract_version="llmopt_phase3_jobs_v1",
         **provenance,
