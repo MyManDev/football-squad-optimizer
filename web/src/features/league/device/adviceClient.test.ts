@@ -91,6 +91,30 @@ function setup() {
 }
 
 describe("one-week advice transport with a real solver", () => {
+  it("keeps legacy individual pricing inside one device preference execution", async () => {
+    const { client, remote, posts } = setup();
+    const selection = { preferences: { avoid_players: [entry.held[1]] }, chip: null };
+    const bundle: PreferenceBundle = {
+      contract_version: "llmopt_preference_bundle_v1",
+      program: null,
+      slots: [selection],
+      prices: [{ outcome: 0, ceiling: null }],
+      choices: [
+        { accepted: 0, applied: [], selection: null },
+        { accepted: 1, applied: [0], selection },
+      ],
+    };
+    const result = await client.requestAdvice({ ...request, preferenceBundle: bundle });
+    expect(result.kind).toBe("advice");
+    if (result.kind !== "advice") throw new Error("No priced answer.");
+    const execution = result.envelope.payload.preference_bundle_result!;
+    expect(execution.accepted).toBe(1);
+    expect(execution.applied).toEqual([0]);
+    expect(execution.components[0]?.status).toBe("done");
+    expect(execution.selected?.payload).toEqual(execution.components[0]?.payload);
+    expect(posts).toHaveBeenCalledTimes(1);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
   it("runs three priorities in one device attempt and reloads without remote work", async () => {
     const { client, remote, posts, load, create } = setup();
     const main = await client.requestAdvice(request);

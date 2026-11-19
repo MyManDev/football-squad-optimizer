@@ -52,6 +52,8 @@ used no live endpoint; tests and CI were not running during measurement.
 
 The Phase 3 public program is complete and independently measured through its API and
 worker. This mandatory-rule audit does not itself establish the remaining one-week
-priority migration. That path must compare the same twenty member-weeks and tiny
-exhaustive examples, retaining the approved active-setting criterion and existing
-capacity. See [ADR 0020](../architecture/decisions/0020-llmopt-device-alternatives.md).
+priority migration. The separate [priority comparison](llmopt_phase4_priority_audit.md)
+now supplies that evidence: 16/16 feasible objectives and priority outcomes plus four
+matching infeasibilities, with eight differing equal-score transfer decisions.
+Tiny exhaustive tests and the existing capacity are retained.
+See [ADR 0020](../architecture/decisions/0020-llmopt-device-alternatives.md).

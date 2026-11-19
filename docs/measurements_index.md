@@ -1,5 +1,11 @@
 # Measurements Index
 
+- 2026-11-19: [LLMOPT device priorities](research/llmopt_phase4_priority_audit.md),
+  [record](research/llmopt_phase4_priority_audit.json): the original twenty frozen
+  controls, 16/16 equal feasible objectives and priority outcomes plus four equal
+  infeasibilities. Eight transfer decisions differ at equal scores; maximum complete
+  device bundle 7.165 seconds. Sequential local calls, zero jobs and network calls. #1468.
+
 - 2026-11-19: [LLMOPT original-control scope audit](research/llmopt_phase4_scope_audit.md),
   [record](research/llmopt_phase4_scope_audit.json): 20 frozen member-weeks, 60 local
   comparisons. Exact original controls replay 20/20; device equality is 15/16 feasible
