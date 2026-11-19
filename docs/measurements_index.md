@@ -1,5 +1,11 @@
 # Measurements Index
 
+- 2026-11-19: [LLMOPT bounded packages](research/llmopt_phase6_results.md),
+  [record](research/llmopt_phase6_results.json): unchanged twenty-member full pool,
+  18 computed and two inherited errors in each arm; raw eleven, expected net and
+  selection-utility gains all zero. Sixteen opened-gate proposals retain the incumbent.
+  One inherited 122.000084823-unit base overrun remains visible. Both controls default off.
+
 - 2026-11-19: [LLMOPT device parity and scope](research/llmopt_phase4/README.md),
   [record](research/llmopt_phase4_parity.json): twenty frozen member-weeks, forty local
   comparisons, forty equal model and published objectives, forty identical transfer
