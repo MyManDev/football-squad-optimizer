@@ -56,6 +56,9 @@ and retain the existing working path. Browser migration belongs to the next phas
 
 ### Public execution boundary
 
+The following is the required integration design. It is not implemented by the
+internal kernel in this PR; the public page still uses its existing four-job path.
+
 Use a closed `llmopt_preference_bundle_v1` contract on the existing advice boundary.
 The full backend advertises the capability only when durable run admission, immutable
 specs, the cache and the bundle worker are wired together. Old readers and confirmed

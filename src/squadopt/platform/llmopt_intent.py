@@ -273,12 +273,12 @@ def _constraint(
         fields.add("max_cost_tenths")
     if comparison:
         fields.add("both")
+    if not isinstance(value, dict) or "kind" not in value or value.keys() - fields:
+        raise IntentValidationError("Invalid intent constraint.")
     if model and isinstance(value, dict):
         # A provider that enforces the schema sends every field, null where it has nothing
         # to say; one that does not may leave such a field out. Both read the same.
         value = {name: item for name, item in value.items() if item is not None}
-    if not isinstance(value, dict) or "kind" not in value or value.keys() - fields:
-        raise IntentValidationError("Invalid intent constraint.")
     kind = value["kind"]
     if not isinstance(kind, str) or kind not in _KINDS:
         raise IntentValidationError("Unsupported intent constraint.")
@@ -356,6 +356,9 @@ def _draft(
     previous_window: int | None = None,
     previous_draft: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    fields = {"hard", "soft", "comparison", "window", "keep_weeks", "min_bank", "scenario"}
+    if not isinstance(value, dict) or value.keys() - fields:
+        raise IntentValidationError("Invalid constraint draft.")
     if model and isinstance(value, dict):
         # A partial reply retains reviewed rules and selections. Lists use [] to clear;
         # the optional comparison, bank floor and scenario use null to clear.
