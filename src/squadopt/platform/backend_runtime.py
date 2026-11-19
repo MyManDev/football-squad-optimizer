@@ -140,7 +140,9 @@ def computable_strategies() -> dict[str, bool]:
     return {slug: value.requires_rival for slug, value in advice_capabilities().items()}
 
 
-def configuration_fingerprint() -> str:
+def configuration_fingerprint(
+    *, transfer_packages: bool = False, package_gate: bool = False
+) -> str:
     """SHA-256 of the settings that can change an answer.
 
     Paths are deliberately absent. Where the store is mounted is deployment placement, not
@@ -171,6 +173,11 @@ def configuration_fingerprint() -> str:
             if slug in STRATEGY_CATALOG
         },
     }
+    if transfer_packages:
+        document["transfer_packages"] = {
+            "version": "transfer_packages_v1",
+            "open_gate": package_gate,
+        }
     encoded = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -215,6 +222,8 @@ class BackendConfig:
     rate_limit: int = DEFAULT_RATE_LIMIT
     rate_window_seconds: float = DEFAULT_RATE_WINDOW_SECONDS
     max_open_jobs_per_client: int = 4
+    transfer_packages: bool = False
+    package_gate: bool = False
     public_entries: bool = False
     public_queue_limit: int = 32
     artifact_root: Path | None = None
@@ -225,6 +234,12 @@ class BackendConfig:
     """The club-news fixture file, or a club-news capture directory under the snapshot
     root, that the rotation table was coded from. The manager's word needs both this and
     ``artifact_root``."""
+
+    def __post_init__(self) -> None:
+        if type(self.transfer_packages) is not bool or type(self.package_gate) is not bool:
+            raise BackendConfigError("Package controls must be boolean.")
+        if self.package_gate and not self.transfer_packages:
+            raise BackendConfigError("The package gate requires packages.")
 
     @property
     def queue_root(self) -> Path:
@@ -288,6 +303,8 @@ class BackendConfig:
             handoff_root=values["handoff_root"],
             allowed_origins=origins,
             public_entries=public_entries == "1",
+            transfer_packages=_flag(source, "SQUADOPT_BACKEND_TRANSFER_PACKAGES"),
+            package_gate=_flag(source, "SQUADOPT_BACKEND_PACKAGE_GATE"),
             public_queue_limit=_positive_int(source, "SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT", 32),
             season=season,
             rate_limit=_positive_int(source, "SQUADOPT_BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT),
@@ -300,6 +317,13 @@ class BackendConfig:
             artifact_root=Path(artifact_root) if artifact_root else None,
             club_news_source=Path(club_news_source) if club_news_source else None,
         )
+
+
+def _flag(source: Mapping[str, str], variable: str) -> bool:
+    value = source.get(variable, "0").strip()
+    if value not in {"0", "1"}:
+        raise BackendConfigError(f"{variable} must be 0 or 1.")
+    return value == "1"
 
 
 def _positive_int(source: Mapping[str, str], variable: str, default: int) -> int:
@@ -507,7 +531,11 @@ class CaptureContextProvider:
         with self._lock:
             held = self._context
             if held is None or held.context != context:
-                held = load_capture_context(identity)
+                held = replace(
+                    load_capture_context(identity),
+                    transfer_packages=self._config.transfer_packages,
+                    package_gate=self._config.package_gate,
+                )
                 self._context = held
                 self._switch_signature = None
             return self._with_current_switches(held)
@@ -826,7 +854,9 @@ def build_backend(
     contexts = CaptureContextProvider(
         config,
         repository_commit=_repository_commit(),
-        fingerprint=configuration_fingerprint(),
+        fingerprint=configuration_fingerprint(
+            transfer_packages=config.transfer_packages, package_gate=config.package_gate
+        ),
         log=component_log,
     )
     reader = AdviceReadStore(
@@ -839,6 +869,7 @@ def build_backend(
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
+        transfer_packages=config.transfer_packages,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -868,6 +899,7 @@ def build_backend(
             public_inputs,
             switches=contexts,
             available_windows=contexts.available_windows,
+            transfer_packages=config.transfer_packages,
         )
         public_submit = AdviceSubmitService(
             public_reader,

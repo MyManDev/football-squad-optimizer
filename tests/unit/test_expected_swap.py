@@ -478,3 +478,176 @@ def test_original_proposals_ties_and_gross_recycled_caps_remain_honest(monkeypat
     assert (
         sum(expected_week_utility(w, problem[3]) * 0.9**i for i, w in enumerate(result.weeks)) >= 0
     )
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_package_disabled_and_closed_gate_preserve_whole_legacy_result(monkeypatch, enabled):
+    from squadopt.planning import expected_window
+
+    problem = world()
+    baseline = replace(
+        problem[-1],
+        diagnostics={
+            **problem[-1].diagnostics,
+            "expected_lineup_window": {"optional_swap": {"reason": "original_routes_incomplete"}},
+        },
+    )
+    calls = []
+
+    def retained(h, initial, config, policy, **kwargs):
+        calls.append(policy)
+        assert not policy.transfer_packages and not policy.package_gate
+        return baseline
+
+    monkeypatch.setattr(expected_window, "_retained_expected_window", retained)
+    monkeypatch.setattr(expected_window, "propose_expected_swap", no_solve)
+    policy = replace(problem[3], transfer_packages=enabled)
+    result = optimize_expected_window(*problem[:3], policy)
+    assert result.weeks == baseline.weeks and len(calls) == 1
+    if not enabled:
+        assert result is baseline
+        assert "transfer_packages_v1" not in result.diagnostics
+    else:
+        assert result.diagnostics["transfer_packages_v1"]["reason"] == "original_routes_incomplete"
+
+
+def test_real_funding_pair_keeps_negative_single_and_original_resource_path():
+    from squadopt.planning.expected_packages import pick_package
+
+    horizon, initial, config, transfer, baseline = world()
+    table = horizon.table.copy()
+    table.loc[table.player_id.eq(16), ["buy_price_tenths", "sell_price_tenths"]] = [80, 80]
+    table.loc[
+        table.player_id.eq(17), ["buy_price_tenths", "sell_price_tenths", "expected_points"]
+    ] = [20, 20, 0]
+    horizon = PlanningHorizon(table)
+    initial = replace(initial, free_transfers=2)
+    transfer = replace(transfer, max_transfers_per_gameweek=1, allow_two_free_transfers=True)
+    result, phase = call(
+        (horizon, initial, config, transfer, baseline),
+        package_picker=pick_package,
+        deterministic_reserve=1,
+    )
+    assert result is not None and phase["checked_pair_packages"] > 0
+    first = result.weeks[0]
+    assert set(first.transfers_in.player_id) == {16, 17}
+    assert set(first.transfers_out.player_id) == {14, 15}
+    assert first.bank_before_tenths == 5 and first.bank_after_tenths == 5
+    assert first.free_transfers_before == 2 and first.paid_transfer_count == 0
+    assert first.transfer_hit_points == 0 and len(result.weeks) == 3
+    assert phase["actual"] <= phase["cap"] + 0.01
+    assert phase["solver_deterministic_limit"] == phase["cap"] - 1
+    for week in result.weeks:
+        assert week.bank_after_tenths >= 0
+        assert week.transfer_hit_points == 4 * week.paid_transfer_count
+        assert set(week.starting_xi.player_id) | set(week.bench.player_id) == set(
+            week.selected_squad.player_id
+        )
+
+
+@pytest.mark.parametrize(
+    "rules",
+    [
+        {"keep_players": [14]},
+        {"avoid_players": [16]},
+        {"include_players": [14]},
+        {"no_hits": True},
+        {"max_hit_points": 0},
+        {"week_rules": [{"week": 1, "rules": {"buy_players": [13]}}]},
+    ],
+)
+def test_package_checks_whole_package_mandatory_rules_and_hits(rules):
+    from squadopt.planning.expected_packages import legal_package
+
+    h, initial, config, transfer, _ = world()
+    first = h.table.loc[h.table.gameweek.eq(1)].set_index("player_id", drop=False)
+    initial = replace(initial, free_transfers=0)
+    assert not legal_package(
+        first, initial, config, transfer, DecisionPreferences.parse(rules), (14, 15), (16, 17), 1
+    )
+
+
+def test_package_gate_still_refuses_work_without_original_slack(monkeypatch):
+    from squadopt.planning import expected_window
+
+    problem = world()
+    review = {
+        "configured_total": 5.0,
+        "actual_total": 4.5,
+        "lineup_evaluations": 6,
+        "lineup_evaluation_cap": 1153,
+        "optional_swap": {"reason": "original_routes_incomplete"},
+    }
+    baseline = replace(
+        problem[-1], diagnostics={**problem[-1].diagnostics, "expected_lineup_window": review}
+    )
+    monkeypatch.setattr(
+        expected_window, "_retained_expected_window", lambda *args, **kwargs: baseline
+    )
+    monkeypatch.setattr(expected_window, "propose_expected_swap", no_solve)
+    result = optimize_expected_window(
+        *problem[:3], replace(problem[3], transfer_packages=True, package_gate=True)
+    )
+    assert result.weeks == baseline.weeks
+    assert result.diagnostics["transfer_packages_v1"]["reason"] == "no_remaining_budget"
+
+
+@pytest.mark.parametrize(
+    "raw,expected,selection,accepted",
+    [(1, 1, 1, True), (-1, 2, 2, False), (1, -1, 2, False), (1, 1, -1, False), (0, 0, 0, False)],
+)
+def test_packages_keep_completed_incumbent_unless_every_reported_metric_is_safe(
+    monkeypatch, raw, expected, selection, accepted
+):
+    from squadopt.planning import expected_window
+
+    problem = world()
+    review = {
+        "configured_total": 5.0,
+        "actual_total": 1.0,
+        "lineup_evaluations": 6,
+        "lineup_evaluation_cap": 1153,
+        "optional_swap": {"reason": "retained"},
+        "ledger": [],
+        "candidates": [],
+        "chosen": "initial_single_swap",
+    }
+    baseline = replace(
+        problem[-1], diagnostics={**problem[-1].diagnostics, "expected_lineup_window": review}
+    )
+    first = baseline.weeks[0]
+    candidate = replace(
+        baseline,
+        weeks=(
+            replace(
+                first,
+                projected_score=first.projected_score + raw,
+                lineup_expectation={
+                    **first.lineup_expectation,
+                    "expected_net_points": first.lineup_expectation["expected_net_points"]
+                    + expected,
+                },
+            ),
+            *baseline.weeks[1:],
+        ),
+        diagnostics={
+            **baseline.diagnostics,
+            "terminal_banked_transfer_value": selection - expected,
+        },
+    )
+    monkeypatch.setattr(
+        expected_window, "_retained_expected_window", lambda *args, **kwargs: baseline
+    )
+    phase = {
+        "actual": 0.1,
+        "cap": 1.0,
+        "hold_score_calls": 0,
+        "lineup_search": {"evaluations": 3, "weeks": [{"states_evaluated": 1}] * 3},
+    }
+    monkeypatch.setattr(
+        expected_window, "propose_expected_swap", lambda *args, **kwargs: (candidate, phase)
+    )
+    result = optimize_expected_window(*problem[:3], replace(problem[3], transfer_packages=True))
+    assert result.diagnostics["transfer_packages_v1"]["accepted"] is accepted
+    assert result.weeks == (candidate if accepted else baseline).weeks
+    assert result.diagnostics["expected_lineup_window"]["actual_total"] == 1.1

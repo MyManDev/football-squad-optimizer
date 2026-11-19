@@ -128,8 +128,14 @@ class MenuRequest:
     managers_word: bool = False
     chip: str | None = None
     preferences: DecisionPreferences = NO_PREFERENCES
+    transfer_packages: bool = False
+    package_gate: bool = False
 
     def __post_init__(self) -> None:
+        if type(self.transfer_packages) is not bool or type(self.package_gate) is not bool:
+            raise EntryError("Package controls must be boolean.")
+        if self.package_gate and not self.transfer_packages:
+            raise EntryError("The package gate requires packages.")
         self.entry_request()  # the shared fields are refused by the type that owns them
         try:
             self.preferences.validate_selection(
@@ -446,6 +452,8 @@ def _advise_menu_entry(
             horizon_builder=horizon_builder,
             counts=top100_counts,
             preferences=request.preferences,
+            transfer_packages=request.transfer_packages,
+            package_gate=request.package_gate,
             include_resource_state=include_resource_state,
         )
         if football_weighted_window:

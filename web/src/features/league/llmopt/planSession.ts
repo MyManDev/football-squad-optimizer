@@ -12,9 +12,13 @@ import { checkedPlanRevision, type PlanRevision } from "./planRevision";
 
 export const ALTERNATIVE_COUNT = 2;
 
-export type StartedAlternative = { kind: "priced" | "roll" } | { kind: "bank"; floor: number };
+export type StartedAlternative =
+  | { kind: "priced" | "roll" }
+  | { kind: "bank"; floor: number }
+  | { kind: "delay"; players: number[] };
 
 export interface PlanConfirmation {
+  paths3w?: true;
   compareOnly?: boolean;
   deviceRun?: boolean;
   deviceAlternatives?: boolean;
@@ -232,6 +236,7 @@ export function checkedPlanSession(
           ? { runId: confirmation.runId }
           : {}),
         wildcardNotHeld: confirmation.wildcardNotHeld,
+        ...(confirmation.paths3w === true ? { paths3w: true as const } : {}),
         ...(typeof confirmation.compareOnly === "boolean"
           ? { compareOnly: confirmation.compareOnly }
           : {}),
@@ -247,6 +252,16 @@ export function checkedPlanSession(
         ...(confirmation.sending === true ? { sending: true as const } : {}),
         ...checkedCombined(confirmation.combined, session.draft.soft.length),
         followups: confirmation.followups?.map((item) => {
+          if (
+            item?.kind === "delay" &&
+            confirmation.paths3w === true &&
+            Array.isArray(item.players) &&
+            item.players.length > 0 &&
+            item.players.length <= 15 &&
+            item.players.every((id) => Number.isSafeInteger(id) && id > 0) &&
+            new Set(item.players).size === item.players.length
+          )
+            return { kind: "delay", players: [...item.players].sort((a, b) => a - b) };
           if (item?.kind === "priced" || item?.kind === "roll") return { kind: item.kind };
           if (
             item?.kind === "bank" &&

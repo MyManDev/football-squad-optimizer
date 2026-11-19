@@ -1,3 +1,4 @@
+import { PlanPathGroups } from "./PlanPathGroups";
 import { useComputedPlans } from "./useComputedPlans";
 import { planCatalogue, planContent, type PlanHistory } from "./planHistory";
 import { commandDraft } from "./planCommand";
@@ -804,6 +805,7 @@ function Workspace({
         frozenWeeks: frozen,
         reference,
         compareOnly: reference?.compareOnly === true,
+        ...(capabilities.transferPackages && plans.window === 3 ? { paths3w: true as const } : {}),
       });
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
       if (
@@ -822,6 +824,7 @@ function Workspace({
         confirmation: {
           runId,
           wildcardNotHeld,
+          ...(next.inputs.paths3w ? { paths3w: true as const } : {}),
           sending: true as const,
           compareOnly: next.inputs.compareOnly === true,
           deviceRun: next.baseRequest?.deviceRun ?? false,
@@ -1358,7 +1361,11 @@ function Workspace({
           aria-busy={isWorking(baseState.phase)}
         >
           <h2>{copy.results}</h2>
-          <div className={styles.planGrid}>
+          <PlanPathGroups
+            enabled={run.inputs.paths3w === true}
+            className={styles.planGrid}
+            label={copy.openingDecision}
+          >
             {(run.baseRequest || run.baseConflict) && !capacityRefused(baseState) && (
               <PlanResult
                 title={copy[run.baseTitle]}
@@ -1421,7 +1428,7 @@ function Workspace({
                 />
               </PlanResult>
             )}
-          </div>
+          </PlanPathGroups>
           {incompleteRun && <p role="status">{copy.unfinishedPlans}</p>}
           {same && (
             <p role="status" className={styles.muted}>

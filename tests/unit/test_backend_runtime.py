@@ -841,3 +841,28 @@ def test_chip_refusal_with_artifact_root_never_projects(deployment: dict[str, An
     assert response.json()["error"]["code"] == "CHIP_HISTORY_UNKNOWN"
     assert backend.contexts._context is None
     assert not backend.queue.jobs()
+
+
+def test_packages_disabled_identity_and_separate_gate_are_server_owned(tmp_path):
+    config = BackendConfig(
+        tmp_path / "store", tmp_path / "site", tmp_path / "snapshot", tmp_path / "handoff"
+    )
+    assert config.transfer_packages is False and config.package_gate is False
+    assert configuration_fingerprint() == configuration_fingerprint(
+        transfer_packages=False, package_gate=False
+    )
+    pairs = configuration_fingerprint(transfer_packages=True)
+    assert pairs != configuration_fingerprint()
+    assert pairs != configuration_fingerprint(transfer_packages=True, package_gate=True)
+    with pytest.raises(BackendConfigError, match="requires packages"):
+        replace(config, package_gate=True)
+    with pytest.raises(BackendConfigError, match="boolean"):
+        replace(config, transfer_packages=1)
+    env = {
+        "SQUADOPT_BACKEND_" + key: "local"
+        for key in ("STORE_ROOT", "SITE_DATA_ROOT", "SNAPSHOT_ROOT", "HANDOFF_ROOT")
+    }
+    enabled = BackendConfig.from_environment({**env, "SQUADOPT_BACKEND_TRANSFER_PACKAGES": "1"})
+    assert enabled.transfer_packages and not enabled.package_gate
+    with pytest.raises(BackendConfigError, match="0 or 1"):
+        BackendConfig.from_environment({**env, "SQUADOPT_BACKEND_TRANSFER_PACKAGES": "yes"})

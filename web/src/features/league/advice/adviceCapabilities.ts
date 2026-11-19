@@ -47,6 +47,7 @@ export interface StrategyCapability {
 }
 
 export interface AdviceCapabilities {
+  transferPackages?: boolean;
   planDataId?: string;
   decisionInformation?: DecisionInformation;
   leagueId: number;
@@ -100,6 +101,8 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
     (typeof value.plan_data_id !== "string" || !/^[0-9a-f]{64}$/.test(value.plan_data_id))
   )
     throw new AdviceCapabilitiesError("Invalid plan data identity.");
+  if (value.transfer_packages !== undefined && typeof value.transfer_packages !== "boolean")
+    throw new AdviceCapabilitiesError("Invalid transfer package capability.");
   const strategies: Record<string, StrategyCapability> = {};
   for (const [slug, row] of Object.entries(value.strategies)) {
     if (
@@ -184,6 +187,9 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       : { preferences: record(value.preferences) && value.preferences.available === true }),
     ...(value.models === undefined ? {} : { models: value.models as ("current" | "football")[] }),
     ...(typeof value.plan_data_id === "string" ? { planDataId: value.plan_data_id } : {}),
+    ...(value.transfer_packages === undefined
+      ? {}
+      : { transferPackages: value.transfer_packages as boolean }),
     leagueId,
     captureSnapshotId: value.capture_snapshot_id,
     season: value.season,

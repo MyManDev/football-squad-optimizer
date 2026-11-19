@@ -52,6 +52,8 @@ def advise_chip_strategy(
     preferences: DecisionPreferences = NO_PREFERENCES,
     chip_tail_forecast: ChipTailForecast | None = None,
     include_resource_state: bool = False,
+    transfer_packages: bool = False,
+    package_gate: bool = False,
 ) -> dict[str, object]:
     if chip_tail_forecast is not None and chip != "auto":
         raise EntryError("A dated chip tail requires the automatic chip strategy.")
@@ -117,6 +119,8 @@ def advise_chip_strategy(
         chip_tail_forecast=chip_tail_forecast,
         linearization_level=WINDOW_LINEARIZATION_LEVEL,
         preferences=preferences,
+        transfer_packages=transfer_packages,
+        package_gate=package_gate,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
         raise SolverExecutionError("Chip strategy reached its wall-clock safety limit.")

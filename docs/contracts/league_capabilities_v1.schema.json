@@ -198,6 +198,10 @@
         "weights"
       ],
       "type": "object"
+    },
+    "transfer_packages": {
+      "type": "boolean",
+      "description": "Optional disabled-by-default three-week package and path capability."
     }
   },
   "required": [

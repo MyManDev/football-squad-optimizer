@@ -406,6 +406,7 @@ class AdviceReadStore:
         preference_players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None]
         | None = None,
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
+        transfer_packages: bool = False,
     ) -> None:
         self._directory = directory
         self._cache = cache
@@ -425,6 +426,7 @@ class AdviceReadStore:
         self._chip_availability = chip_availability
         self._preference_players = preference_players
         self._available_windows = available_windows
+        self._transfer_packages = transfer_packages
 
     def _preference_players_of(
         self, context: AdviceRequestContext, league_id: int, entry_id: int
@@ -640,6 +642,8 @@ class AdviceReadStore:
             document["decision_information"] = inputs.decision_information(
                 context.capture_snapshot_id
             )
+        if self._transfer_packages:
+            document["transfer_packages"] = True
         validate_league_capabilities(document)
         return document
 

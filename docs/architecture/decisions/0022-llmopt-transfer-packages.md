@@ -25,11 +25,15 @@ package optimum. Validate the selected first squad with the full horizon model
 and the original initial resource state. At most one optional solver call uses
 the existing actual slack and lineup evaluation cap.
 
-Retain the original candidates. Select an optional result only by the existing
-expected-selection utility, including the existing terminal resource values.
+Retain the entire existing algorithm, including its optional single, as the incumbent.
+Only unused CP work and lineup evaluations may fund an additional package. Reserve
+one deterministic unit inside the optional solver limit for stopping granularity;
+the accounting cap and tolerance remain unchanged. Select a package only when
+selection utility strictly improves and none of the three reported metrics declines,
+including the existing terminal resource values in selection utility.
 Report raw named-eleven points, expected lineup net points, and selection utility
-separately. Do not use realized points. A primary-utility improvement does not
-claim that every component improved. Keep error rows as errors; missing values
+separately. Do not use realized points. Disclose rejected proposals and their component differences too. This conservative
+acceptance rule can reject an expected-net improvement when raw eleven points fall. Keep error rows as errors; missing values
 must not become zero gains or disappear from the twenty-member population.
 
 The backend exposes disabled configuration controls; enabled settings enter its

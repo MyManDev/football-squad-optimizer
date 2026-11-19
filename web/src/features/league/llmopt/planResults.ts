@@ -8,6 +8,7 @@ import {
   meaningfulOpeningAlternative,
   sameOpeningDecision,
   samePlan,
+  transferPathKey,
 } from "./planComparison";
 import type { ExplicitTitle, PlanRun, PriceTarget } from "./planRun";
 import { isWorking } from "./planSlots";
@@ -65,6 +66,7 @@ export function visibleAutomatic(
   state: ComputePhase,
   reference?: EntryAdvice,
   previous: readonly EntryAdvice[] = [],
+  paths3w = false,
 ) {
   if (state.phase !== "done" || !reference) return null;
   const plan = state.envelope.payload;
@@ -77,7 +79,9 @@ export function visibleAutomatic(
         : null;
   return kind &&
     meaningfulOpeningAlternative(reference, plan, kind) &&
-    !previous.some((shown) => sameOpeningDecision(shown, plan))
+    !previous.some((shown) =>
+      paths3w ? transferPathKey(shown) === transferPathKey(plan) : sameOpeningDecision(shown, plan),
+    )
     ? { kind, state, plan }
     : null;
 }
@@ -169,7 +173,7 @@ export function planResults({
       const previous = results.flatMap(({ state }) =>
         state.phase === "done" ? [state.envelope.payload] : [],
       );
-      const automatic = visibleAutomatic(state, baseAnswer, previous);
+      const automatic = visibleAutomatic(state, baseAnswer, previous, run.inputs.paths3w);
       if (automatic)
         results.push({ title: automatic.kind === "roll" ? copy.rollPlan : copy.bankPlan, state });
     }

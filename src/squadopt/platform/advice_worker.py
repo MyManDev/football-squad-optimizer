@@ -280,6 +280,8 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
         managers_word=word,
         preferences=preferences,
         chip=chip if isinstance(chip, str) else None,
+        transfer_packages=capture.transfer_packages,
+        package_gate=capture.package_gate,
     )
 
 

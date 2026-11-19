@@ -61,6 +61,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
         *,
         switches: SwitchInputsProvider | None = None,
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
+        transfer_packages: bool = False,
     ) -> None:
         menu = menu_capabilities()
         super().__init__(
@@ -71,6 +72,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
             capabilities=menu,
             switches=switches,
             available_windows=available_windows,
+            transfer_packages=transfer_packages,
         )
         self._contexts = context
         self._public_inputs = inputs

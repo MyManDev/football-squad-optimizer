@@ -30,7 +30,7 @@ export function expectedNet(plan: EntryAdvice) {
     : null;
 }
 
-function openingAction(plan: EntryAdvice) {
+export function openingAction(plan: EntryAdvice) {
   const week = plan.plan_weeks?.find((row) => row.gameweek === plan.gameweek);
   const incoming = week
     ? week.transfers_in.map(({ player_id }) => player_id)
@@ -130,7 +130,7 @@ export function meaningfulOpeningAlternative(
   );
 }
 
-function action(plan: EntryAdvice) {
+export function transferPathKey(plan: EntryAdvice) {
   const { incoming, outgoing, chip } = openingAction(plan);
   const later = plannedWeeks(plan)
     ?.slice(1)
@@ -147,6 +147,6 @@ export function samePlan(first: ComputePhase, second: ComputePhase) {
   return (
     first.phase === "done" &&
     second.phase === "done" &&
-    action(first.envelope.payload) === action(second.envelope.payload)
+    transferPathKey(first.envelope.payload) === transferPathKey(second.envelope.payload)
   );
 }
