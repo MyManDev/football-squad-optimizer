@@ -26,7 +26,8 @@ that many tenths. J is the returned feasible value even if its optimality is unp
 that fact stays in internal metadata. Neither the page nor a client-supplied numeric
 claim establishes J. Individual ceilings do not start price jobs in this mode and do not
 constrain the result separately. Total cost is the difference between the two computed
-plans, never a sum of individual prices. A better preference plan has zero concession.
+plans, never a sum of individual prices. The difference is signed: a better preference
+plan has a negative cost. Legacy individual price ceilings retain their zero-floor rule.
 
 With no total limit, existing individually bounded preference behavior is retained.
 Its individual prices and combined decision must be calculated sequentially inside the
@@ -52,6 +53,48 @@ fields preserve old identities and remain readable. A transport switch must be i
 through API admission, immutable job specs, worker computation and result validation before
 the page sends it. Until those boundaries are complete, publish the missing work explicitly
 and retain the existing working path. Browser migration belongs to the next phase.
+
+### Public execution boundary
+
+Use a closed `llmopt_preference_bundle_v1` contract on the existing advice boundary.
+The full backend advertises the capability only when durable run admission, immutable
+specs, the cache and the bundle worker are wired together. Old readers and confirmed
+sessions retain their original transport; new confirmations pin the chosen mode.
+
+One preference job reserves three former job allocations: **63 units at one week**
+or **366 at three weeks**. Together with the main job this is exactly the existing
+84/488-unit run capacity. The client cannot choose an allocation. A child calculation
+cannot reset the parent meter. Count layers share their existing 20/60-unit allowance.
+Certificates are charged work, not additional jobs.
+
+The server derives the reference cache key from the main request and verifies it against
+the durable run's base. No client objective or reference payload is accepted. Cached
+transfer, chip and lineup decisions are certified against the current net-points model;
+the resulting J is recomputed from its integer coefficients. This model already uses
+the game's transfer limits. Unproved main results retain their unproved reference flag.
+
+Without a total limit, package the existing two single-price requests and the existing
+combined request into one execution. The page's existing compiler produces the at most
+four accepted-price combinations, preserving legacy order, conflicts and individual
+ceilings. Encode child preference differences relative to the main request so frozen
+weeks are not duplicated. Keep the existing request size limits and refuse an oversized
+bundle before admission. Completed component answers may be cached only inside the
+existing successful-completion and cancellation boundary, so later edits reuse them.
+
+An incomplete points tie break stopped by the wall clock cannot replace the last completed
+layer witness. Its actual completion status is separate from the public FEASIBLE plan
+status, which never claims that the resulting net score is globally best.
+
+### Conservative morning decisions
+
+Explicit new priorities require an explicit total allowance. Ask for that allowance rather
+than inventing one or silently ignoring a priority. An old request without either field
+keeps its existing individual-price behavior. This resolves the conflict between new
+lexicographic semantics and the required legacy behavior without granting an unstated loss.
+
+A soft Wildcard combined with a total allowance remains unsupported until its chip domain
+can be shared correctly with J. Refuse it before starting a job. Keep ordinary legacy
+Wildcard pricing intact; do not silently weaken an explicit chip-saving requirement.
 
 ## Verification
 
