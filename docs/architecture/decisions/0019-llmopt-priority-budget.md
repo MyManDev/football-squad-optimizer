@@ -78,9 +78,13 @@ the resulting J is recomputed from its integer coefficients. This model already 
 the game's transfer limits. Unproved main results retain their unproved reference flag.
 
 Without a total limit, package the existing two single-price requests and the existing
-combined request into one execution. The page's existing compiler produces the at most
-four accepted-price combinations, preserving legacy order, conflicts and individual
-ceilings. Encode child preference differences relative to the main request so frozen
+combined request into one execution. The page's existing compiler produces reachable
+accepted-price combinations, preserving legacy order, conflicts and individual ceilings.
+Two distinct price slots normally need four combinations. Rules sharing a slot can have
+different ceilings, so enumerate their reachable threshold intervals rather than treating
+a slot as one acceptance bit. Sixteen rules admit at most 289 combinations. Repeated
+choices share their canonical identity. This preserves legacy semantics without duplicating
+its rule compiler on the server. Encode child preference differences relative to the main request so frozen
 weeks are not duplicated. Keep the existing request size limits and refuse an oversized
 bundle before admission. Completed valid component answers enter their ordinary
 answer cache even if the initiating run closes, in accordance with ADR 0018.
