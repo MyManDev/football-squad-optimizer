@@ -1,5 +1,6 @@
 """Optional browser-private device computation fields; public advice identity is unchanged."""
 
+from squadopt.contracts.preference_bundle import preference_bundle_schema, priority_result_schema
 from squadopt.contracts.preferences import preferences_schema
 
 
@@ -7,6 +8,29 @@ def device_extension_schema() -> dict[str, object]:
     choice = {
         "type": "object",
         "not": {"anyOf": [{"required": ["alternatives"]}, {"required": ["device_alternatives"]}]},
+    }
+    component = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["status", "answer", "error_code"],
+        "properties": {
+            "status": {"type": "string", "enum": ["done", "failed", "exhausted", "unavailable"]},
+            "answer": {
+                "anyOf": [
+                    {
+                        "type": "object",
+                        "not": {
+                            "anyOf": [
+                                {"required": ["preference_bundle"]},
+                                {"required": ["alternatives"]},
+                            ]
+                        },
+                    },
+                    {"type": "null"},
+                ]
+            },
+            "error_code": {"type": ["string", "null"], "pattern": "^[A-Z][A-Z0-9_]{0,63}$"},
+        },
     }
     return {
         "type": "object",
@@ -26,7 +50,12 @@ def device_extension_schema() -> dict[str, object]:
                 "properties": {
                     "deviceRun": {"type": "boolean"},
                     "deviceAlternatives": {"type": "boolean"},
+                    "bundleMode": {"type": "boolean"},
                 },
+            },
+            "capabilities_extension": {
+                "type": "object",
+                "properties": {"devicePreferenceBundles": {"type": "boolean", "const": True}},
             },
         },
         "description": (
@@ -34,6 +63,36 @@ def device_extension_schema() -> dict[str, object]:
         ),
         "properties": {
             "preferences": preferences_schema(),
+            "preferenceBundle": preference_bundle_schema(),
+            "priority_preferences": priority_result_schema(),
+            "expected_points_cost": {"type": "number"},
+            "preference_bundle": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "contract_version",
+                    "request",
+                    "components",
+                    "selected",
+                    "accepted",
+                    "applied",
+                    "budget_exhausted",
+                ],
+                "properties": {
+                    "contract_version": {"type": "string", "const": "llmopt_device_preference_v1"},
+                    "request": preference_bundle_schema(),
+                    "components": {"type": "array", "maxItems": 2, "items": component},
+                    "selected": {"anyOf": [component, {"type": "null"}]},
+                    "accepted": {"type": "integer", "minimum": 0, "maximum": 65535},
+                    "applied": {
+                        "type": "array",
+                        "maxItems": 16,
+                        "uniqueItems": True,
+                        "items": {"type": "integer", "minimum": 0, "maximum": 15},
+                    },
+                    "budget_exhausted": {"type": "boolean"},
+                },
+            },
             "alternatives": {"type": ["boolean", "array"], "maxItems": 2, "items": choice},
             "restricted": {"type": "boolean"},
             "bank_after_tenths": {"type": "integer", "minimum": 0},

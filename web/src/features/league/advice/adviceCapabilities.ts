@@ -56,6 +56,8 @@ export interface AdviceCapabilities {
   /** The settings the service would accept now; zero is always one of them. */
   preferences?: boolean;
   preferenceBundles?: boolean;
+  /** Browser-private support; it does not advertise a server capability at three weeks. */
+  devicePreferenceBundles?: true;
   models?: ("current" | "football")[];
   top100Weights: Top100Weight[];
   managersWord: boolean;

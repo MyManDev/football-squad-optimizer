@@ -5,6 +5,7 @@ import { beforeAll, beforeEach, afterEach, describe, it, expect, vi } from "vite
 import fixture from "../../../fixtures/device-plan/instances.json";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { checkedPreferences } from "../advice/decisionPreferences";
+import type { PreferenceBundle } from "../advice/preferenceBundle";
 import type { AdviceClient, AdviceRequest } from "../advice/adviceClient";
 import { deviceAdviceClient } from "./adviceClient";
 import { replyTo } from "./replies";
@@ -90,6 +91,46 @@ function setup() {
 }
 
 describe("one-week advice transport with a real solver", () => {
+  it("runs three priorities in one device attempt and reloads without remote work", async () => {
+    const { client, remote, posts, load, create } = setup();
+    const main = await client.requestAdvice(request);
+    expect(main.kind).toBe("advice");
+    const bundle: PreferenceBundle = {
+      contract_version: "llmopt_preference_bundle_v1",
+      slots: [],
+      prices: [],
+      choices: [],
+      program: {
+        max_total_cost_tenths: 15,
+        preferences: [
+          { rules: checkedPreferences({ keep_players: [entry.held[0]] }), priority: 1 },
+          { rules: checkedPreferences({ avoid_players: [entry.held[1]] }), priority: 2 },
+          { rules: checkedPreferences({ keep_players: [entry.held[2]] }), priority: 3 },
+        ],
+      },
+    };
+    const followup = {
+      ...request,
+      deviceRun: true,
+      preferenceBundle: bundle,
+      run: { ...request.run!, stage: "followup" as const },
+    };
+    const result = await client.requestAdvice(followup);
+    expect(result.kind).toBe("advice");
+    if (result.kind !== "advice") throw new Error("No preference execution.");
+    const selected = result.envelope.payload.preference_bundle_result?.selected?.payload;
+    expect(selected?.priority_preferences?.completed_priorities).toEqual([1, 2, 3]);
+    expect(selected?.priority_preferences?.total_cost).toBeLessThanOrEqual(1.5);
+    expect(selected?.device_input_fingerprint).toBe(
+      result.envelope.payload.device_input_fingerprint,
+    );
+    expect(posts).toHaveBeenCalledTimes(2);
+    const reconstructed = deviceAdviceClient(remote, squad, load, create);
+    expect(await reconstructed.requestAdvice(followup)).toEqual(result);
+    expect(posts).toHaveBeenCalledTimes(2);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+    expect((await client.readCapabilities?.(request.leagueId))?.devicePreferenceBundles).toBe(true);
+  });
   it("computes hard rules locally and reloads without a server job or another solve", async () => {
     const { client, remote, posts, load, create } = setup();
     const result = await client.requestAdvice(request);

@@ -158,6 +158,23 @@ function isBundle(value: unknown): value is PreferenceBundle {
   }
 }
 
+/** The worker accepts the same closed request, including the default priority. */
+export function checkedPreferenceBundle(value: unknown): PreferenceBundle {
+  if (record(value) && record(value.program) && Array.isArray(value.program.preferences)) {
+    value = {
+      ...value,
+      program: {
+        ...value.program,
+        preferences: value.program.preferences.map((item: unknown) =>
+          record(item) && !Object.hasOwn(item, "priority") ? { ...item, priority: 2 } : item,
+        ),
+      },
+    };
+  }
+  if (!isBundle(value)) throw new Error("Invalid preference execution request");
+  return value;
+}
+
 export function isPriorityResult(value: unknown): value is PriorityResult {
   return (
     closed(value, [
@@ -226,6 +243,10 @@ function sorted(value: unknown): unknown {
         .map((key) => [key, sorted(value[key])]),
     );
   return value;
+}
+
+export function priorityRuleIdentity(rules: DecisionPreferences): string {
+  return JSON.stringify(sorted(checkedPreferences(rules)));
 }
 
 export function bundleKey(bundle: PreferenceBundle): string {

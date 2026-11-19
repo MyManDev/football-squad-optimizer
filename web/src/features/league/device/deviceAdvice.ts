@@ -132,7 +132,35 @@ export function deviceAdviceEnvelope(
       (alternative) =>
         deviceAdviceEnvelope(document, squad, alternative, generatedAt, leagueId).payload,
     );
+  if (answer.expected_points_cost !== undefined)
+    payload.expected_points_cost = answer.expected_points_cost;
+  if (answer.priority_preferences) payload.priority_preferences = answer.priority_preferences;
+  if (answer.preference_bundle) {
+    const result = answer.preference_bundle;
+    const component = (value: typeof result.selected) => {
+      if (value === null) return null;
+      if (value.answer?.preference_bundle || value.answer?.alternatives)
+        throw new Error("Nested device preference executions are not accepted.");
+      return {
+        status: value.status,
+        error_code: value.error_code,
+        payload: value.answer
+          ? deviceAdviceEnvelope(document, squad, value.answer, generatedAt, leagueId).payload
+          : null,
+      };
+    };
+    payload.preference_bundle_result = {
+      contract_version: "llmopt_preference_result_v1",
+      request: result.request,
+      components: result.components.map((value) => component(value)!),
+      selected: component(result.selected),
+      accepted: result.accepted,
+      applied: result.applied,
+      budget_exhausted: result.budget_exhausted,
+    };
+  }
   if (answer.top100 !== undefined) {
+    // These strategy-specific prices remain separate from a preference execution.
     // The weight's account: the price on base points against the member's own plan, the
     // rows' reasons, and the counts' source as the document states it.
     const top100 = answer.top100;

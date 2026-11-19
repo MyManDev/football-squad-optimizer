@@ -19,6 +19,7 @@ import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { deviceAdviceClient } from "../device/adviceClient";
+import { deviceSelection } from "../device/selection";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
@@ -784,7 +785,12 @@ function Workspace({
         setFeedback(copy.serviceUnavailable);
         return;
       }
-      if (draft.max_total_cost_tenths !== undefined && !capabilities.preferenceBundles) {
+      const localBundle = plans.window === 1 && capabilities.devicePreferenceBundles === true;
+      if (
+        draft.max_total_cost_tenths !== undefined &&
+        !capabilities.preferenceBundles &&
+        !localBundle
+      ) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
@@ -821,7 +827,7 @@ function Workspace({
       // A public team may have no chip list until its FPL inputs are pinned.
       const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
       const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
-      const next = prepareRun({
+      let next = prepareRun({
         draft,
         held,
         request,
@@ -830,8 +836,36 @@ function Workspace({
         frozenWeeks: frozen,
         reference,
         bundleMode:
-          capabilities.preferenceBundles === true && draft.soft.length > 0 && !draft.scenario,
+          (capabilities.preferenceBundles === true || localBundle) &&
+          draft.soft.length > 0 &&
+          !draft.scenario,
       });
+      const execution = preferenceExecution(next);
+      const requests = [
+        next.baseRequest,
+        ...next.slots.map((slot) => slot.request),
+        execution,
+      ].filter((value): value is NonNullable<typeof value> => value != null);
+      if (
+        next.inputs.request.deviceRun === true &&
+        requests.some((query) => deviceSelection(query, squad)?.kind !== "plain")
+      ) {
+        next = prepareRun({
+          ...next.inputs,
+          request: { ...next.inputs.request, deviceRun: false, deviceAlternatives: false },
+        });
+      }
+      if (
+        next.inputs.bundleMode &&
+        next.baseRequest?.deviceRun === false &&
+        !capabilities.preferenceBundles
+      ) {
+        if (draft.max_total_cost_tenths !== undefined) {
+          setFeedback(copy.serviceUnavailable);
+          return;
+        }
+        next = prepareRun({ ...next.inputs, bundleMode: false });
+      }
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
       if (
         !next.baseRequest &&
