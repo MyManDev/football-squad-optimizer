@@ -32,7 +32,11 @@ The verified one-week path supports keep/include/avoid, no hits, saving chips, h
 transfers, club counts, first-week purchases, hit ceilings, persistent bank floors and
 frozen first-week decisions. Future-week rules, scenarios, a named football model,
 manager news and preference combinations with chips or Top100 remain on the server.
-The new Phase 3 priority transport is incomplete and is not claimed as migrated.
+The Phase 3 ordinary and total-priority bundles now use the verified one-week device
+worker. The [priority comparison](../llmopt_phase4_priority_audit.md) records 16/16
+equal feasible objectives and priority outcomes plus four matching infeasibilities
+on the original twenty controls. Eight differing transfer decisions have equal scores.
+Run `python -m docs.research.llmopt_phase4.priority_measure` separately from tests.
 
 For a one-week hard-rule run with device inputs, the page uses the existing net-points
 objective for its main plan and the local menu. It shows at most three Pareto decisions

@@ -820,7 +820,12 @@ def build_backend(
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
     specs = FileAdviceJobSpecStore(config.spec_root)
-    runs = FileRunStore(config.store_root / "runs")
+
+    def stored_capture(key: str) -> str | None:
+        spec = specs.get(key)
+        return spec.context.capture_snapshot_id if spec is not None else None
+
+    runs = FileRunStore(config.store_root / "runs", capture_for_key=stored_capture)
     liveness = WorkerLiveness(config.worker_root, queue)
     gate = probe if probe is not None else StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
@@ -839,6 +844,7 @@ def build_backend(
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
+        preference_bundles=True,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -868,6 +874,7 @@ def build_backend(
             public_inputs,
             switches=contexts,
             available_windows=contexts.available_windows,
+            preference_bundles=True,
         )
         public_submit = AdviceSubmitService(
             public_reader,

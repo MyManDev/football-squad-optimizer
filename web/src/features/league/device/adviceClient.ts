@@ -3,6 +3,7 @@ import type { AdviceClient, AdviceRequest, AdviceReadResult } from "../advice/ad
 import { checkedAdvice } from "../advice/adviceResponse";
 import { publicEntryCapabilities, type AdviceCapabilities } from "../advice/adviceCapabilities";
 import { preferencesKey } from "../advice/decisionPreferences";
+import { bundleKey } from "../advice/preferenceBundle";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
 import { deviceSelection } from "./selection";
@@ -76,6 +77,7 @@ export function deviceAdviceClient(
     return {
       ...caps,
       preferences: true,
+      devicePreferenceBundles: true,
       strategies: {
         ...caps.strategies,
         "saf-puan": {
@@ -108,6 +110,7 @@ export function deviceAdviceClient(
       request.deviceAlternatives ?? false,
       request.chip ?? null,
       preferencesKey(request.preferences),
+      ...(request.preferenceBundle ? [bundleKey(request.preferenceBundle)] : []),
     ]);
   const cached = (request: AdviceRequest, fingerprint: string): AdviceReadResult => {
     const address = key(request, fingerprint);
@@ -255,6 +258,7 @@ export function deviceAdviceClient(
                 ...(request.deviceAlternatives ? { alternatives: true } : {}),
                 entry: squad.device_plan!,
                 ...(request.preferences ? { preferences: request.preferences } : {}),
+                ...(request.preferenceBundle ? { preferenceBundle: request.preferenceBundle } : {}),
               });
             },
           );
@@ -268,9 +272,14 @@ export function deviceAdviceClient(
             deviceAdviceEnvelope(document, squad, answer, new Date(), request.leagueId),
             request,
           );
-          Object.assign(envelope.payload, { device_input_fingerprint: inputs.fingerprint });
-          for (const alternative of envelope.payload.device_alternatives ?? [])
-            alternative.device_input_fingerprint = inputs.fingerprint;
+          const stamp = (payload: typeof envelope.payload) => {
+            payload.device_input_fingerprint = inputs.fingerprint;
+            payload.device_alternatives?.forEach(stamp);
+            const bundle = payload.preference_bundle_result;
+            for (const component of [...(bundle?.components ?? []), bundle?.selected])
+              if (component?.payload) stamp(component.payload);
+          };
+          stamp(envelope.payload);
           const result: AdviceReadResult = { kind: "advice", envelope, source: "device" };
           memory.set(address, result);
           try {

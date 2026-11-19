@@ -170,6 +170,62 @@ def test_model_numbers_in_clarifications_are_never_forwarded(locale: str, questi
     assert result == {"status": "clarification", "message": question}
 
 
+@pytest.mark.parametrize("catalogue", [False, True])
+@pytest.mark.parametrize(
+    "locale,question",
+    [
+        ("tr", "Hangi oyuncuyu tutmak istersin?"),
+        ("en", "Which player would you like to keep?"),
+        ("tr", "Bu kural 2. hafta m\u0131 3. hafta m\u0131 geçerli olsun?"),
+        ("en", "Should this rule apply in week 2 or 3?"),
+        ("tr", "1. ve 3. hafta ayn\u0131 kural geçerli olsun mu?"),
+        ("en", "Should the same rule apply in the 1st and 3rd weeks?"),
+        ("tr", "Bu kural 2. haftada geçerli olsun mu?"),
+        ("tr", "1-3. haftalar için ayn\u0131 kural m\u0131?"),
+        ("en", "Should it apply in weeks 1-3?"),
+    ],
+)
+def test_clarification_preserves_questions_and_week_numbers(catalogue, locale, question):
+    body = request()
+    body["locale"] = locale
+    if not catalogue:
+        body.pop("plan_context")
+    assert check_reply(
+        parse_intent_request(body), {"status": "clarification", "message": question}
+    ) == {"status": "clarification", "message": question}
+
+
+@pytest.mark.parametrize("catalogue", [False, True])
+@pytest.mark.parametrize(
+    "locale,question",
+    [
+        ("tr", "Bu plan 999 puan getirsin mi?"),
+        ("en", "Should this plan score 999 points?"),
+        ("tr", "2 puan için 3. hafta bu kural\u0131 kullanay\u0131m m\u0131?"),
+        ("en", "Should this rule cost 2 points in week 3?"),
+        ("tr", "4. hafta m\u0131 geçerli olsun?"),
+        ("en", "Should it apply in week 4?"),
+        ("tr", "2,5. hafta m\u0131 geçerli olsun?"),
+        ("en", "Should it apply in week 2.5?"),
+        ("tr", "-2. hafta m\u0131 geçerli olsun?"),
+        ("en", "Should it apply in week -2?"),
+    ],
+)
+def test_clarification_filters_numeric_claims_only_with_a_catalogue(catalogue, locale, question):
+    body = request()
+    body["locale"] = locale
+    if not catalogue:
+        body.pop("plan_context")
+    fixed = (
+        "Hangi plan\u0131 ya da oyuncuyu kastediyorsun?"
+        if locale == "tr"
+        else "Which plan or player do you mean?"
+    )
+    assert check_reply(
+        parse_intent_request(body), {"status": "clarification", "message": question}
+    ) == {"status": "clarification", "message": fixed if catalogue else question}
+
+
 def test_every_existing_server_context_field_changes_the_data_identity() -> None:
     context = AdviceRequestContext("v1", "capture", "2026-27", 8, "handoff", "commit", "config")
     identity = advice_context_identity(context)
