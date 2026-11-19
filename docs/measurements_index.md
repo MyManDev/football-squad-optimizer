@@ -1,9 +1,16 @@
 # Measurements Index
 
+- 2026-11-19: [LLMOPT original-control scope audit](research/llmopt_phase4_scope_audit.md),
+  [record](research/llmopt_phase4_scope_audit.json): 20 frozen member-weeks, 60 local
+  comparisons. Exact original controls replay 20/20; device equality is 15/16 feasible
+  plus four infeasibilities. The unproved zero-bank 52.310 differs from the device's
+  52.978. Active server profile matches 16/16 controls plus four infeasibilities and
+  20/20 no-added-rule cases. No extra keep rule, server jobs or live measurement.
+
 - 2026-11-19: [LLMOPT device parity and scope](research/llmopt_phase4/README.md),
   [record](research/llmopt_phase4_parity.json): twenty frozen member-weeks, forty local
   comparisons, forty equal model and published objectives, forty identical transfer
-  decisions; no server jobs or live measurements.
+  decisions with a keep-first-held-player constraint; no server jobs or live measurements.
 
 - 2026-11-18: [LLMOPT shared admission](research/llmopt_phase2_admission.md),
   [record](research/llmopt_phase2_admission.json): 20 frozen member-weeks, 40 runs,

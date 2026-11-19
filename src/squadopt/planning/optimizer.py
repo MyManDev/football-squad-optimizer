@@ -2116,6 +2116,10 @@ def optimize_priority_preferences(
     start_work = budget.cp_used + budget.native_reserved
     completed: list[int] = []
     exhausted = False
+    started = perf_counter()
+    selected_search_status = "OPTIMAL"
+    selected_deterministic_stop = False
+    phases: list[dict[str, object]] = []
     with work_budget(budget):
         witness, _ = _hint_incumbent(
             artifacts,
@@ -2139,6 +2143,10 @@ def optimize_priority_preferences(
             if remaining <= 0:
                 exhausted = True
                 break
+            wall_remaining = config.solver_time_limit_seconds - (perf_counter() - started)
+            if wall_remaining <= 0:
+                exhausted = True
+                break
             layer = [
                 flag
                 for row, flag in zip(program.preferences, flags, strict=True)
@@ -2147,14 +2155,26 @@ def optimize_priority_preferences(
             objective = cp_model.LinearExpr.sum(layer) if priority else artifacts.primary_objective
             artifacts.model.maximize(objective)
             candidate = cp_model.CpSolver()
-            configure_solver(candidate, config, config.solver_time_limit_seconds, remaining)
+            configure_solver(candidate, config, wall_remaining, remaining)
             candidate.parameters.linearization_level = 2
             try:
-                status = _map_solver_status(_solve(artifacts.model, candidate))
+                raw_status = _solve(artifacts.model, candidate)
+                status = _map_solver_status(raw_status)
             except WorkBudgetExhausted:
                 exhausted = True
                 break
             feasible = status in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}
+            deterministic_stop = (
+                _deterministic_time_used(candidate, raw_status)
+                >= remaining - MIN_TIEBREAK_DETERMINISTIC_TIME
+            )
+            phases.append(
+                {
+                    "priority": priority,
+                    "status": status.name,
+                    "deterministic_stop": deterministic_stop,
+                }
+            )
             complete = status is SolverStatus.OPTIMAL or (
                 feasible and priority != 0 and int(candidate.value(objective)) == len(layer)
             )
@@ -2164,11 +2184,19 @@ def optimize_priority_preferences(
             if not feasible:
                 exhausted = True
                 break
+            if not priority and status is SolverStatus.FEASIBLE and not deterministic_stop:
+                # A clock-cut points tie break cannot replace a completed layer.
+                exhausted = True
+                break
             if not priority and int(candidate.value(objective)) < int(selected.value(objective)):
                 # A truncated points tie break cannot discard a better completed witness.
                 exhausted = True
                 break
             selected = candidate
+            # A feasible all-true count reaches the exact count upper bound.
+            # This is a completed count proof, not a global net-points claim.
+            selected_search_status = "OPTIMAL" if priority else status.name
+            selected_deterministic_stop = deterministic_stop
             if priority:
                 artifacts.model.add(objective == int(selected.value(objective)))
                 completed.append(priority)
@@ -2177,6 +2205,9 @@ def optimize_priority_preferences(
             "configuration_fingerprint": settings.configuration_fingerprint,
             "chip_availability_fingerprint": rights.availability_fingerprint,
             "reference_proved": reference.solver_status is SolverStatus.OPTIMAL,
+            "primary_search_status": selected_search_status,
+            "deterministic_time_budget_exhausted": selected_deterministic_stop,
+            "priority_search_phases": phases,
             "completed_priorities": tuple(completed),
             "scaled_model_objective_value": value / divisor,
             "deterministic_time_used": budget.cp_used + budget.native_reserved - start_work,
@@ -2203,7 +2234,7 @@ def optimize_priority_preferences(
         left_out=tuple(
             row.identity for row in program.preferences if row.identity not in satisfied
         ),
-        total_cost=max(0, reference_value - value) / divisor,
+        total_cost=(reference_value - value) / divisor,
         completed_priorities=tuple(completed),
         reference_proved=reference.solver_status is SolverStatus.OPTIMAL,
         budget_exhausted=exhausted,

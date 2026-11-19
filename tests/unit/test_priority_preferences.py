@@ -2,7 +2,7 @@
 
 import json
 from dataclasses import replace
-from itertools import permutations, product
+from itertools import pairwise, permutations, product
 from pathlib import Path
 
 import pytest
@@ -91,7 +91,7 @@ def test_priority_football_matches_all_transfer_packages(
     squad = tuple(sorted(outcome.plan.weeks[0].selected_squad.player_id))
     assert squad in expected_squads
     assert outcome.plan.objective_value == pytest.approx(expected_score)
-    assert outcome.total_cost == pytest.approx(max(0, main.objective_value - expected_score))
+    assert outcome.total_cost == pytest.approx(main.objective_value - expected_score)
     assert outcome.total_cost <= total / 10
     assert set(outcome.satisfied).isdisjoint(outcome.left_out)
     assert set(outcome.satisfied) | set(outcome.left_out) == {
@@ -121,6 +121,29 @@ def test_unproved_reference_uses_certified_decisions_not_claimed_value(
     assert result.reference_proved is False
     assert result.total_cost == pytest.approx(0.5)
     assert result.plan.objective_value == pytest.approx(main.objective_value - 0.5)
+
+
+def test_better_preference_plan_has_the_signed_difference_from_a_weak_reference(
+    known_optimum_players, small_config
+):
+    horizon, state, config, settings, _ = setup_case(known_optimum_players, small_config)
+    weak = optimize_transfer_plan(
+        horizon,
+        state,
+        config,
+        settings,
+        preferences=DecisionPreferences(include_players=(2,), net_points_priority=True),
+        protect_hold=False,
+    )
+    weak = replace(weak, solver_status=SolverStatus.FEASIBLE)
+    program = PriorityProgram((include(1, 1),), 0)
+    expected_squads, expected_score = enumeration(horizon, program)
+    result = optimize_priority_preferences(horizon, state, config, settings, weak, program)
+    assert tuple(sorted(result.plan.weeks[0].selected_squad.player_id)) in expected_squads
+    assert result.plan.objective_value == pytest.approx(expected_score)
+    assert result.total_cost == pytest.approx(weak.objective_value - expected_score)
+    assert result.total_cost < 0
+    assert result.reference_proved is False
 
 
 def test_hard_rule_survives_conflicting_soft_rule(known_optimum_players, small_config):
@@ -222,3 +245,63 @@ def test_three_week_rules_preserve_hard_constraints(known_optimum_players, small
     assert result.total_cost == pytest.approx(1.5)
     assert all(2 in set(week.selected_squad.player_id) for week in result.plan.weeks)
     assert all(week.paid_transfer_count == 0 for week in result.plan.weeks)
+
+
+def test_clock_cut_points_tie_keeps_completed_count_witness(
+    known_optimum_players, small_config, monkeypatch
+):
+    import squadopt.planning.optimizer as optimizer
+
+    horizon, state, config, settings, main = setup_case(known_optimum_players, small_config)
+    original = optimizer._solve
+    solvers = []
+
+    def stop_points_tie(model, solver):
+        status = original(model, solver)
+        solvers.append(solver)
+        return optimizer.cp_model.FEASIBLE if len(solvers) == 3 else status
+
+    monkeypatch.setattr(optimizer, "_solve", stop_points_tie)
+    result = optimize_priority_preferences(
+        horizon, state, config, settings, main, PriorityProgram((include(2),), 10)
+    )
+    assert len(solvers) == 3
+    assert result.completed_priorities == (2,)
+    assert result.budget_exhausted
+    assert result.plan.solver_status is SolverStatus.FEASIBLE
+    assert result.plan.diagnostics["primary_search_status"] == "OPTIMAL"
+    assert result.plan.diagnostics["priority_search_phases"][-1]["status"] == "FEASIBLE"
+    assert include(2).identity in result.satisfied
+
+
+def test_layers_share_one_wall_ceiling(known_optimum_players, small_config, monkeypatch):
+    import squadopt.planning.optimizer as optimizer
+
+    horizon, state, config, settings, main = setup_case(known_optimum_players, small_config)
+    original = optimizer.configure_solver
+    limits = []
+    elapsed = 0.0
+
+    def advancing_clock():
+        nonlocal elapsed
+        elapsed += 0.001
+        return elapsed
+
+    def record_limit(solver, config, wall_limit, deterministic_limit):
+        limits.append(wall_limit)
+        return original(solver, config, wall_limit, deterministic_limit)
+
+    monkeypatch.setattr(optimizer, "perf_counter", advancing_clock)
+    monkeypatch.setattr(optimizer, "configure_solver", record_limit)
+    result = optimize_priority_preferences(
+        horizon,
+        state,
+        config,
+        settings,
+        main,
+        PriorityProgram((include(2, 1), include(6, 2), include(8, 3)), 15),
+    )
+    assert result.plan.has_solution
+    assert len(limits) >= 4
+    # Certification receives the ceiling; every later layer receives less time.
+    assert all(left > right for left, right in pairwise(limits))
