@@ -1,5 +1,11 @@
 # Measurements Index
 
+- 2026-11-19: [LLMOPT real solver budget controls](research/llmopt_phase2_solver_budget.md),
+  [record](research/llmopt_phase2_solver_budget.json): twenty frozen member-weeks at
+  both windows; 40/40 original statuses and decisions, 32 equal numeric objectives
+  and eight equal infeasibilities; maximum work 20.001169834987554/21 and
+  120.00555450856191/122 units. Sequential local production solves, no network calls.
+
 - 2026-11-18: [LLMOPT shared admission](research/llmopt_phase2_admission.md),
   [record](research/llmopt_phase2_admission.json): 20 frozen member-weeks, 40 runs,
   maximum four server jobs, zero additional jobs from 240 reconstructed-service repeats;

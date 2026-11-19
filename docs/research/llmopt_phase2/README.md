@@ -16,6 +16,9 @@ Phase 1 production-path ceilings rather than from synthetic completion timing.
 
 ## Actual solver controls
 
+The [readout](../llmopt_phase2_solver_budget.md) and
+[record](../llmopt_phase2_solver_budget.json) retain all forty results and work receipts.
+
 `python -m docs.research.llmopt_phase2.measure_solver_budget` complements the admission
 replay with all twenty frozen member-weeks at both windows. It obtains real durable
 21/122-unit allocations, runs the production planner on the exact Phase 1 controls,
