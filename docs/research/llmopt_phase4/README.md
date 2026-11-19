@@ -44,3 +44,30 @@ oracle enumerates all sixteen transfer packages and legal lineups.
 
 Real-worker E2E covers English/Turkish at 1280 and 375 pixels, three distinct decisions,
 hard-player preservation, reload identity, zero server POST jobs and no horizontal overflow.
+
+## Original-control scope audit
+
+The historical 40/40 record adds a keep-first-held-player constraint to every case.
+It cannot establish parity for the original Phase 1 controls or an unrestricted run.
+Keep that record unchanged and audit those scopes separately:
+
+```
+python -m docs.research.llmopt_phase4.audit
+```
+
+Read the scenario identities directly from the frozen Phase 1 result. For all twenty
+member-weeks, replay its exact control with its original settings and default
+linearization, then the same control with the served preference path's linearization
+2 and 20-unit allowance. Also solve the served profile with no added player rule,
+retaining the zero bank for the tight-bank members. The original controls include
+forced Wildcard/Free Hit, four contradictions and the unproved zero-bank case.
+Never add the historical keep rule, change J to a newly found better value, increase
+the work allowance or warm-start the reference to make the comparison pass.
+
+The device probe calls the production `solvePlan`, including publication and the
+hold-score calculation, under one cumulative 120-second ceiling for the complete
+answer. Infeasibility agreement is counted separately from numeric objective equality;
+two missing numbers are never counted as an equal objective. If a transfer decision
+differs, retain the actual squads and both computed scores to check a true tie.
+Measurement is sequential and runs without tests or a live service. These remain the
+frozen published-coefficient models, not the unavailable served football bundles.
