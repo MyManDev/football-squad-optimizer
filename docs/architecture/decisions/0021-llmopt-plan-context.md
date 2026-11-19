@@ -40,6 +40,12 @@ differences. Reuse unaffected results and preserve the shared run admission
 limit. Old data is removed from the conversational catalogue, not relabelled as
 current. No credential enters the catalogue, identity, history or storage.
 
+A substitution fixes both the old player's exclusion and the replacement's
+inclusion in the new main calculation. Retain the selected computed reference
+with an internal `compareOnly` marker: automatic roll/bank menus are disabled
+for that calculation. The table compares the existing reference directly with
+the requested replacement, rather than another unconstrained intermediate plan.
+
 ## Validation
 
 Test content stability and sensitivity, unknown/stale identifiers, strict schemas,

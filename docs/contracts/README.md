@@ -32,6 +32,8 @@ checks a candidate against the copies the accepted site carries.
 
 | File | Written by | Read by | Test that holds the file to the code |
 | --- | --- | --- | --- |
+| `llmopt_intent_v1.schema.json` | `intent_reply_schema(with_plans=True)` in `src/squadopt/platform/llmopt_intent.py` | [Computed-plan conversation](llmopt_plans_v1.md); all provider adapters | `tests/unit/test_llmopt_plan_context.py`, `web/src/features/league/llmopt/planSchema.test.ts` |
+| `llmopt_plans_v1.schema.json` | `plan_conversation_schema()` in `src/squadopt/contracts/llmopt_plans.py` | [Computed-plan conversation](llmopt_plans_v1.md) | `tests/unit/test_llmopt_plan_context.py` |
 | `llmopt_device_v1.schema.json` | `device_extension_schema()` in `src/squadopt/contracts/llmopt_device.py` | [Private worker and device advice extensions](llmopt_device_v1.md) | `tests/unit/test_llmopt_device_contract.py` |
 | `llmopt_priority_program_v1.schema.json` | `priority_program_schema()` in `src/squadopt/contracts/priority_preferences.py` | [Internal priority core proposal](llmopt_priority_program_v1.md), not public admission | `tests/unit/test_priority_preferences.py` |
 | `llmopt_run_v1.schema.json` | `run_reference_schema()` in `src/squadopt/contracts/llmopt_run.py` | Advice POST validation and durable admission; [lifecycle](llmopt_run_v1.md) | `tests/unit/test_llmopt_work_budget.py`, `tests/unit/test_api_advice_post.py` |

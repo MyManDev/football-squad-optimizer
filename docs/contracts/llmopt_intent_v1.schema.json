@@ -1,0 +1,472 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "draft": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "comparison": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "both": {
+                      "type": "boolean"
+                    },
+                    "club": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "count": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "kind": {
+                      "enum": [
+                        "hold_transfers",
+                        "no_hits",
+                        "save_chips",
+                        "wildcard",
+                        "keep_player",
+                        "include_player",
+                        "buy_player",
+                        "avoid_player",
+                        "club_count",
+                        "hit_budget"
+                      ],
+                      "type": "string"
+                    },
+                    "player_id": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "points": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "enum": [
+                        "squad",
+                        "transfers_in",
+                        null
+                      ],
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "week": {
+                      "enum": [
+                        1,
+                        2,
+                        3,
+                        null
+                      ],
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "player_id",
+                    "club",
+                    "count",
+                    "scope",
+                    "week",
+                    "points",
+                    "both"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "hard": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "club": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "enum": [
+                      "hold_transfers",
+                      "no_hits",
+                      "save_chips",
+                      "wildcard",
+                      "keep_player",
+                      "include_player",
+                      "buy_player",
+                      "avoid_player",
+                      "club_count",
+                      "hit_budget"
+                    ],
+                    "type": "string"
+                  },
+                  "player_id": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "points": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "scope": {
+                    "enum": [
+                      "squad",
+                      "transfers_in",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "week": {
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      null
+                    ],
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "player_id",
+                  "club",
+                  "count",
+                  "scope",
+                  "week",
+                  "points"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "keep_weeks": {
+              "items": {
+                "enum": [
+                  1,
+                  2,
+                  3
+                ],
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "min_bank": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "tenths": {
+                      "type": "integer"
+                    },
+                    "week": {
+                      "enum": [
+                        1,
+                        2,
+                        3,
+                        null
+                      ],
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "tenths",
+                    "week"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "scenario": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "price_increase",
+                        "unavailable"
+                      ],
+                      "type": "string"
+                    },
+                    "player_id": {
+                      "type": "integer"
+                    },
+                    "tenths": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "week": {
+                      "enum": [
+                        1,
+                        2,
+                        3,
+                        null
+                      ],
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "player_id",
+                    "week",
+                    "tenths"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "soft": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "club": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "enum": [
+                      "hold_transfers",
+                      "no_hits",
+                      "save_chips",
+                      "wildcard",
+                      "keep_player",
+                      "include_player",
+                      "buy_player",
+                      "avoid_player",
+                      "club_count",
+                      "hit_budget"
+                    ],
+                    "type": "string"
+                  },
+                  "max_cost_tenths": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "player_id": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "points": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "scope": {
+                    "enum": [
+                      "squad",
+                      "transfers_in",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "week": {
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      null
+                    ],
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "player_id",
+                  "club",
+                  "count",
+                  "scope",
+                  "week",
+                  "points",
+                  "max_cost_tenths"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "window": {
+              "enum": [
+                1,
+                3,
+                null
+              ],
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "hard",
+            "soft",
+            "comparison",
+            "window",
+            "keep_weeks",
+            "min_bank",
+            "scenario"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "message": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "plan_command": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "select",
+            "freeze_transfer",
+            "freeze_week",
+            "substitute"
+          ],
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "player_id": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "replacement_id": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "week": {
+          "enum": [
+            1,
+            2,
+            3,
+            null
+          ],
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "plan_id",
+        "action",
+        "week",
+        "player_id",
+        "replacement_id"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "clarification",
+        "plan"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "draft",
+    "message",
+    "plan_command"
+  ],
+  "type": "object"
+}

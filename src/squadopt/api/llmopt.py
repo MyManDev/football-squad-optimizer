@@ -6,6 +6,7 @@ own key, and ``/check`` validates the reply (ADR 0017). The backend never receiv
 key, so both routes refuse any request that carries one.
 """
 
+from collections.abc import Callable
 from typing import Final
 
 from fastapi import APIRouter, Request
@@ -83,7 +84,11 @@ async def _keyless_body(request: Request, limiter: FixedWindowRateLimiter) -> ob
     return body
 
 
-def intent_routes(*, keyless_per_minute: int = KEYLESS_PER_MINUTE) -> APIRouter:
+def intent_routes(
+    *,
+    keyless_per_minute: int = KEYLESS_PER_MINUTE,
+    server_data_id: Callable[[], str | None] | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/api/v1/llmopt")
     # Each keyless route counts on its own: one message is one prompt and one check.
     prompt_limiter = FixedWindowRateLimiter(keyless_per_minute, 60)
@@ -109,7 +114,8 @@ def intent_routes(*, keyless_per_minute: int = KEYLESS_PER_MINUTE) -> APIRouter:
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
         try:
-            result = await run_in_threadpool(check_reply, intent, reply)
+            current = server_data_id() if server_data_id is not None else None
+            result = await run_in_threadpool(check_reply, intent, reply, server_data_id=current)
         except IntentValidationError:
             return _error(422, "REPLY_REFUSED", "The model's reply is not a valid draft.")
         return JSONResponse(result, headers={"Cache-Control": "no-store"})

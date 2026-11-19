@@ -60,7 +60,7 @@ from squadopt.platform.advice_queue import (
     FileJobQueue,
     run_advice_worker_once,
 )
-from squadopt.platform.advice_read import AdviceRequestContext
+from squadopt.platform.advice_read import AdviceRequestContext, advice_context_identity
 from squadopt.platform.advice_worker import build_advice_compute, run_advice_worker
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 from squadopt.platform.jobs_contract import AdviceJob
@@ -1797,6 +1797,11 @@ def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str,
     expected["official_information"] = capture.inputs.official_information.public_record(
         worker_module._advice_player_ids(expected)
     )
+    expected["plan_data_id"] = advice_context_identity(spec.context)
+    assert (
+        client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()["plan_data_id"]
+        == expected["plan_data_id"]
+    )
     assert backend.cache.get(job.cache_key) == _served_bytes(
         backend, expected, capture.inputs.captured_at_utc
     )
@@ -2627,6 +2632,8 @@ def test_a_member_asks_for_a_top100_setting_and_gets_it(
     direct["official_information"] = capture.inputs.official_information.public_record(
         worker_module._advice_player_ids(direct)
     )
+    direct["plan_data_id"] = advice_context_identity(context)
+    assert payload["plan_data_id"] == client.get(capabilities).json()["plan_data_id"]
     assert payload == json.loads(json.dumps(direct))
 
 

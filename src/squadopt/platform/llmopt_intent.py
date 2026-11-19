@@ -14,6 +14,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any, Final
 
+from squadopt.contracts.llmopt_plans import (
+    checked_plan_command,
+    checked_plan_context,
+    plan_command_schema,
+)
 from squadopt.contracts.preferences import PlanScenario
 from squadopt.data.claim_identity import normalise_claim_name
 
@@ -182,6 +187,10 @@ week is missing. Keep the existing hard rules when introducing a scenario. Prese
 existing scenario on follow-up, unless the manager asks to change it or return to the normal
 plan. Use null for no scenario and keep the reference horizon when the user asks about it.
 
+When choosing a displayed plan, freezing its transfer/week, or replacing one of its
+players, use only plan_context identifiers. Without that catalogue ask for clarification;
+do not invent a plan identifier or translate a plan selection into unrelated constraints.
+
 On success use status "draft", return the draft and set message to null. On
 clarification use status "clarification", set draft to null, and ask one short
 question in the requested locale. Never echo unrelated personal text.
@@ -208,6 +217,7 @@ class IntentRequest:
     clubs: tuple[str, ...] = ()
     reference_weeks: tuple[int, ...] = ()
     reference_captains: tuple[tuple[int, int], ...] = ()
+    plan_context: dict[str, Any] | None = None
 
 
 def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -523,7 +533,8 @@ def parse_intent_request(value: object) -> IntentRequest:
     if (
         not isinstance(value, dict)
         or not required <= value.keys()
-        or value.keys() - (required | {"clarification", "reference_weeks", "reference_captains"})
+        or value.keys()
+        - (required | {"clarification", "reference_weeks", "reference_captains", "plan_context"})
     ):
         raise IntentValidationError("Invalid intent request.")
     locale = value["locale"]
@@ -547,6 +558,12 @@ def parse_intent_request(value: object) -> IntentRequest:
             _text(previous["question"], _MAX_QUESTION),
         )
     weeks = _reference_weeks(value.get("reference_weeks", []))
+    plan_context = None
+    if "plan_context" in value:
+        try:
+            plan_context = checked_plan_context(value["plan_context"], ids)
+        except ValueError as error:
+            raise IntentValidationError(str(error)) from None
     return IntentRequest(
         _text(value["message"], INTENT_MAX_MESSAGE),
         locale,
@@ -556,6 +573,7 @@ def parse_intent_request(value: object) -> IntentRequest:
         clubs,
         weeks,
         _reference_captains(value.get("reference_captains", []), weeks, ids),
+        plan_context,
     )
 
 
@@ -568,17 +586,39 @@ def _validate_result(
     previous_draft: Mapping[str, Any] | None = None,
     reference_weeks: tuple[int, ...] = (),
     locale: str = "en",
+    plan_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if (
         not isinstance(value, dict)
         or "status" not in value
-        or value.keys() - {"status", "draft", "message"}
+        or value.keys() - {"status", "draft", "message", "plan_command"}
     ):
         raise IntentValidationError("Invalid intent result.")
+    if value["status"] == "plan":
+        if plan_context is None or value.get("draft") is not None:
+            raise IntentValidationError("A plan command requires a current catalogue.")
+        try:
+            command = checked_plan_command(value.get("plan_command"), plan_context)
+        except ValueError as error:
+            raise IntentValidationError(str(error)) from None
+        if command["action"] == "substitute":
+            roster = {player["id"] for player in candidates}
+            if command["player_id"] not in roster or command["replacement_id"] not in roster:
+                raise IntentValidationError("Substitution is outside the supplied roster.")
+        return {"status": "plan", "command": command}
+    if value.get("plan_command") is not None:
+        raise IntentValidationError("Unexpected plan command.")
     # A provider that does not enforce the schema may leave out the part its answer has no
     # use for, so the status decides which part is read. A draft's message is not read.
     if value["status"] == "clarification" and value.get("draft") is None:
-        return {"status": "clarification", "message": _text(value.get("message"), _MAX_QUESTION)}
+        question = _text(value.get("message"), _MAX_QUESTION)
+        if plan_context is not None or any(char.isdigit() for char in question):
+            question = (
+                "Hangi plan\u0131 ya da oyuncuyu kastediyorsun?"
+                if locale == "tr"
+                else "Which plan or player do you mean?"
+            )
+        return {"status": "clarification", "message": question}
     if value["status"] != "draft":
         raise IntentValidationError("Invalid draft status.")
     player_ids = {player["id"] for player in candidates}
@@ -634,6 +674,13 @@ def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
     previous = (*request.draft["hard"], *request.draft["soft"], request.draft.get("comparison", {}))
     retained = {item.get("player_id") for item in previous}
     retained.update(player for _, player in request.reference_captains)
+    if request.plan_context is not None:
+        for plan in request.plan_context["plans"]:
+            for week in plan["weeks"]:
+                retained.update(week["transfers_in"])
+                retained.update(week["transfers_out"])
+                if week["captain"] is not None:
+                    retained.add(week["captain"])
     if (scenario := request.draft.get("scenario")) is not None:
         retained.add(scenario["player_id"])
     text = _tokens(request.message)
@@ -689,10 +736,13 @@ def _validated(
         previous_draft=request.draft,
         reference_weeks=request.reference_weeks,
         locale=request.locale,
+        plan_context=request.plan_context,
     )
 
 
-def check_reply(request: IntentRequest, reply: object) -> dict[str, Any]:
+def check_reply(
+    request: IntentRequest, reply: object, *, server_data_id: str | None = None
+) -> dict[str, Any]:
     """Validate a reply the member's own model gave to the call ``prompt_for`` wrote.
 
     The shortlist is rebuilt from the request, so no state is kept between the prompt and
@@ -701,7 +751,15 @@ def check_reply(request: IntentRequest, reply: object) -> dict[str, Any]:
     """
     if isinstance(reply, str):
         reply = read_intent_json(reply)
-    return _validated(request, _shortlist(request), reply)
+    result = _validated(request, _shortlist(request), reply)
+    if (
+        result["status"] == "plan"
+        and request.plan_context is not None
+        and request.plan_context["kind"] == "server"
+        and request.plan_context["data_id"] != server_data_id
+    ):
+        raise IntentValidationError("The plan data has been superseded or is unavailable.")
+    return result
 
 
 def parse_check_request(value: object) -> tuple[IntentRequest, object]:
@@ -741,10 +799,11 @@ _DRAFT_SCHEMA: Final = _schema_object(
     {
         "hard": _CONSTRAINT_LIST,
         "soft": _SOFT_CONSTRAINT_LIST,
-        "comparison": {"anyOf": [_COMPARISON_SCHEMA, {"type": "null"}]},
+        "comparison": {"type": ["object", "null"], "anyOf": [_COMPARISON_SCHEMA, {"type": "null"}]},
         "window": {"type": ["integer", "null"], "enum": [*_WINDOWS, None]},
         "keep_weeks": {"type": "array", "items": {"type": "integer", "enum": list(_WEEKS)}},
         "min_bank": {
+            "type": ["object", "null"],
             "anyOf": [
                 _schema_object(
                     {
@@ -753,9 +812,10 @@ _DRAFT_SCHEMA: Final = _schema_object(
                     }
                 ),
                 {"type": "null"},
-            ]
+            ],
         },
         "scenario": {
+            "type": ["object", "null"],
             "anyOf": [
                 _schema_object(
                     {
@@ -766,14 +826,14 @@ _DRAFT_SCHEMA: Final = _schema_object(
                     }
                 ),
                 {"type": "null"},
-            ]
+            ],
         },
     }
 )
 _RESULT_SCHEMA: Final = _schema_object(
     {
         "status": {"type": "string", "enum": ["draft", "clarification"]},
-        "draft": {"anyOf": [_DRAFT_SCHEMA, {"type": "null"}]},
+        "draft": {"type": ["object", "null"], "anyOf": [_DRAFT_SCHEMA, {"type": "null"}]},
         "message": {"type": ["string", "null"]},
     }
 )
@@ -803,6 +863,19 @@ class IntentCall:
         }
 
 
+def intent_reply_schema(*, with_plans: bool = False) -> dict[str, Any]:
+    """Strict reply fields shared by every provider adapter."""
+    if not with_plans:
+        return _RESULT_SCHEMA
+    return _schema_object(
+        {
+            **_RESULT_SCHEMA["properties"],
+            "status": {"type": "string", "enum": ["draft", "clarification", "plan"]},
+            "plan_command": plan_command_schema(),
+        }
+    )
+
+
 def intent_call(request: IntentRequest) -> IntentCall:
     """The call for a request whose players are already the shortlist."""
     context: dict[str, Any] = {
@@ -821,7 +894,22 @@ def intent_call(request: IntentRequest) -> IntentCall:
             "message": request.clarification.message,
             "question": request.clarification.question,
         }
-    return IntentCall(_SYSTEM_PROMPT, json.dumps(context, ensure_ascii=False), _RESULT_SCHEMA)
+    schema = intent_reply_schema(with_plans=request.plan_context is not None)
+    system = _SYSTEM_PROMPT
+    if request.plan_context is not None:
+        context["plan_context"] = request.plan_context
+        system += """
+The supplied plan_context lists computed plans in their displayed order and the selected
+plan_id. For 'use the second plan' / 'ikinci plan\u0131 kullan', return status plan and action
+select with that exact plan_id. For 'bu transferi sabitle' use freeze_transfer, its incoming
+player_id and relative week. For 'bu haftay\u0131 koru' use freeze_week. For 'bu oyuncu yerine
+şunu alsam' use substitute, the existing player_id and replacement_id from players.
+Use the selected plan when no other is specified. Never invent identifiers or decisions.
+Ask when a reference is ambiguous. Return only the identifier and rule/action fields.
+Set draft and message to null for a plan command. Never return scores, prices, gains,
+resources, computed answers or an explanation. For an ordinary draft set plan_command null.
+"""
+    return IntentCall(system, json.dumps(context, ensure_ascii=False), schema)
 
 
 def prompt_for(request: IntentRequest) -> IntentCall:

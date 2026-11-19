@@ -223,7 +223,12 @@ def create_app(
         description="Read-only access to published SquadOpt application views.",
         version=BACKEND_API_VERSION,
     )
-    application.include_router(intent_routes())
+    identity_store = advice_store if advice_store is not None else public_advice_store
+    application.include_router(
+        intent_routes(
+            server_data_id=identity_store.plan_data_id if identity_store is not None else None
+        )
+    )
 
     @application.exception_handler(RunAdmissionError)
     async def planning_run_error(_request: Request, error: RunAdmissionError) -> JSONResponse:

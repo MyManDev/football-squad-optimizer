@@ -39,6 +39,7 @@ export interface PlanRun {
 }
 
 export interface RunInputs {
+  compareOnly?: boolean;
   draft: PlanDraft;
   held: ReadonlySet<number>;
   request: AdviceRequest;
@@ -97,6 +98,7 @@ export function prepareRun(inputs: RunInputs): PlanRun {
   const {
     draft,
     held,
+    compareOnly = false,
     request: originalRequest,
     plans,
     wildcardNotHeld,
@@ -111,7 +113,8 @@ export function prepareRun(inputs: RunInputs): PlanRun {
     )
   )
     request.deviceRun = false;
-  if (draft.soft.length || draft.scenario || draft.comparison) delete request.deviceAlternatives;
+  if (draft.soft.length || draft.scenario || draft.comparison || compareOnly)
+    delete request.deviceAlternatives;
   const preparedInputs =
     originalRequest.deviceAlternatives !== request.deviceAlternatives ||
     originalRequest.deviceRun !== request.deviceRun
@@ -138,7 +141,10 @@ export function prepareRun(inputs: RunInputs): PlanRun {
     const addressed = request.run
       ? { ...request, run: { ...request.run, stage: "followup" as const } }
       : request;
-    return pricing || draft.scenario || (request.deviceAlternatives && !draft.comparison)
+    return pricing ||
+      draft.scenario ||
+      compareOnly ||
+      (request.deviceAlternatives && !draft.comparison)
       ? pricedRequest(addressed, plan)
       : { ...addressed, ...plan, preferences: plan.preferences };
   };
@@ -161,7 +167,7 @@ export function prepareRun(inputs: RunInputs): PlanRun {
       wildcardUnavailable,
     };
   }
-  const automaticBasis = pricing || !compareBoth ? base : submit(hard);
+  const automaticBasis = compareOnly ? null : pricing || !compareBoth ? base : submit(hard);
   const slots: ReservedAlternative[] = [];
   function addExplicit(plan: PreparedPlan | null, conflict: boolean, title: ExplicitTitle) {
     const request = submit(plan);
@@ -232,6 +238,7 @@ export function restoreRun(
     },
     plans,
     wildcardNotHeld: confirmation.wildcardNotHeld,
+    compareOnly: confirmation.compareOnly === true,
     frozenWeeks,
     reference,
   });

@@ -1,0 +1,207 @@
+{
+  "$defs": {
+    "command": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "select",
+            "freeze_transfer",
+            "freeze_week",
+            "substitute"
+          ],
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "player_id": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "replacement_id": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "week": {
+          "enum": [
+            1,
+            2,
+            3,
+            null
+          ],
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "plan_id",
+        "action",
+        "week",
+        "player_id",
+        "replacement_id"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "context": {
+      "additionalProperties": false,
+      "properties": {
+        "data_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "device",
+            "server"
+          ],
+          "type": "string"
+        },
+        "plans": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "data_id": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "plan_id": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "weeks": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "captain": {
+                      "minimum": 1,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "chip": {
+                      "enum": [
+                        null,
+                        "wildcard",
+                        "freehit",
+                        "bboost",
+                        "3xc"
+                      ],
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "players": {
+                      "items": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "transfers_in": {
+                      "items": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "transfers_out": {
+                      "items": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "week": {
+                      "enum": [
+                        1,
+                        2,
+                        3
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "week",
+                    "transfers_in",
+                    "transfers_out",
+                    "players",
+                    "chip",
+                    "captain"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 3,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "plan_id",
+              "data_id",
+              "weeks"
+            ],
+            "type": "object"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "type": "array"
+        },
+        "selected_plan_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "data_id",
+        "kind",
+        "selected_plan_id",
+        "plans"
+      ],
+      "type": "object"
+    },
+    "session_extension": {
+      "additionalProperties": true,
+      "properties": {
+        "compareOnly": {
+          "type": "boolean"
+        },
+        "explicit": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://squadopt.dev/contracts/llmopt_plans_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/context"
+    },
+    {
+      "$ref": "#/$defs/command"
+    }
+  ],
+  "title": "LLMOPT computed-plan conversation"
+}

@@ -80,6 +80,7 @@ export interface AdviceReadOptions extends RequestOptions {
 }
 
 export interface AdviceClient {
+  readDeviceDataId?(): Promise<string>;
   /** Local computation waits for its worker ceiling; network transports keep their own deadline. */
   localRequestAllowanceMs?(request: AdviceRequest): number | undefined;
   cancelRun?(runId: string): Promise<void>;

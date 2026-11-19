@@ -266,6 +266,7 @@ def advice_read_schema() -> dict[str, Any]:
         {
             "transfer_hit_points": {"type": "number", "minimum": 0},
             "source_snapshot_id": {"type": ["string", "null"]},
+            "plan_data_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "bank_after_tenths": {"type": "integer", "minimum": 0},
             "free_transfers_after": {"type": "integer", "minimum": 0},
             "preferences": preferences_schema(),
@@ -608,6 +609,7 @@ def league_capabilities_schema() -> dict[str, Any]:
             # 0 is a public team opened on its own, outside any league.
             "league_id": {"type": "integer", "minimum": 0},
             "capture_snapshot_id": {"type": "string", "minLength": 1},
+            "plan_data_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "preferences": {
                 "type": "object",
                 "properties": {"available": {"type": "boolean"}},

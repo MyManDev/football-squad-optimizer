@@ -118,6 +118,9 @@ export function deviceAdviceClient(
       if (raw) {
         const envelope = checkedAdvice(JSON.parse(raw), request);
         if (envelope.payload.source_snapshot_id === squad.source_snapshot_id) {
+          envelope.payload.device_input_fingerprint = fingerprint;
+          for (const option of envelope.payload.device_alternatives ?? [])
+            option.device_input_fingerprint = fingerprint;
           const result: AdviceReadResult = { kind: "advice", envelope, source: "device" };
           memory.set(address, result);
           return result;
@@ -130,6 +133,10 @@ export function deviceAdviceClient(
   };
   const abort = () => new DOMException("The device request ended.", "AbortError");
   return {
+    readDeviceDataId: async () => {
+      published = undefined;
+      return (await verified()).fingerprint;
+    },
     localRequestAllowanceMs: (request) =>
       eligible(request)
         ? (DEVICE_LOAD_ALLOWANCE_SECONDS +
@@ -262,6 +269,8 @@ export function deviceAdviceClient(
             request,
           );
           Object.assign(envelope.payload, { device_input_fingerprint: inputs.fingerprint });
+          for (const alternative of envelope.payload.device_alternatives ?? [])
+            alternative.device_input_fingerprint = inputs.fingerprint;
           const result: AdviceReadResult = { kind: "advice", envelope, source: "device" };
           memory.set(address, result);
           try {

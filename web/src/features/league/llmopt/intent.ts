@@ -1,3 +1,4 @@
+import type { PlanContext, PlanCommand } from "./planHistory";
 import { discardBody, withRequestDeadline } from "../../../data/request";
 import type { Language } from "../../../i18n/messages";
 import {
@@ -513,6 +514,7 @@ export function intentBody(
   clarification?: Clarification,
   referenceWeeks?: readonly PlanWeekNumber[],
   referenceCaptains?: readonly { week: PlanWeekNumber; player_id: number }[],
+  planContext?: PlanContext,
 ) {
   return {
     message,
@@ -525,6 +527,7 @@ export function intentBody(
     ...(clarification ? { clarification } : {}),
     ...(referenceWeeks?.length ? { reference_weeks: referenceWeeks } : {}),
     ...(referenceCaptains?.length ? { reference_captains: referenceCaptains } : {}),
+    ...(planContext ? { plan_context: planContext } : {}),
   };
 }
 
@@ -540,6 +543,27 @@ export function intentAnswer(value: unknown, players: readonly CatalogPlayer[]) 
     value.message.trim().length <= MAX_QUESTION_LENGTH
   )
     return { status: "clarification" as const, message: value.message.trim() };
+  if (value.status === "plan") {
+    const c = value.command;
+    if (
+      !record(c) ||
+      Object.keys(c).some(
+        (k) => !["plan_id", "action", "week", "player_id", "replacement_id"].includes(k),
+      ) ||
+      typeof c.plan_id !== "string" ||
+      !/^[0-9a-f]{64}$/.test(c.plan_id) ||
+      !["select", "freeze_transfer", "freeze_week", "substitute"].includes(String(c.action))
+    )
+      throw new IntentError(422, "REPLY_REFUSED");
+    if (c.week !== undefined && !isPlanWeek(c.week)) throw new IntentError(422, "REPLY_REFUSED");
+    for (const key of ["player_id", "replacement_id"])
+      if (
+        c[key] !== undefined &&
+        (!Number.isSafeInteger(c[key]) || !players.some((p) => p.id === c[key]))
+      )
+        throw new IntentError(422, "REPLY_REFUSED");
+    return { status: "plan" as const, command: c as unknown as PlanCommand };
+  }
   if (value.status !== "draft") throw new Error("Invalid response");
   return {
     status: "draft" as const,

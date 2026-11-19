@@ -16,10 +16,11 @@ which is a different fact.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Final, Protocol
 
@@ -121,6 +122,13 @@ class AdviceRequestContext:
     projection_handoff_fingerprint: str
     repository_commit: str
     configuration_fingerprint: str
+
+
+def advice_context_identity(context: AdviceRequestContext) -> str:
+    """Opaque current-data identity, separate from request and cache identities."""
+    return hashlib.sha256(
+        json.dumps(asdict(context), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
 
 
 class AdviceInputsNotPreparedError(AdviceNotComputedError):
@@ -528,6 +536,10 @@ class AdviceReadStore:
         validate_league_state(document)  # the route serves only what the contract names
         return document
 
+    def plan_data_id(self) -> str | None:
+        context = self._context.current()
+        return advice_context_identity(context) if context is not None else None
+
     def _switch_inputs(self, context: AdviceRequestContext) -> AdviceSwitchInputs:
         if self._switches is None:
             return AdviceSwitchInputs()
@@ -597,6 +609,7 @@ class AdviceReadStore:
         )
         document: dict[str, object] = {
             "contract_version": LEAGUE_CAPABILITIES_CONTRACT_VERSION,
+            "plan_data_id": advice_context_identity(context),
             "league_id": int(league_id),
             "capture_snapshot_id": context.capture_snapshot_id,
             "season": context.season,

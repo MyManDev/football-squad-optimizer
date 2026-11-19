@@ -1,3 +1,4 @@
+import type { DecisionPreferences } from "../advice/decisionPreferences";
 import type { DecisionInformation, OfficialInformation } from "../advice/informationFacts";
 import type { OfficialInjuryFacts } from "../advice/officialInjuryFacts";
 import type { PlayerView } from "../../../data/schema";
@@ -443,6 +444,9 @@ export interface AdviceRolePointComponents {
 }
 
 export interface EntryAdvice {
+  preferences?: DecisionPreferences;
+  plan_data_id?: string;
+  device_input_fingerprint?: string;
   /** At most two further proved device choices, without nested menus. */
   device_alternatives?: EntryAdvice[];
   bank_after_tenths?: number;

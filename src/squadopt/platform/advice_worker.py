@@ -101,6 +101,7 @@ from squadopt.platform.advice_queue import (
     JobQueue,
     run_advice_worker_once,
 )
+from squadopt.platform.advice_read import advice_context_identity
 from squadopt.platform.advice_runs import FileRunStore, RunAdmissionError
 from squadopt.platform.advice_switches import (
     CHIP_SWITCH,
@@ -622,6 +623,7 @@ def build_advice_compute(
             advice["official_injuries"] = capture.switches.official_injuries.public_record(
                 _injury_fact_ids(advice)
             )
+        advice["plan_data_id"] = advice_context_identity(spec.context)
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a

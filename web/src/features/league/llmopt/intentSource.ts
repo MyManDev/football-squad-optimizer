@@ -1,3 +1,4 @@
+import type { PlanContext, PlanCommand } from "./planHistory";
 import { withRequestDeadline } from "../../../data/request";
 import type { Language } from "../../../i18n/messages";
 import type { PlanWeekNumber } from "../advice/decisionPreferences";
@@ -19,13 +20,16 @@ export interface IntentRequest {
   draft: PlanDraft;
   players: CatalogPlayer[];
   clarification?: Clarification;
+  planContext?: PlanContext;
   referenceWeeks?: readonly PlanWeekNumber[];
   referenceCaptains?: readonly { week: PlanWeekNumber; player_id: number }[];
 }
 
 /** A checked answer: a new draft, or one question back to the member. */
 export type IntentResult =
-  { status: "draft"; draft: PlanDraft } | { status: "clarification"; message: string };
+  | { status: "draft"; draft: PlanDraft }
+  | { status: "clarification"; message: string }
+  | { status: "plan"; command: PlanCommand };
 
 /**
  * Where the page's chat is read: the member's own model, or a stand-in in a test. The site
@@ -70,6 +74,7 @@ export function ownKeyIntentSource(origin: string, keyed: KeyedCall = withOwnKey
             request.clarification,
             request.referenceWeeks,
             request.referenceCaptains,
+            request.planContext,
           );
           const call = checkedProviderCall(
             await postKeyless(`${origin}/api/v1/llmopt/prompt`, body, signal),

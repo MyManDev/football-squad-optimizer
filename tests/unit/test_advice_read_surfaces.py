@@ -26,6 +26,7 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "league_id",  # address: whose rivals it was solved against
         "mode",  # address: the strategy slug the document answers for
         "window",  # address: how many weeks the plan spans (1, 3, 5)
+        "plan_data_id",  # conversation: immutable current advice context, ADR 0021
         "source_snapshot_id",  # provenance: the capture the advice was computed from
         "information_review",  # conditional actions and source playing chance; no rank odds
         "role_forecast",  # explicitly requested experimental start/cameo/minute estimates
