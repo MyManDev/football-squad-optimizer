@@ -651,3 +651,33 @@ def test_packages_keep_completed_incumbent_unless_every_reported_metric_is_safe(
     assert result.diagnostics["transfer_packages_v1"]["accepted"] is accepted
     assert result.weeks == (candidate if accepted else baseline).weeks
     assert result.diagnostics["expected_lineup_window"]["actual_total"] == 1.1
+
+
+def test_real_package_continuation_matches_complete_enabled_call():
+    from time import perf_counter
+
+    from squadopt.planning.expected_window import (
+        _retained_expected_window,
+        extend_expected_packages,
+        package_metrics,
+    )
+
+    problem = world()
+    h, initial, config, policy, _ = problem
+    policy = replace(policy, banked_transfer_value_points=0)
+    enabled = replace(policy, transfer_packages=True, package_gate=True)
+    start = perf_counter()
+    prefix = _retained_expected_window(h, initial, config, policy)
+    continued = extend_expected_packages(
+        h, initial, config, enabled, prefix, elapsed_seconds=perf_counter() - start
+    )
+    complete = optimize_expected_window(h, initial, config, enabled)
+    assert package_metrics(continued, policy) == package_metrics(complete, policy)
+    for a, b in zip(continued.weeks, complete.weeks, strict=True):
+        assert tuple(a.transfers_in.player_id) == tuple(b.transfers_in.player_id)
+        assert tuple(a.transfers_out.player_id) == tuple(b.transfers_out.player_id)
+        assert a.bank_after_tenths == b.bank_after_tenths
+        assert a.free_transfers_for_next_gameweek == b.free_transfers_for_next_gameweek
+    for plan in (continued, complete):
+        review = plan.diagnostics["transfer_packages_v1"]
+        assert review["accepted_metrics"] == package_metrics(plan, policy)

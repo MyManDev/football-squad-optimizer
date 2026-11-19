@@ -17,7 +17,7 @@ from docs.research.llmopt_phase1 import benchmark
 from scripts.measure_window_solver_highs import window_call
 
 from squadopt.optimization.work_budget import WorkBudget, WorkBudgetExhausted, work_budget
-from squadopt.planning.expected_window import optimize_expected_window
+from squadopt.planning.expected_window import extend_expected_packages, optimize_expected_window
 from squadopt.planning.models import PlanningHorizon
 from squadopt.platform.native_windows import execute_native_window
 
@@ -47,6 +47,7 @@ def measure(output, limit=None):
             ).hexdigest()
             for path in SOURCES
         },
+        "comparison": "shared_retained_prefix_charged_in_full_per_arm",
         "producer_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
     }
     rows = []
@@ -89,9 +90,14 @@ def measure(output, limit=None):
                 "wall_safety_seconds": call.settings.solver_time_limit_seconds,
                 "arms": {},
             }
+            retained_plan = None
+            prefix_measure = None
+            prefix_allocation = None
             for name, packages, gate in ARMS:
                 experiment = None
-                allocation = WorkBudget(122)
+                allocation = (
+                    WorkBudget(122) if prefix_allocation is None else replace(prefix_allocation)
+                )
                 policy = replace(
                     call.policy,
                     allow_two_free_transfers=True,
@@ -99,11 +105,35 @@ def measure(output, limit=None):
                     package_gate=gate,
                 )
 
-                def run(horizon=horizon, call=call, policy=policy):
+                def run(
+                    horizon=horizon,
+                    call=call,
+                    policy=policy,
+                    name=name,
+                    retained_plan=retained_plan,
+                    prefix_measure=prefix_measure,
+                ):
                     nonlocal experiment
-                    plan = optimize_expected_window(horizon, call.state, call.settings, policy)
+                    if name == "disabled":
+                        plan = optimize_expected_window(horizon, call.state, call.settings, policy)
+                    else:
+                        plan = extend_expected_packages(
+                            horizon,
+                            call.state,
+                            call.settings,
+                            policy,
+                            retained_plan,
+                            elapsed_seconds=prefix_measure["seconds"],
+                        )
                     experiment = plan.diagnostics.get("transfer_packages_v1")
                     return plan
+
+                def save_prefix(horizon=horizon, call=call, policy=policy):
+                    nonlocal retained_plan
+                    retained_plan = optimize_expected_window(
+                        horizon, call.state, call.settings, policy
+                    )
+                    return retained_plan
 
                 def bounded_native(model, seconds, allocation=allocation):
                     # Same non-refundable reservation and CP fallback as the worker.
@@ -113,15 +143,33 @@ def measure(output, limit=None):
                         raise RuntimeError(str(error)) from error
                     return execute_native_window(model, seconds)
 
-                with (
-                    patch.object(socket.socket, "connect", refuse_network),
-                    patch.object(socket.socket, "connect_ex", refuse_network),
-                    benchmark.accounting_checks() as checks,
-                    work_budget(allocation),
-                    patch.object(benchmark, "execute_native_window", bounded_native),
-                ):
-                    measured = benchmark.timed(run, capture_expected_failure=True)
+                if name != "disabled" and retained_plan is None:
+                    measured = {**prefix_measure}
+                    checks = measured["accounting_failures"]
+                else:
+                    with (
+                        patch.object(socket.socket, "connect", refuse_network),
+                        patch.object(socket.socket, "connect_ex", refuse_network),
+                        benchmark.accounting_checks() as checks,
+                        work_budget(allocation),
+                        patch.object(benchmark, "execute_native_window", bounded_native),
+                    ):
+                        measured = benchmark.timed(
+                            save_prefix if name == "disabled" else run,
+                            capture_expected_failure=True,
+                        )
+                    if name != "disabled":
+                        combined_calls = prefix_measure["calls"] + measured["calls"]
+                        measured = {
+                            **measured,
+                            **benchmark.call_counts(combined_calls),
+                            "calls": combined_calls,
+                            "seconds": prefix_measure["seconds"] + measured["seconds"],
+                        }
                 measured["accounting_failures"] = checks.copy()
+                if name == "disabled":
+                    prefix_measure = measured
+                    prefix_allocation = replace(allocation)
                 row["arms"][name] = clean(
                     {
                         **benchmark.compact_plan(measured),

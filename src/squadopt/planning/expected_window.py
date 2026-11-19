@@ -230,6 +230,39 @@ def optimize_expected_window(
     baseline = _retained_expected_window(
         horizon, initial, optimization, legacy, chips=chips, preferences=preferences
     )
+    return extend_expected_packages(
+        horizon,
+        initial,
+        optimization,
+        transfer,
+        baseline,
+        elapsed_seconds=perf_counter() - started,
+        chips=chips,
+        preferences=preferences,
+    )
+
+
+def extend_expected_packages(
+    horizon: PlanningHorizon,
+    initial: InitialSquadState,
+    optimization: OptimizationConfig,
+    transfer: TransferPlanningConfig,
+    baseline: TransferPlanResult,
+    *,
+    elapsed_seconds: float,
+    chips: ChipAvailability | None = None,
+    preferences: DecisionPreferences | None = None,
+) -> TransferPlanResult:
+    """Continue a retained prefix without resetting any elapsed or charged work."""
+    if (
+        not transfer.transfer_packages
+        or baseline.horizon_fingerprint != horizon.horizon_fingerprint
+    ):
+        raise ValueError("A package continuation requires its own retained horizon.")
+    if not 0 <= elapsed_seconds < float("inf"):
+        raise ValueError("A package continuation requires finite elapsed work.")
+    started = perf_counter() - elapsed_seconds
+    legacy = replace(transfer, transfer_packages=False, package_gate=False)
     review = cast(dict[str, Any], baseline.diagnostics["expected_lineup_window"])
     record: dict[str, Any] = {
         "version": "transfer_packages_v1",

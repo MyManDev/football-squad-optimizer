@@ -58,3 +58,9 @@ separately from tests. Test disabled identity/behavior, incumbent retention,
 funding pairs, full resource validation, mandatory/frozen rules, path grouping,
 confirmation reload and bounded job admission. Leave activation to the owner
 after reviewing the measured coverage and gains.
+
+The local comparison shares the unchanged retained prefix across its three arms.
+Each arm inherits the full prefix work ledger and elapsed time before its own
+continuation. This avoids repeating an identical deterministic calculation; the
+reported arm work includes the prefix in full. These are algorithm comparisons,
+not independent cold-request latency measurements.
