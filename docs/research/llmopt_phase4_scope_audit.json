@@ -14846,5 +14846,16 @@
       "objective_difference": 0.0,
       "frozen_replay_equal": false
     }
-  ]
+  ],
+  "acceptance_decision": {
+    "date": "2026-11-19",
+    "decider": "project owner",
+    "criterion": "Equality with the active server preference settings.",
+    "active_control_feasible_equal": 16,
+    "active_control_feasible_total": 16,
+    "active_control_matching_infeasibilities": 4,
+    "active_no_added_rule_equal": 20,
+    "accepted": true,
+    "interpretation": "The proved active 52.978 is not a failure against the frozen unproved 52.310; measured rows and frozen Phase 1 values stay unchanged."
+  }
 }

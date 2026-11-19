@@ -41,12 +41,13 @@ export type Constraint = (
     ))
   | { kind: "buy_player"; player_id: number; week: PlanWeekNumber }
   | { kind: "hit_budget"; points: number; week?: never }
-) & { max_cost_tenths?: number };
+) & { max_cost_tenths?: number; priority?: 1 | 2 | 3 };
 type Comparison = Constraint & { both?: boolean };
 
 export interface PlanDraft {
   hard: Constraint[];
   soft: Constraint[];
+  max_total_cost_tenths?: number;
   comparison?: Comparison;
   window?: PlanWindow;
   keep_weeks?: PlanWeekNumber[];
@@ -114,7 +115,7 @@ function parseConstraint(
       (key) =>
         !["kind", "player_id", "club", "count", "scope", "week", "points"].includes(key) &&
         !(strength === "comparison" && key === "both") &&
-        !(strength === "soft" && key === "max_cost_tenths"),
+        !(strength === "soft" && (key === "max_cost_tenths" || key === "priority")),
     )
   )
     throw new Error("Invalid constraint");
@@ -123,7 +124,13 @@ function parseConstraint(
   const { club, count, scope, week, points, max_cost_tenths: maxCost } = value;
   if (maxCost !== undefined && !isPreferenceCost(maxCost))
     throw new Error("Invalid preference cost limit");
-  const price = maxCost === undefined ? {} : { max_cost_tenths: maxCost };
+  const priority = value.priority;
+  if (priority !== undefined && priority !== 1 && priority !== 2 && priority !== 3)
+    throw new Error("Invalid priority");
+  const price: Pick<Constraint, "max_cost_tenths" | "priority"> = {
+    ...(maxCost === undefined ? {} : { max_cost_tenths: maxCost }),
+    ...(priority === undefined ? {} : { priority }),
+  };
   if (week !== undefined && !isPlanWeek(week)) throw new Error("Invalid rule week");
   const timing = week === undefined ? {} : { week };
   if (kind === "hit_budget") {
@@ -187,6 +194,10 @@ export function checkedDraft(value: unknown, players: readonly CatalogPlayer[]):
     soft: value.soft.map((item) => parseConstraint(item, playerIds, clubs, "soft")),
     ...(value.window !== undefined ? { window: value.window } : {}),
   };
+  if (value.max_total_cost_tenths !== undefined) {
+    if (!isPreferenceCost(value.max_total_cost_tenths)) throw new Error("Invalid total concession");
+    draft.max_total_cost_tenths = value.max_total_cost_tenths;
+  }
   if (value.keep_weeks !== undefined) {
     if (
       !Array.isArray(value.keep_weeks) ||

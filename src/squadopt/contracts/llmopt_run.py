@@ -48,3 +48,65 @@ def run_reference_schema() -> dict[str, object]:
         "required": ["contract_version", "run_id", "stage"],
         "additionalProperties": False,
     }
+
+
+def run_ledger_schema() -> dict[str, object]:
+    """Internal durable ledger, including bounded pre-admission cancellations."""
+    identifier = {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+    key = {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+    run = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "binding",
+            "capture",
+            "window",
+            "base",
+            "closed",
+            "base_cached",
+            "requests",
+            "reserved",
+        ],
+        "properties": {
+            "binding": key,
+            "capture": {"type": ["string", "null"]},
+            "window": {"type": "integer", "enum": [1, 3]},
+            "base": key,
+            "closed": {"type": "boolean"},
+            "base_cached": {"type": "boolean"},
+            "requests": {
+                "type": "object",
+                "maxProperties": 4,
+                "propertyNames": key,
+                "additionalProperties": {"type": "string"},
+            },
+            "reserved": {"type": "number", "minimum": 0, "maximum": 488},
+        },
+    }
+    job = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["limit", "runs", "receipt", "legacy_consumer"],
+        "properties": {
+            "limit": {"type": "number", "enum": [21, 63, 122, 366]},
+            "runs": {"type": "array", "items": identifier, "minItems": 1, "uniqueItems": True},
+            "legacy_consumer": {"type": "boolean"},
+            "receipt": {"type": ["object", "null"]},
+        },
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["contract_version", "runs", "jobs", "cancelled"],
+        "properties": {
+            "contract_version": {"type": "string", "const": "llmopt_run_ledger_v2"},
+            "runs": {"type": "object", "propertyNames": identifier, "additionalProperties": run},
+            "jobs": {"type": "object", "additionalProperties": job},
+            "cancelled": {
+                "type": "object",
+                "propertyNames": identifier,
+                "maxProperties": 1024,
+                "additionalProperties": {"type": "number", "minimum": 0},
+            },
+        },
+    }

@@ -48,6 +48,7 @@ from datetime import datetime
 from typing import Final, Protocol
 
 from squadopt.contracts.llmopt_run import RunReference as RunReference
+from squadopt.contracts.preference_bundle import BUNDLE_SWITCH, PreferenceBundle
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
@@ -302,12 +303,17 @@ class AdviceSubmitService:
             view["infeasibility"] = record.error.infeasibility
         return view
 
-    def cancel_run(self, run_id: str, *, at_utc: str) -> None:
+    def cancel_run(self, run_id: str, *, at_utc: str, client_bucket: str = "unknown") -> None:
         # Reuse the strict reference parser so IDs can never become arbitrary store paths.
         RunReference.parse({"contract_version": "llmopt_run_v1", "run_id": run_id, "stage": "base"})
         if self._runs is None:
             raise RunAdmissionError("RUN_STORE_UNAVAILABLE", "Planning work is unavailable.")
-        self._runs.cancel(run_id, self._queue, at_utc)
+        bucket = client_address_bucket(client_bucket)
+        if self._limiter is not None and not self._limiter.allow(f"ip:{bucket}"):
+            raise self._rate_limited()
+        self._runs.cancel(
+            run_id, self._queue, at_utc, capture=self._reader.current_capture_snapshot_id()
+        )
 
     def submit(
         self,
@@ -325,9 +331,89 @@ class AdviceSubmitService:
         chip: str | None = None,
         model: str = "current",
         preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
         run: RunReference | None = None,
         run_tx: RunTransaction | None = None,
         run_resolved: ResolvedAdviceRequest | None = None,
+        admission_charged: bool = False,
+    ) -> SubmitOutcome:
+        """Submit work and durably acknowledge anonymous V2 consumers."""
+
+        def ask(transaction: RunTransaction | None, charged: bool) -> SubmitOutcome:
+            return self._submit(
+                league_id=league_id,
+                entry_id=entry_id,
+                strategy=strategy,
+                window=window,
+                rival_entry_id=rival_entry_id,
+                idempotency_key=idempotency_key,
+                client_bucket=client_bucket,
+                at_utc=at_utc,
+                top100_weight=top100_weight,
+                managers_word=managers_word,
+                chip=chip,
+                model=model,
+                preferences=preferences,
+                preference_bundle=preference_bundle,
+                run=run,
+                run_tx=transaction,
+                run_resolved=run_resolved,
+                admission_charged=charged,
+            )
+
+        outcome = ask(run_tx, admission_charged)
+        if (
+            run is not None
+            or self._runs is None
+            or outcome.job is None
+            or outcome.job.contract_version != "backend_jobs_v2"
+        ):
+            return outcome
+        # The queue/admission locks have been released. Preserve ledger -> queue
+        # ordering without serializing independent legacy admissions on the ledger.
+        with self._runs.transaction(at_utc=at_utc) as transaction:
+            joined = self._queue.load(outcome.job.job_id)
+            if joined is None:
+                raise RunAdmissionError("RUN_REQUEST_INCOMPLETE", "Please retry this request.")
+            if joined.status == "cancelled":
+                # Cancellation won before the anonymous join was acknowledged.
+                # Retry under the ledger lock: a new V2 producer cannot race this
+                # admission, and a new V1 job keeps the legacy execution policy.
+                outcome = ask(transaction, True)
+            else:
+                outcome = SubmitOutcome(kind="job", job=joined)
+            if outcome.job is not None and outcome.job.contract_version == "backend_jobs_v2":
+                if (
+                    not outcome.job.is_terminal
+                    and outcome.job.job_id not in transaction.state["jobs"]
+                ):
+                    raise RunAdmissionError(
+                        "RUN_STORE_UNAVAILABLE", "The admitted work is unavailable."
+                    )
+                transaction.legacy_consumer(outcome.job.job_id)
+        return outcome
+
+    def _submit(
+        self,
+        *,
+        league_id: int,
+        entry_id: int,
+        strategy: str,
+        window: int,
+        rival_entry_id: int | None,
+        idempotency_key: str | None,
+        client_bucket: str,
+        at_utc: str,
+        top100_weight: int = 0,
+        managers_word: bool = False,
+        chip: str | None = None,
+        model: str = "current",
+        preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
+        run: RunReference | None = None,
+        run_tx: RunTransaction | None = None,
+        run_resolved: ResolvedAdviceRequest | None = None,
+        admission_charged: bool = False,
     ) -> SubmitOutcome:
         """Validate, answer from the cache, rate-limit, dedupe, and enqueue, in that order.
 
@@ -343,6 +429,8 @@ class AdviceSubmitService:
 
         if run is not None and self._runs is None:
             raise RunAdmissionError("RUN_STORE_UNAVAILABLE", "Planning work is unavailable.")
+        if preference_bundle is not None and (run is None or run.stage != "followup"):
+            raise RunAdmissionError("RUN_BASE_REQUIRED", "Compute the main plan first.")
         client_bucket = client_address_bucket(client_bucket)
         if self._store_ready is not None and not self._store_ready():
             # Refuse before validating: a queue write onto a store that has failed its
@@ -374,10 +462,11 @@ class AdviceSubmitService:
                 chip=chip,
                 model=model,
                 preferences=preferences,
+                preference_bundle=preference_bundle,
             )
 
         limiter = self._limiter
-        charged = False
+        charged = admission_charged
         try:
             resolved = run_resolved if run_resolved is not None else resolve()
         except AdviceInputsNotPreparedError as missing:
@@ -416,10 +505,28 @@ class AdviceSubmitService:
                     sort_keys=True,
                 ).encode()
             ).hexdigest()
-            with self._runs.transaction() as transaction:
-                transaction.bind(run, binding, window, cache_key, self._queue)
-                original = transaction.previous(run, cache_key)
+            with self._runs.transaction(at_utc=at_utc) as transaction:
+                transaction.prune(context.capture_snapshot_id, self._queue)
+                if run is not None:
+                    transaction.bind(
+                        run,
+                        binding,
+                        window,
+                        cache_key,
+                        self._queue,
+                        capture=context.capture_snapshot_id,
+                    )
+                    if (
+                        preference_bundle is not None
+                        and transaction.state["runs"][run.run_id]["base"]
+                        != resolved.switches[BUNDLE_SWITCH]["base_key"]
+                    ):
+                        raise RunAdmissionError(
+                            "RUN_BASE_CHANGED", "The main request does not match this run."
+                        )
+                original = transaction.previous(run, cache_key) if run is not None else None
                 if original is not None:
+                    assert run is not None
                     held = self._reader.cached(cache_key)
                     if held is not None:
                         transaction.cached(run)
@@ -444,17 +551,17 @@ class AdviceSubmitService:
                     chip=chip,
                     model=model,
                     preferences=preferences,
+                    preference_bundle=preference_bundle,
                     run=run,
                     run_tx=transaction,
                     run_resolved=resolved,
+                    admission_charged=charged,
                 )
         cached = self._reader.cached(cache_key)
         if cached is not None:
             if run is not None and run_tx is not None:
                 run_tx.cached(run)
             return SubmitOutcome(kind="hit", payload=cached)
-        if preferences.active and window in (1, 3) and run is None and self._runs is not None:
-            raise RunAdmissionError("RUN_ID_REQUIRED", "Confirm a planning run first.")
         entry_bucket = f"entry:{context.capture_snapshot_id}:{entry_id}"
         if not charged and limiter is not None and not limiter.allow(f"ip:{client_bucket}"):
             raise self._rate_limited()
@@ -514,7 +621,16 @@ class AdviceSubmitService:
                             )
                         if not job.is_terminal:
                             if run is not None and run_tx is not None:
-                                run_tx.reserve(run, cache_key, job.job_id)
+                                run_tx.reserve(
+                                    run,
+                                    cache_key,
+                                    job.job_id,
+                                    preference_bundle=preference_bundle is not None,
+                                )
+                            if run_tx is not None and (
+                                run is None or job.contract_version == "backend_jobs_v1"
+                            ):
+                                run_tx.legacy_consumer(job.job_id)
                             return SubmitOutcome(kind="job", job=job)
                         # Terminal replay of the same request: the cache answers when it
                         # can; a failed job means the same key may honestly try again.
@@ -564,7 +680,12 @@ class AdviceSubmitService:
                     raise self._rate_limited()
                 self._client_jobs[record.job_id] = client_bucket
                 if run is not None and run_tx is not None:
-                    run_tx.reserve(run, cache_key, record.job_id)
+                    run_tx.reserve(
+                        run,
+                        cache_key,
+                        record.job_id,
+                        preference_bundle=preference_bundle is not None,
+                    )
                 try:
                     yield
                 except BaseException:
@@ -615,5 +736,9 @@ class AdviceSubmitService:
                     run_tx.cached(run)
                 return SubmitOutcome(kind="hit", payload=winner)
             if run is not None and run_tx is not None:
-                run_tx.reserve(run, cache_key, winner.job_id)
+                run_tx.reserve(
+                    run, cache_key, winner.job_id, preference_bundle=preference_bundle is not None
+                )
+            if run_tx is not None and (run is None or winner.contract_version == "backend_jobs_v1"):
+                run_tx.legacy_consumer(winner.job_id)
             return SubmitOutcome(kind="job", job=winner)

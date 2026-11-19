@@ -4,6 +4,8 @@
  */
 
 import type { DecisionPreferences } from "../advice/decisionPreferences";
+import type { PreferenceBundle } from "../advice/preferenceBundle";
+import { solvePreferenceBundle } from "./preferenceBundle";
 import { solveAlternatives } from "./alternatives";
 import { orderedBench, viceCaptain } from "./publication/rows";
 import { solveChipGains } from "./chipForecast/gains";
@@ -22,6 +24,7 @@ import type {
 } from "./types";
 
 export interface DevicePlanRequest {
+  preferenceBundle?: PreferenceBundle;
   alternatives?: boolean;
   preferences?: DecisionPreferences;
   id: number;
@@ -60,11 +63,23 @@ export function solveRequest(
     chipGains = [],
     preferences,
     alternatives = false,
+    preferenceBundle,
   }: Omit<DevicePlanRequest, "id">,
   now: () => number = () => performance.now(),
   onPlan?: (plan: DevicePlanAnswer) => void,
   onChip?: (done: number, total: number) => void,
 ): DevicePlanAnswer {
+  if (preferenceBundle) {
+    if (alternatives || strategy || top100Weight || chipGains.length)
+      throw new DevicePlanRefused("unsupported preference execution combination", "plan");
+    return solvePreferenceBundle(
+      solver,
+      { document, entry, preferences, chip, bundle: preferenceBundle },
+      (rules, choice) =>
+        solveRequest(solver, { document, entry, preferences: rules, chip: choice }, now),
+      now,
+    );
+  }
   if (alternatives) {
     if (
       chip !== null ||

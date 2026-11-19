@@ -6,6 +6,12 @@
   selection-utility gains all zero. Sixteen opened-gate proposals retain the incumbent.
   One inherited 122.000084823-unit base overrun remains visible. Both controls default off.
 
+- 2026-11-19: [LLMOPT device priorities](research/llmopt_phase4_priority_audit.md),
+  [record](research/llmopt_phase4_priority_audit.json): the original twenty frozen
+  controls, 16/16 equal feasible objectives and priority outcomes plus four equal
+  infeasibilities. Eight transfer decisions differ at equal scores; maximum complete
+  device bundle 7.165 seconds. Sequential local calls, zero jobs and network calls. #1468.
+
 - 2026-11-19: [LLMOPT original-control scope audit](research/llmopt_phase4_scope_audit.md),
   [record](research/llmopt_phase4_scope_audit.json): 20 frozen member-weeks, 60 local
   comparisons. Exact original controls replay 20/20; device equality is 15/16 feasible
@@ -17,6 +23,19 @@
   [record](research/llmopt_phase4_parity.json): twenty frozen member-weeks, forty local
   comparisons, forty equal model and published objectives, forty identical transfer
   decisions with a keep-first-held-player constraint; no server jobs or live measurements.
+
+- 2026-11-19: [LLMOPT one preference job](research/llmopt_phase3_jobs.md),
+  [record](research/llmopt_phase3_jobs.json): twenty frozen member-weeks, both windows
+  and both modes, 80 real API/worker run records. Maximum two server jobs, every
+  receipt within allocation, zero extra jobs from 192 reconstructed-service repeats.
+  Total mode explicitly reuses a feasible main answer; priority layers retain their
+  inner 20/60-unit ceiling. No latency, realized-score or global-quality claim. #1467.
+
+- 2026-11-19: [LLMOPT real solver budget controls](research/llmopt_phase2_solver_budget.md),
+  [record](research/llmopt_phase2_solver_budget.json): twenty frozen member-weeks at
+  both windows; 40/40 original statuses and decisions, 32 equal numeric objectives
+  and eight equal infeasibilities; maximum work 20.001169834987554/21 and
+  120.00555450856191/122 units. Sequential local production solves, no network calls.
 
 - 2026-11-18: [LLMOPT shared admission](research/llmopt_phase2_admission.md),
   [record](research/llmopt_phase2_admission.json): 20 frozen member-weeks, 40 runs,
@@ -394,3 +413,5 @@ the #980 forwarder is built on Cloudflare.
 | Artifact | Finding | Issue |
 | --- | --- | --- |
 | [GW8 club-news join counts](research/club_news_join_counts_gw8.md) ([record](research/club_news_join_counts_gw8.json); [protocol](research/club_news_join_counts_gw8_prereg.md)) | Offline replay at the clean export commit reproduces the published table. Five unique player joins, zero no-match or ambiguous identities; three absence/doubt statements unapplied because fixture scope is unverified. Frozen verdict `statements_lost`, routing #1006 items 3, 7, 4 and 10. No new model call or prediction claim. | #524, #1006, #1140 |
+
+- [Five-free-transfer served-path preflight](research/llmopt_window_budget_probe.md) ([record](research/llmopt_window_budget_probe.json)): one saved GW6 member with five free transfers selected the bound football input and observed-information route, returning a feasible plan; the specific Phase 1 accounting exception was not reproduced. Exact GW8/GW9 served bundles are absent locally. No planner change.

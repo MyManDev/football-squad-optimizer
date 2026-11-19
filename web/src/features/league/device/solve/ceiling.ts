@@ -38,9 +38,11 @@ export function withinCeiling(
   now: () => number = () => performance.now(),
 ): LpSolver {
   const started = now();
+  const remaining = () => Math.max(0, ceilingSeconds - (now() - started) / 1000);
   return {
+    remainingSeconds: remaining,
     solve(problem, options) {
-      const left = ceilingSeconds - (now() - started) / 1000;
+      const left = remaining();
       return solver.solve(problem, { ...options, time_limit: Math.max(left, LEAST_SECONDS) });
     },
   };

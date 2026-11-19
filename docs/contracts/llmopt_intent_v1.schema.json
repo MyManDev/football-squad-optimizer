@@ -189,6 +189,14 @@
               },
               "type": "array"
             },
+            "max_total_cost_tenths": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
             "min_bank": {
               "anyOf": [
                 {
@@ -325,6 +333,18 @@
                       "null"
                     ]
                   },
+                  "priority": {
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      null
+                    ],
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
                   "scope": {
                     "enum": [
                       "squad",
@@ -357,7 +377,8 @@
                   "scope",
                   "week",
                   "points",
-                  "max_cost_tenths"
+                  "max_cost_tenths",
+                  "priority"
                 ],
                 "type": "object"
               },
@@ -378,6 +399,7 @@
           "required": [
             "hard",
             "soft",
+            "max_total_cost_tenths",
             "comparison",
             "window",
             "keep_weeks",

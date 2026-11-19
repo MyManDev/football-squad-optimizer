@@ -18,6 +18,7 @@ The server data identity hashes the existing immutable advice context, without
 changing its cache key. Carry it on computed advice and capabilities. Device
 plans use their checked input-table/member fingerprint. An unversioned legacy
 answer may be displayed but is not offered as a conversational plan reference.
+The project owner approved this treatment of legacy results.
 The browser rechecks the current input identity before sending a plan command.
 The check route refuses a plan outside the supplied current catalogue, a plan
 with another data identity, and a server identity superseded by the current
@@ -29,8 +30,12 @@ catalogue contains identifiers and decisions, never point/resource outcomes.
 The provider selects a plan identifier and an action/rule; it cannot supply a
 computed result. Keep the existing draft translation contract for ordinary
 instructions. Every new provider-schema field has an explicit type. Reject
-unknown fields. Replace a clarification containing numerical claims with a
-fixed short question, so provider text cannot introduce displayed figures.
+unknown plan-command fields; ordinary draft replies retain legacy null-extra handling.
+Without a plan catalogue, clarification questions retain their previous behavior,
+including numbers. With a catalogue, preserve nonnumeric questions and relative week
+references 1 through 3 in Turkish and English. Replace a question containing any other
+number with the existing fixed short question. A point or resource quantity is not
+a week reference, even when its number is 1 through 3.
 
 Retain at most twelve checked, explicitly whitelisted computed plans in the
 existing safe session. Selecting, undoing and returning to a retained plan

@@ -155,8 +155,27 @@ export interface DevicePlanEntry {
   top100_weights?: number[];
 }
 
+export interface DevicePreferenceComponent {
+  status: "done" | "failed" | "exhausted" | "unavailable";
+  answer: DevicePlanAnswer | null;
+  error_code: string | null;
+}
+
+export interface DevicePreferenceResult {
+  contract_version: "llmopt_device_preference_v1";
+  request: import("../advice/preferenceBundle").PreferenceBundle;
+  components: DevicePreferenceComponent[];
+  selected: DevicePreferenceComponent | null;
+  applied: number[];
+  accepted: number;
+  budget_exhausted: boolean;
+}
+
 /** What the device's solve proved, in player ids. */
 export interface DevicePlanAnswer {
+  expected_points_cost?: number;
+  preference_bundle?: DevicePreferenceResult;
+  priority_preferences?: import("../advice/preferenceBundle").PriorityResult;
   restricted?: boolean;
   alternatives?: DevicePlanAnswer[];
   preferences?: DecisionPreferences;

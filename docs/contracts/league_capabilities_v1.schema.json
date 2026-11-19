@@ -1,113 +1,75 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://squadopt.dev/contracts/league_capabilities_v1.schema.json",
-  "title": "SquadOpt league advice capabilities",
-  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "properties": {
-    "contract_version": {
-      "type": "string",
-      "const": "league_capabilities_v1"
-    },
-    "league_id": {
-      "type": "integer",
-      "minimum": 0
-    },
     "capture_snapshot_id": {
-      "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "type": "string"
     },
-    "plan_data_id": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "transfer_packages": {
-      "type": "boolean",
-      "description": "Optional disabled-by-default three-week package and path capability."
-    },
-    "preferences": {
-      "type": "object",
-      "properties": {
-        "available": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "available"
-      ],
-      "additionalProperties": false
-    },
-    "season": {
-      "type": "string",
-      "minLength": 1
-    },
-    "gameweek": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "strategies": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "windows": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "enum": [
-                1,
-                3,
-                5
-              ]
-            },
-            "uniqueItems": true
-          },
-          "requires_rival": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "windows",
-          "requires_rival"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "top100": {
-      "type": "object",
-      "properties": {
-        "available": {
-          "type": "boolean"
-        },
-        "weights": {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100
-          },
-          "uniqueItems": true
-        }
-      },
-      "required": [
-        "available",
-        "weights"
-      ],
-      "additionalProperties": false
-    },
-    "decision_information": {
-      "type": "object",
+    "chips": {
       "additionalProperties": false,
       "properties": {
-        "version": {
-          "const": "football_decision_information_v1"
+        "held_by_entry": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[1-9][0-9]*$": {
+              "items": {
+                "enum": [
+                  "wildcard",
+                  "freehit",
+                  "bboost",
+                  "3xc"
+                ]
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "type": "object"
         },
-        "revision": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+        "strategy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "const": "dated_joint_opportunity_v3"
+            },
+            "windows": {
+              "items": {
+                "enum": [
+                  1,
+                  3,
+                  5
+                ]
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "version",
+            "windows"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "held_by_entry"
+      ],
+      "type": "object"
+    },
+    "contract_version": {
+      "const": "league_capabilities_v1",
+      "type": "string"
+    },
+    "decision_information": {
+      "additionalProperties": false,
+      "properties": {
+        "coach_news_bound": {
+          "type": "boolean"
         },
-        "source_snapshot_id": {
-          "type": "string",
-          "minLength": 1
+        "minute_components_bound": {
+          "type": "boolean"
         },
         "observed_at": {
           "type": [
@@ -115,11 +77,16 @@
             "null"
           ]
         },
-        "coach_news_bound": {
-          "type": "boolean"
+        "revision": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
         },
-        "minute_components_bound": {
-          "type": "boolean"
+        "source_snapshot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "const": "football_decision_information_v1"
         }
       },
       "required": [
@@ -129,20 +96,19 @@
         "observed_at",
         "coach_news_bound",
         "minute_components_bound"
-      ]
+      ],
+      "type": "object"
     },
-    "models": {
-      "type": "array",
-      "items": {
-        "enum": [
-          "current",
-          "football"
-        ]
-      },
-      "uniqueItems": true
+    "gameweek": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "league_id": {
+      "minimum": 0,
+      "type": "integer"
     },
     "managers_word": {
-      "type": "object",
+      "additionalProperties": false,
       "properties": {
         "available": {
           "type": "boolean"
@@ -151,58 +117,104 @@
       "required": [
         "available"
       ],
-      "additionalProperties": false
+      "type": "object"
     },
-    "chips": {
-      "type": "object",
+    "models": {
+      "items": {
+        "enum": [
+          "current",
+          "football"
+        ]
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "plan_data_id": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "preference_bundles": {
+      "additionalProperties": false,
       "properties": {
-        "strategy": {
-          "type": "object",
-          "properties": {
-            "version": {
-              "const": "dated_joint_opportunity_v3"
-            },
-            "windows": {
-              "type": "array",
-              "items": {
-                "enum": [
-                  1,
-                  3,
-                  5
-                ]
-              },
-              "uniqueItems": true
-            }
-          },
-          "required": [
-            "version",
-            "windows"
-          ],
-          "additionalProperties": false
-        },
-        "held_by_entry": {
-          "type": "object",
-          "patternProperties": {
-            "^[1-9][0-9]*$": {
-              "type": "array",
-              "items": {
-                "enum": [
-                  "wildcard",
-                  "freehit",
-                  "bboost",
-                  "3xc"
-                ]
-              },
-              "uniqueItems": true
-            }
-          },
-          "additionalProperties": false
+        "version": {
+          "const": "llmopt_preference_bundle_v1",
+          "type": "string"
         }
       },
       "required": [
-        "held_by_entry"
+        "version"
       ],
-      "additionalProperties": false
+      "type": "object"
+    },
+    "preferences": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "available"
+      ],
+      "type": "object"
+    },
+    "season": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "strategies": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "requires_rival": {
+            "type": "boolean"
+          },
+          "windows": {
+            "items": {
+              "enum": [
+                1,
+                3,
+                5
+              ],
+              "type": "integer"
+            },
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "windows",
+          "requires_rival"
+        ],
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "top100": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "weights": {
+          "items": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "available",
+        "weights"
+      ],
+      "type": "object"
+    },
+    "transfer_packages": {
+      "description": "Optional disabled-by-default three-week package and path capability.",
+      "type": "boolean"
     }
   },
   "required": [
@@ -215,5 +227,6 @@
     "top100",
     "managers_word"
   ],
-  "additionalProperties": false
+  "title": "SquadOpt league advice capabilities",
+  "type": "object"
 }

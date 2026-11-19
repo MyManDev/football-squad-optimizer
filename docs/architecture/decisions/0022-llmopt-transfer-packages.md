@@ -1,11 +1,19 @@
 # ADR 0022: Bounded transfer packages and three-week paths
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-19
 - Decider: project owner
 - Related: ADR 0021; PR #1469
 
 ## Decision
+
+Ship the package implementation with both `SQUADOPT_BACKEND_TRANSFER_PACKAGES`
+and `SQUADOPT_BACKEND_PACKAGE_GATE` set to their default of 0. In the
+[full-pool comparison](../../research/llmopt_phase6_results.md), opening the gate
+produced 16 package proposals. The planner accepted none. Across the 18 completed
+member-weeks, the gains in raw starting-eleven points, expected net squad points
+and selection utility were each zero. The two remaining member-weeks had no result.
+Both controls stay off until a new measurement demonstrates a gain.
 
 Keep both retained expected-window routes and their 40/60 allocation unchanged.
 Add optional one/two-transfer packages behind a disabled control. A separate
@@ -56,8 +64,7 @@ Replay the same twenty frozen Phase 1 member-weeks on the full pool, with the
 same budgets, in disabled, pairs-only and opened-gate arms. Run measurements
 separately from tests. Test disabled identity/behavior, incumbent retention,
 funding pairs, full resource validation, mandatory/frozen rules, path grouping,
-confirmation reload and bounded job admission. Leave activation to the owner
-after reviewing the measured coverage and gains.
+confirmation reload and bounded job admission.
 
 The local comparison shares the unchanged retained prefix across its three arms.
 Each arm inherits the full prefix work ledger and elapsed time before its own

@@ -1,6 +1,6 @@
 # ADR 0019: Priority layers within one preference job
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-19
 - Decider: project owner
 - Related: ADR 0018; PR #1466
@@ -56,8 +56,9 @@ and retain the existing working path. Browser migration belongs to the next phas
 
 ### Public execution boundary
 
-The following is the required integration design. It is not implemented by the
-internal kernel in this PR; the public page still uses its existing four-job path.
+The following public execution boundary connects admission, immutable requests,
+worker computation and the page. The internal kernel alone does not establish
+the two-job acceptance condition.
 
 Use a closed `llmopt_preference_bundle_v1` contract on the existing advice boundary.
 The full backend advertises the capability only when durable run admission, immutable
@@ -77,18 +78,26 @@ the resulting J is recomputed from its integer coefficients. This model already 
 the game's transfer limits. Unproved main results retain their unproved reference flag.
 
 Without a total limit, package the existing two single-price requests and the existing
-combined request into one execution. The page's existing compiler produces the at most
-four accepted-price combinations, preserving legacy order, conflicts and individual
-ceilings. Encode child preference differences relative to the main request so frozen
+combined request into one execution. The page's existing compiler produces reachable
+accepted-price combinations, preserving legacy order, conflicts and individual ceilings.
+Two distinct price slots normally need four combinations. Rules sharing a slot can have
+different ceilings, so enumerate their reachable threshold intervals rather than treating
+a slot as one acceptance bit. Sixteen rules admit at most 289 combinations. Repeated
+choices share their canonical identity. This preserves legacy semantics without duplicating
+its rule compiler on the server. Encode child preference differences relative to the main request so frozen
 weeks are not duplicated. Keep the existing request size limits and refuse an oversized
-bundle before admission. Completed component answers may be cached only inside the
-existing successful-completion and cancellation boundary, so later edits reuse them.
+bundle before admission. Completed valid component answers enter their ordinary
+answer cache even if the initiating run closes, in accordance with ADR 0018.
+Closing prevents new admission rather than discarding completed computation.
+The parent response retains the main answer and a checked catalogue of computed
+components and the selected outcome; it does not relabel a component as the main
+request. Run identifiers never enter an answer address.
 
 An incomplete points tie break stopped by the wall clock cannot replace the last completed
 layer witness. Its actual completion status is separate from the public FEASIBLE plan
 status, which never claims that the resulting net score is globally best.
 
-### Conservative morning decisions
+### Confirmed product decisions
 
 Explicit new priorities require an explicit total allowance. Ask for that allowance rather
 than inventing one or silently ignoring a priority. An old request without either field
@@ -98,6 +107,9 @@ lexicographic semantics and the required legacy behavior without granting an uns
 A soft Wildcard combined with a total allowance remains unsupported until its chip domain
 can be shared correctly with J. Refuse it before starting a job. Keep ordinary legacy
 Wildcard pricing intact; do not silently weaken an explicit chip-saving requirement.
+
+Unknown provider fields whose value is null retain the legacy ignored-field behavior.
+Non-null unknown fields and malformed page requests remain contract errors.
 
 ## Verification
 

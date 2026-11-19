@@ -33,3 +33,15 @@ receipt does not silently reset. The schema also defines these receipt/confirmat
 The accompanying schema describes these optional extension fields; existing core device
 and advice validators still validate their other fields. Generate it with
 `device_extension_schema()` in `squadopt.contracts.llmopt_device`.
+
+The optional private `preferenceBundle` request is the checked Phase 3 bundle. The
+worker returns `preference_bundle` with at most two computed components and one
+selected answer; answers cannot contain another bundle or alternatives. The adapter
+publishes these as the existing `preference_bundle_result`. A total allowance returns
+computed `priority_preferences`, including completed layers and signed total cost.
+Every internal solve shares the same worker ceiling. No numeric reference is accepted.
+
+The browser-only capability `devicePreferenceBundles` offers this path for one week;
+it does not advertise a three-week service capability. Confirmation `bundleMode`
+and `deviceRun` are saved before work. Bundle identity extends only the private
+device cache address. Public computation identities and provider credentials are unchanged.

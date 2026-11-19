@@ -71,12 +71,11 @@ export function visibleAutomatic(
   if (state.phase !== "done" || !reference) return null;
   const plan = state.envelope.payload;
   const preferences = state.request.preferences;
-  const kind =
-    preferences?.min_opening_bank_tenths !== undefined
-      ? "bank"
-      : preferences?.hold_opening_transfers
-        ? "roll"
-        : null;
+  // A delayed-buy path inherits the member's opening bank floor.
+  const bankGoal =
+    preferences?.min_opening_bank_tenths !== undefined &&
+    !(paths3w && preferences.hold_opening_transfers);
+  const kind = bankGoal ? "bank" : preferences?.hold_opening_transfers ? "roll" : null;
   return kind &&
     meaningfulOpeningAlternative(reference, plan, kind) &&
     !previous.some((shown) =>

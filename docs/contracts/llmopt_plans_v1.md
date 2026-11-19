@@ -16,6 +16,11 @@ choice. Before a plan command the browser rechecks current inputs; late replies 
 belong to its current catalogue. Unversioned legacy plans are displayable but cannot be
 offered as conversational plan references.
 
+Without a catalogue, clarification questions retain legacy behavior, including numeric
+questions. With a catalogue, nonnumeric questions and relative week numbers 1 through 3
+remain unchanged in either language. Other numeric quantities use the fixed clarification
+question. Computed scores and resources continue to come only from checked plan results.
+
 The browser content identity includes all weeks, transfers, chips, lineups, ordered bench,
 captain/vice, point and resource facts. Unordered player/move sets are canonicalized;
 floating arithmetic is normalized to eight decimal places. Proof/timing metadata, names,

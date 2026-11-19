@@ -3,6 +3,7 @@ import { LeagueDataError } from "../dataErrors";
 import type { AdvicePlayer, EntryAdvice, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "./adviceClient";
 import { isAdvicePayload } from "./adviceShape";
+import { checkedBundleResult, expandSelection } from "./preferenceBundle";
 
 export class AdviceResponseError extends LeagueDataError {}
 
@@ -180,6 +181,28 @@ export function checkedAdvice(
     });
     if (new Set(identities).size !== identities.length)
       throw new AdviceResponseError("A transfer decision appears more than once.");
+  }
+  if (request.preferenceBundle) {
+    try {
+      const child = { ...request };
+      delete child.preferenceBundle;
+      payload.preference_bundle_result = checkedBundleResult(
+        payload.preference_bundle_result,
+        request.preferenceBundle,
+        request.chip === "auto" ? null : (request.chip ?? null),
+        (computed, selection) =>
+          checkedAdvice(
+            { ...value, payload: computed },
+            {
+              ...child,
+              preferences: expandSelection(request.preferences, selection),
+              chip: selection.chip,
+            },
+          ).payload,
+      );
+    } catch {
+      throw new AdviceContextError("Advice does not match its preference execution.");
+    }
   }
   return value as unknown as LeagueViewEnvelope<EntryAdvice>;
 }
