@@ -1,110 +1,26 @@
 {
+  "type": "object",
   "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "runs",
+    "jobs",
+    "cancelled"
+  ],
   "properties": {
-    "cancelled": {
-      "additionalProperties": {
-        "minimum": 0,
-        "type": "number"
-      },
-      "maxProperties": 1024,
-      "propertyNames": {
-        "pattern": "^[0-9a-f]{32}$",
-        "type": "string"
-      },
-      "type": "object"
-    },
     "contract_version": {
-      "const": "llmopt_run_ledger_v2",
-      "type": "string"
-    },
-    "jobs": {
-      "additionalProperties": {
-        "additionalProperties": false,
-        "properties": {
-          "legacy_consumer": {
-            "type": "boolean"
-          },
-          "limit": {
-            "enum": [
-              21,
-              122
-            ],
-            "type": "number"
-          },
-          "receipt": {
-            "type": [
-              "object",
-              "null"
-            ]
-          },
-          "runs": {
-            "items": {
-              "pattern": "^[0-9a-f]{32}$",
-              "type": "string"
-            },
-            "minItems": 1,
-            "type": "array",
-            "uniqueItems": true
-          }
-        },
-        "required": [
-          "limit",
-          "runs",
-          "receipt",
-          "legacy_consumer"
-        ],
-        "type": "object"
-      },
-      "type": "object"
+      "type": "string",
+      "const": "llmopt_run_ledger_v2"
     },
     "runs": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}$"
+      },
       "additionalProperties": {
+        "type": "object",
         "additionalProperties": false,
-        "properties": {
-          "base": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string"
-          },
-          "base_cached": {
-            "type": "boolean"
-          },
-          "binding": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string"
-          },
-          "capture": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "closed": {
-            "type": "boolean"
-          },
-          "requests": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "maxProperties": 4,
-            "propertyNames": {
-              "pattern": "^[0-9a-f]{64}$",
-              "type": "string"
-            },
-            "type": "object"
-          },
-          "reserved": {
-            "maximum": 488,
-            "minimum": 0,
-            "type": "number"
-          },
-          "window": {
-            "enum": [
-              1,
-              3
-            ],
-            "type": "integer"
-          }
-        },
         "required": [
           "binding",
           "capture",
@@ -115,20 +31,106 @@
           "requests",
           "reserved"
         ],
-        "type": "object"
-      },
+        "properties": {
+          "binding": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "capture": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "window": {
+            "type": "integer",
+            "enum": [
+              1,
+              3
+            ]
+          },
+          "base": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "base_cached": {
+            "type": "boolean"
+          },
+          "requests": {
+            "type": "object",
+            "maxProperties": 4,
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "reserved": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 488
+          }
+        }
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "limit",
+          "runs",
+          "receipt",
+          "legacy_consumer"
+        ],
+        "properties": {
+          "limit": {
+            "type": "number",
+            "enum": [
+              21,
+              63,
+              122,
+              366
+            ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "legacy_consumer": {
+            "type": "boolean"
+          },
+          "receipt": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "cancelled": {
+      "type": "object",
       "propertyNames": {
-        "pattern": "^[0-9a-f]{32}$",
-        "type": "string"
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}$"
       },
-      "type": "object"
+      "maxProperties": 1024,
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0
+      }
     }
-  },
-  "required": [
-    "contract_version",
-    "runs",
-    "jobs",
-    "cancelled"
-  ],
-  "type": "object"
+  }
 }

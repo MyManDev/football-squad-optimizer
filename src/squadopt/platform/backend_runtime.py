@@ -844,6 +844,7 @@ def build_backend(
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
+        preference_bundles=True,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -873,6 +874,7 @@ def build_backend(
             public_inputs,
             switches=contexts,
             available_windows=contexts.available_windows,
+            preference_bundles=True,
         )
         public_submit = AdviceSubmitService(
             public_reader,

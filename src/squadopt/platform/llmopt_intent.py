@@ -93,8 +93,8 @@ Use soft for wishes (e.g. "if possible", "mümkünse", "tercihen"). Ask for clar
 before choosing when the intent or player is ambiguous. Do not silently omit unsupported
 requirements or resolve a contradiction by weakening it.
 
-List soft rules in the manager's priority order. Preserve their order on follow-up unless
-the manager changes it. A soft rule may carry max_cost_tenths, the most total expected
+Preserve the reviewed soft-rule order on follow-up unless the manager changes it.
+A soft rule may carry max_cost_tenths, the most total expected
 net points the manager will give up over the selected window to satisfy that rule.
 Convert an exact point allowance to tenths: 1.5 or 1,5 points becomes 15, and zero becomes
 0. Use null when a wish has no stated cost. Use this field only on a soft rule, and only
@@ -104,6 +104,15 @@ specific preference. A cap on actual transfer penalties is hit_budget, a differe
 "Saka'y\u0131 tutmak üç haftada en fazla 1,5 beklenen puana mal oluyorsa tut" means window 3
 and a soft keep_player rule for held Saka with max_cost_tenths 15. Keep any separate
 Wildcard and club requirements in hard.
+
+An explicit priority is an integer: 1 for highest, 2 for normal, 3 for lowest. Set priority
+to null when no priority was stated; do not infer different strengths from writing order.
+The draft's max_total_cost_tenths is the total expected net-point allowance for all wishes
+together, from 0 through 1000 integer tenths. It overrides individual price ceilings for
+that calculation. With priorities but no total allowance, ask how many points in total
+the manager would give up. With a total allowance and optional Wildcard, ask which to
+remove; that combination is unsupported. Do not invent a total allowance. A 1.5-point
+allowance for all preferences is max_total_cost_tenths 15, not three separate allowances.
 
 Set window to 1 or 3 for the planning horizon. With no explicit horizon or dated rules,
 keep the preceding draft's window, or use null for the default of one week. Any rule
@@ -270,24 +279,23 @@ def _constraint(
 ) -> dict[str, Any]:
     fields = {"kind", "player_id", "club", "count", "scope", "week", "points"}
     if soft:
-        fields.add("max_cost_tenths")
+        fields.update(("max_cost_tenths", "priority"))
     if comparison:
         fields.add("both")
-    # Older replies may carry an empty field belonging to another constraint shape.
-    # Recognize that vocabulary before removing nulls; reject genuinely unknown names.
-    vocabulary = fields | {"max_cost_tenths", "both"} if model else fields
-    if not isinstance(value, dict) or "kind" not in value or value.keys() - vocabulary:
-        raise IntentValidationError("Invalid intent constraint.")
     if model and isinstance(value, dict):
         # A provider that enforces the schema sends every field, null where it has nothing
         # to say; one that does not may leave such a field out. Both read the same.
         value = {name: item for name, item in value.items() if item is not None}
-    if value.keys() - fields:
+    if not isinstance(value, dict) or "kind" not in value or value.keys() - fields:
         raise IntentValidationError("Invalid intent constraint.")
     kind = value["kind"]
     if not isinstance(kind, str) or kind not in _KINDS:
         raise IntentValidationError("Unsupported intent constraint.")
     result: dict[str, Any] = {"kind": kind}
+    if "priority" in value:
+        if type(value["priority"]) is not int or value["priority"] not in (1, 2, 3):
+            raise IntentValidationError("Priority must be from 1 through 3.")
+        result["priority"] = value["priority"]
     # The strict schema makes a model fill every field of every rule, and a model often
     # writes a filler ("scope": "squad" on a player rule) where a null belongs. A field that
     # has no meaning for the rule's kind is therefore dropped from a model's reply, never
@@ -361,26 +369,28 @@ def _draft(
     previous_window: int | None = None,
     previous_draft: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    fields = {"hard", "soft", "comparison", "window", "keep_weeks", "min_bank", "scenario"}
-    if not isinstance(value, dict) or value.keys() - fields:
-        raise IntentValidationError("Invalid constraint draft.")
+    fields = {
+        "hard",
+        "soft",
+        "comparison",
+        "window",
+        "keep_weeks",
+        "min_bank",
+        "scenario",
+        "max_total_cost_tenths",
+    }
     if model and isinstance(value, dict):
         # A partial reply retains reviewed rules and selections. Lists use [] to clear;
         # the optional comparison, bank floor and scenario use null to clear.
         previous = previous_draft or {}
-        optional = ("comparison", "min_bank", "scenario")
+        optional = ("comparison", "min_bank", "scenario", "max_total_cost_tenths")
         value = {
             "hard": previous.get("hard", []),
             "soft": previous.get("soft", []),
             **{key: previous[key] for key in ("keep_weeks", *optional) if key in previous},
             **{key: item for key, item in value.items() if item is not None or key in optional},
         }
-    if (
-        not isinstance(value, dict)
-        or not {"hard", "soft"} <= value.keys()
-        or value.keys()
-        - {"hard", "soft", "comparison", "window", "keep_weeks", "min_bank", "scenario"}
-    ):
+    if not isinstance(value, dict) or not {"hard", "soft"} <= value.keys() or value.keys() - fields:
         raise IntentValidationError("Invalid constraint draft.")
     window = value.get("window")
     if (window is None and not model and "window" in value) or (
@@ -403,6 +413,13 @@ def _draft(
             for item in soft
         ],
     }
+    total = value.get("max_total_cost_tenths")
+    if total is not None:
+        if type(total) is not int or not 0 <= total <= _MAX_COST_TENTHS:
+            raise IntentValidationError("Invalid total concession.")
+        result["max_total_cost_tenths"] = total
+    elif not model and "max_total_cost_tenths" in value:
+        raise IntentValidationError("Invalid total concession.")
     constraints = (*result["hard"], *result["soft"])
     unique = {
         (
@@ -598,6 +615,27 @@ def _validate_result(
         previous_window=previous_window,
         previous_draft=previous_draft,
     )
+    if any("priority" in rule for rule in draft["soft"]) and "max_total_cost_tenths" not in draft:
+        return {
+            "status": "clarification",
+            "message": (
+                "Bu tercihler için toplam kaç puandan vazgeçebilirsin?"
+                if locale == "tr"
+                else "How many points in total would you give up for these preferences?"
+            ),
+        }
+    if "max_total_cost_tenths" in draft and (
+        not draft["soft"] or any(rule["kind"] == "wildcard" for rule in draft["soft"])
+    ):
+        return {
+            "status": "clarification",
+            "message": (
+                "Toplam puan s\u0131n\u0131r\u0131n\u0131 hangi Wildcard "
+                "d\u0131ş\u0131ndaki tercihlere uygulayal\u0131m?"
+                if locale == "tr"
+                else "Which preferences other than Wildcard should use the total point limit?"
+            ),
+        }
     scenario = draft.get("scenario")
     if scenario is not None and scenario.get("week", 1) not in reference_weeks:
         question = (
@@ -728,6 +766,23 @@ def _schema_object(properties: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _explicit_schema_types(value: Any) -> Any:
+    """Keep nullable object alternatives while giving every provider field a type."""
+    if isinstance(value, list):
+        return [_explicit_schema_types(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result = {name: _explicit_schema_types(item) for name, item in value.items()}
+    if "type" not in result and "anyOf" in result:
+        types = []
+        for alternative in result["anyOf"]:
+            kind = alternative.get("type")
+            types.extend(kind if isinstance(kind, list) else [kind] if kind is not None else [])
+        if types:
+            result["type"] = list(dict.fromkeys(types))
+    return result
+
+
 _CONSTRAINT_PROPERTIES: Final = {
     "kind": {"type": "string", "enum": list(_KINDS)},
     "player_id": {"type": ["integer", "null"]},
@@ -741,7 +796,11 @@ _CONSTRAINT_LIST: Final = {"type": "array", "items": _schema_object(_CONSTRAINT_
 _SOFT_CONSTRAINT_LIST: Final = {
     "type": "array",
     "items": _schema_object(
-        {**_CONSTRAINT_PROPERTIES, "max_cost_tenths": {"type": ["integer", "null"]}}
+        {
+            **_CONSTRAINT_PROPERTIES,
+            "max_cost_tenths": {"type": ["integer", "null"]},
+            "priority": {"type": ["integer", "null"], "enum": [1, 2, 3, None]},
+        }
     ),
 }
 _COMPARISON_SCHEMA: Final = _schema_object({**_CONSTRAINT_PROPERTIES, "both": {"type": "boolean"}})
@@ -749,6 +808,7 @@ _DRAFT_SCHEMA: Final = _schema_object(
     {
         "hard": _CONSTRAINT_LIST,
         "soft": _SOFT_CONSTRAINT_LIST,
+        "max_total_cost_tenths": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000},
         "comparison": {"anyOf": [_COMPARISON_SCHEMA, {"type": "null"}]},
         "window": {"type": ["integer", "null"], "enum": [*_WINDOWS, None]},
         "keep_weeks": {"type": "array", "items": {"type": "integer", "enum": list(_WEEKS)}},
@@ -778,12 +838,14 @@ _DRAFT_SCHEMA: Final = _schema_object(
         },
     }
 )
-_RESULT_SCHEMA: Final = _schema_object(
-    {
-        "status": {"type": "string", "enum": ["draft", "clarification"]},
-        "draft": {"anyOf": [_DRAFT_SCHEMA, {"type": "null"}]},
-        "message": {"type": ["string", "null"]},
-    }
+_RESULT_SCHEMA: Final = _explicit_schema_types(
+    _schema_object(
+        {
+            "status": {"type": "string", "enum": ["draft", "clarification"]},
+            "draft": {"anyOf": [_DRAFT_SCHEMA, {"type": "null"}]},
+            "message": {"type": ["string", "null"]},
+        }
+    )
 )
 
 

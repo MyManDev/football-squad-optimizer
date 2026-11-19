@@ -129,6 +129,19 @@
       "type": "array",
       "uniqueItems": true
     },
+    "preference_bundles": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "llmopt_preference_bundle_v1",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "type": "object"
+    },
     "preferences": {
       "additionalProperties": false,
       "properties": {

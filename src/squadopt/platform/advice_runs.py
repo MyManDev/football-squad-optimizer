@@ -85,14 +85,16 @@ class RunTransaction:
         value = self.state["runs"][ref.run_id]["requests"].get(key)
         return str(value) if value is not None else None
 
-    def reserve(self, ref: RunReference, key: str, job_id: str) -> None:
+    def reserve(
+        self, ref: RunReference, key: str, job_id: str, *, preference_bundle: bool = False
+    ) -> None:
         run = self.state["runs"][ref.run_id]
         previous = run["requests"].get(key)
         if previous is not None:
             if previous != job_id:
                 raise RunAdmissionError("RUN_REQUEST_CHANGED", "The original request is retained.")
             return
-        units = job_capacity(run["window"])
+        units = job_capacity(run["window"]) * (3 if preference_bundle else 1)
         if len(set(run["requests"].values())) >= 4 or run["reserved"] + units > run_capacity(
             run["window"]
         ):
@@ -282,7 +284,12 @@ class FileRunStore:
             if (
                 type(reserved) not in (int, float)
                 or not math.isfinite(reserved)
-                or reserved != len(run["requests"]) * job_capacity(run["window"])
+                or reserved > run_capacity(run["window"])
+                or reserved
+                != sum(
+                    state["jobs"].get(job_id, {}).get("limit", -1)
+                    for job_id in run["requests"].values()
+                )
             ):
                 raise ValueError("Invalid planning run reservation.")
             for key, job_id in run["requests"].items():
@@ -291,13 +298,15 @@ class FileRunStore:
                     re.fullmatch(r"[0-9a-f]{64}", key) is None
                     or not isinstance(job, dict)
                     or identifier not in job.get("runs", [])
+                    or job.get("limit")
+                    not in (job_capacity(run["window"]), 3 * job_capacity(run["window"]))
                 ):
                     raise ValueError("Invalid planning job association.")
         for job in state["jobs"].values():
             if (
                 not isinstance(job, dict)
                 or set(job) != {"limit", "runs", "receipt", "legacy_consumer"}
-                or job["limit"] not in (21.0, 122.0)
+                or job["limit"] not in (21.0, 63.0, 122.0, 366.0)
                 or not isinstance(job["runs"], list)
                 or not job["runs"]
                 or type(job["legacy_consumer"]) is not bool

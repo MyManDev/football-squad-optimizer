@@ -27,6 +27,7 @@ import pandas as pd
 
 from squadopt.contracts.plan_infeasibility import PlanInfeasibility
 from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.contracts.priority_preferences import PriorityProgram, PriorityReference
 from squadopt.data.errors import DataSourceError
 from squadopt.live.errors import LedgerError
 from squadopt.live.football_observations import availability_observations
@@ -59,7 +60,10 @@ from squadopt.planning.guarded import optimize_guarded_window
 from squadopt.planning.lineup_utility import improve_plan_lineups
 from squadopt.planning.models import TransferPlanningError
 from squadopt.planning.observed import optimize_observed_window
-from squadopt.planning.optimizer import diagnose_infeasible_preferences
+from squadopt.planning.optimizer import (
+    diagnose_infeasible_preferences,
+    optimize_priority_preferences,
+)
 
 LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
 # Free transfers a manager holds for the second deadline: the game grants one after the
@@ -1103,6 +1107,63 @@ def _plan_named_chip_window(
     )
 
 
+def _priority_plan(
+    horizon: PlanningHorizon,
+    state: InitialSquadState,
+    settings: OptimizationConfig,
+    policy: TransferPlanningConfig,
+    hard: DecisionPreferences,
+    chips: ChipAvailability | None,
+    program: PriorityProgram,
+    reference: PriorityReference,
+) -> TransferPlanResult:
+    """Reconstruct the cached path's resources before certifying J in the tier model."""
+    if len(reference.weeks) != len(horizon.gameweeks):
+        raise TransferPlanningError("The reference does not cover this planning window.")
+    frozen = optimize_transfer_plan(
+        horizon,
+        state,
+        replace(settings, solver_deterministic_time_limit=1.0, solver_time_limit_seconds=30.0),
+        policy,
+        chips=chips,
+        linearization_level=2,
+        preferences=replace(hard, frozen_weeks=reference.weeks),
+        protect_hold=False,
+    )
+    if not frozen.has_solution:
+        raise TransferPlanningError("The cached reference could not be certified.")
+    # Proving the fixed decision says nothing about the main search's global proof.
+    frozen = replace(
+        frozen, solver_status=SolverStatus.OPTIMAL if reference.proved else SolverStatus.FEASIBLE
+    )
+    outcome = optimize_priority_preferences(
+        horizon,
+        state,
+        settings,
+        policy,
+        frozen,
+        program,
+        hard=hard,
+        chips=chips,
+        work_limit=20.0 if len(horizon.gameweeks) == 1 else 60.0,
+    )
+    return replace(
+        outcome.plan,
+        diagnostics={
+            **outcome.plan.diagnostics,
+            "priority_preferences": {
+                "contract_version": "llmopt_priority_result_v1",
+                "satisfied": list(outcome.satisfied),
+                "left_out": list(outcome.left_out),
+                "total_cost": outcome.total_cost,
+                "completed_priorities": list(outcome.completed_priorities),
+                "reference_proved": outcome.reference_proved,
+                "budget_exhausted": outcome.budget_exhausted,
+            },
+        },
+    )
+
+
 def plan_transfer_horizon(
     inputs: RecommendationInputs,
     projection_horizon: ProjectionHorizon,
@@ -1119,6 +1180,8 @@ def plan_transfer_horizon(
     chip_strategy: bool = False,
     chip_tail_forecast: ChipTailForecast | None = None,
     preferences: DecisionPreferences | None = None,
+    priority_program: PriorityProgram | None = None,
+    priority_reference: PriorityReference | None = None,
 ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
     """Plan several gameweeks from the held squad and one projection horizon.
 
@@ -1158,6 +1221,8 @@ def plan_transfer_horizon(
     """
 
     net_points_priority = preferences is not None and preferences.net_points_priority
+    if priority_program is not None and (not net_points_priority or priority_reference is None):
+        raise DataSourceError("Priority preferences require the computed net-points reference.")
     if net_points_priority and chip_strategy:
         raise DataSourceError("Net points comparisons cannot use automatic chips.")
     if chip_tail_forecast is not None and not chip_strategy:
@@ -1373,7 +1438,18 @@ def plan_transfer_horizon(
     )
     planning_horizon = PlanningHorizon(planning_table)
     plan = (
-        optimize_observed_window(
+        _priority_plan(
+            planning_horizon,
+            state,
+            settings,
+            planning_policy,
+            preferences if preferences is not None else DecisionPreferences(),
+            chips,
+            priority_program,
+            priority_reference,
+        )
+        if priority_program is not None and priority_reference is not None
+        else optimize_observed_window(
             planning_horizon,
             state,
             information.nodes,

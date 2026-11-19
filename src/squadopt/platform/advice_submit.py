@@ -48,6 +48,7 @@ from datetime import datetime
 from typing import Final, Protocol
 
 from squadopt.contracts.llmopt_run import RunReference as RunReference
+from squadopt.contracts.preference_bundle import BUNDLE_SWITCH, PreferenceBundle
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
@@ -330,6 +331,7 @@ class AdviceSubmitService:
         chip: str | None = None,
         model: str = "current",
         preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
         run: RunReference | None = None,
         run_tx: RunTransaction | None = None,
         run_resolved: ResolvedAdviceRequest | None = None,
@@ -352,6 +354,7 @@ class AdviceSubmitService:
                 chip=chip,
                 model=model,
                 preferences=preferences,
+                preference_bundle=preference_bundle,
                 run=run,
                 run_tx=transaction,
                 run_resolved=run_resolved,
@@ -406,6 +409,7 @@ class AdviceSubmitService:
         chip: str | None = None,
         model: str = "current",
         preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
         run: RunReference | None = None,
         run_tx: RunTransaction | None = None,
         run_resolved: ResolvedAdviceRequest | None = None,
@@ -425,6 +429,8 @@ class AdviceSubmitService:
 
         if run is not None and self._runs is None:
             raise RunAdmissionError("RUN_STORE_UNAVAILABLE", "Planning work is unavailable.")
+        if preference_bundle is not None and (run is None or run.stage != "followup"):
+            raise RunAdmissionError("RUN_BASE_REQUIRED", "Compute the main plan first.")
         client_bucket = client_address_bucket(client_bucket)
         if self._store_ready is not None and not self._store_ready():
             # Refuse before validating: a queue write onto a store that has failed its
@@ -456,6 +462,7 @@ class AdviceSubmitService:
                 chip=chip,
                 model=model,
                 preferences=preferences,
+                preference_bundle=preference_bundle,
             )
 
         limiter = self._limiter
@@ -509,6 +516,14 @@ class AdviceSubmitService:
                         self._queue,
                         capture=context.capture_snapshot_id,
                     )
+                    if (
+                        preference_bundle is not None
+                        and transaction.state["runs"][run.run_id]["base"]
+                        != resolved.switches[BUNDLE_SWITCH]["base_key"]
+                    ):
+                        raise RunAdmissionError(
+                            "RUN_BASE_CHANGED", "The main request does not match this run."
+                        )
                 original = transaction.previous(run, cache_key) if run is not None else None
                 if original is not None:
                     assert run is not None
@@ -536,6 +551,7 @@ class AdviceSubmitService:
                     chip=chip,
                     model=model,
                     preferences=preferences,
+                    preference_bundle=preference_bundle,
                     run=run,
                     run_tx=transaction,
                     run_resolved=resolved,
@@ -605,7 +621,12 @@ class AdviceSubmitService:
                             )
                         if not job.is_terminal:
                             if run is not None and run_tx is not None:
-                                run_tx.reserve(run, cache_key, job.job_id)
+                                run_tx.reserve(
+                                    run,
+                                    cache_key,
+                                    job.job_id,
+                                    preference_bundle=preference_bundle is not None,
+                                )
                             if run_tx is not None and (
                                 run is None or job.contract_version == "backend_jobs_v1"
                             ):
@@ -659,7 +680,12 @@ class AdviceSubmitService:
                     raise self._rate_limited()
                 self._client_jobs[record.job_id] = client_bucket
                 if run is not None and run_tx is not None:
-                    run_tx.reserve(run, cache_key, record.job_id)
+                    run_tx.reserve(
+                        run,
+                        cache_key,
+                        record.job_id,
+                        preference_bundle=preference_bundle is not None,
+                    )
                 try:
                     yield
                 except BaseException:
@@ -710,7 +736,9 @@ class AdviceSubmitService:
                     run_tx.cached(run)
                 return SubmitOutcome(kind="hit", payload=winner)
             if run is not None and run_tx is not None:
-                run_tx.reserve(run, cache_key, winner.job_id)
+                run_tx.reserve(
+                    run, cache_key, winner.job_id, preference_bundle=preference_bundle is not None
+                )
             if run_tx is not None and (run is None or winner.contract_version == "backend_jobs_v1"):
                 run_tx.legacy_consumer(winner.job_id)
             return SubmitOutcome(kind="job", job=winner)

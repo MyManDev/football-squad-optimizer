@@ -62,6 +62,53 @@ def _proposed(player_id: int = 1) -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize("locale", ["tr", "en"])
+def test_priority_without_total_asks_for_one_total_allowance(locale):
+    body = {**_request(), "locale": locale}
+    reply = _proposed()
+    reply["draft"]["soft"] = [{"kind": "keep_player", "player_id": 1, "priority": 1}]
+    checked = _interpret(body, lambda _: reply)
+    assert checked.status_code == 200
+    assert checked.json() == {
+        "status": "clarification",
+        "message": "Bu tercihler için toplam kaç puandan vazgeçebilirsin?"
+        if locale == "tr"
+        else "How many points in total would you give up for these preferences?",
+    }
+
+
+@pytest.mark.parametrize("locale", ["tr", "en"])
+def test_total_allowance_and_priorities_are_checked_before_computation(locale):
+    reply = _proposed()
+    reply["draft"]["soft"] = [{"kind": "keep_player", "player_id": 1, "priority": 1}]
+    reply["draft"]["max_total_cost_tenths"] = 15
+    checked = _interpret({**_request(), "locale": locale}, lambda _: reply)
+    assert checked.status_code == 200
+    assert checked.json()["draft"]["max_total_cost_tenths"] == 15
+    assert checked.json()["draft"]["soft"] == reply["draft"]["soft"]
+    reply["draft"]["soft"] = [{"kind": "wildcard", "priority": 2}]
+    checked = _interpret({**_request(), "locale": locale}, lambda _: reply)
+    assert checked.status_code == 200
+    assert checked.json()["status"] == "clarification"
+
+
+@pytest.mark.parametrize("section", ["draft", "hard", "soft", "comparison"])
+def test_legacy_provider_null_extension_is_ignored(section):
+    reply = _proposed()
+    if section == "draft":
+        target = reply["draft"]
+    elif section == "soft":
+        reply["draft"]["soft"] = [{"kind": "save_chips"}]
+        target = reply["draft"]["soft"][0]
+    else:
+        target = reply["draft"]["hard"][0] if section == "hard" else reply["draft"]["comparison"]
+    target["invented"] = None
+    checked = _interpret(_request(), lambda _: reply)
+    assert checked.status_code == 200
+    assert checked.json()["status"] == "draft"
+    assert "invented" not in json.dumps(checked.json())
+
+
 def test_prepares_comparison_and_preserves_hard_constraints() -> None:
     def provider(request: IntentRequest) -> object:
         assert request.locale == "tr"
@@ -513,27 +560,6 @@ def test_confirmed_club_rules_stay_canonical() -> None:
         return {"status": "clarification", "draft": None, "message": "Which plan?"}
 
     assert _interpret(body, provider).status_code == 200
-
-
-@pytest.mark.parametrize("section", ["draft", "hard", "soft", "comparison"])
-def test_null_unknown_provider_field_is_refused(section: str) -> None:
-    def provider(_request: IntentRequest) -> object:
-        result = _proposed()
-        if section == "draft":
-            target = result["draft"]
-        elif section == "hard":
-            target = result["draft"]["hard"][0]
-        elif section == "soft":
-            target = {"kind": "save_chips"}
-            result["draft"]["soft"] = [target]
-        else:
-            target = result["draft"]["comparison"]
-        target["invented"] = None
-        return result
-
-    response = _interpret(_request(), provider)
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "REPLY_REFUSED"
 
 
 @pytest.mark.parametrize("kind", ["keep_player", "avoid_player"])

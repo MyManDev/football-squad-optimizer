@@ -20,6 +20,7 @@ import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
+import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
 import { LEAGUE_READ, useEntrySquad } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
@@ -48,6 +49,7 @@ import { expectedNet, samePlan } from "./planComparison";
 import { BANK_FLOOR, KEEP_WEEK, SCENARIO, draftChanges, type DraftChanges } from "./planChanges";
 import { explainDraftConflict } from "./planConflicts";
 import { planResults, preferencePrice } from "./planResults";
+import { preferenceExecution, preferenceStates } from "./preferenceExecution";
 import {
   referenceCaptains,
   referenceWeeks,
@@ -535,7 +537,13 @@ function Workspace({
     return explainDraftConflict({ ...draft, hard: [...draft.hard, rule] }, conflictContext);
   }
 
-  const { states } = jobs;
+  const execution = useMemo(() => preferenceExecution(run), [run]);
+  const states = preferenceStates(jobs.states, run, execution);
+  const bundleState = jobs.states.first;
+  const bundleResult =
+    execution && bundleState.phase === "done"
+      ? bundleState.envelope.payload.preference_bundle_result
+      : undefined;
   const capacityRefused = (state: ComputePhase) =>
     (state.phase === "failed" || state.phase === "unavailable") &&
     (state.reason === "RUN_BUDGET_EXHAUSTED" || state.reason === "RUN_CANCELLED");
@@ -562,13 +570,15 @@ function Workspace({
   const phases = Object.values(states).map(({ phase }) => phase);
   const knownRequestsStarted =
     !run ||
-    (ALTERNATIVE_SLOTS.every(
-      (slot, index) =>
-        (run.slots[index]?.kind !== "explicit" && !savedRun?.followups?.[index]) ||
-        (run.scenario && savedReplayProof) ||
-        states[slot].phase !== "idle",
-    ) &&
-      (!savedRun?.combined?.length || states.combined.phase !== "idle"));
+    (execution
+      ? bundleState.phase !== "idle"
+      : ALTERNATIVE_SLOTS.every(
+          (slot, index) =>
+            (run.slots[index]?.kind !== "explicit" && !savedRun?.followups?.[index]) ||
+            (run.scenario && savedReplayProof) ||
+            states[slot].phase !== "idle",
+        ) &&
+        (!savedRun?.combined?.length || states.combined.phase !== "idle"));
   const settled =
     knownRequestsStarted &&
     !phases.includes("requesting") &&
@@ -619,6 +629,7 @@ function Workspace({
   useEffect(() => {
     if (
       !run ||
+      execution ||
       incompleteRun ||
       baseState.phase !== "done" ||
       baseState.request !== run.baseRequest
@@ -642,12 +653,51 @@ function Workspace({
       const { request } = prepareCombined(run, confirmed.combined);
       if (request) restore(request, controls.combined);
     }
-  }, [run, restoredRun, baseState, session, savedReplayProof, deadline, controls, incompleteRun]);
+  }, [
+    run,
+    restoredRun,
+    baseState,
+    session,
+    savedReplayProof,
+    deadline,
+    controls,
+    incompleteRun,
+    execution,
+  ]);
+
+  useEffect(() => {
+    if (
+      !execution ||
+      !run ||
+      incompleteRun ||
+      baseState.phase !== "done" ||
+      baseState.request !== run.baseRequest ||
+      bundleState.phase !== "idle"
+    )
+      return;
+    if (run === restoredRun) {
+      if (controls.first.resume?.(execution)) return;
+      if (session.confirmation?.sending && deadlineOpen(deadline))
+        controls.first.compute(execution);
+      else controls.first.readCached?.(execution);
+    } else controls.first.compute(execution);
+  }, [
+    execution,
+    run,
+    restoredRun,
+    incompleteRun,
+    baseState,
+    bundleState,
+    controls,
+    session,
+    deadline,
+  ]);
 
   useEffect(() => {
     const confirmed = session.confirmation;
     if (
       !run?.automaticBasis ||
+      execution ||
       incompleteRun ||
       baseState.phase !== "done" ||
       baseState.request !== run.baseRequest ||
@@ -671,7 +721,18 @@ function Workspace({
       const followup = followups[index];
       if (followup) controls[slot].compute(followup.request);
     });
-  }, [baseState, run, deadline, controls, session, draft, reference, clarification, incompleteRun]);
+  }, [
+    baseState,
+    run,
+    deadline,
+    controls,
+    session,
+    draft,
+    reference,
+    clarification,
+    incompleteRun,
+    execution,
+  ]);
 
   async function compute() {
     if (
@@ -685,6 +746,22 @@ function Workspace({
     )
       return;
     confirming.current = true;
+    if (
+      draft.soft.some(({ priority }) => priority !== undefined) &&
+      draft.max_total_cost_tenths === undefined
+    ) {
+      setFeedback(copy.totalRequired);
+      confirming.current = false;
+      return;
+    }
+    if (
+      draft.max_total_cost_tenths !== undefined &&
+      (draft.scenario || !draft.soft.length || draft.soft.some(({ kind }) => kind === "wildcard"))
+    ) {
+      setFeedback(copy.totalUnavailable);
+      confirming.current = false;
+      return;
+    }
     setFeedback("");
     setChanges(null);
     setCheckingSquad(true);
@@ -697,6 +774,10 @@ function Workspace({
       ]);
       if (!mounted.current) return;
       if (!capabilities?.preferences) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
+      if (draft.max_total_cost_tenths !== undefined && !capabilities.preferenceBundles) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
@@ -741,6 +822,8 @@ function Workspace({
         wildcardNotHeld,
         frozenWeeks: frozen,
         reference,
+        bundleMode:
+          capabilities.preferenceBundles === true && draft.soft.length > 0 && !draft.scenario,
       });
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
       if (
@@ -756,7 +839,12 @@ function Workspace({
       const confirmed = {
         draft,
         reference,
-        confirmation: { runId, wildcardNotHeld, sending: true as const },
+        confirmation: {
+          runId,
+          wildcardNotHeld,
+          sending: true as const,
+          ...(next.inputs.bundleMode ? { bundleMode: true as const } : {}),
+        },
       };
       if (!writePlanSession(context, confirmed)) {
         setFeedback(copy.serviceUnavailable);
@@ -776,7 +864,7 @@ function Workspace({
   }
 
   const baseAnswer = baseState.phase === "done" ? baseState.envelope.payload : undefined;
-  const alternatives = alternativeStates(jobs);
+  const alternatives = alternativeStates({ ...jobs, states });
   const priceReview =
     run?.prices.map((target) => {
       const price = preferencePrice(
@@ -810,6 +898,7 @@ function Workspace({
     const confirmed = session.confirmation;
     if (
       !run ||
+      execution ||
       incompleteRun ||
       !singlesIn ||
       !confirmed ||
@@ -843,11 +932,27 @@ function Workspace({
     reference,
     clarification,
     incompleteRun,
+    execution,
   ]);
   // A rule with no slot of its own is priced in the plan with all preferences, or named as
   // left out of it.
   const combined =
-    run && savedRun?.combined ? prepareCombined(run, savedRun.combined).applied : undefined;
+    execution?.preferenceBundle?.program && states.combined.phase === "done"
+      ? execution.preferenceBundle.program.preferences.flatMap((rule, index) =>
+          states.combined.phase === "done" &&
+          states.combined.envelope.payload.priority_preferences?.satisfied.some(
+            (identity) =>
+              preferencesKey(checkedPreferences(JSON.parse(identity))) ===
+              preferencesKey(rule.rules),
+          )
+            ? [index]
+            : [],
+        )
+      : bundleResult?.selected?.status === "done"
+        ? bundleResult.applied
+        : run && savedRun?.combined
+          ? prepareCombined(run, savedRun.combined).applied
+          : undefined;
   const combinedPending =
     !closed &&
     (isWorking(baseState.phase) ||
@@ -872,11 +977,13 @@ function Workspace({
     combinedState.phase === "done" ? expectedNet(combinedState.envelope.payload) : null;
   const baseNet = baseAnswer ? expectedNet(baseAnswer) : null;
   const combinedCost =
-    combinedNet === null || baseNet === null
-      ? undefined
-      : samePlan(baseState, combinedState)
-        ? 0
-        : Math.max(0, baseNet - combinedNet);
+    combinedState.phase === "done" && combinedState.envelope.payload.priority_preferences
+      ? combinedState.envelope.payload.priority_preferences.total_cost
+      : combinedNet === null || baseNet === null
+        ? undefined
+        : samePlan(baseState, combinedState)
+          ? 0
+          : Math.max(0, baseNet - combinedNet);
   const { results, same } = run
     ? planResults({
         run,
@@ -1238,28 +1345,30 @@ function Workspace({
                   reviseDisabled={editingLocked}
                 />
               ))}
-            {combined && combined.length > 0 && !capacityRefused(combinedState) && (
-              <PlanResult
-                title={copy.combinedPlan}
-                state={combinedState}
-                squad={squad}
-                baseline={baseAnswer}
-                diagnosis={diagnosis(combinedState)}
-                onRevise={
-                  combinedState.phase === "done"
-                    ? () => revisePlan(combinedState.envelope.payload)
-                    : undefined
-                }
-                reviseDisabled={editingLocked}
-              >
-                <CombinedRules
-                  applied={combinedRules(true)}
-                  leftOut={combinedRules(false)}
-                  cost={combinedCost}
-                  infeasible={combinedState.phase === "failed" && !!combinedState.infeasibility}
-                />
-              </PlanResult>
-            )}
+            {combined &&
+              (combined.length > 0 || execution?.preferenceBundle?.program) &&
+              !capacityRefused(combinedState) && (
+                <PlanResult
+                  title={copy.combinedPlan}
+                  state={combinedState}
+                  squad={squad}
+                  baseline={baseAnswer}
+                  diagnosis={diagnosis(combinedState)}
+                  onRevise={
+                    combinedState.phase === "done"
+                      ? () => revisePlan(combinedState.envelope.payload)
+                      : undefined
+                  }
+                  reviseDisabled={editingLocked}
+                >
+                  <CombinedRules
+                    applied={combinedRules(true)}
+                    leftOut={combinedRules(false)}
+                    cost={combinedCost}
+                    infeasible={combinedState.phase === "failed" && !!combinedState.infeasibility}
+                  />
+                </PlanResult>
+              )}
           </div>
           {incompleteRun && <p role="status">{copy.unfinishedPlans}</p>}
           {same && (

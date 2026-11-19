@@ -60,6 +60,7 @@ from squadopt.platform.api_contract import (
     ADVISE_TOP100_WEIGHTS,
     BackendApiContractError,
     DecisionPreferences,
+    PreferenceBundle,
 )
 from squadopt.platform.contributions import ContributionStore
 from squadopt.platform.public_entry_advice import PublicEntryAdviceReader
@@ -119,6 +120,7 @@ class AdviceSelection:
     model: str
     preferences: DecisionPreferences
     run: RunReference | None = None
+    preference_bundle: PreferenceBundle | None = None
 
 
 def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
@@ -150,6 +152,7 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
         "model",
         "preferences",
         "run",
+        "preference_bundle",
     }
     unexpected = set(fields) - allowed
     if unexpected:
@@ -187,11 +190,18 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
         preferences = DecisionPreferences.parse(fields.get("preferences", {}))
         preferences.validate_selection(strategy, word, chip, top100_weight=weight)
         run = RunReference.parse(fields["run"]) if "run" in fields else None
+        bundle = (
+            PreferenceBundle.parse(fields["preference_bundle"])
+            if "preference_bundle" in fields
+            else None
+        )
         if run is not None and window not in (1, 3):
             raise ValueError("Planning runs support one or three weeks.")
     except ValueError as error:
         raise BackendApiContractError(str(error)) from error
-    return AdviceSelection(strategy, window, rival, weight, word, chip, model, preferences, run)
+    return AdviceSelection(
+        strategy, window, rival, weight, word, chip, model, preferences, run, bundle
+    )
 
 
 def create_app(
@@ -533,6 +543,7 @@ def create_app(
         chip: Annotated[str | None, Query()] = None,
         model: Annotated[str, Query()] = "current",
         preferences: Annotated[str | None, Query(max_length=3000)] = None,
+        preference_bundle: Annotated[str | None, Query(max_length=3000)] = None,
     ) -> Response:
         if league_id == 0 and not request.url.path.startswith("/api/v1/public/"):
             return _contract_error(422, "VALIDATION_FAILED", "A league id must be positive.")
@@ -552,6 +563,11 @@ def create_app(
                     "chip": chip,
                     "model": model,
                     "preferences": json.loads(preferences) if preferences is not None else {},
+                    **(
+                        {"preference_bundle": json.loads(preference_bundle)}
+                        if preference_bundle is not None
+                        else {}
+                    ),
                 }
             )
         except ValueError as error:
@@ -568,6 +584,7 @@ def create_app(
                 chip=selection.chip,
                 model=selection.model,
                 preferences=selection.preferences,
+                preference_bundle=selection.preference_bundle,
             )
         except AdviceNotComputedError:
             if metrics is not None:
@@ -656,6 +673,7 @@ def create_app(
             chip=selection.chip,
             model=selection.model,
             preferences=selection.preferences,
+            preference_bundle=selection.preference_bundle,
             run=selection.run,
         )
         if outcome.kind == "hit" and outcome.payload is not None:
