@@ -515,6 +515,27 @@ def test_confirmed_club_rules_stay_canonical() -> None:
     assert _interpret(body, provider).status_code == 200
 
 
+@pytest.mark.parametrize("section", ["draft", "hard", "soft", "comparison"])
+def test_null_unknown_provider_field_is_refused(section: str) -> None:
+    def provider(_request: IntentRequest) -> object:
+        result = _proposed()
+        if section == "draft":
+            target = result["draft"]
+        elif section == "hard":
+            target = result["draft"]["hard"][0]
+        elif section == "soft":
+            target = {"kind": "save_chips"}
+            result["draft"]["soft"] = [target]
+        else:
+            target = result["draft"]["comparison"]
+        target["invented"] = None
+        return result
+
+    response = _interpret(_request(), provider)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "REPLY_REFUSED"
+
+
 @pytest.mark.parametrize("kind", ["keep_player", "avoid_player"])
 def test_model_comparison_accepts_either_side_for_a_held_player(kind: str) -> None:
     def provider(_request: IntentRequest) -> object:
