@@ -64,3 +64,10 @@ Each arm inherits the full prefix work ledger and elapsed time before its own
 continuation. This avoids repeating an identical deterministic calculation; the
 reported arm work includes the prefix in full. These are algorithm comparisons,
 not independent cold-request latency measurements.
+
+Before an optional solve, reserve room for its whole remaining CP allocation plus
+one certificate/stop unit and cap the native phase's wall reservation to the
+remaining whole units. An initial four-member probe at producer 404ad2168 showed
+122.000059 and 122.071752 charged units on two opened-gate continuations. The new
+phase must avoid starting that overcommitted work; no tolerance is widened and
+no prior phase or frozen baseline record is changed.

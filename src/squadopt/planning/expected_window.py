@@ -1,6 +1,7 @@
 """Retained original proposals and one optional swap, on common expected utility."""
 
 from dataclasses import replace
+from math import floor
 from time import perf_counter
 from typing import Any, cast
 
@@ -320,6 +321,15 @@ def extend_expected_packages(
     if remaining_evaluations <= 0 or budget - used <= 1 or (shared and shared.remaining <= 1):
         return retained("no_remaining_budget")
     cp_before = shared.cp_used if shared else 0.0
+    wall_slack = optimization.solver_time_limit_seconds - (perf_counter() - started)
+    if shared is not None:
+        # Leave the full phase CP cap, one certificate/stop unit, and the native
+        # reservation available together before starting any optional work.
+        native_units = floor(max(0.0, shared.remaining - (budget - used) - 1.0))
+        record["shared_native_units_cap"] = native_units
+        if native_units < 1:
+            return retained("no_remaining_native_and_cp_allocation")
+        wall_slack = min(wall_slack, 2 * 30.0 * native_units)
     try:
         proposal, phase = propose_expected_swap(
             horizon,
@@ -329,7 +339,7 @@ def extend_expected_packages(
             baseline.weeks[0],
             (frozenset(baseline.weeks[0].selected_squad.player_id),),
             deterministic_slack=budget - used,
-            wall_slack=optimization.solver_time_limit_seconds - (perf_counter() - started),
+            wall_slack=wall_slack,
             chips=chips,
             preferences=preferences,
             package_picker=pick_package,

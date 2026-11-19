@@ -681,3 +681,56 @@ def test_real_package_continuation_matches_complete_enabled_call():
     for plan in (continued, complete):
         review = plan.diagnostics["transfer_packages_v1"]
         assert review["accepted_metrics"] == package_metrics(plan, policy)
+
+
+@pytest.mark.parametrize("native_spent,expected_cap", [(52, 540.0), (62, 0.0)])
+def test_package_reserves_shared_native_and_cp_work_before_start(
+    monkeypatch, native_spent, expected_cap
+):
+    from squadopt.optimization.work_budget import WorkBudget, work_budget
+    from squadopt.planning import expected_window
+
+    problem = world()
+    h, initial, config, policy, plan = problem
+    config = replace(config, solver_deterministic_time_limit=60, solver_time_limit_seconds=1800)
+    review = {
+        "configured_total": 60.0,
+        "actual_total": 30.0,
+        "lineup_evaluations": 6,
+        "lineup_evaluation_cap": 1153,
+        "optional_swap": {"reason": "original_routes_incomplete"},
+        "ledger": [],
+        "candidates": [],
+        "chosen": "legacy_proposal",
+    }
+    baseline = replace(plan, diagnostics={**plan.diagnostics, "expected_lineup_window": review})
+    monkeypatch.setattr(expected_window, "_retained_expected_window", lambda *a, **k: baseline)
+    calls = []
+
+    def optional(*args, **kwargs):
+        calls.append(kwargs)
+        return None, {
+            "actual": 0.0,
+            "cap": 0.0,
+            "hold_score_calls": 0,
+            "lineup_search": None,
+            "reason": "no_candidate",
+        }
+
+    monkeypatch.setattr(expected_window, "propose_expected_swap", optional)
+    allocation = WorkBudget(122, cp_used=30, native_reserved=native_spent)
+    with work_budget(allocation):
+        result = optimize_expected_window(
+            h, initial, config, replace(policy, transfer_packages=True, package_gate=True)
+        )
+    if expected_cap:
+        assert len(calls) == 1 and calls[0]["wall_slack"] <= expected_cap
+        # Native primary gets half the wall allocation. The full CP cap and an
+        # additional unit still fit even when the primary uses its whole reserve.
+        assert calls[0]["wall_slack"] / 60 + 30 + 1 <= 122 - 30 - native_spent
+    else:
+        assert not calls
+        assert (
+            result.diagnostics["transfer_packages_v1"]["reason"]
+            == "no_remaining_native_and_cp_allocation"
+        )
