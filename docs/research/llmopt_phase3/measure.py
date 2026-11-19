@@ -53,7 +53,7 @@ SOURCES = (
             "platform/advice_submit",
             "platform/advice_runs",
             "platform/advice_worker",
-            "platform/backend/preference_bundle",
+            "platform/advice_preference_bundle",
             "application/advice_menu",
             "application/advice_chip_strategy",
             "live/transfers",
@@ -399,8 +399,14 @@ def measure_case(root, frozen, inputs, entry, scenario, window, producer):
                 ids = sorted(set(state["requests"].values()))
                 jobs = [queue.load(identifier) for identifier in ids]
                 receipts = [tx.state["jobs"][identifier]["receipt"] for identifier in ids]
+                allocations = [tx.state["jobs"][identifier]["limit"] for identifier in ids]
                 reserved = state["reserved"]
             assert len(ids) <= 2
+            if base.status_code == 200:
+                main_status = base.json()["payload"].get("solver_status")
+            else:
+                assert main_job is not None and main_job.error is not None
+                main_status = main_job.error.code
             rows.append(
                 dict(
                     case=f"gw{inputs.gameweek}-{entry}",
@@ -408,16 +414,22 @@ def measure_case(root, frozen, inputs, entry, scenario, window, producer):
                     window=window,
                     mode=mode,
                     main_cache_hit=main_cached,
-                    main_status=(
-                        base.json()["payload"].get("solver_status")
-                        if base.status_code == 200
-                        else main_job.error_code
+                    main_status=main_status,
+                    expected_main_outcome=(
+                        main_status == "PLAN_NOT_FOUND"
+                        if scenario == "conflicting_instructions"
+                        else base.status_code == 200
                     ),
                     admitted_server_jobs=len(ids),
                     reserved_units=reserved,
                     job_ids=ids,
                     terminal_statuses=[job.status for job in jobs],
                     receipts=receipts,
+                    allocations=allocations,
+                    within_allocation=all(
+                        receipt["cp_used"] + receipt["native_reserved"] <= allocation
+                        for receipt, allocation in zip(receipts, allocations, strict=True)
+                    ),
                     repeated_requests=repeated,
                     extra_jobs_from_repeats=0,
                     result=None
@@ -434,14 +446,35 @@ def main():
     parser.add_argument(
         "--output", type=Path, default=ROOT / "docs/research/llmopt_phase3_jobs.json"
     )
+    parser.add_argument(
+        "--checkpoint", type=Path, default=ROOT / ".codex-tmp/p3-measure-progress.json"
+    )
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     producer = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    provenance = dict(
+        producer_repository_commit=producer,
+        source_sha256={path.as_posix(): digest(ROOT / path) for path in SOURCES},
+        frozen_manifest_sha256=digest(ROOT / "docs/research/llmopt_phase1/inputs.json"),
+    )
     original = json.loads((ROOT / "docs/research/llmopt_phase1_baseline.json").read_bytes())
     scenarios = {row["case"]: row["scenario"] for row in original["rows"]}
     rows, cases = [], 0
+    if args.resume:
+        previous = json.loads(args.checkpoint.read_bytes())
+        if previous.get("provenance") != provenance:
+            raise ValueError("Checkpoint code, producing commit or frozen inputs changed.")
+        rows, cases = previous["rows"], previous["completed_member_weeks"]
+        if type(cases) is not int or not 0 <= cases <= 20 or len(rows) != cases * 4:
+            raise ValueError("The checkpoint does not contain complete member-weeks.")
+    skip = cases
+    visited = 0
     with TemporaryDirectory(prefix="lp3-api-") as directory:
         for frozen, inputs in benchmark.snapshots():
             for entry in sorted(inputs.members):
+                visited += 1
+                if visited <= skip:
+                    continue
                 if args.limit is not None and cases >= args.limit:
                     break
                 case = f"gw{inputs.gameweek}-{entry}"
@@ -465,14 +498,31 @@ def main():
                         flush=True,
                     )
                 cases += 1
+                args.checkpoint.parent.mkdir(parents=True, exist_ok=True)
+                pending = args.checkpoint.with_suffix(".tmp")
+                pending.write_text(
+                    json.dumps(
+                        dict(
+                            provenance=provenance,
+                            completed_member_weeks=cases,
+                            rows=rows,
+                        ),
+                        indent=2,
+                        allow_nan=False,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                    newline="\n",
+                )
+                pending.replace(args.checkpoint)
     report = dict(
         contract_version="llmopt_phase3_jobs_v1",
-        producer_repository_commit=producer,
-        source_sha256={path.as_posix(): digest(ROOT / path) for path in SOURCES},
-        frozen_manifest_sha256=digest(ROOT / "docs/research/llmopt_phase1/inputs.json"),
+        **provenance,
         member_weeks=cases,
         windows=[1, 3],
         maximum_server_jobs=max(row["admitted_server_jobs"] for row in rows),
+        all_expected_main_outcomes=all(row["expected_main_outcome"] for row in rows),
+        all_work_within_allocation=all(row["within_allocation"] for row in rows),
         live_network_requests=0,
         execution=(
             "Sequential local API and real worker; frozen precomputed points, no scoring, "

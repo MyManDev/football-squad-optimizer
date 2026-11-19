@@ -2,6 +2,7 @@ import { isDecisionInformation, isOfficialInformation } from "./informationFacts
 import { isOfficialInjuryFacts } from "./officialInjuryFacts";
 /** Runtime counterpart of docs/contracts/advice_read_v1.schema.json. */
 import { checkedPreferences } from "./decisionPreferences";
+import { isPreferenceBundleResult, isPriorityResult } from "./preferenceBundle";
 
 type Predicate = (value: unknown) => boolean;
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -403,6 +404,8 @@ export function isAdvicePayload(value: unknown): boolean {
       official_injuries: isOfficialInjuryFacts,
       decision_information: isDecisionInformation,
       preferences,
+      preference_bundle_result: (result) => isPreferenceBundleResult(result, isAdvicePayload),
+      priority_preferences: isPriorityResult,
       preferences_scope: oneOf("all_selected_weeks", "selected_weeks"),
       bank_after_tenths: integer,
       free_transfers_after: integer,

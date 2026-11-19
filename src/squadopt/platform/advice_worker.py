@@ -97,6 +97,7 @@ from squadopt.platform.advice_observability import (
     AdviceMetrics,
     configure_advice_logging,
 )
+from squadopt.platform.advice_preference_bundle import compute_preference_bundle
 from squadopt.platform.advice_queue import (
     DEFAULT_LEASE_SECONDS,
     AdviceComputeRefused,
@@ -112,7 +113,6 @@ from squadopt.platform.advice_switches import (
     SwitchInputUnavailable,
     switch_identity,
 )
-from squadopt.platform.backend.preference_bundle import compute_preference_bundle
 from squadopt.platform.backend_runtime import (
     AdviceBackend,
     CaptureContextProvider,

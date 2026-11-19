@@ -164,7 +164,10 @@ export function preferenceStates(
         envelope: { ...envelope, payload: component.payload },
         source,
       };
-    return { phase: "failed", request: selected, reason: component.error_code,
+    return {
+      phase: "failed",
+      request: selected,
+      reason: component.error_code,
       ...(component.infeasibility ? { infeasibility: component.infeasibility } : {}),
     };
   }
