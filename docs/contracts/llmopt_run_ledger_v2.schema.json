@@ -1,0 +1,134 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "cancelled": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "number"
+      },
+      "maxProperties": 1024,
+      "propertyNames": {
+        "pattern": "^[0-9a-f]{32}$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "contract_version": {
+      "const": "llmopt_run_ledger_v2",
+      "type": "string"
+    },
+    "jobs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "legacy_consumer": {
+            "type": "boolean"
+          },
+          "limit": {
+            "enum": [
+              21,
+              122
+            ],
+            "type": "number"
+          },
+          "receipt": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "runs": {
+            "items": {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "limit",
+          "runs",
+          "receipt",
+          "legacy_consumer"
+        ],
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "runs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "base": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "base_cached": {
+            "type": "boolean"
+          },
+          "binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "capture": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "requests": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 4,
+            "propertyNames": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "reserved": {
+            "maximum": 488,
+            "minimum": 0,
+            "type": "number"
+          },
+          "window": {
+            "enum": [
+              1,
+              3
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "binding",
+          "capture",
+          "window",
+          "base",
+          "closed",
+          "base_cached",
+          "requests",
+          "reserved"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "pattern": "^[0-9a-f]{32}$",
+        "type": "string"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "contract_version",
+    "runs",
+    "jobs",
+    "cancelled"
+  ],
+  "type": "object"
+}

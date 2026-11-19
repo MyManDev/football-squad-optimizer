@@ -642,7 +642,8 @@ def build_advice_compute(
     def admitted_compute(job: AdviceJob) -> bytes:
         try:
             # Joining an existing V1 job does not transfer its original consumer's
-            # ownership. Only run-owned V2 work receives this allocation and fence.
+            # ownership. Only run-owned V2 work receives this durable allocation.
+            # A running answer remains cacheable after its initiating run closes.
             budget = (
                 runs.allocation(job.job_id)
                 if runs is not None and job.contract_version == "backend_jobs_v2"

@@ -418,6 +418,10 @@ class AdviceReadStore:
         self._preference_players = preference_players
         self._available_windows = available_windows
 
+    def current_capture_snapshot_id(self) -> str | None:
+        context = self._context.current()
+        return context.capture_snapshot_id if context is not None else None
+
     def _preference_players_of(
         self, context: AdviceRequestContext, league_id: int, entry_id: int
     ) -> PreferencePlayers | None:

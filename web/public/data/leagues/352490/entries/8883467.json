@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-18T02:03:05Z",
+  "generated_at_utc": "2026-11-19T02:03:12Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -139,8 +139,8 @@
         "short_name": "McGinn",
         "position": "MID",
         "team": "Aston Villa",
-        "price_tenths": 54,
-        "expected_points": 3.280488206507799,
+        "price_tenths": 55,
+        "expected_points": 3.323353197037318,
         "event_points": null,
         "is_captain": false,
         "is_vice_captain": false,
@@ -315,7 +315,7 @@
     "purchase_prices_known": true,
     "squad_sell_value_tenths": 1009,
     "spendable_budget_tenths": 1009,
-    "source_snapshot_id": "fpl-live-20261118T020054Z-f374b2958d5a",
+    "source_snapshot_id": "fpl-live-20261119T020104Z-376672c1169c",
     "squadopt_comparison": null,
     "data_quality": "complete",
     "missing_fields": [],

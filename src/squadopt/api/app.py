@@ -230,14 +230,18 @@ def create_app(
         return _contract_error(409, error.code, str(error))
 
     @application.post("/api/v1/llmopt/runs/{run_id}/cancel")
-    def cancel_planning_run(run_id: str) -> JSONResponse:
+    def cancel_planning_run(run_id: str, request: Request) -> JSONResponse:
         if advice_submit is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         current = datetime.now(UTC) if utc_now is None else utc_now()
         try:
-            advice_submit.cancel_run(run_id, at_utc=current.astimezone(UTC).isoformat())
+            advice_submit.cancel_run(
+                run_id,
+                at_utc=current.astimezone(UTC).isoformat(),
+                client_bucket=request.client.host if request.client else "unknown",
+            )
         except ValueError as error:
-            if isinstance(error, RunAdmissionError):
+            if isinstance(error, (RunAdmissionError, RateLimitedError)):
                 raise
             return _contract_error(422, "VALIDATION_FAILED", str(error))
         return JSONResponse(
