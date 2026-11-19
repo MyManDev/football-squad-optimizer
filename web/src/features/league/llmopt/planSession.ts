@@ -15,6 +15,7 @@ export type StartedAlternative = { kind: "priced" | "roll" } | { kind: "bank"; f
 export interface PlanConfirmation {
   deviceRun?: boolean;
   deviceAlternatives?: boolean;
+  bundleMode?: true;
   runId?: string;
   wildcardNotHeld: boolean;
   /** Absent until the confirmed baseline has been checked for follow-up requests. */
@@ -213,6 +214,7 @@ export function checkedPlanSession(
           confirmation.followups.length <= ALTERNATIVE_COUNT))
     ) {
       session.confirmation = {
+        ...(confirmation.bundleMode === true ? { bundleMode: true as const } : {}),
         ...(typeof confirmation.runId === "string" && /^[0-9a-f]{32}$/.test(confirmation.runId)
           ? { runId: confirmation.runId }
           : {}),

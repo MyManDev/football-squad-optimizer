@@ -1,13 +1,13 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-18T02:03:05Z",
+  "generated_at_utc": "2026-11-19T02:03:12Z",
   "source_kind": "live",
   "payload": {
     "contract_version": "league_device_plan_v1",
     "league_id": 352490,
     "season": "2026-27",
     "gameweek": 11,
-    "source_snapshot_id": "fpl-live-20261118T020054Z-f374b2958d5a",
+    "source_snapshot_id": "fpl-live-20261119T020104Z-376672c1169c",
     "policy_id": "member_planning_policy_v2",
     "rules": {
       "squad_size": 15,
@@ -56,9 +56,9 @@
           50
         ],
         "cohort_size": 100,
-        "cohort_snapshot_id": "fpl-top100-20261118T020044Z-ed2922bbfe78",
-        "picks_snapshot_id": "fpl-elite-picks-20261118T020048Z-78bd71b49674",
-        "table_sha256": "881e4af008f9426a27e80c0e5ad54cd85e2081ebe8eddea1af7bdc9f895688be",
+        "cohort_snapshot_id": "fpl-top100-20261119T020043Z-074d2e5d07ad",
+        "picks_snapshot_id": "fpl-elite-picks-20261119T020053Z-8f669bf5f576",
+        "table_sha256": "05219ea82fa79c5eb133eb351ee965530710e39812c1e7dc2466446f5df750f2",
         "picks_gameweek": 10
       }
     },
@@ -1380,21 +1380,21 @@
         "short_name": "McGinn",
         "team": "Aston Villa",
         "position": "MID",
-        "buy_tenths": 54,
-        "expected_points": 3.280488206507799,
+        "buy_tenths": 55,
+        "expected_points": 3.323353197037318,
         "coefficients": [
-          328,
-          2952,
-          3280
+          332,
+          2991,
+          3323
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 3280,
-          "10": 3280,
-          "20": 3280,
-          "30": 3280,
-          "40": 3280,
-          "50": 3280
+          "5": 3323,
+          "10": 3323,
+          "20": 3323,
+          "30": 3323,
+          "40": 3323,
+          "50": 3323
         }
       },
       {
@@ -6624,21 +6624,21 @@
         "short_name": "Suzuki",
         "team": "Aston Villa",
         "position": "GK",
-        "buy_tenths": 50,
-        "expected_points": 2.9181973172798203,
+        "buy_tenths": 51,
+        "expected_points": 2.9608251606742093,
         "coefficients": [
-          292,
-          2626,
-          2918
+          296,
+          2665,
+          2961
         ],
         "top100_count": 1,
         "top100_scaled": {
-          "5": 2920,
-          "10": 2921,
-          "20": 2924,
-          "30": 2927,
-          "40": 2930,
-          "50": 2933
+          "5": 2962,
+          "10": 2964,
+          "20": 2967,
+          "30": 2970,
+          "40": 2973,
+          "50": 2976
         }
       },
       {
@@ -8211,21 +8211,21 @@
         "short_name": "Georginio",
         "team": "Brighton",
         "position": "FWD",
-        "buy_tenths": 53,
-        "expected_points": 1.4399025171197062,
+        "buy_tenths": 52,
+        "expected_points": 1.4011138585829956,
         "coefficients": [
-          144,
-          1296,
-          1440
+          140,
+          1261,
+          1401
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 1440,
-          "10": 1440,
-          "20": 1440,
-          "30": 1440,
-          "40": 1440,
-          "50": 1440
+          "5": 1401,
+          "10": 1401,
+          "20": 1401,
+          "30": 1401,
+          "40": 1401,
+          "50": 1401
         }
       },
       {
@@ -9936,21 +9936,21 @@
         "short_name": "McConnell",
         "team": "Liverpool",
         "position": "MID",
-        "buy_tenths": 44,
-        "expected_points": 0.11895417311970644,
+        "buy_tenths": 43,
+        "expected_points": 0.11408776123031465,
         "coefficients": [
-          12,
-          107,
-          119
+          11,
+          103,
+          114
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 119,
-          "10": 119,
-          "20": 119,
-          "30": 119,
-          "40": 119,
-          "50": 119
+          "5": 114,
+          "10": 114,
+          "20": 114,
+          "30": 114,
+          "40": 114,
+          "50": 114
         }
       },
       {
@@ -11178,21 +11178,21 @@
         "short_name": "G\u00f3mez",
         "team": "Brighton",
         "position": "MID",
-        "buy_tenths": 50,
-        "expected_points": 3.0213850274260943,
+        "buy_tenths": 51,
+        "expected_points": 3.0638842733602956,
         "coefficients": [
-          302,
-          2719,
-          3021
+          306,
+          2758,
+          3064
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 3021,
-          "10": 3021,
-          "20": 3021,
-          "30": 3021,
-          "40": 3021,
-          "50": 3021
+          "5": 3064,
+          "10": 3064,
+          "20": 3064,
+          "30": 3064,
+          "40": 3064,
+          "50": 3064
         }
       },
       {
@@ -12558,21 +12558,21 @@
         "short_name": "Gonzalo",
         "team": "Fulham",
         "position": "FWD",
-        "buy_tenths": 59,
-        "expected_points": 2.7039101090782047,
+        "buy_tenths": 58,
+        "expected_points": 2.661826184886772,
         "coefficients": [
-          270,
-          2434,
-          2704
+          266,
+          2396,
+          2662
         ],
         "top100_count": 1,
         "top100_scaled": {
-          "5": 2705,
-          "10": 2707,
-          "20": 2709,
-          "30": 2712,
-          "40": 2715,
-          "50": 2717
+          "5": 2663,
+          "10": 2664,
+          "20": 2667,
+          "30": 2670,
+          "40": 2672,
+          "50": 2675
         }
       },
       {

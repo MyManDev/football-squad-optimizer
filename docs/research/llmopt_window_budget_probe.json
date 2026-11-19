@@ -1,0 +1,31 @@
+{
+  "snapshot_id": "fpl-live-20261002T104314Z-8b70515b9b31",
+  "entry_id": 3832237,
+  "football_selected": true,
+  "notes": [
+    "top100 player_evidence_v1_2026-27_gw06_top100_d37e85839162.csv: top100_inputs_refused: Evidence was captured after the decision snapshot and cannot be used in its replay."
+  ],
+  "routes": [
+    "observed"
+  ],
+  "network_requests": 0,
+  "model": "fixture_football_candidate",
+  "model_version": "football_joint_role_minutes_v1",
+  "free_transfers": 5,
+  "bank_tenths": 5,
+  "roles_bound": true,
+  "deterministic_cap": 60,
+  "wall_safety_seconds": 1800,
+  "input_sha256": {
+    "artifacts/football/fpl-live-20261002T104314Z-8b70515b9b31.json": "28ae35442bb3690a2b9cecdd98f6660ed5e279a891a3f478569eae3291caacef",
+    "artifacts/football/fpl-live-20261002T104314Z-8b70515b9b31.bundle.json": "3bb0c1432b451f226a87297dd8388c5930eccaca9be361cb9b3d527c0db89524"
+  },
+  "status": "FEASIBLE",
+  "has_solution": true,
+  "conclusion": "accounting_error_not_reproduced",
+  "seconds": 62.739835300002596,
+  "runner_sha256": "52020bf937587bfff963e1e9f9ca0241736eab5b0011ae5fab66e5a6955c73b0",
+  "measured_checkout_commit": "0078a43c6207026cfb506d94806101bdf7c6dc50",
+  "producer_repository_commit": "c9821a4873cf248c41d45a7006d40bae35c3bf8d",
+  "provenance_note": "Producer commit identifies the exact measured runner bytes; the product tree was unchanged from measured_checkout_commit. Only metadata is reconciled, not a new measurement."
+}

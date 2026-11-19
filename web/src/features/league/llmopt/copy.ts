@@ -75,6 +75,11 @@ const en = {
   hard: "Required",
   soft: "Preferred",
   preferenceLimit: "Maximum expected points lost (optional)",
+  totalLimit: "Maximum total points lost (optional)",
+  totalRequired: "How many points in total would you give up for these preferences?",
+  totalUnavailable: "Remove the total point limit for this calculation.",
+  priority: "Priority",
+  priorityLevels: { 1: "High", 2: "Normal", 3: "Low" },
   preferenceLimitLabel: (tenths: number) =>
     `Up to ${new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(tenths / 10)} points`,
   comparison: "Compare",
@@ -288,6 +293,11 @@ const tr: typeof en = {
   hard: "Kesin şart",
   soft: "Tercih",
   preferenceLimit: "Azami beklenen puan kaybı (isteğe bağlı)",
+  totalLimit: "Toplam azami puan kaybı (isteğe bağlı)",
+  totalRequired: "Bu tercihler için toplam kaç puandan vazgeçebilirsin?",
+  totalUnavailable: "Bu hesap için toplam puan sınırını kaldır.",
+  priority: "Öncelik",
+  priorityLevels: { 1: "Yüksek", 2: "Normal", 3: "Düşük" },
   preferenceLimitLabel: (tenths: number) =>
     `En fazla ${new Intl.NumberFormat("tr", { maximumFractionDigits: 1 }).format(tenths / 10)} puan`,
   comparison: "Karşılaştır",

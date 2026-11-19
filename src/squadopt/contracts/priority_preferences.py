@@ -1,8 +1,20 @@
-"""Validated internal priority program, deliberately separate from advice admission."""
+"""Validated priority programs shared by admitted preference work and the planner."""
 
+from __future__ import annotations
+
+import json
 from dataclasses import dataclass
+from typing import Any
 
-from squadopt.contracts.preferences import DecisionPreferences, preferences_schema
+from squadopt.contracts.preferences import DecisionPreferences, FrozenPlanWeek, preferences_schema
+
+
+@dataclass(frozen=True, slots=True)
+class PriorityReference:
+    """Server-owned cached decisions, without a client-supplied objective."""
+
+    weeks: tuple[FrozenPlanWeek, ...]
+    proved: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,9 +57,41 @@ class PriorityProgram:
             self, "preferences", tuple(sorted(self.preferences, key=lambda row: row.identity))
         )
 
+    @classmethod
+    def parse(cls, value: object) -> PriorityProgram:
+        if not isinstance(value, dict) or set(value) != {"preferences", "max_total_cost_tenths"}:
+            raise ValueError("Invalid priority program.")
+        rows = value["preferences"]
+        if not isinstance(rows, list):
+            raise ValueError("Invalid preference list.")
+        parsed = []
+        for row in rows:
+            if (
+                not isinstance(row, dict)
+                or "rules" not in row
+                or row.keys() - {"rules", "priority"}
+            ):
+                raise ValueError("Invalid priority preference.")
+            rules = DecisionPreferences.parse(row["rules"])
+            if rules.wildcard_week is not None or rules.frozen_weeks or rules.scenario is not None:
+                raise ValueError("Unsupported priority rule.")
+            parsed.append(PriorityPreference(rules, row.get("priority", 2)))
+        return cls(tuple(parsed), value["max_total_cost_tenths"])
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "preferences": [
+                {"rules": row.rules.payload(), "priority": row.priority} for row in self.preferences
+            ],
+            "max_total_cost_tenths": self.max_total_cost_tenths,
+        }
+
+    def canonical(self) -> str:
+        return json.dumps(self.payload(), sort_keys=True, separators=(",", ":"))
+
 
 def priority_program_schema() -> dict[str, object]:
-    """Internal interchange proposal; not accepted by the public advice API yet."""
+    """The priority program carried by the public preference execution contract."""
     return {
         "type": "object",
         "additionalProperties": False,

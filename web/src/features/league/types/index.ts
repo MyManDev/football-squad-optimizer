@@ -445,6 +445,8 @@ export interface AdviceRolePointComponents {
 export interface EntryAdvice {
   /** At most two further proved device choices, without nested menus. */
   device_alternatives?: EntryAdvice[];
+  preference_bundle_result?: import("../advice/preferenceBundle").PreferenceBundleResult;
+  priority_preferences?: import("../advice/preferenceBundle").PriorityResult;
   bank_after_tenths?: number;
   free_transfers_after?: number;
   role_forecast?: {

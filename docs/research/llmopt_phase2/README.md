@@ -13,3 +13,17 @@ Run separately from tests. The input loader checks the committed Phase 1 hashes;
 never writes the frozen inputs or Phase 1 records. The record retains the producing commit
 and the normalized runner digest. ADR 0018 derives the 84/488-unit capacities from the
 Phase 1 production-path ceilings rather than from synthetic completion timing.
+
+## Actual solver controls
+
+The [readout](../llmopt_phase2_solver_budget.md) and
+[record](../llmopt_phase2_solver_budget.json) retain all forty results and work receipts.
+
+`python -m docs.research.llmopt_phase2.measure_solver_budget` complements the admission
+replay with all twenty frozen member-weeks at both windows. It obtains real durable
+21/122-unit allocations, runs the production planner on the exact Phase 1 controls,
+records every internal solve and work receipt, and compares status, objective and
+decision fingerprints with the unchanged baseline. Infeasibilities are separate from
+numeric matches. Native execution, if used, reserves its allowance before starting.
+The queue setup is local measurement bookkeeping, not a served football-bundle or
+end-to-end public-API claim. Run it serially and separately from tests.

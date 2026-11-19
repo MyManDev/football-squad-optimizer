@@ -17,6 +17,7 @@ and its types are the contract.
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 from typing import Any, Final
@@ -28,6 +29,7 @@ from squadopt.contracts.football_explanations import policy_comparison_schema, r
 from squadopt.contracts.information import decision_information_schema, official_information_schema
 from squadopt.contracts.injuries import official_injuries_schema
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.preference_bundle import preference_result_schema, priority_result_schema
 from squadopt.contracts.preferences import preferences_schema
 from squadopt.contracts.schema_paths import contract_schema_path
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
@@ -269,6 +271,7 @@ def advice_read_schema() -> dict[str, Any]:
             "bank_after_tenths": {"type": "integer", "minimum": 0},
             "free_transfers_after": {"type": "integer", "minimum": 0},
             "preferences": preferences_schema(),
+            "priority_preferences": priority_result_schema(),
             "preferences_scope": {"enum": ["all_selected_weeks", "selected_weeks"]},
             "selection_top100_weight": {"enum": [0, 5, 10, 20, 30, 40, 50]},
             "prediction_model": {
@@ -487,7 +490,7 @@ def advice_read_schema() -> dict[str, Any]:
             },
         }
     )
-    return {
+    schema: dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://squadopt.dev/contracts/advice_read_v1.schema.json",
         "title": "SquadOpt served advice document",
@@ -556,6 +559,14 @@ def advice_read_schema() -> dict[str, Any]:
         "required": ["contract_version", "generated_at_utc", "source_kind", "payload"],
         "additionalProperties": False,
     }
+    payload = schema["properties"]["payload"]
+    component_payload = copy.deepcopy(payload)
+    component_payload["properties"]["preference_bundle_result"] = False
+    schema["$defs"] = {"llmopt_component_payload": component_payload}
+    payload["properties"]["preference_bundle_result"] = preference_result_schema(
+        {"$ref": "#/$defs/llmopt_component_payload"}
+    )
+    return schema
 
 
 def league_state_schema() -> dict[str, Any]:
@@ -612,6 +623,14 @@ def league_capabilities_schema() -> dict[str, Any]:
                 "type": "object",
                 "properties": {"available": {"type": "boolean"}},
                 "required": ["available"],
+                "additionalProperties": False,
+            },
+            "preference_bundles": {
+                "type": "object",
+                "properties": {
+                    "version": {"const": "llmopt_preference_bundle_v1", "type": "string"}
+                },
+                "required": ["version"],
                 "additionalProperties": False,
             },
             "season": {"type": "string", "minLength": 1},

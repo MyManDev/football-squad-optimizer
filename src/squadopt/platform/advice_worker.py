@@ -53,7 +53,7 @@ from contextlib import ExitStack
 from dataclasses import replace
 from datetime import UTC, datetime
 from types import FrameType
-from typing import Final
+from typing import Final, TypedDict
 
 from squadopt.application.advice_capabilities import (
     MEMBER_WINDOWS,
@@ -72,7 +72,9 @@ from squadopt.application.football_participation import INHERITED_ZERO_LIMIT, pa
 from squadopt.application.football_roles import role_forecast_summary
 from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.preference_bundle import BUNDLE_SWITCH
 from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.contracts.priority_preferences import PriorityProgram, PriorityReference
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
 from squadopt.live.transfers import HorizonNoSolutionError
 from squadopt.optimization import SolverStatus
@@ -95,6 +97,7 @@ from squadopt.platform.advice_observability import (
     AdviceMetrics,
     configure_advice_logging,
 )
+from squadopt.platform.advice_preference_bundle import compute_preference_bundle
 from squadopt.platform.advice_queue import (
     DEFAULT_LEASE_SECONDS,
     AdviceComputeRefused,
@@ -282,6 +285,11 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     )
 
 
+class _PriorityArguments(TypedDict, total=False):
+    priority_program: PriorityProgram
+    priority_reference: PriorityReference | None
+
+
 class _DocumentCount:
     """The documents one attempt has to solve, counted as ``advise_menu_entry`` solves them.
 
@@ -392,7 +400,12 @@ def build_advice_compute(
                 raise RuntimeError(str(error)) from error
         return execute_native_window(model, seconds)
 
-    def compute(job: AdviceJob) -> bytes:
+    def compute(
+        job: AdviceJob,
+        supplied_spec: AdviceJobSpec | None = None,
+        priority_program: PriorityProgram | None = None,
+        priority_reference: PriorityReference | None = None,
+    ) -> bytes:
         # One worker computes one job at a time. Share only the validated spec's
         # coordinates with the terminal logger; a later unreadable spec stays absent.
         if job_log_fields is not None:
@@ -404,7 +417,7 @@ def build_advice_compute(
                 "finish is a fault to look at, not work to repeat.",
             )
         try:
-            spec = specs.get(job.cache_key)
+            spec = supplied_spec if supplied_spec is not None else specs.get(job.cache_key)
         except AdviceJobSpecError as error:
             # A spec that is there and cannot be read is the same fact as one that is
             # not there: what to compute cannot be known. It used to be recorded as a
@@ -476,6 +489,17 @@ def build_advice_compute(
             )
         if capture.switches.official_injuries is not None:
             require_official_injury_source()
+        if BUNDLE_SWITCH in menu_spec.switches:
+            plain_spec = replace(
+                menu_spec,
+                switches={
+                    name: value
+                    for name, value in menu_spec.switches.items()
+                    if name != BUNDLE_SWITCH
+                },
+            )
+            request = _menu_request(plain_spec, capture)
+            return compute_preference_bundle(job, spec, request, capture, cache, specs, compute)
         request = _menu_request(menu_spec, capture)
         football = capture.switches.football if MODEL_SWITCH in spec.switches else None
         projection = football.projection if football is not None else capture.projection
@@ -505,6 +529,12 @@ def build_advice_compute(
             )
         )
         native_windows: list[NativeWindowOutcome] = []
+        priority_arguments: _PriorityArguments = {}
+        if priority_program is not None:
+            priority_arguments = {
+                "priority_program": priority_program,
+                "priority_reference": priority_reference,
+            }
         try:
             with (
                 native_window_executor(bounded_native),
@@ -523,6 +553,7 @@ def build_advice_compute(
                     prerequisite=prerequisite,
                     on_document=None if count is None else count.solved,
                     include_resource_state=True,
+                    **priority_arguments,
                 )
         except WorkBudgetExhausted:
             raise
@@ -642,7 +673,8 @@ def build_advice_compute(
     def admitted_compute(job: AdviceJob) -> bytes:
         try:
             # Joining an existing V1 job does not transfer its original consumer's
-            # ownership. Only run-owned V2 work receives this allocation and fence.
+            # ownership. Only run-owned V2 work receives this durable allocation.
+            # A running answer remains cacheable after its initiating run closes.
             budget = (
                 runs.allocation(job.job_id)
                 if runs is not None and job.contract_version == "backend_jobs_v2"

@@ -25,6 +25,7 @@ import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
 import type { ChipSelection } from "./chipChoice";
 
 import { preferencesKey, type DecisionPreferences } from "./decisionPreferences";
+import { bundleKey, type PreferenceBundle } from "./preferenceBundle";
 import { checkedPlanInfeasibility, type PlanInfeasibility } from "./planInfeasibility";
 
 export interface AdviceRequest {
@@ -36,6 +37,7 @@ export interface AdviceRequest {
   /** Fetch and pin this public team's inputs only when computation is requested. */
   publicEntry?: boolean;
   preferences?: DecisionPreferences;
+  preferenceBundle?: PreferenceBundle;
   leagueId: number;
   entryId: number;
   strategy: AdviceStrategy;
@@ -351,6 +353,9 @@ export class HttpAdviceClient implements AdviceClient {
       (preferencesKey(request.preferences)
         ? `&preferences=${encodeURIComponent(preferencesKey(request.preferences))}`
         : "") +
+      (request.preferenceBundle
+        ? `&preference_bundle=${encodeURIComponent(bundleKey(request.preferenceBundle))}`
+        : "") +
       (request.model === "football" ? "&model=football" : "")
     );
   }
@@ -412,6 +417,7 @@ export class HttpAdviceClient implements AdviceClient {
         headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
         body: JSON.stringify({
           ...(request.run ? { run: request.run } : {}),
+          ...(request.preferenceBundle ? { preference_bundle: request.preferenceBundle } : {}),
           ...(preferencesKey(request.preferences) ? { preferences: request.preferences } : {}),
           strategy: request.strategy,
           window: request.window,

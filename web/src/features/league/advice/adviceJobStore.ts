@@ -10,6 +10,7 @@
  */
 
 import { preferencesKey } from "./decisionPreferences";
+import { bundleKey } from "./preferenceBundle";
 import type { AdviceRequest } from "./adviceClient";
 
 const PREFIX = "squadopt.advice-job:";
@@ -40,7 +41,10 @@ export function adviceRequestKey(request: AdviceRequest): string {
   const modelKey = request.model === "football" ? `${key}:model:football` : key;
   const chipKey = request.chip == null ? modelKey : `${modelKey}:chip:${request.chip}`;
   const preferences = preferencesKey(request.preferences);
-  return preferences ? `${chipKey}:preferences:${preferences}` : chipKey;
+  const preferenceKey = preferences ? `${chipKey}:preferences:${preferences}` : chipKey;
+  return request.preferenceBundle
+    ? `${preferenceKey}:bundle:${bundleKey(request.preferenceBundle)}`
+    : preferenceKey;
 }
 
 function storage(): Storage | null {

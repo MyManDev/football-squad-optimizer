@@ -39,6 +39,7 @@ from squadopt.contracts.league_tree import (
     find_league_tree,
     published_league_trees,
 )
+from squadopt.contracts.preference_bundle import BUNDLE_SWITCH, BUNDLE_VERSION, PreferenceBundle
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
@@ -365,6 +366,63 @@ def _member_entry_ids(payload: Mapping[str, object]) -> frozenset[int]:
     return frozenset(ids)
 
 
+def _preserves_required_preferences(
+    main: DecisionPreferences,
+    selected: DecisionPreferences,
+    window: int,
+    main_chip: str | None,
+    selected_chip: str | None,
+) -> bool:
+    if (
+        (main_chip is not None and selected_chip != main_chip)
+        or (main.net_points_priority and not selected.net_points_priority)
+        or (main.hold_opening_transfers and not selected.hold_opening_transfers)
+        or (main.wildcard_week is not None and selected.wildcard_week != main.wildcard_week)
+        or main.frozen_weeks != selected.frozen_weeks
+        or main.scenario != selected.scenario
+    ):
+        return False
+    if main.max_hit_points is not None and (
+        selected.max_hit_points is None or selected.max_hit_points > main.max_hit_points
+    ):
+        return False
+    if (main.min_opening_bank_tenths or 0) > (selected.min_opening_bank_tenths or 0):
+        return False
+    if main.min_bank is not None and (
+        selected.min_bank is None
+        or selected.min_bank.tenths < main.min_bank.tenths
+        or selected.min_bank.week not in (None, main.min_bank.week)
+    ):
+        return False
+    for week in range(1, window + 1):
+        original, chosen = main.for_week(week), selected.for_week(week)
+        if any(
+            not set(getattr(original, name)) <= set(getattr(chosen, name))
+            for name in (
+                "keep_players",
+                "include_players",
+                "avoid_players",
+                "buy_players",
+                "club_counts",
+            )
+        ):
+            return False
+        if (original.no_hits and not chosen.no_hits) or (
+            original.hold_transfers and not chosen.hold_transfers
+        ):
+            return False
+        # Legacy optional Wildcard replaces the compiler's implicit global chip hold.
+        # Explicit scoped chip holds still apply to their respective weeks.
+        scoped_hold = any(row.week == week and row.rules.save_chips for row in main.week_rules)
+        if (
+            original.save_chips
+            and not chosen.save_chips
+            and (scoped_hold or (selected_chip != "wildcard" and selected.wildcard_week is None))
+        ):
+            return False
+    return True
+
+
 class AdviceReadStore:
     """League state and cached advice, composed from injected collaborators.
 
@@ -398,6 +456,7 @@ class AdviceReadStore:
         preference_players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None]
         | None = None,
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
+        preference_bundles: bool = False,
     ) -> None:
         self._directory = directory
         self._cache = cache
@@ -417,6 +476,11 @@ class AdviceReadStore:
         self._chip_availability = chip_availability
         self._preference_players = preference_players
         self._available_windows = available_windows
+        self._preference_bundles = preference_bundles
+
+    def current_capture_snapshot_id(self) -> str | None:
+        context = self._context.current()
+        return context.capture_snapshot_id if context is not None else None
 
     def _preference_players_of(
         self, context: AdviceRequestContext, league_id: int, entry_id: int
@@ -622,6 +686,8 @@ class AdviceReadStore:
                 },
             },
         }
+        if self._preference_bundles:
+            document["preference_bundles"] = {"version": BUNDLE_VERSION}
         if inputs.football is not None:
             document["models"] = list(PREDICTION_MODELS)
             document["decision_information"] = inputs.decision_information(
@@ -753,6 +819,72 @@ class AdviceReadStore:
             preferences=preferences,
         )
 
+    def _bundle_request(
+        self,
+        bundle: PreferenceBundle,
+        select: Callable[[DecisionPreferences, str | None], ResolvedAdviceRequest],
+        *,
+        main: DecisionPreferences,
+        chip: str | None,
+        league_id: int,
+        entry_id: int,
+        strategy: str,
+        window: int,
+        rival_entry_id: int | None,
+        top100_weight: int,
+        managers_word: bool,
+    ) -> ResolvedAdviceRequest:
+        if (
+            not self._preference_bundles
+            or window not in (1, 3)
+            or strategy != "saf-puan"
+            or managers_word
+            or top100_weight
+            or not main.net_points_priority
+            or main.scenario is not None
+        ):
+            raise UnsupportedAdviceRequestError("This preference execution is not supported.")
+        base = select(main, chip)
+        for selection in bundle.selections():
+            preferences = selection.expand(main)
+            if not _preserves_required_preferences(main, preferences, window, chip, selection.chip):
+                raise UnsupportedAdviceRequestError(
+                    "A preference component cannot remove required rules."
+                )
+            child = select(preferences, selection.chip)
+            if child.context != base.context:
+                raise AdviceBackendNotReadyError("Planning inputs changed during validation.")
+        if bundle.program is not None:
+            for rule in bundle.program.preferences:
+                rule.rules.validate_window(window)
+                self._check_preference_players(base.context, league_id, entry_id, rule.rules)
+        switches: SwitchIdentity = {
+            **base.switches,
+            BUNDLE_SWITCH: {
+                "version": BUNDLE_VERSION,
+                "request": bundle.canonical(),
+                "base_key": base.key,
+            },
+        }
+        context = base.context
+        key = advice_cache_key(
+            advice_contract_version=context.advice_contract_version,
+            capture_snapshot_id=context.capture_snapshot_id,
+            season=context.season,
+            gameweek=context.gameweek,
+            league_id=league_id,
+            entry_id=entry_id,
+            strategy=strategy,
+            window=window,
+            projection_handoff_fingerprint=context.projection_handoff_fingerprint,
+            repository_commit=context.repository_commit,
+            configuration_fingerprint=context.configuration_fingerprint,
+            rival_entry_id=rival_entry_id,
+            strategy_uses_rival=self._strategies[strategy],
+            switches=switches,
+        )
+        return ResolvedAdviceRequest(key, context, switches)
+
     def resolve(
         self,
         *,
@@ -766,6 +898,7 @@ class AdviceReadStore:
         chip: str | None = None,
         model: str = "current",
         preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
     ) -> ResolvedAdviceRequest:
         """Validate one request against what this deployment knows and address it.
 
@@ -774,6 +907,31 @@ class AdviceReadStore:
         the cache disagree about what exists.
         """
 
+        if preference_bundle is not None:
+            return self._bundle_request(
+                preference_bundle,
+                lambda selected, selected_chip: self.resolve(
+                    league_id=league_id,
+                    entry_id=entry_id,
+                    strategy=strategy,
+                    window=window,
+                    rival_entry_id=rival_entry_id,
+                    top100_weight=top100_weight,
+                    managers_word=managers_word,
+                    chip=selected_chip,
+                    model=model,
+                    preferences=selected,
+                ),
+                main=preferences,
+                chip=chip,
+                league_id=league_id,
+                entry_id=entry_id,
+                strategy=strategy,
+                window=window,
+                rival_entry_id=rival_entry_id,
+                top100_weight=top100_weight,
+                managers_word=managers_word,
+            )
         self._check_selection(
             strategy=strategy,
             window=window,
@@ -848,6 +1006,7 @@ class AdviceReadStore:
         chip: str | None = None,
         model: str = "current",
         preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
     ) -> tuple[str, AdviceRequestContext]:
         """``resolve`` for a caller that needs only the address and its context."""
 
@@ -862,6 +1021,7 @@ class AdviceReadStore:
             chip=chip,
             model=model,
             preferences=preferences,
+            preference_bundle=preference_bundle,
         )
         return resolved.key, resolved.context
 
@@ -898,6 +1058,7 @@ class AdviceReadStore:
         chip: str | None = None,
         model: str = "current",
         preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
     ) -> bytes:
         """The cached answer under the complete key, or a typed refusal."""
 
@@ -912,6 +1073,7 @@ class AdviceReadStore:
             chip=chip,
             model=model,
             preferences=preferences,
+            preference_bundle=preference_bundle,
         )
         cached = self.cached(key)
         if cached is None:

@@ -1,0 +1,54 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "budget_exhausted": {
+      "type": "boolean"
+    },
+    "completed_priorities": {
+      "items": {
+        "maximum": 3,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "maxItems": 3,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "contract_version": {
+      "const": "llmopt_priority_result_v1",
+      "type": "string"
+    },
+    "left_out": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "reference_proved": {
+      "type": "boolean"
+    },
+    "satisfied": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "total_cost": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "contract_version",
+    "satisfied",
+    "left_out",
+    "total_cost",
+    "completed_priorities",
+    "reference_proved",
+    "budget_exhausted"
+  ],
+  "type": "object"
+}
