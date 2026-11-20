@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-19T02:03:12Z",
+  "generated_at_utc": "2026-11-20T02:03:16Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -153,8 +153,8 @@
         "short_name": "N.Jackson",
         "position": "FWD",
         "team": "Aston Villa",
-        "price_tenths": 71,
-        "expected_points": 4.842874266317716,
+        "price_tenths": 72,
+        "expected_points": 4.8857687284883395,
         "event_points": null,
         "is_captain": false,
         "is_vice_captain": false,
@@ -318,7 +318,7 @@
     "purchase_prices_known": true,
     "squad_sell_value_tenths": 1010,
     "spendable_budget_tenths": 1011,
-    "source_snapshot_id": "fpl-live-20261119T020104Z-376672c1169c",
+    "source_snapshot_id": "fpl-live-20261120T020104Z-2150bca2c2c3",
     "squadopt_comparison": null,
     "data_quality": "complete",
     "missing_fields": [],
