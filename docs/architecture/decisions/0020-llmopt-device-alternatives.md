@@ -17,12 +17,15 @@ Different decisions require an equal objective, not an assertion that they look 
 Unverified rule families remain on the server. Phase 3's complete public preference
 execution is the starting point for this phase's one-week worker transport.
 
-Alternative identity is the transfer decision: the sorted resulting squad and chip.
-Changing only starters or captain does not create another option. Exclude each previous
-squad with a no-good cut. Keep hard constraints on every solve. Show at most three
-non-dominated decisions within the chosen net-points gap, comparing net points, bank,
-hit charges and remaining free transfers. Equal resource vectors do not dominate each
-other; duplicate transfer identities do.
+The sorted resulting squad and chip identify each transfer decision. Exclude each
+previous squad with a no-good cut and keep the hard constraints on every solve.
+Keep the main plan as computed and show up to two distinct alternatives within the
+chosen net-points gap. Each alternative must be non-dominated by the decisions already
+shown when comparing net points, bank, hit charges and remaining free transfers.
+Distinct transfer decisions can have identical resource values. In nine of the 140
+hard-rule comparisons, 13 alternatives matched the main plan's net points and
+improved at least one resource without worsening any other. The main plan stays
+available in these cases. [Hard-rule comparison](../../research/llmopt_phase4_rule_families.md)
 
 The initial gap is **6.3 points**, rounding the frozen Phase 1 maximum one-week gap
 6.251 upwards to the page's one-decimal precision. This is an explicit initial product
