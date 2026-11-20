@@ -99,7 +99,9 @@ def intent_routes(
     @router.post("/prompt")
     async def intent_prompt(request: Request) -> JSONResponse:
         try:
-            intent = parse_intent_request(await _keyless_body(request, prompt_limiter))
+            intent = parse_intent_request(
+                await _keyless_body(request, prompt_limiter), llmopt_vnext=llmopt_vnext
+            )
             call = await run_in_threadpool(prompt_for, intent, llmopt_vnext=llmopt_vnext)
         except _Refusal as refusal:
             return refusal.response
@@ -110,7 +112,9 @@ def intent_routes(
     @router.post("/check")
     async def intent_check(request: Request) -> JSONResponse:
         try:
-            intent, reply = parse_check_request(await _keyless_body(request, check_limiter))
+            intent, reply = parse_check_request(
+                await _keyless_body(request, check_limiter), llmopt_vnext=llmopt_vnext
+            )
         except _Refusal as refusal:
             return refusal.response
         except IntentValidationError as error:

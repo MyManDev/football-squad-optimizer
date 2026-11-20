@@ -96,6 +96,16 @@ export function ownKeyIntentSource(origin: string, keyed: KeyedCall = withOwnKey
             )
               throw error;
             signal.throwIfAborted();
+            if (body.reference_captains) {
+              const roster = new Set(body.players.map(({ id }) => id));
+              const archived = body.plan_context.plans.flatMap(({ weeks }) => weeks);
+              body.reference_captains = body.reference_captains.filter(
+                ({ week, player_id }) =>
+                  roster.has(player_id) ||
+                  !archived.some((row) => row.week === week && row.captain === player_id),
+              );
+              if (!body.reference_captains.length) delete body.reference_captains;
+            }
             delete body.plan_context;
             prepared = await prompt();
           }

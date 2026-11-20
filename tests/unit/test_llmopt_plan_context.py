@@ -324,6 +324,38 @@ def test_malformed_selected_id_is_a_validation_refusal(selected: object) -> None
         ("Plan 2 or Plan 3?", "Plan 2 mi Plan 3 mü?", False),
         ("Plan 2: 61 points. Select it?", "Plan 2: 61 puan. Seçelim mi?", True),
         ("Do you want a projected score of 60 points?", "Beklenen puan 60 olsun mu?", False),
+        ("Is a projected score of 60 your target?", "Beklenen puan 60 hedefin mi?", False),
+        ("Is your target a projected score of 60 points?", "Hedefin 60 puan m\u0131?", False),
+        (
+            "Would you prefer a projected score of 60 points?",
+            "Beklenen puan\u0131n 60 olmas\u0131n\u0131 ister misin?",
+            False,
+        ),
+        (
+            "This plan will give you 61 points. Use it?",
+            "Bu plan 61 puan alacak. Seçelim mi?",
+            True,
+        ),
+        (
+            "Plan 2 could yield 61 points. Select that one?",
+            "Plan 2 sana 61 puan sağlayabilir. Onu mu seçelim?",
+            True,
+        ),
+        (
+            "Is a projected score of 60 your target? This plan will give us 61 points.",
+            "Beklenen puan 60 hedefin mi? Bu plan 61 puan getirecek.",
+            True,
+        ),
+        (
+            "This plan is projected to give you 61 points. Is 60 your target?",
+            "Bu plan 61 puan al\u0131yor. Hedefin 60 m\u0131?",
+            True,
+        ),
+        (
+            "If this plan could gain 61 points, would you keep the same budget?",
+            "Eğer plan 61 puan al\u0131rsa ayn\u0131 bütçeyi mi istersin?",
+            False,
+        ),
         (
             "Would you like a projected score of 60.5 points?",
             "Beklenen puan 60,5 olsun mu?",
