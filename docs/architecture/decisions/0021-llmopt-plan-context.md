@@ -36,6 +36,15 @@ refusal and the earlier clarification. If the prompt route rejects a
 catalogue and a fresh matching grant confirms rollback, repeat only the
 prompt without the catalogue before making the single provider call.
 
+A retained plan can include players absent from the current roster, for example
+when the page has only the member's owned players. The enabled prompt accepts
+the bounded historical decisions so ordinary rules and clarifications remain
+usable. A historical captain absent from the roster cannot supply a current
+captain instruction. Applying a plan command requires every player on the
+target plan to belong to the current full roster. A missing player returns
+`PLAN_DATA_CHANGED`. Other historical entries do not invalidate a current
+selection. New rule players and substitutions still require current candidates.
+
 The browser sends ordered content identities and decisions to the existing
 prompt and check routes. The provider sees each plan's weeks and a short
 label in catalogue order (`P1`, `P2`, and so on). It also sees the label

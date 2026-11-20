@@ -15,10 +15,12 @@ from dataclasses import dataclass, replace
 from typing import Any, Final
 
 from squadopt.contracts.llmopt_plans import (
+    MAX_PLAYER_ID,
     PLAN_LABELS,
     checked_plan_command,
     checked_plan_context,
     plan_command_schema,
+    plan_players_current,
     provider_plan_context,
 )
 from squadopt.contracts.preferences import PlanScenario
@@ -31,7 +33,6 @@ _MAX_ROSTER: Final = 1000
 _MAX_CLUBS: Final = 32
 _MAX_CANDIDATES: Final = 64
 _MAX_CONSTRAINTS: Final = 16
-_MAX_SAFE_ID: Final = 2**53 - 1
 _WINDOWS: Final = (1, 3)
 _WEEKS: Final = (1, 2, 3)
 _MAX_HIT_POINTS: Final = 60
@@ -214,7 +215,7 @@ class IntentValidationError(ValueError):
 
 
 class PlanDataChanged(IntentValidationError):
-    """The selected plan belongs to a superseded server data version."""
+    """The selected plan's players or data version are no longer current."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,7 +262,7 @@ def _text(value: object, maximum: int) -> str:
 
 
 def _player_id(value: object) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not 0 < value <= _MAX_SAFE_ID:
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 < value <= MAX_PLAYER_ID:
         raise IntentValidationError("Invalid player ID.")
     return value
 
@@ -539,10 +540,15 @@ def _reference_weeks(value: object) -> tuple[int, ...]:
 
 
 def _reference_captains(
-    value: object, weeks: tuple[int, ...], roster_ids: set[int]
+    value: object, weeks: tuple[int, ...], roster_ids: set[int], history: dict[str, Any] | None
 ) -> tuple[tuple[int, int], ...]:
     if not isinstance(value, list) or len(value) > len(weeks):
         raise IntentValidationError("Invalid reference captains.")
+    archived = {
+        (week["week"], week["captain"])
+        for plan in (history["plans"] if history else ())
+        for week in plan["weeks"]
+    }
     captains: dict[int, int] = {}
     for row in value:
         if not isinstance(row, dict) or row.keys() != {"week", "player_id"}:
@@ -553,14 +559,16 @@ def _reference_captains(
             type(week) is not int
             or week not in weeks
             or week in captains
-            or player not in roster_ids
+            or (player not in roster_ids and (week, player) not in archived)
         ):
             raise IntentValidationError("Reference captain does not match a solved week or roster.")
         captains[week] = player
-    return tuple(sorted(captains.items()))
+    return tuple(
+        sorted((week, player) for week, player in captains.items() if player in roster_ids)
+    )
 
 
-def parse_intent_request(value: object) -> IntentRequest:
+def parse_intent_request(value: object, *, llmopt_vnext: bool = True) -> IntentRequest:
     required = {"message", "locale", "draft", "players"}
     if (
         not isinstance(value, dict)
@@ -593,7 +601,9 @@ def parse_intent_request(value: object) -> IntentRequest:
     plan_context = None
     if "plan_context" in value:
         try:
-            plan_context = checked_plan_context(value["plan_context"], ids)
+            plan_context = checked_plan_context(
+                value["plan_context"], None if llmopt_vnext else ids
+            )
         except ValueError as error:
             raise IntentValidationError(str(error)) from None
     return IntentRequest(
@@ -604,7 +614,9 @@ def parse_intent_request(value: object) -> IntentRequest:
         clarification,
         clubs,
         weeks,
-        _reference_captains(value.get("reference_captains", []), weeks, ids),
+        _reference_captains(
+            value.get("reference_captains", []), weeks, ids, plan_context if llmopt_vnext else None
+        ),
         plan_context,
     )
 
@@ -617,11 +629,14 @@ def _claims_computed_value(question: str) -> bool:
     amount = rf"(?:{money}|{number}\b)"
     plan = r"\b(?:plan|option|alternative|result|p\d+)(?:\s+(?:#?\d+|[a-z]\b))?"
     metric = r"(?:points?|score|bank|balance|budget|hits?|penalt(?:y|ies)|(?:free )?transfers?)"
+    modal = r"(?:(?:will|would|could|might|may|can)\s+|is (?:expected|projected|predicted) to\s+)"
+    result_verb = r"(?:earn|gain|cost|use|make|leave|give|yield|get|save|return|have|be worth)"
     en_claim = (
         rf"{plan}\s+(?:(?:already|currently)\s+)?"
-        rf"(?:(?:scores|scored|will score|is projected to score|is expected to score)\s+{number}\b|"
+        rf"(?:(?:scores|scored|{modal}score)\s+{number}\b|"
         rf"(?:earns|earned|gains|gained|costs|uses|used|makes|made|leaves|left|"
-        rf"gives|gave|yields|gets|saves|returns|returned|has|had|is worth)\s+(?:you\s+)?"
+        rf"gives|gave|yields|gets|saves|returns|returned|has|had|is worth|{modal}{result_verb})"
+        rf"\s+(?:(?:you|us|me)\s+)?"
         rf"(?:{money}|{number}\s+(?:(?:net|remaining|expected|projected)\s+)?{metric}\b|"
         rf"{number}\s+in\s+the\s+bank\b|(?:an?\s+)?(?:remaining\s+)?{metric}\s+of\s+{amount}))"
     )
@@ -640,7 +655,9 @@ def _claims_computed_value(question: str) -> bool:
     tr_claim = (
         rf"(?:{money}|{number}\s+(?:(?:net\s+)?puan(?:lik)?|(?:ucretsiz\s+)?transfer|"
         rf"oyuncu|ceza|para))\s+(?:(?:kasada|bankada|butcede|daha\s+fazla)\s+)?"
-        r"(?:getiriyor|getirdi|getirecek|kazandiriyor|kazandirdi|kazaniyor|kazandi|"
+        r"(?:aliyor|aldi|alacak|alir|alabilir|sagliyor|sagladi|saglayacak|saglayabilir|"
+        r"getiriyor|getirdi|getirecek|getirebilir|kazandiriyor|kazandirdi|kazandiracak|"
+        r"kazaniyor|kazandi|kazanacak|"
         r"kaybettiriyor|kaybetti|birakiyor|birakti|birakacak|kaliyor|kaldi|harciyor|harcadi|"
         r"kullaniyor|kullandi|yapiyor|yapti|veriyor|verdi|tutuyor)\b"
     )
@@ -649,16 +666,26 @@ def _claims_computed_value(question: str) -> bool:
         if match.lastgroup == "label":
             # A requested metric takes its value from the member. Match immediately
             # beside this quantity so another claim in the same reply is still checked.
-            if re.search(
-                r"\b(?:do you want|would you like|should (?:we|i) (?:target|require|aim for))"
+            after = text[match.end() :]
+            target_before = re.search(
+                r"\b(?:do you (?:want|prefer)|would you (?:like|prefer)|are you aiming for|"
+                r"is your (?:target|goal|minimum|maximum)|"
+                r"should (?:we|i) (?:target|require|aim for|use|set))"
                 r"\s+(?:(?:a|an|the|your|minimum|maximum)\s+)*$",
                 before,
-            ) and not re.search(r"\b(?:is|are|was|were)\b|[:=]", match.group()):
+            )
+            target_after = re.search(r"\bis\s+(?:(?:a|an|the)\s+)?$", before) and re.match(
+                r"\s+(?:points?\s+)?(?:your|the)\s+(?:target|goal|minimum|maximum)\b", after
+            )
+            if (target_before or target_after) and not re.search(
+                r"\b(?:is|are|was|were)\b|[:=]", match.group()
+            ):
                 continue
             if re.match(
-                r"\s+(?:puan\s+)?(?:olsun\s+mu|olmasini\s+(?:ister\s+misin|istiyor\s+musun)|"
+                r"\s+(?:puan\s+)?(?:hedefin(?:iz)?\s+mi|olsun\s+mu|"
+                r"olmasini\s+(?:ister\s+misin|istiyor\s+musun)|"
                 r"olarak\s+(?:belirleyelim|ayarlayalim)\s+mi)\b",
-                text[match.end() :],
+                after,
             ):
                 continue
         # A conditional example in a rule question has no asserted outcome.
@@ -884,22 +911,24 @@ def check_reply(
     ):
         raise IntentValidationError("This planning workflow is closed.")
     result = _validated(request, _shortlist(request), reply)
-    if (
-        result["status"] == "plan"
-        and request.plan_context is not None
-        and request.plan_context["kind"] == "server"
-    ):
-        current = server_data_id() if callable(server_data_id) else server_data_id
-        if request.plan_context["data_id"] != current:
-            raise PlanDataChanged("The plan data has been superseded or is unavailable.")
+    if result["status"] == "plan" and request.plan_context is not None:
+        selected = request.plan_context["plans"][PLAN_LABELS.index(result["plan_label"])]
+        if not plan_players_current(selected, {p["id"] for p in request.players}):
+            raise PlanDataChanged("A player in the selected plan is no longer in the roster.")
+        if request.plan_context["kind"] == "server":
+            current = server_data_id() if callable(server_data_id) else server_data_id
+            if request.plan_context["data_id"] != current:
+                raise PlanDataChanged("The plan data has been superseded or is unavailable.")
     return result
 
 
-def parse_check_request(value: object) -> tuple[IntentRequest, object]:
+def parse_check_request(
+    value: object, *, llmopt_vnext: bool = True
+) -> tuple[IntentRequest, object]:
     """The intent request and the model's reply from a check body."""
     if not isinstance(value, dict) or value.keys() != {"request", "reply"}:
         raise IntentValidationError("Invalid check request.")
-    return parse_intent_request(value["request"]), value["reply"]
+    return parse_intent_request(value["request"], llmopt_vnext=llmopt_vnext), value["reply"]
 
 
 def _schema_object(properties: dict[str, Any]) -> dict[str, Any]:
