@@ -26,6 +26,7 @@ its header.
 | [0016](0016-usage-admin-views.md) | The usage record read inside the site, behind Cloudflare Access | 2026-11-16 | Accepted (owner, 2026-11-16) | None |
 | [0017](0017-llmopt-own-key.md) | LLMOPT with the member's own model key, which the site never receives | 2026-11-17 | Accepted (owner, 2026-11-17) | None |
 | [0018](0018-llmopt-run-budget.md) | One durable job and work budget per LLMOPT run | 2026-11-18 | Proposed | None |
+| [0024](0024-llmopt-release-control.md) | Select the planning workflow with one server setting | 2026-11-20 | Proposed | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.
