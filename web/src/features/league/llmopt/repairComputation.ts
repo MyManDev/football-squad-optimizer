@@ -63,12 +63,13 @@ export function candidateRequest(
       throw new Error("RUN_BUDGET_EXHAUSTED");
     }
   }
+  // Keep the prepared objective and rules. A repair displays one witness for the edited draft.
   return (
     request && {
       ...request,
       run: { contract_version: "llmopt_run_v1", run_id: run.runId, stage },
       ...(window === 1
-        ? { deviceRun: true, deviceRepair: { dataId: run.dataId } }
+        ? { deviceRun: true, deviceAlternatives: false, deviceRepair: { dataId: run.dataId } }
         : { deviceRun: false }),
     }
   );
@@ -122,6 +123,7 @@ export function verificationRequest(
       ? {
           ...request,
           run,
+          deviceAlternatives: false,
           deviceRepair: { ...request.deviceRepair, verify: true },
         }
       : null;
