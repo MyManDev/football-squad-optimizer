@@ -1,11 +1,13 @@
 # LLMOPT priorities and one preference job
 
-The implementation adds a bounded internal football-planning core. It certifies the
-required plan's decisions, recomputes its integer objective, applies a total concession
-floor, maximizes up to three count layers, and then points. Actual solver work uses the
-existing allocation. Uncompleted layers retain the previous completed witness.
+The solver certifies the required plan's decisions, recomputes its integer objective
+and applies the total concession floor. It maximizes up to three priority counts in
+order. The first unproved count stops the count search. When a count has been proved,
+the solver keeps the strongest points witness for the proved counts and can spend
+the remaining allocation on the points tie break. With no proved count it returns
+the certified main plan.
 
-`python -m pytest tests/unit/test_priority_preferences.py -q` runs 25 cases. The independent
+`python -m pytest tests/unit/test_priority_preferences.py -q` exercises the solver. The independent
 oracle enumerates all 16 final transfer packages and both legal lineups in each tiny
 football case, rather than calling the production optimizer for its expected answer.
 Other cases cover exact boundaries, conflicting soft/hard rules, all six writing-order
@@ -25,9 +27,9 @@ cache reads, legacy prices, incomplete graphs and repair diagnoses. The page pin
 transport before the main request. Its compiler tests compare price acceptance with
 the legacy compiler, including shared prices with different ceilings.
 
-Eight `e2e/llmopt-priorities.spec.ts` flows cover both languages and windows, legacy
-and total modes, pending and completed reload, two POSTs and phone overflow. These
-are orchestration tests; actual server job counts are independently tested.
+`e2e/llmopt-priorities.spec.ts` covers both languages and windows, legacy and
+total modes, partial results, failed searches, pending and completed reload,
+two POSTs and phone overflow. The API and worker tests check actual server job counts.
 
 `python -m docs.research.llmopt_phase3.measure` replays the twenty frozen member-weeks
 through local API admission and the real worker, consuming frozen point tables.
@@ -36,15 +38,19 @@ timestamps are replay controls, without claims about a live member's entitlement
 deadline. The priority arm reuses a completed main answer when available, explicitly
 reported. Run separately from tests and CI.
 
-The [complete replay](llmopt_phase3_jobs.md) records all twenty member-weeks,
-both windows and both modes: eighty real API/worker run records, a maximum of two
-server jobs, all job receipts within allocation, and no extra jobs from 192 repeats
-after service reconstruction. Total mode explicitly reuses the completed main when
-feasible. All sixteen feasible one-week programs complete three priority layers;
-at three weeks nine complete all three, one completes two, five complete one and
-one retains the main. These stops reflect the declared inner 20/60-unit kernel
-ceiling rather than consumption of the enclosing 63/366-unit reservation. Actual
-work stays visible; no allowance or accounting tolerance changed.
+The replay with the revised priority search produced 80 API and worker records. Each run opened at most
+two jobs, every receipt stayed within allocation, and 192 repeats after service
+reconstruction opened zero extra jobs. At three weeks, 10/20 member-weeks completed
+three layers, or 10/16 with a feasible main, up from 9/16 previously. Four eligible
+runs completed one layer and two completed two. Ten of their 48 submitted rules were
+unsearched. The four contradictory cases opened no preference job. All 16 eligible
+one-week programs completed three layers. [Complete replay](llmopt_phase3_jobs.md)
+
+Certificates, count searches and the points tie break share up to 63 units at one
+week or 366 at three weeks. The one-week preference jobs used 22.366716274 CP units
+and zero native units out of 1,008 available. The three-week preference jobs used
+2,644.991671485 CP units plus 16 reserved native units out of 5,856 available.
+The record includes per-job charges and completed layers. [Job receipts](llmopt_phase3_jobs.json)
 
 Frozen Phase 1 artifacts are unchanged. Counterfactual scenarios keep their existing
 transport; a new total allowance on that path is refused before starting work.
