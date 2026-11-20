@@ -2,12 +2,14 @@ import { PlanPathGroups } from "./PlanPathGroups";
 import { useComputedPlans } from "./useComputedPlans";
 import {
   addHistory,
+  currentPlanCommand,
   planCatalogue,
   planContent,
   retainedPlan,
   selectHistory,
   type PlanHistory,
 } from "./planHistory";
+import { readPlanAvailability } from "./planAvailability";
 import { commandDraft } from "./planCommand";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
@@ -468,28 +470,29 @@ function Workspace({
     session.save({ draft, reference, clarification: next, confirmation: session.confirmation });
   }
 
-  function askPlanQuestion(text: string) {
-    setQuestion({ message: text, question: copy.planQuestion });
-    setFeedback(copy.planQuestion);
+  function recordExchange(text: string, reply: string) {
+    const userLine = nextChatLine.current++;
+    const replyLine = nextChatLine.current++;
+    setConversation((before) => [
+      ...before.slice(-18),
+      { id: userLine, role: "user", message: text },
+      { id: replyLine, role: "assistant", message: reply },
+    ]);
     setMessage("");
   }
-  async function currentGrant() {
+  async function readCurrentCapabilities() {
     const read = await restoreCapabilities.refetch({ cancelRefetch: false });
     if (read.isError) return undefined;
-    const caps = capabilitiesForPage(read.data, {
+    return capabilitiesForPage(read.data, {
       leagueId: squad.league_id,
       season: squad.season,
       gameweek: squad.gameweek,
       snapshotId: squad.source_snapshot_id,
     });
-    return caps?.llmoptVNext === true ? caps : undefined;
   }
-  async function currentPlanData(kind: "device" | "server", serverDataId?: string) {
-    try {
-      return kind === "device" ? await client.readDeviceDataId?.() : serverDataId;
-    } catch {
-      return undefined;
-    }
+  async function currentGrant() {
+    const caps = await readCurrentCapabilities();
+    return caps?.llmoptVNext === true ? caps : undefined;
   }
 
   async function send(event: FormEvent<HTMLFormElement>) {
@@ -506,25 +509,13 @@ function Workspace({
     )
       return;
     const controller = new AbortController();
-    let sentCatalogue = false;
     interpret.current = controller;
     restoreChatFocus.current = event.currentTarget.contains(document.activeElement);
     setReading(true);
     setFeedback("");
     try {
-      const candidate = vNext ? planCatalogue(computed.history, shownPlans) : undefined;
-      const grant = candidate || selectedReference ? await currentGrant() : undefined;
-      if (controller.signal.aborted) return;
-      const catalogue = grant ? candidate : undefined;
-      sentCatalogue = !!catalogue;
-      const previous = (grant ? selectedReference : undefined) ?? reference ?? revised;
-      if (
-        catalogue &&
-        (await currentPlanData(catalogue.kind, grant?.planDataId)) !== catalogue.data_id
-      ) {
-        askPlanQuestion(text);
-        return;
-      }
+      const catalogue = vNext ? planCatalogue(computed.history, shownPlans) : undefined;
+      const previous = selectedReference ?? reference ?? revised;
       const answer = await intentSource.interpret(
         {
           message: text,
@@ -535,34 +526,44 @@ function Workspace({
           referenceWeeks: referenceWeeks(previous),
           referenceCaptains: referenceCaptains(previous),
           planContext: catalogue,
+          ...(catalogue && {
+            confirmCatalogueRollback: async () => {
+              const caps = await readCurrentCapabilities();
+              return !!caps && caps.llmoptVNext !== true;
+            },
+          }),
         },
         controller.signal,
       );
       if (controller.signal.aborted) return;
       if (answer.status === "plan") {
         if (!catalogue) throw new IntentError(422, "REPLY_REFUSED");
-        const granted = await currentGrant();
+        const availability = await readPlanAvailability(
+          catalogue.kind,
+          currentGrant,
+          client.readDeviceDataId,
+        );
         if (controller.signal.aborted) return;
-        if (!granted) {
+        if (!availability.grant) {
           setFeedback(copy.serviceUnavailable);
           return;
         }
-        const currentCatalogue = planCatalogue(session.history, shownPlans);
+        const currentCatalogue = planCatalogue(session.history, displayedPlans.current);
+        if (
+          !currentCatalogue ||
+          !availability.matches(currentCatalogue.kind, currentCatalogue.data_id) ||
+          !currentPlanCommand(catalogue, currentCatalogue, answer.command.plan_id)
+        ) {
+          recordExchange(text, copy.planDataChanged);
+          return;
+        }
         const item = session.history.items.find((p) => p.id === answer.command.plan_id);
         try {
-          if (
-            !currentCatalogue ||
-            currentCatalogue.data_id !== catalogue?.data_id ||
-            (await currentPlanData(currentCatalogue.kind, granted.planDataId)) !==
-              currentCatalogue.data_id
-          )
-            throw new Error("Stale reply");
           const result = commandDraft(answer.command, currentCatalogue, item?.plan, draft, players);
           if (result.draft) change(checkedDraft(result.draft, players), result.reference);
           else applySelection(computed.choose(answer.command.plan_id));
         } catch {
-          askPlanQuestion(text);
-          return;
+          throw new IntentError(422, "REPLY_REFUSED");
         }
       } else if (answer.status === "draft") {
         change(answer.draft, previous);
@@ -580,18 +581,11 @@ function Workspace({
         });
       }
       const reply = answer.status === "clarification" ? answer.message : copy.understood;
-      const userLine = nextChatLine.current++;
-      const replyLine = nextChatLine.current++;
-      setConversation((before) => [
-        ...before.slice(-18),
-        { id: userLine, role: "user", message: text },
-        { id: replyLine, role: "assistant", message: reply },
-      ]);
-      setMessage("");
+      recordExchange(text, reply);
     } catch (error) {
       if (controller.signal.aborted) return;
-      if (error instanceof IntentError && error.code === "REPLY_REFUSED" && sentCatalogue) {
-        askPlanQuestion(text);
+      if (error instanceof IntentError && error.code === "PLAN_DATA_CHANGED") {
+        recordExchange(text, copy.planDataChanged);
         return;
       }
       const refusal = intentRefusal(error);
@@ -1314,6 +1308,10 @@ function Workspace({
     ...results.flatMap(({ state }) => (state.phase === "done" ? [state.envelope.payload] : [])),
     ...(combinedState.phase === "done" ? [combinedState.envelope.payload] : []),
   ];
+  const displayedPlans = useRef(shownPlans);
+  useLayoutEffect(() => {
+    displayedPlans.current = shownPlans;
+  });
   const computed = useComputedPlans(
     session,
     { draft, reference, clarification, confirmation: session.confirmation },
