@@ -38,12 +38,17 @@ equal feasible objectives and priority outcomes plus four matching infeasibiliti
 on the original twenty controls. Eight differing transfer decisions have equal scores.
 Run `python -m docs.research.llmopt_phase4.priority_measure` separately from tests.
 
-For a one-week hard-rule run with device inputs, the page uses the existing net-points
-objective for its main plan and the local menu. It shows at most three Pareto decisions
-inside 6.3 points of the computed net-points main. A resource lexicographic solve finds
-each decision in the remaining non-dominated region; integer disjunctions retain equal
-resource vectors and exclude strictly dominated ones. Exclusions remove the complete
-squad, so captain/lineup changes do not repeat a transfer decision. The independent tiny
+For a one-week hard-rule run with device inputs, the page keeps the computed net-points
+main plan and offers up to two distinct alternatives within 6.3 points of it. The
+alternative search compares net points, bank, hit charges and remaining free transfers.
+In nine of the 140 comparisons, 13 alternatives tied the main plan on net points and
+improved at least one resource while preserving the others or improving them. For
+example, the GW8 bank-floor run for entry 3832237 returned 53.265 points with either
+plan. The alternative kept £0.2m in the bank and the main plan kept £0.1m, with the
+same hit charge and remaining free transfers. [Hard-rule comparison](../llmopt_phase4_rule_families.md)
+
+Each alternative satisfies the hard rules and has a different resulting squad. The
+search excludes options dominated by a decision already shown. The independent tiny
 oracle enumerates all sixteen transfer packages and legal lineups.
 
 Real-worker E2E covers English/Turkish at 1280 and 375 pixels, three distinct decisions,
