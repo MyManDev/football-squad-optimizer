@@ -181,6 +181,7 @@ for (const language of ["en", "tr"] as const)
           return;
         }
         await expect(cards).toHaveCount(priority ? 2 : 3);
+        expect(workers).toBeGreaterThan(0);
         const identities = await cards.evaluateAll((items) =>
           items.map((item) => item.getAttribute("data-transfer-decision")),
         );
