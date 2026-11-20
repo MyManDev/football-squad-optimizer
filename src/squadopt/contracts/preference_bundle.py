@@ -210,20 +210,16 @@ class PreferenceBundle:
 
 
 def priority_result_schema() -> dict[str, Any]:
+    rule_ids = {
+        "type": "array",
+        "maxItems": 16,
+        "items": {"type": "string"},
+        "uniqueItems": True,
+    }
     properties = {
         "contract_version": {"type": "string", "const": "llmopt_priority_result_v1"},
-        "satisfied": {
-            "type": "array",
-            "maxItems": 16,
-            "items": {"type": "string"},
-            "uniqueItems": True,
-        },
-        "left_out": {
-            "type": "array",
-            "maxItems": 16,
-            "items": {"type": "string"},
-            "uniqueItems": True,
-        },
+        "satisfied": rule_ids,
+        "left_out": rule_ids,
         "total_cost": {"type": "number"},
         "completed_priorities": {
             "type": "array",
@@ -236,7 +232,8 @@ def priority_result_schema() -> dict[str, Any]:
     }
     return {
         "type": "object",
-        "properties": properties,
+        # The first version of the result predates the explicit list of unfinished rules.
+        "properties": {**properties, "unsearched": rule_ids},
         "required": list(properties),
         "additionalProperties": False,
     }
