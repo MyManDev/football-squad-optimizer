@@ -36,12 +36,12 @@
   satisfied the submitted rules. [Comparison](research/llmopt_phase4_rule_families.md),
   [record](research/llmopt_phase4_rule_families.json). #1468.
 
-- 2026-11-19: [LLMOPT one preference job](research/llmopt_phase3_jobs.md),
-  [record](research/llmopt_phase3_jobs.json): twenty frozen member-weeks, both windows
-  and both modes, 80 real API/worker run records. Maximum two server jobs, every
-  receipt within allocation, zero extra jobs from 192 reconstructed-service repeats.
-  Total mode explicitly reuses a feasible main answer; priority layers retain their
-  inner 20/60-unit ceiling. No latency, realized-score or global-quality claim. #1467.
+- 2026-11-20. LLMOPT priorities on twenty frozen member-weeks produced 80 local
+  API/worker run records at both windows and in both modes. At three weeks 10/20
+  completed all three layers, or 10/16 with a feasible main. Their preference jobs
+  charged 2,660.992 of 5,856 available units across the 16 eligible runs. No run
+  exceeded two server jobs and 192 repeats opened zero extra jobs. #1467.
+  [Measurement](research/llmopt_phase3_jobs.md), [record](research/llmopt_phase3_jobs.json)
 
 - 2026-11-19: [LLMOPT real solver budget controls](research/llmopt_phase2_solver_budget.md),
   [record](research/llmopt_phase2_solver_budget.json): twenty frozen member-weeks at
