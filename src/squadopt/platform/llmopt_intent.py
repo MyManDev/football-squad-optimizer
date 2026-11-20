@@ -774,23 +774,6 @@ def _schema_object(properties: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _explicit_schema_types(value: Any) -> Any:
-    """Keep nullable object alternatives while giving every provider field a type."""
-    if isinstance(value, list):
-        return [_explicit_schema_types(item) for item in value]
-    if not isinstance(value, dict):
-        return value
-    result = {name: _explicit_schema_types(item) for name, item in value.items()}
-    if "type" not in result and "anyOf" in result:
-        types = []
-        for alternative in result["anyOf"]:
-            kind = alternative.get("type")
-            types.extend(kind if isinstance(kind, list) else [kind] if kind is not None else [])
-        if types:
-            result["type"] = list(dict.fromkeys(types))
-    return result
-
-
 _CONSTRAINT_PROPERTIES: Final = {
     "kind": {"type": "string", "enum": list(_KINDS)},
     "player_id": {"type": ["integer", "null"]},
@@ -807,7 +790,7 @@ _SOFT_CONSTRAINT_LIST: Final[dict[str, Any]] = {
         {
             **_CONSTRAINT_PROPERTIES,
             "max_cost_tenths": {"type": ["integer", "null"]},
-            "priority": {"type": ["integer", "null"], "enum": [1, 2, 3, None]},
+            "priority": {"anyOf": [{"type": "integer", "enum": [1, 2, 3]}, {"type": "null"}]},
         }
     ),
 }
@@ -816,7 +799,9 @@ _DRAFT_SCHEMA: Final = _schema_object(
     {
         "hard": _CONSTRAINT_LIST,
         "soft": _SOFT_CONSTRAINT_LIST,
-        "max_total_cost_tenths": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000},
+        "max_total_cost_tenths": {
+            "anyOf": [{"type": "integer", "minimum": 0, "maximum": 1000}, {"type": "null"}]
+        },
         "comparison": {"anyOf": [_COMPARISON_SCHEMA, {"type": "null"}]},
         "window": {"type": ["integer", "null"], "enum": [*_WINDOWS, None]},
         "keep_weeks": {"type": "array", "items": {"type": "integer", "enum": list(_WEEKS)}},
@@ -846,14 +831,12 @@ _DRAFT_SCHEMA: Final = _schema_object(
         },
     }
 )
-_RESULT_SCHEMA: Final[dict[str, Any]] = _explicit_schema_types(
-    _schema_object(
-        {
-            "status": {"type": "string", "enum": ["draft", "clarification"]},
-            "draft": {"anyOf": [_DRAFT_SCHEMA, {"type": "null"}]},
-            "message": {"type": ["string", "null"]},
-        }
-    )
+_RESULT_SCHEMA: Final = _schema_object(
+    {
+        "status": {"type": "string", "enum": ["draft", "clarification"]},
+        "draft": {"anyOf": [_DRAFT_SCHEMA, {"type": "null"}]},
+        "message": {"type": ["string", "null"]},
+    }
 )
 
 
@@ -902,15 +885,12 @@ def intent_reply_schema(*, llmopt_vnext: bool = True) -> dict[str, Any]:
         rules = dict(_SOFT_CONSTRAINT_LIST["items"]["properties"])
         del rules["priority"]
         draft["soft"] = {"type": "array", "items": _schema_object(rules)}
-        result: dict[str, Any] = _explicit_schema_types(
-            _schema_object(
-                {
-                    **_RESULT_SCHEMA["properties"],
-                    "draft": {"anyOf": [_schema_object(draft), {"type": "null"}]},
-                }
-            )
+        return _schema_object(
+            {
+                **_RESULT_SCHEMA["properties"],
+                "draft": {"anyOf": [_schema_object(draft), {"type": "null"}]},
+            }
         )
-        return result
     return _RESULT_SCHEMA
 
 
