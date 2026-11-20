@@ -7,6 +7,7 @@ request that prompt carries, and has the reply checked.
 import json
 from collections.abc import Callable
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -111,6 +112,16 @@ def test_legacy_provider_null_extension_is_ignored(section):
     assert "invented" not in json.dumps(checked.json())
 
 
+def test_default_prompt_returns_the_frozen_develop_schema_bytes():
+    # Captured from POST /api/v1/llmopt/prompt at develop 177000ec2cfcd0eb525f9253cd46afd75b7ac733.
+    fixture = Path(__file__).resolve().parents[1] / "fixtures" / "llmopt_develop_prompt_schema.json"
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=_request())
+    assert prompt.status_code == 200
+    wire_schema = prompt.content.split(b',"schema":', 1)[1].split(b',"schema_name":', 1)[0]
+    assert wire_schema == fixture.read_bytes()
+
+
 @pytest.mark.parametrize("enabled", [False, True])
 def test_prompt_schema_and_check_accept_priority_fields_only_when_enabled(enabled):
     body = _request()
@@ -128,8 +139,22 @@ def test_prompt_schema_and_check_accept_priority_fields_only_when_enabled(enable
         assert ("priority" in soft) is enabled
         assert ("max_total_cost_tenths" in draft) is enabled
         assert ("max_total_cost_tenths" in call["system"]) is enabled
-        for field in (*draft.values(), *soft.values()):
-            assert "type" in field
+        if enabled:
+            assert soft["priority"] == {
+                "anyOf": [{"type": "integer", "enum": [1, 2, 3]}, {"type": "null"}]
+            }
+            assert draft["max_total_cost_tenths"] == {
+                "anyOf": [{"type": "integer", "minimum": 0, "maximum": 1000}, {"type": "null"}]
+            }
+        for field in (
+            call["schema"]["properties"]["draft"],
+            *(draft[key] for key in ("comparison", "min_bank", "scenario")),
+        ):
+            assert set(field) == {"anyOf"}
+            obj, null = field["anyOf"]
+            assert obj["type"] == "object" and obj["additionalProperties"] is False
+            assert obj["required"] == list(obj["properties"])
+            assert null == {"type": "null"}
         assert client.post(PROMPT, json={**body, "draft": priority}).status_code == (
             200 if enabled else 422
         )
