@@ -524,6 +524,10 @@ class AdviceSubmitService:
         try:
             resolved = run_resolved if run_resolved is not None else resolve()
         except AdviceInputsNotPreparedError as missing:
+            if run is not None and not self._reader.llmopt_vnext:
+                raise RunAdmissionError(
+                    "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
+                ) from missing
             if self._prepare_inputs is None:
                 raise
             if self._deadline_for is not None and datetime.fromisoformat(
@@ -587,6 +591,17 @@ class AdviceSubmitService:
             ).hexdigest()
             with self._runs.transaction(at_utc=at_utc) as transaction:
                 transaction.prune(context.capture_snapshot_id, self._queue)
+                if (
+                    not self._reader.llmopt_vnext
+                    and run.run_id not in transaction.state["runs"]
+                    and run.run_id not in transaction.state["cancelled"]
+                ):
+                    held = self._reader.cached(cache_key)
+                    if held is not None:
+                        return SubmitOutcome(kind="hit", payload=held)
+                    raise RunAdmissionError(
+                        "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
+                    )
                 if run is not None:
                     transaction.bind(
                         run,
@@ -646,6 +661,8 @@ class AdviceSubmitService:
             if run is not None and run_tx is not None:
                 record_hit(run_tx, run, cached)
             return SubmitOutcome(kind="hit", payload=cached)
+        if run is not None and not self._reader.llmopt_vnext:
+            raise RunAdmissionError("LLMOPT_VNEXT_DISABLED", "This planning workflow is closed.")
         entry_bucket = f"entry:{context.capture_snapshot_id}:{entry_id}"
         if not charged and limiter is not None and not limiter.allow(f"ip:{client_bucket}"):
             raise self._rate_limited()

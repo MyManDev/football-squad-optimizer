@@ -153,6 +153,8 @@ def _deployment(
     deployment_module._publish_members(site_root, RIVAL_ID)
     store_root = tmp_path / "store"
     store_root.mkdir()
+    # These jobs exercise both run stages and identity-free legacy consumers.
+    configured.setdefault("llmopt_vnext", True)
     backend = build_backend(
         BackendConfig(
             store_root=store_root,

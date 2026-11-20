@@ -65,6 +65,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
         transfer_packages: bool = False,
         preference_bundles: bool = False,
         verified_repairs: bool = False,
+        llmopt_vnext: bool = False,
     ) -> None:
         menu = menu_capabilities()
         super().__init__(
@@ -78,6 +79,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
             transfer_packages=transfer_packages,
             preference_bundles=preference_bundles,
             verified_repairs=verified_repairs,
+            llmopt_vnext=llmopt_vnext,
         )
         self._contexts = context
         self._public_inputs = inputs

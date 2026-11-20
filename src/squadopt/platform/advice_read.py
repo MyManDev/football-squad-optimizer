@@ -467,6 +467,7 @@ class AdviceReadStore:
         transfer_packages: bool = False,
         preference_bundles: bool = False,
         verified_repairs: bool = False,
+        llmopt_vnext: bool = False,
     ) -> None:
         self._directory = directory
         self._cache = cache
@@ -489,6 +490,7 @@ class AdviceReadStore:
         self._transfer_packages = transfer_packages
         self._preference_bundles = preference_bundles
         self._verified_repairs = verified_repairs
+        self.llmopt_vnext = llmopt_vnext
 
     def current_capture_snapshot_id(self) -> str | None:
         context = self._context.current()
@@ -703,9 +705,11 @@ class AdviceReadStore:
                 },
             },
         }
-        if self._preference_bundles:
+        if self.llmopt_vnext:
+            document["llmopt_vnext"] = True
+        if self.llmopt_vnext and self._preference_bundles:
             document["preference_bundles"] = {"version": BUNDLE_VERSION}
-        if self._verified_repairs:
+        if self.llmopt_vnext and self._verified_repairs:
             document["verified_repairs"] = True
         if inputs.football is not None:
             document["models"] = list(PREDICTION_MODELS)

@@ -129,7 +129,7 @@ def test_unknown_plan_week_transfer_or_substitution_is_refused(command: dict[str
 def test_superseded_server_identity_is_refused_by_check_route_without_a_solve() -> None:
     current = [DATA]
     app = FastAPI()
-    app.include_router(intent_routes(server_data_id=lambda: current[0]))
+    app.include_router(intent_routes(server_data_id=lambda: current[0], llmopt_vnext=True))
     with TestClient(app) as client:
         body = {"request": request("server"), "reply": reply()}
         assert client.post("/api/v1/llmopt/check", json=body).status_code == 200

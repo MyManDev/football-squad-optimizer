@@ -6,7 +6,7 @@ import type {
   AdviceRequestResult,
 } from "../advice/adviceClient";
 import { checkedAdvice } from "../advice/adviceResponse";
-import { publicEntryCapabilities, type AdviceCapabilities } from "../advice/adviceCapabilities";
+import type { AdviceCapabilities } from "../advice/adviceCapabilities";
 import { preferencesKey } from "../advice/decisionPreferences";
 import { bundleKey } from "../advice/preferenceBundle";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
@@ -90,13 +90,9 @@ export function deviceAdviceClient(
       published = undefined;
       throw error;
     }));
-  const withLocal = (remoteCaps: AdviceCapabilities | null): AdviceCapabilities | null => {
-    if (!consistentBlock || squad.source_snapshot_id === null) return remoteCaps;
-    if (remoteCaps && remoteCaps.captureSnapshotId !== squad.source_snapshot_id) return remoteCaps;
-    const caps = remoteCaps ?? {
-      ...publicEntryCapabilities(squad),
-      chipsByEntry: { [String(squad.entry.entry_id)]: [] },
-    };
+  const withLocal = (caps: AdviceCapabilities | null): AdviceCapabilities | null => {
+    if (caps?.llmoptVNext !== true || !consistentBlock || !squad.source_snapshot_id) return caps;
+    if (caps.captureSnapshotId !== squad.source_snapshot_id) return caps;
     return {
       ...caps,
       preferences: true,
@@ -105,7 +101,7 @@ export function deviceAdviceClient(
         ...caps.strategies,
         "saf-puan": {
           requiresRival: false,
-          windows: remoteCaps?.preferences
+          windows: caps.preferences
             ? [...new Set([1 as const, ...(caps.strategies["saf-puan"]?.windows ?? [])])]
             : [1],
         },

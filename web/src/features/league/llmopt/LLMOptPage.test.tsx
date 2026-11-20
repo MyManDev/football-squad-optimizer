@@ -78,6 +78,7 @@ const CALENDAR = {
 
 let LLMOptPage: typeof Page;
 let roster: "ok" | "fail" | "late";
+let releaseEnabled: boolean;
 let releaseRoster: () => void;
 let rosterGate: Promise<void>;
 let intent: Mock<(body: Record<string, unknown>) => Response>;
@@ -91,6 +92,7 @@ beforeAll(async () => {
 beforeEach(() => {
   jobs.length = 0;
   roster = "ok";
+  releaseEnabled = true;
   rosterGate = new Promise<void>((resolve) => (releaseRoster = resolve));
   intent = vi.fn(
     () =>
@@ -103,6 +105,19 @@ beforeEach(() => {
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.endsWith("/capabilities"))
+        return Response.json({
+          contract_version: "league_capabilities_v1",
+          ...(releaseEnabled ? { llmopt_vnext: true } : {}),
+          league_id: squad.league_id,
+          capture_snapshot_id: squad.source_snapshot_id,
+          season: squad.season,
+          gameweek: squad.gameweek,
+          preferences: { available: true },
+          strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
+          top100: { available: false, weights: [] },
+          managers_word: { available: false },
+        });
       if (url === `${ORIGIN}/api/v1/contributions/players`) {
         if (roster === "fail") return new Response("{}", { status: 503 });
         if (roster === "late") await rosterGate;
@@ -731,6 +746,15 @@ describe("a reload keeps the saved session", () => {
     const base = await reloadConfirmed({ wildcardNotHeld: false });
     await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
     expect(base.compute).not.toHaveBeenCalled();
+  });
+
+  it("reads an enabled session after rollback without restarting its pending work", async () => {
+    releaseEnabled = false;
+    const base = await reloadConfirmed({ wildcardNotHeld: false, sending: true });
+    await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+    expect(base.resume).toHaveBeenCalledTimes(1);
+    expect(base.compute).not.toHaveBeenCalled();
+    for (const slot of jobs.slice(1)) expect(slot.compute).not.toHaveBeenCalled();
   });
 });
 

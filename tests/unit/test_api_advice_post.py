@@ -313,6 +313,7 @@ def _world(
         _Context(),
         {"saf-puan": False, "fark-yarat": True},
         preference_players=preference_players,
+        llmopt_vnext=True,
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
     if submit_services is not None:

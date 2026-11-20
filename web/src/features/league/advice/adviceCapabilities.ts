@@ -47,6 +47,7 @@ export interface StrategyCapability {
 }
 
 export interface AdviceCapabilities {
+  llmoptVNext?: boolean;
   verifiedRepairs?: boolean;
   transferPackages?: boolean;
   planDataId?: string;
@@ -185,6 +186,7 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   )
     throw new AdviceCapabilitiesError("Invalid decision information.");
   return {
+    ...(value.llmopt_vnext === true ? { llmoptVNext: true } : {}),
     ...(typeof value.verified_repairs === "boolean"
       ? { verifiedRepairs: value.verified_repairs }
       : {}),

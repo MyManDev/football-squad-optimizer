@@ -32,7 +32,7 @@ def _interpret(body: dict[str, Any], model: Callable[[IntentRequest], object]) -
     ``model`` gets the request as the prompt carries it, its players the shortlist. A body
     the prompt refuses never reaches the model, and that refusal is the answer.
     """
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(llmopt_vnext=True)) as client:
         prompt = client.post(PROMPT, json=body)
         if prompt.status_code != 200:
             return prompt

@@ -51,6 +51,21 @@ anonymous-consumer ownership. Old-capture runs with no open jobs are removed tog
 with unreferenced allocations. V1 migration preserves existing work receipts and recovers
 capture identity from immutable specs where available. It never resets a live budget.
 
+## Workflow selection
+
+The backend advertises `llmopt_vnext: true` on current league and public-entry
+capabilities only when `SQUADOPT_BACKEND_LLMOPT_VNEXT=1`. The default is 0.
+During rollback cached answers, existing run requests, job polling and
+cancellation remain available. A new run-owned computation returns HTTP 409
+with `LLMOPT_VNEXT_DISABLED`. Identity-free legacy requests continue to use
+their ordinary cache address and admission. A run already admitted can finish
+on the worker and publish its answer. The master setting does not enter the
+answer key or change a persisted computation specification. Both settings
+serve the same immutable cached document. Newly computed answers include
+`plan_data_id` for their source data in either setting. Older answers without
+it remain readable. This additive provenance leaves the ordinary plan decisions,
+scoring and request identity unchanged.
+
 ## Verified repairs
 
 League and public-entry capabilities can advertise `verified_repairs: true`.

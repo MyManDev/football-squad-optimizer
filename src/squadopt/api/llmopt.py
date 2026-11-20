@@ -87,6 +87,7 @@ async def _keyless_body(request: Request, limiter: FixedWindowRateLimiter) -> ob
 def intent_routes(
     *,
     keyless_per_minute: int = KEYLESS_PER_MINUTE,
+    llmopt_vnext: bool = False,
     server_data_id: Callable[[], str | None] | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1/llmopt")
@@ -98,11 +99,11 @@ def intent_routes(
     async def intent_prompt(request: Request) -> JSONResponse:
         try:
             intent = parse_intent_request(await _keyless_body(request, prompt_limiter))
+            call = await run_in_threadpool(prompt_for, intent, llmopt_vnext=llmopt_vnext)
         except _Refusal as refusal:
             return refusal.response
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
-        call = await run_in_threadpool(prompt_for, intent)
         return JSONResponse(call.payload(), headers={"Cache-Control": "no-store"})
 
     @router.post("/check")
@@ -115,7 +116,9 @@ def intent_routes(
             return _error(422, "VALIDATION_FAILED", str(error))
         try:
             current = server_data_id() if server_data_id is not None else None
-            result = await run_in_threadpool(check_reply, intent, reply, server_data_id=current)
+            result = await run_in_threadpool(
+                check_reply, intent, reply, server_data_id=current, llmopt_vnext=llmopt_vnext
+            )
         except IntentValidationError:
             return _error(422, "REPLY_REFUSED", "The model's reply is not a valid draft.")
         return JSONResponse(result, headers={"Cache-Control": "no-store"})

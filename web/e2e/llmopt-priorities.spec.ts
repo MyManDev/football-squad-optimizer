@@ -70,6 +70,7 @@ for (const language of ["tr", "en"] as const)
         await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
           answer(route, {
             contract_version: "league_capabilities_v1",
+            llmopt_vnext: true,
             league_id: LEAGUE,
             capture_snapshot_id: squad.source_snapshot_id,
             season: squad.season,

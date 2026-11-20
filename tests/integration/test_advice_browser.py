@@ -22,13 +22,11 @@ import pytest
 import tests.unit.test_advice_worker as worker_fixture
 import tests.unit.test_backend_runtime as deployment_fixture
 import tests.unit.test_player_evidence as evidence_fixture
-from tests.unit.test_projection_horizon_builder import _calendar
 
 from squadopt.application.entries import EntryRegistration
 from squadopt.application.league_views import MemberStanding, build_league_views
 from squadopt.application.player_evidence import write_evidence_artifact
 from squadopt.application.weekly_plan import evidence_artifact
-from squadopt.data.snapshots import write_snapshot
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -226,8 +224,9 @@ def _top100_export(capture, bootstrap: bytes, directory: Path) -> None:
     os.environ.get("SQUADOPT_BROWSER_SMOKE") != "1",
     reason="Opt-in: requires web/node_modules and the Playwright Chromium browser.",
 )
+@pytest.mark.parametrize("workflow", ["member", "vnext-off", "vnext-on"])
 def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow: str
 ) -> None:
     node = shutil.which("node")
     assert node is not None, "Install the web toolchain before running the browser smoke."
@@ -247,28 +246,15 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         handoff_root=tmp_path / "handoffs",
         allowed_origins=(web_origin,),
         artifact_root=tmp_path / "artifacts",
+        llmopt_vnext=workflow == "vnext-on",
     )
     config.store_root.mkdir()
     entry_id = deployment_fixture.ENTRY_ID
     entries = (entry_id, entry_id + 1, entry_id + 2)
     world = worker_fixture.world_module
-    snapshot_id = write_snapshot(
-        config.snapshot_root,
-        source="fpl-live",
-        captured_at_utc=world.GW2_CAPTURED_AT,
-        payloads={
-            world.BOOTSTRAP_PAYLOAD: world._bootstrap(
-                events=[dict(world.EVENTS[0], finished=True), *world.EVENTS[1:]],
-                elements=world._elements(event_points=2),
-            ),
-            world.FIXTURES_PAYLOAD: _calendar(gameweeks=(1, 2, 3)),
-            **{
-                name: value
-                for entry in entries
-                for name, value in worker_fixture._entry_payloads(entry, 1).items()
-            },
-        },
-    ).snapshot_id
+    snapshot_id = worker_fixture._capture_with_entries(
+        config.snapshot_root, entries, last_gameweek=3 if workflow == "member" else 5
+    )
     deployment_fixture._handoff(config.handoff_root, snapshot_id)
     deployment_fixture._publish_members(config.site_data_root)
     backend = build_backend(config)
@@ -367,11 +353,13 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         SQUADOPT_BACKEND_HANDOFF_ROOT=str(config.handoff_root),
         SQUADOPT_BACKEND_ALLOWED_ORIGINS=web_origin,
         SQUADOPT_BACKEND_ARTIFACT_ROOT=str(config.artifact_root),
+        SQUADOPT_BACKEND_LLMOPT_VNEXT="1" if config.llmopt_vnext else "0",
         SQUADOPT_BROWSER_CONTEXT=json.dumps(
             {
                 "apiOrigin": api_origin,
                 "webOrigin": web_origin,
                 "webPort": web_port,
+                "workflow": workflow,
                 "siteRoot": str(config.site_data_root),
                 "entryId": entry_id,
                 "rivalId": rival_id,
@@ -414,7 +402,13 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         browser_context["apiPid"] = api.pid
         environment["SQUADOPT_BROWSER_CONTEXT"] = json.dumps(browser_context)
         with _process(
-            [sys.executable, "-m", "squadopt.platform.advice_worker", "--max-jobs", "4"],
+            [
+                sys.executable,
+                "-m",
+                "squadopt.platform.advice_worker",
+                "--max-jobs",
+                "4" if workflow == "member" else "3",
+            ],
             environment,
             worker_log,
         ) as worker:
@@ -452,6 +446,28 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
     # A fresh reader proves four distinct jobs persisted, and reload queued nothing extra.
     fresh = build_backend(config)
     jobs = fresh.queue.jobs()
+    if workflow != "member":
+        # A plain three-week draft has the main plan, roll and bank alternatives.
+        assert len(jobs) == 3
+        for job in jobs:
+            assert job.status == "completed", job.error
+            assert job.contract_version == (
+                "backend_jobs_v2" if config.llmopt_vnext else "backend_jobs_v1"
+            )
+            spec = fresh.job_specs.get(job.cache_key)
+            assert spec is not None and spec.window == 3
+            payload = json.loads(fresh.cache.get(job.cache_key))["payload"]
+            assert payload["source_snapshot_id"] == snapshot_id
+            assert len(payload["plan_weeks"]) == 3
+        if config.llmopt_vnext:
+            ledger = json.loads(fresh.runs.path.read_bytes())
+            assert len(ledger["runs"]) == 1
+            assert next(iter(ledger["runs"].values()))["reserved"] == 366
+            for allocation in ledger["jobs"].values():
+                assert allocation["limit"] == 122 and allocation["receipt"]["calls"] > 0
+        else:
+            assert not fresh.runs.path.exists()
+        return
     assert len(jobs) == 4
     assert all(job.status == "completed" for job in jobs)
     # The browser's automatic chip request was refused before a job existed (audit H3).

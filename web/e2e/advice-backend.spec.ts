@@ -7,6 +7,7 @@ import { atRest } from "./atRest";
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
 import { MESSAGES } from "../src/i18n/messages";
+import { LLMOPT_COPY } from "../src/features/league/llmopt/copy";
 import { pickMember, publishedMember } from "./identity";
 
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
@@ -50,10 +51,7 @@ function windowsApiPids(apiPid: number, fixturePid: number, port: number): numbe
   return selected.reverse().map((row) => row.ProcessId);
 }
 
-test("member selections compute, reload uses cache, and a stopped backend leaves the published plan", async ({
-  page,
-}) => {
-  test.setTimeout(120_000);
+async function publishedFixture() {
   // These are the Python fixture's captured squad and member documents. No route,
   // including the API, is intercepted; Chromium enforces the cross-origin request.
   const built = `node_modules/.cache/${context.buildName}/data`;
@@ -63,6 +61,61 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   // to another league's tree, so the page is left with the fixture's alone.
   await rm(`${built}/leagues.json`, { force: true });
   await rm(`${built}/leagues`, { recursive: true, force: true });
+  return built;
+}
+
+test("LLMOPT confirms, polls and displays a three-week worker plan across reload", async ({
+  page,
+}) => {
+  test.skip(context.workflow === "member");
+  test.setTimeout(120_000);
+  const built = await publishedFixture();
+  const enabled = context.workflow === "vnext-on";
+  const league = `${context.apiOrigin}/api/v1/leagues/${context.leagueId}`;
+  const route = `${league}/entries/${context.entryId}/advice`;
+  await page.goto(`/league/${context.leagueId}/members`);
+  await pickMember(page, publishedMember(`${built}/league/members.json`, context.entryId));
+  const capabilities = page.waitForResponse(
+    (response) => response.url() === `${league}/capabilities`,
+  );
+  await page.goto(`/league/${context.leagueId}/members/${context.entryId}/llmopt`);
+  expect((await (await capabilities).json()).llmopt_vnext === true).toBe(enabled);
+  const words = LLMOPT_COPY.tr;
+  await page.getByRole("combobox", { name: words.window, exact: true }).selectOption("3");
+  const accepted = page.waitForResponse(
+    (r) => r.url().startsWith(route) && r.request().method() === "POST",
+    { timeout: 15_000 },
+  );
+  const completed = page.waitForResponse(
+    (r) => r.url().startsWith(route) && r.request().method() === "GET" && r.status() === 200,
+  );
+  await page.getByRole("button", { name: words.compute, exact: true }).click();
+  const post = await accepted;
+  expect(post.status()).toBe(202);
+  const body = post.request().postDataJSON();
+  expect(body.window).toBe(3);
+  if (enabled) expect(body.run).toMatchObject({ contract_version: "llmopt_run_v1", stage: "base" });
+  else expect(body.run).toBeUndefined();
+  const { job_id } = await post.json();
+  const answer = (await (await completed).json()).payload;
+  expect(answer.source_snapshot_id).toBe(context.snapshotId);
+  expect(answer.plan_weeks).toHaveLength(3);
+  const job = await page.request.get(`${context.apiOrigin}/api/v1/advice-jobs/${job_id}`);
+  expect(await job.json()).toMatchObject({ job_id, status: "completed" });
+  const card = page.locator("article[data-plan-ready]").first();
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(answer.captain.short_name);
+  await page.reload();
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(answer.captain.short_name);
+});
+
+test("member selections compute, reload uses cache, and a stopped backend leaves the published plan", async ({
+  page,
+}) => {
+  test.skip(context.workflow !== "member");
+  test.setTimeout(120_000);
+  const built = await publishedFixture();
   const route =
     `${context.apiOrigin}/api/v1/leagues/${context.leagueId}` +
     `/entries/${context.entryId}/advice`;

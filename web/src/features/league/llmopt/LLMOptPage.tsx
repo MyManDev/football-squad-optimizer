@@ -30,7 +30,7 @@ import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { deviceAdviceClient } from "../device/adviceClient";
-import { deviceSelection } from "../device/selection";
+import { prepareConfirmedRun } from "./releaseRun";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
@@ -75,7 +75,6 @@ import {
 } from "./planRevision";
 import {
   baseDraft,
-  prepareRun,
   requestFor,
   restoreRun,
   type BaseTitle,
@@ -494,7 +493,7 @@ function Workspace({
     setReading(true);
     setFeedback("");
     try {
-      const catalogue = planCatalogue(computed.history, shownPlans);
+      const catalogue = vNext ? planCatalogue(computed.history, shownPlans) : undefined;
       if (catalogue && (await currentPlanData(catalogue.kind)) !== catalogue.data_id) {
         askPlanQuestion(text);
         return;
@@ -559,6 +558,7 @@ function Workspace({
       if (
         error instanceof IntentError &&
         error.code === "REPLY_REFUSED" &&
+        vNext &&
         session.history.items.length
       ) {
         askPlanQuestion(text);
@@ -594,14 +594,7 @@ function Workspace({
       (forwarded
         ? await client.readPublicCapabilities?.(squad.league_id, squad.entry.entry_id, { signal })
         : await client.readCapabilities?.(squad.league_id, { signal })) ?? null,
-    enabled:
-      !!ORIGIN &&
-      !!(
-        draft.hard.length ||
-        draft.min_bank ||
-        draft.keep_weeks?.length ||
-        session.confirmation?.repairSearch
-      ),
+    enabled: !!ORIGIN,
     ...LEAGUE_READ,
   });
   const scenarioReferenceMissing =
@@ -693,6 +686,8 @@ function Workspace({
     gameweek: squad.gameweek,
     snapshotId: squad.source_snapshot_id,
   });
+  const vNext = !repairCaps.isError && capabilities?.llmoptVNext === true;
+  const canContinue = !run?.inputs.request.run || vNext;
   const oldSearch = savedRun?.repairSearch;
   const failure =
     baseState.phase === "failed" || baseState.phase === "unavailable" ? baseState : null;
@@ -709,7 +704,7 @@ function Workspace({
         )?.baseRequest
       : undefined);
   const analysis =
-    capabilities?.verifiedRepairs && !draft.scenario
+    vNext && capabilities?.verifiedRepairs && !draft.scenario
       ? ruleRepairChoices(draft, {
           ...conflictContext,
           language,
@@ -738,7 +733,8 @@ function Workspace({
     });
     if (
       !mounted.current ||
-      !verified?.verifiedRepairs ||
+      !verified?.llmoptVNext ||
+      !verified.verifiedRepairs ||
       caps.isError ||
       squadBasis(fresh.payload) !== squadBasis(squad) ||
       !deadlineOpen(deadline)
@@ -806,13 +802,14 @@ function Workspace({
       />
     ) : undefined;
   useEffect(() => {
-    if (!run || run !== restoredRun) return;
+    if (!run || run !== restoredRun || (!!ORIGIN && repairCaps.isPending)) return;
     let active = true;
     // A reload can land before a started job's id was stored, which leaves nothing to resume.
     // Such a slot asks again while the deadline is open: the service answers a computed request
     // from its cache and joins a request still running to its open job.
     const askAgain =
-      !!run.inputs.request.run &&
+      canContinue &&
+      (!vNext || !!run.inputs.request.run) &&
       restored?.confirmation?.sending === true &&
       deadlineOpen(deadline);
     const restore = (request: PlanRequest, job: JobControls) => {
@@ -824,15 +821,35 @@ function Workspace({
     queueMicrotask(() => {
       if (!active) return;
       if (run.baseRequest) restore(run.baseRequest, controls.base);
+      if (!run.inputs.request.run) {
+        ALTERNATIVE_SLOTS.forEach((name, index) => {
+          const request = restoredSlot(run, index, restored?.confirmation?.followups?.[index]);
+          if (request && !(run.scenario && savedReplayProof)) restore(request, controls[name]);
+        });
+        if (restored?.confirmation?.combined?.length) {
+          const { request } = prepareCombined(run, restored.confirmation.combined);
+          if (request) restore(request, controls.combined);
+        }
+      }
     });
     return () => {
       active = false;
     };
-  }, [run, restoredRun, restored, savedReplayProof, deadline, controls]);
+  }, [
+    run,
+    restoredRun,
+    restored,
+    savedReplayProof,
+    deadline,
+    controls,
+    repairCaps.isPending,
+    canContinue,
+    vNext,
+  ]);
 
   useEffect(() => {
     if (
-      !run ||
+      !run?.inputs.request.run ||
       execution ||
       incompleteRun ||
       baseState.phase !== "done" ||
@@ -843,7 +860,7 @@ function Workspace({
     const restoring = run === restoredRun;
     const restore = (request: PlanRequest, slot: JobControls) => {
       if (slot.resume?.(request)) return;
-      if (request.run && confirmed?.sending && deadlineOpen(deadline)) slot.compute(request);
+      if (canContinue && confirmed?.sending && deadlineOpen(deadline)) slot.compute(request);
       else slot.readCached?.(request);
     };
     ALTERNATIVE_SLOTS.forEach((name, index) => {
@@ -851,7 +868,8 @@ function Workspace({
       if (restoring) {
         const request = restoredSlot(run, index, confirmed?.followups?.[index]);
         if (request && !(run.scenario && savedReplayProof)) restore(request, controls[name]);
-      } else if (slot?.kind === "explicit" && slot.request) controls[name].compute(slot.request);
+      } else if (canContinue && slot?.kind === "explicit" && slot.request)
+        controls[name].compute(slot.request);
     });
     if (restoring && confirmed?.combined?.length) {
       const { request } = prepareCombined(run, confirmed.combined);
@@ -865,6 +883,7 @@ function Workspace({
     savedReplayProof,
     deadline,
     controls,
+    canContinue,
     incompleteRun,
     execution,
   ]);
@@ -881,10 +900,10 @@ function Workspace({
       return;
     if (run === restoredRun) {
       if (controls.first.resume?.(execution)) return;
-      if (session.confirmation?.sending && deadlineOpen(deadline))
+      if (canContinue && session.confirmation?.sending && deadlineOpen(deadline))
         controls.first.compute(execution);
       else controls.first.readCached?.(execution);
-    } else controls.first.compute(execution);
+    } else if (canContinue) controls.first.compute(execution);
   }, [
     execution,
     run,
@@ -892,6 +911,7 @@ function Workspace({
     incompleteRun,
     baseState,
     bundleState,
+    canContinue,
     controls,
     session,
     deadline,
@@ -900,6 +920,7 @@ function Workspace({
   useEffect(() => {
     const confirmed = session.confirmation;
     if (
+      !canContinue ||
       !run?.automaticBasis ||
       execution ||
       incompleteRun ||
@@ -928,6 +949,7 @@ function Workspace({
   }, [
     baseState,
     run,
+    canContinue,
     deadline,
     controls,
     session,
@@ -973,24 +995,14 @@ function Workspace({
     try {
       const [fresh, capabilities] = await Promise.all([
         tree.entrySquad(squad.entry.entry_id),
-        forwarded
-          ? client.readPublicCapabilities?.(squad.league_id, squad.entry.entry_id)
-          : client.readCapabilities?.(squad.league_id),
+        repairCaps.refetch().then((result) => (result.isError ? null : result.data)),
       ]);
       if (!mounted.current) return;
       if (!capabilities?.preferences) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
-      const localBundle = plans.window === 1 && capabilities.devicePreferenceBundles === true;
-      if (
-        draft.max_total_cost_tenths !== undefined &&
-        !capabilities.preferenceBundles &&
-        !localBundle
-      ) {
-        setFeedback(copy.serviceUnavailable);
-        return;
-      }
+
       if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
         setFeedback(copy.windowUnavailable);
         return;
@@ -1012,58 +1024,17 @@ function Workspace({
         session.save({ draft });
         return;
       }
-      const runId = crypto.randomUUID().replaceAll("-", "");
-      const request = {
-        ...requestFor(squad, forwarded, plans.window),
-        run: {
-          contract_version: "llmopt_run_v1" as const,
-          run_id: runId,
-          stage: "base" as const,
-        },
-      };
-      // A public team may have no chip list until its FPL inputs are pinned.
-      const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
-      const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
-      let next = prepareRun({
-        draft,
-        held,
-        request,
-        plans,
-        wildcardNotHeld,
-        frozenWeeks: frozen,
-        reference,
-        compareOnly: reference?.compareOnly === true,
-        ...(capabilities.transferPackages && plans.window === 3 ? { paths3w: true as const } : {}),
-        bundleMode:
-          (capabilities.preferenceBundles === true || localBundle) &&
-          draft.soft.length > 0 &&
-          !draft.scenario,
-      });
-      const execution = preferenceExecution(next);
-      const requests = [
-        next.baseRequest,
-        ...next.slots.map((slot) => slot.request),
-        execution,
-      ].filter((value): value is NonNullable<typeof value> => value != null);
-      if (
-        next.inputs.request.deviceRun === true &&
-        requests.some((query) => deviceSelection(query, squad)?.kind !== "plain")
-      ) {
-        next = prepareRun({
-          ...next.inputs,
-          request: { ...next.inputs.request, deviceRun: false, deviceAlternatives: false },
-        });
-      }
-      if (
-        next.inputs.bundleMode &&
-        next.baseRequest?.deviceRun === false &&
-        !capabilities.preferenceBundles
-      ) {
-        if (draft.max_total_cost_tenths !== undefined) {
-          setFeedback(copy.serviceUnavailable);
-          return;
-        }
-        next = prepareRun({ ...next.inputs, bundleMode: false });
+      const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
+      const next = prepareConfirmedRun(
+        { draft, held, plans, frozenWeeks: frozen, reference },
+        squad,
+        forwarded,
+        capabilities,
+        runId,
+      );
+      if (!next) {
+        setFeedback(copy.serviceUnavailable);
+        return;
       }
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
       if (
@@ -1080,17 +1051,21 @@ function Workspace({
         draft,
         reference,
         confirmation: {
-          runId,
-          wildcardNotHeld,
+          ...(runId ? { runId } : {}),
+          wildcardNotHeld: next.inputs.wildcardNotHeld,
           ...(next.inputs.paths3w ? { paths3w: true as const } : {}),
           sending: true as const,
-          compareOnly: next.inputs.compareOnly === true,
-          deviceRun: next.baseRequest?.deviceRun ?? false,
-          deviceAlternatives: next.baseRequest?.deviceAlternatives ?? false,
+          ...(runId
+            ? {
+                compareOnly: next.inputs.compareOnly === true,
+                deviceRun: next.baseRequest?.deviceRun ?? false,
+                deviceAlternatives: next.baseRequest?.deviceAlternatives ?? false,
+              }
+            : {}),
           ...(next.inputs.bundleMode ? { bundleMode: true as const } : {}),
         },
       };
-      if (!writePlanSession(context, confirmed)) {
+      if (runId && !writePlanSession(context, confirmed)) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
@@ -1099,6 +1074,11 @@ function Workspace({
       if (next.baseRequest) {
         controls.base.compute(next.baseRequest);
       } else controls.base.reset();
+      if (!runId)
+        ALTERNATIVE_SLOTS.forEach((name, index) => {
+          const slot = next.slots[index];
+          if (slot?.kind === "explicit" && slot.request) controls[name].compute(slot.request);
+        });
     } catch {
       if (mounted.current) setFeedback(copy.squadUnavailable);
     } finally {
@@ -1145,6 +1125,7 @@ function Workspace({
       execution ||
       incompleteRun ||
       !singlesIn ||
+      !canContinue ||
       !confirmed ||
       confirmed.followups === undefined ||
       confirmed.combined !== undefined ||
@@ -1168,6 +1149,7 @@ function Workspace({
   }, [
     run,
     singlesIn,
+    canContinue,
     combinedChoice,
     deadline,
     controls,
@@ -1247,11 +1229,11 @@ function Workspace({
   const computed = useComputedPlans(
     session,
     { draft, reference, clarification, confirmation: session.confirmation },
-    shownPlans,
+    vNext ? shownPlans : [],
     session.confirmation?.runId,
   );
   const selectedReference =
-    computed.history.explicit && computed.selected
+    vNext && computed.history.explicit && computed.selected
       ? summarizeRevision(computed.selected.plan)
       : undefined;
   const historical =
@@ -1262,13 +1244,16 @@ function Workspace({
     setClarification(undefined);
     session.save({ draft, reference, confirmation: session.confirmation, history });
   }
-  const planProps = (plan: EntryAdvice) => ({
-    planId: computed.idFor(plan),
-    selected: computed.selected?.id === computed.idFor(plan),
-    onSelect: computed.idFor(plan)
-      ? () => selectComputed(computed.choose(computed.idFor(plan)!))
-      : undefined,
-  });
+  const planProps = (plan: EntryAdvice) =>
+    !vNext
+      ? {}
+      : {
+          planId: computed.idFor(plan),
+          selected: computed.selected?.id === computed.idFor(plan),
+          onSelect: computed.idFor(plan)
+            ? () => selectComputed(computed.choose(computed.idFor(plan)!))
+            : undefined,
+        };
   const alternative = results.find(({ state }) => state.phase === "done")?.state;
   const revisionAnswer =
     baseAnswer ?? (alternative?.phase === "done" ? alternative.envelope.payload : undefined);
@@ -1403,6 +1388,7 @@ function Workspace({
           </p>
         )}
         <RuleEditor
+          priorities={vNext}
           draft={draft}
           players={players}
           copy={copy}
@@ -1566,7 +1552,7 @@ function Workspace({
           </p>
         )}
       </section>
-      {computed.history.items.length > 0 && (
+      {vNext && computed.history.items.length > 0 && (
         <section className={styles.revision} aria-label={copy.planHistory}>
           <label>
             {copy.planHistory}{" "}

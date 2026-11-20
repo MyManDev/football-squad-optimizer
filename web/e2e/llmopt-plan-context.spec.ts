@@ -73,6 +73,19 @@ for (const language of ["en", "tr"] as const)
       await page.route(`**/data/league/entries/${ENTRY}.json*`, (route) =>
         route.fulfill({ json: squad }),
       );
+      await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+        answer(route, {
+          contract_version: "league_capabilities_v1",
+          llmopt_vnext: true,
+          league_id: LEAGUE,
+          capture_snapshot_id: table.source_snapshot_id,
+          season: table.season,
+          gameweek: table.gameweek,
+          strategies: { "saf-puan": { requires_rival: false, windows: [1] } },
+          top100: { available: false, weights: [] },
+          managers_word: { available: false },
+        }),
+      );
       await page.route("**/data/league/device-plan.json*", (route) =>
         route.fulfill({
           json: {

@@ -4,6 +4,7 @@ import { webcrypto } from "node:crypto";
 import { beforeAll, beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import fixture from "../../../fixtures/device-plan/instances.json";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
+import { publicEntryCapabilities } from "../advice/adviceCapabilities";
 import { checkedPreferences } from "../advice/decisionPreferences";
 import type { PreferenceBundle } from "../advice/preferenceBundle";
 import type { AdviceClient, AdviceRequest } from "../advice/adviceClient";
@@ -68,7 +69,13 @@ function setup(deviceSolver: LpSolver = solver) {
     requestAdvice: vi.fn().mockResolvedValue({ kind: "unavailable" }),
     readJob: vi.fn(),
     cancelRun: vi.fn(),
-    readCapabilities: vi.fn().mockResolvedValue(null),
+    readCapabilities: vi
+      .fn()
+      .mockResolvedValue({ ...publicEntryCapabilities(squad), llmoptVNext: true }),
+    readPublicCapabilities: vi.fn().mockResolvedValue({
+      ...publicEntryCapabilities({ ...squad, league_id: 0 }),
+      llmoptVNext: true,
+    }),
   } satisfies AdviceClient;
   const posts = vi.fn();
   const create = () => {
@@ -304,7 +311,17 @@ describe("one-week advice transport with a real solver", () => {
     expect(posts).toHaveBeenCalledTimes(1);
     expect(remote.requestAdvice).not.toHaveBeenCalled();
   });
-  it("has local one-week capabilities for an unpublished league", async () => {
+  it("requires an explicit server release before adding device capabilities", async () => {
+    const { remote, load, create } = setup();
+    remote.readCapabilities.mockResolvedValue(null);
+    const client = deviceAdviceClient(remote, squad, load, create);
+    expect(await client.readCapabilities?.(squad.league_id)).toBeNull();
+    remote.readCapabilities.mockResolvedValue(publicEntryCapabilities(squad));
+    expect(
+      (await client.readCapabilities?.(squad.league_id))?.devicePreferenceBundles,
+    ).toBeUndefined();
+  });
+  it("has local one-week capabilities for an enabled public entry", async () => {
     const { remote, create, load } = setup();
     const forwarded = { ...squad, league_id: 0 };
     const client = deviceAdviceClient(remote, forwarded, load, create);
