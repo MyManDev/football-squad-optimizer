@@ -88,6 +88,24 @@ describe("createPlanSessionStore", () => {
     expect(readPlanSession(context)).not.toHaveProperty("confirmation");
   });
 
+  it("retains a pending repair only with its original run and data identifiers", () => {
+    const runId = "a".repeat(32);
+    const dataId = "b".repeat(64);
+    const repairSearch = { dataId, failedBase: true, failureCode: "CHIP_NOT_HELD" };
+    const confirmation = { runId, wildcardNotHeld: false, repairSearch };
+    const read = (saved: unknown) =>
+      checkedPlanSession({ draft, confirmation: saved }, ROSTER, GAMEWEEK);
+    expect(read(confirmation)?.confirmation).toMatchObject(confirmation);
+    for (const broken of [
+      { ...confirmation, runId: [runId] },
+      { ...confirmation, repairSearch: { ...repairSearch, dataId: [dataId] } },
+      { ...confirmation, repairSearch: null },
+    ]) {
+      expect(read(broken)?.draft).toEqual(draft);
+      expect(read(broken)?.confirmation).toBeUndefined();
+    }
+  });
+
   it("tells its listeners after each save until they leave", () => {
     const store = createPlanSessionStore(context);
     const listener = vi.fn();

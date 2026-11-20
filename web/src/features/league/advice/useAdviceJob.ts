@@ -138,6 +138,7 @@ export type ComputePhase =
       reason?: string | null;
       retryAfterSeconds?: number | null;
       infeasibility?: PlanInfeasibility;
+      terminalJobId?: string;
       earlier?: EarlierAnswer | null;
     };
 
@@ -286,7 +287,12 @@ export function useAdviceJob(
       ) => withRequestDeadline(operation, { signal, timeoutMs });
       let readAfterMissingJob = false;
       const alive = () => generation.current === run && !signal.aborted;
-      const fail = (error?: unknown, reason?: string, infeasibility?: PlanInfeasibility) => {
+      const fail = (
+        error?: unknown,
+        reason?: string,
+        infeasibility?: PlanInfeasibility,
+        terminalJobId?: string,
+      ) => {
         if (!alive()) return;
         const stated = failure(error);
         setState({
@@ -295,6 +301,7 @@ export function useAdviceJob(
           ...stated,
           reason: reason ?? stated.reason,
           ...(infeasibility ? { infeasibility } : {}),
+          ...(terminalJobId ? { terminalJobId } : {}),
         });
       };
       setState(
@@ -341,6 +348,10 @@ export function useAdviceJob(
             return;
           }
           if (outcome.kind === "unavailable") {
+            if (outcome.infeasibility) {
+              fail(undefined, outcome.reason ?? undefined, outcome.infeasibility);
+              return;
+            }
             setState({ phase: "unavailable", request, reason: outcome.reason ?? null });
             return;
           }
@@ -468,7 +479,12 @@ export function useAdviceJob(
           }
           if (job.status === "failed" || job.status === "cancelled") {
             forgetJob(request);
-            fail(undefined, job.errorCode ?? undefined, job.infeasibility);
+            fail(
+              undefined,
+              job.errorCode ?? undefined,
+              job.infeasibility,
+              job.errorCode === "CHIP_NOT_HELD" ? jobId : undefined,
+            );
             return;
           }
           if (job.status === "running" && waiting.runningSince === undefined) {

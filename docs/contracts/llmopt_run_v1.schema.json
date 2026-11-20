@@ -12,7 +12,8 @@
     "stage": {
       "enum": [
         "base",
-        "followup"
+        "followup",
+        "repair"
       ],
       "type": "string"
     }

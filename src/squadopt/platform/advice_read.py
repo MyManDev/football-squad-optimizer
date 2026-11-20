@@ -466,6 +466,7 @@ class AdviceReadStore:
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
         transfer_packages: bool = False,
         preference_bundles: bool = False,
+        verified_repairs: bool = False,
     ) -> None:
         self._directory = directory
         self._cache = cache
@@ -487,6 +488,7 @@ class AdviceReadStore:
         self._available_windows = available_windows
         self._transfer_packages = transfer_packages
         self._preference_bundles = preference_bundles
+        self._verified_repairs = verified_repairs
 
     def current_capture_snapshot_id(self) -> str | None:
         context = self._context.current()
@@ -703,6 +705,8 @@ class AdviceReadStore:
         }
         if self._preference_bundles:
             document["preference_bundles"] = {"version": BUNDLE_VERSION}
+        if self._verified_repairs:
+            document["verified_repairs"] = True
         if inputs.football is not None:
             document["models"] = list(PREDICTION_MODELS)
             document["decision_information"] = inputs.decision_information(

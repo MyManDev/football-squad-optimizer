@@ -37,6 +37,7 @@ from squadopt.optimization import (
     OptimizationConfig,
     SolverExecutionError,
     SolverStatus,
+    SolverWallTimeLimit,
     wall_clock_stopped_the_search,
 )
 from squadopt.optimization.work_budget import current_work_budget
@@ -889,12 +890,14 @@ class HorizonNoSolutionError(DataSourceError):
         status: SolverStatus,
         deterministic_time_used: object = None,
         relative_optimality_gap: object = None,
+        wall_time_exhausted: bool = False,
         infeasibility: PlanInfeasibility | None = None,
     ) -> None:
         super().__init__(message)
         self.status = status
         self.deterministic_time_used = deterministic_time_used
         self.relative_optimality_gap = relative_optimality_gap
+        self.wall_time_exhausted = wall_time_exhausted
         self.infeasibility = infeasibility
 
 
@@ -917,7 +920,7 @@ def _refuse_clock_stopped_seed(plan: TransferPlanResult, label: str) -> None:
         unfinished = probe.get("status") in {"FEASIBLE", "UNKNOWN"}
         stopped = stopped or (unfinished and used < limit - 1e-9)
     if stopped:
-        raise SolverExecutionError(
+        raise SolverWallTimeLimit(
             f"The named chip window's {label} seed reached its wall-clock safety limit."
         )
 
@@ -1581,6 +1584,8 @@ def plan_transfer_horizon(
                         chips or ChipAvailability(),
                         preferences,
                     )
+        elapsed = plan.diagnostics.get("solve_time_seconds")
+        wall_limit = plan.diagnostics.get("wall_time_limit_seconds")
         raise HorizonNoSolutionError(
             f"The transfer planner produced no {len(projection_horizon.target_gameweeks)}-"
             f"week solution; solver status was {plan.solver_status.name}, "
@@ -1588,6 +1593,13 @@ def plan_transfer_horizon(
             status=plan.solver_status,
             deterministic_time_used=used,
             relative_optimality_gap=relative_gap,
+            wall_time_exhausted=(
+                plan.solver_status is SolverStatus.UNKNOWN
+                and isinstance(elapsed, (int, float))
+                and isinstance(wall_limit, (int, float))
+                and 0 < wall_limit <= elapsed
+                and plan.diagnostics.get("deterministic_time_budget_exhausted") is False
+            ),
             infeasibility=details,
         )
     return plan, planning_policy

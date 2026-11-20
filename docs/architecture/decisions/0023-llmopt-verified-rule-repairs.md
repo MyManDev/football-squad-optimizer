@@ -41,7 +41,8 @@ replay or mismatching witness cannot stand in for the selected plan.
 Repeating or restoring a selection must not allocate additional attempts.
 
 Run stages describe admission and do not enter ordinary advice-cache identity.
-Repairs use the football planner. They require no changes to either model
+Repairs use the squad optimizer with the original projection model and data.
+They require no changes to either model
 endpoint and never contain credentials. Preserve readable older diagnoses
 and saved sessions. Release controls and activation are addressed separately.
 

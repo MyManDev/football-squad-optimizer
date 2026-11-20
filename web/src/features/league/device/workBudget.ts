@@ -12,7 +12,11 @@ interface Receipt {
   binding: string;
   units: number;
   closed: boolean;
+  repairCandidates?: string[];
+  repairSelection?: string;
 }
+const digest = (value: unknown) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+const workerUnits = Math.ceil(DEVICE_SOLVE_CEILING_SECONDS / 30);
 const prefix = "llmopt-device-work-v1:";
 export function deviceWorkReceipt(id: string): Receipt | undefined {
   let value: unknown;
@@ -31,7 +35,14 @@ export function deviceWorkReceipt(id: string): Receipt | undefined {
     !Number.isInteger(r.units) ||
     r.units! < 0 ||
     r.units! > 84 ||
-    typeof r.closed !== "boolean"
+    typeof r.closed !== "boolean" ||
+    (r.repairCandidates !== undefined &&
+      (!Array.isArray(r.repairCandidates) ||
+        r.repairCandidates.length > 2 ||
+        !r.repairCandidates.every(digest) ||
+        new Set(r.repairCandidates).size !== r.repairCandidates.length)) ||
+    (r.repairSelection !== undefined &&
+      (!digest(r.repairSelection) || !r.repairCandidates?.includes(r.repairSelection)))
   )
     throw new DeviceWorkRefused("RUN_STORE_UNAVAILABLE");
   return r as Receipt;
@@ -53,9 +64,43 @@ export function bindDeviceRun(id: string | undefined, binding: string): void {
 export function reserveDeviceWork(id: string | undefined, binding: string): void {
   bindDeviceRun(id, binding);
   const prior = deviceWorkReceipt(id!)!;
-  const units = Math.ceil(DEVICE_SOLVE_CEILING_SECONDS / 30);
-  if (prior.units + units > 84) throw new DeviceWorkRefused("RUN_BUDGET_EXHAUSTED");
-  write(id!, { ...prior, units: prior.units + units });
+  const heldForSelection =
+    prior.repairCandidates?.length && !prior.repairSelection ? workerUnits : 0;
+  if (prior.units + workerUnits + heldForSelection > 84)
+    throw new DeviceWorkRefused("RUN_BUDGET_EXHAUSTED");
+  write(id!, { ...prior, units: prior.units + workerUnits });
+}
+
+/** Persist an attempt before starting its worker, retaining capacity for one selected replay. */
+export function claimDeviceRepair(
+  id: string,
+  binding: string,
+  addressDigest: string,
+  verify: boolean,
+  cacheHit: boolean,
+): boolean {
+  bindDeviceRun(id, binding);
+  const prior = deviceWorkReceipt(id)!;
+  const candidates = prior.repairCandidates ?? [];
+  if (verify) {
+    if (prior.repairSelection === addressDigest) return false;
+    if (prior.repairSelection || !candidates.includes(addressDigest))
+      throw new DeviceWorkRefused("RUN_BASE_REQUIRED");
+  } else {
+    if (candidates.includes(addressDigest)) return false;
+    if (prior.repairSelection || candidates.length >= 2)
+      throw new DeviceWorkRefused("RUN_BUDGET_EXHAUSTED");
+  }
+  const units = prior.units + (!verify && cacheHit ? 0 : workerUnits);
+  if (units + (verify ? 0 : workerUnits) > 84) throw new DeviceWorkRefused("RUN_BUDGET_EXHAUSTED");
+  write(id, {
+    ...prior,
+    units,
+    ...(verify
+      ? { repairSelection: addressDigest }
+      : { repairCandidates: [...candidates, addressDigest] }),
+  });
+  return true;
 }
 export function closeDeviceWork(id: string): boolean {
   const held = deviceWorkReceipt(id);

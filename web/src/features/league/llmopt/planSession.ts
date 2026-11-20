@@ -1,5 +1,6 @@
 import { checkedHistory, EMPTY_HISTORY, type PlanHistory } from "./planHistory";
 import type { EntrySquad } from "../types";
+import { checkedPlanInfeasibility, type PlanInfeasibility } from "../advice/planInfeasibility";
 import {
   MAX_MESSAGE_LENGTH,
   MAX_QUESTION_LENGTH,
@@ -18,6 +19,12 @@ export type StartedAlternative =
   | { kind: "delay"; players: number[] };
 
 export interface PlanConfirmation {
+  repairSearch?: {
+    dataId: string;
+    failedBase: boolean;
+    diagnosis?: PlanInfeasibility;
+    failureCode?: "PLAN_NOT_FOUND" | "CHIP_NOT_HELD";
+  };
   paths3w?: true;
   compareOnly?: boolean;
   deviceRun?: boolean;
@@ -232,11 +239,35 @@ export function checkedPlanSession(
         (Array.isArray(confirmation.followups) &&
           confirmation.followups.length <= ALTERNATIVE_COUNT))
     ) {
+      const runId =
+        typeof confirmation.runId === "string" && /^[0-9a-f]{32}$/.test(confirmation.runId)
+          ? confirmation.runId
+          : undefined;
+      const search = confirmation.repairSearch;
+      if (
+        search !== undefined &&
+        (!runId ||
+          typeof search?.dataId !== "string" ||
+          !/^[0-9a-f]{64}$/.test(search.dataId) ||
+          typeof search.failedBase !== "boolean")
+      )
+        return session;
       session.confirmation = {
-        ...(confirmation.bundleMode === true ? { bundleMode: true as const } : {}),
-        ...(typeof confirmation.runId === "string" && /^[0-9a-f]{32}$/.test(confirmation.runId)
-          ? { runId: confirmation.runId }
+        ...(search
+          ? {
+              repairSearch: {
+                dataId: search.dataId,
+                failedBase: search.failedBase,
+                diagnosis: checkedPlanInfeasibility(search.diagnosis),
+                failureCode:
+                  search.failureCode === "PLAN_NOT_FOUND" || search.failureCode === "CHIP_NOT_HELD"
+                    ? search.failureCode
+                    : undefined,
+              },
+            }
           : {}),
+        ...(confirmation.bundleMode === true ? { bundleMode: true as const } : {}),
+        ...(runId ? { runId } : {}),
         wildcardNotHeld: confirmation.wildcardNotHeld,
         ...(confirmation.paths3w === true ? { paths3w: true as const } : {}),
         ...(typeof confirmation.compareOnly === "boolean"

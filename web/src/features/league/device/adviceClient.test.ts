@@ -8,6 +8,9 @@ import { checkedPreferences } from "../advice/decisionPreferences";
 import type { PreferenceBundle } from "../advice/preferenceBundle";
 import type { AdviceClient, AdviceRequest } from "../advice/adviceClient";
 import { deviceAdviceClient } from "./adviceClient";
+import { deviceWorkReceipt } from "./workBudget";
+import { planIdentity } from "../llmopt/planHistory";
+import { expectedNet } from "../llmopt/planComparison";
 import { replyTo } from "./replies";
 import type { DeviceSolver } from "./useDevicePlan";
 import type { LpSolver } from "./lp/problem";
@@ -58,7 +61,7 @@ const request: AdviceRequest = {
   run: { contract_version: "llmopt_run_v1", run_id: "d".repeat(32), stage: "base" },
   preferences: checkedPreferences({ keep_players: [entry.held[0]], net_points_priority: true }),
 };
-function setup() {
+function setup(deviceSolver: LpSolver = solver) {
   const remote = {
     readAdvice: vi.fn().mockResolvedValue({ kind: "not-computed" }),
     readPublished: vi.fn().mockResolvedValue({ kind: "not-computed" }),
@@ -75,7 +78,7 @@ function setup() {
       postMessage: (input) => {
         posts(input);
         queueMicrotask(() =>
-          replyTo(solver, input, (data) => worker.onmessage?.({ data } as MessageEvent)),
+          replyTo(deviceSolver, input, (data) => worker.onmessage?.({ data } as MessageEvent)),
         );
       },
     };
@@ -91,6 +94,96 @@ function setup() {
 }
 
 describe("one-week advice transport with a real solver", () => {
+  it("computes a repair and freshly verifies the selected content once across reload", async () => {
+    const { client, remote, posts, load, create } = setup();
+    const dataId = await client.readDeviceDataId!();
+    const failed = await client.requestAdvice({
+      ...request,
+      preferences: checkedPreferences({
+        net_points_priority: true,
+        min_bank: { tenths: 10000 },
+      }),
+    });
+    expect(failed).toEqual({
+      kind: "unavailable",
+      reason: "PLAN_NOT_FOUND",
+      infeasibility: { repairs: [] },
+    });
+    const candidate: AdviceRequest = {
+      ...request,
+      run: { ...request.run!, stage: "repair" },
+      deviceAlternatives: true,
+      deviceRepair: { dataId },
+    };
+    const witness = await client.requestAdvice(candidate);
+    if (witness.kind !== "advice") throw new Error("A feasible witness was required.");
+    expect(posts).toHaveBeenCalledTimes(2);
+    const selected = { ...candidate, deviceRepair: { dataId, verify: true } };
+    const [a, b] = await Promise.all([
+      client.requestAdvice(selected),
+      client.requestAdvice(selected),
+    ]);
+    expect(a).toEqual(b);
+    if (a.kind !== "advice") throw new Error("The selected repair was not verified.");
+    expect(await planIdentity(a.envelope.payload)).toBe(
+      await planIdentity(witness.envelope.payload),
+    );
+    expect(expectedNet(a.envelope.payload)).toBe(expectedNet(witness.envelope.payload));
+    expect(posts).toHaveBeenCalledTimes(3);
+    const restored = deviceAdviceClient(remote, squad, load, create);
+    expect(await restored.requestAdvice(selected)).toEqual(a);
+    expect(await restored.requestAdvice(candidate)).toEqual(witness);
+    expect(posts).toHaveBeenCalledTimes(3);
+    expect(deviceWorkReceipt(request.run!.run_id)?.units).toBe(12);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it("pins failed and stale repair attempts to the device and reserves only once", async () => {
+    const { client, remote, posts, create, load } = setup();
+    const dataId = await client.readDeviceDataId!();
+    const missing = {
+      ...request,
+      deviceRepair: { dataId },
+      preferences: checkedPreferences({ include_players: [999999] }),
+    };
+    const unknown = { kind: "unavailable", reason: "DEVICE_INPUTS_UNAVAILABLE" };
+    expect(await client.requestAdvice(missing)).toEqual(unknown);
+    const restored = deviceAdviceClient(remote, squad, load, create);
+    expect(await restored.requestAdvice(missing)).toEqual(unknown);
+    expect(
+      await restored.requestAdvice({ ...missing, deviceRepair: { dataId, verify: true } }),
+    ).toMatchObject({ reason: "RUN_BASE_REQUIRED" });
+    expect(
+      await restored.requestAdvice({ ...missing, deviceRepair: { dataId: "0".repeat(64) } }),
+    ).toMatchObject({ reason: "RUN_CONTEXT_CHANGED" });
+    expect(await restored.requestAdvice({ ...missing, deviceRun: false })).toEqual(unknown);
+    expect(await restored.readAdvice({ ...missing, deviceRun: false })).toEqual({
+      kind: "not-computed",
+    });
+    expect(await restored.readPublished(missing)).toEqual({ kind: "not-computed" });
+    expect(posts).toHaveBeenCalledTimes(1);
+    expect(deviceWorkReceipt(request.run!.run_id)?.units).toBe(4);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+    expect(remote.readAdvice).not.toHaveBeenCalled();
+    expect(remote.readPublished).not.toHaveBeenCalled();
+  });
+  it.each(["Time limit reached", "Infeasible"])(
+    "retains a stopped or failed tie-break as %s",
+    async (status) => {
+      let calls = 0;
+      const { client } = setup({
+        solve(problem, options) {
+          if (++calls === 1) return solver.solve(problem, options);
+          return { Status: status, ObjectiveValue: 0, Columns: {} };
+        },
+      });
+      const result = await client.requestAdvice(request);
+      expect(calls).toBe(2);
+      expect(result).toEqual({
+        kind: "unavailable",
+        reason: status === "Time limit reached" ? "RUN_BUDGET_EXHAUSTED" : "DEVICE_PLAN_FAILED",
+      });
+    },
+  );
   it("keeps legacy individual pricing inside one device preference execution", async () => {
     const { client, remote, posts } = setup();
     const selection = { preferences: { avoid_players: [entry.held[1]] }, chip: null };

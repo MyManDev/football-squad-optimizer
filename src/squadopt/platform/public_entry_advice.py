@@ -64,6 +64,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
         transfer_packages: bool = False,
         preference_bundles: bool = False,
+        verified_repairs: bool = False,
     ) -> None:
         menu = menu_capabilities()
         super().__init__(
@@ -76,6 +77,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
             available_windows=available_windows,
             transfer_packages=transfer_packages,
             preference_bundles=preference_bundles,
+            verified_repairs=verified_repairs,
         )
         self._contexts = context
         self._public_inputs = inputs

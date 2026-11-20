@@ -77,7 +77,7 @@ from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.contracts.priority_preferences import PriorityProgram, PriorityReference
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
 from squadopt.live.transfers import HorizonNoSolutionError
-from squadopt.optimization import SolverStatus
+from squadopt.optimization import SolverStatus, SolverWallTimeLimit
 from squadopt.optimization.work_budget import (
     WorkBudgetExhausted,
     current_work_budget,
@@ -568,6 +568,12 @@ def build_advice_compute(
             # not be produced. The same request without the word still answers.
             raise AdviceComputeRefused("MANAGERS_WORD_NOT_SOLVED", str(error)) from error
         except HorizonNoSolutionError as error:
+            if (
+                error.wall_time_exhausted
+                and request.window == 3
+                and current_work_budget() is not None
+            ):
+                raise WorkBudgetExhausted("The window reached its wall-clock limit.") from error
             if error.status is SolverStatus.INFEASIBLE:
                 raise AdviceComputeRefused(
                     "PLAN_NOT_FOUND",
@@ -578,6 +584,12 @@ def build_advice_compute(
                 "ADVICE_FAILED", "The service could not solve this plan."
             ) from error
         except PLAN_NOT_FOUND_ERRORS as error:
+            if (
+                isinstance(error, SolverWallTimeLimit)
+                and request.window == 3
+                and current_work_budget() is not None
+            ):
+                raise WorkBudgetExhausted("The window reached its wall-clock limit.") from error
             if request.preferences.active:
                 raise AdviceComputeRefused(
                     "ADVICE_FAILED", "The service could not solve this plan."

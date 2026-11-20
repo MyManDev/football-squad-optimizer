@@ -7,6 +7,23 @@ import {
 import type { ComputePhase } from "../advice/useAdviceJob";
 import type { AdvicePlanWeek, EntryAdvice } from "../types";
 
+/** A full starting eleven and bench, with both armbands on distinct starters. */
+export function hasPlanLineup(
+  plan: Pick<EntryAdvice, "starting_xi" | "bench" | "captain" | "vice_captain"> | undefined,
+) {
+  const starters = new Set(plan?.starting_xi?.map(({ player_id }) => player_id));
+  return (
+    plan?.starting_xi?.length === 11 &&
+    plan.bench?.length === 4 &&
+    new Set([...starters, ...plan.bench.map(({ player_id }) => player_id)]).size === 15 &&
+    !!plan.captain &&
+    !!plan.vice_captain &&
+    plan.captain.player_id !== plan.vice_captain.player_id &&
+    starters.has(plan.captain.player_id) &&
+    starters.has(plan.vice_captain.player_id)
+  );
+}
+
 export function plannedWeeks(plan: EntryAdvice) {
   const weeks = [...(plan.plan_weeks ?? [])].sort((a, b) => a.gameweek - b.gameweek);
   return weeks.length === plan.window &&

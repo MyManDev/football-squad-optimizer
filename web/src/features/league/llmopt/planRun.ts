@@ -218,7 +218,7 @@ export function restoreRun(
   held: ReadonlySet<number>,
   requestForWindow: (window: AdviceRequest["window"]) => AdviceRequest,
 ): PlanRun | null {
-  if (!restored?.confirmation) return null;
+  if (!restored?.confirmation || restored.confirmation.repairSearch) return null;
   const { draft, confirmation, reference } = restored;
   const frozenWeeks = frozenForDraft(draft, reference);
   const plans = preparePlans(baseDraft(draft), held, frozenWeeks);

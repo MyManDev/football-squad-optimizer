@@ -10,7 +10,7 @@ from typing import Literal
 @dataclass(frozen=True, slots=True)
 class RunReference:
     run_id: str
-    stage: Literal["base", "followup"]
+    stage: Literal["base", "followup", "repair"]
 
     @classmethod
     def parse(cls, value: object) -> RunReference:
@@ -21,7 +21,7 @@ class RunReference:
         identifier, stage = value["run_id"], value["stage"]
         if not isinstance(identifier, str) or re.fullmatch(r"[0-9a-f]{32}", identifier) is None:
             raise ValueError("run_id must contain 32 lowercase hexadecimal digits.")
-        if stage not in ("base", "followup"):
+        if stage not in ("base", "followup", "repair"):
             raise ValueError("Unknown planning run stage.")
         return cls(identifier, stage)
 
@@ -43,7 +43,7 @@ def run_reference_schema() -> dict[str, object]:
         "properties": {
             "contract_version": {"type": "string", "const": "llmopt_run_v1"},
             "run_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
-            "stage": {"type": "string", "enum": ["base", "followup"]},
+            "stage": {"type": "string", "enum": ["base", "followup", "repair"]},
         },
         "required": ["contract_version", "run_id", "stage"],
         "additionalProperties": False,
@@ -74,6 +74,12 @@ def run_ledger_schema() -> dict[str, object]:
             "base": key,
             "closed": {"type": "boolean"},
             "base_cached": {"type": "boolean"},
+            "repair_candidates": {
+                "type": "array",
+                "items": key,
+                "maxItems": 2,
+                "uniqueItems": True,
+            },
             "requests": {
                 "type": "object",
                 "maxProperties": 4,

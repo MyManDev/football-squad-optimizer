@@ -31,7 +31,7 @@ from squadopt.live.chip_strategy import strategy_chip_availability
 from squadopt.live.transfers import plan_transfer_horizon
 from squadopt.optimization import (
     OptimizationConfig,
-    SolverExecutionError,
+    SolverWallTimeLimit,
     wall_clock_stopped_the_search,
 )
 from squadopt.planning import ChipAvailability
@@ -128,7 +128,7 @@ def advise_chip_strategy(
         priority_reference=priority_reference,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
-        raise SolverExecutionError("Chip strategy reached its wall-clock safety limit.")
+        raise SolverWallTimeLimit("Chip strategy reached its wall-clock safety limit.")
     scenario = preferences.scenario
     opening_absence = scenario is not None and scenario.kind == "unavailable" and scenario.week == 1
     if scenario is not None and scenario.kind == "unavailable":

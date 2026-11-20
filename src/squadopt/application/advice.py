@@ -82,6 +82,7 @@ from squadopt.optimization import (
     OptimizationConfig,
     SolverExecutionError,
     SolverStatus,
+    SolverWallTimeLimit,
     wall_clock_stopped_the_search,
 )
 from squadopt.planning import (
@@ -976,7 +977,7 @@ def solve_window_plan(
         linearization_level=WINDOW_LINEARIZATION_LEVEL,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
-        raise SolverExecutionError(
+        raise SolverWallTimeLimit(
             f"The {window}-week window for entry {picks.entry_id} was stopped by the "
             f"{WINDOW_WALL_CEILING_SECONDS}s wall-clock safety cap after "
             f"{plan.diagnostics.get('deterministic_time_used')!r} of its "

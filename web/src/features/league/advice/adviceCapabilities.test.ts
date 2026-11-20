@@ -36,6 +36,16 @@ const DOCUMENT = {
 };
 
 describe("league capabilities", () => {
+  it("preserves an omitted, disabled or enabled verified repair capability", () => {
+    expect(checkedCapabilities(DOCUMENT, 352490).verifiedRepairs).toBeUndefined();
+    for (const enabled of [false, true])
+      expect(
+        checkedCapabilities({ ...DOCUMENT, verified_repairs: enabled }, 352490).verifiedRepairs,
+      ).toBe(enabled);
+    expect(() => checkedCapabilities({ ...DOCUMENT, verified_repairs: "true" }, 352490)).toThrow(
+      AdviceCapabilitiesError,
+    );
+  });
   it.each(["model_opportunity_reservation_v1", "model_opportunity_reservation_v2"])(
     "accepts published chip strategy %s and refuses unknown versions",
     (version) => {

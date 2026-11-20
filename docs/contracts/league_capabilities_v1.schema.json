@@ -215,6 +215,10 @@
     "transfer_packages": {
       "description": "Optional disabled-by-default three-week package and path capability.",
       "type": "boolean"
+    },
+    "verified_repairs": {
+      "const": true,
+      "type": "boolean"
     }
   },
   "required": [

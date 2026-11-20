@@ -1,6 +1,13 @@
 import { PlanPathGroups } from "./PlanPathGroups";
 import { useComputedPlans } from "./useComputedPlans";
-import { planCatalogue, planContent, type PlanHistory } from "./planHistory";
+import {
+  addHistory,
+  planCatalogue,
+  planContent,
+  retainedPlan,
+  selectHistory,
+  type PlanHistory,
+} from "./planHistory";
 import { commandDraft } from "./planCommand";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
@@ -34,6 +41,9 @@ import { combinedCandidates, prepareCombined } from "./combinedPlan";
 import { CombinedRules } from "./CombinedRules";
 import { LLMOPT_COPY, ruleLabel } from "./copy";
 import { InfeasibilityResult } from "./InfeasibilityResult";
+import { VerifiedRuleRepairs } from "./VerifiedRuleRepairs";
+import { ruleRepairChoices, type RepairChoice } from "./ruleRepairChoices";
+import type { RepairRun } from "./repairComputation";
 import {
   EMPTY_DRAFT,
   checkedDraft,
@@ -571,6 +581,29 @@ function Workspace({
 
   const frozen = frozenForDraft(draft, reference);
   const plans = preparePlans(baseDraft(draft), held, frozen);
+  const repairCaps = useQuery({
+    queryKey: [
+      "llmopt-repair-capabilities",
+      ORIGIN,
+      forwarded === true,
+      squad.league_id,
+      squad.entry.entry_id,
+      squad.source_snapshot_id,
+    ],
+    queryFn: async ({ signal }) =>
+      (forwarded
+        ? await client.readPublicCapabilities?.(squad.league_id, squad.entry.entry_id, { signal })
+        : await client.readCapabilities?.(squad.league_id, { signal })) ?? null,
+    enabled:
+      !!ORIGIN &&
+      !!(
+        draft.hard.length ||
+        draft.min_bank ||
+        draft.keep_weeks?.length ||
+        session.confirmation?.repairSearch
+      ),
+    ...LEAGUE_READ,
+  });
   const scenarioReferenceMissing =
     draft.scenario && !matchingScenarioReference(reference, plans.window);
   const canCalculate =
@@ -653,8 +686,116 @@ function Workspace({
     delete answered.sending;
     session.save({ draft, reference, clarification, confirmation: answered });
   }, [settled, session, draft, reference, clarification]);
+  const baseState = states.base;
+  const capabilities = capabilitiesForPage(repairCaps.data, {
+    leagueId: squad.league_id,
+    season: squad.season,
+    gameweek: squad.gameweek,
+    snapshotId: squad.source_snapshot_id,
+  });
+  const oldSearch = savedRun?.repairSearch;
+  const failure =
+    baseState.phase === "failed" || baseState.phase === "unavailable" ? baseState : null;
+  const failureCode = failure?.reason ?? oldSearch?.failureCode;
+  const failureDetails = failure?.phase === "failed" ? failure.infeasibility : oldSearch?.diagnosis;
+  const diagnosedRequest =
+    failure?.request ??
+    run?.baseRequest ??
+    (oldSearch?.diagnosis && savedRun
+      ? restoreRun(
+          { draft, reference, confirmation: { ...savedRun, repairSearch: undefined } },
+          held,
+          (window) => requestFor(squad, forwarded, window),
+        )?.baseRequest
+      : undefined);
+  const analysis =
+    capabilities?.verifiedRepairs && !draft.scenario
+      ? ruleRepairChoices(draft, {
+          ...conflictContext,
+          language,
+          heldChips: capabilities.chipsByEntry?.[String(squad.entry.entry_id)] ?? null,
+          freeTransfers: squad.free_transfers_known ? squad.free_transfers : null,
+          heldClubs: new Map(
+            [...squad.starting_xi, ...squad.bench].map((player) => [player.player_id, player.team]),
+          ),
+          bankTenths: squad.bank_tenths,
+          request: diagnosedRequest ?? undefined,
+          failureCode,
+          diagnosis: failureDetails,
+        })
+      : null;
+  async function repairData() {
+    if (!deadlineOpen(deadline)) throw new Error("RUN_CONTEXT_CHANGED");
+    const [fresh, caps] = await Promise.all([
+      tree.entrySquad(squad.entry.entry_id),
+      repairCaps.refetch(),
+    ]);
+    const verified = capabilitiesForPage(caps.data, {
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      snapshotId: squad.source_snapshot_id,
+    });
+    if (
+      !mounted.current ||
+      !verified?.verifiedRepairs ||
+      caps.isError ||
+      squadBasis(fresh.payload) !== squadBasis(squad) ||
+      !deadlineOpen(deadline)
+    )
+      throw new Error("RUN_CONTEXT_CHANGED");
+    const dataId = plans.window === 1 ? await client.readDeviceDataId?.() : verified.planDataId;
+    if (!dataId || !/^[0-9a-f]{64}$/.test(dataId)) throw new Error("INPUTS_UNAVAILABLE");
+    return dataId;
+  }
+  async function beginRepair(signal: AbortSignal): Promise<RepairRun> {
+    const dataId = await repairData();
+    if (signal.aborted || !deadlineOpen(deadline)) throw new Error("RUN_CANCELLED");
+    const confirmation = session.confirmation;
+    if (confirmation?.repairSearch && confirmation.repairSearch.dataId !== dataId)
+      throw new Error("RUN_CONTEXT_CHANGED");
+    const runId = confirmation?.runId ?? crypto.randomUUID().replaceAll("-", "");
+    const failedBase =
+      confirmation?.repairSearch?.failedBase ??
+      !!(
+        confirmation?.runId &&
+        run &&
+        failure?.phase === "failed" &&
+        ((failure.reason === "PLAN_NOT_FOUND" && failure.infeasibility) ||
+          (failure.reason === "CHIP_NOT_HELD" && failure.terminalJobId))
+      );
+    const next = {
+      draft,
+      reference,
+      history: session.history,
+      confirmation: {
+        ...confirmation,
+        runId,
+        wildcardNotHeld: confirmation?.wildcardNotHeld ?? false,
+        repairSearch: {
+          dataId,
+          failedBase,
+          diagnosis: failureDetails,
+          ...(failureCode === "PLAN_NOT_FOUND" || failureCode === "CHIP_NOT_HELD"
+            ? { failureCode: failureCode as "PLAN_NOT_FOUND" | "CHIP_NOT_HELD" }
+            : {}),
+        },
+      },
+    };
+    if (!writePlanSession(context, next)) throw new Error("RUN_STORE_UNAVAILABLE");
+    session.save(next);
+    return { runId, dataId, failedBase };
+  }
+  function acceptRepair(choice: RepairChoice, plan: EntryAdvice, id: string) {
+    change(choice.draft, reference);
+    const history = selectHistory(
+      addHistory(session.history, [{ id, plan: retainedPlan(plan) }]),
+      id,
+    );
+    session.save({ draft: choice.draft, reference, history });
+  }
   const diagnosis = (state: ComputePhase) =>
-    state.phase === "failed" && state.infeasibility ? (
+    state.phase === "failed" && state.infeasibility && !capabilities?.verifiedRepairs ? (
       <InfeasibilityResult
         diagnosis={state.infeasibility}
         request={state.request}
@@ -664,7 +805,6 @@ function Workspace({
         change={applyRepair}
       />
     ) : undefined;
-  const baseState = states.base;
   useEffect(() => {
     if (!run || run !== restoredRun) return;
     let active = true;
@@ -806,7 +946,8 @@ function Workspace({
       !ORIGIN ||
       !squad.source_snapshot_id ||
       !deadlineOpen(deadline) ||
-      !canCalculate
+      !canCalculate ||
+      !!analysis
     )
       return;
     confirming.current = true;
@@ -1351,10 +1492,31 @@ function Workspace({
             {copy.scenarioReferenceRequired}
           </p>
         )}
-        {hardConflict && (
+        {hardConflict && !analysis && (
           <p role="alert" className={styles.notice}>
             {hardConflict}
           </p>
+        )}
+        {analysis && (
+          <VerifiedRuleRepairs
+            key={JSON.stringify([draft, reference, squad.source_snapshot_id, language])}
+            analysis={analysis}
+            client={client}
+            squad={squad}
+            window={plans.window}
+            forwarded={forwarded}
+            reference={reference}
+            disabled={
+              editingLocked || computing || closed || basisChanged || !deadlineOpen(deadline)
+            }
+            begin={beginRepair}
+            current={async (owner) =>
+              session.confirmation?.runId === owner.runId &&
+              (await repairData()) === owner.dataId &&
+              session.confirmation?.runId === owner.runId
+            }
+            apply={acceptRepair}
+          />
         )}
         {closed && (
           <p role="status" className={styles.notice}>
@@ -1378,6 +1540,7 @@ function Workspace({
             closed ||
             deadline === null ||
             !canCalculate ||
+            !!analysis ||
             basisChanged
           }
           onClick={() => void compute()}
@@ -1503,7 +1666,7 @@ function Workspace({
             className={styles.planGrid}
             label={copy.openingDecision}
           >
-            {(run.baseRequest || run.baseConflict) && !capacityRefused(baseState) && (
+            {(run.baseRequest || run.baseConflict) && !capacityRefused(baseState) && !analysis && (
               <PlanResult
                 title={copy[run.baseTitle]}
                 state={baseState}
@@ -1568,7 +1731,7 @@ function Workspace({
                 </PlanResult>
               )}
           </PlanPathGroups>
-          {incompleteRun && <p role="status">{copy.unfinishedPlans}</p>}
+          {incompleteRun && !analysis && <p role="status">{copy.unfinishedPlans}</p>}
           {same && (
             <p role="status" className={styles.muted}>
               {copy.same}

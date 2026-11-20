@@ -29,6 +29,13 @@ export class DevicePlanRefused extends Error {
   }
 }
 
+/** Only the primary solve of the requested week can establish this outcome. */
+export class DeviceWeekInfeasible extends DevicePlanRefused {
+  constructor() {
+    super("Infeasible", "plan");
+  }
+}
+
 /** The document with its players in the order the planner sorts its own table into. */
 export function inSolverOrder(published: DevicePlanDocument): DevicePlanDocument {
   // The planner sorts its table by id before it solves and ranks ties in that order;
@@ -193,7 +200,7 @@ export function solvePlan(
       }
     : ordered;
   const solution = solveWeek(solver, document, entry, { chip, ...extra });
-  if (solution === null) throw new DevicePlanRefused("Infeasible", "plan");
+  if (solution === null) throw new DeviceWeekInfeasible();
   const answer = answerFrom(solver, document, entry, solution, { chip });
   const sold = new Set(answer.transfers_out),
     bought = new Set(answer.transfers_in);

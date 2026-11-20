@@ -47,6 +47,7 @@ export interface StrategyCapability {
 }
 
 export interface AdviceCapabilities {
+  verifiedRepairs?: boolean;
   transferPackages?: boolean;
   planDataId?: string;
   decisionInformation?: DecisionInformation;
@@ -106,6 +107,8 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
     throw new AdviceCapabilitiesError("Invalid plan data identity.");
   if (value.transfer_packages !== undefined && typeof value.transfer_packages !== "boolean")
     throw new AdviceCapabilitiesError("Invalid transfer package capability.");
+  if (value.verified_repairs !== undefined && typeof value.verified_repairs !== "boolean")
+    throw new AdviceCapabilitiesError("Invalid verified repair capability.");
   const strategies: Record<string, StrategyCapability> = {};
   for (const [slug, row] of Object.entries(value.strategies)) {
     if (
@@ -182,6 +185,9 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   )
     throw new AdviceCapabilitiesError("Invalid decision information.");
   return {
+    ...(typeof value.verified_repairs === "boolean"
+      ? { verifiedRepairs: value.verified_repairs }
+      : {}),
     ...(value.decision_information === undefined
       ? {}
       : { decisionInformation: value.decision_information as DecisionInformation }),

@@ -876,6 +876,7 @@ def build_backend(
         available_windows=contexts.available_windows,
         transfer_packages=config.transfer_packages,
         preference_bundles=True,
+        verified_repairs=True,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -907,6 +908,7 @@ def build_backend(
             available_windows=contexts.available_windows,
             transfer_packages=config.transfer_packages,
             preference_bundles=True,
+            verified_repairs=True,
         )
         public_submit = AdviceSubmitService(
             public_reader,

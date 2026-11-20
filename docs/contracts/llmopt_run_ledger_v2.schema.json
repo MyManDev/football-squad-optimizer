@@ -59,6 +59,15 @@
           "base_cached": {
             "type": "boolean"
           },
+          "repair_candidates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "maxItems": 2,
+            "uniqueItems": true
+          },
           "requests": {
             "type": "object",
             "maxProperties": 4,

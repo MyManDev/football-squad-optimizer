@@ -10,7 +10,7 @@ import { MemberBench, MemberPitch } from "../components/MemberPitch";
 import { squadOnPitch } from "../pages/squadOnPitch";
 import type { AdvicePlanWeek, EntryAdvice, EntrySquad } from "../types";
 import { LLMOPT_COPY } from "./copy";
-import { expectedNet, plannedWeeks, weekNet } from "./planComparison";
+import { expectedNet, hasPlanLineup, plannedWeeks, weekNet } from "./planComparison";
 import styles from "./LLMOptPage.module.css";
 
 function PlanSquad({ plan, squad }: { plan: EntryAdvice; squad: EntrySquad }) {
@@ -18,19 +18,7 @@ function PlanSquad({ plan, squad }: { plan: EntryAdvice; squad: EntrySquad }) {
   const copy = LLMOPT_COPY[language];
   const titleId = useId();
   const fixtures = useFixtures();
-  const { starting_xi: eleven, bench, captain, vice_captain: vice } = plan;
-  const starters = new Set(eleven?.map(({ player_id }) => player_id));
-  if (
-    eleven?.length !== 11 ||
-    bench?.length !== 4 ||
-    new Set([...starters, ...bench.map(({ player_id }) => player_id)]).size !== 15 ||
-    !captain ||
-    !vice ||
-    captain.player_id === vice.player_id ||
-    !starters.has(captain.player_id) ||
-    !starters.has(vice.player_id)
-  )
-    return <p className={styles.muted}>{copy.lineupUnavailable}</p>;
+  if (!hasPlanLineup(plan)) return <p className={styles.muted}>{copy.lineupUnavailable}</p>;
 
   const onPitch = squadOnPitch(plan, squad);
   const codes = clubCodesFromFixtures(fixtures.data);

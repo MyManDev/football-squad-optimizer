@@ -1,5 +1,10 @@
 /** Advice transport for verified one-week device rules; credentials never enter it. */
-import type { AdviceClient, AdviceRequest, AdviceReadResult } from "../advice/adviceClient";
+import type {
+  AdviceClient,
+  AdviceRequest,
+  AdviceReadResult,
+  AdviceRequestResult,
+} from "../advice/adviceClient";
 import { checkedAdvice } from "../advice/adviceResponse";
 import { publicEntryCapabilities, type AdviceCapabilities } from "../advice/adviceCapabilities";
 import { preferencesKey } from "../advice/decisionPreferences";
@@ -11,6 +16,7 @@ import { isDevicePlanDocument, isDevicePlanEntry, type DevicePlanDocument } from
 import type { DeviceSolver } from "./useDevicePlan";
 import {
   reserveDeviceWork,
+  claimDeviceRepair,
   bindDeviceRun,
   closeDeviceWork,
   deviceWorkReceipt,
@@ -22,6 +28,25 @@ import {
   DEVICE_SOLVE_CEILING_SECONDS,
 } from "./solve/ceiling";
 
+function repairRequest(request: AdviceRequest) {
+  return (
+    request.deviceRepair !== undefined || (request.window === 1 && request.run?.stage === "repair")
+  );
+}
+
+async function sha256(value: string) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function refused(reason: string): AdviceRequestResult {
+  return {
+    kind: "unavailable",
+    reason,
+    ...(reason === "PLAN_NOT_FOUND" ? { infeasibility: { repairs: [] } } : {}),
+  };
+}
+
 export function deviceAdviceClient(
   remote: AdviceClient,
   squad: EntrySquad,
@@ -32,6 +57,7 @@ export function deviceAdviceClient(
     }) as unknown as DeviceSolver,
 ): AdviceClient {
   const memory = new Map<string, AdviceReadResult>();
+  const failures = new Map<string, string>();
   const pending = new Map<string, Promise<AdviceReadResult>>();
   const localRuns = new Set<string>();
   const closedLocalRuns = new Set<string>();
@@ -55,13 +81,10 @@ export function deviceAdviceClient(
         document.gameweek !== squad.gameweek
       )
         throw new Error("The device inputs do not match the requested capture.");
-      const bytes = new TextEncoder().encode(
-        JSON.stringify({ document, entry: squad.device_plan }),
-      );
-      const hash = await crypto.subtle.digest("SHA-256", bytes);
-      const fingerprint = Array.from(new Uint8Array(hash), (b) =>
-        b.toString(16).padStart(2, "0"),
-      ).join("");
+      const roster = new Set(document.players.map(({ id }) => id));
+      if (!block || !block.held.every((id) => roster.has(id)))
+        throw new Error("A held player is missing from the device projections.");
+      const fingerprint = await sha256(JSON.stringify({ document, entry: squad.device_plan }));
       return { document, fingerprint };
     })().catch((error) => {
       published = undefined;
@@ -112,8 +135,11 @@ export function deviceAdviceClient(
       preferencesKey(request.preferences),
       ...(request.preferenceBundle ? [bundleKey(request.preferenceBundle)] : []),
     ]);
-  const cached = (request: AdviceRequest, fingerprint: string): AdviceReadResult => {
-    const address = key(request, fingerprint);
+  const cached = (
+    request: AdviceRequest,
+    fingerprint: string,
+    address = key(request, fingerprint),
+  ): AdviceReadResult => {
     const held = memory.get(address);
     if (held) return held;
     try {
@@ -134,6 +160,14 @@ export function deviceAdviceClient(
     }
     return { kind: "not-computed" };
   };
+  function remember(address: string, result: Extract<AdviceReadResult, { kind: "advice" }>) {
+    memory.set(address, result);
+    try {
+      globalThis.sessionStorage.setItem(address, JSON.stringify(result.envelope));
+    } catch {
+      /* A persisted capacity claim still prevents another attempt after reload. */
+    }
+  }
   const abort = () => new DOMException("The device request ended.", "AbortError");
   return {
     readDeviceDataId: async () => {
@@ -147,7 +181,10 @@ export function deviceAdviceClient(
             DEVICE_SOLVE_CEILING_SECONDS) *
           1000
         : undefined,
-    readPublished: (request, options) => remote.readPublished(request, options),
+    readPublished: (request, options) =>
+      repairRequest(request)
+        ? Promise.resolve({ kind: "not-computed" })
+        : remote.readPublished(request, options),
     readJob: (id, options) => remote.readJob(id, options),
     readCapabilities: async (id, options) =>
       withLocal((await remote.readCapabilities?.(id, options)) ?? null),
@@ -164,6 +201,9 @@ export function deviceAdviceClient(
       else await remote.cancelRun?.(id);
     },
     readAdvice: async (request, options) => {
+      // Only requestAdvice can check the selection receipt and distinguish a verified replay
+      // from an ordinary cached plan at the very same computation address.
+      if (repairRequest(request)) return { kind: "not-computed" };
       if (!eligible(request)) return remote.readAdvice(request, options);
       try {
         return cached(request, (await verified()).fingerprint);
@@ -172,9 +212,12 @@ export function deviceAdviceClient(
       }
     },
     requestAdvice: async (request, options) => {
+      const repair = repairRequest(request);
+      const verify = request.deviceRepair?.verify === true;
       if (request.run && closedLocalRuns.has(request.run.run_id))
         return { kind: "unavailable", reason: "RUN_CANCELLED" };
       if (!eligible(request)) {
+        if (repair) return refused("DEVICE_INPUTS_UNAVAILABLE");
         if (request.deviceRun === true)
           return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
         if (request.run) {
@@ -195,15 +238,21 @@ export function deviceAdviceClient(
       if (request.run) localRuns.add(request.run.run_id);
       let inputs: Awaited<ReturnType<typeof verified>>;
       try {
+        if (repair) published = undefined;
         inputs = await verified();
       } catch {
         return { kind: "unavailable", reason: "DEVICE_INPUTS_UNAVAILABLE" };
       }
+      if (request.deviceRepair && request.deviceRepair.dataId !== inputs.fingerprint)
+        return refused("RUN_CONTEXT_CHANGED");
+      const binding = JSON.stringify([
+        inputs.fingerprint,
+        request.leagueId,
+        request.entryId,
+        request.window,
+      ]);
       try {
-        bindDeviceRun(
-          request.run?.run_id,
-          JSON.stringify([inputs.fingerprint, request.leagueId, request.entryId, request.window]),
-        );
+        bindDeviceRun(request.run?.run_id, binding);
       } catch (error) {
         return {
           kind: "unavailable",
@@ -211,18 +260,51 @@ export function deviceAdviceClient(
         };
       }
       const saved = cached(request, inputs.fingerprint);
-      if (saved.kind === "advice") return saved;
+      if (!repair && saved.kind === "advice") return saved;
       const address = key(request, inputs.fingerprint);
-      const runningKey = address + ":" + (request.run?.run_id ?? "");
+      const addressDigest = repair ? await sha256(address) : undefined;
+      const repairKey =
+        addressDigest && `llmopt-device-repair-v1:${request.run!.run_id}:${addressDigest}`;
+      const privateKey = repairKey && repairKey + (verify ? ":selection" : ":candidate");
+      const runningKey = privateKey || address + ":" + (request.run?.run_id ?? "");
+      let claimed = false;
       let work = pending.get(runningKey);
       if (!work) {
         work = (async (): Promise<AdviceReadResult> => {
           const document = inputs.document;
           if (options?.signal?.aborted) throw abort();
-          reserveDeviceWork(
-            request.run?.run_id,
-            JSON.stringify([inputs.fingerprint, request.leagueId, request.entryId, request.window]),
-          );
+          if (addressDigest && privateKey) {
+            if (
+              verify &&
+              cached(request, inputs.fingerprint, repairKey + ":candidate").kind !== "advice"
+            )
+              throw new DeviceWorkRefused("RUN_BASE_REQUIRED");
+            const useSaved = !verify && saved.kind === "advice";
+            claimed = claimDeviceRepair(
+              request.run!.run_id,
+              binding,
+              addressDigest,
+              verify,
+              useSaved,
+            );
+            if (!claimed) {
+              const repeated = cached(request, inputs.fingerprint, privateKey);
+              if (repeated.kind === "advice") return repeated;
+              let reason = failures.get(privateKey);
+              if (!reason) {
+                try {
+                  reason = globalThis.sessionStorage.getItem(privateKey + ":failure") ?? undefined;
+                } catch {
+                  throw new DeviceWorkRefused("RUN_STORE_UNAVAILABLE");
+                }
+              }
+              throw new DeviceWorkRefused(reason ?? "RUN_BUDGET_EXHAUSTED");
+            }
+            if (useSaved) {
+              remember(privateKey, saved);
+              return saved;
+            }
+          } else reserveDeviceWork(request.run?.run_id, binding);
           const worker = createSolver();
           const id = ++sequence;
           const answer = await new Promise<Parameters<typeof deviceAdviceEnvelope>[2]>(
@@ -239,7 +321,7 @@ export function deviceAdviceClient(
               };
               const cancelled = () => finish(abort());
               const timer = setTimeout(
-                () => finish(new Error("Device solve did not complete.")),
+                () => finish(new DeviceWorkRefused("RUN_BUDGET_EXHAUSTED")),
                 (DEVICE_LOAD_ALLOWANCE_SECONDS +
                   DEVICE_REPLY_GRACE_SECONDS +
                   DEVICE_SOLVE_CEILING_SECONDS) *
@@ -249,7 +331,13 @@ export function deviceAdviceClient(
               worker.onmessage = ({ data }) => {
                 if (data.id !== id || data.kind === "ready") return;
                 if (data.kind === "answer") finish(undefined, data.answer);
-                else finish(new Error("Device solve did not prove this selection."));
+                else if (data.kind === "refused" && data.primaryInfeasible)
+                  finish(new DeviceWorkRefused("PLAN_NOT_FOUND"));
+                else if (data.kind === "refused" && data.status === "Time limit reached")
+                  finish(new DeviceWorkRefused("RUN_BUDGET_EXHAUSTED"));
+                else if (data.kind === "failed" && data.inputsUnavailable)
+                  finish(new DeviceWorkRefused("DEVICE_INPUTS_UNAVAILABLE"));
+                else finish(new DeviceWorkRefused("DEVICE_PLAN_FAILED"));
               };
               worker.onerror = () => finish(new Error("The device solve failed."));
               worker.postMessage({
@@ -281,12 +369,8 @@ export function deviceAdviceClient(
           };
           stamp(envelope.payload);
           const result: AdviceReadResult = { kind: "advice", envelope, source: "device" };
-          memory.set(address, result);
-          try {
-            globalThis.sessionStorage?.setItem(address, JSON.stringify(envelope));
-          } catch {
-            /* Memory remains usable. */
-          }
+          if (privateKey) remember(privateKey, result);
+          if (!verify) remember(address, result);
           return result;
         })().finally(() => pending.delete(runningKey));
         pending.set(runningKey, work);
@@ -297,11 +381,17 @@ export function deviceAdviceClient(
           ? result
           : { kind: "unavailable", reason: "DEVICE_PLAN_FAILED" };
       } catch (error) {
+        const reason = error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED";
+        if (claimed && privateKey) {
+          failures.set(privateKey, reason);
+          try {
+            globalThis.sessionStorage.setItem(privateKey + ":failure", reason);
+          } catch {
+            /* The capacity claim remains durable. */
+          }
+        }
         if (options?.signal?.aborted) throw error;
-        return {
-          kind: "unavailable",
-          reason: error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED",
-        };
+        return refused(reason);
       }
     },
   };

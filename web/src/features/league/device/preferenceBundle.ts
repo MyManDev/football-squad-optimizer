@@ -12,7 +12,7 @@ import {
 } from "../advice/preferenceBundle";
 import { oneWeekPreferences } from "./preferences";
 import { solvePriorityPreferences } from "./priority";
-import { DevicePlanRefused } from "./solve/week";
+import { DevicePlanRefused, DeviceWeekInfeasible } from "./solve/week";
 import type { LpSolver } from "./lp/problem";
 import type {
   DeviceChip,
@@ -85,7 +85,7 @@ export function solvePreferenceBundle(
       };
     } catch (error) {
       if (!(error instanceof DevicePlanRefused)) throw error;
-      if (error.status === "Infeasible")
+      if (error instanceof DeviceWeekInfeasible)
         return { status: "failed", answer: null, error_code: "PLAN_NOT_FOUND" };
       if (error.status !== "Time limit reached") throw error;
       exhausted = true;

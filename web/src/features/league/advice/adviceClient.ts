@@ -33,7 +33,13 @@ export interface AdviceRequest {
   deviceAlternatives?: boolean;
   /** A run with an unsupported rule remains entirely on the service. */
   deviceRun?: boolean;
-  run?: { contract_version: "llmopt_run_v1"; run_id: string; stage: "base" | "followup" };
+  /** Browser-only repair witness or selection, pinned to the verified device inputs. */
+  deviceRepair?: { dataId: string; verify?: boolean };
+  run?: {
+    contract_version: "llmopt_run_v1";
+    run_id: string;
+    stage: "base" | "followup" | "repair";
+  };
   /** Fetch and pin this public team's inputs only when computation is requested. */
   publicEntry?: boolean;
   preferences?: DecisionPreferences;
@@ -69,7 +75,7 @@ export type AdviceRequestResult =
   /** `status` is the job's word when the answer says it: a press can join a running job. */
   | { kind: "job"; jobId: string; status?: "queued" | "running" }
   /** `reason` is a service code when a configured service refused or could not be reached. */
-  | { kind: "unavailable"; reason?: string | null };
+  | { kind: "unavailable"; reason?: string | null; infeasibility?: PlanInfeasibility };
 
 /** One click's identity: sent as `Idempotency-Key`, the same for every retry of that click. */
 export interface AdviceRequestOptions extends RequestOptions {
