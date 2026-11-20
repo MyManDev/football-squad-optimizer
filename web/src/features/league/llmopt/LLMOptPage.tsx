@@ -797,7 +797,7 @@ function Workspace({
     session.save({ draft: choice.draft, reference, history });
   }
   const diagnosis = (state: ComputePhase) =>
-    state.phase === "failed" && state.infeasibility && !capabilities?.verifiedRepairs ? (
+    state.phase === "failed" && state.infeasibility && !(vNext && capabilities?.verifiedRepairs) ? (
       <InfeasibilityResult
         diagnosis={state.infeasibility}
         request={state.request}
