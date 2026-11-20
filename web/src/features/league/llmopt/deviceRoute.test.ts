@@ -73,6 +73,38 @@ describe("the confirmed workflow shared with the acceptance workload", () => {
   const capabilities = { ...publicEntryCapabilities(squad), preferences: true };
   const runId = confirmation.runId;
 
+  it.each([
+    [3, true, false, false, false],
+    [3, true, true, false, false],
+    [3, true, false, true, true],
+    [3, true, true, true, true],
+    [3, false, false, true, false],
+    [3, false, true, true, false],
+    [1, true, true, true, false],
+  ] as const)(
+    "prepares the %i-week path mode with master=%s, packages=%s and paths=%s",
+    async (window, master, packages, paths, expected) => {
+      const requestDraft = { ...draft, window };
+      const run = await prepareConfirmedRun(
+        { draft: requestDraft, held, plans: preparePlans(requestDraft, held) },
+        squad,
+        false,
+        {
+          ...capabilities,
+          strategies: { "saf-puan": { windows: [1, 3], requiresRival: false } },
+          ...(master ? { llmoptVNext: true } : {}),
+          ...(packages ? { transferPackages: true } : {}),
+          ...(paths ? { threeWeekPaths: true } : {}),
+        },
+        runId,
+        undefined,
+      );
+      expect(run?.baseRequest?.window).toBe(window);
+      expect(run?.inputs.paths3w).toBe(expected ? true : undefined);
+      expect(run?.baseRequest?.run?.run_id).toBe(master ? runId : undefined);
+    },
+  );
+
   it("uses the current master and device grant together when choosing a one-week menu", async () => {
     const localSupport = { ...capabilities, devicePreferenceBundles: true as const };
     const bind = vi.fn(async () => true);

@@ -49,18 +49,31 @@ describe("league capabilities", () => {
       AdviceCapabilitiesError,
     );
   });
-  it.each([
-    [undefined, true, undefined],
-    [false, true, undefined],
-    [true, undefined, undefined],
-    [true, false, undefined],
-    [true, true, true],
-  ])("exposes paths only with both release %s and packages %s", (release, packages, expected) => {
-    const caps = checkedCapabilities(
-      { ...DOCUMENT, llmopt_vnext: release, transfer_packages: packages },
-      DOCUMENT.league_id,
-    );
-    expect(caps.transferPackages).toBe(expected);
+  it.each([undefined, false, true])(
+    "decodes path and package grants independently under release %s",
+    (release) => {
+      for (const packages of [undefined, false, true]) {
+        for (const paths of [undefined, false, true]) {
+          const caps = checkedCapabilities(
+            {
+              ...DOCUMENT,
+              llmopt_vnext: release,
+              transfer_packages: packages,
+              three_week_paths: paths,
+            },
+            DOCUMENT.league_id,
+          );
+          expect(caps.transferPackages).toBe(release && packages ? true : undefined);
+          expect(caps.threeWeekPaths).toBe(release && paths ? true : undefined);
+          expect(caps.verifiedRepairs).toBeUndefined();
+        }
+      }
+    },
+  );
+  it("refuses a malformed path grant", () => {
+    expect(() =>
+      checkedCapabilities({ ...DOCUMENT, three_week_paths: "1" }, DOCUMENT.league_id),
+    ).toThrow(AdviceCapabilitiesError);
   });
   it.each([undefined, false, true])(
     "advertises grouped preferences only with the release setting %s",

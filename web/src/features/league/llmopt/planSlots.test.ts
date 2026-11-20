@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { preparePlans, type PlanDraft } from "./intent";
+import { visibleAutomatic } from "./planResults";
 import { baseDraft, prepareRun, requestFor } from "./planRun";
 import { ALTERNATIVE_SLOTS, followupRequests, restoredSlot } from "./planSlots";
 import { ALTERNATIVE_COUNT } from "./planSession";
@@ -59,6 +60,54 @@ describe("restoredSlot", () => {
 
 describe("followupRequests", () => {
   const plan = mockEntryAdviceEnvelope(35249001, "saf-puan", 1).payload;
+
+  it.each(["hold", "frozen"] as const)(
+    "keeps the ordinary roll and restores it when a week-two %s blocks the delayed buy",
+    (condition) => {
+      const draft: PlanDraft = {
+        window: 3,
+        hard: condition === "hold" ? [{ kind: "hold_transfers", week: 2 }] : [],
+        soft: [],
+        ...(condition === "frozen" ? { keep_weeks: [2] } : {}),
+      };
+      const frozenWeeks =
+        condition === "frozen"
+          ? [{ week: 2 as const, transfers_in: [], transfers_out: [], chip: null }]
+          : [];
+      const inputs = {
+        draft,
+        held,
+        frozenWeeks,
+        request: requestFor(squad, false, 3),
+        plans: preparePlans(baseDraft(draft), held, frozenWeeks),
+        wildcardNotHeld: false,
+      };
+      const envelope = mockEntryAdviceEnvelope(35249001, "saf-puan", 3);
+      const main = envelope.payload;
+      main.bank_after_tenths = 20;
+      main.plan_weeks![0]!.free_transfers_after = 1;
+      const plain = followupRequests(prepareRun(inputs), main);
+      const enabled = prepareRun({ ...inputs, paths3w: true });
+      const alternatives = followupRequests(enabled, main);
+      expect(plain.map((row) => row?.alternative.kind)).toEqual(["roll", "bank"]);
+      expect(alternatives).toEqual(plain);
+      const roll = alternatives[0]!.request;
+      expect(restoredSlot(enabled, 0, { kind: "roll" })).toEqual(roll);
+      const answer = structuredClone(envelope);
+      Object.assign(answer.payload.plan_weeks![0]!, {
+        transfers_in: [],
+        transfers_out: [],
+        free_transfers_after: 2,
+      });
+      const state = {
+        phase: "done",
+        request: roll,
+        envelope: answer,
+        source: "api-cache",
+      } as const;
+      expect(visibleAutomatic(state, main, [], true)?.kind).toBe("roll");
+    },
+  );
 
   it("starts every priced plan once the base is in", () => {
     const priced = run({

@@ -177,7 +177,8 @@ async function replay(cache) {
     (caps.verifiedRepairs === true) !== enabled ||
     (caps.preferenceBundles === true) !== enabled ||
     (caps.devicePreferenceBundles === true) !== enabled ||
-    caps.transferPackages === true
+    caps.transferPackages === true ||
+    caps.threeWeekPaths === true
   )
     throw new Error("Authoritative release capability mismatch.");
   const before = deviceWorkReceipt(runId);
@@ -198,6 +199,7 @@ async function replay(cache) {
   const receipt = deviceWorkReceipt(runId);
   if (
     device !== (enabled && window === 1) ||
+    run.inputs.paths3w !== undefined ||
     !!run.baseRequest.run !== enabled ||
     !!execution !== enabled ||
     (device ? !receipt || receipt.closed || receipt.units !== (before?.units ?? 0) : !!receipt) ||

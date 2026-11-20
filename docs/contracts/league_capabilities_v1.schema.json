@@ -193,6 +193,10 @@
       },
       "type": "object"
     },
+    "three_week_paths": {
+      "description": "Whether three-week path comparisons are enabled.",
+      "type": "boolean"
+    },
     "top100": {
       "additionalProperties": false,
       "properties": {
@@ -216,7 +220,7 @@
       "type": "object"
     },
     "transfer_packages": {
-      "description": "Optional disabled-by-default three-week package and path capability.",
+      "description": "Whether transfer-package search is enabled.",
       "type": "boolean"
     },
     "verified_repairs": {

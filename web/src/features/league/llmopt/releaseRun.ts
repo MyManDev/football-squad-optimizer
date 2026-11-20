@@ -64,7 +64,9 @@ export async function prepareConfirmedRun(
     request,
     wildcardNotHeld,
     compareOnly: reference?.compareOnly === true,
-    ...(capabilities.transferPackages && plans.window === 3 ? { paths3w: true as const } : {}),
+    ...(capabilities.threeWeekPaths === true && plans.window === 3
+      ? { paths3w: true as const }
+      : {}),
     bundleMode:
       (capabilities.preferenceBundles === true || localBundle) &&
       draft.soft.length > 0 &&

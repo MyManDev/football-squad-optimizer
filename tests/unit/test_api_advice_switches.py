@@ -529,20 +529,26 @@ def test_the_committed_capabilities_schema_matches_its_generator() -> None:
 
 
 @pytest.mark.parametrize("enabled", [False, True])
-def test_package_capability_follows_the_release_and_passes_the_committed_schema(tmp_path, enabled):
+@pytest.mark.parametrize("packages", [False, True])
+@pytest.mark.parametrize("paths", [False, True])
+def test_package_and_path_capabilities_are_independent_under_the_release(
+    tmp_path, enabled, packages, paths
+):
     _publish_members(tmp_path / "site")
     reader = AdviceReadStore(
         FileLeagueDirectory(tmp_path / "site"),
         FileAdviceCache(tmp_path / "cache"),
         _Context(),
         {"saf-puan": False},
-        transfer_packages=True,
+        transfer_packages=packages,
+        three_week_paths=paths,
         llmopt_vnext=enabled,
     )
     document = reader.league_capabilities(LEAGUE_ID)
-    if enabled:
-        assert document["transfer_packages"] is True
-    else:
-        assert "transfer_packages" not in document
+    for field, active in (("transfer_packages", packages), ("three_week_paths", paths)):
+        if enabled and active:
+            assert document[field] is True
+        else:
+            assert field not in document
     committed = json.loads(LEAGUE_CAPABILITIES_SCHEMA_PATH.read_text(encoding="utf-8"))
     jsonschema.validate(document, committed)

@@ -175,6 +175,7 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
         {"saf-puan": False},
         capabilities=menu_capabilities(),
         transfer_packages=config.enabled_packages,
+        three_week_paths=config.enabled_three_week_paths,
         preference_bundles=True,
         verified_repairs=config.llmopt_vnext,
         llmopt_vnext=config.llmopt_vnext,

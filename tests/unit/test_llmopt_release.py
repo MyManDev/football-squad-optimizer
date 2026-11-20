@@ -47,7 +47,8 @@ def test_both_capabilities_report_the_server_setting_and_use_the_same_ordinary_k
             assert response.status_code == 200, response.text
             for key in ("llmopt_vnext", "preference_bundles", "verified_repairs"):
                 assert (key in response.json()) is active
-            assert response.json().get("transfer_packages") is None
+            assert "transfer_packages" not in response.json()
+            assert "three_week_paths" not in response.json()
     args = dict(
         league_id=world.LEAGUE_ID,
         entry_id=world.ENTRY_ID,
