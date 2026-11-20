@@ -24,6 +24,12 @@
   comparisons, forty equal model and published objectives, forty identical transfer
   decisions with a keep-first-held-player constraint; no server jobs or live measurements.
 
+- 2026-11-20. Seven one-week hard-rule families covered all 20 frozen member-weeks.
+  The server and device returned the same score and transfers in 130 feasible
+  comparisons. Both proved the other ten infeasible. All 220 device alternatives
+  satisfied the submitted rules. [Comparison](research/llmopt_phase4_rule_families.md),
+  [record](research/llmopt_phase4_rule_families.json). #1468.
+
 - 2026-11-19: [LLMOPT one preference job](research/llmopt_phase3_jobs.md),
   [record](research/llmopt_phase3_jobs.json): twenty frozen member-weeks, both windows
   and both modes, 80 real API/worker run records. Maximum two server jobs, every
