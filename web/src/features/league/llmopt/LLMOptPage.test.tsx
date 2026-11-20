@@ -164,11 +164,31 @@ function open(
   language: "en" | "tr" = "en",
   intentSource: IntentSource | null = model,
   calendar: typeof CALENDAR | null = CALENDAR,
+  previousRelease?: boolean,
 ) {
   // The fixtures are set, not read, so the cache keeps them while no page observes them.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
   client.setQueryData(FIXTURES_QUERY.queryKey, calendar);
+  if (previousRelease !== undefined) {
+    client.setQueryData(
+      [
+        "llmopt-release",
+        ORIGIN,
+        false,
+        squad.league_id,
+        squad.entry.entry_id,
+        squad.source_snapshot_id,
+      ],
+      {
+        llmoptVNext: previousRelease,
+        leagueId: squad.league_id,
+        season: squad.season,
+        gameweek: squad.gameweek,
+        captureSnapshotId: squad.source_snapshot_id,
+      },
+    );
+  }
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider initialLanguage={language}>
@@ -678,7 +698,7 @@ describe("a reload keeps the saved session", () => {
     expect(await screen.findByText(outsiderRule, { exact: true })).toBeVisible();
   });
 
-  async function reloadConfirmed(confirmation: Record<string, unknown>) {
+  async function reloadConfirmed(confirmation: Record<string, unknown>, previousRelease?: boolean) {
     open();
     await ready();
     await addRule("hold_transfers");
@@ -689,7 +709,7 @@ describe("a reload keeps the saved session", () => {
       JSON.stringify({ ...session, confirmation: { runId: "a".repeat(32), ...confirmation } }),
     );
     jobs.length = 0;
-    open();
+    open("en", model, CALENDAR, previousRelease);
     await ready();
     return jobs[0]!;
   }
@@ -750,7 +770,7 @@ describe("a reload keeps the saved session", () => {
 
   it("reads an enabled session after rollback without restarting its pending work", async () => {
     releaseEnabled = false;
-    const base = await reloadConfirmed({ wildcardNotHeld: false, sending: true });
+    const base = await reloadConfirmed({ wildcardNotHeld: false, sending: true }, true);
     await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
     expect(base.resume).toHaveBeenCalledTimes(1);
     expect(base.compute).not.toHaveBeenCalled();

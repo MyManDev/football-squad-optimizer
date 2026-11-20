@@ -581,9 +581,9 @@ function Workspace({
 
   const frozen = frozenForDraft(draft, reference);
   const plans = preparePlans(baseDraft(draft), held, frozen);
-  const repairCaps = useQuery({
+  const releaseCapabilities = useQuery({
     queryKey: [
-      "llmopt-repair-capabilities",
+      "llmopt-release",
       ORIGIN,
       forwarded === true,
       squad.league_id,
@@ -596,6 +596,7 @@ function Workspace({
         : await client.readCapabilities?.(squad.league_id, { signal })) ?? null,
     enabled: !!ORIGIN,
     ...LEAGUE_READ,
+    refetchOnMount: "always",
   });
   const scenarioReferenceMissing =
     draft.scenario && !matchingScenarioReference(reference, plans.window);
@@ -680,14 +681,19 @@ function Workspace({
     session.save({ draft, reference, clarification, confirmation: answered });
   }, [settled, session, draft, reference, clarification]);
   const baseState = states.base;
-  const capabilities = capabilitiesForPage(repairCaps.data, {
+  const capabilities = capabilitiesForPage(releaseCapabilities.data, {
     leagueId: squad.league_id,
     season: squad.season,
     gameweek: squad.gameweek,
     snapshotId: squad.source_snapshot_id,
   });
-  const vNext = !repairCaps.isError && capabilities?.llmoptVNext === true;
-  const canContinue = !run?.inputs.request.run || vNext;
+  const currentModeKnown =
+    releaseCapabilities.isFetchedAfterMount && !releaseCapabilities.isError && !!capabilities;
+  const vNext = currentModeKnown && capabilities.llmoptVNext === true;
+  const canContinue =
+    run === restoredRun
+      ? currentModeKnown && vNext === !!run?.inputs.request.run
+      : !run?.inputs.request.run || vNext;
   const oldSearch = savedRun?.repairSearch;
   const failure =
     baseState.phase === "failed" || baseState.phase === "unavailable" ? baseState : null;
@@ -723,7 +729,7 @@ function Workspace({
     if (!deadlineOpen(deadline)) throw new Error("RUN_CONTEXT_CHANGED");
     const [fresh, caps] = await Promise.all([
       tree.entrySquad(squad.entry.entry_id),
-      repairCaps.refetch(),
+      releaseCapabilities.refetch(),
     ]);
     const verified = capabilitiesForPage(caps.data, {
       leagueId: squad.league_id,
@@ -802,16 +808,14 @@ function Workspace({
       />
     ) : undefined;
   useEffect(() => {
-    if (!run || run !== restoredRun || (!!ORIGIN && repairCaps.isPending)) return;
+    if (!run || run !== restoredRun || (!!ORIGIN && !releaseCapabilities.isFetchedAfterMount))
+      return;
     let active = true;
     // A reload can land before a started job's id was stored, which leaves nothing to resume.
     // Such a slot asks again while the deadline is open: the service answers a computed request
     // from its cache and joins a request still running to its open job.
     const askAgain =
-      canContinue &&
-      (!vNext || !!run.inputs.request.run) &&
-      restored?.confirmation?.sending === true &&
-      deadlineOpen(deadline);
+      canContinue && restored?.confirmation?.sending === true && deadlineOpen(deadline);
     const restore = (request: PlanRequest, job: JobControls) => {
       if (job.resume?.(request)) return;
       if (askAgain) job.compute(request);
@@ -842,9 +846,8 @@ function Workspace({
     savedReplayProof,
     deadline,
     controls,
-    repairCaps.isPending,
+    releaseCapabilities.isFetchedAfterMount,
     canContinue,
-    vNext,
   ]);
 
   useEffect(() => {
@@ -995,7 +998,7 @@ function Workspace({
     try {
       const [fresh, capabilities] = await Promise.all([
         tree.entrySquad(squad.entry.entry_id),
-        repairCaps.refetch().then((result) => (result.isError ? null : result.data)),
+        releaseCapabilities.refetch().then((result) => (result.isError ? null : result.data)),
       ]);
       if (!mounted.current) return;
       if (!capabilities?.preferences) {
