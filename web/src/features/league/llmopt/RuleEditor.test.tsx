@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +14,36 @@ const PLAYERS: CatalogPlayer[] = [
 ];
 
 afterEach(cleanup);
+
+it.each(["en", "tr"] as const)(
+  "distinguishes an unset priority from normal when editing or adding a preference in %s",
+  async (language) => {
+    const copy = LLMOPT_COPY[language];
+    const change = vi.fn();
+    render(
+      <RuleEditor
+        draft={{ hard: [], soft: [{ kind: "no_hits" }] }}
+        players={PLAYERS}
+        copy={copy}
+        priorities
+        disabled={false}
+        change={change}
+      />,
+    );
+    await userEvent.selectOptions(screen.getByLabelText(copy.strength), "soft");
+    const saved = screen.getByRole("combobox", {
+      name: `${copy.priority} · ${copy.rules.no_hits}`,
+    });
+    const added = screen.getByRole("combobox", { name: copy.priority });
+    for (const select of [saved, added]) {
+      expect(select).toHaveValue("");
+      expect(within(select).getByRole("option", { name: copy.noPriority })).toHaveValue("");
+      expect(within(select).getByRole("option", { name: copy.priorityLevels[2] })).toHaveValue("2");
+    }
+    await userEvent.selectOptions(saved, "2");
+    expect(change).toHaveBeenCalledWith({ hard: [], soft: [{ kind: "no_hits", priority: 2 }] });
+  },
+);
 
 describe("the club rule reads as an exact count", () => {
   it.each([

@@ -115,7 +115,53 @@
             "type": [
               "object",
               "null"
-            ]
+            ],
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "finished": {
+                "type": "boolean"
+              },
+              "calls": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cp_used": {
+                "type": "number",
+                "minimum": 0
+              },
+              "native_reserved": {
+                "type": "number",
+                "minimum": 0
+              },
+              "pending": {
+                "type": "number",
+                "minimum": 0
+              },
+              "unconfirmed": {
+                "type": "number",
+                "minimum": 0
+              },
+              "charged": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "dependentRequired": {
+              "attempt": [
+                "finished",
+                "calls",
+                "cp_used",
+                "native_reserved",
+                "pending",
+                "unconfirmed"
+              ],
+              "charged": [
+                "attempt"
+              ]
+            }
           }
         }
       }

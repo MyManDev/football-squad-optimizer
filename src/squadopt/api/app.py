@@ -550,7 +550,7 @@ def create_app(
         chip: Annotated[str | None, Query()] = None,
         model: Annotated[str, Query()] = "current",
         preferences: Annotated[str | None, Query(max_length=3000)] = None,
-        preference_bundle: Annotated[str | None, Query(max_length=3000)] = None,
+        preference_bundle: Annotated[str | None, Query(max_length=ADVICE_BODY_MAX_BYTES)] = None,
     ) -> Response:
         if league_id == 0 and not request.url.path.startswith("/api/v1/public/"):
             return _contract_error(422, "VALIDATION_FAILED", "A league id must be positive.")
