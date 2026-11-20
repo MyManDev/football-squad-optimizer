@@ -387,6 +387,49 @@
         }
       }
     },
+    "priorityMain": {
+      "type": "boolean",
+      "const": true
+    },
+    "priorityReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "squad",
+        "startingXi",
+        "captain",
+        "proved"
+      ],
+      "properties": {
+        "squad": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 15
+        },
+        "startingXi": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 11
+        },
+        "captain": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "proved": {
+          "type": "boolean"
+        }
+      }
+    },
     "preferenceBundle": {
       "type": "object",
       "properties": {
@@ -1855,6 +1898,14 @@
         },
         "budget_exhausted": {
           "type": "boolean"
+        },
+        "unsearched": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
         }
       },
       "required": [

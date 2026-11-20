@@ -70,6 +70,33 @@ describe("createPlanSessionStore", () => {
     }
   });
 
+  it("keeps an identity-free plan out of history when storage is blocked", () => {
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    try {
+      history.replaceState({ usr: { tab: "squad" } }, "");
+      const session = { draft, confirmation: { wildcardNotHeld: false } };
+      expect(writePlanSession(context, session)).toBe(false);
+      expect(history.state).toEqual({ usr: { tab: "squad" } });
+      expect(readPlanSession(context)).toBeNull();
+    } finally {
+      write.mockRestore();
+    }
+  });
+
+  it("clears a reselected member's history fallback when storage recovers", () => {
+    const confirmation = { runId: "a".repeat(32), wildcardNotHeld: false };
+    const { key, ...metadata } = context;
+    const saved = { key, raw: JSON.stringify({ ...metadata, draft, confirmation }) };
+    history.replaceState({ usr: { tab: "squad", llmoptSession: saved } }, "");
+    expect(readPlanSession(context)).toMatchObject({ confirmation });
+    expect(readPlanSession({ ...context, key: "another-member" })).toBeNull();
+    expect(writePlanSession(context, { draft })).toBe(true);
+    expect(history.state.usr).toEqual({ tab: "squad" });
+    expect(readPlanSession(context)).not.toHaveProperty("confirmation");
+  });
+
   it("saves the whole session and keeps the run's confirmation beside it", () => {
     const store = createPlanSessionStore(context);
     expect(store.confirmation).toBeUndefined();

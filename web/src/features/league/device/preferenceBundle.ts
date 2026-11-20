@@ -12,7 +12,8 @@ import {
 } from "../advice/preferenceBundle";
 import { oneWeekPreferences } from "./preferences";
 import { solvePriorityPreferences } from "./priority";
-import { DevicePlanRefused } from "./solve/week";
+import type { DevicePriorityReference } from "./priorityWitness";
+import { DevicePlanRefused, solvePlan } from "./solve/week";
 import type { LpSolver } from "./lp/problem";
 import type {
   DeviceChip,
@@ -47,6 +48,7 @@ export function solvePreferenceBundle(
     preferences?: DecisionPreferences;
     chip: DeviceChip | null;
     bundle: PreferenceBundle;
+    priorityReference?: DevicePriorityReference;
   },
   plain: (preferences: DecisionPreferences, chip: DeviceChip | null) => DevicePlanAnswer,
   now: () => number,
@@ -54,7 +56,20 @@ export function solvePreferenceBundle(
   const started = now();
   const hard = checkedPreferences(input.preferences);
   const bundle = oneWeekBundle(input.bundle, hard);
-  const baseline = plain(hard, input.chip);
+  if (bundle.program && !input.priorityReference)
+    throw new DevicePlanRefused("missing confirmed main", "plan");
+  const baseline =
+    bundle.program && input.priorityReference
+      ? solvePlan(
+          solver,
+          input.document,
+          input.entry,
+          now,
+          input.chip,
+          { preferences: hard },
+          input.priorityReference,
+        )
+      : plain(hard, input.chip);
   const net = (answer: DevicePlanAnswer) => answer.expected_own_points - answer.transfer_hit_points;
   const reference = net(baseline);
   const cache = new Map<string, DevicePlanAnswer>([

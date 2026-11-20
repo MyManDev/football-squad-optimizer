@@ -124,6 +124,7 @@ export type ComputePhase =
       request: AdviceRequest;
       envelope: LeagueViewEnvelope<EntryAdvice>;
       source: AdviceSource;
+      deviceAlternativesPending?: boolean;
     }
   | {
       phase: "unavailable";
@@ -159,6 +160,8 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
     left.run?.stage === right.run?.stage &&
     (left.deviceAlternatives ?? false) === (right.deviceAlternatives ?? false) &&
     (left.deviceRun ?? false) === (right.deviceRun ?? false) &&
+    left.priorityMain === right.priorityMain &&
+    JSON.stringify(left.shownDeviceMain) === JSON.stringify(right.shownDeviceMain) &&
     left.leagueId === right.leagueId &&
     left.entryId === right.entryId &&
     left.strategy === right.strategy &&
@@ -286,8 +289,9 @@ export function useAdviceJob(
       ) => withRequestDeadline(operation, { signal, timeoutMs });
       let readAfterMissingJob = false;
       const alive = () => generation.current === run && !signal.aborted;
+      let publishedPlan = false;
       const fail = (error?: unknown, reason?: string, infeasibility?: PlanInfeasibility) => {
-        if (!alive()) return;
+        if (!alive() || publishedPlan) return;
         const stated = failure(error);
         setState({
           phase: "failed",
@@ -314,7 +318,28 @@ export function useAdviceJob(
             // One key for this click, whatever the transport retries underneath it.
             outcome = await call(
               (signal) =>
-                client.requestAdvice(request, { signal, idempotencyKey: newIdempotencyKey() }),
+                client.requestAdvice(request, {
+                  signal,
+                  idempotencyKey: newIdempotencyKey(),
+                  onPlan: (plan) => {
+                    if (!alive() || signal.aborted) return;
+                    checkedAdvice(plan.envelope, request);
+                    if (
+                      (request.publicEntry || requireMatchingSnapshot) &&
+                      expectedSnapshotId != null &&
+                      plan.envelope.payload.source_snapshot_id !== expectedSnapshotId
+                    )
+                      return;
+                    publishedPlan = true;
+                    setState({
+                      phase: "done",
+                      request,
+                      envelope: plan.envelope,
+                      source: plan.source,
+                      deviceAlternativesPending: true,
+                    });
+                  },
+                }),
               client.localRequestAllowanceMs?.(request),
             );
             if (outcome.kind === "advice") checkedAdvice(outcome.envelope, request);
@@ -341,6 +366,7 @@ export function useAdviceJob(
             return;
           }
           if (outcome.kind === "unavailable") {
+            if (publishedPlan) return;
             setState({ phase: "unavailable", request, reason: outcome.reason ?? null });
             return;
           }
@@ -506,7 +532,15 @@ export function useAdviceJob(
         })
         .finally(() => {
           if (active.current === controller) active.current = null;
-          if (generation.current === run) submitting.current = null;
+          if (generation.current === run) {
+            submitting.current = null;
+            if (publishedPlan)
+              setState((current) =>
+                current.phase === "done" && current.deviceAlternativesPending
+                  ? { ...current, deviceAlternativesPending: false }
+                  : current,
+              );
+          }
           if (readAfterMissingJob && generation.current === run) readCached(request);
         });
     },
