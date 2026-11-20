@@ -1,21 +1,22 @@
 {
   "contract_version": "llmopt_phase3_jobs_v1",
-  "producer_repository_commit": "89e380b9d30e481324dce90a51a168038593b3e5",
+  "producer_repository_commit": "8a8da017d7068e1682117b04ac64215358355d07",
+  "llmopt_vnext": true,
   "source_sha256": {
-    "docs/research/llmopt_phase3/measure.py": "0ff5306dce3f81fcde4144d32d91690050fbd2bb61c4e11c8f8cc320930bd71e",
-    "src/squadopt/api/app.py": "134bec71de052c666a14188acab37e975f5d2b7a55b6aafb5d260d55371e9b03",
-    "src/squadopt/contracts/preference_bundle.py": "7317125adeb0e6a7811bfd536fb37b12015ec44b8da834777771db67246fca92",
+    "docs/research/llmopt_phase3/measure.py": "b393023da254199103dcd90eebb87f135adb44cf7b25cb27d1271407860dce52",
+    "src/squadopt/api/app.py": "223eddca09823e5c0a8d5f91e83dd2d171ff8ffdb7b472a58e9b334e4384a77b",
+    "src/squadopt/contracts/preference_bundle.py": "a7efbe70b8a4e331f85a85b7012fcdf809f1efbbc954b421888ac1397ffde804",
     "src/squadopt/contracts/priority_preferences.py": "c17c430febfc9a9e22ecbde4afd7d1e858b78460590ec85c7689be857f673e2b",
-    "src/squadopt/platform/advice_read.py": "e2b5777660d5cedf187406356bcbbdeb12614c77f8983af73a830f5cf4015c08",
-    "src/squadopt/platform/advice_submit.py": "fe61c06d4c726681a519be389c3f86b9de43c9a20d6cc8459b9b6f0f6221b843",
-    "src/squadopt/platform/advice_runs.py": "5d9b221358c26bf6f84ca3df3f467715e4ee6d41af92a229788178549fff7af4",
-    "src/squadopt/platform/advice_worker.py": "82627b8ab1227ab5f80c5665a5963a614363911e07ce2858b2ec5e22bb1d4a51",
-    "src/squadopt/platform/advice_preference_bundle.py": "532140ba0ac2570b8c8bdfb7264cb8c7f832a0218ae56d907856cbaabf117df1",
+    "src/squadopt/platform/advice_read.py": "acae582b1cd028eebc707cd3475a004c2186657be1619967a20b5898ba10b809",
+    "src/squadopt/platform/advice_submit.py": "62d02889abadc4fa848c49189b1e666bfdea233e75ff957bad89a34428407194",
+    "src/squadopt/platform/advice_runs.py": "0c7519e70ba25abdd2706d0ec87eab2b83d1ab465dabf0d604bb3211fa509700",
+    "src/squadopt/platform/advice_worker.py": "1538a553b2ab602e3cb7ad12e9a7bdae2246eae58fb0f48bc4a67a55fa56bbcb",
+    "src/squadopt/platform/advice_preference_bundle.py": "8f2e13eecc53f573c67c89c7e88aaee4d401d214bc7f883541433ce012d47094",
     "src/squadopt/application/advice_menu.py": "6dd8d1777fa011f13af0ad5e8dcd07c6b81cff5c0bd47eeb82800bcf39e955c5",
     "src/squadopt/application/advice_chip_strategy.py": "827694d7faf20fac4283be762bbb1b3414e43b11e148a7e5f714662c13650a64",
-    "src/squadopt/live/transfers.py": "ef44ac4aefd72ea42696050d9d45c3c6cc681989930a3e80c57b4cd1ba2f072e",
-    "src/squadopt/planning/optimizer.py": "0bd2be3fe61abde34f74a57deae527db7d95824147a1f8bafa6bd95d4523418a",
-    "src/squadopt/optimization/work_budget.py": "739db997f8bc89a266785ffb10fea7fc103d27dc6679fd4cc7ea6eb53a3f5f8e"
+    "src/squadopt/live/transfers.py": "d94d1dbb15b99adf5256244ed4ed183f558edb3b2e36d530fc50198ffbd78793",
+    "src/squadopt/planning/optimizer.py": "83b202fbb7e0a01377b235cc170ee7f4617fdbab4b60bd2d8c8db38b5d2e0c38",
+    "src/squadopt/optimization/work_budget.py": "f6ae8220bfc48846a93754a320a86b95ca1884564dac48ae60ab6cb3873a9c1d"
   },
   "frozen_manifest_sha256": "fdbd303a04679d1b866f366c56b72cf0fe056b6e9f52c2ed752f0ae88d0032fc",
   "member_weeks": 20,
@@ -40,8 +41,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-2622d66aab38e42e-1",
-        "advice-667a8854c147fece-1"
+        "advice-2f104456b21dca51-1",
+        "advice-79bb3d0ced785b6c-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -50,13 +51,17 @@
       "receipts": [
         {
           "calls": 3,
-          "cp_used": 0.9050621264826666,
+          "cp_used": 0.9050621264826667,
           "native_reserved": 0.0
         },
         {
+          "attempt": 1,
           "calls": 9,
-          "cp_used": 2.783827342283613,
-          "native_reserved": 0.0
+          "cp_used": 2.7838273422836135,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -110,16 +115,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-cfef6fb04275f1f4-1"
+        "advice-9f27225f9f8deed7-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.7360262595826548,
-          "native_reserved": 0.0
+          "cp_used": 1.3855283201679724,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -150,7 +159,8 @@
               "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 1.316
+            "total_cost": 1.316,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -169,8 +179,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-34387c8f1e035dd6-1",
-        "advice-5fddde5427e7603b-1"
+        "advice-c4726594ceecbf37-1",
+        "advice-ec9fe3167681146b-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -179,13 +189,17 @@
       "receipts": [
         {
           "calls": 4,
-          "cp_used": 4.162897981251791,
+          "cp_used": 4.16289798125179,
           "native_reserved": 60.0
         },
         {
+          "attempt": 1,
           "calls": 12,
           "cp_used": 10.7486392625224,
-          "native_reserved": 180.0
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -239,16 +253,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-db70bf4028ac72dd-1"
+        "advice-89fa97bdcad63a0a-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 8,
-          "cp_used": 46.072852849168726,
-          "native_reserved": 1.0
+          "cp_used": 45.06189274393035,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -280,7 +298,8 @@
               "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -299,8 +318,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-5393cd2a76ae4133-1",
-        "advice-8be0e7449a7c1298-1"
+        "advice-261bd25e8ab9ce36-1",
+        "advice-3579104aae2a4880-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -313,9 +332,13 @@
           "native_reserved": 0.0
         },
         {
+          "attempt": 1,
           "calls": 9,
           "cp_used": 2.3900821433560613,
-          "native_reserved": 0.0
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -369,16 +392,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-7748abfc01326308-1"
+        "advice-31a0f50cf58bf883-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.274870543397975,
-          "native_reserved": 0.0
+          "cp_used": 1.2650290616126991,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -393,7 +420,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 58.03000000000001,
-          "decision_sha256": "2db9f581e249e66fb5c25e714089c2d2e2cd69df24f32977ce1f1fb501ddebe5",
+          "decision_sha256": "27c5ffb6ba1f60dd41f0a9c5b1b3ad5417963c5eea27d38f5e9412e297b602de",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -409,7 +436,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[209036],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.497
+            "total_cost": 0.497,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -428,8 +456,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-6dbd73432c3fcec5-1",
-        "advice-b2022f94ac1a0abc-1"
+        "advice-503fc67051f40984-1",
+        "advice-68435157d9573e01-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -437,19 +465,23 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
+          "calls": 12,
+          "cp_used": 117.35232578114358,
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
+        },
+        {
           "calls": 4,
           "cp_used": 20.985609221191122,
           "native_reserved": 60.0
-        },
-        {
-          "calls": 12,
-          "cp_used": 117.35232578114358,
-          "native_reserved": 180.0
         }
       ],
       "allocations": [
-        122.0,
-        366.0
+        366.0,
+        122.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -498,16 +530,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-1f1bf77115230f52-1"
+        "advice-fff534c04e8cdaa9-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
-          "calls": 7,
-          "cp_used": 60.00515669881229,
-          "native_reserved": 1.0
+          "attempt": 1,
+          "calls": 8,
+          "cp_used": 288.9393331143594,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -530,15 +566,16 @@
               2
             ],
             "contract_version": "llmopt_priority_result_v1",
-            "left_out": [
-              "{\"avoid_players\":[],\"keep_players\":[209036],\"no_hits\":false,\"save_chips\":false}"
-            ],
+            "left_out": [],
             "reference_proved": true,
             "satisfied": [
               "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": [
+              "{\"avoid_players\":[],\"keep_players\":[209036],\"no_hits\":false,\"save_chips\":false}"
+            ]
           }
         },
         "applied": [],
@@ -557,8 +594,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-01375f9c54ab016c-1",
-        "advice-cd7400f3d8986c25-1"
+        "advice-52fc66f9d2128c64-1",
+        "advice-8541da2977e22a9d-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -566,19 +603,23 @@
       ],
       "receipts": [
         {
-          "calls": 3,
-          "cp_used": 0.9290230131623006,
-          "native_reserved": 0.0
+          "attempt": 1,
+          "calls": 9,
+          "cp_used": 2.609987343074033,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         },
         {
-          "calls": 9,
-          "cp_used": 2.6099873430740326,
+          "calls": 3,
+          "cp_used": 0.9290230131623006,
           "native_reserved": 0.0
         }
       ],
       "allocations": [
-        21.0,
-        63.0
+        63.0,
+        21.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -627,16 +668,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-b7090968036f0d14-1"
+        "advice-33f500ef2e1c0528-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.4095718536976276,
-          "native_reserved": 0.0
+          "cp_used": 1.348546576976657,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -651,7 +696,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 57.93600000000001,
-          "decision_sha256": "0b8e92714db8169454a33c7ad9e0a2083f8edf489d69616374aeacc184f515b3",
+          "decision_sha256": "9296b0cfc63f162652f0a415b401d447847ec1b186fa8f057620134bc238e865",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -667,7 +712,8 @@
               "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.278
+            "total_cost": 0.278,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -686,8 +732,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-2c4d855ba9657ef6-1",
-        "advice-9ada7d4d3510cd73-1"
+        "advice-06456a2147174cc3-1",
+        "advice-45c39b5d5799040c-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -695,19 +741,23 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
+          "calls": 12,
+          "cp_used": 15.676082405587916,
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
+        },
+        {
           "calls": 4,
           "cp_used": 12.250623116921888,
           "native_reserved": 60.0
-        },
-        {
-          "calls": 12,
-          "cp_used": 15.676082405587916,
-          "native_reserved": 180.0
         }
       ],
       "allocations": [
-        122.0,
-        366.0
+        366.0,
+        122.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -756,16 +806,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-0ff591588b605ea9-1"
+        "advice-fcd611ec182122bc-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 8,
-          "cp_used": 47.16049672540994,
-          "native_reserved": 1.0
+          "cp_used": 26.2581699370036,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -780,7 +834,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 167.269,
-          "decision_sha256": "fcd5274855400319f0be825e740574fda560f0cb8622f7fa79b535c3f7a3e36d",
+          "decision_sha256": "7dc69cef1648e47fb08cd82d58e0cf9033e4f8048af2862274781c24f8e553ef",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -796,7 +850,8 @@
               "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.6
+            "total_cost": 0.6,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -815,8 +870,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-16600826f7725d82-1",
-        "advice-4d83b6582b6913ea-1"
+        "advice-01950a81a67570fe-1",
+        "advice-5c9809cf7b1fa363-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -824,9 +879,13 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 9,
-          "cp_used": 2.7995787193288972,
-          "native_reserved": 0.0
+          "cp_used": 2.799578719328897,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         },
         {
           "calls": 3,
@@ -885,16 +944,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-585037a44f504727-1"
+        "advice-47017ccca0273ea5-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.4153288151104821,
-          "native_reserved": 0.0
+          "cp_used": 1.468228289616307,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -909,7 +972,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 52.58500000000001,
-          "decision_sha256": "b208a95585c51bb9074e5de4cb458b46dd03469cc39b7767cdb541380d0d645e",
+          "decision_sha256": "3bf6e0e7466c71bc0c7bba4fc5069afc5f17c582733a563830151a54cfc7d6b0",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -925,7 +988,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[472769],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.75
+            "total_cost": 0.75,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -944,8 +1008,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-3e19e73cb8841e07-1",
-        "advice-4f14c932773ea357-1"
+        "advice-a66370133a09f427-1",
+        "advice-fc24a3259bd3fe27-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -953,19 +1017,23 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
+          "calls": 12,
+          "cp_used": 108.60341861861659,
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
+        },
+        {
           "calls": 4,
           "cp_used": 33.73308989588725,
           "native_reserved": 60.0
-        },
-        {
-          "calls": 12,
-          "cp_used": 108.60341861861659,
-          "native_reserved": 180.0
         }
       ],
       "allocations": [
-        122.0,
-        366.0
+        366.0,
+        122.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -1014,16 +1082,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-4e62ff2de24c3f00-1"
+        "advice-c9ebebab2fc484b7-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
-          "calls": 6,
-          "cp_used": 60.00521363787334,
-          "native_reserved": 1.0
+          "attempt": 1,
+          "calls": 7,
+          "cp_used": 287.58735347907674,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1045,15 +1117,16 @@
               1
             ],
             "contract_version": "llmopt_priority_result_v1",
-            "left_out": [
-              "{\"avoid_players\":[226597],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
-              "{\"avoid_players\":[],\"keep_players\":[472769],\"no_hits\":false,\"save_chips\":false}"
-            ],
+            "left_out": [],
             "reference_proved": true,
             "satisfied": [
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": [
+              "{\"avoid_players\":[226597],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[472769],\"no_hits\":false,\"save_chips\":false}"
+            ]
           }
         },
         "applied": [],
@@ -1072,7 +1145,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 21.0,
       "job_ids": [
-        "advice-d41f6f64d50344e9-1"
+        "advice-2a7d7ec5c618b495-1"
       ],
       "terminal_statuses": [
         "failed"
@@ -1103,7 +1176,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 21.0,
       "job_ids": [
-        "advice-d41f6f64d50344e9-2"
+        "advice-2a7d7ec5c618b495-2"
       ],
       "terminal_statuses": [
         "failed"
@@ -1134,7 +1207,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 122.0,
       "job_ids": [
-        "advice-bb54c9213aef702d-1"
+        "advice-325d737ffe4589fa-1"
       ],
       "terminal_statuses": [
         "failed"
@@ -1165,7 +1238,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 122.0,
       "job_ids": [
-        "advice-bb54c9213aef702d-2"
+        "advice-325d737ffe4589fa-2"
       ],
       "terminal_statuses": [
         "failed"
@@ -1196,8 +1269,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-df89282de3afd2d7-1",
-        "advice-fd0afcdaaf15162d-1"
+        "advice-24a2ee39f9892b01-1",
+        "advice-ea02d34eb9120bec-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -1210,9 +1283,13 @@
           "native_reserved": 0.0
         },
         {
+          "attempt": 1,
           "calls": 9,
-          "cp_used": 2.5527813365770418,
-          "native_reserved": 0.0
+          "cp_used": 2.552781336577042,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1266,16 +1343,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-96d0823111141b51-1"
+        "advice-1a320bb095ded3f9-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
           "cp_used": 1.3999028213919102,
-          "native_reserved": 0.0
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1307,7 +1388,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -1326,8 +1408,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-7fcd4f121ebf25d6-1",
-        "advice-e11b8f46e7f3cf30-1"
+        "advice-3d28789674a03e2c-1",
+        "advice-a4265c11e86cd8d4-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -1335,19 +1417,23 @@
       ],
       "receipts": [
         {
-          "calls": 12,
-          "cp_used": 59.59870313423068,
-          "native_reserved": 180.0
-        },
-        {
           "calls": 4,
           "cp_used": 10.102308019917816,
           "native_reserved": 60.0
+        },
+        {
+          "attempt": 1,
+          "calls": 12,
+          "cp_used": 59.59870313423068,
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
-        366.0,
-        122.0
+        122.0,
+        366.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -1396,16 +1482,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-8b886616dd2ce315-1"
+        "advice-099b3c2fb46ea4f0-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 8,
-          "cp_used": 58.87490283976479,
-          "native_reserved": 1.0
+          "cp_used": 58.58086201711156,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1437,7 +1527,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -1456,8 +1547,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-3f16591a5a2e3a7f-1",
-        "advice-dda690ab4bbbc9b6-1"
+        "advice-4849236c93755894-1",
+        "advice-92a02e5309b93a7d-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -1470,9 +1561,13 @@
           "native_reserved": 0.0
         },
         {
+          "attempt": 1,
           "calls": 9,
-          "cp_used": 2.4955599775996404,
-          "native_reserved": 0.0
+          "cp_used": 2.49555997759964,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1526,16 +1621,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-c002624fa6688ba4-1"
+        "advice-6a1942a2eadc170d-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.5027349483880232,
-          "native_reserved": 0.0
+          "cp_used": 1.42485892709477,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1550,7 +1649,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 56.73800000000001,
-          "decision_sha256": "97dad4b1f9a0112bc76238a8ce3d26fd2b933481b2a145dad0c7da26b00f421c",
+          "decision_sha256": "f9333b3c62e9f2fdcbf7005095846a11fd8d30d4e40153f69eabf75d931b9828",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -1566,7 +1665,8 @@
               "{\"avoid_players\":[],\"keep_players\":[191866],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.705
+            "total_cost": 0.705,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -1585,8 +1685,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-15ebd44bb1c23b0c-1",
-        "advice-5ad5ca921b1a3c37-1"
+        "advice-3c30e560a4378423-1",
+        "advice-95314efc3107e4ad-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -1594,19 +1694,23 @@
       ],
       "receipts": [
         {
-          "calls": 12,
-          "cp_used": 150.5099355775034,
-          "native_reserved": 180.0
-        },
-        {
           "calls": 4,
           "cp_used": 30.027935178129404,
           "native_reserved": 60.0
+        },
+        {
+          "attempt": 1,
+          "calls": 12,
+          "cp_used": 150.50993557750337,
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
-        366.0,
-        122.0
+        122.0,
+        366.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -1655,16 +1759,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-3aa58f85b0dcf323-1"
+        "advice-f9bb3f5a48db2be0-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
-          "calls": 5,
-          "cp_used": 60.002622646889826,
-          "native_reserved": 1.0
+          "attempt": 1,
+          "calls": 7,
+          "cp_used": 284.84512059516607,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1678,20 +1786,24 @@
         "selected": {
           "status": "done",
           "error_code": null,
-          "expected_net_points": 172.329,
-          "decision_sha256": "60e1e72e0e2396f3524dd5412a23dfb2d67180750ae3028e3ed8504bc291fa51",
+          "expected_net_points": 171.06600000000003,
+          "decision_sha256": "09ae799ebe0bac0c1dc71e2727dee7016a3c6a582706adb1fd236af0d5edc50d",
           "priority": {
             "budget_exhausted": true,
-            "completed_priorities": [],
+            "completed_priorities": [
+              1
+            ],
             "contract_version": "llmopt_priority_result_v1",
-            "left_out": [
-              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
-              "{\"avoid_players\":[],\"keep_players\":[191866],\"no_hits\":false,\"save_chips\":false}",
+            "left_out": [],
+            "reference_proved": true,
+            "satisfied": [
               "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "reference_proved": true,
-            "satisfied": [],
-            "total_cost": 0.0
+            "total_cost": 1.263,
+            "unsearched": [
+              "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[191866],\"no_hits\":false,\"save_chips\":false}"
+            ]
           }
         },
         "applied": [],
@@ -1710,8 +1822,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-38b3f9b7b7152d13-1",
-        "advice-c99c954604f5038a-1"
+        "advice-a21a8d433b7eef63-1",
+        "advice-f64ae6cb6e58a104-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -1724,9 +1836,13 @@
           "native_reserved": 0.0
         },
         {
+          "attempt": 1,
           "calls": 9,
           "cp_used": 2.5073452474438334,
-          "native_reserved": 0.0
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1780,16 +1896,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-7db8c03c152f34fd-1"
+        "advice-788d1d137aca9e69-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.51856756348737,
-          "native_reserved": 0.0
+          "cp_used": 1.3764015109149426,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1804,7 +1924,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 57.278000000000006,
-          "decision_sha256": "20e3ca3720aaaecba672dd711458a8c3b9972f91c98050a6c9d580fcd70b5fa4",
+          "decision_sha256": "6cc942d324449c1ffb0da23f11acef28761b27884fb524171be6c96a732f43db",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -1820,7 +1940,8 @@
               "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.614
+            "total_cost": 0.614,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -1839,8 +1960,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-46d5b3a2d5429194-1",
-        "advice-9c78fb4b539cfa2d-1"
+        "advice-5cfeccdcedba4478-1",
+        "advice-d33bea5bf886c6f0-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -1853,9 +1974,13 @@
           "native_reserved": 60.0
         },
         {
+          "attempt": 1,
           "calls": 12,
           "cp_used": 16.17849267500349,
-          "native_reserved": 180.0
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1909,16 +2034,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-3d740f22ac1083b4-1"
+        "advice-41eab0f328bdb4cc-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 8,
-          "cp_used": 11.627703102754676,
-          "native_reserved": 1.0
+          "cp_used": 7.371767470476286,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -1933,7 +2062,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 165.98800000000003,
-          "decision_sha256": "f29adff6d5a30f4ba615920c73a0ec178f9f1990475c0c6431eb601f5281e757",
+          "decision_sha256": "a9691eacdad65dc627f64a9e92fa21cc175c72808d76166d763393c88a33d59e",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -1950,7 +2079,8 @@
               "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.574
+            "total_cost": 0.574,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -1969,8 +2099,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-2325828298480f8a-1",
-        "advice-39877f104368dd8f-1"
+        "advice-623365c8e4c94863-1",
+        "advice-9bc0383ccc8746d4-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -1978,19 +2108,23 @@
       ],
       "receipts": [
         {
-          "calls": 9,
-          "cp_used": 2.8096195107229804,
-          "native_reserved": 0.0
-        },
-        {
           "calls": 3,
           "cp_used": 0.9924455759921582,
           "native_reserved": 0.0
+        },
+        {
+          "attempt": 1,
+          "calls": 9,
+          "cp_used": 2.8096195107229804,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
-        63.0,
-        21.0
+        21.0,
+        63.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -2039,16 +2173,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-57222366f9e9928e-1"
+        "advice-d0a4c834cae467a9-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
           "cp_used": 1.4825106350961634,
-          "native_reserved": 0.0
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -2080,7 +2218,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -2099,8 +2238,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-04801218483ad12f-1",
-        "advice-416e5e7bff97913f-1"
+        "advice-31b111148c106a4b-1",
+        "advice-349ead0030c370fa-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -2108,9 +2247,13 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 12,
           "cp_used": 155.9017007839344,
-          "native_reserved": 180.0
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         },
         {
           "calls": 4,
@@ -2169,16 +2312,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-ee9402b9809f3e9b-1"
+        "advice-41a569a6a20c2b8c-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
-          "calls": 6,
-          "cp_used": 60.002517997484645,
-          "native_reserved": 1.0
+          "attempt": 1,
+          "calls": 7,
+          "cp_used": 292.31783728893095,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -2200,15 +2347,16 @@
               1
             ],
             "contract_version": "llmopt_priority_result_v1",
-            "left_out": [
-              "{\"avoid_players\":[154043],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
-            ],
+            "left_out": [],
             "reference_proved": true,
             "satisfied": [
-              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
-              "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": [
+              "{\"avoid_players\":[154043],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
+            ]
           }
         },
         "applied": [],
@@ -2227,7 +2375,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 21.0,
       "job_ids": [
-        "advice-ceed8bd61b8eb9d2-1"
+        "advice-f00e9336e875f107-1"
       ],
       "terminal_statuses": [
         "failed"
@@ -2258,7 +2406,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 21.0,
       "job_ids": [
-        "advice-ceed8bd61b8eb9d2-2"
+        "advice-f00e9336e875f107-2"
       ],
       "terminal_statuses": [
         "failed"
@@ -2289,7 +2437,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 122.0,
       "job_ids": [
-        "advice-f50bb6637911ada6-1"
+        "advice-e8708a52bbfbbf2c-1"
       ],
       "terminal_statuses": [
         "failed"
@@ -2320,7 +2468,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 122.0,
       "job_ids": [
-        "advice-f50bb6637911ada6-2"
+        "advice-e8708a52bbfbbf2c-2"
       ],
       "terminal_statuses": [
         "failed"
@@ -2351,8 +2499,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-54ef3ee9321c2811-1",
-        "advice-7dbed26f8adcb5d5-1"
+        "advice-a56924f453586c9b-1",
+        "advice-c3c1fb1dacda5e1a-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -2360,19 +2508,23 @@
       ],
       "receipts": [
         {
-          "calls": 3,
-          "cp_used": 0.9233647287110588,
-          "native_reserved": 0.0
-        },
-        {
+          "attempt": 1,
           "calls": 9,
           "cp_used": 2.795085385479805,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
+        },
+        {
+          "calls": 3,
+          "cp_used": 0.9233647287110588,
           "native_reserved": 0.0
         }
       ],
       "allocations": [
-        21.0,
-        63.0
+        63.0,
+        21.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -2421,16 +2573,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-fa8458cbd15ae21f-1"
+        "advice-e72c8a2293143f37-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.3721509621279406,
-          "native_reserved": 0.0
+          "cp_used": 1.3072104688366353,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -2461,7 +2617,8 @@
               "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -2480,8 +2637,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-35082740712ca31e-1",
-        "advice-f912b9989fe44165-1"
+        "advice-aac5aa651a459f80-1",
+        "advice-ec9e04bed694866d-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -2489,19 +2646,23 @@
       ],
       "receipts": [
         {
-          "calls": 12,
-          "cp_used": 122.22913217276592,
-          "native_reserved": 180.0
-        },
-        {
           "calls": 4,
           "cp_used": 15.046582220272171,
           "native_reserved": 60.0
+        },
+        {
+          "attempt": 1,
+          "calls": 12,
+          "cp_used": 122.22913217276592,
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
-        366.0,
-        122.0
+        122.0,
+        366.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -2550,16 +2711,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-16e02d7b08c51eb1-1"
+        "advice-bfd44025e18dddf0-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 8,
-          "cp_used": 8.268180279174283,
-          "native_reserved": 1.0
+          "cp_used": 7.610062223452437,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -2590,7 +2755,8 @@
               "{\"avoid_players\":[],\"keep_players\":[199798],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[489639],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -2609,8 +2775,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-42a3f285340ed901-1",
-        "advice-cebb94223dde5ac9-1"
+        "advice-09364d5709c991c3-1",
+        "advice-b11c36fcf1652664-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -2618,19 +2784,23 @@
       ],
       "receipts": [
         {
-          "calls": 9,
-          "cp_used": 2.4276352218840587,
-          "native_reserved": 0.0
-        },
-        {
           "calls": 3,
           "cp_used": 0.9185238948159411,
           "native_reserved": 0.0
+        },
+        {
+          "attempt": 1,
+          "calls": 9,
+          "cp_used": 2.4276352218840587,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
-        63.0,
-        21.0
+        21.0,
+        63.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -2679,16 +2849,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-2cc3098ee971dd9a-1"
+        "advice-06d3ec2590dea4b1-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.2790154913796112,
-          "native_reserved": 0.0
+          "cp_used": 1.2699913065056752,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -2719,7 +2893,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[465730],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.111
+            "total_cost": 0.111,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -2738,8 +2913,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-86c4aa230add1fca-1",
-        "advice-b1d6fca971874503-1"
+        "advice-8144f2c93df3b3c7-1",
+        "advice-b6f1472b051b9c29-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -2752,9 +2927,13 @@
           "native_reserved": 60.0
         },
         {
+          "attempt": 1,
           "calls": 12,
           "cp_used": 135.5337783097193,
-          "native_reserved": 180.0
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -2808,16 +2987,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-fed7f330af9bc631-1"
+        "advice-65ebfa732f1023d4-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 8,
-          "cp_used": 60.0026814585876,
-          "native_reserved": 1.0
+          "cp_used": 243.87032831663754,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -2848,7 +3031,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[465730],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.333
+            "total_cost": 0.333,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -2867,8 +3051,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-438478dec4ef0ef5-1",
-        "advice-ef0c1b7a35c9994f-1"
+        "advice-9c8297a7729c9042-1",
+        "advice-e8bcf06e6583bfc5-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -2876,9 +3060,13 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 9,
           "cp_used": 2.6191996295836786,
-          "native_reserved": 0.0
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         },
         {
           "calls": 3,
@@ -2937,16 +3125,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-0080f4fd52355857-1"
+        "advice-43c58db55cd559ff-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.5560327014088666,
-          "native_reserved": 0.0
+          "cp_used": 1.3834292626487186,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -2961,7 +3153,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 57.703,
-          "decision_sha256": "7ed63db7dcf72fb081d1178f07eacb51256a0b7ea6c366cda2cc769279ad95bd",
+          "decision_sha256": "cec407b9097794f11795eea1ec354bfdd4d441afee720333335c69499cb188d8",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -2977,7 +3169,8 @@
               "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[473284],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.94
+            "total_cost": 0.94,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -2996,8 +3189,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-b868c1b2bc09aa94-1",
-        "advice-e82f30a903f31355-1"
+        "advice-192e8ebf0fc6d3ad-1",
+        "advice-de53e6df51837d11-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -3005,19 +3198,23 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
+          "calls": 12,
+          "cp_used": 9.824840255533864,
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
+        },
+        {
           "calls": 4,
           "cp_used": 3.2914445559929395,
           "native_reserved": 60.0
-        },
-        {
-          "calls": 12,
-          "cp_used": 9.824840255533864,
-          "native_reserved": 180.0
         }
       ],
       "allocations": [
-        122.0,
-        366.0
+        366.0,
+        122.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -3066,16 +3263,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-f6f31f64bc9df69d-1"
+        "advice-0a0f0f967b8897f9-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 8,
-          "cp_used": 55.129250918797105,
-          "native_reserved": 1.0
+          "cp_used": 276.03193530820346,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3089,24 +3290,25 @@
         "selected": {
           "status": "done",
           "error_code": null,
-          "expected_net_points": 166.25,
-          "decision_sha256": "a679c01d815e2021cb7aa0fafae0b2658955da1a25859f3f14458dcde5534b62",
+          "expected_net_points": 166.98000000000002,
+          "decision_sha256": "de0dd7c228162c8ff97689307f055f2d3138bbce5a212e4f7fa3dec90a38717f",
           "priority": {
-            "budget_exhausted": false,
+            "budget_exhausted": true,
             "completed_priorities": [
               1,
-              2,
-              3
+              2
             ],
             "contract_version": "llmopt_priority_result_v1",
             "left_out": [],
             "reference_proved": true,
             "satisfied": [
               "{\"avoid_players\":[477424],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
-              "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[473284],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 1.486
+            "total_cost": 0.756,
+            "unsearched": [
+              "{\"avoid_players\":[],\"keep_players\":[466075],\"no_hits\":false,\"save_chips\":false}"
+            ]
           }
         },
         "applied": [],
@@ -3125,8 +3327,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-4bb9a08187a76a5c-1",
-        "advice-f0c3ad57850634b3-1"
+        "advice-32fa04c52ee78c85-1",
+        "advice-e9763e83de19f240-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -3134,19 +3336,23 @@
       ],
       "receipts": [
         {
-          "calls": 9,
-          "cp_used": 2.670340610923429,
-          "native_reserved": 0.0
-        },
-        {
           "calls": 3,
           "cp_used": 1.113468222682841,
           "native_reserved": 0.0
+        },
+        {
+          "attempt": 1,
+          "calls": 9,
+          "cp_used": 2.6703406109234296,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
-        63.0,
-        21.0
+        21.0,
+        63.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -3195,16 +3401,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-629b3e96945c582b-1"
+        "advice-dcd976aa12fb0f90-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.6683159564598906,
-          "native_reserved": 0.0
+          "cp_used": 1.6751513515509888,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3235,7 +3445,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[441164],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 1.255
+            "total_cost": 1.255,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -3254,8 +3465,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-5882a03b26e1d200-1",
-        "advice-a438a37c0d4984d2-1"
+        "advice-5823d4803ace5510-1",
+        "advice-d3cde306ad9b0278-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -3263,9 +3474,13 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 12,
           "cp_used": 100.39418357088115,
-          "native_reserved": 180.0
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         },
         {
           "calls": 4,
@@ -3324,16 +3539,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-20bc25c2db27f84e-1"
+        "advice-efa25b3e0de0cb55-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
-          "calls": 6,
-          "cp_used": 60.19715922704569,
-          "native_reserved": 1.0
+          "attempt": 1,
+          "calls": 7,
+          "cp_used": 289.7209396445611,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3355,15 +3574,16 @@
               1
             ],
             "contract_version": "llmopt_priority_result_v1",
-            "left_out": [
-              "{\"avoid_players\":[226597],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
-              "{\"avoid_players\":[],\"keep_players\":[441164],\"no_hits\":false,\"save_chips\":false}"
-            ],
+            "left_out": [],
             "reference_proved": true,
             "satisfied": [
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": [
+              "{\"avoid_players\":[226597],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[441164],\"no_hits\":false,\"save_chips\":false}"
+            ]
           }
         },
         "applied": [],
@@ -3382,7 +3602,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 21.0,
       "job_ids": [
-        "advice-331778f25413f176-1"
+        "advice-cdb3b22ef648f377-1"
       ],
       "terminal_statuses": [
         "failed"
@@ -3413,7 +3633,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 21.0,
       "job_ids": [
-        "advice-331778f25413f176-2"
+        "advice-cdb3b22ef648f377-2"
       ],
       "terminal_statuses": [
         "failed"
@@ -3444,7 +3664,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 122.0,
       "job_ids": [
-        "advice-6aeee91931718e28-1"
+        "advice-99e60aadabff43a1-1"
       ],
       "terminal_statuses": [
         "failed"
@@ -3475,7 +3695,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 122.0,
       "job_ids": [
-        "advice-6aeee91931718e28-2"
+        "advice-99e60aadabff43a1-2"
       ],
       "terminal_statuses": [
         "failed"
@@ -3506,8 +3726,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-9d6758bb9ea2899a-1",
-        "advice-b44426113ce74807-1"
+        "advice-b058808730d2f094-1",
+        "advice-fdfa6554190363ec-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -3515,19 +3735,23 @@
       ],
       "receipts": [
         {
-          "calls": 3,
-          "cp_used": 1.2899780664064495,
-          "native_reserved": 0.0
-        },
-        {
+          "attempt": 1,
           "calls": 9,
           "cp_used": 2.7277549441112123,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
+        },
+        {
+          "calls": 3,
+          "cp_used": 1.2899780664064497,
           "native_reserved": 0.0
         }
       ],
       "allocations": [
-        21.0,
-        63.0
+        63.0,
+        21.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -3576,16 +3800,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-88fc792ca61d0762-1"
+        "advice-1b0c5e442a59095f-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.4593346740252224,
-          "native_reserved": 0.0
+          "cp_used": 1.3090931292282368,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3616,7 +3844,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[465730],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.701
+            "total_cost": 0.701,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -3635,8 +3864,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-cbff34457325dbff-1",
-        "advice-fa095ca25a51345f-1"
+        "advice-6dd54d72af798bc2-1",
+        "advice-b22bb2790cc380f9-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -3649,9 +3878,13 @@
           "native_reserved": 60.0
         },
         {
+          "attempt": 1,
           "calls": 12,
           "cp_used": 72.00603763350139,
-          "native_reserved": 180.0
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3705,16 +3938,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-f6de82ed07d6af39-1"
+        "advice-c6cbf6853f70c5eb-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
-          "calls": 6,
-          "cp_used": 60.00362221147133,
-          "native_reserved": 1.0
+          "attempt": 1,
+          "calls": 8,
+          "cp_used": 77.21527991115994,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3728,23 +3965,25 @@
         "selected": {
           "status": "done",
           "error_code": null,
-          "expected_net_points": 162.246,
-          "decision_sha256": "4709d2fe1f0c7783040cc794f2d6099c986adb0688f364348e12b8582936b87a",
+          "expected_net_points": 161.763,
+          "decision_sha256": "b5f4a7576eebed3af05b0dc734d1b2c4557cb32e2b6ae10fad58d61885d0e4a5",
           "priority": {
-            "budget_exhausted": true,
+            "budget_exhausted": false,
             "completed_priorities": [
-              1
+              1,
+              2,
+              3
             ],
             "contract_version": "llmopt_priority_result_v1",
-            "left_out": [
-              "{\"avoid_players\":[247348],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
-            ],
+            "left_out": [],
             "reference_proved": true,
             "satisfied": [
+              "{\"avoid_players\":[247348],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[465730],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.483,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -3763,8 +4002,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-06bc5134bf9c8163-1",
-        "advice-747a211aeefe177a-1"
+        "advice-5509000e64bcb7f2-1",
+        "advice-ab90d2cf72faca08-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -3777,9 +4016,13 @@
           "native_reserved": 0.0
         },
         {
+          "attempt": 1,
           "calls": 9,
           "cp_used": 2.5556631645456607,
-          "native_reserved": 0.0
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3833,16 +4076,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-342fd73f5e30f12b-1"
+        "advice-faa1d0c59dee5f3f-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.4254165854712335,
-          "native_reserved": 0.0
+          "cp_used": 1.350613802150481,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3857,7 +4104,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 57.46600000000001,
-          "decision_sha256": "d37bedbdbf71b88a8d9e3b3db460698c1b83c52ef4cda09c7573dc4224ac4523",
+          "decision_sha256": "8a257852f0a21dec6eb5562fd7825391d959633c0e7a2feaab331c0a4a705929",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -3873,7 +4120,8 @@
               "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[469142],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.342
+            "total_cost": 0.342,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -3892,8 +4140,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-0ac6b654a47f1bfc-1",
-        "advice-de428d85048c4b01-1"
+        "advice-3e5ecd496daa0583-1",
+        "advice-6e020f3343bda418-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -3906,9 +4154,13 @@
           "native_reserved": 60.0
         },
         {
+          "attempt": 1,
           "calls": 12,
           "cp_used": 95.67616356852145,
-          "native_reserved": 180.0
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3962,16 +4214,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-2ed3ed1eb75dd52b-1"
+        "advice-c598e330cc73c428-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 8,
-          "cp_used": 60.00217624567188,
-          "native_reserved": 1.0
+          "cp_used": 218.57883126559932,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -3985,8 +4241,8 @@
         "selected": {
           "status": "done",
           "error_code": null,
-          "expected_net_points": 172.27400000000003,
-          "decision_sha256": "3ad583f41b58c58a4beec59839c07127fee9528f13e38d8957e4a6578fdc7027",
+          "expected_net_points": 172.39800000000002,
+          "decision_sha256": "c16334e488ff58d3953cec0787e5606711c47a6ea05930a51622c40d6e6d14f2",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -4002,7 +4258,8 @@
               "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[469142],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 1.15
+            "total_cost": 1.026,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -4021,8 +4278,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-2f541dc4fa4f8eca-1",
-        "advice-ced9cbb273aa649f-1"
+        "advice-1f34c93e35f7d582-1",
+        "advice-5a728df9316c8b5a-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -4030,19 +4287,23 @@
       ],
       "receipts": [
         {
-          "calls": 9,
-          "cp_used": 2.5439632986335328,
-          "native_reserved": 0.0
-        },
-        {
           "calls": 3,
           "cp_used": 0.9110799963061327,
           "native_reserved": 0.0
+        },
+        {
+          "attempt": 1,
+          "calls": 9,
+          "cp_used": 2.5439632986335323,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
-        63.0,
-        21.0
+        21.0,
+        63.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -4091,16 +4352,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-b61307339dc4b9cc-1"
+        "advice-b0425121e662483d-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.4764757405621292,
-          "native_reserved": 0.0
+          "cp_used": 1.4096448600178029,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -4115,7 +4380,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 57.33800000000001,
-          "decision_sha256": "007cff2d29b3552e403e14888a1d612d4bff0a4c2022e199a29a76a2054833c1",
+          "decision_sha256": "698fc2631145cc54c10b86f8cba7b3c8c3e93dfe02bf2b356439a062cc93c34f",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -4131,7 +4396,8 @@
               "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[477424],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.947
+            "total_cost": 0.947,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -4150,8 +4416,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-3d4395536ec1d97d-1",
-        "advice-445b4ae4720c5365-1"
+        "advice-0d9334bd8ae30c66-1",
+        "advice-c3a9f7a0fa785c13-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -4159,9 +4425,13 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 12,
           "cp_used": 27.25258707467044,
-          "native_reserved": 180.0
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         },
         {
           "calls": 4,
@@ -4220,16 +4490,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-50381654aa8054b9-1"
+        "advice-9bf40cbdebb6c7b9-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 8,
-          "cp_used": 55.42059193116975,
-          "native_reserved": 1.0
+          "cp_used": 66.02709325635074,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -4244,7 +4518,7 @@
           "status": "done",
           "error_code": null,
           "expected_net_points": 158.28500000000003,
-          "decision_sha256": "21f3bcfbd77a0b825205e868957d3971001484928d09acac3d157022c815210b",
+          "decision_sha256": "023770b3f931b99cc6189b209a1322b92c263b58d7bcbb3f190e601ec730297c",
           "priority": {
             "budget_exhausted": false,
             "completed_priorities": [
@@ -4261,7 +4535,8 @@
               "{\"avoid_players\":[466075],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[204936],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 1.401
+            "total_cost": 1.401,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -4280,8 +4555,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 84.0,
       "job_ids": [
-        "advice-67ee954501195c3e-1",
-        "advice-6ed01872223981d3-1"
+        "advice-c16a1e9c2f64df5d-1",
+        "advice-cdf8ee2b8cb30d11-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -4289,19 +4564,23 @@
       ],
       "receipts": [
         {
-          "calls": 3,
-          "cp_used": 0.9991719182695553,
-          "native_reserved": 0.0
-        },
-        {
+          "attempt": 1,
           "calls": 9,
           "cp_used": 2.816995632335012,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
+        },
+        {
+          "calls": 3,
+          "cp_used": 0.9991719182695553,
           "native_reserved": 0.0
         }
       ],
       "allocations": [
-        21.0,
-        63.0
+        63.0,
+        21.0
       ],
       "within_allocation": true,
       "repeated_requests": 3,
@@ -4350,16 +4629,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 63.0,
       "job_ids": [
-        "advice-779ebcdf6c4118e8-1"
+        "advice-a6fef44fdb6afb36-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 7,
-          "cp_used": 1.510570751094323,
-          "native_reserved": 0.0
+          "cp_used": 1.510575950094323,
+          "finished": true,
+          "native_reserved": 0.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -4391,7 +4674,8 @@
               "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
               "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.0,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -4410,8 +4694,8 @@
       "admitted_server_jobs": 2,
       "reserved_units": 488.0,
       "job_ids": [
-        "advice-024ad94fd97abae5-1",
-        "advice-460b59d59c235dad-1"
+        "advice-19b55bf2606f9737-1",
+        "advice-f0cb96a18300c91e-1"
       ],
       "terminal_statuses": [
         "completed",
@@ -4419,9 +4703,13 @@
       ],
       "receipts": [
         {
+          "attempt": 1,
           "calls": 12,
-          "cp_used": 132.13286774646116,
-          "native_reserved": 180.0
+          "cp_used": 132.13286774646113,
+          "finished": true,
+          "native_reserved": 180.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         },
         {
           "calls": 4,
@@ -4480,16 +4768,20 @@
       "admitted_server_jobs": 1,
       "reserved_units": 366.0,
       "job_ids": [
-        "advice-4906df197e81c36d-1"
+        "advice-dccf976cf30a1490-1"
       ],
       "terminal_statuses": [
         "completed"
       ],
       "receipts": [
         {
-          "calls": 6,
-          "cp_used": 60.17122422788566,
-          "native_reserved": 1.0
+          "attempt": 1,
+          "calls": 8,
+          "cp_used": 174.97486491290482,
+          "finished": true,
+          "native_reserved": 1.0,
+          "pending": 0.0,
+          "unconfirmed": 0.0
         }
       ],
       "allocations": [
@@ -4503,23 +4795,26 @@
         "selected": {
           "status": "done",
           "error_code": null,
-          "expected_net_points": 159.909,
-          "decision_sha256": "5724b0ae72314fad382a8ea2c82f10cbfb78173b926f986f6535c4c813238ab4",
+          "expected_net_points": 159.517,
+          "decision_sha256": "b1a985e397da4d7a03fb19fdd7e7e471835ad8c2bcd6a379530e32da02ce5643",
           "priority": {
-            "budget_exhausted": true,
+            "budget_exhausted": false,
             "completed_priorities": [
-              1
+              1,
+              2,
+              3
             ],
             "contract_version": "llmopt_priority_result_v1",
             "left_out": [
-              "{\"avoid_players\":[191866],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}",
-              "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
+              "{\"avoid_players\":[191866],\"keep_players\":[],\"no_hits\":false,\"save_chips\":false}"
             ],
             "reference_proved": true,
             "satisfied": [
-              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}"
+              "{\"avoid_players\":[],\"keep_players\":[154561],\"no_hits\":false,\"save_chips\":false}",
+              "{\"avoid_players\":[],\"keep_players\":[220237],\"no_hits\":false,\"save_chips\":false}"
             ],
-            "total_cost": 0.0
+            "total_cost": 0.392,
+            "unsearched": []
           }
         },
         "applied": [],
@@ -4538,7 +4833,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 21.0,
       "job_ids": [
-        "advice-079fc97b1845cdca-1"
+        "advice-0faab0b6e221aba5-1"
       ],
       "terminal_statuses": [
         "failed"
@@ -4569,7 +4864,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 21.0,
       "job_ids": [
-        "advice-079fc97b1845cdca-2"
+        "advice-0faab0b6e221aba5-2"
       ],
       "terminal_statuses": [
         "failed"
@@ -4600,7 +4895,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 122.0,
       "job_ids": [
-        "advice-d5d85758d9ffb361-1"
+        "advice-62f982f49ccaf2a4-1"
       ],
       "terminal_statuses": [
         "failed"
@@ -4631,7 +4926,7 @@
       "admitted_server_jobs": 1,
       "reserved_units": 122.0,
       "job_ids": [
-        "advice-d5d85758d9ffb361-2"
+        "advice-62f982f49ccaf2a4-2"
       ],
       "terminal_statuses": [
         "failed"
