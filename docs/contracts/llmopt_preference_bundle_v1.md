@@ -13,7 +13,9 @@ null removes an inherited field. Frozen decisions are stored once. Every expande
 choice is validated before admission. An incomplete price graph or a component
 removing required player, resource, frozen-week or objective rules is refused.
 Legacy optional Wildcard can replace the compiler's implicit global chip hold while
-explicit scoped holds are preserved. Existing body and query size limits remain.
+explicit scoped holds are preserved. The complete POST body has a 4,096-byte limit.
+The GET accepts a bundle of up to 4,096 decoded characters, enough for every compact
+JSON bundle in an admitted POST. The standalone preferences query allows 3,000 characters.
 
 Without a total allowance, the existing page compiler enumerates accepted-price
 patterns, including different ceilings on rules sharing a price. There are at most
@@ -26,14 +28,20 @@ With a total allowance, `program` contains the rules and priorities. `prices` an
 `choices` are empty. The worker reconstructs the cached main decisions and resource
 path, then executes count layers and a net-points tie break. Cost is the signed
 difference between computed plans. A fixed-path certificate cannot upgrade global proof.
+New answers place every rule identity in exactly one of `satisfied`, `left_out` or
+`unsearched`. The first two lists cover completed count layers. The last list covers
+all rules from unfinished layers, including incidental matches in the returned plan.
+For older answers, readers use the program and `completed_priorities` to identify them.
 
 POST requires an identified follow-up whose durable main key matches the key derived
 by the server. A client cannot supply J, reference payload or allocation. The main
 job reserves 21/122 units and the preference job 63/366, within 84/488 total. An
-uncached ordinary component receives 21/122 units only if it fits the remaining
-parent work. Actual receipts accumulate even on failure. A cache hit starts no solve;
-no component creates a queue job. Completed valid components enter their ordinary
-answer cache even if the initiating run closes, as specified by ADR 0018.
+uncached ordinary component can use up to 21/122 units from the remaining parent work.
+The total-allowance program shares the full remaining allocation across its count and
+points searches. Actual receipts accumulate even on failure. A cache hit starts no solve;
+no component creates a queue job. A completed component with its ordinary allocation
+enters its own answer cache even if the initiating run closes. A component computed
+with a smaller allocation is readable in the cached bundle.
 
 The response retains the main payload and adds `preference_bundle_result`, containing
 computed components, the selected payload, applied indexes and completion state.

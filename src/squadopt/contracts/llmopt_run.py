@@ -97,7 +97,36 @@ def run_ledger_schema() -> dict[str, object]:
             "limit": {"type": "number", "enum": [21, 63, 122, 366]},
             "runs": {"type": "array", "items": identifier, "minItems": 1, "uniqueItems": True},
             "legacy_consumer": {"type": "boolean"},
-            "receipt": {"type": ["object", "null"], "properties": {"answer_sha256": key}},
+            "receipt": {
+                "type": ["object", "null"],
+                "properties": {
+                    "answer_sha256": key,
+                    "attempt": {"type": "integer", "minimum": 1},
+                    "finished": {"type": "boolean"},
+                    "calls": {"type": "integer", "minimum": 0},
+                    **{
+                        name: {"type": "number", "minimum": 0}
+                        for name in (
+                            "cp_used",
+                            "native_reserved",
+                            "pending",
+                            "unconfirmed",
+                            "charged",
+                        )
+                    },
+                },
+                "dependentRequired": {
+                    "attempt": [
+                        "finished",
+                        "calls",
+                        "cp_used",
+                        "native_reserved",
+                        "pending",
+                        "unconfirmed",
+                    ],
+                    "charged": ["attempt"],
+                },
+            },
         },
     }
     return {

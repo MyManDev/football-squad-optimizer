@@ -41,8 +41,13 @@ function answer(route: Route, json: unknown, status = 200) {
 
 for (const language of ["tr", "en"] as const)
   for (const window of [1, 3] as const)
-    for (const total of [false, true]) {
-      test(`${language} ${window}-week ${total ? "priority total" : "legacy prices"} uses one preference request across pending reload`, async ({
+    for (const mode of window === 3
+      ? ["legacy prices", "priority total", "partial priority total", "failed priority total"]
+      : ["legacy prices", "priority total"]) {
+      const total = mode !== "legacy prices";
+      const partial = mode === "partial priority total";
+      const failed = mode === "failed priority total";
+      test(`${language} ${window}-week ${mode} uses one preference request across pending reload`, async ({
         page,
       }) => {
         test.skip(!API, "API build required");
@@ -177,16 +182,19 @@ for (const language of ["tr", "en"] as const)
             1,
             selected!.chip,
           ).payload;
-          if (bundle.program)
+          if (bundle.program) {
+            const identities = bundle.program.preferences.map((row) => JSON.stringify(row.rules));
             preferred.priority_preferences = {
               contract_version: "llmopt_priority_result_v1",
-              satisfied: bundle.program.preferences.map((row) => JSON.stringify(row.rules)),
-              left_out: [],
-              completed_priorities: [1, 2, 3],
+              satisfied: partial ? identities.slice(0, 1) : identities,
+              left_out: partial ? identities.slice(1, 2) : [],
+              unsearched: partial ? identities.slice(2) : [],
+              completed_priorities: partial ? [1, 2] : [1, 2, 3],
               total_cost: 1,
               reference_proved: false,
-              budget_exhausted: false,
+              budget_exhausted: partial,
             };
+          }
           const result: PreferenceBundleResult = {
             contract_version: "llmopt_preference_result_v1",
             request: bundle,
@@ -195,10 +203,12 @@ for (const language of ["tr", "en"] as const)
               payload: computed(expandSelection(body.preferences, slot!), 0.5, slot!.chip).payload,
               error_code: null,
             })),
-            selected: { status: "done", payload: preferred, error_code: null },
+            selected: failed
+              ? { status: "failed", payload: null, error_code: "ADVICE_FAILED" }
+              : { status: "done", payload: preferred, error_code: null },
             applied: bundle.program ? [] : choice!.applied,
             accepted,
-            budget_exhausted: false,
+            budget_exhausted: partial,
           };
           parent.payload.preference_bundle_result = result;
           cache.set(key(body.preferences, bundle), parent);
@@ -243,7 +253,25 @@ for (const language of ["tr", "en"] as const)
         await expect(
           page.getByRole("heading", { name: copy.combinedPlan, exact: true }),
         ).toBeVisible();
-        await expect(page.locator('[data-combined="applied"]')).toHaveCount(3);
+        await expect(page.locator('[data-combined="applied"]')).toHaveCount(
+          failed ? 0 : partial ? 1 : 3,
+        );
+        if (failed) {
+          await expect(page.getByText(copy.combinedFailed, { exact: true })).toBeVisible();
+          const summary = page.getByRole("region", { name: copy.requestedPreferences });
+          for (const player of held.slice(0, 3)) await expect(summary).toContainText(player.name);
+          await expect(page.locator("article[data-plan-ready]")).toHaveCount(1);
+        }
+        if (partial) {
+          await expect(page.locator('[data-combined="left-out"]')).toContainText(
+            copy.combinedLeftOut,
+          );
+          await expect(page.locator('[data-combined="left-out"]')).toContainText(held[1]!.name);
+          await expect(page.locator('[data-combined="unsearched"]')).toContainText(
+            copy.combinedUnsearched,
+          );
+          await expect(page.locator('[data-combined="unsearched"]')).toContainText(held[2]!.name);
+        }
         await page.reload();
         await expect(
           page.getByRole("heading", { name: copy.combinedPlan, exact: true }),
@@ -254,5 +282,18 @@ for (const language of ["tr", "en"] as const)
           width: globalThis.innerWidth,
         }));
         expect(size.scroll).toBeLessThanOrEqual(size.width);
+        if (failed) {
+          await expect(page.getByText(copy.combinedFailed, { exact: true })).toBeVisible();
+          await page
+            .getByRole("button", {
+              name: `${copy.remove} · ${copy.rules.avoid_player} · ${held[1]!.name}`,
+              exact: true,
+            })
+            .click();
+          await page.getByRole("button", { name: copy.compute, exact: true }).click();
+          await expect.poll(() => posts.length).toBe(4);
+          expect(posts[2]!.run.run_id).not.toBe(posts[0]!.run.run_id);
+          expect(posts[3]!.preference_bundle?.program?.preferences).toHaveLength(2);
+        }
       });
     }

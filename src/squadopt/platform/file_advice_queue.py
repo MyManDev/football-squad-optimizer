@@ -507,6 +507,18 @@ class FileJobQueue:
             self._cleanup(job)
             self._settled.add(job.job_id)
 
+    def _requeue(self, job: AdviceJob, at_utc: str) -> AdviceJob:
+        requeued = job.transition("queued", at_utc=at_utc)
+        self._write(self._path(job.job_id), requeued)
+        self._claim_marker(job.job_id).unlink(missing_ok=True)
+        self._progress_record(job.job_id).unlink(missing_ok=True)
+        return requeued
+
+    def requeue(self, job: AdviceJob, *, at_utc: str) -> AdviceJob:
+        with self._lock.hold():
+            self._owned(job)
+            return self._requeue(job, at_utc)
+
     def complete(
         self, job: AdviceJob, *, cache: AdviceCacheRepository, payload: bytes, at_utc: str
     ) -> AdviceJob:
@@ -637,12 +649,7 @@ class FileJobQueue:
                     age = float("inf")
                 if age < lease_seconds:
                     continue
-                requeued = job.transition("queued", at_utc=stamp())
-                self._write(self._path(job.job_id), requeued)
-                marker.unlink(missing_ok=True)
-                # The next attempt counts from zero; this one's count is history.
-                self._progress_record(job.job_id).unlink(missing_ok=True)
-                recovered.append(requeued)
+                recovered.append(self._requeue(job, stamp()))
         return tuple(recovered)
 
     def archive(

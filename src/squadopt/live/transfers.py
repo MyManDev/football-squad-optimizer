@@ -1163,7 +1163,6 @@ def _priority_plan(
         program,
         hard=hard,
         chips=chips,
-        work_limit=20.0 if len(horizon.gameweeks) == 1 else 60.0,
     )
     return replace(
         outcome.plan,
@@ -1173,6 +1172,7 @@ def _priority_plan(
                 "contract_version": "llmopt_priority_result_v1",
                 "satisfied": list(outcome.satisfied),
                 "left_out": list(outcome.left_out),
+                "unsearched": list(outcome.unsearched),
                 "total_cost": outcome.total_cost,
                 "completed_priorities": list(outcome.completed_priorities),
                 "reference_proved": outcome.reference_proved,
