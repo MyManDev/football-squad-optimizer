@@ -1,6 +1,8 @@
 """Bounded sequential construction followed by full-model incumbent protection."""
 
 from dataclasses import replace
+from functools import partial
+from math import isfinite
 from typing import cast
 
 from squadopt.contracts.preferences import DecisionPreferences
@@ -36,6 +38,7 @@ def optimize_guarded_window(
     *,
     chips: ChipAvailability | None = None,
     preferences: DecisionPreferences | None = None,
+    limit_remaining_work: bool = False,
 ) -> TransferPlanResult:
     """Spend 10% on construction and 90% on certification/search, without retries.
 
@@ -56,7 +59,12 @@ def optimize_guarded_window(
     sequential = preferences is None or not preferences.needs_full_window
     if sequential:
         try:
-            seed = plan_in_segments(
+            construct = (
+                partial(plan_in_segments, limit_remaining_work=True)
+                if limit_remaining_work
+                else plan_in_segments
+            )
+            seed = construct(
                 horizon,
                 initial,
                 replace(
@@ -80,16 +88,31 @@ def optimize_guarded_window(
         final_cap = budget
     if clock_stopped:
         raise SolverExecutionError("Sequential construction reached its wall-clock safety limit.")
+    remaining = None
+    if limit_remaining_work:
+        if not isfinite(seed_work) or seed_work < 0:
+            raise ValueError("Invalid deterministic-work accounting for expected windows.")
+        remaining = min(final_cap, budget - seed_work)
+        if remaining <= 0:
+            raise SolverExecutionError("Construction left no work for full-window validation.")
     final_wall = optimization.solver_time_limit_seconds * (0.9 if sequential else 1.0)
     if seed is None:
         # The hold probe has its own wall ceiling in the underlying solver.
         final_wall -= min(30.0, final_wall / 2)
-    plan = optimize_transfer_plan(
+    search_cap = final_cap if seed is not None else final_cap - 1
+    if remaining is not None:
+        search_cap = min(search_cap, remaining)
+    search = (
+        partial(optimize_transfer_plan, phase_remaining=remaining)
+        if remaining is not None
+        else optimize_transfer_plan
+    )
+    plan = search(
         horizon,
         initial,
         replace(
             optimization,
-            solver_deterministic_time_limit=final_cap if seed is not None else final_cap - 1,
+            solver_deterministic_time_limit=search_cap,
             solver_time_limit_seconds=final_wall,
         ),
         transfer,
@@ -112,7 +135,7 @@ def optimize_guarded_window(
                 "seed_completed": seed is not None,
                 "configured_total": budget,
                 "seed_cap": seed_cap,
-                "final_cap_including_hold": final_cap,
+                "final_cap_including_hold": final_cap if remaining is None else remaining,
                 "seed_work": seed_work,
                 "final_work_including_hold": final_work + hold_work,
                 "actual_total": seed_work + final_work + hold_work,

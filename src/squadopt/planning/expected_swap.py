@@ -30,6 +30,8 @@ from squadopt.planning.models import (
 from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.scenarios.expected_lineup import expected_lineup_score
 
+WORK_TOLERANCE = 0.01
+
 
 def checked_work(value: object, cap: float) -> float:
     """Bad accounting is an error, never permission for fresh solver work."""
@@ -39,7 +41,7 @@ def checked_work(value: object, cap: float) -> float:
         or not isfinite(float(value))
         or not isfinite(cap)
         or cap < 0
-        or not 0 <= float(value) <= cap + 0.01
+        or not 0 <= float(value) <= cap + WORK_TOLERANCE
     ):
         raise ValueError("Invalid deterministic-work accounting for expected windows.")
     return float(value)
@@ -280,6 +282,7 @@ def propose_expected_swap(
         protect_hold=False,
         incumbent_plan=None,
         protect_incumbent=False,
+        phase_remaining=deterministic_slack,
     )
     record.update(
         status=candidate.solver_status.name,

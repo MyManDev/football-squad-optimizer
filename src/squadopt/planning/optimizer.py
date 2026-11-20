@@ -4,8 +4,9 @@ from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal
+from functools import partial
 from itertools import chain, pairwise
-from math import lcm
+from math import isfinite, lcm
 from numbers import Integral
 from time import perf_counter
 from typing import Final
@@ -1485,6 +1486,7 @@ def optimize_transfer_plan(
     incumbent_plan: TransferPlanResult | None = None,
     protect_incumbent: bool = False,
     chip_tail: ChipTailTable | None = None,
+    phase_remaining: float | None = None,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
 
@@ -1495,6 +1497,9 @@ def optimize_transfer_plan(
     ``protect_incumbent`` additionally retains the certified witness after UNKNOWN
     or a worse feasible search. Its value is computed from the current model, never
     read from the supplied result. A retained witness is FEASIBLE, not an optimum.
+
+    ``phase_remaining`` also bounds the sum of protection, native certification
+    and CP search when the caller accounts for a previously started phase.
 
     ``fixed_week_squads`` is an opt-in temporal neighborhood: named gameweeks keep
     their entire squad, while all bank, transfer, chip and XI constraints still span
@@ -1660,6 +1665,16 @@ def optimize_transfer_plan(
         deterministic_limit = PLAN_DETERMINISTIC_TIME_LIMIT
         wall_limit = max(wall_limit, PLAN_WALL_CEILING_SECONDS)
         deterministic_budget_source = "planner_default"
+    if phase_remaining is not None:
+        if (
+            isinstance(phase_remaining, bool)
+            or not isfinite(phase_remaining)
+            or phase_remaining <= 0
+        ):
+            raise TransferPlanningValidationError(
+                "Remaining phase work must be finite and positive."
+            )
+        deterministic_limit = min(deterministic_limit, phase_remaining)
     incumbent_deterministic_time = 0.0
     incumbent_solver: cp_model.CpSolver | None = None
     incumbent_value: int | None = None
@@ -1700,7 +1715,8 @@ def optimize_transfer_plan(
         for variable in artifacts.transfer_count_vars:
             hold_model.add(variable == 0)
         probe = cp_model.CpSolver()
-        configure_solver(probe, optimization_config, min(wall_limit, 30.0), 1.0)
+        hold_cap = 1.0 if phase_remaining is None else min(1.0, phase_remaining)
+        configure_solver(probe, optimization_config, min(wall_limit, 30.0), hold_cap)
         if linearization_level is not None:
             probe.parameters.linearization_level = linearization_level
         hold_raw = _solve(hold_model, probe)
@@ -1708,7 +1724,7 @@ def optimize_transfer_plan(
         hold_deterministic_time = _deterministic_time_used(probe, hold_raw)
         if hold_status is SolverStatus.OPTIMAL or (
             hold_status is SolverStatus.FEASIBLE
-            and hold_deterministic_time >= 1.0 - MIN_TIEBREAK_DETERMINISTIC_TIME
+            and hold_deterministic_time >= hold_cap - MIN_TIEBREAK_DETERMINISTIC_TIME
         ):
             hold_solver = probe
             hold_value = int(probe.value(artifacts.primary_objective))
@@ -1716,9 +1732,29 @@ def optimize_transfer_plan(
             for index in range(len(artifacts.model.proto.variables)):
                 variable = artifacts.model.get_int_var_from_proto_index(index)
                 artifacts.model.add_hint(variable, probe.value(variable))
-    primary_solver, raw_primary_status, native_details = solve_window_model(
-        artifacts.model, primary_solver, _solve, weeks=len(verified_horizon.gameweeks)
-    )
+    if phase_remaining is not None:
+        # An incomplete seed uses a separate hold probe. Keep its unspent work
+        # available, without increasing the original primary search allowance.
+        deterministic_limit = min(
+            deterministic_limit, max(0.0, phase_remaining - hold_deterministic_time)
+        )
+        search_limit = max(0.0, deterministic_limit - incumbent_deterministic_time)
+        primary_solver.parameters.max_deterministic_time = search_limit
+    native_details: dict[str, object]
+    if phase_remaining is not None and search_limit <= 0:
+        raw_primary_status, native_details = int(cp_model.UNKNOWN), {}
+    else:
+        search = (
+            partial(solve_window_model, charge_rejected_certificate=True)
+            if phase_remaining is not None
+            else solve_window_model
+        )
+        primary_solver, raw_primary_status, native_details = search(
+            artifacts.model,
+            primary_solver,
+            _solve,
+            weeks=len(verified_horizon.gameweeks),
+        )
     primary_status = _map_solver_status(raw_primary_status)
     used_incumbent = False
     if protect_incumbent:
@@ -1742,13 +1778,13 @@ def optimize_transfer_plan(
     if hold_solver is not None and primary_status is SolverStatus.INFEASIBLE:
         raise SolverExecutionError("Full search contradicts its verified feasible hold plan.")
     primary_deterministic_time = _deterministic_time_used(primary_solver, raw_primary_status)
-    # A CP-SAT fallback ran with its whole budget, so the work the certificate spent on a
-    # rejected native witness is not the search's. It stays out of the primary counter,
-    # the exhaustion flag, the tie-break's remaining budget and ``deterministic_time_used``
-    # (which callers hold to their own budgets), and is reported at the top level, where
-    # runtime counters live: nested metadata also enters immutable horizon records.
+    # Preserve the separate native-fallback counter for ordinary jobs. Inside
+    # an explicitly bounded phase a rejected certificate also spent its work.
     verification_work = native_details.pop("verification_work_before_fallback", 0.0)
     assert isinstance(verification_work, (int, float))
+    primary_charge = primary_deterministic_time + (
+        verification_work if phase_remaining is not None else 0.0
+    )
     divisor = settings.objective_weight_scale * optimization_config.expected_points_scale
     diagnostics: dict[str, object] = {
         "solver_backend": (
@@ -1809,10 +1845,10 @@ def optimize_transfer_plan(
         "primary_deterministic_time": primary_deterministic_time,
         "tiebreak_deterministic_time_limit": None,
         "tiebreak_deterministic_time": None,
-        "deterministic_time_used": incumbent_deterministic_time + primary_deterministic_time,
+        "deterministic_time_used": incumbent_deterministic_time + primary_charge,
         "deterministic_time_budget_exhausted": (
             primary_status is not SolverStatus.OPTIMAL
-            and primary_deterministic_time >= search_limit - MIN_TIEBREAK_DETERMINISTIC_TIME
+            and primary_charge >= search_limit - MIN_TIEBREAK_DETERMINISTIC_TIME
         ),
         "tiebreak_attempted": False,
         "tiebreak_status": None,
@@ -1852,7 +1888,7 @@ def optimize_transfer_plan(
             "objective_value": None if hold_value is None else hold_value / divisor,
             "selected": used_hold,
             "deterministic_time": hold_deterministic_time,
-            "deterministic_time_limit": 1.0,
+            "deterministic_time_limit": hold_cap,
         }
     if used_incumbent:
         assert incumbent_solver is not None and incumbent_value is not None
@@ -1910,7 +1946,7 @@ def optimize_transfer_plan(
     result_solver = primary_solver
     remaining_deterministic_time = _remaining_deterministic_time(
         deterministic_limit,
-        incumbent_deterministic_time + primary_deterministic_time,
+        incumbent_deterministic_time + primary_charge,
     )
     deterministic_budget_available = (
         remaining_deterministic_time is None
@@ -1969,7 +2005,7 @@ def optimize_transfer_plan(
         diagnostics["tiebreak_status"] = _raw_status_name(raw_tiebreak_status)
         diagnostics["tiebreak_deterministic_time"] = tiebreak_deterministic_time
         diagnostics["deterministic_time_used"] = (
-            incumbent_deterministic_time + primary_deterministic_time + tiebreak_deterministic_time
+            incumbent_deterministic_time + primary_charge + tiebreak_deterministic_time
         )
         diagnostics["deterministic_time_budget_exhausted"] = (
             remaining_deterministic_time is not None
