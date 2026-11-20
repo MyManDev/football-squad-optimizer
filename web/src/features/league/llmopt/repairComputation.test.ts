@@ -9,10 +9,13 @@ import type { AdviceClient } from "../advice/adviceClient";
 import { PATIENCE_EXHAUSTED, QUEUE_PATIENCE_MS } from "../advice/useAdviceJob";
 import { deviceAdviceClient } from "../device/adviceClient";
 import type { LpSolver } from "../device/lp/problem";
+import { shownPriorityReference } from "../device/priorityWitness";
 import { replyTo } from "../device/replies";
+import { withinCeiling } from "../device/solve/ceiling";
 import { solvePlan } from "../device/solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "../device/types";
 import type { DeviceSolver } from "../device/useDevicePlan";
+import { deviceWorkReceipt } from "../device/workBudget";
 import type { Constraint, PlanDraft } from "./intent";
 import type { EntryAdvice } from "../types";
 import { expectedNet } from "./planComparison";
@@ -52,7 +55,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function clientForFixture(inputs = document) {
+function clientForFixture(inputs = document, native: LpSolver = solver) {
   const remote = {
     readCapabilities: vi.fn().mockResolvedValue({
       ...publicEntryCapabilities(squad),
@@ -81,7 +84,9 @@ function clientForFixture(inputs = document) {
         postMessage(input) {
           posted(input);
           queueMicrotask(() =>
-            replyTo(solver, input, (data) => worker.onmessage?.({ data } as MessageEvent)),
+            replyTo(withinCeiling(native), input, (data) =>
+              worker.onmessage?.({ data } as MessageEvent),
+            ),
           );
         },
       };
@@ -135,10 +140,20 @@ it("solves just the mandatory transfer witness and its independent confirmation"
   expect(remote.requestAdvice).not.toHaveBeenCalled();
 });
 
-it.each([false, true])(
-  "recalculates the preference-selected one-week witness (priority program: %s)",
-  async (priority) => {
-    const { client, posted, remote } = clientForFixture();
+it.each(["individual", "proved main", "unproved main"])(
+  "recalculates and restores the preferred one-week repair with %s",
+  async (mode) => {
+    const priority = mode !== "individual";
+    let interruptMain = mode === "unproved main";
+    const { client, posted, remote } = clientForFixture(document, {
+      solve(problem, options) {
+        const answer = solver.solve(problem, options);
+        if (!interruptMain) return answer;
+        // Keep the real integer incumbent, but simulate the main search ending without a proof.
+        interruptMain = false;
+        return { ...answer, Status: "Time limit reached", ObjectiveValue: 1e9 };
+      },
+    });
     const dataId = await client.readDeviceDataId!();
     const owner = { runId, dataId, failedBase: true };
     const options = { squad, window: 1 as const };
@@ -148,7 +163,7 @@ it.each([false, true])(
       ...(priority ? { priority: 1 as const } : {}),
     };
     const draft: PlanDraft = {
-      hard: [],
+      hard: priority ? [{ kind: "buy_player", week: 1, player_id: 104 }] : [],
       soft: [soft],
       ...(priority ? { max_total_cost_tenths: 1000 } : {}),
     };
@@ -182,6 +197,39 @@ it.each([false, true])(
     expect(matchesRepair(parent.envelope.payload, result)).toBe(false);
     expect(posted).toHaveBeenCalledTimes(2);
     for (const [input] of posted.mock.calls) expect(input).not.toHaveProperty("alternatives");
+    if (priority) {
+      const main = parent.envelope.payload;
+      const [candidate, replay] = posted.mock.calls.map(([input]) => input);
+      expect(main.solver_status).toBe(mode === "proved main" ? "OPTIMAL" : "FEASIBLE");
+      expect(candidate!.priorityMain).toBe(true);
+      expect(candidate!.priorityReference).toBeUndefined();
+      expect(replay!.priorityMain).toBeUndefined();
+      expect(replay!.priorityReference).toEqual(shownPriorityReference(main));
+      for (const plan of [main, witness, result]) {
+        expect(plan.plan_weeks![0]!.transfers_in.map((p) => p.player_id)).toContain(104);
+      }
+      for (const plan of [witness, result]) {
+        expect(plan.priority_preferences!.reference_proved).toBe(main.solver_status === "OPTIMAL");
+        expect(plan.priority_preferences!.total_cost).toBeCloseTo(
+          expectedNet(main)! - expectedNet(plan)!,
+          10,
+        );
+      }
+      const beforeReload = deviceWorkReceipt(runId);
+      expect(beforeReload?.units).toBe(8);
+      const restored = clientForFixture();
+      const repeated = await computeRepairPlan(
+        restored.client,
+        verification,
+        document.source_snapshot_id,
+        dataId,
+        new AbortController().signal,
+      );
+      expect(matchesRepair(witness, repeated)).toBe(true);
+      expect(deviceWorkReceipt(runId)).toEqual(beforeReload);
+      expect(restored.posted).not.toHaveBeenCalled();
+      expect(restored.remote.requestAdvice).not.toHaveBeenCalled();
+    }
     expect(remote.requestAdvice).not.toHaveBeenCalled();
   },
 );

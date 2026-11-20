@@ -2227,8 +2227,16 @@ def optimize_priority_preferences(
                 break
             count = int(phase.solver.value(objective))
             if phase.status is not SolverStatus.OPTIMAL and count != len(indices):
-                exhausted = True
-                break
+                # The one-way indicators may still be zero in an interrupted
+                # incumbent. Its physical decisions can prove the same upper bound.
+                if all(
+                    _priority_predicate(predicates[i], artifacts.model, phase.solver)
+                    for i in indices
+                ):
+                    count = len(indices)
+                else:
+                    exhausted = True
+                    break
             artifacts.model.add(objective == count)
             completed.append(priority)
             # A certified decision can meet this count even if its old flag

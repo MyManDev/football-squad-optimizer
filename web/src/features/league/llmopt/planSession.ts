@@ -63,7 +63,7 @@ export interface PlanSessionContext {
 export function readPlanSession(context: PlanSessionContext): unknown {
   if (context.deadline === null) return null;
   try {
-    const fallback = history.state?.llmoptSession;
+    const fallback = history.state?.llmoptSession ?? history.state?.usr?.llmoptSession;
     let raw: string | null = null;
     try {
       raw = sessionStorage.getItem(context.key);
@@ -97,16 +97,22 @@ export function writePlanSession(
   let retained = false;
   try {
     sessionStorage.setItem(key, raw);
-    retained = true;
+    retained = sessionStorage.getItem(key) === raw;
   } catch {
     /* Try history below. */
   }
   try {
-    history.replaceState(
-      { ...history.state, llmoptSession: retained ? undefined : { key, raw } },
-      "",
-    );
-    retained = true;
+    const prior = history.state?.llmoptSession ?? history.state?.usr?.llmoptSession;
+    const useFallback = !retained && !!session.confirmation?.runId;
+    if (!useFallback && !prior) return retained;
+    const state = { ...history.state, llmoptSession: useFallback ? { key, raw } : undefined };
+    if (state.usr?.llmoptSession) {
+      state.usr = { ...state.usr };
+      delete state.usr.llmoptSession;
+    }
+    history.replaceState(state, "");
+    retained ||=
+      history.state?.llmoptSession?.raw === raw && history.state.llmoptSession.key === key;
   } catch {
     /* Refuse new work if neither store can retain its identity. */
   }
