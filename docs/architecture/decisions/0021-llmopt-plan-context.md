@@ -14,8 +14,13 @@ preserve bench order. Exclude elapsed time, proof metadata, translated labels,
 request/run identifiers and player names. Identical computed content under the
 same data identity keeps its identifier across reload and recomputation.
 
-The server data identity hashes the existing immutable advice context, without
-changing its cache key. Carry it on computed advice and capabilities. Device
+The server data identity hashes the existing immutable advice context.
+An enabled worker records provenance separately from the immutable answer. The receipt
+binds each plan's data identifier to the answer address and exact bytes.
+The connected and public entry APIs expose `plan_data_id` only when enabled and
+the worker supplied provenance. Both settings store the original ordinary answer bytes
+under the existing key. On rollback a warm read returns the ordinary answer. Opening
+the setting leaves a previously unversioned warm answer unversioned. Device
 plans use their checked input-table/member fingerprint. An unversioned legacy
 answer may be displayed but is not offered as a conversational plan reference.
 The project owner approved this treatment of legacy results.
@@ -44,6 +49,11 @@ plan; substitutions create the existing comparison request and use its computed
 differences. Reuse unaffected results and preserve the shared run admission
 limit. Old data is removed from the conversational catalogue, not relabelled as
 current. No credential enters the catalogue, identity, history or storage.
+
+The existing comparison table remains available in both modes. Only a current grant
+adds the total transfer penalty and the weekly net points, penalty, budget and free
+transfers to revision and scenario comparisons. The closed check endpoint rejects
+any top-level `plan_command` property, including null.
 
 A substitution fixes both the old player's exclusion and the replacement's
 inclusion in the new main calculation. Retain the selected computed reference

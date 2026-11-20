@@ -45,19 +45,22 @@ it.each(Object.keys(PROVIDERS) as OwnKeyProvider[])(
       expect((request.body.messages as { content: string }[])[0]!.content).toContain(
         JSON.stringify(schema),
       );
-    function visit(node: unknown) {
-      if (!node || typeof node !== "object") return;
-      if (Array.isArray(node)) {
-        node.forEach(visit);
-        return;
+    interface Schema {
+      type?: string | string[];
+      properties?: Record<string, Schema>;
+      items?: Schema;
+      anyOf?: Schema[];
+    }
+    function visit(node: Schema) {
+      if (node.anyOf) {
+        expect(Object.keys(node)).toEqual(["anyOf"]);
+        expect(node.anyOf.length).toBeGreaterThan(0);
+        node.anyOf.forEach(visit);
+      } else {
+        expect(node).toHaveProperty("type");
       }
-      const value = node as Record<string, unknown>;
-      if (value.properties)
-        for (const field of Object.values(
-          value.properties as Record<string, Record<string, unknown>>,
-        ))
-          expect(field).toHaveProperty("type");
-      Object.values(value).forEach(visit);
+      Object.values(node.properties ?? {}).forEach(visit);
+      if (node.items) visit(node.items);
     }
     visit(schema);
   },

@@ -20,8 +20,8 @@ from fastapi.testclient import TestClient
 from squadopt.api.app import create_app
 from squadopt.application.advice_capabilities import menu_capabilities
 from squadopt.platform import advice_worker
-from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import FileAdviceJobSpecStore
+from squadopt.platform.advice_plan_cache import PlanAdviceCache
 from squadopt.platform.advice_queue import FileJobQueue, run_advice_worker_once
 from squadopt.platform.advice_read import AdviceReadStore, PreferencePlayers
 from squadopt.platform.advice_runs import FileRunStore
@@ -158,7 +158,7 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
         }
     )
     queue = ObservedQueue(root / "queue")
-    cache = FileAdviceCache(root / "answers")
+    cache = PlanAdviceCache(root / "answers", llmopt_vnext=config.llmopt_vnext)
     specs = FileAdviceJobSpecStore(root / "specs")
 
     def capture_for_key(key):
@@ -190,9 +190,14 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
         max_open_jobs_per_client=config.max_open_jobs_per_client,
     )
     app = create_app(
-        advice_store=reader, advice_submit=submit, utc_now=lambda: datetime.fromisoformat(stamp)
+        advice_store=reader,
+        advice_submit=submit,
+        llmopt_vnext=config.llmopt_vnext,
+        utc_now=lambda: datetime.fromisoformat(stamp),
     )
-    compute = build_advice_compute(contexts, specs, cache=cache, runs=runs)
+    compute = build_advice_compute(
+        contexts, specs, cache=cache, runs=runs, llmopt_vnext=config.llmopt_vnext
+    )
     case = f"gw{inputs.gameweek}-{entry}"
     identifier = hashlib.sha256(f"{case}:{window}:{enabled}".encode()).hexdigest()[:32]
     published = publication(frozen["source_commit"], "device-plan")
@@ -331,6 +336,7 @@ def provenance(*, require_clean=True):
         ROOT / "web/src/features/league/llmopt/preferenceExecution.ts",
         ROOT / "web/src/features/league/device/adviceClient.ts",
         ROOT / "web/src/features/league/device/requests.ts",
+        ROOT / "src/squadopt/platform/advice_plan_cache.py",
         ROOT / "src/squadopt/platform/advice_read.py",
         ROOT / "src/squadopt/platform/advice_worker.py",
         ROOT / "src/squadopt/platform/backend_runtime.py",

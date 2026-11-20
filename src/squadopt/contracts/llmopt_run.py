@@ -97,7 +97,7 @@ def run_ledger_schema() -> dict[str, object]:
             "limit": {"type": "number", "enum": [21, 63, 122, 366]},
             "runs": {"type": "array", "items": identifier, "minItems": 1, "uniqueItems": True},
             "legacy_consumer": {"type": "boolean"},
-            "receipt": {"type": ["object", "null"]},
+            "receipt": {"type": ["object", "null"], "properties": {"answer_sha256": key}},
         },
     }
     return {

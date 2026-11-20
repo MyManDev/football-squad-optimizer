@@ -336,6 +336,7 @@ def build_advice_compute(
     progress: ProgressRecorder | None = None,
     public_inputs: PublicEntryInputs | None = None,
     runs: FileRunStore | None = None,
+    llmopt_vnext: bool = False,
 ) -> Callable[[AdviceJob], bytes]:
     """Return the callback that turns one claimed job into the bytes it will be served as.
 
@@ -668,7 +669,8 @@ def build_advice_compute(
             advice["official_injuries"] = capture.switches.official_injuries.public_record(
                 _injury_fact_ids(advice)
             )
-        advice["plan_data_id"] = advice_context_identity(spec.context)
+        if llmopt_vnext:
+            advice["plan_data_id"] = advice_context_identity(spec.context)
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a
@@ -700,13 +702,17 @@ def build_advice_compute(
                 raise RunAdmissionError(
                     "RUN_STORE_UNAVAILABLE", "The admitted work is unavailable."
                 )
+            result = None
             try:
                 with work_budget(budget):
-                    return compute(job)
+                    result = compute(job)
+                    return result
             finally:
                 if budget is not None:
                     assert runs is not None
-                    runs.finish(job.job_id, budget)
+                    runs.finish(
+                        job.job_id, budget, rollback_answer=None if llmopt_vnext else result
+                    )
         except RunAdmissionError as error:
             raise AdviceComputeRefused(error.code, str(error)) from error
         except WorkBudgetExhausted as error:
@@ -1118,6 +1124,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 progress=running.queue.record_progress,
                 public_inputs=running.public_inputs,
                 runs=running.runs,
+                llmopt_vnext=running.config.llmopt_vnext,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.
