@@ -41,6 +41,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | LLMOPT priorities and one preference job | [Frozen twenty-member API/worker replay](llmopt_phase3_jobs.md) and [implementation](llmopt_phase3_status.md) |
 | LLMOPT shared run admission | [Local admission replay](llmopt_phase2/README.md) |
 | Five-free-transfer accounting preflight | [Saved served-path probe and unresolved capture gap](llmopt_window_budget_probe.md) |
+| Five-free-transfer expected windows | [Paired results for the twenty frozen member-weeks](expected_window_guard.md) |
 | Fixture football candidate and observed planning | [Implementation and evidence contract](football_candidate_development.md) |
 | Private set-piece duties candidate | [Source, learned allocation, synthetic checks and real-use gates](football_set_piece_duties.md) |
 | Private tactical matchup candidate | [Source, model, synthetic checks and real-use gates](football_tactical_matchup_development.md) |
