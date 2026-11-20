@@ -1,5 +1,12 @@
 # Measurements Index
 
+- 2026-11-20. LLMOPT priorities on twenty frozen member-weeks produced 80 local
+  API/worker run records at both windows and in both modes. At three weeks 10/20
+  completed all three layers, or 10/16 with a feasible main. Their preference jobs
+  charged 2,660.992 of 5,856 available units across the 16 eligible runs. No run
+  exceeded two server jobs and 192 repeats opened zero extra jobs. #1467.
+  [Measurement](research/llmopt_phase3_jobs.md), [record](research/llmopt_phase3_jobs.json)
+
 - 2026-11-19: [LLMOPT real solver budget controls](research/llmopt_phase2_solver_budget.md),
   [record](research/llmopt_phase2_solver_budget.json): twenty frozen member-weeks at
   both windows; 40/40 original statuses and decisions, 32 equal numeric objectives

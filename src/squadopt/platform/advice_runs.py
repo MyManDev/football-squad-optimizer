@@ -19,7 +19,7 @@ from typing import Any
 
 from squadopt.contracts.llmopt_run import RunReference, job_capacity, run_capacity
 from squadopt.data.atomic import replace_retrying
-from squadopt.optimization.work_budget import WorkBudget
+from squadopt.optimization.work_budget import WorkBudget, WorkBudgetExhausted
 from squadopt.platform.queue_contracts import JobQueue
 from squadopt.platform.storage._queue_lock import QueueFileLock
 
@@ -31,6 +31,87 @@ class RunAdmissionError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+def _reservation(job: dict[str, Any]) -> float:
+    receipt = job.get("receipt")
+    if isinstance(receipt, dict) and "attempt" in receipt and "charged" in receipt:
+        return float(receipt["charged"])
+    return float(job["limit"])
+
+
+def _spent(receipt: dict[str, Any]) -> float:
+    return float(receipt["cp_used"] + receipt["native_reserved"] + receipt["unconfirmed"])
+
+
+def _bundle_receipt(attempt: int, *, finished: bool = False) -> dict[str, Any]:
+    return {
+        "attempt": attempt,
+        "pending": 0.0,
+        "unconfirmed": 0.0,
+        "cp_used": 0.0,
+        "native_reserved": 0.0,
+        "calls": 0,
+        "finished": finished,
+    }
+
+
+def _close_grant(receipt: dict[str, Any]) -> None:
+    receipt["unconfirmed"] += receipt["pending"]
+    receipt.update(pending=0.0, finished=True)
+
+
+class BundleWorkJournal:
+    """Persist each solver grant before the current queue attempt may use it."""
+
+    def __init__(self, store: FileRunStore, job_id: str, attempt: int) -> None:
+        self.store = store
+        self.job_id = job_id
+        self.attempt = attempt
+
+    @contextmanager
+    def _update(self) -> Iterator[tuple[dict[str, Any], float]]:
+        with self.store.transaction() as tx:
+            job = tx.state["jobs"][self.job_id]
+            receipt = job["receipt"]
+            if receipt["attempt"] != self.attempt or receipt.get("finished"):
+                raise WorkBudgetExhausted("This attempt no longer owns the planning work.")
+            yield receipt, float(job["limit"])
+            self.store._save(tx.state)
+
+    def begin_cp(self, requested: float) -> float:
+        with self._update() as (receipt, limit):
+            remaining = limit - _spent(receipt)
+            grant = min(requested, remaining)
+            single = limit / 3
+            if grant > single:
+                grant = min(grant, max(single, remaining - single / 4))
+            if grant <= 0 or receipt["pending"] != 0:
+                raise WorkBudgetExhausted("No further planning work can start.")
+            receipt["pending"] = grant
+            receipt["calls"] += 1
+            return grant
+
+    def finish_cp(self, used: float) -> None:
+        with self._update() as (receipt, _):
+            if receipt["pending"] <= 0 or not math.isfinite(used) or used < 0:
+                raise WorkBudgetExhausted("The planning work cannot be confirmed.")
+            receipt["cp_used"] += used
+            receipt["pending"] = 0.0
+
+    def abandon_cp(self) -> float:
+        with self._update() as (receipt, _):
+            grant = float(receipt["pending"])
+            receipt["unconfirmed"] += grant
+            receipt["pending"] = 0.0
+            return grant
+
+    def reserve_native(self, units: int) -> None:
+        with self._update() as (receipt, limit):
+            if receipt["pending"] or units > limit - _spent(receipt):
+                raise WorkBudgetExhausted("The native solve cannot fit the admitted work.")
+            receipt["native_reserved"] += units
+            receipt["calls"] += 1
 
 
 class RunTransaction:
@@ -85,25 +166,56 @@ class RunTransaction:
         value = self.state["runs"][ref.run_id]["requests"].get(key)
         return str(value) if value is not None else None
 
-    def reserve(self, ref: RunReference, key: str, job_id: str) -> None:
+    def release_failed_bundles(self, run_id: str, queue: JobQueue) -> None:
+        owners: set[str] = set()
+        for identifier in self.state["runs"][run_id]["requests"].values():
+            job = self.state["jobs"][identifier]
+            receipt = job["receipt"]
+            if job["limit"] not in (63, 366) or (
+                receipt is not None and ("attempt" not in receipt or "charged" in receipt)
+            ):
+                continue
+            record = queue.load(identifier)
+            if record is None or record.status not in ("failed", "cancelled"):
+                continue
+            if receipt is None:
+                # Allocation never published its first grant, so no solver could start.
+                receipt = job["receipt"] = _bundle_receipt(record.attempt, finished=True)
+            _close_grant(receipt)
+            receipt["charged"] = min(job["limit"], _spent(receipt))
+            owners.update(job["runs"])
+        if owners:
+            for owner in owners:
+                run = self.state["runs"][owner]
+                run["reserved"] = math.fsum(
+                    _reservation(self.state["jobs"][identifier])
+                    for identifier in run["requests"].values()
+                )
+            self.store._save(self.state)
+
+    def reserve(
+        self, ref: RunReference, key: str, job_id: str, *, preference_bundle: bool = False
+    ) -> None:
         run = self.state["runs"][ref.run_id]
         previous = run["requests"].get(key)
         if previous is not None:
             if previous != job_id:
                 raise RunAdmissionError("RUN_REQUEST_CHANGED", "The original request is retained.")
             return
-        units = job_capacity(run["window"])
+        units = job_capacity(run["window"]) * (3 if preference_bundle else 1)
         if len(set(run["requests"].values())) >= 4 or run["reserved"] + units > run_capacity(
             run["window"]
         ):
             raise RunAdmissionError("RUN_BUDGET_EXHAUSTED", "The completed plans are available.")
         run["requests"][key] = job_id
-        run["reserved"] += units
         job = self.state["jobs"].setdefault(
             job_id, {"limit": units, "runs": [], "receipt": None, "legacy_consumer": False}
         )
         if ref.run_id not in job["runs"]:
             job["runs"].append(ref.run_id)
+        run["reserved"] = math.fsum(
+            _reservation(self.state["jobs"][identifier]) for identifier in run["requests"].values()
+        )
         self.store._save(self.state)
 
     def cached(self, ref: RunReference) -> None:
@@ -282,7 +394,12 @@ class FileRunStore:
             if (
                 type(reserved) not in (int, float)
                 or not math.isfinite(reserved)
-                or reserved != len(run["requests"]) * job_capacity(run["window"])
+                or reserved > run_capacity(run["window"])
+                or reserved
+                != math.fsum(
+                    _reservation(state["jobs"].get(job_id, {"limit": -1}))
+                    for job_id in run["requests"].values()
+                )
             ):
                 raise ValueError("Invalid planning run reservation.")
             for key, job_id in run["requests"].items():
@@ -291,19 +408,46 @@ class FileRunStore:
                     re.fullmatch(r"[0-9a-f]{64}", key) is None
                     or not isinstance(job, dict)
                     or identifier not in job.get("runs", [])
+                    or job.get("limit")
+                    not in (job_capacity(run["window"]), 3 * job_capacity(run["window"]))
                 ):
                     raise ValueError("Invalid planning job association.")
         for job in state["jobs"].values():
             if (
                 not isinstance(job, dict)
                 or set(job) != {"limit", "runs", "receipt", "legacy_consumer"}
-                or job["limit"] not in (21.0, 122.0)
+                or job["limit"] not in (21.0, 63.0, 122.0, 366.0)
                 or not isinstance(job["runs"], list)
                 or not job["runs"]
                 or type(job["legacy_consumer"]) is not bool
                 or any(owner not in state["runs"] for owner in job["runs"])
             ):
                 raise ValueError("Invalid planning job allocation.")
+            receipt = job["receipt"]
+            if not isinstance(receipt, dict) or "attempt" not in receipt:
+                continue
+            if (
+                type(receipt["attempt"]) is not int
+                or receipt["attempt"] < 1
+                or type(receipt.get("calls")) is not int
+                or receipt["calls"] < 0
+                or type(receipt.get("finished")) is not bool
+                or any(
+                    type(receipt.get(field)) not in (int, float)
+                    or not math.isfinite(receipt[field])
+                    or receipt[field] < 0
+                    for field in ("pending", "cp_used", "native_reserved", "unconfirmed")
+                )
+                or (
+                    "charged" in receipt
+                    and (
+                        type(receipt["charged"]) not in (int, float)
+                        or not math.isfinite(receipt["charged"])
+                        or not 0 <= receipt["charged"] <= job["limit"]
+                    )
+                )
+            ):
+                raise ValueError("Invalid bundle work receipt.")
 
     def _save(self, state: dict[str, Any]) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
@@ -340,11 +484,43 @@ class FileRunStore:
                     ):
                         queue.cancel_pending(identifier, at_utc=at_utc)
 
-    def allocation(self, job_id: str) -> WorkBudget | None:
+    def allocation(self, job_id: str, *, attempt: int = 1) -> WorkBudget | None:
         with self.transaction() as tx:
             job = tx.state["jobs"].get(job_id)
             if job is None:
                 return None
+            if job["limit"] in (63, 366):
+                receipt = job["receipt"]
+                if (
+                    attempt > 1
+                    and not job["legacy_consumer"]
+                    and all(tx.state["runs"][owner]["closed"] for owner in job["runs"])
+                ):
+                    if (
+                        isinstance(receipt, dict)
+                        and "attempt" in receipt
+                        and attempt > receipt["attempt"]
+                    ):
+                        _close_grant(receipt)
+                        receipt["attempt"] = attempt
+                        self._save(tx.state)
+                    raise RunAdmissionError("RUN_CANCELLED", "This planning run has ended.")
+                if receipt is None:
+                    receipt = job["receipt"] = _bundle_receipt(attempt)
+                elif (
+                    "attempt" not in receipt
+                    or attempt <= receipt["attempt"]
+                    or "charged" in receipt
+                ):
+                    raise RunAdmissionError("RUN_BUDGET_EXHAUSTED", "The admitted work was used.")
+                else:
+                    _close_grant(receipt)
+                    receipt.update(attempt=attempt, pending=0.0, finished=False)
+                self._save(tx.state)
+                return WorkBudget(
+                    max(0.0, job["limit"] - _spent(receipt)),
+                    journal=BundleWorkJournal(self, job_id, attempt),
+                )
             # Retries cannot reset work: previous execution was charged its entire limit.
             if job["receipt"] is not None:
                 raise RunAdmissionError("RUN_BUDGET_EXHAUSTED", "The admitted work was used.")
@@ -355,9 +531,15 @@ class FileRunStore:
     def finish(self, job_id: str, budget: WorkBudget) -> None:
         with self.transaction() as tx:
             job = tx.state["jobs"][job_id]
-            job["receipt"] = {
-                "cp_used": budget.cp_used,
-                "native_reserved": budget.native_reserved,
-                "calls": budget.calls,
-            }
+            if isinstance(budget.journal, BundleWorkJournal):
+                receipt = job["receipt"]
+                if receipt["attempt"] != budget.journal.attempt or receipt["finished"]:
+                    return
+                _close_grant(receipt)
+            else:
+                job["receipt"] = {
+                    "cp_used": budget.cp_used,
+                    "native_reserved": budget.native_reserved,
+                    "calls": budget.calls,
+                }
             self._save(tx.state)

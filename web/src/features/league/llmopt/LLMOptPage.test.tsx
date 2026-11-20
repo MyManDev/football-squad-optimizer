@@ -80,6 +80,7 @@ let LLMOptPage: typeof Page;
 let roster: "ok" | "fail" | "late";
 let releaseRoster: () => void;
 let releaseEnabled: boolean;
+let bundlesOffered: boolean;
 let rosterGate: Promise<void>;
 let intent: Mock<(body: Record<string, unknown>) => Response>;
 const clients: QueryClient[] = [];
@@ -92,6 +93,7 @@ beforeAll(async () => {
 beforeEach(() => {
   jobs.length = 0;
   releaseEnabled = true;
+  bundlesOffered = false;
   roster = "ok";
   rosterGate = new Promise<void>((resolve) => (releaseRoster = resolve));
   intent = vi.fn(
@@ -117,6 +119,9 @@ beforeEach(() => {
           top100: { available: false, weights: [0] },
           managers_word: { available: false },
           ...(releaseEnabled ? { llmopt_vnext: true } : {}),
+          ...(bundlesOffered
+            ? { preference_bundles: { version: "llmopt_preference_bundle_v1" } }
+            : {}),
         });
       }
       if (url === `${ORIGIN}/api/v1/contributions/players`) {
@@ -202,10 +207,11 @@ async function ready() {
   return screen.findByRole("heading", { level: 1, name: en.title });
 }
 
-async function sendMessage(text: string) {
+async function sendMessage(text: string, language: "en" | "tr" = "en") {
   const user = userEvent.setup();
-  await user.type(screen.getByRole("textbox", { name: en.chat }), text);
-  const send = screen.getByRole("button", { name: en.send });
+  const copy = LLMOPT_COPY[language];
+  await user.type(screen.getByRole("textbox", { name: copy.chat }), text);
+  const send = screen.getByRole("button", { name: copy.send });
   await waitFor(() => expect(send).toBeEnabled());
   await user.click(send);
 }
@@ -985,6 +991,63 @@ describe("the plan with all preferences", () => {
     await ready();
   }
 
+  it.each([false, true])(
+    "gates priority editing and grouped admission on the master setting %s",
+    async (enabled) => {
+      releaseEnabled = enabled;
+      bundlesOffered = true;
+      intent.mockImplementation(() =>
+        Response.json({
+          status: "draft",
+          draft: { hard: [], soft, max_total_cost_tenths: 15 },
+        }),
+      );
+      open();
+      await ready();
+      await sendMessage("Prefer these players within a total allowance");
+      await screen.findByText(en.understood);
+      if (enabled) {
+        expect(await screen.findByRole("spinbutton", { name: en.totalLimit })).toHaveValue(1.5);
+        expect(screen.getAllByRole("combobox", { name: new RegExp(en.priority) })).toHaveLength(3);
+      } else {
+        expect(screen.queryByRole("spinbutton", { name: en.totalLimit })).toBeNull();
+        expect(screen.queryByRole("combobox", { name: new RegExp(en.priority) })).toBeNull();
+      }
+      await userEvent.click(screen.getByRole("button", { name: en.compute }));
+      if (enabled) {
+        await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+        let request = jobs[0]!.compute.mock.calls[0]![0];
+        expect(request.run?.stage).toBe("base");
+        answer(jobs[0]!, request, 50, []);
+        await waitFor(() => expect(jobs[1]!.compute).toHaveBeenCalledTimes(1));
+        request = jobs[1]!.compute.mock.calls[0]![0];
+        expect(request.run?.stage).toBe("followup");
+        expect(request.preferenceBundle?.program?.preferences).toHaveLength(3);
+        expect(jobs.slice(2).every((job) => !job.compute.mock.calls.length)).toBe(true);
+      } else {
+        await screen.findByText(en.serviceUnavailable);
+        expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+        expect(savedSession()[1]).toMatchObject({ draft: { max_total_cost_tenths: 15 } });
+      }
+    },
+  );
+
+  it("a restored priority run reads its saved preference result after rollback without admitting another stage", async () => {
+    releaseEnabled = false;
+    bundlesOffered = true;
+    await reloadWith(
+      { hard: [], soft, max_total_cost_tenths: 15 },
+      { wildcardNotHeld: false, bundleMode: true, sending: true },
+    );
+    await waitFor(() => expect(jobs[0]!.readCached).toHaveBeenCalledTimes(1));
+    answer(jobs[0]!, jobs[0]!.readCached.mock.calls[0]![0], 50, []);
+    await waitFor(() => expect(jobs[1]!.readCached).toHaveBeenCalledTimes(1));
+    expect(
+      jobs[1]!.readCached.mock.calls[0]![0].preferenceBundle?.program?.preferences,
+    ).toHaveLength(3);
+    expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+  });
+
   async function singlePrices(net: [number, number]) {
     const [base, first, second] = jobs as [FakeJob, FakeJob, FakeJob];
     await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
@@ -994,6 +1057,111 @@ describe("the plan with all preferences", () => {
     answer(first, first.compute.mock.calls[0]![0], net[0]);
     expect(jobs[3]!.compute).not.toHaveBeenCalled();
     answer(second, second.compute.mock.calls[0]![0], net[1]);
+  }
+
+  for (const language of ["tr", "en"] as const) {
+    it.each(["failed", "exhausted", "missing"] as const)(
+      `keeps the base, both completed comparisons and requested preferences in ${language} when the preference plan is %s`,
+      async (outcome) => {
+        const copy = LLMOPT_COPY[language];
+        bundlesOffered = true;
+        intent.mockImplementation(() =>
+          Response.json({
+            status: "draft",
+            draft: {
+              hard: [],
+              soft: [{ kind: "no_hits" }, { kind: "save_chips" }],
+              comparison: { kind: "include_player", player_id: OUTSIDER.id, both: true },
+              max_total_cost_tenths: 15,
+            },
+          }),
+        );
+        open(language);
+        await ready();
+        await sendMessage("Compare", language);
+        await screen.findByText(copy.understood);
+        await userEvent.click(screen.getByRole("button", { name: copy.compute }));
+        await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+        answer(jobs[0]!, jobs[0]!.compute.mock.calls[0]![0], 50, []);
+        await waitFor(() => expect(jobs[1]!.compute).toHaveBeenCalledTimes(1));
+        const request = jobs[1]!.compute.mock.calls[0]![0];
+        const bundle = request.preferenceBundle!;
+        expect(bundle.slots).toHaveLength(2);
+        const result = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+        const component = {
+          status: "done" as const,
+          payload: { ...result.payload },
+          error_code: null,
+        };
+        result.payload.preference_bundle_result = {
+          contract_version: "llmopt_preference_result_v1",
+          request: bundle,
+          components: [component, component],
+          selected:
+            outcome === "missing"
+              ? null
+              : {
+                  status: outcome,
+                  payload: null,
+                  error_code: outcome === "exhausted" ? "RUN_BUDGET_EXHAUSTED" : "ADVICE_FAILED",
+                },
+          accepted: 0,
+          applied: [],
+          budget_exhausted: outcome === "exhausted",
+        };
+        act(() => jobs[1]!.show({ phase: "done", source: "api-cache", request, envelope: result }));
+        for (const name of [copy.base, copy.with, copy.without]) {
+          const ready = screen.getByRole("heading", { name }).closest("article");
+          expect(ready).toHaveAttribute("data-plan-ready");
+        }
+        const summary = screen
+          .getByRole("heading", { name: copy.combinedPlan })
+          .closest("article")!;
+        expect(summary).not.toHaveAttribute("data-plan-ready");
+        expect(summary).toHaveTextContent(
+          {
+            failed: copy.combinedFailed,
+            exhausted: copy.combinedExhausted,
+            missing: copy.combinedMissing,
+          }[outcome],
+        );
+        expect(summary).toHaveTextContent(copy.rules.no_hits);
+        expect(summary).toHaveTextContent(copy.rules.save_chips);
+        expect(summary.querySelector("[data-combined]")).toBeNull();
+        expect(jobs.slice(2).every((job) => !job.compute.mock.calls.length)).toBe(true);
+        await userEvent.click(
+          screen.getByRole("button", { name: `${copy.remove} · ${copy.rules.save_chips}` }),
+        );
+        await userEvent.click(screen.getByRole("button", { name: copy.compute }));
+        await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(2));
+        expect(jobs[0]!.compute.mock.calls[1]![0].run?.run_id).not.toBe(request.run?.run_id);
+      },
+    );
+
+    it(`can remove an orphaned total limit when prompted in ${language}`, async () => {
+      const copy = LLMOPT_COPY[language];
+      bundlesOffered = true;
+      intent.mockImplementation(() =>
+        Response.json({
+          status: "draft",
+          draft: { hard: [], soft: [{ kind: "no_hits" }], max_total_cost_tenths: 15 },
+        }),
+      );
+      open(language);
+      await ready();
+      await sendMessage("Prefer", language);
+      await screen.findByText(copy.understood);
+      await userEvent.click(
+        screen.getByRole("button", { name: `${copy.remove} · ${copy.rules.no_hits}` }),
+      );
+      await userEvent.click(screen.getByRole("button", { name: copy.compute }));
+      expect(await screen.findByText(copy.totalUnavailable)).toBeVisible();
+      expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+      await userEvent.clear(screen.getByRole("spinbutton", { name: copy.totalLimit }));
+      expect(savedSession()[1].draft).not.toHaveProperty("max_total_cost_tenths");
+      await userEvent.click(screen.getByRole("button", { name: copy.compute }));
+      await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+    });
   }
 
   it("keeps the main plan and one sentence when the shared capacity refuses follow-ups", async () => {

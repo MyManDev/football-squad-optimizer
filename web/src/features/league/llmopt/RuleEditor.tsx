@@ -47,7 +47,9 @@ export function RuleEditor({
   disabled,
   change,
   changes,
+  priorities = false,
 }: {
+  priorities?: boolean;
   draft: PlanDraft;
   players: CatalogPlayer[];
   copy: LLMOptCopy;
@@ -65,6 +67,7 @@ export function RuleEditor({
   const [week, setWeek] = useState<PlanWeekNumber>();
   const [points, setPoints] = useState("4");
   const [cost, setCost] = useState("");
+  const [priority, setPriority] = useState<Constraint["priority"]>();
   const [both, setBoth] = useState(false);
   const availablePlayers = kind === "keep_player" ? players.filter(({ held }) => held) : players;
   const player = availablePlayers.find(({ id }) => String(id) === playerId);
@@ -113,6 +116,7 @@ export function RuleEditor({
       rule = { ...rule, max_cost_tenths: maxCost };
       setCost("");
     }
+    if (priorities && strength === "soft" && priority !== undefined) rule = { ...rule, priority };
     if (strength === "comparison") {
       apply({
         ...draft,
@@ -174,6 +178,38 @@ export function RuleEditor({
                             </>
                           )}
                         </span>
+                        {priorities && strength === "soft" && (
+                          <label>
+                            {copy.priority}
+                            <select
+                              aria-label={`${copy.priority} · ${label(rule)}`}
+                              value={rule.priority ?? ""}
+                              disabled={disabled}
+                              onChange={(event) =>
+                                change({
+                                  ...draft,
+                                  soft: draft.soft.map((item, i) =>
+                                    i === index
+                                      ? {
+                                          ...item,
+                                          priority: event.target.value
+                                            ? (Number(event.target.value) as Constraint["priority"])
+                                            : undefined,
+                                        }
+                                      : item,
+                                  ),
+                                })
+                              }
+                            >
+                              <option value="">{copy.noPriority}</option>
+                              {([1, 2, 3] as const).map((level) => (
+                                <option key={level} value={level}>
+                                  {copy.priorityLevels[level]}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                         <button
                           type="button"
                           className={styles.remove}
@@ -206,6 +242,32 @@ export function RuleEditor({
           );
         })}
       </div>
+      {priorities && (draft.soft.length > 0 || draft.max_total_cost_tenths !== undefined) && (
+        <div className={styles.editor}>
+          <label>
+            {copy.totalLimit}
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              max="100"
+              step="0.1"
+              disabled={disabled}
+              value={
+                draft.max_total_cost_tenths === undefined ? "" : draft.max_total_cost_tenths / 10
+              }
+              onChange={(event) => {
+                const value = event.target.value;
+                if (!value) change({ ...draft, max_total_cost_tenths: undefined });
+                else if (/^\d+(?:\.\d)?$/.test(value)) {
+                  const tenths = Math.round(Number(value) * 10);
+                  if (isPreferenceCost(tenths)) change({ ...draft, max_total_cost_tenths: tenths });
+                }
+              }}
+            />
+          </label>
+        </div>
+      )}
       <form onSubmit={add} className={styles.editor}>
         <label>
           {copy.rule}
@@ -324,6 +386,28 @@ export function RuleEditor({
             ))}
           </select>
         </label>
+        {priorities && strength === "soft" && (
+          <label>
+            {copy.priority}
+            <select
+              value={priority ?? ""}
+              onChange={(event) =>
+                setPriority(
+                  event.target.value
+                    ? (Number(event.target.value) as Constraint["priority"])
+                    : undefined,
+                )
+              }
+            >
+              <option value="">{copy.noPriority}</option>
+              {([1, 2, 3] as const).map((level) => (
+                <option key={level} value={level}>
+                  {copy.priorityLevels[level]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {strength === "soft" && (
           <label>
             {copy.preferenceLimit}
