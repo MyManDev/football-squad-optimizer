@@ -47,6 +47,7 @@ export interface StrategyCapability {
 }
 
 export interface AdviceCapabilities {
+  llmoptVNext?: true;
   decisionInformation?: DecisionInformation;
   leagueId: number;
   captureSnapshotId: string;
@@ -171,6 +172,7 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   )
     throw new AdviceCapabilitiesError("Invalid decision information.");
   return {
+    ...(value.llmopt_vnext === true ? { llmoptVNext: true as const } : {}),
     ...(value.decision_information === undefined
       ? {}
       : { decisionInformation: value.decision_information as DecisionInformation }),

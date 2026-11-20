@@ -2,8 +2,10 @@
 
 ADR 0019 defines the execution after the main plan. The optional `preference_bundle`
 field uses the existing advice POST and cache GET. The full backend advertises
-`preference_bundles.version = llmopt_preference_bundle_v1`; confirmed page sessions
-pin their transport. Old services and old confirmations keep their existing path.
+`preference_bundles.version = llmopt_preference_bundle_v1` when the server enables
+`SQUADOPT_BACKEND_LLMOPT_VNEXT`. The default uses the original unbound pricing requests.
+A restored confirmation checks the current server setting before starting another stage.
+During rollback, clients can still poll jobs and read stored bundle results for the current capture.
 
 The closed request contains at most two `slots`, sixteen `prices`, reachable price
 `choices`, and an optional `program`. Component preferences override the main request;

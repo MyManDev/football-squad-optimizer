@@ -207,6 +207,7 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
 def create_app(
     *,
     data_root: str | Path = DEFAULT_SITE_DATA_ROOT,
+    llmopt_vnext: bool = False,
     view_store: PublishedViewStore | None = None,
     advice_store: AdviceReadStore | None = None,
     advice_submit: AdviceSubmitService | None = None,
@@ -233,7 +234,7 @@ def create_app(
         description="Read-only access to published SquadOpt application views.",
         version=BACKEND_API_VERSION,
     )
-    application.include_router(intent_routes())
+    application.include_router(intent_routes(llmopt_vnext=llmopt_vnext))
 
     @application.exception_handler(RunAdmissionError)
     async def planning_run_error(_request: Request, error: RunAdmissionError) -> JSONResponse:

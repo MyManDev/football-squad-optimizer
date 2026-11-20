@@ -226,6 +226,12 @@ class BackendConfig:
     root, that the rotation table was coded from. The manager's word needs both this and
     ``artifact_root``."""
 
+    llmopt_vnext: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.llmopt_vnext) is not bool:
+            raise BackendConfigError("The LLMOPT release control must be boolean.")
+
     @property
     def queue_root(self) -> Path:
         return self.store_root / "jobs"
@@ -288,6 +294,7 @@ class BackendConfig:
             handoff_root=values["handoff_root"],
             allowed_origins=origins,
             public_entries=public_entries == "1",
+            llmopt_vnext=_flag(source, "SQUADOPT_BACKEND_LLMOPT_VNEXT"),
             public_queue_limit=_positive_int(source, "SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT", 32),
             season=season,
             rate_limit=_positive_int(source, "SQUADOPT_BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT),
@@ -300,6 +307,13 @@ class BackendConfig:
             artifact_root=Path(artifact_root) if artifact_root else None,
             club_news_source=Path(club_news_source) if club_news_source else None,
         )
+
+
+def _flag(source: Mapping[str, str], variable: str) -> bool:
+    value = source.get(variable, "0").strip()
+    if value not in {"0", "1"}:
+        raise BackendConfigError(f"{variable} must be 0 or 1.")
+    return value == "1"
 
 
 def _positive_int(source: Mapping[str, str], variable: str, default: int) -> int:
@@ -845,6 +859,7 @@ def build_backend(
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
         preference_bundles=True,
+        llmopt_vnext=config.llmopt_vnext,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -875,6 +890,7 @@ def build_backend(
             switches=contexts,
             available_windows=contexts.available_windows,
             preference_bundles=True,
+            llmopt_vnext=config.llmopt_vnext,
         )
         public_submit = AdviceSubmitService(
             public_reader,
