@@ -43,8 +43,11 @@ retain its feasible incumbent. No incomplete search is described as an optimum.
 Hard rules are applied outside reification. Soft rules get separate satisfaction literals;
 conflicting soft rules may remain unsatisfied without making the hard model infeasible.
 No key handling changes. New interpretation fields travel only through prompt/check;
-solver preferences and results travel through the existing advice boundary. Every field
-in a provider-facing schema has an explicit type.
+solver preferences and results travel through the existing advice boundary. With the
+release setting off, the schema sent to the provider preserves the exact bytes of the
+develop schema at `177000ec2cfcd0eb525f9253cd46afd75b7ac733`. The new nullable fields
+use `anyOf` with an explicitly typed branch for each alternative. Object branches declare
+their properties, required fields and `additionalProperties: false`.
 
 ## Contracts and rollout
 

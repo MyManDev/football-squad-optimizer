@@ -9,6 +9,7 @@ import styles from "./LLMOptPage.module.css";
 
 export function ScenarioComparison({
   reference,
+  planContextEnabled,
   replay,
   optimized,
   description,
@@ -17,6 +18,7 @@ export function ScenarioComparison({
   children,
 }: {
   reference: PlanRevision;
+  planContextEnabled: boolean;
   replay: ComputePhase;
   optimized: ComputePhase;
   description: string;
@@ -45,6 +47,7 @@ export function ScenarioComparison({
           : copy.scenarioUnverified;
   return (
     <RevisionComparison
+      planContextEnabled={planContextEnabled}
       previous={original ?? movesOnly}
       revised={reoptimized}
       scenario

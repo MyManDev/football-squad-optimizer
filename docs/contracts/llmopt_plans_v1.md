@@ -9,13 +9,19 @@ The optional context travels only through prompt/check. Its bounded catalogue
 contains plan/data identifiers and already-computed decisions, without point or resource
 outcomes. The strict reply adds nullable `plan_command` only when a catalogue is supplied.
 Commands select a plan, freeze its transfer/week, or request a substitution comparison.
-Unknown fields, identifiers and superseded server data are refused by check. Every
-provider-schema property has an explicit type. Existing ordinary draft replies remain valid.
+Unknown fields, identifiers and superseded server data are refused by check. The
+provider schema expresses optional commands with `anyOf`. Its object branch lists
+all command fields, and a separate typed branch accepts null. Existing ordinary
+draft replies remain valid.
 
-Newly computed server advice can carry `plan_data_id`, SHA-256 of the existing advice
-context. Both settings read the same immutable cached answer. The current capabilities
-advertise the identifier when plan conversations are enabled. This metadata does not enter
-or replace the existing cache key.
+With plan conversations enabled, newly computed server advice can carry `plan_data_id`,
+the SHA-256 of the existing advice context. A separate worker receipt identifies exactly
+which computed plans carry provenance and binds it to the stored answer bytes. The closed
+API serves the original ordinary response on both cold and warm reads. Opening the
+setting preserves an earlier unversioned answer. Both settings use the same immutable
+answer bytes and cache address. Current capabilities advertise the data identifier only
+while the setting is enabled. With the setting closed, a top-level `plan_command` property
+in a model reply is refused even when its value is null.
 Device choices carry the checked input-table/member fingerprint, inherited by every menu
 choice. Before a plan command the browser rechecks current inputs; late replies must still
 belong to its current catalogue. Unversioned legacy plans are displayable but cannot be

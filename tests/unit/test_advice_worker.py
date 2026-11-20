@@ -1769,13 +1769,10 @@ def test_worker_publishes_official_facts_for_decisions_and_statement_outcomes(
     assert "private-audit-identity" not in served.text
 
 
-@pytest.mark.parametrize("enabled", [False, True])
-def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(
-    tmp_path, monkeypatch, enabled
-) -> None:
+def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str, Any]) -> None:
     """The worker preserves the producer decision and adds resources and official facts."""
 
-    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=enabled)["backend"]
+    backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
@@ -1805,12 +1802,6 @@ def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(
     expected["official_information"] = capture.inputs.official_information.public_record(
         worker_module._advice_player_ids(expected)
     )
-    expected["plan_data_id"] = advice_context_identity(spec.context)
-    state = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
-    if enabled:
-        assert state["plan_data_id"] == expected["plan_data_id"]
-    else:
-        assert "plan_data_id" not in state
     assert backend.cache.get(job.cache_key) == _served_bytes(
         backend, expected, capture.inputs.captured_at_utc
     )
@@ -1869,14 +1860,60 @@ def test_package_switches_preserve_ordinary_worker_bytes_unless_the_master_and_p
         assert read.status_code == 200 and len(read.json()["payload"]["plan_weeks"]) == 3
         assert client.post(route, json=question).content == read.content
         assert len(backend.queue.jobs()) == 1
-        if ordinary_key is None:
-            ordinary_key, ordinary_spec, ordinary_answer = job.cache_key, spec, read.content
+        canonical = FileAdviceCache(config.cache_root).get(job.cache_key)
+        assert canonical is not None
+        if master:
+            versioned = read.json()
+            assert versioned["payload"].pop("plan_data_id") == advice_context_identity(spec.context)
+            assert versioned == json.loads(canonical)
         else:
-            assert (job.cache_key, spec, read.content) == (
+            assert read.content == canonical
+        if ordinary_key is None:
+            ordinary_key, ordinary_spec, ordinary_answer = job.cache_key, spec, canonical
+        else:
+            assert (job.cache_key, spec, canonical) == (
                 ordinary_key,
                 ordinary_spec,
                 ordinary_answer,
             )
+
+
+@pytest.mark.parametrize("producer_enabled", [False, True])
+def test_provenance_follows_the_worker_and_current_grant_across_restarts(
+    tmp_path, monkeypatch, producer_enabled
+) -> None:
+    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=producer_enabled)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    response = client.post(route, json=body)
+    assert response.status_code == 202
+    assert _work(backend) == 1
+    job = backend.queue.load(response.json()["job_id"])
+    spec = backend.job_specs.get(job.cache_key)
+    canonical = FileAdviceCache(backend.config.cache_root).get(job.cache_key)
+    assert canonical is not None and "plan_data_id" not in json.loads(canonical)["payload"]
+    receipt_dir = backend.config.cache_root / "plan-provenance"
+    assert receipt_dir.exists() is producer_enabled
+    for enabled in (not producer_enabled, producer_enabled):
+        reopened = build_backend(replace(backend.config, llmopt_vnext=enabled))
+        with TestClient(app_for_capture(reopened, world_module.GW2_CAPTURED_AT)) as client:
+            key, _ = reopened.reader.resolve_key(league_id=LEAGUE_ID, entry_id=ENTRY_ID, **body)
+            assert key == job.cache_key
+            get = client.get(route, params=body)
+            post = client.post(route, json=body)
+            assert get.status_code == post.status_code == 200
+            assert get.content == post.content
+            if enabled and producer_enabled:
+                versioned = get.json()
+                assert versioned["payload"].pop("plan_data_id") == advice_context_identity(
+                    spec.context
+                )
+                assert versioned == json.loads(canonical)
+            else:
+                assert get.content == canonical
+            assert len(reopened.queue.jobs()) == 1
+            assert FileAdviceCache(backend.config.cache_root).get(key) == canonical
 
 
 def _work(backend: Any, jobs: int = 1) -> int:
@@ -1884,7 +1921,11 @@ def _work(backend: Any, jobs: int = 1) -> int:
         backend.queue,
         backend.cache,
         build_advice_compute(
-            backend.contexts, backend.job_specs, runs=backend.runs, cache=backend.cache
+            backend.contexts,
+            backend.job_specs,
+            runs=backend.runs,
+            cache=backend.cache,
+            llmopt_vnext=backend.config.llmopt_vnext,
         ),
         should_stop=_stop_after(3 * jobs + 3),
         max_jobs=jobs,
@@ -2710,8 +2751,6 @@ def test_a_member_asks_for_a_top100_setting_and_gets_it(
     direct["official_information"] = capture.inputs.official_information.public_record(
         worker_module._advice_player_ids(direct)
     )
-    direct["plan_data_id"] = advice_context_identity(context)
-    assert "plan_data_id" not in client.get(capabilities).json()
     assert payload == json.loads(json.dumps(direct))
 
 

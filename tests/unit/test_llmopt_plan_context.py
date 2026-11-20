@@ -72,14 +72,17 @@ def test_plan_catalogue_carries_decisions_and_explicit_types_without_metrics() -
     assert not any(key in call.user for key in ("expected_points", "bank_after", "net_points"))
 
     def visit(schema: Any) -> None:
-        if isinstance(schema, dict):
-            for field in schema.get("properties", {}).values():
-                assert "type" in field, field
-            for value in schema.values():
-                visit(value)
-        elif isinstance(schema, list):
-            for value in schema:
-                visit(value)
+        if "anyOf" in schema:
+            assert set(schema) == {"anyOf"}
+            assert schema["anyOf"]
+            for branch in schema["anyOf"]:
+                visit(branch)
+        else:
+            assert "type" in schema, schema
+        for field in schema.get("properties", {}).values():
+            visit(field)
+        if "items" in schema:
+            visit(schema["items"])
 
     visit(call.schema)
     assert check_reply(parse_intent_request(request()), reply()) == {
@@ -164,6 +167,22 @@ def test_plan_catalogue_and_commands_require_the_server_setting(enabled: bool) -
             },
         )
         assert clarification.json() == {"status": "clarification", "message": "Week 2 or 3?"}
+        extra = client.post(
+            "/api/v1/llmopt/check",
+            json={
+                "request": body if enabled else plain,
+                "reply": {
+                    "status": "clarification",
+                    "message": "Week 2 or 3?",
+                    "plan_command": None,
+                },
+            },
+        )
+        if enabled:
+            assert extra.json() == clarification.json()
+        else:
+            assert extra.status_code == 422
+            assert extra.json()["error"]["code"] == "REPLY_REFUSED"
         call = client.post("/api/v1/llmopt/prompt", json=body)
         checked = client.post("/api/v1/llmopt/check", json={"request": body, "reply": reply()})
         assert (
@@ -286,6 +305,11 @@ def test_committed_conversation_schema_matches_the_runtime_writer() -> None:
     jsonschema.validate(request()["plan_context"], schema)
     reply_schema = intent_reply_schema(with_plans=True)
     jsonschema.Draft202012Validator.check_schema(reply_schema)
+    command = reply_schema["properties"]["plan_command"]
+    assert set(command) == {"anyOf"}
+    object_branch, null_branch = command["anyOf"]
+    assert object_branch["type"] == "object" and object_branch["additionalProperties"] is False
+    assert null_branch == {"type": "null"}
     assert (
         json.loads(contract_schema_path("llmopt_intent_v1").read_text(encoding="utf-8"))
         == reply_schema
