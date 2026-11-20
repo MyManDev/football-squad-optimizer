@@ -6,6 +6,7 @@ observation-contingent policy. Every segment sees the same decision-time forecas
 
 from collections.abc import Sequence
 from dataclasses import replace
+from math import isfinite
 from numbers import Integral
 from typing import cast
 
@@ -76,6 +77,7 @@ def plan_in_segments(
     transfer: TransferPlanningConfig | None = None,
     chips: ChipAvailability | None = None,
     preferences: DecisionPreferences | None = None,
+    limit_remaining_work: bool = False,
 ) -> TransferPlanResult:
     """Construct a complete sequential or window-then-tail incumbent.
 
@@ -125,6 +127,7 @@ def plan_in_segments(
     purchases: dict[object, int] = {}
     weeks = []
     parts: list[TransferPlanResult] = []
+    charges: list[float] = []
     offset = 0
     clock_stopped = False
     fee = settings.acquisition_sell_on_fee
@@ -138,9 +141,19 @@ def plan_in_segments(
                         int(row.buy_price_tenths), purchases[row.player_id], sell_on_fee=fee
                     )
         fraction = length / len(forecast.gameweeks)
+        limit = budget * fraction
+        if limit_remaining_work:
+            spent = sum(charges)
+            limit = min(limit, budget - spent)
+            if limit <= 0:
+                raise SegmentConstructionError(
+                    "The construction used its deterministic allowance before the next segment.",
+                    actual_work=spent,
+                    clock_stopped=clock_stopped,
+                )
         config = replace(
             optimization,
-            solver_deterministic_time_limit=budget * fraction,
+            solver_deterministic_time_limit=limit,
             solver_time_limit_seconds=optimization.solver_time_limit_seconds * fraction,
         )
         part = optimize_transfer_plan(
@@ -155,14 +168,16 @@ def plan_in_segments(
         clock_stopped = clock_stopped or wall_clock_stopped_the_search(
             part.solver_status, part.diagnostics
         )
+        used = cast(float, part.diagnostics["deterministic_time_used"])
+        if limit_remaining_work and (isinstance(used, bool) or not isfinite(used) or used < 0):
+            raise ValueError("Invalid deterministic-work accounting for expected windows.")
+        charges.append(used)
         if not part.has_solution or tuple(w.gameweek for w in part.weeks) != dates:
             raise SegmentConstructionError(
                 f"Segment starting at GW{dates[0]} did not produce a complete feasible path "
                 f"({part.solver_status.name}); used deterministic time "
                 f"{part.diagnostics.get('deterministic_time_used')}.",
-                actual_work=sum(
-                    cast(float, p.diagnostics["deterministic_time_used"]) for p in [*parts, part]
-                ),
+                actual_work=sum(charges),
                 clock_stopped=clock_stopped,
             )
         parts.append(part)
@@ -213,9 +228,7 @@ def plan_in_segments(
         "construction_wall_clock_stopped": clock_stopped,
         "segment_statuses": tuple(part.solver_status.name for part in parts),
         "solver_deterministic_time_limit": budget,
-        "deterministic_time_used": sum(
-            cast(float, part.diagnostics["deterministic_time_used"]) for part in parts
-        ),
+        "deterministic_time_used": sum(charges),
         "solve_time_seconds": sum(
             cast(float, part.diagnostics["solve_time_seconds"]) for part in parts
         ),

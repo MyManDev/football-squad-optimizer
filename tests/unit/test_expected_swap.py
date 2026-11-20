@@ -176,6 +176,24 @@ def test_five_free_transfers_return_a_protected_plan_without_another_solve(monke
     assert review["ledger"][0]["actual"] == actual
     assert review["optional_swap"]["status"] == "skipped"
     assert result.diagnostics.get("best_objective_bound") is None
+    from squadopt.planning.expected_window import extend_expected_packages
+
+    # Reopening the package gate cannot spend more work after a protected stop.
+    for gate in (False, True):
+        extended = extend_expected_packages(
+            horizon,
+            initial,
+            settings,
+            replace(transfer, transfer_packages=True, package_gate=gate),
+            result,
+            elapsed_seconds=0,
+        )
+        assert extended.weeks is result.weeks
+        assert extended.diagnostics["expected_lineup_window"] == review
+        assert (
+            extended.diagnostics["transfer_packages_v1"]["reason"]
+            == "original_phase_work_exhausted"
+        )
 
 
 @pytest.fixture(scope="module")
