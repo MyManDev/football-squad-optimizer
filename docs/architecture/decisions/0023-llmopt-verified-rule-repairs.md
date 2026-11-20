@@ -31,6 +31,16 @@ capacity for selection, use at most two candidates and stop when capacity
 is insufficient. Across all stages, the four-job and 84/488-unit ceilings
 remain binding. Missing data and exhausted capacity produce no new proposal.
 
+For a one-week repair with a total allowance, compute the main plan under
+the edited hard rules and use its decisions and proof status for the priority
+calculation in the same worker. The candidate's private answer retains both
+this main and the preference-selected plan. On selection, reconstruct J from
+the saved main on the same inputs and rerun the priorities in a fresh worker.
+The candidate and its selection each share one 120-second ceiling across all
+their solves and each consume one four-unit worker reservation.
+The initial device receipt reserves storage for both candidate digests and
+the selected replay so later reservations fit if the tab reaches its quota.
+
 Selecting a proposal recalculates the selected concrete plan and checks its
 decision content and net points against the witness on the same data. On the
 device rerun the edited request. On the server the existing frozen-week

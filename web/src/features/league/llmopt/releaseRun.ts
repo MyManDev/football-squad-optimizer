@@ -1,4 +1,5 @@
 import { capabilitiesForPage, type AdviceCapabilities } from "../advice/adviceCapabilities";
+import type { AdviceClient } from "../advice/adviceClient";
 import { deviceSelection } from "../device/selection";
 import type { EntrySquad } from "../types";
 import { prepareRun, requestFor, type PlanRun, type RunInputs } from "./planRun";
@@ -26,13 +27,14 @@ export function confirmationProblem(
 }
 
 /** Prepare the workflow offered by the current server for a freshly confirmed draft. */
-export function prepareConfirmedRun(
+export async function prepareConfirmedRun(
   inputs: Pick<RunInputs, "draft" | "held" | "plans" | "frozenWeeks" | "reference">,
   squad: EntrySquad,
   forwarded: boolean | undefined,
   capabilities: AdviceCapabilities,
   runId: string | undefined,
-): PlanRun | null {
+  prepareDeviceRun: AdviceClient["prepareDeviceRun"],
+): Promise<PlanRun | null> {
   const { draft, plans, reference } = inputs;
   if (
     !capabilitiesForPage(capabilities, {
@@ -75,7 +77,8 @@ export function prepareConfirmedRun(
   ];
   if (
     next.inputs.request.deviceRun === true &&
-    queries.some((query) => query && deviceSelection(query, squad)?.kind !== "plain")
+    (queries.some((query) => query && deviceSelection(query, squad)?.kind !== "plain") ||
+      !(await prepareDeviceRun?.(next.inputs.request)))
   )
     next = prepareRun({
       ...next.inputs,

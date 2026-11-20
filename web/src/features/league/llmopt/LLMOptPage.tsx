@@ -30,6 +30,7 @@ import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { deviceAdviceClient } from "../device/adviceClient";
+import { shownPriorityReference } from "../device/priorityWitness";
 import { confirmationProblem, prepareConfirmedRun } from "./releaseRun";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
@@ -370,7 +371,7 @@ function Workspace({
   const computeButton = useRef<HTMLButtonElement>(null);
   const interpret = useRef<AbortController | null>(null);
   const nextChatLine = useRef(conversation.length);
-  const confirming = useRef(false);
+  const confirming = useRef<symbol | null>(null);
   const mounted = useRef(true);
 
   // Follow new replies within the list, without moving the page or taking an older
@@ -430,6 +431,10 @@ function Workspace({
   // An edit keeps the plan the member compares against; only Revise picks another. Before any
   // plan was picked, the first edit after a result compares against the plan shown.
   function change(next: PlanDraft, previous = selectedReference ?? reference ?? revised) {
+    if (confirming.current) {
+      confirming.current = null;
+      setCheckingSquad(false);
+    }
     const abandoned = session.confirmation?.runId;
     const hadOpenWork = Object.values(jobs.states).some(({ phase }) => isWorking(phase));
     if (abandoned)
@@ -639,7 +644,24 @@ function Workspace({
     return explainDraftConflict({ ...draft, hard: [...draft.hard, rule] }, conflictContext);
   }
 
-  const execution = useMemo(() => preferenceExecution(run), [run]);
+  const execution = useMemo(() => {
+    const request = preferenceExecution(run);
+    const base = jobs.states.base;
+    if (
+      request?.deviceRun &&
+      request.preferenceBundle?.program &&
+      base.phase === "done" &&
+      base.request === run?.baseRequest
+    ) {
+      const fingerprint = base.envelope.payload.device_input_fingerprint;
+      const decisions = shownPriorityReference(base.envelope.payload);
+      return {
+        ...request,
+        shownDeviceMain: fingerprint && decisions ? { fingerprint, decisions } : null,
+      };
+    }
+    return request;
+  }, [run, jobs.states.base]);
   const states = preferenceStates(jobs.states, run, execution);
   const bundleState = jobs.states.first;
   const bundleResult =
@@ -650,7 +672,10 @@ function Workspace({
     (state.phase === "failed" || state.phase === "unavailable") &&
     (state.reason === "RUN_BUDGET_EXHAUSTED" || state.reason === "RUN_CANCELLED");
   const incompleteRun = Object.values(states).some(capacityRefused);
-  const computing = Object.values(states).some(({ phase }) => isWorking(phase));
+  const computing = Object.values(states).some(
+    (state) =>
+      isWorking(state.phase) || (state.phase === "done" && state.deviceAlternativesPending),
+  );
   const editingLocked = checkingSquad || reading || (computing && !run?.inputs.request.run);
   const busy = editingLocked || computing;
   const replayProof =
@@ -989,7 +1014,9 @@ function Workspace({
       !!analysis
     )
       return;
-    confirming.current = true;
+    const attempt = Symbol();
+    confirming.current = attempt;
+    const currentConfirmation = () => mounted.current && confirming.current === attempt;
     setFeedback("");
     setChanges(null);
     setCheckingSquad(true);
@@ -1000,7 +1027,7 @@ function Workspace({
           .refetch({ cancelRefetch: false })
           .then((read) => (read.isError ? null : read.data)),
       ]);
-      if (!mounted.current) return;
+      if (!currentConfirmation()) return;
       if (!capabilities) {
         setFeedback(copy.serviceUnavailable);
         return;
@@ -1031,13 +1058,15 @@ function Workspace({
         return;
       }
       const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
-      const next = prepareConfirmedRun(
+      const next = await prepareConfirmedRun(
         { draft, held, plans, frozenWeeks: frozen, reference },
         squad,
         forwarded,
         capabilities,
         runId,
+        client.prepareDeviceRun,
       );
+      if (!currentConfirmation() || !deadlineOpen(deadline)) return;
       if (!next) {
         setFeedback(
           copy[confirmationProblem(draft, plans.window, capabilities) ?? "serviceUnavailable"],
@@ -1085,10 +1114,12 @@ function Workspace({
         });
       }
     } catch {
-      if (mounted.current) setFeedback(copy.squadUnavailable);
+      if (currentConfirmation()) setFeedback(copy.squadUnavailable);
     } finally {
-      confirming.current = false;
-      if (mounted.current) setCheckingSquad(false);
+      if (confirming.current === attempt) {
+        confirming.current = null;
+        if (mounted.current) setCheckingSquad(false);
+      }
     }
   }
 

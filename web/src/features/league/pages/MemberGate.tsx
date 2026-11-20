@@ -170,9 +170,15 @@ export function MemberGate({ children }: { children: ReactNode }) {
         // A new key at the same address, so the shell's scroll to an id in it (#kadro) runs
         // again now that the page is drawn.
         if (!ownPage) {
+          // Replacing this same entry retains the session when the tab could only save it
+          // in history. The planner checks its member, league and deadline on restore.
+          const saved = page === "llmopt" && history.state?.llmoptSession;
           navigate(
             { pathname: location.pathname, search: location.search, hash: location.hash },
-            { replace: true, state: location.state },
+            {
+              replace: true,
+              state: saved ? { ...location.state, llmoptSession: saved } : location.state,
+            },
           );
         }
       },

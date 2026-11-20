@@ -1,8 +1,17 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import fixture from "../src/fixtures/device-plan/instances.json" with { type: "json" };
-import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../src/fixtures/league";
+import {
+  mockEntryAdviceEnvelope,
+  mockEntrySquadEnvelopes,
+  mockLeagueMembersEnvelope,
+} from "../src/fixtures/league";
+import {
+  checkedPreferences,
+  preferenceScope,
+  preferencesKey,
+} from "../src/features/league/advice/decisionPreferences";
 import { installLeagueMocks } from "./leagueMocks";
-import { EXAMPLE_CLAIM } from "./identity";
+import { EXAMPLE_CLAIM, pickMember } from "./identity";
 import { MESSAGES } from "../src/i18n/messages";
 import { LLMOPT_COPY } from "../src/features/league/llmopt/copy";
 import { holdModel, routeChat } from "./llmoptChat";
@@ -89,6 +98,7 @@ for (const language of ["en", "tr"] as const)
             { priority: false, mode: "unavailable" },
             { priority: false, mode: "stale-off" },
             { priority: false, mode: "stale-on" },
+            { priority: false, mode: "later-worker-error" },
           ]
         : []),
     ];
@@ -104,7 +114,51 @@ for (const language of ["en", "tr"] as const)
           language,
         );
         const { table, block, byId } = await serveDeviceMember(page);
-        let release = mode;
+        const fault = mode === "later-worker-error";
+        const delayed =
+          (mode === "enabled" || fault) && !priority && language === "en" && width === 1280;
+        if (delayed) {
+          // Run the shipped WASM worker. Hold only messages produced after its main
+          // plan so the browser can inspect the UI before the optional answers arrive.
+          await page.addInitScript((fail) => {
+            const Native = window.Worker;
+            window.Worker = class extends Native {
+              constructor(...args: ConstructorParameters<typeof Native>) {
+                super(...args);
+                const held: unknown[] = [];
+                let main = false,
+                  released = false;
+                this.addEventListener(
+                  "message",
+                  (event: MessageEvent) => {
+                    if (released) return;
+                    if (!main) {
+                      main = event.data?.kind === "plan";
+                      return;
+                    }
+                    event.stopImmediatePropagation();
+                    held.push(event.data);
+                    if (event.data?.kind !== "answer") return;
+                    document.documentElement.dataset.optionalWorkerFinished = "true";
+                    window.addEventListener(
+                      "release-optional-worker",
+                      () => {
+                        released = true;
+                        if (fail) this.dispatchEvent(new ErrorEvent("error"));
+                        else
+                          for (const data of held)
+                            this.dispatchEvent(new MessageEvent("message", { data }));
+                      },
+                      { once: true },
+                    );
+                  },
+                  true,
+                );
+              }
+            };
+          }, fault);
+        }
+        let release = fault ? "enabled" : mode;
         let workers = 0;
         page.on("worker", () => workers++);
         await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
@@ -174,7 +228,7 @@ for (const language of ["en", "tr"] as const)
           .getByRole("button", { name: language === "tr" ? "Planları hesapla" : "Compute plans" })
           .click();
         const cards = page.locator("article[data-plan-ready]");
-        if (mode !== "enabled") {
+        if (mode !== "enabled" && !fault) {
           if (mode === "disabled") await expect.poll(() => jobs).toBe(1);
           else if (mode.startsWith("stale-")) {
             await expect(
@@ -200,12 +254,33 @@ for (const language of ["en", "tr"] as const)
           ).toBe(false);
           return;
         }
-        await expect(cards).toHaveCount(priority ? 2 : 3);
+        let mainDecision: string | null = null;
+        if (delayed) {
+          await expect(cards).toHaveCount(1);
+          mainDecision = await cards.first().getAttribute("data-transfer-decision");
+          await expect(page.locator("html")).toHaveAttribute(
+            "data-optional-worker-finished",
+            "true",
+          );
+          await expect(cards).toHaveCount(1);
+          await expect(
+            page.getByRole("button", { name: LLMOPT_COPY[language].computing, exact: true }),
+          ).toBeDisabled();
+          await page.evaluate(() => window.dispatchEvent(new Event("release-optional-worker")));
+        }
+        const expectedCards = fault ? 1 : priority ? 2 : 3;
+        await expect(cards).toHaveCount(expectedCards);
         expect(workers).toBeGreaterThan(0);
         const identities = await cards.evaluateAll((items) =>
           items.map((item) => item.getAttribute("data-transfer-decision")),
         );
-        if (!priority) expect(new Set(identities).size).toBe(3);
+        if (delayed) {
+          expect(identities[0]).toBe(mainDecision);
+          await expect(
+            page.getByRole("button", { name: LLMOPT_COPY[language].compute, exact: true }),
+          ).toBeEnabled();
+        }
+        if (!priority) expect(new Set(identities).size).toBe(expectedCards);
         for (const identity of identities)
           expect(JSON.parse(identity!)[1]).toContain(block.held[0]);
         expect(jobs).toBe(0);
@@ -214,7 +289,7 @@ for (const language of ["en", "tr"] as const)
         );
         await page.reload();
         await holdModel(page);
-        await expect(cards).toHaveCount(priority ? 2 : 3);
+        await expect(cards).toHaveCount(expectedCards);
         expect(
           await cards.evaluateAll((items) =>
             items.map((item) => item.getAttribute("data-transfer-decision")),
@@ -224,7 +299,7 @@ for (const language of ["en", "tr"] as const)
           release = "disabled";
           const beforeRollback = workers;
           await page.reload();
-          await expect(cards).toHaveCount(priority ? 2 : 3);
+          await expect(cards).toHaveCount(expectedCards);
           expect(
             await cards.evaluateAll((items) =>
               items.map((item) => item.getAttribute("data-transfer-decision")),
@@ -291,6 +366,92 @@ for (const enabled of [false, true]) {
     ]);
     expect(submitted.postDataJSON()).toMatchObject({ window: 1, preferences: { no_hits: true } });
     expect(submitted.postDataJSON()).not.toHaveProperty("run");
+    expect(workers).toBe(0);
+  });
+}
+
+for (const unavailable of ["blocked", "full"] as const) {
+  test(`one-week confirmation uses the server when session storage is ${unavailable}`, async ({
+    page,
+  }) => {
+    test.skip(!API, "API build required for the advice boundary.");
+    await installLeagueMocks(page, { claim: null });
+    await page.addInitScript((mode) => {
+      localStorage.setItem("squadopt.language", "en");
+      if (mode === "blocked") {
+        Object.defineProperty(window, "sessionStorage", {
+          get() {
+            throw new DOMException("Blocked", "SecurityError");
+          },
+        });
+      } else {
+        const write = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (key, value) {
+          if (this === window.sessionStorage) throw new DOMException("Full", "QuotaExceededError");
+          write.call(this, key, value);
+        };
+      }
+    }, unavailable);
+    const { table } = await serveDeviceMember(page);
+    const league = `${API}/api/v1/leagues/${LEAGUE}`;
+    await page.route(`${league}/capabilities`, (route) =>
+      answer(route, {
+        contract_version: "league_capabilities_v1",
+        llmopt_vnext: true,
+        preference_bundles: { version: "llmopt_preference_bundle_v1" },
+        league_id: LEAGUE,
+        capture_snapshot_id: table.source_snapshot_id,
+        season: table.season,
+        gameweek: table.gameweek,
+        strategies: { "saf-puan": { requires_rival: false, windows: [1] } },
+        preferences: { available: true },
+        top100: { available: false, weights: [] },
+        managers_word: { available: false },
+      }),
+    );
+    let workers = 0;
+    page.on("worker", () => workers++);
+    const runIds: string[] = [];
+    const answers = new Map<string, ReturnType<typeof mockEntryAdviceEnvelope>>();
+    await page.route(`${league}/entries/${ENTRY}/advice**`, (route) => {
+      const request = route.request();
+      if (request.method() === "OPTIONS") return answer(route, null);
+      if (request.method() === "GET") {
+        const prefs = new URL(request.url()).searchParams.get("preferences");
+        const result = answers.get(preferencesKey(checkedPreferences(JSON.parse(prefs ?? "{}"))));
+        return result
+          ? answer(route, result)
+          : answer(route, { error: { code: "NOT_COMPUTED" } }, 404);
+      }
+      const body = request.postDataJSON();
+      expect(body.window).toBe(1);
+      expect(body.run.run_id).toMatch(/^[0-9a-f]{32}$/);
+      runIds.push(body.run.run_id);
+      const result = structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));
+      result.payload.preferences = checkedPreferences(body.preferences);
+      result.payload.preferences_scope = preferenceScope(result.payload.preferences);
+      answers.set(preferencesKey(result.payload.preferences), result);
+      return answer(route, result);
+    });
+    await page.goto(`/league/${LEAGUE}/members/${ENTRY}/llmopt`);
+    await pickMember(page, EXAMPLE_CLAIM, "en");
+    await page
+      .getByRole("combobox", { name: LLMOPT_COPY.en.window, exact: true })
+      .selectOption("1");
+    await page.getByRole("button", { name: LLMOPT_COPY.en.compute, exact: true }).click();
+    const first = page.locator("article[data-plan-ready]").first();
+    await expect(first).toBeVisible();
+    expect(runIds.length).toBeGreaterThan(0);
+    const pinned = await page.evaluate(
+      () => JSON.parse(history.state.llmoptSession.raw).confirmation,
+    );
+    expect(pinned).toMatchObject({ runId: runIds[0], deviceRun: false, deviceAlternatives: false });
+    const started = [...runIds];
+    await page.reload();
+    // A tab without storage asks for the member again. The run lives in the history entry.
+    await pickMember(page, EXAMPLE_CLAIM, "en");
+    await expect(first).toBeVisible();
+    expect(runIds).toEqual(started);
     expect(workers).toBe(0);
   });
 }

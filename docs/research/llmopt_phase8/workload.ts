@@ -46,8 +46,13 @@ const storage = new Map();
 Object.defineProperty(globalThis, "sessionStorage", {
   configurable: true,
   value: {
+    get length() {
+      return storage.size;
+    },
+    key: (index) => [...storage.keys()][index] ?? null,
     getItem: (key) => storage.get(key) ?? null,
     setItem: (key, value) => storage.set(key, value),
+    removeItem: (key) => storage.delete(key),
   },
 });
 const held = new Set<number>(block.held);
@@ -175,23 +180,28 @@ async function replay(cache) {
     caps.transferPackages === true
   )
     throw new Error("Authoritative release capability mismatch.");
-  // Confirmation cannot authorize a later worker. Its own read must follow this one.
-  lastWorkerGrant = grantReads;
-  const run = prepareConfirmedRun(
+  const before = deviceWorkReceipt(runId);
+  const run = await prepareConfirmedRun(
     { draft, held, plans },
     squad,
     false,
     caps,
     enabled ? runId : undefined,
+    client.prepareDeviceRun,
   );
+  // A worker must read its own grant after confirmation and any storage preflight.
+  lastWorkerGrant = grantReads;
   if (!run?.baseRequest)
     throw new Error("Standard workload could not prepare its base request.");
   const execution = preferenceExecution(run);
   const device = run.baseRequest.deviceRun === true;
+  const receipt = deviceWorkReceipt(runId);
   if (
     device !== (enabled && window === 1) ||
     !!run.baseRequest.run !== enabled ||
-    !!execution !== enabled
+    !!execution !== enabled ||
+    (device ? !receipt || receipt.closed || receipt.units !== (before?.units ?? 0) : !!receipt) ||
+    deviceWork.length !== workStart
   )
     throw new Error(
       "Confirmed workload did not select the expected release path.",

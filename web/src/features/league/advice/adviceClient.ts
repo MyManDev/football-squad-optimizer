@@ -35,6 +35,12 @@ export interface AdviceRequest {
   deviceRun?: boolean;
   /** Browser-only repair witness or selection, pinned to the verified device inputs. */
   deviceRepair?: { dataId: string; verify?: boolean };
+  /** Private device main for a confirmed total-allowance run. */
+  priorityMain?: true;
+  shownDeviceMain?: {
+    fingerprint: string;
+    decisions: import("../device/priorityWitness").DevicePriorityReference;
+  } | null;
   run?: {
     contract_version: "llmopt_run_v1";
     run_id: string;
@@ -80,6 +86,8 @@ export type AdviceRequestResult =
 /** One click's identity: sent as `Idempotency-Key`, the same for every retry of that click. */
 export interface AdviceRequestOptions extends RequestOptions {
   idempotencyKey?: string;
+  /** A completed device plan available while optional alternatives continue. */
+  onPlan?: (result: Extract<AdviceReadResult, { kind: "advice" }>) => void;
 }
 
 export interface AdviceReadOptions extends RequestOptions {
@@ -89,6 +97,8 @@ export interface AdviceReadOptions extends RequestOptions {
 
 export interface AdviceClient {
   readDeviceDataId?(): Promise<string>;
+  /** Bind a new local run without spending work before its location is confirmed. */
+  prepareDeviceRun?(request: AdviceRequest): Promise<boolean>;
   /** Local computation waits for its worker ceiling; network transports keep their own deadline. */
   localRequestAllowanceMs?(request: AdviceRequest): number | undefined;
   cancelRun?(runId: string): Promise<void>;

@@ -63,6 +63,33 @@ def device_extension_schema() -> dict[str, object]:
         ),
         "properties": {
             "preferences": preferences_schema(),
+            "priorityMain": {
+                "type": "boolean",
+                "const": True,
+                "description": (
+                    "Compute the hard-rule main. A repair candidate can also supply a priority "
+                    "program to solve against this main in the same worker."
+                ),
+            },
+            "priorityReference": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["squad", "startingXi", "captain", "proved"],
+                "properties": {
+                    **{
+                        name: {
+                            "type": "array",
+                            "items": {"type": "integer", "minimum": 1},
+                            "uniqueItems": True,
+                            "minItems": 1,
+                            "maxItems": limit,
+                        }
+                        for name, limit in (("squad", 15), ("startingXi", 11))
+                    },
+                    "captain": {"type": "integer", "minimum": 1},
+                    "proved": {"type": "boolean"},
+                },
+            },
             "preferenceBundle": preference_bundle_schema(),
             "priority_preferences": priority_result_schema(),
             "expected_points_cost": {"type": "number"},

@@ -25,6 +25,15 @@ def test_device_extension_schema_is_committed():
         {"device_alternatives": [{"device_alternatives": []}]},
         {"alternatives": [{"alternatives": []}]},
         {"device_input_fingerprint": "old"},
+        {
+            "priorityReference": {
+                "squad": [1],
+                "startingXi": [1],
+                "captain": 1,
+                "proved": False,
+                "objective": 42,
+            }
+        },
     ],
 )
 def test_invalid_device_extension_is_rejected(value):
@@ -40,6 +49,7 @@ def test_invalid_device_extension_is_rejected(value):
         {"alternatives": []},
         {"device_alternatives": [{}, {}], "free_transfers_after": 5, "bank_after_tenths": 0},
         {"device_input_fingerprint": "a" * 64},
+        {"priorityReference": {"squad": [1], "startingXi": [1], "captain": 1, "proved": False}},
     ],
 )
 def test_legacy_and_bounded_device_extensions_remain_valid(value):
