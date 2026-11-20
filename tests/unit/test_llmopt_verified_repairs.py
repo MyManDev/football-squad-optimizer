@@ -12,6 +12,7 @@ from tests.unit.test_api_advice_post import ADVICE_URL, _run_ref, _world
 
 from squadopt.contracts.llmopt_run import RunReference
 from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.contracts.repair_origin import RepairOrigin
 from squadopt.live.transfers import HorizonNoSolutionError
 from squadopt.optimization import SolverStatus, SolverWallTimeLimit
 from squadopt.platform import advice_worker
@@ -30,6 +31,134 @@ def _spec(preferences, chip=None):
     if chip:
         switches["chip"] = {"chip": chip}
     return world._spec(window=3, switches=switches)
+
+
+def _witness_pins(rows):
+    return [
+        {
+            "week": i,
+            "chip": row["chip"],
+            "transfers_in": [p["player_id"] for p in row["transfers_in"]],
+            "transfers_out": [p["player_id"] for p in row["transfers_out"]],
+            "starting_xi": sorted(p["player_id"] for p in row["lineup"]["starting_xi"]),
+            "captain": row["lineup"]["captain"]["player_id"],
+        }
+        for i, row in enumerate(rows, 1)
+    ]
+
+
+def test_static_repair_keeps_a_wildcard_requested_independently_of_a_fixed_week():
+    week = {"week": 2, "transfers_in": [], "transfers_out": [], "chip": "wildcard"}
+    fixed = {"frozen_weeks": [week]}
+    implicit = RepairOrigin.parse({"preferences": [fixed], "wildcard_weeks": []})
+    explicit = RepairOrigin.parse({"preferences": [fixed], "wildcard_weeks": [2]})
+    saved = DecisionPreferences.parse({"save_chips": True})
+    forced = DecisionPreferences.parse({"wildcard_week": 2})
+    assert implicit.permits(saved, None)
+    assert not explicit.permits(saved, None)
+    assert explicit.permits(forced, None)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        {"preferences": [], "wildcard_weeks": []},
+        {"preferences": [{}] * 33, "wildcard_weeks": []},
+        {"preferences": [{"unknown": 4}], "wildcard_weeks": []},
+        {"preferences": [], "wildcard_weeks": [True]},
+        {"preferences": [], "wildcard_weeks": [2, 2]},
+    ],
+)
+def test_run_refuses_invalid_and_unbounded_originals(raw):
+    with pytest.raises(ValueError):
+        RunReference.parse({**_run_ref(), "repair_origin": raw})
+
+
+def test_real_precomputed_club_conflict_keeps_original_after_first_edit_fails(
+    tmp_path, monkeypatch
+):
+    backend = world._deployment(tmp_path, monkeypatch, last_gameweek=5, llmopt_vnext=True)[
+        "backend"
+    ]
+    client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/advice"
+    held = {"hold_transfers": True, "save_chips": True}
+    # Club 1 has three players in the member's original squad. The two requested
+    # counts cannot be serialized together as a normal immutable solver request.
+    two = {"club_counts": [{"club": "Club 1", "count": 2}]}
+    three = {"club_counts": [{"club": "Club 1", "count": 3}]}
+    original = {"preferences": [held, three, two], "wildcard_weeks": []}
+
+    def ask(stage, prefs, origin=original, identifier="a" * 32):
+        ref = _run_ref(identifier, stage=stage)
+        if origin is not None:
+            ref["repair_origin"] = origin
+        return client.post(
+            route, json={"strategy": "saf-puan", "window": 3, "run": ref, "preferences": prefs}
+        )
+
+    # A first candidate cannot discard both conflicting requirements.
+    assert ask("base", held).json()["error"]["code"] == "RUN_REPAIR_INVALID"
+    assert not backend.queue.jobs()
+    first = ask("base", {**held, **two})
+    assert first.status_code == 202, first.text
+    assert ask("base", {**held, **two}).json() == first.json()
+    assert world._work(backend) == 1
+    failed = backend.queue.load(first.json()["job_id"])
+    assert failed.error.code == "PLAN_NOT_FOUND" and failed.error.infeasibility is not None
+    assert ask("repair", {**held, **three}, None).json()["error"]["code"] == "RUN_CONTEXT_CHANGED"
+    assert ask("repair", three).json()["error"]["code"] == "RUN_REPAIR_INVALID"
+    assert len(backend.queue.jobs()) == 1
+
+    # This candidate differs by two counts from the failed candidate but just
+    # one removal from the member's original. Reordering fragments is equivalent.
+    second = ask("repair", {**held, **three}, {**original, "preferences": [two, three, held]})
+    assert second.status_code == 202, second.text
+    assert world._work(backend) == 1
+    answer = ask("repair", {**held, **three})
+    assert answer.status_code == 200, answer.text
+    rows = answer.json()["payload"]["plan_weeks"]
+    pins = _witness_pins(rows)
+    assert len(rows) == 3 and all(
+        not row["transfers_in"] and not row["transfers_out"] for row in rows
+    )
+    verify = {**held, **three, "frozen_weeks": pins}
+    queued = ask("repair", verify)
+    assert queued.status_code == 202, queued.text
+    assert ask("repair", verify).json() == queued.json()
+    assert world._work(backend) == 1
+    replay = ask("repair", verify)
+    assert replay.status_code == 200, replay.text
+    replay_rows = replay.json()["payload"]["plan_weeks"]
+    assert _witness_pins(replay_rows) == pins
+    for before, after in zip(rows, replay_rows, strict=True):
+        assert before["expected_points"] - before["transfer_hit_points"] == (
+            after["expected_points"] - after["transfer_hit_points"]
+        )
+    assert ask("repair", verify).content == replay.content
+    assert len(backend.queue.jobs()) == 3
+    run = json.loads(backend.runs.path.read_bytes())["runs"][_run_ref()["run_id"]]
+    assert len(run["repair_candidates"]) == 2 and run["reserved"] == 366
+
+    # An ordinary successfully completed base also cannot authorize unrelated edits.
+    assert ask("base", {**held, **three}, None, "b" * 32).status_code == 200
+    refused = ask("repair", {"no_hits": True}, None, "b" * 32)
+    assert refused.json()["error"]["code"] == "RUN_REPAIR_INVALID"
+    assert len(backend.queue.jobs()) == 3
+
+    # A marked first candidate can also be an already completed cache hit.
+    # Its unrelated rule remains binding and it consumes one of the two candidate slots.
+    bank = {"min_bank": {"tenths": 10000}}
+    again = {"preferences": [held, three, bank], "wildcard_weeks": []}
+    identifier = "c" * 32
+    assert ask("base", {**held, **three}, again, identifier).status_code == 200
+    assert ask("repair", held, again, identifier).json()["error"]["code"] == "RUN_REPAIR_INVALID"
+    other = ask("repair", {**held, **bank}, again, identifier)
+    assert other.status_code == 202, other.text
+    third = ask("repair", {**held, **three, "min_bank": {"tenths": 9999}}, again, identifier)
+    assert third.json()["error"]["code"] == "RUN_BUDGET_EXHAUSTED"
+    recorded = json.loads(backend.runs.path.read_bytes())["runs"][identifier]
+    assert len(recorded["repair_candidates"]) == 2 and recorded["reserved"] == 122
 
 
 @pytest.mark.parametrize(
@@ -148,17 +277,7 @@ def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp
         assert tx.completed_answer(owner, key, witness.content, backend.queue)
         assert not tx.completed_answer(owner, key, witness.content + b" ", backend.queue)
     rows = witness.json()["payload"]["plan_weeks"]
-    pins = [
-        {
-            "week": i,
-            "chip": row["chip"],
-            "transfers_in": [p["player_id"] for p in row["transfers_in"]],
-            "transfers_out": [p["player_id"] for p in row["transfers_out"]],
-            "starting_xi": [p["player_id"] for p in row["lineup"]["starting_xi"]],
-            "captain": row["lineup"]["captain"]["player_id"],
-        }
-        for i, row in enumerate(rows, 1)
-    ]
+    pins = _witness_pins(rows)
     wrong = {
         **pins[0],
         "captain": next(p for p in pins[0]["starting_xi"] if p != pins[0]["captain"]),

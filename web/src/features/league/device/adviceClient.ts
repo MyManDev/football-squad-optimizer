@@ -51,6 +51,14 @@ function refused(reason: string): AdviceRequestResult {
   };
 }
 
+function isAbort(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+// Clients recreated in the same document share live repair workers. A full reload
+// ends those workers and leaves only the charged reservation and durable result.
+const pendingRepairs = new Map<string, Promise<AdviceReadResult>>();
+
 export function deviceAdviceClient(
   remote: AdviceClient,
   squad: EntrySquad,
@@ -212,7 +220,7 @@ export function deviceAdviceClient(
     try {
       globalThis.sessionStorage.setItem(address, JSON.stringify(result.envelope));
     } catch {
-      /* A persisted capacity claim still prevents another attempt after reload. */
+      /* A reload can recover a missing answer within the remaining capacity. */
     }
   }
   const referenceFor = (request: AdviceRequest, fingerprint: string) => {
@@ -375,6 +383,7 @@ export function deviceAdviceClient(
         addressDigest && `llmopt-device-repair-v1:${request.run!.run_id}:${addressDigest}`;
       const privateKey = repairKey && repairKey + (verify ? ":selection" : ":candidate");
       const runningKey = privateKey || address + ":" + (request.run?.run_id ?? "");
+      const active = privateKey ? pendingRepairs : pending;
       // A total-mode repair first establishes its own edited main under its private receipt.
       const saved = priorityRepair ? undefined : readCached(request, inputs.fingerprint, reference);
       if (!repair && saved?.kind === "advice") {
@@ -389,13 +398,13 @@ export function deviceAdviceClient(
         if (!pending.has(runningKey)) return saved;
         options?.onPlan?.(saved);
       }
-      if (options?.onPlan) {
+      if (!repair && options?.onPlan) {
         const updates = listeners.get(runningKey) ?? new Set();
         updates.add(options.onPlan);
         listeners.set(runningKey, updates);
       }
       let claimed = false;
-      let work = pending.get(runningKey);
+      let work = active.get(runningKey);
       if (!work) {
         work = (async (): Promise<AdviceReadResult> => {
           const document = inputs.document;
@@ -411,7 +420,8 @@ export function deviceAdviceClient(
                 throw new DeviceWorkRefused("RUN_STORE_UNAVAILABLE");
               }
             }
-            throw new DeviceWorkRefused(reason ?? "RUN_BUDGET_EXHAUSTED");
+            if (reason) throw new DeviceWorkRefused(reason);
+            return undefined;
           }
           if (addressDigest && privateKey) {
             const receipt = deviceWorkReceipt(request.run!.run_id);
@@ -420,7 +430,8 @@ export function deviceAdviceClient(
               : receipt?.repairCandidates?.includes(addressDigest);
             if (attempted) {
               bindDeviceRun(request.run!.run_id, binding);
-              return priorRepair(privateKey);
+              const outcome = priorRepair(privateKey);
+              if (outcome) return outcome;
             }
           }
           const caps = await readCapabilities(
@@ -454,8 +465,8 @@ export function deviceAdviceClient(
               addressDigest,
               verify,
               useSaved,
+              "recover",
             );
-            if (!claimed) return priorRepair(privateKey);
             if (useSaved) {
               rememberRepair(privateKey, saved);
               return saved;
@@ -577,11 +588,24 @@ export function deviceAdviceClient(
               ...(request.preferenceBundle ? { preferenceBundle: request.preferenceBundle } : {}),
             });
           });
-        })().finally(() => {
-          pending.delete(runningKey);
-          listeners.delete(runningKey);
-        });
-        pending.set(runningKey, work);
+        })()
+          .catch((error: unknown) => {
+            if (claimed && privateKey && !isAbort(error)) {
+              const reason = error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED";
+              failures.set(privateKey, reason);
+              try {
+                globalThis.sessionStorage.setItem(privateKey + ":failure", reason);
+              } catch {
+                /* The attempted work remains charged if the failure cannot be retained. */
+              }
+            }
+            throw error;
+          })
+          .finally(() => {
+            active.delete(runningKey);
+            listeners.delete(runningKey);
+          });
+        active.set(runningKey, work);
       }
       try {
         const result = await work;
@@ -590,15 +614,7 @@ export function deviceAdviceClient(
           : { kind: "unavailable", reason: "DEVICE_PLAN_FAILED" };
       } catch (error) {
         const reason = error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED";
-        if (claimed && privateKey) {
-          failures.set(privateKey, reason);
-          try {
-            globalThis.sessionStorage.setItem(privateKey + ":failure", reason);
-          } catch {
-            /* The capacity claim remains durable. */
-          }
-        }
-        if (options?.signal?.aborted) throw error;
+        if (options?.signal?.aborted || (privateKey && isAbort(error))) throw error;
         return refused(reason);
       }
     },

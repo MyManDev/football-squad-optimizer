@@ -98,6 +98,25 @@ describe("verified repair candidates", () => {
       ruleRepairChoices({ ...draft, hard: [...draft.hard, { kind: "wildcard" }] }, context),
     ).toBeNull();
   });
+  it.each(["en", "tr"] as const)("names the actual hit constraint in %s", (language) => {
+    const buys = [
+      { kind: "buy_player", player_id: 3, week: 1 },
+      { kind: "buy_player", player_id: 4, week: 1 },
+    ] as const;
+    const sentence = (rule: PlanDraft["hard"][number]) =>
+      ruleRepairChoices(
+        { hard: [rule, ...buys], soft: [] },
+        { ...context, freeTransfers: 0, language },
+      )?.sentence;
+    const noHits = sentence({ kind: "no_hits" });
+    expect(noHits).toMatch(
+      language === "en" ? /hit your rules do not allow/ : /puan cezası.*izin vermiyor/,
+    );
+    expect(sentence({ kind: "hit_budget", points: 0 })).toBe(noHits);
+    expect(sentence({ kind: "hit_budget", points: 4 })).toMatch(
+      language === "en" ? /4-point hit limit/ : /4 puanlık ceza sınırını/,
+    );
+  });
   it("unlocks only the affected week and does not mistake an absent reference for a conflict", () => {
     const draft: PlanDraft = {
       ...untouched,
@@ -162,7 +181,7 @@ describe("verified repair candidates", () => {
     ).toMatchObject({
       status: "budget",
       choices: [],
-      sentence: "The wait for this plan timed out.",
+      sentence: "The calculation timed out, so try again.",
     });
     expect(
       ruleRepairChoices(draft, {

@@ -436,23 +436,26 @@ class AdviceSubmitService:
                 )
             ):
                 return
-        if not base_ready:
-            if (
-                job is None
-                or job.error is None
-                or not single_rule_edit(
-                    base,
-                    spec,
-                    known_chip_conflict=job.error.code == "CHIP_NOT_HELD",
-                    diagnosed=job.error.infeasibility["repairs"] if job.error.infeasibility else (),
-                )
-            ):
-                raise rejected
-        elif len(preferences.frozen_weeks) == 3:
-            # All-week selection pins must come from a witness, even for a static run.
+        # New work, including a shared cached candidate, needs current permission.
+        if not self._reader.llmopt_vnext:
+            raise RunAdmissionError("LLMOPT_VNEXT_DISABLED", "This planning workflow is closed.")
+        if base_ready and len(preferences.frozen_weeks) == 3 and run.repair_origin is None:
             raise rejected
-        # After a static conflict its first edited request was the successful base.
-        if len(candidates) >= (1 if base_ready else 2):
+        error = job.error if job is not None else None
+        if run.repair_origin is not None:
+            permitted = run.repair_origin.permits(preferences, spec.switch("chip").get("chip"))
+        else:
+            permitted = single_rule_edit(
+                base,
+                spec,
+                known_chip_conflict=error is not None and error.code == "CHIP_NOT_HELD",
+                diagnosed=error.infeasibility["repairs"] if error and error.infeasibility else (),
+            )
+        if not permitted:
+            raise rejected
+        # An origin-bound first candidate is already recorded, whatever its outcome.
+        limit = 2 if run.repair_origin is not None or not base_ready else 1
+        if len(candidates) >= limit:
             raise RunAdmissionError("RUN_BUDGET_EXHAUSTED", "The completed plans are available.")
         tx.repair_candidate = key
 
@@ -598,6 +601,13 @@ class AdviceSubmitService:
 
         if run is not None and run_tx is None:
             assert self._runs is not None
+            origin = run.repair_origin
+            if origin is not None and (
+                window != 3
+                or preference_bundle is not None
+                or (run.stage == "base" and not origin.permits(preferences, chip))
+            ):
+                raise RunAdmissionError("RUN_REPAIR_INVALID", "This edit does not match the plan.")
             binding = hashlib.sha256(
                 json.dumps(
                     {
@@ -605,6 +615,7 @@ class AdviceSubmitService:
                         "league": league_id,
                         "entry": entry_id,
                         "window": window,
+                        **({"repair_origin": origin.facts} if origin is not None else {}),
                     },
                     sort_keys=True,
                 ).encode()
@@ -616,6 +627,10 @@ class AdviceSubmitService:
                     or run.run_id in transaction.state["cancelled"]
                 )
                 original = None
+                if origin is not None and not known and not self._reader.llmopt_vnext:
+                    raise RunAdmissionError(
+                        "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
+                    )
                 if self._reader.llmopt_vnext or known:
                     transaction.bind(
                         run,
@@ -631,6 +646,8 @@ class AdviceSubmitService:
                         self._authorize_repair(
                             run, transaction, cache_key, request_spec(), preferences
                         )
+                    elif origin is not None:
+                        transaction.repair_candidate = cache_key
                     if (
                         preference_bundle is not None
                         and transaction.state["runs"][run.run_id]["base"]

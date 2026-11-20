@@ -3,6 +3,7 @@ import { isTimeoutError } from "../../../data/request";
 import { useLanguage } from "../../../i18n/context";
 import { AdviceApiError, type AdviceClient } from "../advice/adviceClient";
 import type { EntryAdvice, EntrySquad } from "../types";
+import { LLMOPT_COPY } from "./copy";
 import { expectedNet } from "./planComparison";
 import { planIdentity } from "./planHistory";
 import type { PlanRevision } from "./planRevision";
@@ -14,12 +15,7 @@ import {
   verificationRequest,
   type RepairRun,
 } from "./repairComputation";
-import {
-  isMissingRepairInput,
-  repairSentence,
-  type RepairChoice,
-  type RepairStatus,
-} from "./ruleRepairChoices";
+import { isMissingRepairInput, type RepairChoice, type RepairStatus } from "./ruleRepairChoices";
 import styles from "./LLMOptPage.module.css";
 
 interface Witness {
@@ -61,9 +57,11 @@ export function VerifiedRuleRepairs({
   apply: (choice: RepairChoice, plan: EntryAdvice, id: string) => void;
 }) {
   const { language, locale } = useLanguage();
+  const copy = LLMOPT_COPY[language];
   const [witnesses, setWitnesses] = useState<Witness[]>([]);
   const [busy, setBusy] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [pendingReplay, setPendingReplay] = useState<Witness | null>(null);
   const [problem, setProblem] = useState<"unconfirmed" | "missing" | "budget" | "wait" | null>(
     null,
   );
@@ -89,7 +87,7 @@ export function VerifiedRuleRepairs({
                 ? "missing"
                 : "unconfirmed",
         );
-        setWitnesses([]);
+        setChecked(false);
       }
     } finally {
       if (!controller.signal.aborted) setBusy(false);
@@ -102,7 +100,10 @@ export function VerifiedRuleRepairs({
       if (signal.aborted) return;
       setChecked(true);
       let stage: "repair" | "base" = run.failedBase ? "repair" : "base";
-      const found: Witness[] = [];
+      const found = witnesses.filter(
+        (witness) => witness.run.runId === run.runId && witness.run.dataId === run.dataId,
+      );
+      setWitnesses(found);
       for (const choice of analysis.choices.slice(0, 2)) {
         if (stage === "repair" && !(await current(run))) throw new Error("RUN_CONTEXT_CHANGED");
         if (signal.aborted) return;
@@ -115,6 +116,8 @@ export function VerifiedRuleRepairs({
           );
           if (!request) continue;
           stage = "repair";
+          if (found.some((witness) => JSON.stringify(witness.request) === JSON.stringify(request)))
+            continue;
           const answer = await computeRepairPlan(
             client,
             request,
@@ -134,8 +137,6 @@ export function VerifiedRuleRepairs({
         } catch (error) {
           const code = failureCode(error);
           if (code === "PLAN_NOT_FOUND") continue;
-          if (found.length && (code === "RUN_BUDGET_EXHAUSTED" || isMissingRepairInput(code)))
-            break;
           throw error;
         }
       }
@@ -143,6 +144,7 @@ export function VerifiedRuleRepairs({
   }
   function select(witness: Witness) {
     void work(async (signal) => {
+      setPendingReplay(witness);
       if (!(await current(witness.run)) || signal.aborted) throw new Error("RUN_CONTEXT_CHANGED");
       const request = verificationRequest(witness.request, witness.answer);
       if (!request) throw new Error("RUN_CONTEXT_CHANGED");
@@ -156,23 +158,23 @@ export function VerifiedRuleRepairs({
       if (signal.aborted) return;
       if (!matchesRepair(witness.answer, plan) || !(await current(witness.run)))
         throw new Error("RUN_CONTEXT_CHANGED");
-      if (!signal.aborted) apply(witness.choice, plan, witness.id);
+      if (!signal.aborted) {
+        setPendingReplay(null);
+        apply(witness.choice, plan, witness.id);
+      }
     });
   }
   return (
     <section className={styles.infeasibility} data-rule-repairs aria-busy={busy}>
-      <p role="status">
-        {problem === "unconfirmed"
-          ? language === "tr"
-            ? "Değişiklik doğrulanamadı."
-            : "The change could not be confirmed."
-          : problem
-            ? repairSentence(language, problem)
-            : analysis.sentence}
-      </p>
+      <p role="status">{problem ? copy.repairs[problem] : analysis.sentence}</p>
       {analysis.status === "conflict" && analysis.choices.length > 0 && !checked && (
-        <button type="button" className={styles.revise} disabled={disabled || busy} onClick={check}>
-          {language === "tr" ? "Değişiklikleri denetle" : "Check changes"}
+        <button
+          type="button"
+          className={styles.revise}
+          disabled={disabled || busy}
+          onClick={pendingReplay ? () => select(pendingReplay) : check}
+        >
+          {copy.repairs.check}
         </button>
       )}
       {witnesses.length > 0 && (
@@ -186,14 +188,14 @@ export function VerifiedRuleRepairs({
               <button
                 type="button"
                 className={styles.revise}
-                disabled={disabled || busy || !!problem}
+                disabled={disabled || busy}
                 onClick={() => select(witness)}
               >
                 {witness.choice.label}
               </button>
               <span>
                 {witness.net.toLocaleString(locale, { maximumFractionDigits: 3 })}{" "}
-                {language === "tr" ? "net puan" : "net points"}
+                {copy.repairs.netPoints}
               </span>
             </li>
           ))}
