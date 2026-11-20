@@ -9,6 +9,7 @@ import {
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks, openCalendar } from "./leagueMocks";
 import { holdModel, routeChat } from "./llmoptChat";
+import { observeCompletedJob, reloadQueuedJob, startQueuedJob } from "./queuedAdviceJob";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -118,6 +119,7 @@ for (const reloadAt of ["base", "preferred"] as const) {
       }),
     );
     await page.route(`${API}/api/v1/advice-jobs/${JOB}`, (route) => {
+      if (route.request().method() === "OPTIONS") return answer(route, null);
       polls += 1;
       return answer(route, { job_id: JOB, status: completed ? "completed" : "queued" });
     });
@@ -147,6 +149,7 @@ for (const reloadAt of ["base", "preferred"] as const) {
       });
     });
 
+    await page.clock.install();
     await page.goto(PAGE);
 
     await holdModel(page);
@@ -160,14 +163,15 @@ for (const reloadAt of ["base", "preferred"] as const) {
     expect(posts).toHaveLength(0);
     expect(reads).toHaveLength(0);
 
-    await compute.click();
+    await startQueuedJob(page, JOB, compute, "en");
     await expect.poll(() => polls).toBeGreaterThan(0);
     const beforeReload = polls;
-    await page.reload();
+    await reloadQueuedJob(page, JOB);
     await expect(rule).toBeVisible();
     await expect.poll(() => polls).toBeGreaterThan(beforeReload);
     expect(posts).toHaveLength(reloadAt === "base" ? 1 : 2);
     completed = true;
+    await observeCompletedJob(page, JOB);
     await expect.poll(() => posts.length).toBe(2);
     await expect(compute).toBeEnabled();
     const base = page.getByRole("article").filter({ hasText: "Base plan" });
