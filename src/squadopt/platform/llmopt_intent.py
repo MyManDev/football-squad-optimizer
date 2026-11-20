@@ -825,7 +825,11 @@ def check_reply(
         or _priority_draft(request.draft)
         or (
             isinstance(reply, dict)
-            and (reply.get("status") == "plan" or _priority_draft(reply.get("draft")))
+            and (
+                "plan_command" in reply
+                or reply.get("status") == "plan"
+                or _priority_draft(reply.get("draft"))
+            )
         )
     ):
         raise IntentValidationError("This planning workflow is closed.")

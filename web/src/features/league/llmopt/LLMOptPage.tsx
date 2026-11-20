@@ -1532,10 +1532,11 @@ function Workspace({
         />
       )}
       {reference && !draft.scenario && (
-        <RevisionComparison previous={reference} revised={revised} />
+        <RevisionComparison previous={reference} revised={revised} planContextEnabled={vNext} />
       )}
       {reference && run?.scenario && scenarioDescription && (
         <ScenarioComparison
+          planContextEnabled={vNext}
           reference={reference}
           replay={states.first}
           optimized={baseState}

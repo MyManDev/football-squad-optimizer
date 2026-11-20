@@ -36,7 +36,11 @@ it("compares weekly and total net points, hits and carried resources in the comp
   );
   render(
     <LanguageProvider initialLanguage="en">
-      <RevisionComparison previous={summarizeRevision(old)!} revised={summarizeRevision(next)} />
+      <RevisionComparison
+        previous={summarizeRevision(old)!}
+        revised={summarizeRevision(next)}
+        planContextEnabled
+      />
     </LanguageProvider>,
   );
   const rows = within(screen.getByRole("region", { name: "Plan revision" })).getAllByRole("row");
@@ -57,6 +61,9 @@ it("compares weekly and total net points, hits and carried resources in the comp
   ]);
   expect(values("Budget after final week")).toEqual([["£1.4m", "£2.0m", "+£0.6m"]]);
   expect(values("Free transfers after final week")).toEqual([["4", "5", "+1"]]);
+  for (const label of ["Transfer penalty", "Remaining budget", "Free transfers next week"]) {
+    expect(values(label)).toHaveLength(3);
+  }
 });
 
 it("advertises available weeks, then freezes only the selected exact transfers, chip and lineup", () => {
@@ -97,7 +104,11 @@ it("shows actual final bank and FTs without subtracting unequal planning horizon
   latest.free_transfers_after = 2;
   render(
     <LanguageProvider initialLanguage="en">
-      <RevisionComparison previous={summarizeRevision(old)!} revised={summarizeRevision(latest)} />
+      <RevisionComparison
+        previous={summarizeRevision(old)!}
+        revised={summarizeRevision(latest)}
+        planContextEnabled={false}
+      />
     </LanguageProvider>,
   );
   const comparison = screen.getByRole("region", { name: "Plan revision" });
@@ -109,4 +120,15 @@ it("shows actual final bank and FTs without subtracting unequal planning horizon
   expect(values("Budget after final week")).toEqual(["£1.2m", "£2.4m", "—"]);
   expect(values("Free transfers after final week")).toEqual(["4", "2", "—"]);
   expect(values("Total expected net points").at(-1)).toBe("—");
+  expect(
+    within(comparison)
+      .getAllByRole("rowheader")
+      .map((header) => header.textContent),
+  ).toEqual([
+    "Total expected net points",
+    "Budget after final week",
+    "Free transfers after final week",
+    ...[2, 3, 4].flatMap((week) => [`GW ${week}`, "Incoming transfers", "Outgoing transfers"]),
+    "Chip",
+  ]);
 });
