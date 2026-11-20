@@ -2,7 +2,6 @@
 
 import io
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,15 +21,21 @@ TESTS = (
 def main():
     # Keep the tests' own cross-imports and shared fixture defaults at the same revision.
     archive = subprocess.check_output(
-        ["git", "archive", "--format=zip", DEVELOP, "tests", "pyproject.toml"], cwd=ROOT
+        [
+            "git",
+            "archive",
+            "--format=zip",
+            DEVELOP,
+            "tests",
+            "pyproject.toml",
+            "web/src/fixtures/league.ts",
+        ],
+        cwd=ROOT,
     )
     with tempfile.TemporaryDirectory(prefix="llmopt-off-") as directory:
         tree = Path(directory)
         with zipfile.ZipFile(io.BytesIO(archive)) as original:
             original.extractall(tree)
-        fixture = Path("web/src/fixtures/league.ts")
-        (tree / fixture).parent.mkdir(parents=True)
-        shutil.copyfile(ROOT / fixture, tree / fixture)
         environment = {
             **os.environ,
             "PYTHONPATH": os.pathsep.join(map(str, (tree, ROOT / "src", ROOT))),

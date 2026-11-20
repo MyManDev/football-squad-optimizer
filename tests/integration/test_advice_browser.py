@@ -459,6 +459,10 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
             payload = json.loads(fresh.cache.get(job.cache_key))["payload"]
             assert payload["source_snapshot_id"] == snapshot_id
             assert len(payload["plan_weeks"]) == 3
+            if config.llmopt_vnext:
+                assert payload["plan_data_id"] == fresh.reader.plan_data_id()
+            else:
+                assert "plan_data_id" not in payload
         if config.llmopt_vnext:
             ledger = json.loads(fresh.runs.path.read_bytes())
             assert len(ledger["runs"]) == 1
