@@ -90,6 +90,7 @@ export interface AdviceReadOptions extends RequestOptions {
 }
 
 export interface AdviceClient {
+  readDeviceDataId?(): Promise<string>;
   /** Bind a new local run without spending work before its location is confirmed. */
   prepareDeviceRun?(request: AdviceRequest): Promise<boolean>;
   /** Local computation waits for its worker ceiling; network transports keep their own deadline. */

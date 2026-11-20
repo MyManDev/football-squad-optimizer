@@ -154,6 +154,9 @@ function PreferencePrices({ prices }: { prices: PreferencePrice[] }) {
 }
 
 export function PlanResult({
+  planId,
+  selected,
+  onSelect,
   title,
   state,
   squad,
@@ -166,6 +169,9 @@ export function PlanResult({
   reviseDisabled,
   children,
 }: {
+  planId?: string;
+  selected?: boolean;
+  onSelect?: () => void;
   title: string;
   state: ComputePhase;
   squad: EntrySquad;
@@ -237,6 +243,8 @@ export function PlanResult({
     <article
       className={styles.result}
       data-plan-ready=""
+      data-plan-id={planId}
+      data-selected={selected || undefined}
       data-transfer-decision={JSON.stringify([
         plan.chip ?? null,
         [...(plan.starting_xi ?? []), ...(plan.bench ?? [])]
@@ -245,6 +253,16 @@ export function PlanResult({
       ])}
     >
       <h3 className={styles.resultTitle}>{title}</h3>
+      {onSelect && (
+        <button
+          type="button"
+          className={styles.revise}
+          onClick={onSelect}
+          aria-pressed={!!selected}
+        >
+          {copy.usePlan}
+        </button>
+      )}
       {onRevise && (
         <button
           className={styles.revise}

@@ -1456,6 +1456,10 @@
           ],
           "type": "object"
         },
+        "plan_data_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
         "plan_kind": {
           "enum": [
             "within_free_transfers",
@@ -4051,6 +4055,10 @@
             "assumptions"
           ],
           "type": "object"
+        },
+        "plan_data_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
         },
         "plan_kind": {
           "enum": [

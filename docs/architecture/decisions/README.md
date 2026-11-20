@@ -28,6 +28,7 @@ its header.
 | [0018](0018-llmopt-run-budget.md) | One durable job and work budget per LLMOPT run | 2026-11-18 | Proposed | None |
 | [0019](0019-llmopt-priority-budget.md) | Priority layers within one preference job | 2026-11-19 | Proposed | None |
 | [0020](0020-llmopt-device-alternatives.md) | One-week device equivalence and Pareto transfer decisions | 2026-11-19 | Proposed | None |
+| [0021](0021-llmopt-plan-context.md) | Content identities and bounded conversations about computed plans | 2026-11-19 | Proposed | None |
 | [0024](0024-llmopt-release-control.md) | Select the planning workflow with one server setting | 2026-11-20 | Proposed | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the

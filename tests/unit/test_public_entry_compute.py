@@ -15,9 +15,10 @@ from tests.unit import test_advice_worker as worker_tests
 from squadopt.api.runtime import app_for_backend
 from squadopt.platform.advice_documents import league_capabilities_schema
 from squadopt.platform.advice_queue import run_advice_worker_once
-from squadopt.platform.advice_read import AdviceBackendNotReadyError
+from squadopt.platform.advice_read import AdviceBackendNotReadyError, advice_context_identity
 from squadopt.platform.advice_submit import FixedWindowRateLimiter
 from squadopt.platform.advice_worker import build_advice_compute
+from squadopt.platform.backend_runtime import build_backend
 from squadopt.platform.public_entry_inputs import MAX_BUNDLE_BYTES
 
 ENTRY = 987654
@@ -40,8 +41,10 @@ def bundle(entry_id=ENTRY, gameweek=2):
 
 
 @pytest.fixture
-def public(tmp_path, monkeypatch):
-    world = worker_tests._deployment(tmp_path, monkeypatch, public_entries=True)
+def public(tmp_path, monkeypatch, request):
+    world = worker_tests._deployment(
+        tmp_path, monkeypatch, public_entries=True, llmopt_vnext=getattr(request, "param", False)
+    )
     backend = world["backend"]
     fetch = Mock(side_effect=lambda entry, week: json.dumps(bundle(entry, week)).encode())
     monkeypatch.setattr(backend.public_inputs, "_fetch", fetch)
@@ -50,6 +53,7 @@ def public(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("league", [239, 0])
+@pytest.mark.parametrize("public", [False, True], indirect=True)
 def test_public_team_get_does_no_work_post_deduplicates_and_worker_answers(public, league):
     backend, client, fetch = public
     route = f"/api/v1/public/leagues/{league}/entries/{ENTRY}/advice"
@@ -72,7 +76,10 @@ def test_public_team_get_does_no_work_post_deduplicates_and_worker_answers(publi
         backend.queue,
         backend.cache,
         build_advice_compute(
-            backend.contexts, backend.job_specs, public_inputs=backend.public_inputs
+            backend.contexts,
+            backend.job_specs,
+            public_inputs=backend.public_inputs,
+            llmopt_vnext=backend.config.llmopt_vnext,
         ),
         at_utc=worker_tests.world_module.GW2_CAPTURED_AT,
     )
@@ -86,6 +93,18 @@ def test_public_team_get_does_no_work_post_deduplicates_and_worker_answers(publi
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
     assert len(payload["starting_xi"]) == 11
     assert client.post(route, json=BODY).content == served.content
+    if backend.config.llmopt_vnext:
+        assert payload.pop("plan_data_id") == advice_context_identity(context)
+    else:
+        assert "plan_data_id" not in payload
+    switched = build_backend(replace(backend.config, llmopt_vnext=not backend.config.llmopt_vnext))
+    with TestClient(
+        app_for_capture(switched, worker_tests.world_module.GW2_CAPTURED_AT)
+    ) as reopened:
+        warm = reopened.get(route, params=BODY)
+        assert warm.json()["payload"] == payload
+        assert reopened.post(route, json=BODY).content == warm.content
+        assert len(switched.queue.jobs()) == 1
     assert len(backend.queue.jobs()) == 1
     fetch.assert_called_once()
     assert dict(identity.snapshot.payloads) == before

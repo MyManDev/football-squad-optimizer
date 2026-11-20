@@ -5,6 +5,7 @@ import {
   mockEntrySquadEnvelopes,
   mockLeagueMembersEnvelope,
 } from "../src/fixtures/league";
+import { planIdentity, retainedPlan } from "../src/features/league/llmopt/planHistory";
 import { MESSAGES } from "../src/i18n/messages";
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
@@ -924,6 +925,30 @@ async function checkCombinedPrices(page: Page, vNext: boolean) {
     .getByRole("textbox", { name: "Plan instructions" })
     .fill("No hits. The first two are worth up to 1.5 points each. Also prefer the third player.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
+  let archived: string | undefined;
+  if (!vNext) {
+    await expect(page.getByText("Instructions updated.", { exact: true })).toBeVisible();
+    const plan = retainedPlan(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1).payload);
+    archived = await planIdentity(plan);
+    await page.evaluate(
+      ({ id, plan }) => {
+        const [key, raw] = Object.entries(sessionStorage).find(([k]) =>
+          k.startsWith("squadopt.llmopt:"),
+        )!;
+        sessionStorage.setItem(
+          key,
+          JSON.stringify({
+            ...JSON.parse(raw),
+            history: { items: [{ id, plan }], navigation: [id], cursor: 0, explicit: true },
+          }),
+        );
+      },
+      { id: archived, plan },
+    );
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Selected plan", exact: true })).toBeVisible();
+    await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+  }
   await page.getByRole("button", { name: "Compute plans" }).click();
 
   const combined = page.getByRole("article").filter({
@@ -936,6 +961,11 @@ async function checkCombinedPrices(page: Page, vNext: boolean) {
   await expect(
     page.getByText("Applied in the plan with all preferences.", { exact: true }),
   ).toBeVisible();
+  if (!vNext) {
+    await expect(page.getByRole("heading", { name: "Selected plan", exact: true })).toHaveCount(0);
+    await expect(page.locator("article[data-plan-ready]")).toHaveCount(4);
+    await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+  }
   expect(posts).toHaveLength(4);
   expect(posts[3]?.preferences).toMatchObject({
     no_hits: true,
@@ -953,11 +983,17 @@ async function checkCombinedPrices(page: Page, vNext: boolean) {
   }
   await page.reload();
   await expect(combined.getByText("2.4 expected points lost against the base plan")).toBeVisible();
+  if (!vNext) {
+    await expect(page.getByRole("heading", { name: "Selected plan", exact: true })).toHaveCount(0);
+    await expect(page.locator("article[data-plan-ready]")).toHaveCount(4);
+    await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+  }
   expect(posts).toHaveLength(4);
   const retained = await page.evaluate(
     () => Object.entries(sessionStorage).find(([key]) => key.startsWith("squadopt.llmopt:"))?.[1],
   );
   expect(JSON.parse(retained!).confirmation.runId).toBe(runId);
+  if (!vNext) expect(JSON.parse(retained!).history.navigation).toEqual([archived]);
 }
 
 test("a waiting run survives reload and an edit closes it without a follow-up", async ({

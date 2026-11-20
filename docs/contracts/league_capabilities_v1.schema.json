@@ -132,6 +132,10 @@
       "type": "array",
       "uniqueItems": true
     },
+    "plan_data_id": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
     "preference_bundles": {
       "additionalProperties": false,
       "properties": {

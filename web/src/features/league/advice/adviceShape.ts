@@ -395,6 +395,7 @@ export function isAdvicePayload(value: unknown): boolean {
     },
     {
       source_snapshot_id: nullable(text),
+      plan_data_id: (v) => typeof v === "string" && /^[0-9a-f]{64}$/.test(v),
       prediction_model: predictionModel,
       information_review: informationReview,
       role_forecast: roleForecast,

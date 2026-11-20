@@ -1,3 +1,4 @@
+import { planIdForLabel, type PlanContext, type PlanCommand } from "./planHistory";
 import { discardBody, withRequestDeadline } from "../../../data/request";
 import type { Language } from "../../../i18n/messages";
 import {
@@ -524,6 +525,7 @@ export function intentBody(
   clarification?: Clarification,
   referenceWeeks?: readonly PlanWeekNumber[],
   referenceCaptains?: readonly { week: PlanWeekNumber; player_id: number }[],
+  planContext?: PlanContext,
 ) {
   return {
     message,
@@ -536,11 +538,16 @@ export function intentBody(
     ...(clarification ? { clarification } : {}),
     ...(referenceWeeks?.length ? { reference_weeks: referenceWeeks } : {}),
     ...(referenceCaptains?.length ? { reference_captains: referenceCaptains } : {}),
+    ...(planContext ? { plan_context: planContext } : {}),
   };
 }
 
 /** A checked answer from the site's intent routes: a draft, or one question back. */
-export function intentAnswer(value: unknown, players: readonly CatalogPlayer[]) {
+export function intentAnswer(
+  value: unknown,
+  players: readonly CatalogPlayer[],
+  context?: PlanContext,
+) {
   if (!record(value)) throw new Error("Invalid response");
   // The question is saved with the session and sent back on the next message, so it must
   // fit the limit both the restore check and the service hold it to.
@@ -551,6 +558,35 @@ export function intentAnswer(value: unknown, players: readonly CatalogPlayer[]) 
     value.message.trim().length <= MAX_QUESTION_LENGTH
   )
     return { status: "clarification" as const, message: value.message.trim() };
+  if (value.status === "plan") {
+    const c = value.command;
+    if (
+      !context ||
+      !record(c) ||
+      Object.keys(c).some(
+        (k) => !["plan_id", "action", "week", "player_id", "replacement_id"].includes(k),
+      ) ||
+      typeof c.plan_id !== "string" ||
+      !/^[0-9a-f]{64}$/.test(c.plan_id) ||
+      !["select", "freeze_transfer", "freeze_week", "substitute"].includes(String(c.action))
+    )
+      throw new IntentError(422, "REPLY_REFUSED");
+    // A tab talking to an earlier check route can still receive just the full identity.
+    const id =
+      value.plan_label === undefined
+        ? context.plans.find((p) => p.plan_id === c.plan_id && p.data_id === context.data_id)
+            ?.plan_id
+        : planIdForLabel(context, value.plan_label);
+    if (!id || id !== c.plan_id) throw new IntentError(422, "REPLY_REFUSED");
+    if (c.week !== undefined && !isPlanWeek(c.week)) throw new IntentError(422, "REPLY_REFUSED");
+    for (const key of ["player_id", "replacement_id"])
+      if (
+        c[key] !== undefined &&
+        (!Number.isSafeInteger(c[key]) || !players.some((p) => p.id === c[key]))
+      )
+        throw new IntentError(422, "REPLY_REFUSED");
+    return { status: "plan" as const, command: { ...(c as unknown as PlanCommand), plan_id: id } };
+  }
   if (value.status !== "draft") throw new Error("Invalid response");
   return {
     status: "draft" as const,

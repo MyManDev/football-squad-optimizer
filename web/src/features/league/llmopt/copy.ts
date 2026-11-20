@@ -11,6 +11,14 @@ function waitUnits(seconds: number): [number, "second" | "minute" | "hour"] {
 
 const en = {
   title: "LLMOPT",
+  usePlan: "Use this plan",
+  selectedPlan: "Selected plan",
+  planHistory: "Saved plans",
+  savedPlan: (index: number) => `Plan ${index}`,
+  undoPlan: "Previous selection",
+  redoPlan: "Next selection",
+  planQuestion: "Which plan or player do you mean?",
+  planDataChanged: "Recalculate the plans to choose one with the latest data.",
   assistant: "LLMOPT",
   back: "Back to team",
   chat: "Plan instructions",
@@ -234,6 +242,14 @@ const en = {
 
 const tr: typeof en = {
   title: "LLMOPT",
+  usePlan: "Bu planı kullan",
+  selectedPlan: "Seçilen plan",
+  planHistory: "Kayıtlı planlar",
+  savedPlan: (index: number) => `Plan ${index}`,
+  undoPlan: "Önceki seçim",
+  redoPlan: "Sonraki seçim",
+  planQuestion: "Hangi planı ya da oyuncuyu kastediyorsun?",
+  planDataChanged: "Güncel verilerle bir plan seçmek için planları yeniden hesapla.",
   assistant: "LLMOPT",
   back: "Takıma dön",
   chat: "Plan talimatların",

@@ -32,6 +32,8 @@ checks a candidate against the copies the accepted site carries.
 
 | File | Written by | Read by | Test that holds the file to the code |
 | --- | --- | --- | --- |
+| `llmopt_intent_v1.schema.json` | `intent_reply_schema(with_plans=True)` in `src/squadopt/platform/llmopt_intent.py` | [Computed-plan conversation](llmopt_plans_v1.md); all provider adapters | `tests/unit/test_llmopt_plan_context.py`, `web/src/features/league/llmopt/planSchema.test.ts` |
+| `llmopt_plans_v1.schema.json` | `plan_conversation_schema()` in `src/squadopt/contracts/llmopt_plans.py` | [Computed-plan conversation](llmopt_plans_v1.md) | `tests/unit/test_llmopt_plan_context.py` |
 | `llmopt_device_v1.schema.json` | `device_extension_schema()` in `src/squadopt/contracts/llmopt_device.py` | [Private worker and device advice extensions](llmopt_device_v1.md) | `tests/unit/test_llmopt_device_contract.py` |
 | `llmopt_priority_program_v1.schema.json` | `priority_program_schema()` in `src/squadopt/contracts/priority_preferences.py` | [Priority program](llmopt_priority_program_v1.md), contained in one preference job | `tests/unit/test_priority_preferences.py`, `tests/unit/test_llmopt_preference_bundle.py` |
 | `llmopt_preference_bundle_v1.schema.json` | `preference_bundle_schema()` in `src/squadopt/contracts/preference_bundle.py` | [One preference execution](llmopt_preference_bundle_v1.md), immutable after main admission | `tests/unit/test_llmopt_preference_bundle.py` |
