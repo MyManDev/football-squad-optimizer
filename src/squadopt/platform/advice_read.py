@@ -51,6 +51,7 @@ from squadopt.platform.advice_documents import (
     validate_league_capabilities,
     validate_league_state,
 )
+from squadopt.platform.advice_plan_cache import PlanAdviceCache
 from squadopt.platform.advice_switches import (
     MANAGERS_WORD_SWITCH,
     MODEL_SWITCH,
@@ -1062,10 +1063,14 @@ class AdviceReadStore:
             raise UnknownStrategyError(f"Strategy {strategy!r} is not computed here.")
         return self._strategies[strategy]
 
-    def cached(self, key: str) -> bytes | None:
+    def cached(self, key: str, *, repair_witness: bool = False) -> bytes | None:
         """GET and POST share the same validation of exact cached bytes."""
 
-        cached = self._cache.get(key)
+        cached = (
+            self._cache.repair_witness(key)
+            if repair_witness and isinstance(self._cache, PlanAdviceCache)
+            else self._cache.get(key)
+        )
         if cached is not None:
             validate_advice_document(cached)
         return cached

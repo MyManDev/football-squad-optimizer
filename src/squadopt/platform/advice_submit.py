@@ -423,9 +423,18 @@ class AdviceSubmitService:
         # A selection must replay one of this run's completed candidate documents.
         sources = [*candidates, *([state["base"]] if base_ready else [])]
         for source in sources:
-            answer = self._reader.cached(source)
+            answer = self._reader.cached(source, repair_witness=True)
             prior = self._specs.get(source)
-            if answer is not None and prior is not None and replays_witness(prior, spec, answer):
+            if (
+                answer is not None
+                and prior is not None
+                and replays_witness(
+                    prior,
+                    spec,
+                    answer,
+                    completed_here=tx.completed_answer(run, source, answer, self._queue),
+                )
+            ):
                 return
         if not base_ready:
             if (
@@ -567,10 +576,21 @@ class AdviceSubmitService:
         def record_hit(tx: RunTransaction, ref: RunReference, document: bytes) -> None:
             if window == 3 and ref.stage in ("base", "repair") and self._specs is not None:
                 spec = request_spec()
-                if ref.stage == "repair" and not current_repair_answer(
-                    spec, json.loads(document)["payload"]
-                ):
-                    raise RunAdmissionError("RUN_CONTEXT_CHANGED", "The planning data changed.")
+                if ref.stage == "repair":
+                    witness = (
+                        document
+                        if self._reader.llmopt_vnext
+                        else self._reader.cached(cache_key, repair_witness=True)
+                    )
+                    if witness is None or not current_repair_answer(
+                        spec,
+                        json.loads(witness)["payload"],
+                        completed_here=(
+                            self._specs.get(cache_key) == spec
+                            and tx.completed_answer(ref, cache_key, witness, self._queue)
+                        ),
+                    ):
+                        raise RunAdmissionError("RUN_CONTEXT_CHANGED", "The planning data changed.")
                 # Imported answers may have no queue record. Store the immutable spec
                 # before publishing the run's reference to its cached witness.
                 self._specs.put(cache_key, spec)

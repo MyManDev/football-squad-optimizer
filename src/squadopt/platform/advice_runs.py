@@ -6,6 +6,7 @@ grant another attempt. Run metadata never changes the immutable answer or spec k
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -99,6 +100,25 @@ class RunTransaction:
     def previous(self, ref: RunReference, key: str) -> str | None:
         value = self.state["runs"][ref.run_id]["requests"].get(key)
         return str(value) if value is not None else None
+
+    def completed_answer(
+        self, ref: RunReference, key: str, document: bytes, queue: JobQueue
+    ) -> bool:
+        identifier = self.previous(ref, key)
+        if identifier is None:
+            return False
+        allocation = self.state["jobs"][identifier]
+        receipt = allocation["receipt"]
+        if not isinstance(receipt, dict) or "answer_sha256" not in receipt:
+            return False
+        job = queue.load(identifier)
+        return (
+            job is not None
+            and job.status == "completed"
+            and job.contract_version == "backend_jobs_v2"
+            and job.cache_key == key
+            and receipt["answer_sha256"] == hashlib.sha256(document).hexdigest()
+        )
 
     def reserve(
         self, ref: RunReference, key: str, job_id: str, *, preference_bundle: bool = False
@@ -403,7 +423,9 @@ class FileRunStore:
             self._save(tx.state)
             return WorkBudget(float(job["limit"]))
 
-    def finish(self, job_id: str, budget: WorkBudget) -> None:
+    def finish(
+        self, job_id: str, budget: WorkBudget, *, rollback_answer: bytes | None = None
+    ) -> None:
         with self.transaction() as tx:
             job = tx.state["jobs"][job_id]
             job["receipt"] = {
@@ -411,4 +433,8 @@ class FileRunStore:
                 "native_reserved": budget.native_reserved,
                 "calls": budget.calls,
             }
+            if rollback_answer is not None and any(
+                tx.state["runs"][owner]["window"] == 3 for owner in job["runs"]
+            ):
+                job["receipt"]["answer_sha256"] = hashlib.sha256(rollback_answer).hexdigest()
             self._save(tx.state)

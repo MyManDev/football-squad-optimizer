@@ -57,8 +57,11 @@ export function deviceChip(
 export function deviceSelection(
   request: AdviceRequest,
   squad: Pick<EntrySquad, "chips" | "device_plan">,
+  allowRunPreferences = request.deviceRun === true,
 ): DeviceSelection | null {
   if (
+    // Ordinary member links have no confirmed run. Their preferences are served remotely.
+    ((request.preferences || request.preferenceBundle) && (!request.run || !allowRunPreferences)) ||
     request.window !== 1 ||
     (request.managersWord ?? false) ||
     (request.model ?? "current") !== "current"

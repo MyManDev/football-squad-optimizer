@@ -99,6 +99,10 @@ export function deviceAdviceClient(
       gameweek: squad.gameweek,
       snapshotId: squad.source_snapshot_id,
     });
+    if (!caps && remoteCaps) {
+      // The page needs the changed capture to prompt for a reload. It grants no local work.
+      return { ...remoteCaps, llmoptVNext: undefined, devicePreferenceBundles: undefined };
+    }
     if (caps?.llmoptVNext !== true || !consistentBlock || !squad.source_snapshot_id) return caps;
     return {
       ...caps,
@@ -144,7 +148,8 @@ export function deviceAdviceClient(
     request.entryId === squad.entry.entry_id &&
     (request.season === undefined || request.season === squad.season) &&
     (request.gameweek === undefined || request.gameweek === squad.gameweek) &&
-    deviceSelection(request, squad)?.kind === "plain";
+    // This transport rechecks the current server grant before starting a run-bound worker.
+    deviceSelection(request, squad, true)?.kind === "plain";
   const key = (request: AdviceRequest, fingerprint: string) =>
     "llmopt-device-v1:" +
     JSON.stringify([

@@ -316,6 +316,18 @@ for (const [kind, vNext] of [
       ).toBeUndefined();
 
       const comparison = page.getByRole("region", { name: "Scenario comparison" });
+      const rows = comparison.getByRole("table");
+      await expect(
+        rows.getByRole("rowheader", { name: "Total transfer penalty", exact: true }),
+      ).toHaveCount(vNext ? 1 : 0);
+      for (const name of [
+        "Expected net points",
+        "Transfer penalty",
+        "Remaining budget",
+        "Free transfers next week",
+      ]) {
+        await expect(rows.getByRole("rowheader", { name, exact: true })).toHaveCount(vNext ? 3 : 0);
+      }
       await expect(
         comparison.getByRole("columnheader", { name: "Original transfers" }),
       ).toBeVisible();

@@ -307,16 +307,27 @@ def single_rule_edit(
     return False
 
 
-def current_repair_answer(spec: AdviceJobSpec, payload: Mapping[str, Any]) -> bool:
+def current_repair_answer(
+    spec: AdviceJobSpec, payload: Mapping[str, Any], *, completed_here: bool = False
+) -> bool:
     return (
         payload.get("source_snapshot_id") == spec.context.capture_snapshot_id
-        and payload.get("plan_data_id") == advice_context_identity(spec.context)
+        and (
+            payload.get("plan_data_id") == advice_context_identity(spec.context)
+            or ("plan_data_id" not in payload and completed_here)
+        )
         and payload.get("entry_id") == spec.entry_id
         and payload.get("window") == 3
     )
 
 
-def replays_witness(original: AdviceJobSpec, candidate: AdviceJobSpec, document: bytes) -> bool:
+def replays_witness(
+    original: AdviceJobSpec,
+    candidate: AdviceJobSpec,
+    document: bytes,
+    *,
+    completed_here: bool = False,
+) -> bool:
     if not same_repair_scope(original, candidate) or original.switch("chip") != candidate.switch(
         "chip"
     ):
@@ -330,7 +341,7 @@ def replays_witness(original: AdviceJobSpec, candidate: AdviceJobSpec, document:
         return False
     try:
         payload = json.loads(document)["payload"]
-        if not current_repair_answer(original, payload):
+        if not current_repair_answer(original, payload, completed_here=completed_here):
             return False
         weeks = payload["plan_weeks"]
         if len(weeks) != 3:

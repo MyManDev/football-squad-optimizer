@@ -998,12 +998,8 @@ function Workspace({
           .then((read) => (read.isError ? null : read.data)),
       ]);
       if (!mounted.current) return;
-      if (!capabilities?.preferences) {
+      if (!capabilities) {
         setFeedback(copy.serviceUnavailable);
-        return;
-      }
-      if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
-        setFeedback(copy.windowUnavailable);
         return;
       }
       if (
@@ -1021,6 +1017,14 @@ function Workspace({
         setReference(undefined);
         // The reload the page asks for opens the new squad; the rules go with the member.
         session.save({ draft });
+        return;
+      }
+      if (!capabilities.preferences) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
+      if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
+        setFeedback(copy.windowUnavailable);
         return;
       }
       const local =
@@ -1668,10 +1672,11 @@ function Workspace({
         />
       )}
       {reference && !draft.scenario && (
-        <RevisionComparison previous={reference} revised={revised} />
+        <RevisionComparison previous={reference} revised={revised} planContextEnabled={vNext} />
       )}
       {reference && run?.scenario && scenarioDescription && (
         <ScenarioComparison
+          planContextEnabled={vNext}
           reference={reference}
           replay={states.first}
           optimized={baseState}

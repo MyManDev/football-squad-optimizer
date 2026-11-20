@@ -381,7 +381,7 @@ describe("one-week advice transport with a real solver", () => {
     ["no response", null],
     ["missing release", publicEntryCapabilities(squad)],
     ["disabled release", { ...enabledCaps, llmoptVNext: false }],
-    ["old capture", { ...enabledCaps, captureSnapshotId: "old" }],
+    ["old capture", { ...enabledCaps, captureSnapshotId: "old", devicePreferenceBundles: true }],
     ["another gameweek", { ...enabledCaps, gameweek: squad.gameweek + 1 }],
   ])("does not advertise or start a local alternative with %s", async (_label, capabilities) => {
     const { client, remote, posts } = setup();

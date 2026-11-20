@@ -40,6 +40,14 @@ Publish the selected result only after agreement. A stale input, unfinished
 replay or mismatching witness cannot stand in for the selected plan.
 Repeating or restoring a selection must not allocate additional attempts.
 
+When a three-week job admitted before rollback finishes with the release
+switch closed, its existing run receipt may store the SHA-256 of the exact
+answer bytes. A repair can use that digest only with the same run's completed
+job, immutable request specification and current capture. Earlier receipts
+remain readable. A cache hit alone supplies no such proof. This private
+completion record grants no catalogue identity. Only provenance written
+while the release switch was open can identify a plan for conversation.
+
 Run stages describe admission and do not enter ordinary advice-cache identity.
 Repairs use the squad optimizer with the original projection model and data.
 They require no changes to either model

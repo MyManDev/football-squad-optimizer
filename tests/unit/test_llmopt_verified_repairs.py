@@ -1,5 +1,6 @@
 """Three-week repair admission retains the original rules, capture and run budget."""
 
+import hashlib
 import json
 from dataclasses import replace
 
@@ -9,6 +10,7 @@ from tests.fixtures.backend_app import app_for_capture
 from tests.unit import test_advice_worker as world
 from tests.unit.test_api_advice_post import ADVICE_URL, _run_ref, _world
 
+from squadopt.contracts.llmopt_run import RunReference
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.transfers import HorizonNoSolutionError
 from squadopt.optimization import SolverStatus, SolverWallTimeLimit
@@ -131,7 +133,20 @@ def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp
     assert off.get(f"/api/v1/advice-jobs/{first.json()['job_id']}").json()["status"] == "completed"
     witness = ask("repair", candidate)
     assert witness.status_code == 200, witness.text
+    assert "plan_data_id" not in witness.json()["payload"]
     assert ask("repair", candidate, off).content == witness.content
+    # Reopening cannot give a cold rollback completion a catalogue identity.
+    ordinary = client.post(
+        route, json={"strategy": "saf-puan", "window": 3, "preferences": candidate}
+    )
+    assert ordinary.content == witness.content
+    receipt = json.loads(backend.runs.path.read_bytes())["jobs"][first.json()["job_id"]]["receipt"]
+    assert receipt["answer_sha256"] == hashlib.sha256(witness.content).hexdigest()
+    key = backend.queue.load(first.json()["job_id"]).cache_key
+    with backend.runs.transaction() as tx:
+        owner = RunReference("a" * 32, "repair")
+        assert tx.completed_answer(owner, key, witness.content, backend.queue)
+        assert not tx.completed_answer(owner, key, witness.content + b" ", backend.queue)
     rows = witness.json()["payload"]["plan_weeks"]
     pins = [
         {
@@ -195,11 +210,16 @@ def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp
     verified_spec = backend.job_specs.get(backend.queue.load(accepted.json()["job_id"]).cache_key)
     stale = witness.json()
     stale["payload"]["source_snapshot_id"] = "older-capture"
-    assert not replays_witness(first_spec, verified_spec, json.dumps(stale).encode())
+    assert not replays_witness(
+        first_spec, verified_spec, json.dumps(stale).encode(), completed_here=True
+    )
+    # An unrelated run owns neither the rollback job nor its private completion.
+    assert ask("base", candidate, client, "e" * 32).status_code == 200
+    assert ask("repair", verify, client, "e" * 32).json()["error"]["code"] == "RUN_REPAIR_INVALID"
 
     # A preflight conflict starts with a completed, possibly already cached edit.
     # Both the witnessed edit and its verified replay are hits for this new run.
-    for stage, selections in [("base", candidate), ("repair", verify)]:
+    for stage, selections in [("base", verify), ("repair", verify)]:
         hit = client.post(
             route,
             json={
@@ -212,7 +232,9 @@ def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp
         assert hit.status_code == 200, hit.text
     assert len(backend.queue.jobs()) == 4
     assert json.loads(backend.runs.path.read_bytes())["runs"]["b" * 32]["reserved"] == 0
-    assert ask("repair", verify, off, "b" * 32).content == checked.content
+    expected = checked.json()
+    assert expected["payload"].pop("plan_data_id") == caps["plan_data_id"]
+    assert ask("repair", verify, off, "b" * 32).json() == expected
     assert ask("base", verify, client, "d" * 32).status_code == 200
     before = backend.runs.path.read_bytes()
     fresh = ask("repair", candidate, off, "d" * 32)

@@ -142,15 +142,20 @@ def plan_command_schema() -> dict[str, Any]:
     properties = {
         "plan_id": {"type": "string"},
         "action": {"type": "string", "enum": list(ACTIONS)},
-        "week": {"type": ["integer", "null"], "enum": [1, 2, 3, None]},
-        "player_id": {"type": ["integer", "null"]},
-        "replacement_id": {"type": ["integer", "null"]},
+        "week": {"anyOf": [{"type": "integer", "enum": [1, 2, 3]}, {"type": "null"}]},
+        "player_id": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "replacement_id": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
     }
     return {
-        "type": ["object", "null"],
-        "properties": properties,
-        "required": list(properties),
-        "additionalProperties": False,
+        "anyOf": [
+            {
+                "type": "object",
+                "properties": properties,
+                "required": list(properties),
+                "additionalProperties": False,
+            },
+            {"type": "null"},
+        ]
     }
 
 

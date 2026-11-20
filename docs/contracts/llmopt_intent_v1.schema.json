@@ -92,10 +92,6 @@
                 {
                   "type": "null"
                 }
-              ],
-              "type": [
-                "object",
-                "null"
               ]
             },
             "hard": {
@@ -190,11 +186,15 @@
               "type": "array"
             },
             "max_total_cost_tenths": {
-              "maximum": 1000,
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "min_bank": {
@@ -227,10 +227,6 @@
                 {
                   "type": "null"
                 }
-              ],
-              "type": [
-                "object",
-                "null"
               ]
             },
             "scenario": {
@@ -278,10 +274,6 @@
                 {
                   "type": "null"
                 }
-              ],
-              "type": [
-                "object",
-                "null"
               ]
             },
             "soft": {
@@ -334,15 +326,18 @@
                     ]
                   },
                   "priority": {
-                    "enum": [
-                      1,
-                      2,
-                      3,
-                      null
-                    ],
-                    "type": [
-                      "integer",
-                      "null"
+                    "anyOf": [
+                      {
+                        "enum": [
+                          1,
+                          2,
+                          3
+                        ],
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "scope": {
@@ -411,10 +406,6 @@
         {
           "type": "null"
         }
-      ],
-      "type": [
-        "object",
-        "null"
       ]
     },
     "message": {
@@ -424,55 +415,70 @@
       ]
     },
     "plan_command": {
-      "additionalProperties": false,
-      "properties": {
-        "action": {
-          "enum": [
-            "select",
-            "freeze_transfer",
-            "freeze_week",
-            "substitute"
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "enum": [
+                "select",
+                "freeze_transfer",
+                "freeze_week",
+                "substitute"
+              ],
+              "type": "string"
+            },
+            "plan_id": {
+              "type": "string"
+            },
+            "player_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "replacement_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "week": {
+              "anyOf": [
+                {
+                  "enum": [
+                    1,
+                    2,
+                    3
+                  ],
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "plan_id",
+            "action",
+            "week",
+            "player_id",
+            "replacement_id"
           ],
-          "type": "string"
+          "type": "object"
         },
-        "plan_id": {
-          "type": "string"
-        },
-        "player_id": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "replacement_id": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "week": {
-          "enum": [
-            1,
-            2,
-            3,
-            null
-          ],
-          "type": [
-            "integer",
-            "null"
-          ]
+        {
+          "type": "null"
         }
-      },
-      "required": [
-        "plan_id",
-        "action",
-        "week",
-        "player_id",
-        "replacement_id"
-      ],
-      "type": [
-        "object",
-        "null"
       ]
     },
     "status": {
