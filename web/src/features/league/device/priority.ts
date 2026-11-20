@@ -263,13 +263,21 @@ export function solvePriorityPreferences(
       else throw new DevicePlanRefused(solution.Status, "plan");
     }
   }
-  const satisfied = requested.filter((_, i) => holds(soft[i]!, best)).map((r) => r.identity);
+  const satisfied: string[] = [];
+  const leftOut: string[] = [];
+  const unsearched: string[] = [];
+  requested.forEach((rule, i) => {
+    if (!completed.includes(rule.priority)) unsearched.push(rule.identity);
+    else if (holds(soft[i]!, best)) satisfied.push(rule.identity);
+    else leftOut.push(rule.identity);
+  });
   const score = Math.round(valueOf(points, best));
   if (score < floor) throw new Error("The priority plan exceeds its total concession.");
   const metadata: PriorityResult = {
     contract_version: "llmopt_priority_result_v1",
     satisfied,
-    left_out: requested.filter((r) => !satisfied.includes(r.identity)).map((r) => r.identity),
+    left_out: leftOut,
+    unsearched,
     completed_priorities: completed,
     reference_proved: !baseline.restricted,
     total_cost: (reference - score) / document.rules.expected_points_scale,

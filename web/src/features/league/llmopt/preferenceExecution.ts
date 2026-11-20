@@ -193,3 +193,22 @@ export function preferenceStates(
     combined: state(result.selected, selection, childRequest),
   };
 }
+
+/** The outcome of the preference plan after the bundle itself reaches a terminal state. */
+export function preferencePlanProblem(state: ComputePhase) {
+  if (state.phase === "failed" || state.phase === "unavailable")
+    return state.reason === "RUN_BUDGET_EXHAUSTED" ? "combinedExhausted" : "combinedFailed";
+  if (state.phase !== "done") return undefined;
+  const result = state.envelope.payload.preference_bundle_result;
+  if (!result?.selected) return result?.budget_exhausted ? "combinedExhausted" : "combinedMissing";
+  switch (result.selected.status) {
+    case "done":
+      return undefined;
+    case "failed":
+      return "combinedFailed";
+    case "unavailable":
+      return "combinedMissing";
+    case "exhausted":
+      return "combinedExhausted";
+  }
+}

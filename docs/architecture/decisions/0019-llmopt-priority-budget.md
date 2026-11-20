@@ -34,11 +34,14 @@ Its individual prices and combined decision must be calculated sequentially insi
 single preference job before that execution path can replace the existing page path.
 An incomplete bundle implementation must not silently change legacy acceptance rules.
 
-Only completed layers may be published as the preference outcome. If remaining work
-cannot start another solve, retain the last completed layer, or the required-rule plan
-if none completed. A layer is complete when its count is proved optimal (including a
-feasible witness satisfying every rule in that layer). The last points tie break can
-retain its feasible incumbent. No incomplete search is described as an optimum.
+Only a proved count completes a layer. A feasible witness meeting every rule also proves
+the count by attaining its upper bound. Freeze completed counts and stop counting at
+the first incomplete layer. Maximize net points with the counts proved so far, even
+if a weaker layer stopped early. If no count was proved, return the certified main plan.
+Keep the higher-scoring witness when two plans attain the same proved counts.
+In the result, only completed layers contribute to `satisfied` and `left_out`.
+`unsearched` contains all rules from the other layers, including any the returned
+plan happens to satisfy. Each rule appears exactly once.
 
 Hard rules are applied outside reification. Soft rules get separate satisfaction literals;
 conflicting soft rules may remain unsatisfied without making the hard model infeasible.
@@ -71,14 +74,49 @@ sessions retain their original transport; new confirmations pin the chosen mode.
 One preference job reserves three former job allocations: **63 units at one week**
 or **366 at three weeks**. Together with the main job this is exactly the existing
 84/488-unit run capacity. The client cannot choose an allocation. A child calculation
-cannot reset the parent meter. Count layers share their existing 20/60-unit allowance.
-Certificates are charged work, not additional jobs.
+cannot reset the parent meter. In total-allowance mode, certification, count searches
+and the points pass share the bundle's full remaining allocation. After certification,
+hold a quarter of the remaining work and wall time for the points pass. All count
+layers share the other three quarters. The points pass may also use everything the
+counts did not spend. The proportion leaves a final search available after an
+interrupted count without giving each count a fresh allocation. Certificates are
+charged work in the same job. If the durable admission limit shortens a large final
+points call and that call reaches its granted limit, one further points call can
+use the unspent balance. It retains all completed counts and the highest score
+already attained under those counts.
+
+Each ordinary price or combination may start with the positive balance actually
+available, up to 21 or 122 units. A total-priority calculation shares all of
+the bundle's remaining 63 or 366 units. Charge actual solver stop granularity.
+Neither rounding nor a tolerance can create another unit.
+A component solved with less than its ordinary allocation belongs to the bundle
+result. It cannot populate the shared full-allocation answer at that address.
+
+Persist a bundle's solver grants before work starts. Settle each returned call
+with its measured work and keep the original job identity across queue lease
+recovery. A newer queue attempt fences the old worker and charges any unreturned
+grant before requesting more work. A terminal failure releases unused capacity
+for other eligible requests in that run. The existing job count and work
+ceilings continue to apply across processes and retries. Ordinary jobs and old
+receipts retain their original one-attempt accounting.
+
+A single grant may exceed a former job allowance. If such a grant would consume
+the final balance, retain one quarter of a former allowance for same-job recovery
+(5.25 units at one week or 30.5 at three). A grant of up to 21 or 122 units
+may use the final balance. Thus a lost larger call leaves retry capacity, and
+a lost smaller call costs at most one former job. A later call can spend a held
+tail. Queue retries retain their existing finite attempt limit and never reset
+the ledger.
 
 The server derives the reference cache key from the main request and verifies it against
 the durable run's base. No client objective or reference payload is accepted. Cached
 transfer, chip and lineup decisions are certified against the current net-points model;
 the resulting J is recomputed from its integer coefficients. This model already uses
 the game's transfer limits. Unproved main results retain their unproved reference flag.
+In the preference model, Triple Captain contributes the captain's extra score exactly
+when played. Bench Boost contributes each benched squad member's score exactly when
+played. These identities hold during certification and count search as well as during
+points maximization.
 
 Without a total limit, package the existing two single-price requests and the existing
 combined request into one execution. The page's existing compiler produces reachable
@@ -89,8 +127,11 @@ a slot as one acceptance bit. Sixteen rules admit at most 289 combinations. Repe
 choices share their canonical identity. This preserves legacy semantics without duplicating
 its rule compiler on the server. Encode child preference differences relative to the main request so frozen
 weeks are not duplicated. Keep the existing request size limits and refuse an oversized
-bundle before admission. Completed valid component answers enter their ordinary
-answer cache even if the initiating run closes, in accordance with ADR 0018.
+bundle before admission. A completed component that received its ordinary allocation
+enters the ordinary answer cache even if the initiating run closes, as in ADR 0018.
+The bundle query on a result read accepts up to 4,096 decoded characters. A compact
+JSON bundle that fits the 4,096-byte submission body always fits this read limit.
+The existing standalone preferences query keeps its separate limit.
 Closing prevents new admission rather than discarding completed computation.
 The parent response retains the main answer and a checked catalogue of computed
 components and the selected outcome; it does not relabel a component as the main
@@ -101,6 +142,9 @@ layer witness. Its actual completion status is separate from the public FEASIBLE
 status, which never claims that the resulting net score is globally best.
 
 ### Confirmed product decisions
+
+Readers of earlier saved results use the original program and `completed_priorities`
+to distinguish a pending search from an excluded rule.
 
 Explicit new priorities require an explicit total allowance. Ask for that allowance rather
 than inventing one or silently ignoring a priority. An old request without either field

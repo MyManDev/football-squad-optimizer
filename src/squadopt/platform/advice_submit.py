@@ -625,6 +625,8 @@ class AdviceSubmitService:
                         self._queue,
                         capture=context.capture_snapshot_id,
                     )
+                    if self._reader.llmopt_vnext:
+                        transaction.release_failed_bundles(run.run_id, self._queue)
                     if run.stage == "repair":
                         self._authorize_repair(
                             run, transaction, cache_key, request_spec(), preferences

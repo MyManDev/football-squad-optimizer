@@ -33,7 +33,7 @@ import { deviceAdviceClient } from "../device/adviceClient";
 import { deviceSelection } from "../device/selection";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
-import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
+import { priorityOutcomes } from "../advice/preferenceBundle";
 import { LEAGUE_READ, useEntrySquad, useRestoredPlanCapabilities } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
@@ -66,7 +66,11 @@ import { expectedNet, samePlan } from "./planComparison";
 import { BANK_FLOOR, KEEP_WEEK, SCENARIO, draftChanges, type DraftChanges } from "./planChanges";
 import { explainDraftConflict } from "./planConflicts";
 import { planResults, preferencePrice } from "./planResults";
-import { preferenceExecution, preferenceStates } from "./preferenceExecution";
+import {
+  preferenceExecution,
+  preferencePlanProblem,
+  preferenceStates,
+} from "./preferenceExecution";
 import {
   referenceCaptains,
   referenceWeeks,
@@ -1218,23 +1222,13 @@ function Workspace({
   ]);
   // A rule with no slot of its own is priced in the plan with all preferences, or named as
   // left out of it.
+  const program = execution?.preferenceBundle?.program;
   const combined =
-    execution?.preferenceBundle?.program && states.combined.phase === "done"
-      ? execution.preferenceBundle.program.preferences.flatMap((rule, index) =>
-          states.combined.phase === "done" &&
-          states.combined.envelope.payload.priority_preferences?.satisfied.some(
-            (identity) =>
-              preferencesKey(checkedPreferences(JSON.parse(identity))) ===
-              preferencesKey(rule.rules),
-          )
-            ? [index]
-            : [],
-        )
-      : bundleResult?.selected?.status === "done"
-        ? bundleResult.applied
-        : run && savedRun?.combined
-          ? prepareCombined(run, savedRun.combined).applied
-          : undefined;
+    bundleResult?.selected?.status === "done"
+      ? bundleResult.applied
+      : run && savedRun?.combined
+        ? prepareCombined(run, savedRun.combined).applied
+        : undefined;
   const combinedPending =
     !closed &&
     (isWorking(baseState.phase) ||
@@ -1248,13 +1242,26 @@ function Workspace({
     return combinedPending ? { key, label, ceiling, status: "pending" } : price;
   });
   const softRules = run?.inputs.draft.soft ?? [];
-  const combinedRules = (keep: boolean) =>
-    softRules.flatMap((rule, index) =>
-      combined?.includes(index) === keep
-        ? [{ key: String(index), label: ruleLabel(rule, players, copy) }]
-        : [],
-    );
   const combinedState = states.combined;
+  const priorityResult =
+    combinedState.phase === "done"
+      ? combinedState.envelope.payload.priority_preferences
+      : undefined;
+  const outcomes =
+    program && priorityResult ? priorityOutcomes(priorityResult, program) : undefined;
+  const combinedRules = softRules.map((rule, index) => ({
+    label: ruleLabel(rule, players, copy),
+    outcome: program
+      ? outcomes?.[index]
+      : combined?.includes(index)
+        ? ("applied" as const)
+        : ("left-out" as const),
+  }));
+  if (!program)
+    combinedRules.sort(
+      (a, b) => Number(a.outcome === "left-out") - Number(b.outcome === "left-out"),
+    );
+  const problem = program ? preferencePlanProblem(bundleState) : undefined;
   const combinedNet =
     combinedState.phase === "done" ? expectedNet(combinedState.envelope.payload) : null;
   const baseNet = baseAnswer ? expectedNet(baseAnswer) : null;
@@ -1756,35 +1763,39 @@ function Workspace({
                   reviseDisabled={editingLocked}
                 />
               ))}
-            {combined &&
-              (combined.length > 0 || execution?.preferenceBundle?.program) &&
-              !capacityRefused(combinedState) && (
-                <PlanResult
-                  title={copy.combinedPlan}
-                  state={combinedState}
-                  squad={squad}
-                  baseline={baseAnswer}
-                  diagnosis={diagnosis(combinedState)}
-                  {...(combinedState.phase === "done"
-                    ? planProps(combinedState.envelope.payload)
-                    : {})}
-                  onRevise={
-                    combinedState.phase === "done"
-                      ? () => revisePlan(combinedState.envelope.payload)
-                      : undefined
-                  }
-                  reviseDisabled={editingLocked}
-                >
-                  <CombinedRules
-                    applied={combinedRules(true)}
-                    leftOut={combinedRules(false)}
-                    cost={combinedCost}
-                    infeasible={combinedState.phase === "failed" && !!combinedState.infeasibility}
-                  />
-                </PlanResult>
-              )}
+            {(priorityResult ||
+              problem ||
+              (!!combined?.length && !capacityRefused(combinedState))) && (
+              <PlanResult
+                title={copy.combinedPlan}
+                state={combinedState}
+                squad={squad}
+                baseline={baseAnswer}
+                diagnosis={
+                  diagnosis(combinedState) ?? (problem && <p role="status">{copy[problem]}</p>)
+                }
+                {...(combinedState.phase === "done"
+                  ? planProps(combinedState.envelope.payload)
+                  : {})}
+                onRevise={
+                  combinedState.phase === "done"
+                    ? () => revisePlan(combinedState.envelope.payload)
+                    : undefined
+                }
+                reviseDisabled={editingLocked}
+              >
+                <CombinedRules
+                  rules={combinedRules}
+                  unanswered={!!problem}
+                  cost={combinedCost}
+                  infeasible={combinedState.phase === "failed" && !!combinedState.infeasibility}
+                />
+              </PlanResult>
+            )}
           </PlanPathGroups>
-          {incompleteRun && !analysis && <p role="status">{copy.unfinishedPlans}</p>}
+          {incompleteRun && !analysis && problem !== "combinedExhausted" && (
+            <p role="status">{copy.unfinishedPlans}</p>
+          )}
           {same && (
             <p role="status" className={styles.muted}>
               {copy.same}
