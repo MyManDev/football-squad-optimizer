@@ -79,6 +79,7 @@ def replay(root, inputs, entry, window, producer):
                 cache,
                 Context(context),
                 {"saf-puan": False},
+                llmopt_vnext=True,
                 preference_players=lambda *_: PreferencePlayers(frozenset(held), frozenset(held)),
             ),
             queue,
@@ -149,6 +150,7 @@ def replay(root, inputs, entry, window, producer):
     state = json.loads((root / "runs/ledger.json").read_text(encoding="utf-8"))
     run = state["runs"][identifier]
     assert len(queue.jobs()) == 4 and main.job is not None
+    assert all(job.contract_version == "backend_jobs_v2" for job in queue.jobs())
     return dict(
         gameweek=inputs.gameweek,
         entry_id=entry,
@@ -172,6 +174,7 @@ def main():
                     rows.append(replay(root, inputs, entry, window, producer))
     record = dict(
         producer_repository_commit=producer,
+        llmopt_vnext=True,
         runner_sha256=hashlib.sha256(
             Path(__file__).read_bytes().replace(b"\r\n", b"\n")
         ).hexdigest(),

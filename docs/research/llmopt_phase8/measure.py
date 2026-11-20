@@ -232,14 +232,22 @@ def replay(root, frozen, inputs, entry, window, enabled, producer):
                     )
                     send({"status": response.status_code, "body": result})
                 elif event["op"] == "drain":
-                    queued = set(event["jobs"])
+                    # A repeated run can point to its earlier terminal failure.
+                    # Only new queue publications are charged to this cache pass.
+                    queued = set()
+                    for identifier in event["jobs"]:
+                        job = queue.load(identifier)
+                        if job is None:
+                            raise ValueError(f"API returned a missing job: {identifier}")
+                        if not job.is_terminal:
+                            queued.add(identifier)
                     completed = [
                         complete(queue, cache, compute, runs, stamp, event["label"]) for _ in queued
                     ]
                     if {job["job_id"] for job in completed} != queued:
                         raise ValueError("Worker drained a different job than the submitted stage.")
                     current["jobs"].extend(completed)
-                    send({})
+                    send([j["job_id"] for j in completed])
                 elif event["op"] == "done":
                     for measured in event["passes"]:
                         passes[measured["cache"]].update(measured)
@@ -258,6 +266,10 @@ def replay(root, frozen, inputs, entry, window, enabled, producer):
             result["incomplete"] = True
         if len(result["jobs"]) != sum(len(s["job_ids"]) for s in result["stages"]):
             raise ValueError("Queue and transport disagree on opened jobs.")
+    if set(queue.enqueued) != {
+        job["job_id"] for result in passes.values() for job in result["jobs"]
+    }:
+        raise ValueError("Published queue records disagree with the per-pass job counts.")
     return {"case": case, "window": window, "release": "on" if enabled else "off", **passes}
 
 

@@ -55,8 +55,10 @@ capture identity from immutable specs where available. It never resets a live bu
 
 The backend advertises `llmopt_vnext: true` on current league and public-entry
 capabilities only when `SQUADOPT_BACKEND_LLMOPT_VNEXT=1`. The default is 0.
-During rollback cached answers, existing run requests, job polling and
-cancellation remain available. A new run-owned computation returns HTTP 409
+During rollback advice reads and existing run requests use the current capture
+to resolve their cache address. Without that capture, advice reads return HTTP 503.
+Job polling reads queue state independently of the capture. Cancellation remains
+available during rollback. A new run-owned computation returns HTTP 409
 with `LLMOPT_VNEXT_DISABLED`. Identity-free legacy requests continue to use
 their ordinary cache address and admission. A run already admitted can finish
 on the worker and publish its answer. The master setting does not enter the

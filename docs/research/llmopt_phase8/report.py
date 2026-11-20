@@ -213,7 +213,7 @@ def render(receipt, baseline, packages):
                 "Weeks",
                 "Release",
                 "Cache",
-                "Completed / requested preference results",
+                "Completed / possible preference results",
                 "Distinct additional paths",
                 "Runs yielding another path",
             ],

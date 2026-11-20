@@ -137,6 +137,7 @@ def run_arm(root, capture, stamp, inputs, entry, request, *, bound):
         contexts,
         {"saf-puan": False},
         capabilities=menu_capabilities(),
+        llmopt_vnext=True,
         preference_players=lambda *_: PreferencePlayers(
             held, frozenset(players.player_id), frozenset(players.team_id)
         ),
@@ -144,7 +145,10 @@ def run_arm(root, capture, stamp, inputs, entry, request, *, bound):
     )
     service = AdviceSubmitService(reader, queue, specs=specs, runs=runs)
     app = create_app(
-        advice_store=reader, advice_submit=service, utc_now=lambda: datetime.fromisoformat(stamp)
+        advice_store=reader,
+        advice_submit=service,
+        llmopt_vnext=reader.llmopt_vnext,
+        utc_now=lambda: datetime.fromisoformat(stamp),
     )
     body = dict(request)
     if bound:
@@ -172,6 +176,8 @@ def run_arm(root, capture, stamp, inputs, entry, request, *, bound):
         ):
             raise ValueError(f"No queued job for {job_id}.")
     job = queue.load(job_id)
+    if job.contract_version != ("backend_jobs_v2" if bound else "backend_jobs_v1"):
+        raise ValueError(f"Unexpected worker contract for {job_id}: {job.contract_version}")
     spec = specs.get(job.cache_key)
     if spec is None or len(queue.jobs()) != 1:
         raise ValueError(f"The isolated queue must have one job and one immutable spec: {job_id}.")
@@ -303,6 +309,7 @@ def main():
     report = dict(
         contract_version="llmopt_phase2_named_chip_parity_v1",
         producer_repository_commit=producer,
+        llmopt_vnext=True,
         source_sha256={
             p.relative_to(ROOT).as_posix(): digest(p.read_bytes().replace(b"\r\n", b"\n"))
             for p in SOURCES

@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { HttpAdviceClient } from "../../../web/src/features/league/advice/adviceClient";
+import {
+  AdviceApiError,
+  HttpAdviceClient,
+} from "../../../web/src/features/league/advice/adviceClient";
 import { deviceAdviceClient } from "../../../web/src/features/league/device/adviceClient";
 import { replyTo } from "../../../web/src/features/league/device/replies";
 import { withinCeiling } from "../../../web/src/features/league/device/solve/ceiling";
@@ -155,13 +158,22 @@ async function replay(cache) {
     const pending = [];
     for (const request of requests) {
       // Compute presses submit via the public transport, which serves a warm answer directly.
-      const outcome = await client.requestAdvice(request);
+      let outcome;
+      try {
+        outcome = await client.requestAdvice(request);
+      } catch (error) {
+        if (!(error instanceof AdviceApiError)) throw error;
+        outcome = {
+          kind: "unavailable",
+          reason: error.code ?? `HTTP_${error.status}`,
+        };
+      }
       pending.push({ request, outcome });
     }
     const jobs = pending
       .filter(({ outcome }) => outcome.kind === "job")
       .map(({ outcome }) => outcome.jobId);
-    if (jobs.length) await driver("drain", { jobs, label });
+    const drained = jobs.length ? await driver("drain", { jobs, label }) : [];
     const states = [];
     for (const { request, outcome } of pending) {
       let result = outcome;
@@ -186,7 +198,8 @@ async function replay(cache) {
     stages.push({
       label,
       submissions: pending.map(({ outcome }) => outcome.kind),
-      job_ids: jobs,
+      returned_job_ids: jobs,
+      job_ids: drained,
     });
     return states;
   }
