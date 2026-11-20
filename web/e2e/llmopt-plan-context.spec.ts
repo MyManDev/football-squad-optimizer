@@ -1,9 +1,10 @@
 import { expect, test, type Route } from "@playwright/test";
+import developSchema from "../../tests/fixtures/llmopt_develop_prompt_schema.json" with { type: "json" };
 import fixture from "../src/fixtures/device-plan/instances.json" with { type: "json" };
 import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { installLeagueMocks } from "./leagueMocks";
 import { EXAMPLE_CLAIM } from "./identity";
-import { holdModel, routeChat } from "./llmoptChat";
+import { holdModel, routeChat, TEST_PROVIDER } from "./llmoptChat";
 import { LLMOPT_COPY } from "../src/features/league/llmopt/copy";
 import type { PlanContext } from "../src/features/league/llmopt/planHistory";
 
@@ -73,19 +74,23 @@ for (const language of ["en", "tr"] as const)
       await page.route(`**/data/league/entries/${ENTRY}.json*`, (route) =>
         route.fulfill({ json: squad }),
       );
-      await page.route("**/data/league/device-plan.json*", (route) =>
-        route.fulfill({
+      let documentReads = 0;
+      await page.route("**/data/league/device-plan.json*", (route) => {
+        documentReads++;
+        return route.fulfill({
           json: {
             contract_version: "provisional_league_ui_v1",
             generated_at_utc: original.generated_at_utc,
             source_kind: "example",
             payload: table,
           },
-        }),
-      );
+        });
+      });
       let release = true;
-      await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
-        answer(route, {
+      let grantReads = 0;
+      await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) => {
+        if (route.request().method() === "GET") grantReads++;
+        return answer(route, {
           contract_version: "league_capabilities_v1",
           league_id: LEAGUE,
           season: table.season,
@@ -96,8 +101,8 @@ for (const language of ["en", "tr"] as const)
           top100: { available: false, weights: [] },
           managers_word: { available: false },
           ...(release ? { llmopt_vnext: true } : {}),
-        }),
-      );
+        });
+      });
       const weekQuestion =
         language === "tr"
           ? "Bu kural 2. hafta mı 3. hafta mı uygulansın?"
@@ -124,6 +129,7 @@ for (const language of ["en", "tr"] as const)
         const body = route.request().postDataJSON() as {
           message: string;
           plan_context?: PlanContext;
+          clarification?: { question: string; message: string };
         };
         if (body.message === "legacy-week-question") {
           expect(body.plan_context).toBeUndefined();
@@ -134,6 +140,7 @@ for (const language of ["en", "tr"] as const)
           release = false;
           return answer(route, {
             status: "plan",
+            plan_label: "P1",
             command: { plan_id: body.plan_context!.plans[0]!.plan_id, action: "select" },
           });
         }
@@ -149,6 +156,24 @@ for (const language of ["en", "tr"] as const)
         expect(JSON.stringify(body.plan_context)).not.toMatch(
           /expected_points|bank_after|net_points/,
         );
+        if (body.message === "ordinary-question")
+          return answer(route, { status: "clarification", message: weekQuestion });
+        if (body.message === "unreadable" || body.message === "ordinary-rule") {
+          expect(body.clarification).toEqual({
+            message: "ordinary-question",
+            question: weekQuestion,
+          });
+          return body.message === "unreadable"
+            ? route.fulfill({
+                status: 422,
+                headers: CORS,
+                json: { error: { code: "REPLY_REFUSED" } },
+              })
+            : answer(route, {
+                status: "draft",
+                draft: { hard: [{ kind: "no_hits" }], soft: [], window: 1 },
+              });
+        }
         if (body.message === "swap") {
           const [first, second] = body.plan_context.plans;
           const a = first!.weeks[0]!.players,
@@ -159,6 +184,7 @@ for (const language of ["en", "tr"] as const)
           };
           return answer(route, {
             status: "plan",
+            plan_label: "P1",
             command: {
               plan_id: first!.plan_id,
               action: "substitute",
@@ -172,15 +198,21 @@ for (const language of ["en", "tr"] as const)
         if (body.message === "unknown")
           return answer(route, {
             status: "plan",
+            plan_label: "P99",
             command: { plan_id: "f".repeat(64), action: "select" },
           });
         if (body.message === "invent")
           return answer(route, {
             status: "plan",
+            plan_label: "P2",
             command: { plan_id, action: "select", score: 98765 },
           });
         if (body.message === "late") table.players[0]!.expected_points += 1;
-        return answer(route, { status: "plan", command: { plan_id, action: "select" } });
+        return answer(route, {
+          status: "plan",
+          plan_label: "P2",
+          command: { plan_id, action: "select" },
+        });
       });
       const copy = LLMOPT_COPY[language];
       const send = async (text: string) => {
@@ -199,8 +231,11 @@ for (const language of ["en", "tr"] as const)
       expect(new Set(ids).size).toBe(3);
       for (const id of ids) expect(id).toMatch(/^[0-9a-f]{64}$/);
       const selected = page.locator("article[data-selected=true]");
+      const beforeSelect = { grantReads, documentReads };
       await send(language === "tr" ? "İkinci planı kullan" : "Use the second plan");
       await expect(selected).toHaveAttribute("data-plan-id", ids[1]!);
+      expect(grantReads - beforeSelect.grantReads).toBe(1);
+      expect(documentReads - beforeSelect.documentReads).toBe(1);
       const workBefore = workers;
       await page.reload();
       await holdModel(page);
@@ -218,25 +253,36 @@ for (const language of ["en", "tr"] as const)
         .selectOption(ids[0]!);
       await expect(selected).toHaveAttribute("data-plan-id", ids[0]!);
       await send("unknown");
-      await expect(page.getByText(copy.planQuestion, { exact: true })).toBeVisible();
-      await page.getByRole("button", { name: copy.dismissQuestion, exact: true }).click();
+      await expect(page.getByText(copy.refusals.replyInvalid, { exact: true })).toBeVisible();
       await send("invent");
-      await expect(page.getByText(copy.planQuestion, { exact: true })).toBeVisible();
+      await expect(page.getByText(copy.refusals.replyInvalid, { exact: true })).toBeVisible();
       await expect(page.getByRole("main")).not.toContainText("98765");
-      await page.getByRole("button", { name: copy.dismissQuestion, exact: true }).click();
       const beforeLate = checks;
       await send("late");
-      await expect(page.getByText(copy.planQuestion, { exact: true })).toBeVisible();
+      const stale = page.getByText(copy.planDataChanged, { exact: true });
+      await expect(stale).toHaveCount(1);
       expect(checks).toBe(beforeLate + 1);
-      await page.getByRole("button", { name: copy.dismissQuestion, exact: true }).click();
+      await expect(page.getByRole("button", { name: copy.compute, exact: true })).toBeEnabled();
       const beforeStale = checks;
       await send("Use the second plan");
-      await expect(page.getByText(copy.planQuestion, { exact: true })).toBeVisible();
-      expect(checks).toBe(beforeStale);
+      await expect(stale).toHaveCount(2);
+      expect(checks).toBe(beforeStale + 1);
+      await expect(selected).toHaveAttribute("data-plan-id", ids[0]!);
       expect(jobs).toBe(0);
       expect(workers).toBe(workBefore);
+      if (width === 375) {
+        const beforeRule = { grantReads, documentReads };
+        await send("ordinary-question");
+        await expect(page.getByText(weekQuestion, { exact: true })).toBeVisible();
+        await send("unreadable");
+        await expect(page.getByText(copy.refusals.replyInvalid, { exact: true })).toBeVisible();
+        await expect(page.getByRole("textbox", { name: copy.chat })).toHaveValue("unreadable");
+        await send("ordinary-rule");
+        await expect(page.getByText(copy.understood, { exact: true }).last()).toBeVisible();
+        await expect(page.getByRole("button", { name: copy.dismissQuestion })).toHaveCount(0);
+        expect({ grantReads, documentReads }).toEqual(beforeRule);
+      }
       if (language === "en" && width === 1280) {
-        await page.getByRole("button", { name: copy.dismissQuestion, exact: true }).click();
         table.players[0]!.expected_points = originalPoints;
         await send("swap");
         await page.getByRole("button", { name: copy.compute, exact: true }).click();
@@ -300,6 +346,55 @@ for (const language of ["en", "tr"] as const)
         release = true;
         await page.reload();
         await expect(selected).toHaveAttribute("data-plan-id", before!);
+        expect(workers).toBe(solved);
+        expect(jobs).toBe(0);
+
+        await holdModel(page);
+        const promptCatalogues: boolean[] = [];
+        let providerCalls = 0;
+        await page.route(`${API}/api/v1/llmopt/prompt`, (route) => {
+          if (route.request().method() !== "POST") return route.fallback();
+          const body = route.request().postDataJSON();
+          promptCatalogues.push(body.plan_context !== undefined);
+          if (body.plan_context)
+            return route.fulfill({
+              status: 422,
+              headers: CORS,
+              json: { error: { code: "VALIDATION_FAILED" } },
+            });
+          return answer(route, {
+            system: "Read the member's instructions.",
+            user: JSON.stringify(body),
+            schema: developSchema,
+            schema_name: "llmopt_intent",
+            max_output_tokens: 1200,
+          });
+        });
+        await page.route(TEST_PROVIDER, (route) => {
+          if (route.request().method() === "POST") {
+            providerCalls++;
+            const call = route.request().postDataJSON();
+            expect(call.response_format.json_schema.schema).toEqual(developSchema);
+            const prompt = JSON.parse(
+              call.messages.find((m: { role: string }) => m.role === "user").content,
+            );
+            expect(prompt.message).toBe("legacy-week-question");
+            expect(prompt).not.toHaveProperty("plan_context");
+          }
+          return route.fallback();
+        });
+        const beforeRollbackRule = { grantReads, documentReads, checks };
+        release = false;
+        await send("legacy-week-question");
+        await expect.poll(() => checks).toBe(beforeRollbackRule.checks + 1);
+        await expect(
+          page.getByRole("button", { name: copy.dismissQuestion, exact: true }),
+        ).toBeVisible();
+        expect(promptCatalogues).toEqual([true, false]);
+        expect(providerCalls).toBe(1);
+        expect(grantReads).toBe(beforeRollbackRule.grantReads + 1);
+        expect(documentReads).toBe(beforeRollbackRule.documentReads);
+        expect(await readHistory()).toEqual(history);
         expect(workers).toBe(solved);
         expect(jobs).toBe(0);
       }

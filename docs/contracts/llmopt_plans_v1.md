@@ -9,7 +9,15 @@ The optional context travels only through prompt/check. Its bounded catalogue
 contains plan/data identifiers and already-computed decisions, without point or resource
 outcomes. The strict reply adds nullable `plan_command` only when a catalogue is supplied.
 Commands select a plan, freeze its transfer/week, or request a substitution comparison.
-Unknown fields, identifiers and superseded server data are refused by check. The
+The provider's catalogue uses ordered labels `P1` through `P12`, presents only
+the labels that exist in this request and omits plan and data digests. The
+provider returns `plan_label` in the command. Check validates the action on
+the associated plan, then returns the label alongside the checked command
+containing its full `plan_id`. Existing clients can read that identity. New
+clients also resolve the label against the sent catalogue and compare the
+two identities before applying it to the still-current plan. Unknown labels
+or fields are refused. A superseded server selection returns HTTP 422
+`PLAN_DATA_CHANGED`. An ordinary draft or clarification can still proceed. The
 provider schema expresses optional commands with `anyOf`. Its object branch lists
 all command fields, and a separate typed branch accepts null. Existing ordinary
 draft replies remain valid.
@@ -23,14 +31,15 @@ answer bytes and cache address. Current capabilities advertise the data identifi
 while the setting is enabled. With the setting closed, a top-level `plan_command` property
 in a model reply is refused even when its value is null.
 Device choices carry the checked input-table/member fingerprint, inherited by every menu
-choice. Before a plan command the browser rechecks current inputs; late replies must still
-belong to its current catalogue. Unversioned legacy plans are displayable but cannot be
+choice. A plan command uses one current grant and at most one device input read.
+Ordinary messages need neither read. Late selections must still match the input
+identity and ordered local catalogue. Unversioned legacy plans are displayable but cannot be
 offered as conversational plan references.
 
 Without a catalogue, clarification questions retain legacy behavior, including numeric
-questions. With a catalogue, nonnumeric questions and relative week numbers 1 through 3
-remain unchanged in either language. Other numeric quantities use the fixed clarification
-question. Computed scores and resources continue to come only from checked plan results.
+questions. With a catalogue, questions about rule inputs, weeks and plan labels retain
+their numbers. A numerical claim about a computed outcome uses the neutral clarification.
+Computed scores and resources continue to come only from checked plan results.
 
 The browser content identity includes all weeks, transfers, chips, lineups, ordered bench,
 captain/vice, point and resource facts. Unordered player/move sets are canonicalized;

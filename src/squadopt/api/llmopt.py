@@ -18,6 +18,7 @@ from squadopt.platform.advice_submit import FixedWindowRateLimiter, client_addre
 from squadopt.platform.llmopt_intent import (
     INTENT_BODY_MAX_BYTES,
     IntentValidationError,
+    PlanDataChanged,
     check_reply,
     parse_check_request,
     parse_intent_request,
@@ -115,17 +116,11 @@ def intent_routes(
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
         try:
-            current = (
-                server_data_id()
-                if llmopt_vnext
-                and intent.plan_context is not None
-                and intent.plan_context["kind"] == "server"
-                and server_data_id is not None
-                else None
-            )
             result = await run_in_threadpool(
-                check_reply, intent, reply, server_data_id=current, llmopt_vnext=llmopt_vnext
+                check_reply, intent, reply, server_data_id=server_data_id, llmopt_vnext=llmopt_vnext
             )
+        except PlanDataChanged:
+            return _error(422, "PLAN_DATA_CHANGED", "Recalculate the plans to select one.")
         except IntentValidationError:
             return _error(422, "REPLY_REFUSED", "The model's reply is not a valid draft.")
         return JSONResponse(result, headers={"Cache-Control": "no-store"})

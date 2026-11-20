@@ -24,23 +24,35 @@ the setting leaves a previously unversioned warm answer unversioned. Device
 plans use their checked input-table/member fingerprint. An unversioned legacy
 answer may be displayed but is not offered as a conversational plan reference.
 The project owner approved this treatment of legacy results.
-The browser rechecks the current input identity before sending a plan command.
-The check route refuses a plan outside the supplied current catalogue, a plan
-with another data identity, and a server identity superseded by the current
-advice context when that context is available. Late replies are also checked
-against the page's current catalogue before applying them.
+An ordinary rule or clarification can use the catalogue without reading
+capabilities or hashing device inputs. When applying a checked plan command,
+the browser reads the current grant once and, for a device result, hashes
+the current inputs once. A selected plan requires the current capture. The check
+route returns HTTP 422 `PLAN_DATA_CHANGED` for a server plan command whose
+data identity is superseded, so the member can recalculate. For a device
+plan the browser checks the same input snapshot and current local catalogue
+when applying the answer. An invalid reply preserves both the existing
+refusal and the earlier clarification. If the prompt route rejects a
+catalogue and a fresh matching grant confirms rollback, repeat only the
+prompt without the catalogue before making the single provider call.
 
-Only prompt and check carry the plan catalogue to the member's provider. The
-catalogue contains identifiers and decisions, never point/resource outcomes.
-The provider selects a plan identifier and an action/rule; it cannot supply a
-computed result. Keep the existing draft translation contract for ordinary
-instructions. Every new provider-schema field has an explicit type. Reject
-unknown plan-command fields; ordinary draft replies retain legacy null-extra handling.
+The browser sends ordered content identities and decisions to the existing
+prompt and check routes. The provider sees each plan's weeks and a short
+label in catalogue order (`P1`, `P2`, and so on). It also sees the label
+of the selected plan. It can return only a presented label and action fields.
+The check route resolves the label against that request and validates the
+action on the full plan. The browser maps the checked label to the full
+identity in the exact catalogue sent. Before applying a reply, it verifies
+that the same label still denotes the same content under the same current
+data identity. Reordering a catalogue cannot reinterpret an in-flight answer.
+Sessions and navigation continue to use the complete SHA-256 identities.
+Keep the existing draft translation contract for ordinary instructions.
+Every provider-schema branch has an explicit type. Reject unknown plan-command
+fields. Ordinary draft replies retain legacy null-extra handling.
 Without a plan catalogue, clarification questions retain their previous behavior,
-including numbers. With a catalogue, preserve nonnumeric questions and relative week
-references 1 through 3 in Turkish and English. Replace a question containing any other
-number with the existing fixed short question. A point or resource quantity is not
-a week reference, even when its number is 1 through 3.
+including numbers. With a catalogue, preserve questions about rule inputs,
+weeks and plan labels in both languages, including their numbers. Replace a
+numerical claim about a computed plan's outcomes with the neutral question.
 
 Retain at most twelve checked, explicitly whitelisted computed plans in the
 existing safe session. Selecting, undoing and returning to a retained plan

@@ -7,6 +7,7 @@ from typing import Any
 
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 ACTIONS = ("select", "freeze_transfer", "freeze_week", "substitute")
+PLAN_LABELS = tuple(f"P{i}" for i in range(1, 13))
 
 
 def _digest(value: object) -> str:
@@ -38,7 +39,7 @@ def checked_plan_context(value: object, roster: set[int]) -> dict[str, Any]:
     if value["kind"] not in ("server", "device"):
         raise ValueError("Invalid plan data kind.")
     plans = value["plans"]
-    if not isinstance(plans, list) or not 1 <= len(plans) <= 12:
+    if not isinstance(plans, list) or not 1 <= len(plans) <= len(PLAN_LABELS):
         raise ValueError("Invalid plan catalogue.")
     result = []
     seen = set()
@@ -91,23 +92,36 @@ def checked_plan_context(value: object, roster: set[int]) -> dict[str, Any]:
     }
 
 
+def provider_plan_context(context: dict[str, Any]) -> dict[str, Any]:
+    """Expose only the short labels and decisions for the exact ordered catalogue."""
+    selected = None
+    plans = []
+    for label, plan in zip(PLAN_LABELS, context["plans"], strict=False):
+        if plan["plan_id"] == context["selected_plan_id"]:
+            selected = label
+        plans.append({"plan_label": label, "weeks": plan["weeks"]})
+    return {"selected_plan_label": selected, "plans": plans}
+
+
 def checked_plan_command(value: object, context: dict[str, Any]) -> dict[str, Any]:
-    fields = {"plan_id", "action", "week", "player_id", "replacement_id"}
+    fields = {"plan_label", "action", "week", "player_id", "replacement_id"}
     if (
         not isinstance(value, dict)
-        or not {"plan_id", "action"} <= value.keys()
+        or not {"plan_label", "action"} <= value.keys()
         or value.keys() - fields
     ):
         raise ValueError("Invalid plan command.")
-    plan_id = _digest(value["plan_id"])
-    plan = next((item for item in context["plans"] if item["plan_id"] == plan_id), None)
-    if plan is None or plan["data_id"] != context["data_id"]:
-        raise ValueError("Unknown or stale plan identity.")
+    labels = PLAN_LABELS[: len(context["plans"])]
+    if value["plan_label"] not in labels:
+        raise ValueError("Unknown catalogue label.")
+    plan = context["plans"][labels.index(value["plan_label"])]
+    if plan["data_id"] != context["data_id"]:
+        raise ValueError("Stale catalogue plan.")
     action = value["action"]
     if action not in ACTIONS:
         raise ValueError("Unknown plan action.")
     command = {key: item for key, item in value.items() if item is not None}
-    needed = {"plan_id", "action"}
+    needed = {"plan_label", "action"}
     if action in ("freeze_week", "freeze_transfer", "substitute"):
         needed.add("week")
         week = value.get("week")
@@ -135,12 +149,13 @@ def checked_plan_command(value: object, context: dict[str, Any]) -> dict[str, An
                 raise ValueError("Substitution does not match the selected squad.")
     if command.keys() != needed:
         raise ValueError("Unexpected plan command fields.")
-    return command
+    del command["plan_label"]
+    return {**command, "plan_id": plan["plan_id"]}
 
 
-def plan_command_schema() -> dict[str, Any]:
+def plan_command_schema(plan_count: int = len(PLAN_LABELS)) -> dict[str, Any]:
     properties = {
-        "plan_id": {"type": "string"},
+        "plan_label": {"type": "string", "enum": list(PLAN_LABELS[:plan_count])},
         "action": {"type": "string", "enum": list(ACTIONS)},
         "week": {"anyOf": [{"type": "integer", "enum": [1, 2, 3]}, {"type": "null"}]},
         "player_id": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
@@ -205,18 +220,51 @@ def plan_conversation_schema() -> dict[str, Any]:
             "plans": {"type": "array", "minItems": 1, "maxItems": 12, "items": plan},
         }
     )
+    label = {"type": "string", "enum": list(PLAN_LABELS)}
+    provider_context = closed(
+        {
+            "selected_plan_label": {"anyOf": [label, {"type": "null"}]},
+            "plans": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": len(PLAN_LABELS),
+                "items": closed({"plan_label": label, "weeks": plan["properties"]["weeks"]}),
+            },
+        }
+    )
+    checked_command = closed(
+        {
+            "plan_id": digest,
+            "action": {"type": "string", "enum": list(ACTIONS)},
+            "week": {"type": "integer", "enum": [1, 2, 3]},
+            "player_id": {"type": "integer", "minimum": 1},
+            "replacement_id": {"type": "integer", "minimum": 1},
+        }
+    )
+    checked_command["required"] = ["plan_id", "action"]
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://squadopt.dev/contracts/llmopt_plans_v1.schema.json",
         "title": "LLMOPT computed-plan conversation",
         "$defs": {
             "context": context,
+            "provider_context": provider_context,
             "command": plan_command_schema(),
+            "checked_selection": closed(
+                {
+                    "status": {"type": "string", "const": "plan"},
+                    "plan_label": label,
+                    "command": checked_command,
+                }
+            ),
             "session_extension": {
                 "type": "object",
                 "properties": {"compareOnly": {"type": "boolean"}, "explicit": {"type": "boolean"}},
                 "additionalProperties": True,
             },
         },
-        "oneOf": [{"$ref": "#/$defs/context"}, {"$ref": "#/$defs/command"}],
+        "oneOf": [
+            {"$ref": f"#/$defs/{name}"}
+            for name in ("context", "provider_context", "command", "checked_selection")
+        ],
     }
