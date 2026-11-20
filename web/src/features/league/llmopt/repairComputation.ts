@@ -24,13 +24,19 @@ export interface RepairRun {
   sourceDraft?: PlanDraft;
 }
 
+export class RepairEnvelopeTooLarge extends Error {
+  constructor() {
+    super("The repair request exceeds the advice body limit.");
+  }
+}
+
 function serverRepairEnvelope(request: PlanRequest): PlanRequest {
   // Match the API's four-KiB POST gate, including UTF-8 club names and current lineup pins.
   if (
     request.window === 3 &&
     new TextEncoder().encode(adviceRequestBody(request)).byteLength > 4096
   )
-    throw new Error("RUN_REPAIR_INVALID");
+    throw new RepairEnvelopeTooLarge();
   return request;
 }
 

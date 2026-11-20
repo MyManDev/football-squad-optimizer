@@ -89,11 +89,11 @@ def test_real_precomputed_club_conflict_keeps_original_after_first_edit_fails(
     three = {"club_counts": [{"club": "Club 1", "count": 3}]}
     original = {"preferences": [held, three, two], "wildcard_weeks": []}
 
-    def ask(stage, prefs, origin=original, identifier="a" * 32):
+    def ask(stage, prefs, origin=original, identifier="a" * 32, session=client):
         ref = _run_ref(identifier, stage=stage)
         if origin is not None:
             ref["repair_origin"] = origin
-        return client.post(
+        return session.post(
             route, json={"strategy": "saf-puan", "window": 3, "run": ref, "preferences": prefs}
         )
 
@@ -159,6 +159,28 @@ def test_real_precomputed_club_conflict_keeps_original_after_first_edit_fails(
     assert third.json()["error"]["code"] == "RUN_BUDGET_EXHAUSTED"
     recorded = json.loads(backend.runs.path.read_bytes())["runs"][identifier]
     assert len(recorded["repair_candidates"]) == 2 and recorded["reserved"] == 122
+
+    # Binding precedes admission. A rollback in between may read admitted work,
+    # but a warm shared answer cannot turn an unadmitted base into a new proposal.
+    closed = build_backend(replace(backend.config, llmopt_vnext=False))
+    off = TestClient(app_for_capture(closed, world.world_module.GW2_CAPTURED_AT))
+    waiting = "d" * 32
+    with backend.runs.transaction() as tx:
+        tx.bind(
+            RunReference(waiting, "base"),
+            recorded["binding"],
+            3,
+            recorded["base"],
+            backend.queue,
+            capture=recorded["capture"],
+        )
+    before = backend.runs.path.read_bytes()
+    assert ask("base", {**held, **three}, again, identifier, off).status_code == 200
+    assert (
+        ask("base", {**held, **three}, again, waiting, off).json()["error"]["code"]
+        == "LLMOPT_VNEXT_DISABLED"
+    )
+    assert backend.runs.path.read_bytes() == before
 
 
 @pytest.mark.parametrize(
