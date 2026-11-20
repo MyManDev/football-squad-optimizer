@@ -27,3 +27,18 @@ decision fingerprints with the unchanged baseline. Infeasibilities are separate 
 numeric matches. Native execution, if used, reserves its allowance before starting.
 The queue setup is local measurement bookkeeping, not a served football-bundle or
 end-to-end public-API claim. Run it serially and separately from tests.
+
+## Named-chip worker parity
+
+`python -m docs.research.llmopt_phase2.measure_named_chip` runs the local API and worker for
+the eight Wildcard and Free Hit member-weeks in the frozen Phase 1 baseline. Each one- and
+three-week request runs twice from an empty queue and cache. One request carries a durable run
+reference and the other omits it. The captured member, prices, expected points, fixtures,
+configuration, chip and preferences are shared by both workers. The capture adapter reconstructs
+an equivalent purchase basis for the published initial sale proceeds at static prices.
+
+The runner writes [the raw pairs](../llmopt_phase2_named_chip.json) and
+[the comparison](../llmopt_phase2_named_chip.md). Pass `--output PATH` to retain a separate
+implementation's replay. To regenerate the Markdown from an existing record, run
+`python -m docs.research.llmopt_phase2.named_chip_readout PATH`. Run the solver replay
+serially and separately from tests.
