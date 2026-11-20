@@ -129,7 +129,7 @@ def test_unknown_plan_week_transfer_or_substitution_is_refused(command: dict[str
 def test_superseded_server_identity_is_refused_by_check_route_without_a_solve() -> None:
     current = [DATA]
     app = FastAPI()
-    app.include_router(intent_routes(server_data_id=lambda: current[0]))
+    app.include_router(intent_routes(server_data_id=lambda: current[0], llmopt_vnext=True))
     with TestClient(app) as client:
         body = {"request": request("server"), "reply": reply()}
         assert client.post("/api/v1/llmopt/check", json=body).status_code == 200
@@ -137,6 +137,49 @@ def test_superseded_server_identity_is_refused_by_check_route_without_a_solve() 
         stale = client.post("/api/v1/llmopt/check", json=body)
         assert stale.status_code == 422
         assert stale.json()["error"]["code"] == "REPLY_REFUSED"
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_plan_catalogue_and_commands_require_the_server_setting(enabled: bool) -> None:
+    def current_data():
+        assert enabled, "A closed plan catalogue must not read server data."
+        return DATA
+
+    app = FastAPI()
+    app.include_router(intent_routes(server_data_id=current_data, llmopt_vnext=enabled))
+    with TestClient(app) as client:
+        body = request("server")
+        plain = {key: value for key, value in body.items() if key != "plan_context"}
+        ordinary = client.post("/api/v1/llmopt/prompt", json=plain)
+        assert ordinary.status_code == 200
+        fields = ordinary.json()["schema"]["properties"]
+        assert (
+            set(fields) == {"status", "draft", "message"} and "plan" not in fields["status"]["enum"]
+        )
+        clarification = client.post(
+            "/api/v1/llmopt/check",
+            json={
+                "request": plain,
+                "reply": {"status": "clarification", "message": "Week 2 or 3?"},
+            },
+        )
+        assert clarification.json() == {"status": "clarification", "message": "Week 2 or 3?"}
+        call = client.post("/api/v1/llmopt/prompt", json=body)
+        checked = client.post("/api/v1/llmopt/check", json={"request": body, "reply": reply()})
+        assert (
+            client.post(
+                "/api/v1/llmopt/check", json={"request": plain, "reply": reply()}
+            ).status_code
+            == 422
+        )
+        if enabled:
+            assert call.status_code == 200 and "plan_command" in call.json()["schema"]["properties"]
+            assert checked.json() == {
+                "status": "plan",
+                "command": {"plan_id": PLAN, "action": "select"},
+            }
+        else:
+            assert call.status_code == checked.status_code == 422
 
 
 def test_stale_rows_are_not_accepted_as_the_current_catalogue() -> None:

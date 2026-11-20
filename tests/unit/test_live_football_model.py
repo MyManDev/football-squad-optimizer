@@ -251,7 +251,12 @@ def test_the_site_holds_the_share_limit_verbatim_and_it_passes_the_honesty_guard
 def test_public_football_plan_keeps_a_frozen_second_week_lineup(tmp_path, monkeypatch):
     artifacts = tmp_path / "artifacts"
     world = _deployment(
-        tmp_path, monkeypatch, last_gameweek=6, artifact_root=artifacts, public_entries=True
+        tmp_path,
+        monkeypatch,
+        llmopt_vnext=True,
+        last_gameweek=6,
+        artifact_root=artifacts,
+        public_entries=True,
     )
     backend = world["backend"]
     context = backend.contexts.identity()
@@ -309,7 +314,9 @@ def test_public_football_plan_keeps_a_frozen_second_week_lineup(tmp_path, monkey
 @pytest.mark.parametrize("model", ["current", "football"])
 def test_absence_scenario_benches_the_player_only_in_its_target_week(tmp_path, monkeypatch, model):
     artifacts = tmp_path / "artifacts"
-    world = _deployment(tmp_path, monkeypatch, last_gameweek=6, artifact_root=artifacts)
+    world = _deployment(
+        tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=6, artifact_root=artifacts
+    )
     backend = world["backend"]
     if model == "football":
         context = backend.contexts.identity()

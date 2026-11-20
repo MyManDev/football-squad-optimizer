@@ -2,15 +2,20 @@
 
 See [ADR 0021](../architecture/decisions/0021-llmopt-plan-context.md).
 
-The optional `plan_context` travels only through prompt/check. Its bounded catalogue
+The page uses the optional `plan_context` when current server capabilities grant
+`llmopt_vnext`. With the release setting off, prompt/check use the original draft
+contract. Existing stored results remain readable after a rollback.
+The optional context travels only through prompt/check. Its bounded catalogue
 contains plan/data identifiers and already-computed decisions, without point or resource
 outcomes. The strict reply adds nullable `plan_command` only when a catalogue is supplied.
 Commands select a plan, freeze its transfer/week, or request a substitution comparison.
 Unknown fields, identifiers and superseded server data are refused by check. Every
 provider-schema property has an explicit type. Existing ordinary draft replies remain valid.
 
-Computed server advice and capabilities optionally carry `plan_data_id`, SHA-256 of the
-existing advice context. This metadata does not enter or replace the existing cache key.
+Newly computed server advice can carry `plan_data_id`, SHA-256 of the existing advice
+context. Both settings read the same immutable cached answer. The current capabilities
+advertise the identifier when plan conversations are enabled. This metadata does not enter
+or replace the existing cache key.
 Device choices carry the checked input-table/member fingerprint, inherited by every menu
 choice. Before a plan command the browser rechecks current inputs; late replies must still
 belong to its current catalogue. Unversioned legacy plans are displayable but cannot be

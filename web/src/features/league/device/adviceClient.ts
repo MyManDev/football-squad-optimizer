@@ -1,7 +1,8 @@
 /** Advice transport for verified one-week device rules; credentials never enter it. */
 import type { AdviceClient, AdviceRequest, AdviceReadResult } from "../advice/adviceClient";
 import { checkedAdvice } from "../advice/adviceResponse";
-import { publicEntryCapabilities, type AdviceCapabilities } from "../advice/adviceCapabilities";
+import { capabilitiesForPage, type AdviceCapabilities } from "../advice/adviceCapabilities";
+import { withRequestDeadline, type RequestOptions } from "../../../data/request";
 import { preferencesKey } from "../advice/decisionPreferences";
 import { bundleKey } from "../advice/preferenceBundle";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
@@ -33,6 +34,7 @@ export function deviceAdviceClient(
 ): AdviceClient {
   const memory = new Map<string, AdviceReadResult>();
   const pending = new Map<string, Promise<AdviceReadResult>>();
+  const capabilityReads = new Map<string, Promise<AdviceCapabilities | null>>();
   const localRuns = new Set<string>();
   const closedLocalRuns = new Set<string>();
   const block = squad.device_plan;
@@ -68,12 +70,13 @@ export function deviceAdviceClient(
       throw error;
     }));
   const withLocal = (remoteCaps: AdviceCapabilities | null): AdviceCapabilities | null => {
-    if (!consistentBlock || squad.source_snapshot_id === null) return remoteCaps;
-    if (remoteCaps && remoteCaps.captureSnapshotId !== squad.source_snapshot_id) return remoteCaps;
-    const caps = remoteCaps ?? {
-      ...publicEntryCapabilities(squad),
-      chipsByEntry: { [String(squad.entry.entry_id)]: [] },
-    };
+    const caps = capabilitiesForPage(remoteCaps, {
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      snapshotId: squad.source_snapshot_id,
+    });
+    if (caps?.llmoptVNext !== true || !consistentBlock || !squad.source_snapshot_id) return caps;
     return {
       ...caps,
       preferences: true,
@@ -82,17 +85,39 @@ export function deviceAdviceClient(
         ...caps.strategies,
         "saf-puan": {
           requiresRival: false,
-          windows: remoteCaps?.preferences
+          windows: caps.preferences
             ? [...new Set([1 as const, ...(caps.strategies["saf-puan"]?.windows ?? [])])]
             : [1],
         },
       },
     };
   };
+  const readCapabilities = (leagueId: number, entryId?: number, options?: RequestOptions) =>
+    withRequestDeadline(async () => {
+      const key = JSON.stringify([leagueId, entryId ?? null]);
+      let read = capabilityReads.get(key);
+      if (!read) {
+        // A dismissed view cannot cancel a concurrent confirmation's read. The
+        // underlying HTTP call keeps its own timeout. Only concurrent reads share it.
+        read = withRequestDeadline(async (signal) => {
+          const remoteCaps =
+            entryId === undefined
+              ? await remote.readCapabilities?.(leagueId, { signal })
+              : await remote.readPublicCapabilities?.(leagueId, entryId, { signal });
+          return withLocal(remoteCaps ?? null);
+        })
+          .catch(() => null)
+          .finally(() => capabilityReads.delete(key));
+        capabilityReads.set(key, read);
+      }
+      return read;
+    }, options);
   const eligible = (request: AdviceRequest) =>
+    request.run !== undefined &&
     request.deviceRun !== false &&
     squad.source_snapshot_id !== null &&
     consistentBlock &&
+    request.leagueId === squad.league_id &&
     request.entryId === squad.entry.entry_id &&
     (request.season === undefined || request.season === squad.season) &&
     (request.gameweek === undefined || request.gameweek === squad.gameweek) &&
@@ -149,10 +174,8 @@ export function deviceAdviceClient(
         : undefined,
     readPublished: (request, options) => remote.readPublished(request, options),
     readJob: (id, options) => remote.readJob(id, options),
-    readCapabilities: async (id, options) =>
-      withLocal((await remote.readCapabilities?.(id, options)) ?? null),
-    readPublicCapabilities: async (id, entry, options) =>
-      withLocal((await remote.readPublicCapabilities?.(id, entry, options)) ?? null),
+    readCapabilities: (id, options) => readCapabilities(id, undefined, options),
+    readPublicCapabilities: (id, entry, options) => readCapabilities(id, entry, options),
     cancelRun: async (id) => {
       let local = localRuns.has(id);
       try {
@@ -172,10 +195,15 @@ export function deviceAdviceClient(
       }
     },
     requestAdvice: async (request, options) => {
+      if (
+        !request.run &&
+        (request.deviceRun || request.deviceAlternatives || request.preferenceBundle)
+      )
+        return { kind: "unavailable", reason: "RUN_ID_REQUIRED" };
       if (request.run && closedLocalRuns.has(request.run.run_id))
         return { kind: "unavailable", reason: "RUN_CANCELLED" };
       if (!eligible(request)) {
-        if (request.deviceRun === true)
+        if (request.deviceRun === true || request.deviceAlternatives === true)
           return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
         if (request.run) {
           if (localRuns.has(request.run.run_id))
@@ -199,30 +227,42 @@ export function deviceAdviceClient(
       } catch {
         return { kind: "unavailable", reason: "DEVICE_INPUTS_UNAVAILABLE" };
       }
-      try {
-        bindDeviceRun(
-          request.run?.run_id,
-          JSON.stringify([inputs.fingerprint, request.leagueId, request.entryId, request.window]),
-        );
-      } catch (error) {
-        return {
-          kind: "unavailable",
-          reason: error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED",
-        };
-      }
       const saved = cached(request, inputs.fingerprint);
-      if (saved.kind === "advice") return saved;
+      const binding = JSON.stringify([
+        inputs.fingerprint,
+        request.leagueId,
+        request.entryId,
+        request.window,
+      ]);
+      if (saved.kind === "advice") {
+        try {
+          if (request.run && deviceWorkReceipt(request.run.run_id))
+            bindDeviceRun(request.run.run_id, binding);
+        } catch (error) {
+          return {
+            kind: "unavailable",
+            reason: error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED",
+          };
+        }
+        return saved;
+      }
       const address = key(request, inputs.fingerprint);
       const runningKey = address + ":" + (request.run?.run_id ?? "");
       let work = pending.get(runningKey);
       if (!work) {
         work = (async (): Promise<AdviceReadResult> => {
           const document = inputs.document;
-          if (options?.signal?.aborted) throw abort();
-          reserveDeviceWork(
-            request.run?.run_id,
-            JSON.stringify([inputs.fingerprint, request.leagueId, request.entryId, request.window]),
+          const caps = await readCapabilities(
+            request.leagueId,
+            request.publicEntry ? request.entryId : undefined,
+            options,
           );
+          if (caps?.llmoptVNext !== true || caps.devicePreferenceBundles !== true)
+            throw new DeviceWorkRefused("LLMOPT_VNEXT_DISABLED");
+          if (options?.signal?.aborted) throw abort();
+          if (request.run && closedLocalRuns.has(request.run.run_id))
+            throw new DeviceWorkRefused("RUN_CANCELLED");
+          reserveDeviceWork(request.run?.run_id, binding);
           const worker = createSolver();
           const id = ++sequence;
           const answer = await new Promise<Parameters<typeof deviceAdviceEnvelope>[2]>(

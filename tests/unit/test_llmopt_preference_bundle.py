@@ -1,6 +1,7 @@
 """The public API and real worker execute preferences in one admitted follow-up."""
 
 import json
+from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,10 +16,13 @@ from squadopt.contracts.preference_bundle import (
 )
 from squadopt.contracts.schema_paths import contract_schema_path
 from squadopt.platform.advice_documents import advice_read_schema
+from squadopt.platform.backend_runtime import build_backend
 
 
 def _started(tmp_path, monkeypatch, window=1, chip=None):
-    backend = world._deployment(tmp_path, monkeypatch, last_gameweek=5)["backend"]
+    backend = world._deployment(tmp_path, monkeypatch, last_gameweek=5, llmopt_vnext=True)[
+        "backend"
+    ]
     client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/advice"
     body = {
@@ -103,6 +107,68 @@ def test_three_priority_rules_use_two_real_server_jobs_and_resume_from_cache(
     assert len(backend.queue.jobs()) == 2
     with backend.runs.transaction() as tx:
         assert tx.state["jobs"][job.job_id]["receipt"]["calls"] >= 5
+
+
+def test_rollback_drains_and_reads_the_original_bundle_without_admitting_new_work(
+    tmp_path, monkeypatch
+):
+    opened, on, route, body, run, held = _started(tmp_path, monkeypatch)
+    closed = build_backend(replace(opened.config, llmopt_vnext=False))
+    off = TestClient(app_for_capture(closed, world.world_module.GW2_CAPTURED_AT))
+    program = {"preferences": [{"rules": {"keep_players": [held[0]]}}], "max_total_cost_tenths": 5}
+    bundle = {
+        "contract_version": BUNDLE_VERSION,
+        "slots": [],
+        "prices": [],
+        "choices": [],
+        "program": program,
+    }
+    request = {**body, "run": run, "preference_bundle": bundle}
+    queued = on.post(route, json=request)
+    assert queued.status_code == 202, queued.text
+    previous = off.post(route, json=request)
+    assert previous.status_code == 202 and previous.json() == queued.json()
+    assert world._work(closed) == 1
+    expected = on.post(route, json=request)
+    assert expected.status_code == 200, expected.text
+    query = {
+        **body,
+        "preferences": json.dumps(body["preferences"]),
+        "preference_bundle": json.dumps(bundle),
+    }
+    assert (
+        off.get(route, params=query).content
+        == off.post(route, json=request).content
+        == expected.content
+    )
+    changed = {**bundle, "program": {**program, "max_total_cost_tenths": 6}}
+    refused = off.post(route, json={**request, "preference_bundle": changed})
+    assert refused.status_code == 409 and refused.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
+    assert len(closed.queue.jobs()) == 2
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_bundle_capability_follows_release_on_league_and_public_routes(
+    tmp_path, monkeypatch, enabled
+):
+    backend = world._deployment(tmp_path, monkeypatch, public_entries=True, llmopt_vnext=enabled)[
+        "backend"
+    ]
+    client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
+    for route in (
+        f"/api/v1/leagues/{world.LEAGUE_ID}/capabilities",
+        f"/api/v1/public/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/capabilities",
+    ):
+        response = client.get(route)
+        assert response.status_code == 200, response.text
+        state = response.json()
+        if enabled:
+            assert state["llmopt_vnext"] is True
+            assert state["preference_bundles"] == {"version": BUNDLE_VERSION}
+            assert state["plan_data_id"] == backend.reader.plan_data_id()
+        else:
+            assert "llmopt_vnext" not in state and "preference_bundles" not in state
+            assert "plan_data_id" not in state
 
 
 def test_bundle_requires_the_original_completed_main_before_admission(tmp_path, monkeypatch):

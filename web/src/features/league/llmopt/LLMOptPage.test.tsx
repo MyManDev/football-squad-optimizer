@@ -79,6 +79,8 @@ const CALENDAR = {
 let LLMOptPage: typeof Page;
 let roster: "ok" | "fail" | "late";
 let releaseRoster: () => void;
+let releaseEnabled: boolean;
+let bundlesOffered: boolean;
 let rosterGate: Promise<void>;
 let intent: Mock<(body: Record<string, unknown>) => Response>;
 const clients: QueryClient[] = [];
@@ -90,6 +92,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jobs.length = 0;
+  releaseEnabled = true;
+  bundlesOffered = false;
   roster = "ok";
   rosterGate = new Promise<void>((resolve) => (releaseRoster = resolve));
   intent = vi.fn(
@@ -103,6 +107,23 @@ beforeEach(() => {
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url === `${ORIGIN}/api/v1/leagues/${squad.league_id}/capabilities`) {
+        return Response.json({
+          contract_version: "league_capabilities_v1",
+          league_id: squad.league_id,
+          capture_snapshot_id: squad.source_snapshot_id,
+          season: squad.season,
+          gameweek: squad.gameweek,
+          strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
+          preferences: { available: true },
+          top100: { available: false, weights: [0] },
+          managers_word: { available: false },
+          ...(releaseEnabled ? { llmopt_vnext: true } : {}),
+          ...(bundlesOffered
+            ? { preference_bundles: { version: "llmopt_preference_bundle_v1" } }
+            : {}),
+        });
+      }
       if (url === `${ORIGIN}/api/v1/contributions/players`) {
         if (roster === "fail") return new Response("{}", { status: 503 });
         if (roster === "late") await rosterGate;
@@ -149,11 +170,21 @@ function open(
   language: "en" | "tr" = "en",
   intentSource: IntentSource | null = model,
   calendar: typeof CALENDAR | null = CALENDAR,
+  previousRelease?: boolean,
 ) {
   // The fixtures are set, not read, so the cache keeps them while no page observes them.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
   client.setQueryData(FIXTURES_QUERY.queryKey, calendar);
+  if (previousRelease !== undefined) {
+    client.setQueryData(leagueKeys.restoredPlanCapabilities(ORIGIN, false, squad), {
+      llmoptVNext: previousRelease,
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      captureSnapshotId: squad.source_snapshot_id,
+    });
+  }
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider initialLanguage={language}>
@@ -663,7 +694,7 @@ describe("a reload keeps the saved session", () => {
     expect(await screen.findByText(outsiderRule, { exact: true })).toBeVisible();
   });
 
-  async function reloadConfirmed(confirmation: Record<string, unknown>) {
+  async function reloadConfirmed(confirmation: Record<string, unknown>, previousRelease?: boolean) {
     open();
     await ready();
     await addRule("hold_transfers");
@@ -674,10 +705,62 @@ describe("a reload keeps the saved session", () => {
       JSON.stringify({ ...session, confirmation: { runId: "a".repeat(32), ...confirmation } }),
     );
     jobs.length = 0;
-    open();
+    open("en", model, CALENDAR, previousRelease);
     await ready();
     return jobs[0]!;
   }
+
+  it.each([false, true])(
+    "restores an answered session without an identity with the flag %s",
+    async (enabled) => {
+      releaseEnabled = enabled;
+      const base = await reloadConfirmed({ runId: undefined, wildcardNotHeld: false });
+      await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+      expect(base.compute).not.toHaveBeenCalled();
+      expect(base.readCached.mock.calls[0]![0]).not.toHaveProperty("run");
+    },
+  );
+
+  it("reads the saved job and cache after rollback without posting the interrupted run", async () => {
+    releaseEnabled = false;
+    const base = await reloadConfirmed({ wildcardNotHeld: false, sending: true }, true);
+    await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+    expect(base.resume).toHaveBeenCalledTimes(1);
+    expect(base.readCached.mock.calls[0]![0].run?.run_id).toBe("a".repeat(32));
+    for (const job of jobs) expect(job.compute).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "uses the current release setting %s for the first explicit comparison",
+    async (enabled) => {
+      releaseEnabled = enabled;
+      intent.mockImplementation(() =>
+        Response.json({
+          status: "draft",
+          draft: {
+            hard: [{ kind: "no_hits" }],
+            soft: [],
+            comparison: { kind: "include_player", player_id: OUTSIDER.id },
+          },
+        }),
+      );
+      open();
+      await ready();
+      await sendMessage("Compare including Outside Signing");
+      await screen.findByText(en.understood);
+      await userEvent.click(screen.getByRole("button", { name: en.compute }));
+      await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+      const [base, first] = jobs;
+      if (enabled) {
+        expect(base!.compute.mock.calls[0]![0].run?.stage).toBe("base");
+        expect(first!.compute).not.toHaveBeenCalled();
+      } else {
+        expect(base!.compute.mock.calls[0]![0]).not.toHaveProperty("run");
+        expect(first!.compute).toHaveBeenCalledTimes(1);
+        expect(first!.compute.mock.calls[0]![0]).not.toHaveProperty("run");
+      }
+    },
+  );
 
   it("says how long a 3-week plan takes while it is computed", async () => {
     open();
@@ -906,6 +989,63 @@ describe("the plan with all preferences", () => {
     open();
     await ready();
   }
+
+  it.each([false, true])(
+    "gates priority editing and grouped admission on the master setting %s",
+    async (enabled) => {
+      releaseEnabled = enabled;
+      bundlesOffered = true;
+      intent.mockImplementation(() =>
+        Response.json({
+          status: "draft",
+          draft: { hard: [], soft, max_total_cost_tenths: 15 },
+        }),
+      );
+      open();
+      await ready();
+      await sendMessage("Prefer these players within a total allowance");
+      await screen.findByText(en.understood);
+      if (enabled) {
+        expect(await screen.findByRole("spinbutton", { name: en.totalLimit })).toHaveValue(1.5);
+        expect(screen.getAllByRole("combobox", { name: new RegExp(en.priority) })).toHaveLength(3);
+      } else {
+        expect(screen.queryByRole("spinbutton", { name: en.totalLimit })).toBeNull();
+        expect(screen.queryByRole("combobox", { name: new RegExp(en.priority) })).toBeNull();
+      }
+      await userEvent.click(screen.getByRole("button", { name: en.compute }));
+      if (enabled) {
+        await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+        let request = jobs[0]!.compute.mock.calls[0]![0];
+        expect(request.run?.stage).toBe("base");
+        answer(jobs[0]!, request, 50, []);
+        await waitFor(() => expect(jobs[1]!.compute).toHaveBeenCalledTimes(1));
+        request = jobs[1]!.compute.mock.calls[0]![0];
+        expect(request.run?.stage).toBe("followup");
+        expect(request.preferenceBundle?.program?.preferences).toHaveLength(3);
+        expect(jobs.slice(2).every((job) => !job.compute.mock.calls.length)).toBe(true);
+      } else {
+        await screen.findByText(en.serviceUnavailable);
+        expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+        expect(savedSession()[1]).toMatchObject({ draft: { max_total_cost_tenths: 15 } });
+      }
+    },
+  );
+
+  it("a restored priority run reads its saved preference result after rollback without admitting another stage", async () => {
+    releaseEnabled = false;
+    bundlesOffered = true;
+    await reloadWith(
+      { hard: [], soft, max_total_cost_tenths: 15 },
+      { wildcardNotHeld: false, bundleMode: true, sending: true },
+    );
+    await waitFor(() => expect(jobs[0]!.readCached).toHaveBeenCalledTimes(1));
+    answer(jobs[0]!, jobs[0]!.readCached.mock.calls[0]![0], 50, []);
+    await waitFor(() => expect(jobs[1]!.readCached).toHaveBeenCalledTimes(1));
+    expect(
+      jobs[1]!.readCached.mock.calls[0]![0].preferenceBundle?.program?.preferences,
+    ).toHaveLength(3);
+    expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+  });
 
   async function singlePrices(net: [number, number]) {
     const [base, first, second] = jobs as [FakeJob, FakeJob, FakeJob];

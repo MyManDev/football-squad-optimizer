@@ -48,6 +48,7 @@ export interface StrategyCapability {
 
 export interface AdviceCapabilities {
   planDataId?: string;
+  llmoptVNext?: true;
   decisionInformation?: DecisionInformation;
   leagueId: number;
   captureSnapshotId: string;
@@ -179,6 +180,7 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   )
     throw new AdviceCapabilitiesError("Invalid decision information.");
   return {
+    ...(value.llmopt_vnext === true ? { llmoptVNext: true as const } : {}),
     ...(value.decision_information === undefined
       ? {}
       : { decisionInformation: value.decision_information as DecisionInformation }),
@@ -186,13 +188,16 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       ? {}
       : { preferences: record(value.preferences) && value.preferences.available === true }),
     ...(value.models === undefined ? {} : { models: value.models as ("current" | "football")[] }),
-    ...(typeof value.plan_data_id === "string" ? { planDataId: value.plan_data_id } : {}),
+    ...(value.llmopt_vnext === true && typeof value.plan_data_id === "string"
+      ? { planDataId: value.plan_data_id }
+      : {}),
     leagueId,
     captureSnapshotId: value.capture_snapshot_id,
     season: value.season,
     gameweek: value.gameweek as number,
     strategies,
-    ...(record(value.preference_bundles) &&
+    ...(value.llmopt_vnext === true &&
+    record(value.preference_bundles) &&
     value.preference_bundles.version === "llmopt_preference_bundle_v1"
       ? { preferenceBundles: true }
       : {}),

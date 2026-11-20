@@ -55,11 +55,12 @@ export function requestFor(
   squad: EntrySquad,
   forwarded: boolean | undefined,
   window: AdviceRequest["window"],
+  allowDevice = false,
 ): AdviceRequest {
+  const device = allowDevice && window === 1 && isDevicePlanEntry(squad.device_plan);
   return {
-    ...(window === 1 && isDevicePlanEntry(squad.device_plan)
-      ? { deviceRun: true, deviceAlternatives: true }
-      : {}),
+    deviceRun: device,
+    deviceAlternatives: device,
     publicEntry: forwarded,
     leagueId: squad.league_id,
     entryId: squad.entry.entry_id,
@@ -228,8 +229,11 @@ export function restoreRun(
     held,
     request: {
       ...requestForWindow(plans.window),
-      deviceRun: confirmation.deviceRun === true,
-      deviceAlternatives: confirmation.deviceAlternatives === true,
+      deviceRun: !!confirmation.runId && confirmation.deviceRun === true,
+      deviceAlternatives:
+        !!confirmation.runId &&
+        confirmation.deviceRun === true &&
+        confirmation.deviceAlternatives === true,
       ...(confirmation.runId
         ? {
             run: {

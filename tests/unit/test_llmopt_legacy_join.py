@@ -13,7 +13,7 @@ from squadopt.platform import advice_worker
 
 
 def test_abandoning_a_run_cannot_cancel_the_original_legacy_consumer(tmp_path, monkeypatch):
-    backend = world._deployment(tmp_path, monkeypatch)["backend"]
+    backend = world._deployment(tmp_path, monkeypatch, llmopt_vnext=True)["backend"]
     client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/advice"
     body = {"strategy": "saf-puan", "window": 1}
@@ -45,7 +45,7 @@ def test_abandoning_a_run_cannot_cancel_the_original_legacy_consumer(tmp_path, m
 
 
 def _abandon_actual_job(tmp_path, monkeypatch, *, running, legacy):
-    backend = world._deployment(tmp_path, monkeypatch)["backend"]
+    backend = world._deployment(tmp_path, monkeypatch, llmopt_vnext=True)["backend"]
     client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/advice"
     body = {"strategy": "saf-puan", "window": 1}
