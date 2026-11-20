@@ -12,9 +12,12 @@ from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.transfers import HorizonNoSolutionError
 from squadopt.optimization import SolverStatus, SolverWallTimeLimit
 from squadopt.platform import advice_worker
-from squadopt.platform.advice_job_spec import FileAdviceJobSpecStore
+from squadopt.platform.advice_job_spec import (
+    FileAdviceJobSpecStore,
+    replays_witness,
+    single_rule_edit,
+)
 from squadopt.platform.advice_runs import FileRunStore
-from squadopt.platform.backend.advice_repairs import replays_witness, single_rule_edit
 from squadopt.platform.jobs_contract import JobError
 
 

@@ -50,7 +50,14 @@ from typing import Final, Protocol
 from squadopt.contracts.llmopt_run import RunReference as RunReference
 from squadopt.contracts.preference_bundle import BUNDLE_SWITCH, PreferenceBundle
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
-from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
+from squadopt.platform.advice_job_spec import (
+    AdviceJobSpec,
+    AdviceJobSpecStore,
+    current_repair_answer,
+    replays_witness,
+    same_repair_scope,
+    single_rule_edit,
+)
 from squadopt.platform.advice_queue import JobQueue
 from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
@@ -65,12 +72,6 @@ from squadopt.platform.api_contract import (
     ApiCommandRequest,
     BackendApiContractError,
     validate_idempotency_key,
-)
-from squadopt.platform.backend.advice_repairs import (
-    current_repair_answer,
-    replays_witness,
-    same_repair_scope,
-    single_rule_edit,
 )
 from squadopt.platform.jobs_contract import AdviceJob
 from squadopt.platform.queue_contracts import IdempotencyConflictError as IdempotencyConflictError
