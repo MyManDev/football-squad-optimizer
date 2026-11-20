@@ -130,6 +130,11 @@ def _running(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     return _deployment(tmp_path, monkeypatch)
 
 
+@pytest.fixture
+def confirmed_running(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    return _deployment(tmp_path, monkeypatch, llmopt_vnext=True)
+
+
 def _deployment(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1838,7 +1843,9 @@ def test_calendar_limits_member_windows_before_queueing(running, chip, window):
 
 
 def test_three_week_plan_can_buy_a_player_back_and_include_a_captured_blank(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4, blank_decision_week=4)["backend"]
+    backend = _deployment(
+        tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4, blank_decision_week=4
+    )["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     league = f"/api/v1/leagues/{LEAGUE_ID}"
     route = f"{league}/entries/{ENTRY_ID}/advice"
@@ -1866,8 +1873,8 @@ def test_three_week_plan_can_buy_a_player_back_and_include_a_captured_blank(tmp_
     assert blank["expected_points"] == 0
 
 
-def test_an_opening_buy_of_an_owned_player_is_refused_before_queueing(running):
-    backend = running["backend"]
+def test_an_opening_buy_of_an_owned_player_is_refused_before_queueing(confirmed_running):
+    backend = confirmed_running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 1}
@@ -1885,7 +1892,7 @@ def test_an_opening_buy_of_an_owned_player_is_refused_before_queueing(running):
 def test_llmopt_replans_after_a_frozen_wildcard_and_keeps_the_following_lineup(
     tmp_path, monkeypatch
 ):
-    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
+    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3, "chip": "wildcard"}
@@ -1923,7 +1930,7 @@ def test_llmopt_replans_after_a_frozen_wildcard_and_keeps_the_following_lineup(
 def test_frozen_paid_moves_can_exceed_the_default_advice_cap_only_in_that_week(
     tmp_path, monkeypatch
 ):
-    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
+    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     preferences = {
@@ -1947,8 +1954,8 @@ def test_frozen_paid_moves_can_exceed_the_default_advice_cap_only_in_that_week(
     assert WINDOW_TRANSFER_CAP_LIMIT not in payload["stated_limits"]
 
 
-def test_price_scenario_refuses_the_unfunded_old_transfer_and_can_reoptimize(running):
-    backend = running["backend"]
+def test_price_scenario_refuses_the_unfunded_old_transfer_and_can_reoptimize(confirmed_running):
+    backend = confirmed_running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 1}
@@ -1999,8 +2006,8 @@ def test_price_scenario_refuses_the_unfunded_old_transfer_and_can_reoptimize(run
     )
 
 
-def test_preferences_round_trip_through_http_worker_cache(running):
-    backend = running["backend"]
+def test_preferences_round_trip_through_http_worker_cache(confirmed_running):
+    backend = confirmed_running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     preferences = {
@@ -2073,8 +2080,10 @@ def test_preferences_round_trip_through_http_worker_cache(running):
         ({"include_players": [1007]}, 1007),
     ],
 )
-def test_llmopt_constraints_round_trip_through_the_advice_worker(running, new_preferences, target):
-    backend = running["backend"]
+def test_llmopt_constraints_round_trip_through_the_advice_worker(
+    confirmed_running, new_preferences, target
+):
+    backend = confirmed_running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     preferences = {"no_hits": True, "save_chips": True, **new_preferences}
@@ -2101,7 +2110,7 @@ def test_llmopt_constraints_round_trip_through_the_advice_worker(running, new_pr
 
 
 def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
+    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
     message = (
         "Bu hafta transferi sakla, haftaya Player 1002'yi al. Üç haftada en fazla 4 puan ceza öde."
     )
@@ -2184,7 +2193,7 @@ def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_pa
 
 
 def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
+    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3}
@@ -2227,7 +2236,7 @@ def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, 
 
 
 def test_llmopt_prices_a_preference_on_the_same_three_week_net_points_basis(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
+    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3}
@@ -2265,8 +2274,8 @@ def test_llmopt_prices_a_preference_on_the_same_three_week_net_points_basis(tmp_
     assert 1002 in {player["player_id"] for player in preference["plan_weeks"][1]["transfers_in"]}
 
 
-def test_llmopt_wildcard_rebuilds_the_squad_under_player_preferences(running):
-    backend = running["backend"]
+def test_llmopt_wildcard_rebuilds_the_squad_under_player_preferences(confirmed_running):
+    backend = confirmed_running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 1, "chip": "wildcard"}
@@ -2289,8 +2298,8 @@ def test_llmopt_wildcard_rebuilds_the_squad_under_player_preferences(running):
     assert payload["bank_after_tenths"] >= 0
 
 
-def test_llmopt_wildcard_chooses_club_signings_without_player_ids(running):
-    backend = running["backend"]
+def test_llmopt_wildcard_chooses_club_signings_without_player_ids(confirmed_running):
+    backend = confirmed_running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 1, "chip": "wildcard"}
@@ -2322,8 +2331,8 @@ def test_llmopt_wildcard_chooses_club_signings_without_player_ids(running):
 
 
 @pytest.mark.parametrize("dated_purchase", [False, True])
-def test_impossible_llmopt_plan_returns_the_public_no_plan_code(running, dated_purchase):
-    backend = running["backend"]
+def test_impossible_llmopt_plan_returns_the_public_no_plan_code(confirmed_running, dated_purchase):
+    backend = confirmed_running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     # Club 2 is already full. Buying its goalkeeper and making room for him by
@@ -2354,8 +2363,8 @@ def test_impossible_llmopt_plan_returns_the_public_no_plan_code(running, dated_p
     assert "INFEASIBLE" not in job.text
 
 
-def test_llmopt_proves_bank_shortfall_and_the_lower_floor_can_be_solved(running):
-    backend = running["backend"]
+def test_llmopt_proves_bank_shortfall_and_the_lower_floor_can_be_solved(confirmed_running):
+    backend = confirmed_running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 1}
@@ -2386,7 +2395,7 @@ def test_llmopt_proves_bank_shortfall_and_the_lower_floor_can_be_solved(running)
 
 
 def test_llmopt_only_offers_a_deferral_witness_with_other_rules_preserved(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, last_gameweek=4)["backend"]
+    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3}
@@ -2423,7 +2432,9 @@ def test_llmopt_only_offers_a_deferral_witness_with_other_rules_preserved(tmp_pa
 
 
 @pytest.mark.parametrize("error_kind", ["unknown", "wall_clock"])
-def test_unfinished_llmopt_search_has_no_preference_diagnosis(running, monkeypatch, error_kind):
+def test_unfinished_llmopt_search_has_no_preference_diagnosis(
+    confirmed_running, monkeypatch, error_kind
+):
     from squadopt.live.transfers import HorizonNoSolutionError
     from squadopt.optimization import SolverExecutionError, SolverStatus
 
@@ -2433,7 +2444,7 @@ def test_unfinished_llmopt_search_has_no_preference_diagnosis(running, monkeypat
         raise SolverExecutionError("private wall-clock details")
 
     monkeypatch.setattr(worker_module, "advise_menu_entry", unfinished)
-    backend = running["backend"]
+    backend = confirmed_running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     accepted = client.post(

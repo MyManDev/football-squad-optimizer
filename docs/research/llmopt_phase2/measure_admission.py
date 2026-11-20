@@ -79,6 +79,7 @@ def replay(root, inputs, entry, window, producer):
                 cache,
                 Context(context),
                 {"saf-puan": False},
+                llmopt_vnext=True,
                 preference_players=lambda *_: PreferencePlayers(frozenset(held), frozenset(held)),
             ),
             queue,

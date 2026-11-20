@@ -83,7 +83,9 @@ async def _keyless_body(request: Request, limiter: FixedWindowRateLimiter) -> ob
     return body
 
 
-def intent_routes(*, keyless_per_minute: int = KEYLESS_PER_MINUTE) -> APIRouter:
+def intent_routes(
+    *, keyless_per_minute: int = KEYLESS_PER_MINUTE, llmopt_vnext: bool = False
+) -> APIRouter:
     router = APIRouter(prefix="/api/v1/llmopt")
     # Each keyless route counts on its own: one message is one prompt and one check.
     prompt_limiter = FixedWindowRateLimiter(keyless_per_minute, 60)
@@ -93,11 +95,11 @@ def intent_routes(*, keyless_per_minute: int = KEYLESS_PER_MINUTE) -> APIRouter:
     async def intent_prompt(request: Request) -> JSONResponse:
         try:
             intent = parse_intent_request(await _keyless_body(request, prompt_limiter))
+            call = await run_in_threadpool(prompt_for, intent, llmopt_vnext=llmopt_vnext)
         except _Refusal as refusal:
             return refusal.response
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
-        call = await run_in_threadpool(prompt_for, intent)
         return JSONResponse(call.payload(), headers={"Cache-Control": "no-store"})
 
     @router.post("/check")
@@ -109,7 +111,7 @@ def intent_routes(*, keyless_per_minute: int = KEYLESS_PER_MINUTE) -> APIRouter:
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
         try:
-            result = await run_in_threadpool(check_reply, intent, reply)
+            result = await run_in_threadpool(check_reply, intent, reply, llmopt_vnext=llmopt_vnext)
         except IntentValidationError:
             return _error(422, "REPLY_REFUSED", "The model's reply is not a valid draft.")
         return JSONResponse(result, headers={"Cache-Control": "no-store"})

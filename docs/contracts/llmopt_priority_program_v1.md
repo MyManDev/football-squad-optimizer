@@ -13,5 +13,6 @@ a client never supplies J.
 
 An explicit priority without a total allowance asks the member for that allowance.
 A soft Wildcard with a total allowance is refused before admission. Fixed named chips
-remain part of the main plan's mandatory domain. Legacy absent fields preserve their
-individual-price behavior, calculated sequentially in one preference job.
+remain part of the main plan's mandatory domain. When the release setting is on,
+omitting both fields retains individual pricing within one preference job. When
+the setting is off, the original workflow submits individual prices separately.

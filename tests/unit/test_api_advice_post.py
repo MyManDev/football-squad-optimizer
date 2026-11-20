@@ -118,6 +118,60 @@ def test_new_preference_work_without_identity_keeps_legacy_admission(tmp_path, w
     assert len(queue.jobs()) == 1
 
 
+@pytest.mark.parametrize("enabled", [False, True])
+def test_release_control_preserves_legacy_admission_and_scopes_new_runs(tmp_path, enabled):
+    store = FileRunStore(tmp_path / "runs")
+    client, _, queue = _world(tmp_path, llmopt_vnext=enabled, runs=store)
+    capabilities = client.get(ADVICE_URL.split("/entries/")[0] + "/capabilities").json()
+    assert capabilities.get("llmopt_vnext", False) is enabled
+    if not enabled:
+        assert "llmopt_vnext" not in capabilities
+    legacy = client.post(ADVICE_URL, json={**BODY, "preferences": {"no_hits": True}})
+    assert legacy.status_code == 202, legacy.text
+    assert queue.load(legacy.json()["job_id"]).contract_version == "backend_jobs_v1"
+    bound = client.post(ADVICE_URL, json={**BODY, "run": _run_ref()})
+    if enabled:
+        assert bound.status_code == 202, bound.text
+        assert queue.load(bound.json()["job_id"]).contract_version == "backend_jobs_v2"
+    else:
+        assert bound.status_code == 409, bound.text
+        assert bound.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
+        assert len(queue.jobs()) == 1
+        assert not store.path.exists()
+
+
+def test_rollback_reads_admitted_and_completed_work_without_a_new_followup(tmp_path):
+    store = FileRunStore(tmp_path / "runs")
+    on, cache, queue = _world(tmp_path, runs=store, llmopt_vnext=True)
+    body = {**BODY, "run": _run_ref()}
+    first = on.post(ADVICE_URL, json=body)
+    assert first.status_code == 202, first.text
+    off, _, _ = _world(tmp_path, runs=store, llmopt_vnext=False)
+    assert off.post(ADVICE_URL, json=body).json()["job_id"] == first.json()["job_id"]
+    run_advice_worker_once(
+        queue, cache, lambda _: _valid_advice_document(), at_utc="2026-08-27T12:01:00Z"
+    )
+    answer = off.post(ADVICE_URL, json=body)
+    assert answer.status_code == 200, answer.text
+    assert off.post(ADVICE_URL, json={**BODY, "run": _run_ref("b" * 32)}).content == answer.content
+    refused = off.post(
+        ADVICE_URL,
+        json={**body, "run": _run_ref(stage="followup"), "preferences": {"no_hits": True}},
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
+    assert len(queue.jobs()) == 1
+    other = off.post(ADVICE_URL, json={**BODY, "preferences": {"no_hits": True}})
+    assert other.status_code == 202
+    unadmitted = off.post(
+        ADVICE_URL,
+        json={**body, "run": _run_ref(stage="followup"), "preferences": {"no_hits": True}},
+    )
+    assert unadmitted.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
+    with store.transaction() as tx:
+        assert len(tx.state["runs"]["a" * 32]["requests"]) == 1
+
+
 def test_five_week_advice_cannot_claim_the_one_three_week_run_budget(tmp_path):
     client, _, queue = _world(tmp_path, runs=FileRunStore(tmp_path / "runs"))
     refused = client.post(ADVICE_URL, json={**BODY, "window": 5, "run": _run_ref()})
@@ -299,6 +353,7 @@ def _world(
     allowed_origins: tuple[str, ...] = (),
     metrics: AdviceMetrics | None = None,
     submit_services: list[AdviceSubmitService] | None = None,
+    llmopt_vnext: bool = True,
     utc_now: Callable[[], datetime] = lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
     preference_players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None]
     | None = None,
@@ -313,6 +368,7 @@ def _world(
         _Context(),
         {"saf-puan": False, "fark-yarat": True},
         preference_players=preference_players,
+        llmopt_vnext=llmopt_vnext,
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
     if submit_services is not None:

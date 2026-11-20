@@ -23,7 +23,7 @@ import { deviceSelection } from "../device/selection";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
-import { LEAGUE_READ, useEntrySquad } from "../queries";
+import { LEAGUE_READ, useEntrySquad, useRestoredPlanCapabilities } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
 import { combinedCandidates, prepareCombined } from "./combinedPlan";
@@ -287,6 +287,13 @@ function Workspace({
   const [restored] = useState(() => checkedPlanSession(saved, players, squad.gameweek));
   const [restoredRun] = useState(() =>
     restoreRun(restored, held, (window) => requestFor(squad, forwarded, window)),
+  );
+  const restoreCapabilities = useRestoredPlanCapabilities(
+    client,
+    ORIGIN,
+    forwarded === true,
+    squad,
+    true,
   );
   const [draft, setDraft] = useState<PlanDraft>(restored?.draft ?? EMPTY_DRAFT);
   const [reference, setReference] = useState<PlanRevision | undefined>(restored?.reference);
@@ -557,7 +564,7 @@ function Workspace({
     (state.reason === "RUN_BUDGET_EXHAUSTED" || state.reason === "RUN_CANCELLED");
   const incompleteRun = Object.values(states).some(capacityRefused);
   const computing = Object.values(states).some(({ phase }) => isWorking(phase));
-  const editingLocked = checkingSquad || reading;
+  const editingLocked = checkingSquad || reading || (computing && !run?.inputs.request.run);
   const busy = editingLocked || computing;
   const replayProof =
     run?.scenario && states.first.phase === "failed" && states.first.infeasibility !== undefined;
@@ -609,16 +616,36 @@ function Workspace({
       />
     ) : undefined;
   const baseState = states.base;
+  const restoreMode = capabilitiesForPage(restoreCapabilities.data, {
+    leagueId: squad.league_id,
+    season: squad.season,
+    gameweek: squad.gameweek,
+    snapshotId: squad.source_snapshot_id,
+  });
+  const currentCapabilities =
+    restoreCapabilities.isFetchedAfterMount && !restoreCapabilities.isError ? restoreMode : null;
+  const prioritiesEnabled =
+    currentCapabilities?.llmoptVNext === true &&
+    (currentCapabilities.preferenceBundles === true ||
+      (plans.window === 1 && currentCapabilities.devicePreferenceBundles === true));
+  const canContinue =
+    run !== restoredRun ||
+    (!!currentCapabilities &&
+      (currentCapabilities.llmoptVNext === true) === !!run?.inputs.request.run &&
+      (!run?.inputs.request.deviceRun || currentCapabilities.devicePreferenceBundles === true) &&
+      (!run?.inputs.bundleMode ||
+        (run.inputs.request.deviceRun
+          ? currentCapabilities.devicePreferenceBundles === true
+          : currentCapabilities.preferenceBundles === true)));
   useEffect(() => {
-    if (!run || run !== restoredRun) return;
+    if (!run || run !== restoredRun || (!!ORIGIN && !restoreCapabilities.isFetchedAfterMount))
+      return;
     let active = true;
     // A reload can land before a started job's id was stored, which leaves nothing to resume.
     // Such a slot asks again while the deadline is open: the service answers a computed request
     // from its cache and joins a request still running to its open job.
     const askAgain =
-      !!run.inputs.request.run &&
-      restored?.confirmation?.sending === true &&
-      deadlineOpen(deadline);
+      canContinue && restored?.confirmation?.sending === true && deadlineOpen(deadline);
     const restore = (request: PlanRequest, job: JobControls) => {
       if (job.resume?.(request)) return;
       if (askAgain) job.compute(request);
@@ -628,15 +655,34 @@ function Workspace({
     queueMicrotask(() => {
       if (!active) return;
       if (run.baseRequest) restore(run.baseRequest, controls.base);
+      if (!run.inputs.request.run) {
+        ALTERNATIVE_SLOTS.forEach((name, index) => {
+          const request = restoredSlot(run, index, restored?.confirmation?.followups?.[index]);
+          if (request && !(run.scenario && savedReplayProof)) restore(request, controls[name]);
+        });
+        if (restored?.confirmation?.combined?.length) {
+          const { request } = prepareCombined(run, restored.confirmation.combined);
+          if (request) restore(request, controls.combined);
+        }
+      }
     });
     return () => {
       active = false;
     };
-  }, [run, restoredRun, restored, savedReplayProof, deadline, controls]);
+  }, [
+    run,
+    restoredRun,
+    restored,
+    savedReplayProof,
+    deadline,
+    controls,
+    restoreCapabilities.isFetchedAfterMount,
+    canContinue,
+  ]);
 
   useEffect(() => {
     if (
-      !run ||
+      !run?.inputs.request.run ||
       execution ||
       incompleteRun ||
       baseState.phase !== "done" ||
@@ -647,7 +693,7 @@ function Workspace({
     const restoring = run === restoredRun;
     const restore = (request: PlanRequest, slot: JobControls) => {
       if (slot.resume?.(request)) return;
-      if (request.run && confirmed?.sending && deadlineOpen(deadline)) slot.compute(request);
+      if (canContinue && confirmed?.sending && deadlineOpen(deadline)) slot.compute(request);
       else slot.readCached?.(request);
     };
     ALTERNATIVE_SLOTS.forEach((name, index) => {
@@ -655,7 +701,8 @@ function Workspace({
       if (restoring) {
         const request = restoredSlot(run, index, confirmed?.followups?.[index]);
         if (request && !(run.scenario && savedReplayProof)) restore(request, controls[name]);
-      } else if (slot?.kind === "explicit" && slot.request) controls[name].compute(slot.request);
+      } else if (canContinue && slot?.kind === "explicit" && slot.request)
+        controls[name].compute(slot.request);
     });
     if (restoring && confirmed?.combined?.length) {
       const { request } = prepareCombined(run, confirmed.combined);
@@ -671,6 +718,7 @@ function Workspace({
     controls,
     incompleteRun,
     execution,
+    canContinue,
   ]);
 
   useEffect(() => {
@@ -685,10 +733,10 @@ function Workspace({
       return;
     if (run === restoredRun) {
       if (controls.first.resume?.(execution)) return;
-      if (session.confirmation?.sending && deadlineOpen(deadline))
+      if (canContinue && session.confirmation?.sending && deadlineOpen(deadline))
         controls.first.compute(execution);
       else controls.first.readCached?.(execution);
-    } else controls.first.compute(execution);
+    } else if (canContinue) controls.first.compute(execution);
   }, [
     execution,
     run,
@@ -699,11 +747,13 @@ function Workspace({
     controls,
     session,
     deadline,
+    canContinue,
   ]);
 
   useEffect(() => {
     const confirmed = session.confirmation;
     if (
+      !canContinue ||
       !run?.automaticBasis ||
       execution ||
       incompleteRun ||
@@ -740,6 +790,7 @@ function Workspace({
     clarification,
     incompleteRun,
     execution,
+    canContinue,
   ]);
 
   async function compute() {
@@ -754,22 +805,6 @@ function Workspace({
     )
       return;
     confirming.current = true;
-    if (
-      draft.soft.some(({ priority }) => priority !== undefined) &&
-      draft.max_total_cost_tenths === undefined
-    ) {
-      setFeedback(copy.totalRequired);
-      confirming.current = false;
-      return;
-    }
-    if (
-      draft.max_total_cost_tenths !== undefined &&
-      (draft.scenario || !draft.soft.length || draft.soft.some(({ kind }) => kind === "wildcard"))
-    ) {
-      setFeedback(copy.totalUnavailable);
-      confirming.current = false;
-      return;
-    }
     setFeedback("");
     setChanges(null);
     setCheckingSquad(true);
@@ -782,15 +817,6 @@ function Workspace({
       ]);
       if (!mounted.current) return;
       if (!capabilities?.preferences) {
-        setFeedback(copy.serviceUnavailable);
-        return;
-      }
-      const localBundle = plans.window === 1 && capabilities.devicePreferenceBundles === true;
-      if (
-        draft.max_total_cost_tenths !== undefined &&
-        !capabilities.preferenceBundles &&
-        !localBundle
-      ) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
@@ -815,15 +841,31 @@ function Workspace({
         session.save({ draft });
         return;
       }
-      const runId = crypto.randomUUID().replaceAll("-", "");
-      const request = {
-        ...requestFor(squad, forwarded, plans.window),
-        run: {
-          contract_version: "llmopt_run_v1" as const,
-          run_id: runId,
-          stage: "base" as const,
-        },
-      };
+      const local =
+        capabilities.llmoptVNext === true &&
+        capabilities.devicePreferenceBundles === true &&
+        plans.window === 1;
+      const grouped =
+        capabilities.llmoptVNext === true && (capabilities.preferenceBundles === true || local);
+      const hasPriority = draft.soft.some(({ priority }) => priority !== undefined);
+      if (!grouped && (hasPriority || draft.max_total_cost_tenths !== undefined)) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
+      if (hasPriority && draft.max_total_cost_tenths === undefined) {
+        setFeedback(copy.totalRequired);
+        return;
+      }
+      if (
+        draft.max_total_cost_tenths !== undefined &&
+        (draft.scenario || !draft.soft.length || draft.soft.some(({ kind }) => kind === "wildcard"))
+      ) {
+        setFeedback(copy.totalUnavailable);
+        return;
+      }
+      const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
+      const request = requestFor(squad, forwarded, plans.window, local);
+      if (runId) request.run = { contract_version: "llmopt_run_v1", run_id: runId, stage: "base" };
       // A public team may have no chip list until its FPL inputs are pinned.
       const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
       const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
@@ -835,10 +877,7 @@ function Workspace({
         wildcardNotHeld,
         frozenWeeks: frozen,
         reference,
-        bundleMode:
-          (capabilities.preferenceBundles === true || localBundle) &&
-          draft.soft.length > 0 &&
-          !draft.scenario,
+        bundleMode: grouped && draft.soft.length > 0 && !draft.scenario,
       });
       const execution = preferenceExecution(next);
       const requests = [
@@ -881,7 +920,7 @@ function Workspace({
         draft,
         reference,
         confirmation: {
-          runId,
+          ...(runId ? { runId } : {}),
           wildcardNotHeld,
           sending: true as const,
           deviceRun: next.baseRequest?.deviceRun ?? false,
@@ -889,7 +928,7 @@ function Workspace({
           ...(next.inputs.bundleMode ? { bundleMode: true as const } : {}),
         },
       };
-      if (!writePlanSession(context, confirmed)) {
+      if (runId && !writePlanSession(context, confirmed)) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
@@ -898,6 +937,12 @@ function Workspace({
       if (next.baseRequest) {
         controls.base.compute(next.baseRequest);
       } else controls.base.reset();
+      if (!runId) {
+        ALTERNATIVE_SLOTS.forEach((name, index) => {
+          const slot = next.slots[index];
+          if (slot?.kind === "explicit" && slot.request) controls[name].compute(slot.request);
+        });
+      }
     } catch {
       if (mounted.current) setFeedback(copy.squadUnavailable);
     } finally {
@@ -943,6 +988,7 @@ function Workspace({
       !run ||
       execution ||
       incompleteRun ||
+      !canContinue ||
       !singlesIn ||
       !confirmed ||
       confirmed.followups === undefined ||
@@ -976,6 +1022,7 @@ function Workspace({
     clarification,
     incompleteRun,
     execution,
+    canContinue,
   ]);
   // A rule with no slot of its own is priced in the plan with all preferences, or named as
   // left out of it.
@@ -1171,6 +1218,7 @@ function Workspace({
           </p>
         )}
         <RuleEditor
+          priorities={prioritiesEnabled}
           draft={draft}
           players={players}
           copy={copy}

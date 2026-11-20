@@ -41,7 +41,9 @@ publishes these as the existing `preference_bundle_result`. A total allowance re
 computed `priority_preferences`, including completed layers and signed total cost.
 Every internal solve shares the same worker ceiling. No numeric reference is accepted.
 
-The browser-only capability `devicePreferenceBundles` offers this path for one week;
-it does not advertise a three-week service capability. Confirmation `bundleMode`
+The browser offers `devicePreferenceBundles` for one week after current server
+capabilities grant `llmopt_vnext` and the matching device inputs are available.
+A missing or disabled grant keeps fresh confirmations on the original service path.
+The device capability applies only to one week. Confirmation `bundleMode`
 and `deviceRun` are saved before work. Bundle identity extends only the private
 device cache address. Public computation identities and provider credentials are unchanged.

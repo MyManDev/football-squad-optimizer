@@ -3,6 +3,7 @@ import fixture from "../src/fixtures/device-plan/instances.json" with { type: "j
 import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { installLeagueMocks } from "./leagueMocks";
 import { EXAMPLE_CLAIM } from "./identity";
+import { LLMOPT_COPY } from "../src/features/league/llmopt/copy";
 import { holdModel, routeChat } from "./llmoptChat";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
@@ -20,8 +21,18 @@ const answer = (route: Route, json: unknown) =>
 
 for (const language of ["en", "tr"] as const)
   for (const width of [1280, 375]) {
-    for (const priority of [false, true])
-      test(`device ${priority ? "priorities" : "choices"} obey hard rules and reload without jobs (${language}, ${width})`, async ({
+    const cases = [
+      { priority: false, mode: "enabled" },
+      { priority: true, mode: "enabled" },
+      ...(language === "en" && width === 1280
+        ? [
+            { priority: false, mode: "disabled" },
+            { priority: false, mode: "unavailable" },
+          ]
+        : []),
+    ];
+    for (const { priority, mode } of cases)
+      test(`device ${priority ? "priorities" : "choices"} with ${mode} release control (${language}, ${width})`, async ({
         page,
       }) => {
         test.skip(!API, "API build required for the interpretation boundary.");
@@ -75,6 +86,25 @@ for (const language of ["en", "tr"] as const)
         await page.route(`**/data/league/entries/${ENTRY}.json*`, (route) =>
           route.fulfill({ json: squad }),
         );
+        let release = mode;
+        let workers = 0;
+        page.on("worker", () => workers++);
+        await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+          release === "unavailable"
+            ? route.abort()
+            : answer(route, {
+                contract_version: "league_capabilities_v1",
+                ...(release === "enabled" ? { llmopt_vnext: true } : {}),
+                league_id: LEAGUE,
+                capture_snapshot_id: table.source_snapshot_id,
+                season: table.season,
+                gameweek: table.gameweek,
+                strategies: { "saf-puan": { requires_rival: false, windows: [1] } },
+                preferences: { available: true },
+                top100: { available: false, weights: [] },
+                managers_word: { available: false },
+              }),
+        );
         await page.route("**/data/league/device-plan.json*", (route) =>
           route.fulfill({
             json: {
@@ -87,7 +117,11 @@ for (const language of ["en", "tr"] as const)
         );
         let jobs = 0;
         await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
-          if (route.request().method() === "POST") jobs++;
+          if (route.request().method() === "POST") {
+            jobs++;
+            if (release === "disabled")
+              expect(route.request().postDataJSON()).not.toHaveProperty("run");
+          }
           return route.abort();
         });
         await page.route(`${API}/api/v1/contributions/players`, (route) =>
@@ -130,6 +164,22 @@ for (const language of ["en", "tr"] as const)
           .getByRole("button", { name: language === "tr" ? "Planları hesapla" : "Compute plans" })
           .click();
         const cards = page.locator("article[data-plan-ready]");
+        if (mode !== "enabled") {
+          if (mode === "disabled") await expect.poll(() => jobs).toBe(1);
+          else
+            await expect(
+              page.getByText(LLMOPT_COPY[language].serviceUnavailable, { exact: true }),
+            ).toBeVisible();
+          expect(jobs).toBe(mode === "disabled" ? 1 : 0);
+          expect(workers).toBe(0);
+          await expect(cards).toHaveCount(0);
+          expect(
+            await page.evaluate(() =>
+              Object.keys(sessionStorage).some((key) => key.startsWith("llmopt-device-work-v1:")),
+            ),
+          ).toBe(false);
+          return;
+        }
         await expect(cards).toHaveCount(priority ? 2 : 3);
         const identities = await cards.evaluateAll((items) =>
           items.map((item) => item.getAttribute("data-transfer-decision")),
@@ -149,6 +199,18 @@ for (const language of ["en", "tr"] as const)
             items.map((item) => item.getAttribute("data-transfer-decision")),
           ),
         ).toEqual(identities);
+        if (language === "en" && width === 1280) {
+          release = "disabled";
+          const beforeRollback = workers;
+          await page.reload();
+          await expect(cards).toHaveCount(priority ? 2 : 3);
+          expect(
+            await cards.evaluateAll((items) =>
+              items.map((item) => item.getAttribute("data-transfer-decision")),
+            ),
+          ).toEqual(identities);
+          expect(workers).toBe(beforeRollback);
+        }
         expect(jobs).toBe(0);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true,
