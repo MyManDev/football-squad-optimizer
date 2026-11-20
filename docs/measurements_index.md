@@ -371,3 +371,5 @@ the #980 forwarder is built on Cloudflare.
 | Artifact | Finding | Issue |
 | --- | --- | --- |
 | [GW8 club-news join counts](research/club_news_join_counts_gw8.md) ([record](research/club_news_join_counts_gw8.json); [protocol](research/club_news_join_counts_gw8_prereg.md)) | Offline replay at the clean export commit reproduces the published table. Five unique player joins, zero no-match or ambiguous identities; three absence/doubt statements unapplied because fixture scope is unverified. Frozen verdict `statements_lost`, routing #1006 items 3, 7, 4 and 10. No new model call or prediction claim. | #524, #1006, #1140 |
+
+- [Five-free-transfer served-path preflight](research/llmopt_window_budget_probe.md) ([record](research/llmopt_window_budget_probe.json)): one saved GW6 member with five free transfers selected the bound football input and observed-information route, returning a feasible plan; the specific Phase 1 accounting exception was not reproduced. Exact GW8/GW9 served bundles are absent locally. No planner change.

@@ -1,13 +1,13 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-19T02:03:12Z",
+  "generated_at_utc": "2026-11-20T02:03:16Z",
   "source_kind": "live",
   "payload": {
     "contract_version": "league_device_plan_v1",
     "league_id": 352490,
     "season": "2026-27",
     "gameweek": 11,
-    "source_snapshot_id": "fpl-live-20261119T020104Z-376672c1169c",
+    "source_snapshot_id": "fpl-live-20261120T020104Z-2150bca2c2c3",
     "policy_id": "member_planning_policy_v2",
     "rules": {
       "squad_size": 15,
@@ -56,9 +56,9 @@
           50
         ],
         "cohort_size": 100,
-        "cohort_snapshot_id": "fpl-top100-20261119T020043Z-074d2e5d07ad",
-        "picks_snapshot_id": "fpl-elite-picks-20261119T020053Z-8f669bf5f576",
-        "table_sha256": "05219ea82fa79c5eb133eb351ee965530710e39812c1e7dc2466446f5df750f2",
+        "cohort_snapshot_id": "fpl-top100-20261120T020050Z-326c58e2fe6d",
+        "picks_snapshot_id": "fpl-elite-picks-20261120T020056Z-4032c2a50824",
+        "table_sha256": "13e6a706d8ce53454a2c16021cef511d5dd5d95f58ac6caaa8622a4b3005f6c1",
         "picks_gameweek": 10
       }
     },
@@ -553,20 +553,20 @@
         "team": "Sunderland",
         "position": "MID",
         "buy_tenths": 53,
-        "expected_points": 1.7724006615972425,
+        "expected_points": 0.0,
         "coefficients": [
-          177,
-          1595,
-          1772
+          0,
+          0,
+          0
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 1772,
-          "10": 1772,
-          "20": 1772,
-          "30": 1772,
-          "40": 1772,
-          "50": 1772
+          "5": 0,
+          "10": 0,
+          "20": 0,
+          "30": 0,
+          "40": 0,
+          "50": 0
         }
       },
       {
@@ -3658,20 +3658,20 @@
         "team": "Nott'm Forest",
         "position": "MID",
         "buy_tenths": 57,
-        "expected_points": 0.6908026090635356,
+        "expected_points": 0.0,
         "coefficients": [
-          69,
-          622,
-          691
+          0,
+          0,
+          0
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 691,
-          "10": 691,
-          "20": 691,
-          "30": 691,
-          "40": 691,
-          "50": 691
+          "5": 0,
+          "10": 0,
+          "20": 0,
+          "30": 0,
+          "40": 0,
+          "50": 0
         }
       },
       {
@@ -5613,20 +5613,20 @@
         "team": "Coventry City",
         "position": "MID",
         "buy_tenths": 53,
-        "expected_points": 0.7268933212226999,
+        "expected_points": 0.5451699909170249,
         "coefficients": [
-          73,
-          654,
-          727
+          55,
+          490,
+          545
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 727,
-          "10": 727,
-          "20": 727,
-          "30": 727,
-          "40": 727,
-          "50": 727
+          "5": 545,
+          "10": 545,
+          "20": 545,
+          "30": 545,
+          "40": 545,
+          "50": 545
         }
       },
       {
@@ -5820,20 +5820,20 @@
         "team": "Leeds",
         "position": "DEF",
         "buy_tenths": 45,
-        "expected_points": 1.6199600515646408,
+        "expected_points": 2.159946735419521,
         "coefficients": [
-          162,
-          1458,
-          1620
+          216,
+          1944,
+          2160
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 1620,
-          "10": 1620,
-          "20": 1620,
-          "30": 1620,
-          "40": 1620,
-          "50": 1620
+          "5": 2160,
+          "10": 2160,
+          "20": 2160,
+          "30": 2160,
+          "40": 2160,
+          "50": 2160
         }
       },
       {
@@ -5911,21 +5911,21 @@
         "short_name": "Mitchell",
         "team": "Crystal Palace",
         "position": "DEF",
-        "buy_tenths": 45,
-        "expected_points": 2.2838511896413944,
+        "buy_tenths": 44,
+        "expected_points": 2.2424513221092175,
         "coefficients": [
-          228,
-          2056,
-          2284
+          224,
+          2018,
+          2242
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 2284,
-          "10": 2284,
-          "20": 2284,
-          "30": 2284,
-          "40": 2284,
-          "50": 2284
+          "5": 2242,
+          "10": 2242,
+          "20": 2242,
+          "30": 2242,
+          "40": 2242,
+          "50": 2242
         }
       },
       {
@@ -6349,20 +6349,20 @@
         "team": "Coventry City",
         "position": "MID",
         "buy_tenths": 48,
-        "expected_points": 0.29876321293945923,
+        "expected_points": 0.4481448194091888,
         "coefficients": [
-          30,
-          269,
-          299
+          45,
+          403,
+          448
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 299,
-          "10": 299,
-          "20": 299,
-          "30": 299,
-          "40": 299,
-          "50": 299
+          "5": 448,
+          "10": 448,
+          "20": 448,
+          "30": 448,
+          "40": 448,
+          "50": 448
         }
       },
       {
@@ -7108,20 +7108,20 @@
         "team": "Sunderland",
         "position": "FWD",
         "buy_tenths": 57,
-        "expected_points": 1.8540440990963694,
+        "expected_points": 0.0,
         "coefficients": [
-          185,
-          1669,
-          1854
+          0,
+          0,
+          0
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 1854,
-          "10": 1854,
-          "20": 1854,
-          "30": 1854,
-          "40": 1854,
-          "50": 1854
+          "5": 0,
+          "10": 0,
+          "20": 0,
+          "30": 0,
+          "40": 0,
+          "50": 0
         }
       },
       {
@@ -8051,20 +8051,20 @@
         "team": "Coventry City",
         "position": "DEF",
         "buy_tenths": 40,
-        "expected_points": 0.28536015168596973,
+        "expected_points": 0.4280402275289546,
         "coefficients": [
-          29,
-          256,
-          285
+          43,
+          385,
+          428
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 285,
-          "10": 285,
-          "20": 285,
-          "30": 285,
-          "40": 285,
-          "50": 285
+          "5": 428,
+          "10": 428,
+          "20": 428,
+          "30": 428,
+          "40": 428,
+          "50": 428
         }
       },
       {
@@ -8603,20 +8603,20 @@
         "team": "Leeds",
         "position": "MID",
         "buy_tenths": 60,
-        "expected_points": 0.7373187527947298,
+        "expected_points": 1.4746375055894596,
         "coefficients": [
-          74,
-          663,
-          737
+          148,
+          1327,
+          1475
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 737,
-          "10": 737,
-          "20": 737,
-          "30": 737,
-          "40": 737,
-          "50": 737
+          "5": 1475,
+          "10": 1475,
+          "20": 1475,
+          "30": 1475,
+          "40": 1475,
+          "50": 1475
         }
       },
       {
@@ -9523,20 +9523,20 @@
         "team": "Chelsea",
         "position": "MID",
         "buy_tenths": 53,
-        "expected_points": 3.000791888894225,
+        "expected_points": 2.2505939166706685,
         "coefficients": [
-          300,
-          2701,
-          3001
+          225,
+          2026,
+          2251
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 3001,
-          "10": 3001,
-          "20": 3001,
-          "30": 3001,
-          "40": 3001,
-          "50": 3001
+          "5": 2251,
+          "10": 2251,
+          "20": 2251,
+          "30": 2251,
+          "40": 2251,
+          "50": 2251
         }
       },
       {
@@ -11339,21 +11339,21 @@
         "short_name": "N.Jackson",
         "team": "Aston Villa",
         "position": "FWD",
-        "buy_tenths": 71,
-        "expected_points": 4.842874266317716,
+        "buy_tenths": 72,
+        "expected_points": 4.8857687284883395,
         "coefficients": [
-          484,
-          4359,
-          4843
+          489,
+          4397,
+          4886
         ],
         "top100_count": 74,
         "top100_scaled": {
-          "5": 5022,
-          "10": 5201,
-          "20": 5560,
-          "30": 5918,
-          "40": 6276,
-          "50": 6635
+          "5": 5067,
+          "10": 5247,
+          "20": 5609,
+          "30": 5970,
+          "40": 6332,
+          "50": 6694
         }
       },
       {
@@ -12765,21 +12765,21 @@
         "short_name": "Walle Egeli",
         "team": "Ipswich Town",
         "position": "FWD",
-        "buy_tenths": 45,
-        "expected_points": 0.13415829775343505,
+        "buy_tenths": 44,
+        "expected_points": 0.12788893306230198,
         "coefficients": [
           13,
-          121,
-          134
+          115,
+          128
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 134,
-          "10": 134,
-          "20": 134,
-          "30": 134,
-          "40": 134,
-          "50": 134
+          "5": 128,
+          "10": 128,
+          "20": 128,
+          "30": 128,
+          "40": 128,
+          "50": 128
         }
       },
       {
@@ -13087,21 +13087,21 @@
         "short_name": "Palacios",
         "team": "Fulham",
         "position": "MID",
-        "buy_tenths": 53,
-        "expected_points": 1.5236525814447064,
+        "buy_tenths": 52,
+        "expected_points": 1.4849540474206804,
         "coefficients": [
-          152,
-          1372,
-          1524
+          149,
+          1336,
+          1485
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 1524,
-          "10": 1524,
-          "20": 1524,
-          "30": 1524,
-          "40": 1524,
-          "50": 1524
+          "5": 1485,
+          "10": 1485,
+          "20": 1485,
+          "30": 1485,
+          "40": 1485,
+          "50": 1485
         }
       },
       {
@@ -15296,20 +15296,20 @@
         "team": "Coventry City",
         "position": "MID",
         "buy_tenths": 48,
-        "expected_points": 2.5812827253426605,
+        "expected_points": 1.9359620440069953,
         "coefficients": [
-          258,
-          2323,
-          2581
+          194,
+          1742,
+          1936
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 2581,
-          "10": 2581,
-          "20": 2581,
-          "30": 2581,
-          "40": 2581,
-          "50": 2581
+          "5": 1936,
+          "10": 1936,
+          "20": 1936,
+          "30": 1936,
+          "40": 1936,
+          "50": 1936
         }
       },
       {
