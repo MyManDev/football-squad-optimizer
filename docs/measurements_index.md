@@ -1,5 +1,11 @@
 # Measurements Index
 
+- 2026-11-20: [LLMOPT release acceptance and local workload](research/llmopt_phase8_closing.md)
+  and [80 paired cold and warm records](research/llmopt_phase8_load.json). Across the same
+  twenty member-weeks, enabling the release setting changed cold server work from 80 jobs
+  to zero at one week and from 80 to 40 at three weeks. Both three-week modes used 320
+  solver calls. All 80 warm repeats opened zero jobs and zero device workers.
+
 - 2026-11-19: [LLMOPT bounded packages](research/llmopt_phase6_results.md),
   [record](research/llmopt_phase6_results.json): unchanged twenty-member full pool,
   18 computed and two inherited errors in each arm; raw eleven, expected net and
