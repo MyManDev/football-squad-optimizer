@@ -1,5 +1,6 @@
 {
   "contract_version": "llmopt_phase8_workload_v1",
+  "producer_repository_commit": "5813b8832f3a9799c877756cef4e4e4aa32068a5",
   "provenance": {
     "commit": "5813b8832f3a9799c877756cef4e4e4aa32068a5",
     "source_sha256": {

@@ -383,7 +383,12 @@ def main():
             raise ValueError("The checkpoint was produced by different code or inputs.")
         rows = prior["rows"]
     done = {(r["case"], r["window"], r["release"]) for r in rows}
-    record = {"contract_version": "llmopt_phase8_workload_v1", "provenance": producer, "rows": rows}
+    record = {
+        "contract_version": "llmopt_phase8_workload_v1",
+        "producer_repository_commit": producer["commit"],
+        "provenance": producer,
+        "rows": rows,
+    }
     subprocess.run(["node", str(HERE / "bundle.mjs")], cwd=ROOT, check=True)
     cases = set()
     with TemporaryDirectory(prefix="llmopt-measure-") as tmp:
