@@ -234,7 +234,7 @@ for (const [kind, vNext] of [
         });
       });
 
-      if (!isPrice) await page.clock.install();
+      await page.clock.install();
       await page.goto(PAGE);
 
       await holdModel(page);
@@ -258,8 +258,7 @@ for (const [kind, vNext] of [
       await expect(page.getByRole("listitem").filter({ hasText: assumption })).toBeVisible();
       await expect(compute).toBeEnabled();
       expect(posts).toHaveLength(1);
-      if (isPrice) await compute.click();
-      else await startQueuedJob(page, JOB, compute, "en");
+      await startQueuedJob(page, JOB, compute, "en", isPrice ? "failed" : "queued");
       await expect.poll(() => polls).toBeGreaterThan(0);
 
       if (!isPrice) {

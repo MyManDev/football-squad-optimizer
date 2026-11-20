@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { LLMOPT_COPY } from "../src/features/league/llmopt/copy";
 
 /** Observe the actual HTTP reply for this job, including its id and state. */
-async function jobStatus(page: Page, jobId: string, status: "queued" | "completed") {
+async function jobStatus(page: Page, jobId: string, status: "queued" | "completed" | "failed") {
   const response = await page.waitForResponse(
     (response) =>
       response.request().method() === "GET" &&
@@ -17,6 +17,7 @@ export async function startQueuedJob(
   jobId: string,
   compute: Locator,
   language: "tr" | "en",
+  firstStatus: "queued" | "failed" = "queued",
 ) {
   const [accepted] = await Promise.all([
     page.waitForResponse(
@@ -31,7 +32,7 @@ export async function startQueuedJob(
   await expect(
     page.getByRole("button", { name: LLMOPT_COPY[language].computing, exact: true }),
   ).toBeVisible();
-  await Promise.all([jobStatus(page, jobId, "queued"), page.clock.fastForward(2_000)]);
+  await Promise.all([jobStatus(page, jobId, firstStatus), page.clock.fastForward(2_000)]);
 }
 
 export async function reloadQueuedJob(page: Page, jobId: string, language: "tr" | "en" = "en") {
