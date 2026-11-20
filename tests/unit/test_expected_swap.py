@@ -734,3 +734,109 @@ def test_package_reserves_shared_native_and_cp_work_before_start(
             result.diagnostics["transfer_packages_v1"]["reason"]
             == "no_remaining_native_and_cp_allocation"
         )
+
+
+@pytest.mark.parametrize("overshoot,retained", [(0.000084823, True), (0.02, False)])
+def test_optional_shared_cutoff_keeps_checked_plan_and_unrounded_charge(
+    monkeypatch, tmp_path, overshoot, retained
+):
+    import json
+    from contextlib import nullcontext
+
+    from squadopt.contracts.llmopt_run import RunReference
+    from squadopt.optimization.work_budget import WorkBudgetExhausted, work_budget
+    from squadopt.planning import expected_window
+    from squadopt.platform.advice_queue import FileJobQueue
+    from squadopt.platform.advice_runs import FileRunStore
+
+    horizon, initial, config, policy, hold = world()
+    policy = replace(policy, banked_transfer_value_points=0)
+    # Preserve the closing week's lineup. The opening week remains eligible for a
+    # package and the baseline leaves some lineup evaluations for the optional phase.
+    preferences = DecisionPreferences.parse(
+        {
+            "frozen_weeks": [
+                {
+                    "week": 3,
+                    "transfers_in": [],
+                    "transfers_out": [],
+                    "starting_xi": hold.weeks[-1].starting_xi.player_id.tolist(),
+                    "captain": int(hold.weeks[-1].captain.player_id),
+                    "chip": None,
+                }
+            ]
+        }
+    )
+    baseline = optimize_expected_window(horizon, initial, config, policy, preferences=preferences)
+    review = baseline.diagnostics["expected_lineup_window"]
+    assert baseline.has_solution and tuple(w.gameweek for w in baseline.weeks) == horizon.gameweeks
+    assert "transfer_packages_v1" not in baseline.diagnostics
+    slack = review["configured_total"] - review["actual_total"]
+    # Replay the observed 122.000084823 boundary with controlled solver accounting.
+    # Native reservations and CP grants all go through the ordinary shared meter.
+    runs = FileRunStore(tmp_path / "runs")
+    ref, key, job = RunReference("a" * 32, "base"), "c" * 64, "d" * 32
+    with runs.transaction() as tx:
+        tx.bind(ref, "b" * 64, 3, key, FileJobQueue(tmp_path / "jobs"))
+        tx.reserve(ref, key, job)
+    shared = runs.allocation(job)
+    assert shared is not None and shared.limit == 122
+    shared.reserve_native(1800)
+    shared.record_cp(shared.cp_limit(shared.limit - 60 - slack - 3))
+    cp_before = shared.cp_used
+    attempts = []
+
+    def spend_optional(*args, **kwargs):
+        attempts.append("package")
+        shared.reserve_native(60)
+        shared.reserve_native(60)
+        grant = shared.cp_limit(kwargs["deterministic_slack"])
+        assert grant == pytest.approx(slack - 1)
+        shared.record_cp(grant + overshoot)
+        shared.cp_limit(1)  # The next solve is refused before it starts.
+        pytest.fail("The exhausted allocation admitted another solve.")
+
+    monkeypatch.setattr(expected_window, "propose_expected_swap", spend_optional)
+    enabled = replace(policy, transfer_packages=True, package_gate=True)
+    result = None
+    outcome = (
+        nullcontext()
+        if retained
+        else pytest.raises(ValueError, match="Invalid deterministic-work accounting")
+    )
+    with work_budget(shared), outcome:
+        result = expected_window.extend_expected_packages(
+            horizon,
+            initial,
+            config,
+            enabled,
+            baseline,
+            elapsed_seconds=0.0,
+            preferences=preferences,
+        )
+    assert (result is not None) == retained
+    shared_used = shared.cp_used + shared.native_reserved
+    if result is not None:
+        assert result.weeks is baseline.weeks
+        assert result.objective_value == baseline.objective_value
+        assert result.solver_status == baseline.solver_status
+        record = result.diagnostics["transfer_packages_v1"]
+        assert record["reason"] == "shared_work_exhausted" and record["accepted"] is False
+        assert record["accepted_metrics"] == expected_window.package_metrics(baseline, policy)
+        assert record["additional_cp_work"] == shared.cp_used - cp_before
+        assert record["actual_total"] == pytest.approx(
+            review["actual_total"] + shared.cp_used - cp_before
+        )
+        assert record["shared_limit"] == 122 and record["shared_used"] == shared_used
+    # The optional CP phase itself still fits in both cases. Only the shared
+    # allocation distinguishes the reported native stop from the larger error.
+    assert review["actual_total"] + shared.cp_used - cp_before < review["configured_total"]
+    assert shared_used == pytest.approx(122 + overshoot, rel=0, abs=1e-12)
+    assert shared.remaining == 0
+    assert attempts == ["package"] and shared.calls == 5
+    with pytest.raises(WorkBudgetExhausted):
+        shared.reserve_native(1)
+    runs.finish(job, shared)
+    receipt = json.loads(runs.path.read_bytes())["jobs"][job]["receipt"]
+    assert receipt == {"calls": 5, "cp_used": shared.cp_used, "native_reserved": 64}
+    assert receipt["cp_used"] + receipt["native_reserved"] == shared_used

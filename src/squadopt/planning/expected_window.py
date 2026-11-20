@@ -347,13 +347,19 @@ def extend_expected_packages(
             deterministic_reserve=1.0,
         )
     except WorkBudgetExhausted:
-        # The shared admission meter refuses another invocation. Already charged
-        # work remains charged; an invalid accounting exception is never caught.
-        if shared is None or shared.cp_used + shared.native_reserved > shared.limit:
+        if shared is None:
             raise
-        checked_work(used + shared.cp_used - cp_before, budget)
-        record["additional_cp_work"] = shared.cp_used - cp_before
-        record["actual_total"] = used + shared.cp_used - cp_before
+        # A final CP call can stop beyond its grant. Keep its full charge and the
+        # verified incumbent when admission refuses the next optional solve.
+        extra_cp = checked_work(shared.cp_used - cp_before, budget - used)
+        record.update(
+            additional_cp_work=extra_cp,
+            actual_total=checked_work(used + extra_cp, budget),
+            shared_used=checked_work(
+                shared.cp_used + shared.native_reserved + shared.unconfirmed, shared.limit
+            ),
+            shared_limit=shared.limit,
+        )
         return retained("shared_work_exhausted")
     actual = checked_work(used + float(phase["actual"]), budget)
     lineup = phase.get("lineup_search")

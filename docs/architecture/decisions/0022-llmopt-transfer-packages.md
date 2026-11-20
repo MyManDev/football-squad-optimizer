@@ -19,6 +19,22 @@ The server also requires the planning release setting from ADR 0024. With it
 off, the package controls have no effect on a new calculation. Enabling the
 release setting alone retains the original transfer search.
 
+Three-week paths, including the delayed buy, have their own default-off
+`SQUADOPT_BACKEND_THREE_WEEK_PATHS` control. With the planning release enabled,
+the league and public capabilities can advertise `three_week_paths` independently
+of package search and its optional gate. The page reads current capabilities at
+confirmation and again on reload. Follow-up submissions use that page's current
+grant. If a restored session lacks the path grant, it can still poll previously
+started jobs and read saved answers. It cannot start another path. Path visibility
+does not change the calculation identity, the search policy, or the four-job
+and 488-unit limits. Both package controls remain at their zero defaults.
+
+If optional package work overruns its allowance after a complete incumbent has
+been checked, return that incumbent and retain the actual recorded work. An
+overrun cannot admit another solve or increase any limit or tolerance. The
+three-week page keeps opening-decision groups stable as results arrive. A plain
+roll remains available when a mandatory or frozen rule rules out a delayed buy.
+
 Keep both retained expected-window routes and their 40/60 allocation unchanged.
 Add optional one/two-transfer packages behind a disabled control. A separate
 disabled gate control permits the optional phase after an incomplete proof only
@@ -48,8 +64,8 @@ separately. Do not use realized points. Disclose rejected proposals and their co
 acceptance rule can reject an expected-net improvement when raw eleven points fall. Keep error rows as errors; missing values
 must not become zero gains or disappear from the twenty-member population.
 
-The backend exposes disabled configuration controls; enabled settings enter its
-existing configuration identity. No deployment setting is changed in this PR.
+Only effective package-search settings enter the calculation configuration
+identity. No deployment setting is changed in this PR.
 The page receives the enabled capability and pins its path mode at confirmation.
 Three-week paths start after the main plan, use at most two existing alternative
 slots, and retain ADR 0018's four-job and 488-unit limits. A delayed-buy path holds

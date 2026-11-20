@@ -49,6 +49,7 @@ export interface StrategyCapability {
 export interface AdviceCapabilities {
   verifiedRepairs?: true;
   transferPackages?: true;
+  threeWeekPaths?: true;
   planDataId?: string;
   llmoptVNext?: true;
   decisionInformation?: DecisionInformation;
@@ -110,6 +111,8 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
     throw new AdviceCapabilitiesError("Invalid transfer package capability.");
   if (value.verified_repairs !== undefined && typeof value.verified_repairs !== "boolean")
     throw new AdviceCapabilitiesError("Invalid verified repair capability.");
+  if (value.three_week_paths !== undefined && typeof value.three_week_paths !== "boolean")
+    throw new AdviceCapabilitiesError("Invalid three-week path capability.");
   const strategies: Record<string, StrategyCapability> = {};
   for (const [slug, row] of Object.entries(value.strategies)) {
     if (
@@ -202,6 +205,9 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       : {}),
     ...(value.llmopt_vnext === true && value.transfer_packages === true
       ? { transferPackages: true }
+      : {}),
+    ...(value.llmopt_vnext === true && value.three_week_paths === true
+      ? { threeWeekPaths: true }
       : {}),
     leagueId,
     captureSnapshotId: value.capture_snapshot_id,

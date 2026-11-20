@@ -726,7 +726,7 @@ function Workspace({
     (!!currentCapabilities &&
       (currentCapabilities.llmoptVNext === true) === !!run?.inputs.request.run &&
       (!run?.inputs.request.deviceRun || currentCapabilities.devicePreferenceBundles === true) &&
-      (!run?.inputs.paths3w || currentCapabilities.transferPackages === true) &&
+      (!run?.inputs.paths3w || currentCapabilities.threeWeekPaths === true) &&
       (!run?.inputs.bundleMode ||
         (run.inputs.request.deviceRun
           ? currentCapabilities.devicePreferenceBundles === true
@@ -1084,7 +1084,7 @@ function Workspace({
         reference,
         compareOnly: !!runId && reference?.compareOnly === true,
         bundleMode: grouped && draft.soft.length > 0 && !draft.scenario,
-        ...(runId && capabilities.transferPackages === true && plans.window === 3
+        ...(runId && capabilities.threeWeekPaths === true && plans.window === 3
           ? { paths3w: true as const }
           : {}),
       });
@@ -1744,6 +1744,7 @@ function Workspace({
           <h2>{copy.results}</h2>
           <PlanPathGroups
             enabled={showPaths}
+            runId={run.inputs.request.run?.run_id}
             className={styles.planGrid}
             label={copy.openingDecision}
           >

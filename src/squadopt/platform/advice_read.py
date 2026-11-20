@@ -466,6 +466,7 @@ class AdviceReadStore:
         | None = None,
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
         transfer_packages: bool = False,
+        three_week_paths: bool = False,
         preference_bundles: bool = False,
         verified_repairs: bool = False,
         llmopt_vnext: bool = False,
@@ -489,6 +490,7 @@ class AdviceReadStore:
         self._preference_players = preference_players
         self._available_windows = available_windows
         self._transfer_packages = transfer_packages
+        self._three_week_paths = three_week_paths
         self._preference_bundles = preference_bundles
         self._verified_repairs = verified_repairs
         self.llmopt_vnext = llmopt_vnext
@@ -719,6 +721,8 @@ class AdviceReadStore:
             )
         if self.llmopt_vnext and self._transfer_packages:
             document["transfer_packages"] = True
+        if self.llmopt_vnext and self._three_week_paths:
+            document["three_week_paths"] = True
         validate_league_capabilities(document)
         return document
 
