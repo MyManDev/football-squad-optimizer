@@ -53,6 +53,8 @@ def advise_chip_strategy(
     preferences: DecisionPreferences = NO_PREFERENCES,
     chip_tail_forecast: ChipTailForecast | None = None,
     include_resource_state: bool = False,
+    transfer_packages: bool = False,
+    package_gate: bool = False,
     priority_program: PriorityProgram | None = None,
     priority_reference: PriorityReference | None = None,
 ) -> dict[str, object]:
@@ -120,6 +122,8 @@ def advise_chip_strategy(
         chip_tail_forecast=chip_tail_forecast,
         linearization_level=WINDOW_LINEARIZATION_LEVEL,
         preferences=preferences,
+        transfer_packages=transfer_packages,
+        package_gate=package_gate,
         priority_program=priority_program,
         priority_reference=priority_reference,
     )

@@ -12,6 +12,7 @@ import {
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 import { holdModel, routeChat } from "./llmoptChat";
+import { observeCompletedJob, reloadQueuedJob, startQueuedJob } from "./queuedAdviceJob";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -233,6 +234,7 @@ for (const [kind, vNext] of [
         });
       });
 
+      await page.clock.install();
       await page.goto(PAGE);
 
       await holdModel(page);
@@ -256,7 +258,7 @@ for (const [kind, vNext] of [
       await expect(page.getByRole("listitem").filter({ hasText: assumption })).toBeVisible();
       await expect(compute).toBeEnabled();
       expect(posts).toHaveLength(1);
-      await compute.click();
+      await startQueuedJob(page, JOB, compute, "en", isPrice ? "failed" : "queued");
       await expect.poll(() => polls).toBeGreaterThan(0);
 
       if (!isPrice) {
@@ -273,10 +275,11 @@ for (const [kind, vNext] of [
             .toEqual(["original", "reoptimized"]);
         }
         const beforeReload = polls;
-        await page.reload();
+        await reloadQueuedJob(page, JOB);
         await expect.poll(() => polls).toBeGreaterThan(beforeReload);
         expect(posts).toHaveLength(vNext ? 2 : 3);
         completed = true;
+        await observeCompletedJob(page, JOB);
         await expect.poll(() => posts.length).toBe(3);
       }
 

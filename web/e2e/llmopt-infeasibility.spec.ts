@@ -9,6 +9,7 @@ import {
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 import { holdModel, routeChat } from "./llmoptChat";
+import { startQueuedJob } from "./queuedAdviceJob";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -143,6 +144,7 @@ for (const failure of ["proven", "witnessed", "interrupted"] as const) {
       });
     });
 
+    await page.clock.install();
     await page.goto(PAGE);
 
     await holdModel(page);
@@ -163,7 +165,7 @@ for (const failure of ["proven", "witnessed", "interrupted"] as const) {
     await expect(holdRule).toBeVisible();
     expect(posts).toHaveLength(0);
 
-    await compute.click();
+    await startQueuedJob(page, JOB, compute, "en", "failed");
     await expect.poll(() => polls).toBeGreaterThan(0);
     await expect(compute).toBeEnabled();
     expect(posts).toHaveLength(1);

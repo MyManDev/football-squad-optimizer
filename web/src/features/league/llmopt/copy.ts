@@ -10,6 +10,7 @@ function waitUnits(seconds: number): [number, "second" | "minute" | "hour"] {
 }
 
 const en = {
+  openingDecision: (index: number) => `Opening decision ${index}`,
   title: "LLMOPT",
   usePlan: "Use this plan",
   selectedPlan: "Selected plan",
@@ -241,6 +242,7 @@ const en = {
 };
 
 const tr: typeof en = {
+  openingDecision: (index: number) => `İlk hafta kararı ${index}`,
   title: "LLMOPT",
   usePlan: "Bu planı kullan",
   selectedPlan: "Seçilen plan",

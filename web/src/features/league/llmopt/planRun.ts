@@ -39,6 +39,7 @@ export interface PlanRun {
 }
 
 export interface RunInputs {
+  paths3w?: true;
   compareOnly?: boolean;
   draft: PlanDraft;
   held: ReadonlySet<number>;
@@ -249,6 +250,9 @@ export function restoreRun(
     plans,
     wildcardNotHeld: confirmation.wildcardNotHeld,
     compareOnly: confirmation.compareOnly === true,
+    ...(confirmation.runId && plans.window === 3 && confirmation.paths3w === true
+      ? { paths3w: true as const }
+      : {}),
     frozenWeeks,
     reference,
     bundleMode: confirmation.bundleMode === true,
