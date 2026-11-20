@@ -816,12 +816,8 @@ function Workspace({
           : client.readCapabilities?.(squad.league_id),
       ]);
       if (!mounted.current) return;
-      if (!capabilities?.preferences) {
+      if (!capabilities) {
         setFeedback(copy.serviceUnavailable);
-        return;
-      }
-      if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
-        setFeedback(copy.windowUnavailable);
         return;
       }
       if (
@@ -839,6 +835,14 @@ function Workspace({
         setReference(undefined);
         // The reload the page asks for opens the new squad; the rules go with the member.
         session.save({ draft });
+        return;
+      }
+      if (!capabilities.preferences) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
+      if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
+        setFeedback(copy.windowUnavailable);
         return;
       }
       const local =

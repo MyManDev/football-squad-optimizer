@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
+import { checkedPreferences } from "../advice/decisionPreferences";
 import type { AdviceRequest } from "../advice/adviceClient";
 import { deviceSelection, offeredDeviceSelection, rivalFromSquad } from "./selection";
 
@@ -25,6 +26,21 @@ describe("what the device solves", () => {
     expect(
       deviceSelection({ ...plain, strategy: "ortak-koru", rivalEntryId: 35249002 }, squad),
     ).toEqual({ kind: "rival", strategy: "ortak-koru", rivalEntryId: 35249002 });
+  });
+
+  it("reserves device preferences for a confirmed local run", () => {
+    const preferences = checkedPreferences({ no_hits: true });
+    const ask = { ...plain, preferences };
+    const run = {
+      contract_version: "llmopt_run_v1",
+      run_id: "a".repeat(32),
+      stage: "base",
+    } as const;
+    expect(deviceSelection(ask, squad)).toBeNull();
+    expect(deviceSelection({ ...ask, deviceRun: true }, squad)).toBeNull();
+    expect(deviceSelection({ ...ask, run }, squad)).toBeNull();
+    expect(deviceSelection({ ...ask, run, deviceRun: false }, squad)).toBeNull();
+    expect(deviceSelection({ ...ask, run, deviceRun: true }, squad)).toEqual({ kind: "plain" });
   });
 
   it("leaves every other selection to the service", () => {
