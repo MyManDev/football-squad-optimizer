@@ -117,6 +117,36 @@ describe("ownKeyIntentSource", () => {
     expect(confirmCatalogueRollback).toHaveBeenCalledOnce();
     expect(sentRequests(fetch).map((r) => r.url)).toEqual([`${ORIGIN}/api/v1/llmopt/prompt`]);
   });
+  it("drops a departed archived captain from the confirmed rollback prompt while keeping current captains", async () => {
+    setOwnKey({ provider: "openai", model: "gpt-5-mini", key: KEY });
+    const historical = structuredClone(planContext);
+    const first = historical.plans[0]!.weeks[0]!;
+    first.captain = 2;
+    first.players = [2];
+    const request: IntentRequest = {
+      ...REQUEST,
+      planContext: historical,
+      referenceWeeks: [1, 2],
+      referenceCaptains: [
+        { week: 1, player_id: 2 },
+        { week: 2, player_id: 1 },
+      ],
+      confirmCatalogueRollback: async () => true,
+    };
+    const fetch = ownKeyFetch(undefined, (body) =>
+      body.plan_context ||
+      JSON.stringify(body.reference_captains) !== JSON.stringify([{ week: 2, player_id: 1 }])
+        ? Response.json({ error: { code: "VALIDATION_FAILED" } }, { status: 422 })
+        : Response.json(CALL),
+    );
+    const result = await ownKeyIntentSource(ORIGIN).interpret(
+      request,
+      new AbortController().signal,
+    );
+    expect(result).toEqual({ status: "draft", draft: DRAFT });
+    expect(sentRequests(fetch).filter(({ url }) => url === PROVIDER)).toHaveLength(1);
+    expect(request.referenceCaptains).toHaveLength(2);
+  });
   it("asks the site for the call, sends it to the provider with the key, and has the site check the reply", async () => {
     setOwnKey({ provider: "openai", model: "gpt-5-mini", key: KEY });
     const fetch = ownKeyFetch();

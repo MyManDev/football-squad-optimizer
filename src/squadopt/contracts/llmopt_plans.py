@@ -8,6 +8,7 @@ from typing import Any
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 ACTIONS = ("select", "freeze_transfer", "freeze_week", "substitute")
 PLAN_LABELS = tuple(f"P{i}" for i in range(1, 13))
+MAX_PLAYER_ID = 2**53 - 1
 
 
 def _digest(value: object) -> str:
@@ -16,18 +17,22 @@ def _digest(value: object) -> str:
     return value
 
 
-def _ids(value: object, roster: set[int]) -> list[int]:
+def _valid_player(value: object, roster: set[int] | None) -> bool:
+    return type(value) is int and 0 < value <= MAX_PLAYER_ID and (roster is None or value in roster)
+
+
+def _ids(value: object, roster: set[int] | None) -> list[int]:
     if (
         not isinstance(value, list)
         or len(value) > 15
-        or any(type(item) is not int or item not in roster for item in value)
+        or any(not _valid_player(item, roster) for item in value)
         or len(set(value)) != len(value)
     ):
         raise ValueError("Invalid plan players.")
     return sorted(value)
 
 
-def checked_plan_context(value: object, roster: set[int]) -> dict[str, Any]:
+def checked_plan_context(value: object, roster: set[int] | None) -> dict[str, Any]:
     if not isinstance(value, dict) or value.keys() != {
         "data_id",
         "kind",
@@ -62,10 +67,7 @@ def checked_plan_context(value: object, roster: set[int]) -> dict[str, Any]:
                 or type(week["week"]) is not int
                 or week["week"] != index
                 or week["chip"] not in (None, "wildcard", "freehit", "bboost", "3xc")
-                or (
-                    week["captain"] is not None
-                    and (type(week["captain"]) is not int or week["captain"] not in roster)
-                )
+                or (week["captain"] is not None and not _valid_player(week["captain"], roster))
             ):
                 raise ValueError("Invalid catalogue week.")
             squad = _ids(week["players"], roster)
@@ -101,6 +103,18 @@ def provider_plan_context(context: dict[str, Any]) -> dict[str, Any]:
             selected = label
         plans.append({"plan_label": label, "weeks": plan["weeks"]})
     return {"selected_plan_label": selected, "plans": plans}
+
+
+def plan_players_current(plan: dict[str, Any], roster: set[int]) -> bool:
+    for week in plan["weeks"]:
+        if week["captain"] is not None and week["captain"] not in roster:
+            return False
+        if any(
+            not roster.issuperset(week[field])
+            for field in ("players", "transfers_in", "transfers_out")
+        ):
+            return False
+    return True
 
 
 def checked_plan_command(value: object, context: dict[str, Any]) -> dict[str, Any]:
@@ -181,7 +195,7 @@ def plan_conversation_schema() -> dict[str, Any]:
         "type": "array",
         "maxItems": 15,
         "uniqueItems": True,
-        "items": {"type": "integer", "minimum": 1},
+        "items": {"type": "integer", "minimum": 1, "maximum": MAX_PLAYER_ID},
     }
 
     def closed(properties: dict[str, Any]) -> dict[str, Any]:
@@ -202,7 +216,7 @@ def plan_conversation_schema() -> dict[str, Any]:
                 "type": ["string", "null"],
                 "enum": [None, "wildcard", "freehit", "bboost", "3xc"],
             },
-            "captain": {"type": ["integer", "null"], "minimum": 1},
+            "captain": {"type": ["integer", "null"], "minimum": 1, "maximum": MAX_PLAYER_ID},
         }
     )
     plan = closed(

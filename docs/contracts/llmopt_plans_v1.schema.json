@@ -183,6 +183,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "captain": {
+                      "maximum": 9007199254740991,
                       "minimum": 1,
                       "type": [
                         "integer",
@@ -204,6 +205,7 @@
                     },
                     "players": {
                       "items": {
+                        "maximum": 9007199254740991,
                         "minimum": 1,
                         "type": "integer"
                       },
@@ -213,6 +215,7 @@
                     },
                     "transfers_in": {
                       "items": {
+                        "maximum": 9007199254740991,
                         "minimum": 1,
                         "type": "integer"
                       },
@@ -222,6 +225,7 @@
                     },
                     "transfers_out": {
                       "items": {
+                        "maximum": 9007199254740991,
                         "minimum": 1,
                         "type": "integer"
                       },
@@ -309,6 +313,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "captain": {
+                      "maximum": 9007199254740991,
                       "minimum": 1,
                       "type": [
                         "integer",
@@ -330,6 +335,7 @@
                     },
                     "players": {
                       "items": {
+                        "maximum": 9007199254740991,
                         "minimum": 1,
                         "type": "integer"
                       },
@@ -339,6 +345,7 @@
                     },
                     "transfers_in": {
                       "items": {
+                        "maximum": 9007199254740991,
                         "minimum": 1,
                         "type": "integer"
                       },
@@ -348,6 +355,7 @@
                     },
                     "transfers_out": {
                       "items": {
+                        "maximum": 9007199254740991,
                         "minimum": 1,
                         "type": "integer"
                       },
