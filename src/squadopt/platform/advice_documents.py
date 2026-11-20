@@ -608,6 +608,7 @@ def league_capabilities_schema() -> dict[str, Any]:
             # 0 is a public team opened on its own, outside any league.
             "league_id": {"type": "integer", "minimum": 0},
             "capture_snapshot_id": {"type": "string", "minLength": 1},
+            "llmopt_vnext": {"type": "boolean"},
             "preferences": {
                 "type": "object",
                 "properties": {"available": {"type": "boolean"}},

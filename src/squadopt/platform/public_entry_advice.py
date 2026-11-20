@@ -61,6 +61,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
         *,
         switches: SwitchInputsProvider | None = None,
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
+        llmopt_vnext: bool = False,
     ) -> None:
         menu = menu_capabilities()
         super().__init__(
@@ -71,6 +72,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
             capabilities=menu,
             switches=switches,
             available_windows=available_windows,
+            llmopt_vnext=llmopt_vnext,
         )
         self._contexts = context
         self._public_inputs = inputs

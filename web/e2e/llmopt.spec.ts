@@ -1,4 +1,4 @@
-import { expect, test, type Route } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 import {
   mockEntryAdviceEnvelope,
@@ -816,9 +816,15 @@ test("preferred players are priced individually and only shown within their exac
   );
 });
 
-test("accepted preferred players are combined into one plan after their single prices", async ({
-  page,
-}) => {
+for (const vNext of [false, true]) {
+  test(`accepted preferred players are combined after their single prices (release control ${vNext})`, async ({
+    page,
+  }) => {
+    await checkCombinedPrices(page, vNext);
+  });
+}
+
+async function checkCombinedPrices(page: Page, vNext: boolean) {
   test.skip(!API, "API build required");
   await installLeagueMocks(page);
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
@@ -846,6 +852,7 @@ test("accepted preferred players are combined into one plan after their single p
   );
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
     answer(route, {
+      ...(vNext ? { llmopt_vnext: true } : {}),
       contract_version: "league_capabilities_v1",
       league_id: LEAGUE,
       capture_snapshot_id: squad.source_snapshot_id,
@@ -936,9 +943,14 @@ test("accepted preferred players are combined into one plan after their single p
     include_players: players.map(({ player_id }) => player_id),
   });
   for (const post of posts) expect(JSON.stringify(post)).not.toContain("max_cost_tenths");
-  expect(new Set(posts.map(({ run }) => run.run_id)).size).toBe(1);
-  expect(posts.map(({ run }) => run.stage)).toEqual(["base", "followup", "followup", "followup"]);
-  const runId = posts[0]!.run.run_id;
+  const runId = posts[0]!.run?.run_id;
+  if (vNext) {
+    expect(runId).toMatch(/^[a-f0-9]{32}$/);
+    expect(new Set(posts.map(({ run }) => run.run_id)).size).toBe(1);
+    expect(posts.map(({ run }) => run.stage)).toEqual(["base", "followup", "followup", "followup"]);
+  } else {
+    for (const post of posts) expect(post).not.toHaveProperty("run");
+  }
   await page.reload();
   await expect(combined.getByText("2.4 expected points lost against the base plan")).toBeVisible();
   expect(posts).toHaveLength(4);
@@ -946,7 +958,7 @@ test("accepted preferred players are combined into one plan after their single p
     () => Object.entries(sessionStorage).find(([key]) => key.startsWith("squadopt.llmopt:"))?.[1],
   );
   expect(JSON.parse(retained!).confirmation.runId).toBe(runId);
-});
+}
 
 test("a waiting run survives reload and an edit closes it without a follow-up", async ({
   page,
@@ -970,6 +982,7 @@ test("a waiting run survives reload and an edit closes it without a follow-up", 
   );
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
     answer(route, {
+      llmopt_vnext: true,
       contract_version: "league_capabilities_v1",
       league_id: LEAGUE,
       capture_snapshot_id: squad.source_snapshot_id,
