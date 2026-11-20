@@ -101,10 +101,10 @@ async function installMember(page: Page, language: Language, chipHistory = true)
       players: table.players.map(({ id, name, team }) => ({ id, name, team })),
     }),
   );
+  const release = { master: true, repairs: true };
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
     answer(route, {
       contract_version: "league_capabilities_v1",
-      llmopt_vnext: true,
       league_id: LEAGUE,
       capture_snapshot_id: squad.source_snapshot_id,
       season: squad.season,
@@ -113,12 +113,13 @@ async function installMember(page: Page, language: Language, chipHistory = true)
       top100: { available: false, weights: [] },
       managers_word: { available: false },
       preferences: { available: true },
-      verified_repairs: true,
+      llmopt_vnext: release.master,
+      verified_repairs: release.repairs,
       plan_data_id: DATA_ID,
       chips: { held_by_entry: chipHistory ? { [ENTRY]: [] } : {} },
     }),
   );
-  return { squad, block, held, players };
+  return { squad, block, held, players, release };
 }
 
 async function instructions(page: Page, language: Language, text: string) {
@@ -334,14 +335,19 @@ for (const language of ["en", "tr"] as const) {
   for (const mode of [
     "replays the selected complete path",
     "reports exhausted capacity",
+    "refuses search after rollback",
+    "discards a candidate completed after rollback",
+    "refuses selection after rollback",
+    "discards a replay completed after rollback",
     "keeps the first witness when the second change exhausts capacity",
   ] as const) {
     test(`three-week repair ${mode} in ${language} on a phone`, async ({ page }) => {
       test.skip(!API, "API-origin build required");
-      const { squad } = await installMember(page, language);
+      const { squad, release } = await installMember(page, language);
       const copy = LLMOPT_COPY[language];
       const twoCandidates =
-        mode === "keeps the first witness when the second change exhausts capacity";
+        mode === "keeps the first witness when the second change exhausts capacity" ||
+        mode === "discards a candidate completed after rollback";
       const firstRefused = mode === "reports exhausted capacity";
       const counts = [3, 2].map((count) => ({ kind: "club_count", club: "Club 1", count }));
       await routeChat(page, API, (route) =>
@@ -390,6 +396,11 @@ for (const language of ["en", "tr"] as const) {
           expect(rules.frozen_weeks).toBeUndefined();
           return answer(route, { error: { code: "RUN_BUDGET_EXHAUSTED" } }, 409);
         }
+        if (
+          mode === "discards a candidate completed after rollback" ||
+          (mode === "discards a replay completed after rollback" && submitted.length === 2)
+        )
+          release.master = false;
         const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
         const weeks = Array.from({ length: 3 }, (_, i) => ({
           gameweek: squad.gameweek + i,
@@ -454,8 +465,16 @@ for (const language of ["en", "tr"] as const) {
       await expect(region.getByRole("status")).toHaveText(
         twoCandidates ? /Club 1.*3.*(?:conflicts|uyuşmuyor)/ : /3\.0m.*bank|kasada 3,0m/,
       );
+      if (mode === "refuses search after rollback") release.master = false;
       await checkButton(page, language).click();
-      if (firstRefused) {
+      if (
+        mode === "refuses search after rollback" ||
+        mode === "discards a candidate completed after rollback"
+      ) {
+        await expect(region).toHaveCount(0);
+        expect(submitted).toHaveLength(mode === "refuses search after rollback" ? 0 : 1);
+        await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+      } else if (firstRefused) {
         await expect(region.getByRole("status")).toHaveText(statusText[language].budget);
         await expect(region.locator("[data-repair-plan]")).toHaveCount(0);
         expect(submitted).toHaveLength(1);
@@ -467,6 +486,18 @@ for (const language of ["en", "tr"] as const) {
         await expect(options.getByRole("button")).toBeEnabled();
         const id = await options.getAttribute("data-repair-plan");
         expect(Number(await options.getAttribute("data-repair-net"))).toBeCloseTo(3 * score, 8);
+        if (
+          mode === "refuses selection after rollback" ||
+          mode === "discards a replay completed after rollback"
+        ) {
+          if (mode === "refuses selection after rollback") release.repairs = false;
+          await options.getByRole("button").click();
+          await expect(region).toHaveCount(0);
+          await expect(page.locator(`article[data-plan-id="${id}"]`)).toHaveCount(0);
+          expect(submitted).toHaveLength(mode === "refuses selection after rollback" ? 1 : 2);
+          await noOverflow(page);
+          return;
+        }
         await options.getByRole("button").click();
         const selected = page.locator(`article[data-plan-id="${id}"]`);
         await expect(selected).toBeVisible();

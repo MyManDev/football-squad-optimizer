@@ -6,7 +6,8 @@ import type {
   AdviceRequestResult,
 } from "../advice/adviceClient";
 import { checkedAdvice } from "../advice/adviceResponse";
-import type { AdviceCapabilities } from "../advice/adviceCapabilities";
+import { capabilitiesForPage, type AdviceCapabilities } from "../advice/adviceCapabilities";
+import { withRequestDeadline, type RequestOptions } from "../../../data/request";
 import { preferencesKey } from "../advice/decisionPreferences";
 import { bundleKey } from "../advice/preferenceBundle";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
@@ -59,6 +60,7 @@ export function deviceAdviceClient(
   const memory = new Map<string, AdviceReadResult>();
   const failures = new Map<string, string>();
   const pending = new Map<string, Promise<AdviceReadResult>>();
+  const capabilityReads = new Map<string, Promise<AdviceCapabilities | null>>();
   const localRuns = new Set<string>();
   const closedLocalRuns = new Set<string>();
   const block = squad.device_plan;
@@ -90,9 +92,14 @@ export function deviceAdviceClient(
       published = undefined;
       throw error;
     }));
-  const withLocal = (caps: AdviceCapabilities | null): AdviceCapabilities | null => {
+  const withLocal = (remoteCaps: AdviceCapabilities | null): AdviceCapabilities | null => {
+    const caps = capabilitiesForPage(remoteCaps, {
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      snapshotId: squad.source_snapshot_id,
+    });
     if (caps?.llmoptVNext !== true || !consistentBlock || !squad.source_snapshot_id) return caps;
-    if (caps.captureSnapshotId !== squad.source_snapshot_id) return caps;
     return {
       ...caps,
       preferences: true,
@@ -108,10 +115,32 @@ export function deviceAdviceClient(
       },
     };
   };
+  const readCapabilities = (leagueId: number, entryId?: number, options?: RequestOptions) =>
+    withRequestDeadline(async () => {
+      const key = JSON.stringify([leagueId, entryId ?? null]);
+      let read = capabilityReads.get(key);
+      if (!read) {
+        // A dismissed view cannot cancel a concurrent confirmation's read. The
+        // underlying HTTP call keeps its own timeout. Only concurrent reads share it.
+        read = withRequestDeadline(async (signal) => {
+          const remoteCaps =
+            entryId === undefined
+              ? await remote.readCapabilities?.(leagueId, { signal })
+              : await remote.readPublicCapabilities?.(leagueId, entryId, { signal });
+          return withLocal(remoteCaps ?? null);
+        })
+          .catch(() => null)
+          .finally(() => capabilityReads.delete(key));
+        capabilityReads.set(key, read);
+      }
+      return read;
+    }, options);
   const eligible = (request: AdviceRequest) =>
+    request.run !== undefined &&
     request.deviceRun !== false &&
     squad.source_snapshot_id !== null &&
     consistentBlock &&
+    request.leagueId === squad.league_id &&
     request.entryId === squad.entry.entry_id &&
     (request.season === undefined || request.season === squad.season) &&
     (request.gameweek === undefined || request.gameweek === squad.gameweek) &&
@@ -182,10 +211,8 @@ export function deviceAdviceClient(
         ? Promise.resolve({ kind: "not-computed" })
         : remote.readPublished(request, options),
     readJob: (id, options) => remote.readJob(id, options),
-    readCapabilities: async (id, options) =>
-      withLocal((await remote.readCapabilities?.(id, options)) ?? null),
-    readPublicCapabilities: async (id, entry, options) =>
-      withLocal((await remote.readPublicCapabilities?.(id, entry, options)) ?? null),
+    readCapabilities: (id, options) => readCapabilities(id, undefined, options),
+    readPublicCapabilities: (id, entry, options) => readCapabilities(id, entry, options),
     cancelRun: async (id) => {
       let local = localRuns.has(id);
       try {
@@ -210,11 +237,16 @@ export function deviceAdviceClient(
     requestAdvice: async (request, options) => {
       const repair = repairRequest(request);
       const verify = request.deviceRepair?.verify === true;
+      if (
+        !request.run &&
+        (repair || request.deviceRun || request.deviceAlternatives || request.preferenceBundle)
+      )
+        return { kind: "unavailable", reason: "RUN_ID_REQUIRED" };
       if (request.run && closedLocalRuns.has(request.run.run_id))
         return { kind: "unavailable", reason: "RUN_CANCELLED" };
       if (!eligible(request)) {
         if (repair) return refused("DEVICE_INPUTS_UNAVAILABLE");
-        if (request.deviceRun === true)
+        if (request.deviceRun === true || request.deviceAlternatives === true)
           return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
         if (request.run) {
           if (localRuns.has(request.run.run_id))
@@ -241,22 +273,25 @@ export function deviceAdviceClient(
       }
       if (request.deviceRepair && request.deviceRepair.dataId !== inputs.fingerprint)
         return refused("RUN_CONTEXT_CHANGED");
+      const saved = cached(request, inputs.fingerprint);
       const binding = JSON.stringify([
         inputs.fingerprint,
         request.leagueId,
         request.entryId,
         request.window,
       ]);
-      try {
-        bindDeviceRun(request.run?.run_id, binding);
-      } catch (error) {
-        return {
-          kind: "unavailable",
-          reason: error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED",
-        };
+      if (!repair && saved.kind === "advice") {
+        try {
+          if (request.run && deviceWorkReceipt(request.run.run_id))
+            bindDeviceRun(request.run.run_id, binding);
+        } catch (error) {
+          return {
+            kind: "unavailable",
+            reason: error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED",
+          };
+        }
+        return saved;
       }
-      const saved = cached(request, inputs.fingerprint);
-      if (!repair && saved.kind === "advice") return saved;
       const address = key(request, inputs.fingerprint);
       const addressDigest = repair ? await sha256(address) : undefined;
       const repairKey =
@@ -269,6 +304,43 @@ export function deviceAdviceClient(
         work = (async (): Promise<AdviceReadResult> => {
           const document = inputs.document;
           if (options?.signal?.aborted) throw abort();
+          function priorRepair(address: string) {
+            const repeated = cached(request, inputs.fingerprint, address);
+            if (repeated.kind === "advice") return repeated;
+            let reason = failures.get(address);
+            if (!reason) {
+              try {
+                reason = globalThis.sessionStorage.getItem(address + ":failure") ?? undefined;
+              } catch {
+                throw new DeviceWorkRefused("RUN_STORE_UNAVAILABLE");
+              }
+            }
+            throw new DeviceWorkRefused(reason ?? "RUN_BUDGET_EXHAUSTED");
+          }
+          if (addressDigest && privateKey) {
+            const receipt = deviceWorkReceipt(request.run!.run_id);
+            const attempted = verify
+              ? receipt?.repairSelection === addressDigest
+              : receipt?.repairCandidates?.includes(addressDigest);
+            if (attempted) {
+              bindDeviceRun(request.run!.run_id, binding);
+              return priorRepair(privateKey);
+            }
+          }
+          const caps = await readCapabilities(
+            request.leagueId,
+            request.publicEntry ? request.entryId : undefined,
+            options,
+          );
+          if (
+            caps?.llmoptVNext !== true ||
+            caps.devicePreferenceBundles !== true ||
+            (repair && caps.verifiedRepairs !== true)
+          )
+            throw new DeviceWorkRefused("LLMOPT_VNEXT_DISABLED");
+          if (options?.signal?.aborted) throw abort();
+          if (request.run && closedLocalRuns.has(request.run.run_id))
+            throw new DeviceWorkRefused("RUN_CANCELLED");
           if (addressDigest && privateKey) {
             if (
               verify &&
@@ -283,19 +355,7 @@ export function deviceAdviceClient(
               verify,
               useSaved,
             );
-            if (!claimed) {
-              const repeated = cached(request, inputs.fingerprint, privateKey);
-              if (repeated.kind === "advice") return repeated;
-              let reason = failures.get(privateKey);
-              if (!reason) {
-                try {
-                  reason = globalThis.sessionStorage.getItem(privateKey + ":failure") ?? undefined;
-                } catch {
-                  throw new DeviceWorkRefused("RUN_STORE_UNAVAILABLE");
-                }
-              }
-              throw new DeviceWorkRefused(reason ?? "RUN_BUDGET_EXHAUSTED");
-            }
+            if (!claimed) return priorRepair(privateKey);
             if (useSaved) {
               remember(privateKey, saved);
               return saved;

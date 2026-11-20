@@ -1,6 +1,7 @@
 """Three-week repair admission retains the original rules, capture and run budget."""
 
 import json
+from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +19,7 @@ from squadopt.platform.advice_job_spec import (
     single_rule_edit,
 )
 from squadopt.platform.advice_runs import FileRunStore
+from squadopt.platform.backend_runtime import build_backend
 from squadopt.platform.jobs_contract import JobError
 
 
@@ -71,6 +73,7 @@ def test_only_the_requested_chip_can_resolve_a_known_chip_entitlement_failure():
 def test_repair_fails_closed_for_missing_unproved_and_exhausted_bases(tmp_path, error):
     client, _, queue = _world(
         tmp_path,
+        llmopt_vnext=True,
         runs=FileRunStore(tmp_path / "runs"),
         specs=FileAdviceJobSpecStore(tmp_path / "specs"),
     )
@@ -85,20 +88,24 @@ def test_repair_fails_closed_for_missing_unproved_and_exhausted_bases(tmp_path, 
 
 
 def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp_path, monkeypatch):
-    backend = world._deployment(tmp_path, monkeypatch, last_gameweek=5)["backend"]
+    backend = world._deployment(tmp_path, monkeypatch, last_gameweek=5, llmopt_vnext=True)[
+        "backend"
+    ]
     client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
+    closed = build_backend(replace(backend.config, llmopt_vnext=False))
+    off = TestClient(app_for_capture(closed, world.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/advice"
     caps = client.get(f"/api/v1/leagues/{world.LEAGUE_ID}/capabilities").json()
     assert caps["verified_repairs"] is True
     original = {"no_hits": True, "save_chips": True, "min_bank": {"tenths": 10000}}
 
-    def ask(stage, prefs):
-        return client.post(
+    def ask(stage, prefs, session=client, identifier="a" * 32):
+        return session.post(
             route,
             json={
                 "strategy": "saf-puan",
                 "window": 3,
-                "run": _run_ref(stage=stage),
+                "run": _run_ref(identifier, stage=stage),
                 "preferences": prefs,
             },
         )
@@ -112,14 +119,19 @@ def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp
     refused = backend.queue.load(base.json()["job_id"])
     assert refused.error.code == "PLAN_NOT_FOUND"
     assert refused.error.infeasibility is not None
+    status_url = f"/api/v1/advice-jobs/{base.json()['job_id']}"
+    assert off.get(status_url).json() == client.get(status_url).json()
     candidate = {"no_hits": True, "save_chips": True}
     assert ask("followup", candidate).json()["error"]["code"] == "RUN_BASE_REQUIRED"
     assert ask("repair", {"save_chips": True}).json()["error"]["code"] == "RUN_REPAIR_INVALID"
     first = ask("repair", candidate)
     assert first.status_code == 202, first.text
-    work()
+    assert ask("repair", candidate, off).json() == first.json()
+    assert world._work(closed) == 1
+    assert off.get(f"/api/v1/advice-jobs/{first.json()['job_id']}").json()["status"] == "completed"
     witness = ask("repair", candidate)
     assert witness.status_code == 200, witness.text
+    assert ask("repair", candidate, off).content == witness.content
     rows = witness.json()["payload"]["plan_weeks"]
     pins = [
         {
@@ -138,6 +150,17 @@ def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp
     }
     forged = ask("repair", {**candidate, "frozen_weeks": [wrong, *pins[1:]]})
     assert forged.json()["error"]["code"] == "RUN_REPAIR_INVALID"
+    before = backend.runs.path.read_bytes()
+    for refused in (
+        ask("repair", {**candidate, "min_bank": {"tenths": 9999}}, off),
+        ask("repair", {**candidate, "frozen_weeks": pins}, off),
+        ask("repair", candidate, off, "c" * 32),
+    ):
+        assert (
+            refused.status_code == 409
+            and refused.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
+        )
+    assert backend.runs.path.read_bytes() == before and len(backend.queue.jobs()) == 2
     # The second candidate still cannot produce a third proposal or consume the replay slot.
     second = ask("repair", {**candidate, "min_bank": {"tenths": 9999}})
     assert second.status_code == 202, second.text
@@ -189,6 +212,12 @@ def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp
         assert hit.status_code == 200, hit.text
     assert len(backend.queue.jobs()) == 4
     assert json.loads(backend.runs.path.read_bytes())["runs"]["b" * 32]["reserved"] == 0
+    assert ask("repair", verify, off, "b" * 32).content == checked.content
+    assert ask("base", verify, client, "d" * 32).status_code == 200
+    before = backend.runs.path.read_bytes()
+    fresh = ask("repair", candidate, off, "d" * 32)
+    assert fresh.status_code == 409 and fresh.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
+    assert backend.runs.path.read_bytes() == before and len(backend.queue.jobs()) == 4
     assert client.post(f"/api/v1/llmopt/runs/{'a' * 32}/cancel", json={}).status_code == 200
     assert ask("repair", verify).json()["error"]["code"] == "RUN_CANCELLED"
 
@@ -209,8 +238,6 @@ def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp
 def test_only_typed_wall_time_exhaustion_is_a_run_budget_outcome(
     tmp_path, monkeypatch, error, expected
 ):
-    backend = world._deployment(tmp_path, monkeypatch, last_gameweek=5)["backend"]
-    client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/advice"
 
     def stopped(*args, **kwargs):
@@ -219,6 +246,10 @@ def test_only_typed_wall_time_exhaustion_is_a_run_budget_outcome(
     monkeypatch.setattr(advice_worker, "advise_menu_entry", stopped)
     body = {"strategy": "saf-puan", "window": 3, "preferences": {"no_hits": True}}
     for with_run, code in [(True, expected), (False, "ADVICE_FAILED")]:
+        backend = world._deployment(
+            tmp_path / str(with_run), monkeypatch, last_gameweek=5, llmopt_vnext=with_run
+        )["backend"]
+        client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
         result = client.post(route, json={**body, **({"run": _run_ref()} if with_run else {})})
         assert result.status_code == 202, result.text
         assert world._work(backend) == 1

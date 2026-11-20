@@ -12,6 +12,7 @@ import { replyTo } from "../../../web/src/features/league/device/replies";
 import { withinCeiling } from "../../../web/src/features/league/device/solve/ceiling";
 import { deviceWorkReceipt } from "../../../web/src/features/league/device/workBudget";
 import { preparePlans } from "../../../web/src/features/league/llmopt/intent";
+import { baseDraft } from "../../../web/src/features/league/llmopt/planRun";
 import { prepareConfirmedRun } from "../../../web/src/features/league/llmopt/releaseRun";
 import {
   combinedCandidates,
@@ -50,6 +51,10 @@ Object.defineProperty(globalThis, "sessionStorage", {
   },
 });
 const held = new Set<number>(block.held);
+let grantReads = 0;
+let lastWorkerGrant = 0;
+let masterGranted = false;
+let deniedWorker = false;
 const remote = new HttpAdviceClient("http://127.0.0.1", async (url, init) => {
   const target = new URL(url);
   if (target.hostname !== "127.0.0.1") throw new Error("Unexpected origin");
@@ -59,6 +64,16 @@ const remote = new HttpAdviceClient("http://127.0.0.1", async (url, init) => {
     body: init?.body,
     headers: init?.headers,
   });
+  if (target.pathname.endsWith("/capabilities")) {
+    grantReads++;
+    masterGranted =
+      res.status === 200 &&
+      res.body.llmopt_vnext === true &&
+      res.body.capture_snapshot_id === squad.source_snapshot_id &&
+      res.body.league_id === squad.league_id &&
+      res.body.gameweek === squad.gameweek &&
+      res.body.season === squad.season;
+  }
   return new Response(JSON.stringify(res.body), {
     status: res.status,
     headers: { "Content-Type": "application/json" },
@@ -68,6 +83,14 @@ const deviceWork = [];
 // Only replace the browser Worker message port. The production reply dispatcher,
 // cumulative ceiling, WASM model, storage, cache and envelope processing run as usual.
 function createSolver() {
+  const permissionRead = grantReads;
+  if (!masterGranted || permissionRead <= lastWorkerGrant) {
+    deniedWorker = true;
+    throw new Error(
+      "New device worker did not obtain a fresh matching release permission.",
+    );
+  }
+  lastWorkerGrant = permissionRead;
   return {
     onmessage: undefined,
     onerror: undefined,
@@ -99,6 +122,7 @@ function createSolver() {
         },
       );
       deviceWork.push({
+        grant_read: permissionRead,
         bundle: !!request.preferenceBundle,
         outcome,
         calls,
@@ -117,7 +141,7 @@ const draft = {
     { kind: "no_hits" },
   ],
 };
-const plans = preparePlans({ ...draft, soft: [] }, held);
+const plans = preparePlans(baseDraft(draft), held);
 function compact(state) {
   if (state.phase !== "done")
     return { status: state.phase, reason: state.reason ?? null };
@@ -132,6 +156,7 @@ function compact(state) {
 
 async function replay(cache) {
   const workStart = deviceWork.length;
+  const grantsAtStart = grantReads;
   const start = performance.now();
   await driver("begin", { cache });
   const client = deviceAdviceClient(
@@ -141,8 +166,17 @@ async function replay(cache) {
     createSolver,
   );
   const caps = await client.readCapabilities(squad.league_id);
-  if ((caps?.llmoptVNext === true) !== enabled)
+  if (
+    !caps ||
+    (caps.llmoptVNext === true) !== enabled ||
+    (caps.verifiedRepairs === true) !== enabled ||
+    (caps.preferenceBundles === true) !== enabled ||
+    (caps.devicePreferenceBundles === true) !== enabled ||
+    caps.transferPackages === true
+  )
     throw new Error("Authoritative release capability mismatch.");
+  // Confirmation cannot authorize a later worker. Its own read must follow this one.
+  lastWorkerGrant = grantReads;
   const run = prepareConfirmedRun(
     { draft, held, plans },
     squad,
@@ -153,6 +187,16 @@ async function replay(cache) {
   if (!run?.baseRequest)
     throw new Error("Standard workload could not prepare its base request.");
   const execution = preferenceExecution(run);
+  const device = run.baseRequest.deviceRun === true;
+  if (
+    device !== (enabled && window === 1) ||
+    !!run.baseRequest.run !== enabled ||
+    !!execution !== enabled
+  )
+    throw new Error(
+      "Confirmed workload did not select the expected release path.",
+    );
+  if (initial.setupOnly) return { cache, setup: true };
   let stages = [];
   async function stage(label, requests) {
     const pending = [];
@@ -219,7 +263,8 @@ async function replay(cache) {
         s?.request ? [s.request] : [],
       );
       const prices = await stage("individual_prices", slots);
-      [states.first, states.second] = prices;
+      states.first = prices[0] ?? states.first;
+      states.second = prices[1] ?? states.second;
       const reviews = run.prices.map((t) => ({
         outcome: t.outcome,
         price: preferencePrice(t, "", base, prices, false),
@@ -239,8 +284,13 @@ async function replay(cache) {
       .filter(Boolean),
   );
   paths.delete(answers.base.path);
+  if (deniedWorker)
+    throw new Error(
+      "Observed worker admission without fresh matching permission.",
+    );
   return {
     cache,
+    grant_reads: grantReads - grantsAtStart,
     seconds: (performance.now() - start) / 1000,
     stages,
     answers,
@@ -252,6 +302,7 @@ async function replay(cache) {
   };
 }
 const passes = [];
-for (const cache of ["cold", "warm"]) passes.push(await replay(cache));
+for (const cache of initial.setupOnly ? ["cold"] : ["cold", "warm"])
+  passes.push(await replay(cache));
 process.stdout.write(JSON.stringify({ op: "done", passes }) + "\n");
 process.stdin.destroy();

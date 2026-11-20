@@ -115,7 +115,14 @@ def intent_routes(
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
         try:
-            current = server_data_id() if server_data_id is not None else None
+            current = (
+                server_data_id()
+                if llmopt_vnext
+                and intent.plan_context is not None
+                and intent.plan_context["kind"] == "server"
+                and server_data_id is not None
+                else None
+            )
             result = await run_in_threadpool(
                 check_reply, intent, reply, server_data_id=current, llmopt_vnext=llmopt_vnext
             )

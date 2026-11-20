@@ -15,6 +15,10 @@ member-weeks, the gains in raw starting-eleven points, expected net squad points
 and selection utility were each zero. The two remaining member-weeks had no result.
 Both controls stay off until a new measurement demonstrates a gain.
 
+The server also requires the planning release setting from ADR 0024. With it
+off, the package controls have no effect on a new calculation. Enabling the
+release setting alone retains the original transfer search.
+
 Keep both retained expected-window routes and their 40/60 allocation unchanged.
 Add optional one/two-transfer packages behind a disabled control. A separate
 disabled gate control permits the optional phase after an incomplete proof only

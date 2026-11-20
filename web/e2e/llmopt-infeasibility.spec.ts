@@ -9,6 +9,7 @@ import {
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 import { holdModel, routeChat } from "./llmoptChat";
+import { startQueuedJob } from "./queuedAdviceJob";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -61,13 +62,12 @@ for (const failure of ["proven", "witnessed", "interrupted"] as const) {
     await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
       answer(route, {
         contract_version: "league_capabilities_v1",
-        // Earlier servers can advertise repairs without opting into the released workflow.
-        verified_repairs: true,
         league_id: LEAGUE,
         capture_snapshot_id: squad.source_snapshot_id,
         season: squad.season,
         gameweek: squad.gameweek,
         strategies: { "saf-puan": { windows: [1], requires_rival: false } },
+        ...(failure === "proven" ? { verified_repairs: true } : {}),
         preferences: { available: true },
         managers_word: { available: false },
         top100: { available: false, weights: [] },
@@ -145,6 +145,7 @@ for (const failure of ["proven", "witnessed", "interrupted"] as const) {
       });
     });
 
+    await page.clock.install();
     await page.goto(PAGE);
 
     await holdModel(page);
@@ -165,7 +166,7 @@ for (const failure of ["proven", "witnessed", "interrupted"] as const) {
     await expect(holdRule).toBeVisible();
     expect(posts).toHaveLength(0);
 
-    await compute.click();
+    await startQueuedJob(page, JOB, compute, "en", "failed");
     await expect.poll(() => polls).toBeGreaterThan(0);
     await expect(compute).toBeEnabled();
     expect(posts).toHaveLength(1);

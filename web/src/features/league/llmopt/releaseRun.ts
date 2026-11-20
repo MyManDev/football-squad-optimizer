@@ -1,8 +1,29 @@
-import type { AdviceCapabilities } from "../advice/adviceCapabilities";
+import { capabilitiesForPage, type AdviceCapabilities } from "../advice/adviceCapabilities";
 import { deviceSelection } from "../device/selection";
 import type { EntrySquad } from "../types";
 import { prepareRun, requestFor, type PlanRun, type RunInputs } from "./planRun";
 import { preferenceExecution } from "./preferenceExecution";
+
+export function confirmationProblem(
+  draft: RunInputs["draft"],
+  window: RunInputs["plans"]["window"],
+  capabilities: AdviceCapabilities,
+) {
+  const hasPriority = draft.soft.some(({ priority }) => priority !== undefined);
+  const hasTotal = draft.max_total_cost_tenths !== undefined;
+  const grouped =
+    capabilities.llmoptVNext === true &&
+    (capabilities.preferenceBundles === true ||
+      (window === 1 && capabilities.devicePreferenceBundles === true));
+  if (!grouped && (hasPriority || hasTotal)) return "serviceUnavailable";
+  if (hasPriority && !hasTotal) return "totalRequired";
+  if (
+    hasTotal &&
+    (draft.scenario || !draft.soft.length || draft.soft.some(({ kind }) => kind === "wildcard"))
+  )
+    return "totalUnavailable";
+  return null;
+}
 
 /** Prepare the workflow offered by the current server for a freshly confirmed draft. */
 export function prepareConfirmedRun(
@@ -13,26 +34,29 @@ export function prepareConfirmedRun(
   runId: string | undefined,
 ): PlanRun | null {
   const { draft, plans, reference } = inputs;
+  if (
+    !capabilitiesForPage(capabilities, {
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      snapshotId: squad.source_snapshot_id,
+    }) ||
+    !capabilities.preferences ||
+    !capabilities.strategies["saf-puan"]?.windows.includes(plans.window)
+  )
+    return null;
+  if (confirmationProblem(draft, plans.window, capabilities)) return null;
+  // Public entries may have no chip history until their inputs are pinned.
   const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
   const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
-  const request = requestFor(squad, forwarded, plans.window);
-  if (capabilities.llmoptVNext !== true) {
-    if (
-      draft.max_total_cost_tenths !== undefined ||
-      draft.soft.some((rule) => rule.priority !== undefined)
-    )
-      return null;
-    return prepareRun({
-      ...inputs,
-      wildcardNotHeld,
-      request: { ...request, deviceRun: false, deviceAlternatives: false },
-    });
-  }
+  const localBundle =
+    capabilities.llmoptVNext === true &&
+    plans.window === 1 &&
+    capabilities.devicePreferenceBundles === true;
+  const request = requestFor(squad, forwarded, plans.window, localBundle);
+  if (capabilities.llmoptVNext !== true) return prepareRun({ ...inputs, wildcardNotHeld, request });
   if (!runId) return null;
   request.run = { contract_version: "llmopt_run_v1", run_id: runId, stage: "base" };
-  const localBundle = plans.window === 1 && capabilities.devicePreferenceBundles === true;
-  if (draft.max_total_cost_tenths !== undefined && !capabilities.preferenceBundles && !localBundle)
-    return null;
   let next = prepareRun({
     ...inputs,
     request,

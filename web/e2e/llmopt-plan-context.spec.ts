@@ -73,19 +73,6 @@ for (const language of ["en", "tr"] as const)
       await page.route(`**/data/league/entries/${ENTRY}.json*`, (route) =>
         route.fulfill({ json: squad }),
       );
-      await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
-        answer(route, {
-          contract_version: "league_capabilities_v1",
-          llmopt_vnext: true,
-          league_id: LEAGUE,
-          capture_snapshot_id: table.source_snapshot_id,
-          season: table.season,
-          gameweek: table.gameweek,
-          strategies: { "saf-puan": { requires_rival: false, windows: [1] } },
-          top100: { available: false, weights: [] },
-          managers_word: { available: false },
-        }),
-      );
       await page.route("**/data/league/device-plan.json*", (route) =>
         route.fulfill({
           json: {
@@ -96,6 +83,25 @@ for (const language of ["en", "tr"] as const)
           },
         }),
       );
+      let release = true;
+      await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+        answer(route, {
+          contract_version: "league_capabilities_v1",
+          league_id: LEAGUE,
+          season: table.season,
+          gameweek: table.gameweek,
+          capture_snapshot_id: table.source_snapshot_id,
+          strategies: { "saf-puan": { windows: [1], requires_rival: false } },
+          preferences: { available: true },
+          top100: { available: false, weights: [] },
+          managers_word: { available: false },
+          ...(release ? { llmopt_vnext: true } : {}),
+        }),
+      );
+      const weekQuestion =
+        language === "tr"
+          ? "Bu kural 2. hafta mı 3. hafta mı uygulansın?"
+          : "Should this apply in week 2 or week 3?";
       const originalPoints = table.players[0]!.expected_points;
       let swap: { out: number; incoming: number } | undefined;
       let jobs = 0,
@@ -119,6 +125,18 @@ for (const language of ["en", "tr"] as const)
           message: string;
           plan_context?: PlanContext;
         };
+        if (body.message === "legacy-week-question") {
+          expect(body.plan_context).toBeUndefined();
+          return answer(route, { status: "clarification", message: weekQuestion });
+        }
+        if (body.message === "rollback-before-selection") {
+          expect(body.plan_context).toBeDefined();
+          release = false;
+          return answer(route, {
+            status: "plan",
+            command: { plan_id: body.plan_context!.plans[0]!.plan_id, action: "select" },
+          });
+        }
         if (!body.plan_context)
           return answer(route, {
             status: "draft",
@@ -250,6 +268,39 @@ for (const language of ["en", "tr"] as const)
         await expect(cards).toHaveCount(1);
         await expect(selected).toHaveAttribute("data-plan-id", ids[0]!);
         expect(workers).toBe(workBefore + 1);
+        expect(jobs).toBe(0);
+      }
+      if (width === 1280) {
+        const dismiss = page.getByRole("button", { name: copy.dismissQuestion, exact: true });
+        if (await dismiss.isVisible()) await dismiss.click();
+        table.players[0]!.expected_points = originalPoints;
+        const before = await selected.getAttribute("data-plan-id");
+        const solved = workers;
+        const readHistory = () =>
+          page.evaluate(
+            () =>
+              JSON.parse(
+                Object.entries(sessionStorage).find(([key]) =>
+                  key.startsWith("squadopt.llmopt:"),
+                )![1],
+              ).history,
+          );
+        const history = await readHistory();
+        await send("rollback-before-selection");
+        await expect(page.getByText(copy.serviceUnavailable, { exact: true })).toBeVisible();
+        expect(await readHistory()).toEqual(history);
+        await expect(page.getByRole("region", { name: copy.planHistory })).toHaveCount(0);
+        await expect(cards).toHaveCount(0);
+        await send("legacy-week-question");
+        await expect(page.getByText(weekQuestion, { exact: true }).first()).toBeVisible();
+        await page.reload();
+        await expect(page.locator("article[data-plan-ready]").first()).toBeVisible();
+        await expect(cards).toHaveCount(0);
+        expect(await readHistory()).toEqual(history);
+        release = true;
+        await page.reload();
+        await expect(selected).toHaveAttribute("data-plan-id", before!);
+        expect(workers).toBe(solved);
         expect(jobs).toBe(0);
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

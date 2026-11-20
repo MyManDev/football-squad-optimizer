@@ -128,7 +128,7 @@ def stats_by_window(receipt, members):
 
 def render(receipt, baseline, packages):
     members = sorted(row["case"] for row in baseline["rows"])
-    if len(set(members)) != 20:
+    if len(members) != 20 or len(set(members)) != 20:
         raise ValueError("Phase 1 must identify twenty distinct members.")
     overview, costs, alternatives, scores, totals, statuses = stats_by_window(receipt, members)
     count_change = []
@@ -145,6 +145,28 @@ def render(receipt, baseline, packages):
         [name, w, row["backend_jobs"], row["solver_calls"], f"{row['total_seconds']:.3f}"]
         for name, w, row in frozen
     ]
+    warm_rows = []
+    for window in (1, 3):
+        for mode in ("off", "on"):
+            selected = [
+                r for r in receipt["rows"] if r["release"] == mode and r["window"] == window
+            ]
+            matches = sum(r["cold"]["answers"] == r["warm"]["answers"] for r in selected)
+            old_jobs = sum(
+                len(set(s["returned_job_ids"]) - set(s["job_ids"]))
+                for r in selected
+                for s in r["warm"]["stages"]
+            )
+            warm_rows.append(
+                [
+                    window,
+                    mode,
+                    f"{matches} / {len(selected)}",
+                    old_jobs,
+                    sum(len(r["warm"]["jobs"]) for r in selected),
+                    sum(len(r["warm"]["device_work"]) for r in selected),
+                ]
+            )
     arms = packages["arms"]
     package_rows = []
     for mode, data in arms.items():
@@ -207,6 +229,20 @@ def render(receipt, baseline, packages):
         "retain actual WASM calls, solve times and load time. Local elapsed values describe "
         "this single-worker replay. The median and nearest-rank p95 describe independent cases "
         "within each row.",
+        table(
+            [
+                "Weeks",
+                "Release",
+                "Warm runs matching cold",
+                "Existing jobs returned",
+                "New warm jobs",
+                "New warm device workers",
+            ],
+            warm_rows,
+        ),
+        "Warm confirmation repeats the same draft against its own completed or failed run. "
+        "The comparison covers each slot's outcome, reason, source, expected net points and "
+        "transfer path. Returning an existing terminal job does not create a queue entry.",
         "## Alternative yield and paired scores",
         table(
             [
@@ -275,7 +311,10 @@ def render(receipt, baseline, packages):
         "digests. The server parses each isolated configuration through its normal environment "
         "reader. The local API advertises the capability to the production planner. The measured "
         "transport submits the resulting production requests via an in-process FastAPI adapter. "
-        "The local solver uses the original published table and member documents, verified "
+        "For the enabled one-week draft, every new device worker requires another matching "
+        "capability response. Each new worker records its permission read number. The server "
+        "retains its legacy cache reader in both modes. The local solver uses the original "
+        "published table and member documents, verified "
         "against the frozen solver inputs. Only the worker message port, browser session-storage "
         "medium and HTTP connection are adapted for local replay. Each asset loads locally.",
         "Cold arms start with independent empty queues, caches and storage. Warm arms rebuild "

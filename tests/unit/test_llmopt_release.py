@@ -34,7 +34,9 @@ def test_master_is_default_closed_and_package_experiments_need_both_permissions(
 def test_both_capabilities_report_the_server_setting_and_use_the_same_ordinary_key(
     tmp_path, monkeypatch
 ):
-    opened = world._deployment(tmp_path, monkeypatch, public_entries=True)["backend"]
+    opened = world._deployment(tmp_path, monkeypatch, public_entries=True, llmopt_vnext=True)[
+        "backend"
+    ]
     closed = build_backend(replace(opened.config, llmopt_vnext=False))
     league = f"/api/v1/leagues/{world.LEAGUE_ID}/capabilities"
     public = f"/api/v1/public/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/capabilities"
@@ -57,7 +59,7 @@ def test_both_capabilities_report_the_server_setting_and_use_the_same_ordinary_k
 
 
 def test_rollback_drains_existing_work_and_only_admits_new_legacy_jobs(tmp_path, monkeypatch):
-    opened = world._deployment(tmp_path, monkeypatch, last_gameweek=5)["backend"]
+    opened = world._deployment(tmp_path, monkeypatch, last_gameweek=5, llmopt_vnext=True)["backend"]
     closed = build_backend(replace(opened.config, llmopt_vnext=False))
     on = TestClient(app_for_capture(opened, world.world_module.GW2_CAPTURED_AT))
     off = TestClient(app_for_capture(closed, world.world_module.GW2_CAPTURED_AT))

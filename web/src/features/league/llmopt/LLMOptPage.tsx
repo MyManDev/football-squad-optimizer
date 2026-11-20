@@ -30,11 +30,11 @@ import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { deviceAdviceClient } from "../device/adviceClient";
-import { prepareConfirmedRun } from "./releaseRun";
+import { confirmationProblem, prepareConfirmedRun } from "./releaseRun";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { checkedPreferences, preferencesKey } from "../advice/decisionPreferences";
-import { LEAGUE_READ, useEntrySquad } from "../queries";
+import { LEAGUE_READ, useEntrySquad, useRestoredPlanCapabilities } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
 import { combinedCandidates, prepareCombined } from "./combinedPlan";
@@ -302,6 +302,13 @@ function Workspace({
   const [restoredRun] = useState(() =>
     restoreRun(restored, held, (window) => requestFor(squad, forwarded, window)),
   );
+  const restoreCapabilities = useRestoredPlanCapabilities(
+    client,
+    ORIGIN,
+    forwarded === true,
+    squad,
+    true,
+  );
   const [draft, setDraft] = useState<PlanDraft>(restored?.draft ?? EMPTY_DRAFT);
   const [reference, setReference] = useState<PlanRevision | undefined>(restored?.reference);
   const [message, setMessage] = useState("");
@@ -460,14 +467,20 @@ function Workspace({
     setFeedback(copy.planQuestion);
     setMessage("");
   }
-  async function currentPlanData(kind: "device" | "server") {
+  async function currentGrant() {
+    const read = await restoreCapabilities.refetch({ cancelRefetch: false });
+    if (read.isError) return undefined;
+    const caps = capabilitiesForPage(read.data, {
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      snapshotId: squad.source_snapshot_id,
+    });
+    return caps?.llmoptVNext === true ? caps : undefined;
+  }
+  async function currentPlanData(kind: "device" | "server", serverDataId?: string) {
     try {
-      return kind === "device"
-        ? await client.readDeviceDataId?.()
-        : (forwarded
-            ? await client.readPublicCapabilities?.(squad.league_id, squad.entry.entry_id)
-            : await client.readCapabilities?.(squad.league_id)
-          )?.planDataId;
+      return kind === "device" ? await client.readDeviceDataId?.() : serverDataId;
     } catch {
       return undefined;
     }
@@ -487,14 +500,22 @@ function Workspace({
     )
       return;
     const controller = new AbortController();
-    const previous = selectedReference ?? reference ?? revised;
+    let sentCatalogue = false;
     interpret.current = controller;
     restoreChatFocus.current = event.currentTarget.contains(document.activeElement);
     setReading(true);
     setFeedback("");
     try {
-      const catalogue = vNext ? planCatalogue(computed.history, shownPlans) : undefined;
-      if (catalogue && (await currentPlanData(catalogue.kind)) !== catalogue.data_id) {
+      const candidate = vNext ? planCatalogue(computed.history, shownPlans) : undefined;
+      const grant = candidate || selectedReference ? await currentGrant() : undefined;
+      if (controller.signal.aborted) return;
+      const catalogue = grant ? candidate : undefined;
+      sentCatalogue = !!catalogue;
+      const previous = (grant ? selectedReference : undefined) ?? reference ?? revised;
+      if (
+        catalogue &&
+        (await currentPlanData(catalogue.kind, grant?.planDataId)) !== catalogue.data_id
+      ) {
         askPlanQuestion(text);
         return;
       }
@@ -513,18 +534,26 @@ function Workspace({
       );
       if (controller.signal.aborted) return;
       if (answer.status === "plan") {
+        if (!catalogue) throw new IntentError(422, "REPLY_REFUSED");
+        const granted = await currentGrant();
+        if (controller.signal.aborted) return;
+        if (!granted) {
+          setFeedback(copy.serviceUnavailable);
+          return;
+        }
         const currentCatalogue = planCatalogue(session.history, shownPlans);
         const item = session.history.items.find((p) => p.id === answer.command.plan_id);
         try {
           if (
             !currentCatalogue ||
             currentCatalogue.data_id !== catalogue?.data_id ||
-            (await currentPlanData(currentCatalogue.kind)) !== currentCatalogue.data_id
+            (await currentPlanData(currentCatalogue.kind, granted.planDataId)) !==
+              currentCatalogue.data_id
           )
             throw new Error("Stale reply");
           const result = commandDraft(answer.command, currentCatalogue, item?.plan, draft, players);
           if (result.draft) change(checkedDraft(result.draft, players), result.reference);
-          else selectComputed(computed.choose(answer.command.plan_id));
+          else applySelection(computed.choose(answer.command.plan_id));
         } catch {
           askPlanQuestion(text);
           return;
@@ -555,12 +584,7 @@ function Workspace({
       setMessage("");
     } catch (error) {
       if (controller.signal.aborted) return;
-      if (
-        error instanceof IntentError &&
-        error.code === "REPLY_REFUSED" &&
-        vNext &&
-        session.history.items.length
-      ) {
+      if (error instanceof IntentError && error.code === "REPLY_REFUSED" && sentCatalogue) {
         askPlanQuestion(text);
         return;
       }
@@ -581,23 +605,6 @@ function Workspace({
 
   const frozen = frozenForDraft(draft, reference);
   const plans = preparePlans(baseDraft(draft), held, frozen);
-  const releaseCapabilities = useQuery({
-    queryKey: [
-      "llmopt-release",
-      ORIGIN,
-      forwarded === true,
-      squad.league_id,
-      squad.entry.entry_id,
-      squad.source_snapshot_id,
-    ],
-    queryFn: async ({ signal }) =>
-      (forwarded
-        ? await client.readPublicCapabilities?.(squad.league_id, squad.entry.entry_id, { signal })
-        : await client.readCapabilities?.(squad.league_id, { signal })) ?? null,
-    enabled: !!ORIGIN,
-    ...LEAGUE_READ,
-    refetchOnMount: "always",
-  });
   const scenarioReferenceMissing =
     draft.scenario && !matchingScenarioReference(reference, plans.window);
   const canCalculate =
@@ -640,7 +647,7 @@ function Workspace({
     (state.reason === "RUN_BUDGET_EXHAUSTED" || state.reason === "RUN_CANCELLED");
   const incompleteRun = Object.values(states).some(capacityRefused);
   const computing = Object.values(states).some(({ phase }) => isWorking(phase));
-  const editingLocked = checkingSquad || reading;
+  const editingLocked = checkingSquad || reading || (computing && !run?.inputs.request.run);
   const busy = editingLocked || computing;
   const replayProof =
     run?.scenario && states.first.phase === "failed" && states.first.infeasibility !== undefined;
@@ -681,19 +688,30 @@ function Workspace({
     session.save({ draft, reference, clarification, confirmation: answered });
   }, [settled, session, draft, reference, clarification]);
   const baseState = states.base;
-  const capabilities = capabilitiesForPage(releaseCapabilities.data, {
+  const restoreMode = capabilitiesForPage(restoreCapabilities.data, {
     leagueId: squad.league_id,
     season: squad.season,
     gameweek: squad.gameweek,
     snapshotId: squad.source_snapshot_id,
   });
-  const currentModeKnown =
-    releaseCapabilities.isFetchedAfterMount && !releaseCapabilities.isError && !!capabilities;
-  const vNext = currentModeKnown && capabilities.llmoptVNext === true;
+  const currentCapabilities =
+    restoreCapabilities.isFetchedAfterMount && !restoreCapabilities.isError ? restoreMode : null;
+  const vNext = currentCapabilities?.llmoptVNext === true;
+  const prioritiesEnabled =
+    currentCapabilities?.llmoptVNext === true &&
+    (currentCapabilities.preferenceBundles === true ||
+      (plans.window === 1 && currentCapabilities.devicePreferenceBundles === true));
   const canContinue =
-    run === restoredRun
-      ? currentModeKnown && vNext === !!run?.inputs.request.run
-      : !run?.inputs.request.run || vNext;
+    (run !== restoredRun && !run?.inputs.request.run) ||
+    (!!currentCapabilities &&
+      (currentCapabilities.llmoptVNext === true) === !!run?.inputs.request.run &&
+      (!run?.inputs.request.deviceRun || currentCapabilities.devicePreferenceBundles === true) &&
+      (!run?.inputs.paths3w || currentCapabilities.transferPackages === true) &&
+      (!run?.inputs.bundleMode ||
+        (run.inputs.request.deviceRun
+          ? currentCapabilities.devicePreferenceBundles === true
+          : currentCapabilities.preferenceBundles === true)));
+  const repairsEnabled = vNext && currentCapabilities?.verifiedRepairs === true;
   const oldSearch = savedRun?.repairSearch;
   const failure =
     baseState.phase === "failed" || baseState.phase === "unavailable" ? baseState : null;
@@ -710,11 +728,11 @@ function Workspace({
         )?.baseRequest
       : undefined);
   const analysis =
-    vNext && capabilities?.verifiedRepairs && !draft.scenario
+    repairsEnabled && !draft.scenario
       ? ruleRepairChoices(draft, {
           ...conflictContext,
           language,
-          heldChips: capabilities.chipsByEntry?.[String(squad.entry.entry_id)] ?? null,
+          heldChips: currentCapabilities.chipsByEntry?.[String(squad.entry.entry_id)] ?? null,
           freeTransfers: squad.free_transfers_known ? squad.free_transfers : null,
           heldClubs: new Map(
             [...squad.starting_xi, ...squad.bench].map((player) => [player.player_id, player.team]),
@@ -727,26 +745,18 @@ function Workspace({
       : null;
   async function repairData() {
     if (!deadlineOpen(deadline)) throw new Error("RUN_CONTEXT_CHANGED");
-    const [fresh, caps] = await Promise.all([
+    const [fresh, grant] = await Promise.all([
       tree.entrySquad(squad.entry.entry_id),
-      releaseCapabilities.refetch(),
+      currentGrant(),
     ]);
-    const verified = capabilitiesForPage(caps.data, {
-      leagueId: squad.league_id,
-      season: squad.season,
-      gameweek: squad.gameweek,
-      snapshotId: squad.source_snapshot_id,
-    });
     if (
       !mounted.current ||
-      !verified?.llmoptVNext ||
-      !verified.verifiedRepairs ||
-      caps.isError ||
+      !grant?.verifiedRepairs ||
       squadBasis(fresh.payload) !== squadBasis(squad) ||
       !deadlineOpen(deadline)
     )
       throw new Error("RUN_CONTEXT_CHANGED");
-    const dataId = plans.window === 1 ? await client.readDeviceDataId?.() : verified.planDataId;
+    const dataId = plans.window === 1 ? await client.readDeviceDataId?.() : grant.planDataId;
     if (!dataId || !/^[0-9a-f]{64}$/.test(dataId)) throw new Error("INPUTS_UNAVAILABLE");
     return dataId;
   }
@@ -797,7 +807,7 @@ function Workspace({
     session.save({ draft: choice.draft, reference, history });
   }
   const diagnosis = (state: ComputePhase) =>
-    state.phase === "failed" && state.infeasibility && !(vNext && capabilities?.verifiedRepairs) ? (
+    state.phase === "failed" && state.infeasibility && !repairsEnabled ? (
       <InfeasibilityResult
         diagnosis={state.infeasibility}
         request={state.request}
@@ -808,7 +818,7 @@ function Workspace({
       />
     ) : undefined;
   useEffect(() => {
-    if (!run || run !== restoredRun || (!!ORIGIN && !releaseCapabilities.isFetchedAfterMount))
+    if (!run || run !== restoredRun || (!!ORIGIN && !restoreCapabilities.isFetchedAfterMount))
       return;
     let active = true;
     // A reload can land before a started job's id was stored, which leaves nothing to resume.
@@ -846,7 +856,7 @@ function Workspace({
     savedReplayProof,
     deadline,
     controls,
-    releaseCapabilities.isFetchedAfterMount,
+    restoreCapabilities.isFetchedAfterMount,
     canContinue,
   ]);
 
@@ -886,9 +896,9 @@ function Workspace({
     savedReplayProof,
     deadline,
     controls,
-    canContinue,
     incompleteRun,
     execution,
+    canContinue,
   ]);
 
   useEffect(() => {
@@ -914,10 +924,10 @@ function Workspace({
     incompleteRun,
     baseState,
     bundleState,
-    canContinue,
     controls,
     session,
     deadline,
+    canContinue,
   ]);
 
   useEffect(() => {
@@ -952,7 +962,6 @@ function Workspace({
   }, [
     baseState,
     run,
-    canContinue,
     deadline,
     controls,
     session,
@@ -961,6 +970,7 @@ function Workspace({
     clarification,
     incompleteRun,
     execution,
+    canContinue,
   ]);
 
   async function compute() {
@@ -976,36 +986,21 @@ function Workspace({
     )
       return;
     confirming.current = true;
-    if (
-      draft.soft.some(({ priority }) => priority !== undefined) &&
-      draft.max_total_cost_tenths === undefined
-    ) {
-      setFeedback(copy.totalRequired);
-      confirming.current = false;
-      return;
-    }
-    if (
-      draft.max_total_cost_tenths !== undefined &&
-      (draft.scenario || !draft.soft.length || draft.soft.some(({ kind }) => kind === "wildcard"))
-    ) {
-      setFeedback(copy.totalUnavailable);
-      confirming.current = false;
-      return;
-    }
     setFeedback("");
     setChanges(null);
     setCheckingSquad(true);
     try {
       const [fresh, capabilities] = await Promise.all([
         tree.entrySquad(squad.entry.entry_id),
-        releaseCapabilities.refetch().then((result) => (result.isError ? null : result.data)),
+        restoreCapabilities
+          .refetch({ cancelRefetch: false })
+          .then((read) => (read.isError ? null : read.data)),
       ]);
       if (!mounted.current) return;
       if (!capabilities?.preferences) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
-
       if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
         setFeedback(copy.windowUnavailable);
         return;
@@ -1036,7 +1031,9 @@ function Workspace({
         runId,
       );
       if (!next) {
-        setFeedback(copy.serviceUnavailable);
+        setFeedback(
+          copy[confirmationProblem(draft, plans.window, capabilities) ?? "serviceUnavailable"],
+        );
         return;
       }
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
@@ -1058,13 +1055,9 @@ function Workspace({
           wildcardNotHeld: next.inputs.wildcardNotHeld,
           ...(next.inputs.paths3w ? { paths3w: true as const } : {}),
           sending: true as const,
-          ...(runId
-            ? {
-                compareOnly: next.inputs.compareOnly === true,
-                deviceRun: next.baseRequest?.deviceRun ?? false,
-                deviceAlternatives: next.baseRequest?.deviceAlternatives ?? false,
-              }
-            : {}),
+          compareOnly: next.inputs.compareOnly === true,
+          deviceRun: next.baseRequest?.deviceRun ?? false,
+          deviceAlternatives: next.baseRequest?.deviceAlternatives ?? false,
           ...(next.inputs.bundleMode ? { bundleMode: true as const } : {}),
         },
       };
@@ -1077,11 +1070,12 @@ function Workspace({
       if (next.baseRequest) {
         controls.base.compute(next.baseRequest);
       } else controls.base.reset();
-      if (!runId)
+      if (!runId) {
         ALTERNATIVE_SLOTS.forEach((name, index) => {
           const slot = next.slots[index];
           if (slot?.kind === "explicit" && slot.request) controls[name].compute(slot.request);
         });
+      }
     } catch {
       if (mounted.current) setFeedback(copy.squadUnavailable);
     } finally {
@@ -1127,8 +1121,8 @@ function Workspace({
       !run ||
       execution ||
       incompleteRun ||
-      !singlesIn ||
       !canContinue ||
+      !singlesIn ||
       !confirmed ||
       confirmed.followups === undefined ||
       confirmed.combined !== undefined ||
@@ -1152,7 +1146,6 @@ function Workspace({
   }, [
     run,
     singlesIn,
-    canContinue,
     combinedChoice,
     deadline,
     controls,
@@ -1162,6 +1155,7 @@ function Workspace({
     clarification,
     incompleteRun,
     execution,
+    canContinue,
   ]);
   // A rule with no slot of its own is priced in the plan with all preferences, or named as
   // left out of it.
@@ -1213,9 +1207,11 @@ function Workspace({
         : samePlan(baseState, combinedState)
           ? 0
           : Math.max(0, baseNet - combinedNet);
+  const showPaths = vNext && run?.inputs.paths3w === true;
   const { results, same } = run
     ? planResults({
         run,
+        showPaths,
         base: baseState,
         alternatives,
         priceReview,
@@ -1239,24 +1235,32 @@ function Workspace({
     vNext && computed.history.explicit && computed.selected
       ? summarizeRevision(computed.selected.plan)
       : undefined;
+  const restoredArchive =
+    !!restored?.history &&
+    run === restoredRun &&
+    (!restored.confirmation || !!restored.confirmation.runId);
   const historical =
+    (vNext || restoredArchive) &&
     computed.selected &&
     !shownPlans.some((p) => planContent(p) === planContent(computed.selected!.plan));
-  function selectComputed(history: PlanHistory) {
+  async function selectComputed(history: PlanHistory) {
+    if (vNext && (await currentGrant()) && mounted.current) applySelection(history);
+  }
+  function applySelection(history: PlanHistory) {
     if (!history.items.some((p) => p.id === history.navigation[history.cursor])) return;
     setClarification(undefined);
     session.save({ draft, reference, confirmation: session.confirmation, history });
   }
-  const planProps = (plan: EntryAdvice) =>
-    !vNext
-      ? {}
-      : {
-          planId: computed.idFor(plan),
-          selected: computed.selected?.id === computed.idFor(plan),
-          onSelect: computed.idFor(plan)
-            ? () => selectComputed(computed.choose(computed.idFor(plan)!))
-            : undefined,
-        };
+  const planProps = (plan: EntryAdvice) => {
+    const id = vNext ? computed.idFor(plan) : undefined;
+    return id
+      ? {
+          planId: id,
+          selected: computed.selected?.id === id,
+          onSelect: () => selectComputed(computed.choose(id)),
+        }
+      : {};
+  };
   const alternative = results.find(({ state }) => state.phase === "done")?.state;
   const revisionAnswer =
     baseAnswer ?? (alternative?.phase === "done" ? alternative.envelope.payload : undefined);
@@ -1391,7 +1395,7 @@ function Workspace({
           </p>
         )}
         <RuleEditor
-          priorities={vNext}
+          priorities={prioritiesEnabled}
           draft={draft}
           players={players}
           copy={copy}
@@ -1592,8 +1596,8 @@ function Workspace({
       {historical && computed.selected && !computing && (
         <PlanResult
           title={copy.selectedPlan}
-          planId={computed.selected.id}
-          selected
+          planId={vNext ? computed.selected.id : undefined}
+          selected={vNext}
           state={{
             phase: "done",
             source: "api-cache",
@@ -1651,7 +1655,7 @@ function Workspace({
         >
           <h2>{copy.results}</h2>
           <PlanPathGroups
-            enabled={run.inputs.paths3w === true}
+            enabled={showPaths}
             className={styles.planGrid}
             label={copy.openingDecision}
           >

@@ -23,9 +23,14 @@ const answer = (route: Route, json: unknown) =>
     ? route.fulfill({ status: 204, headers: CORS })
     : route.fulfill({ json, headers: CORS });
 
-for (const enabled of [false, true])
+for (const [master, packages] of [
+  [false, false],
+  [false, true],
+  [true, false],
+  [true, true],
+] as const)
   for (const language of ["en", "tr"] as const) {
-    test(`three-week paths stay bounded across reload (${enabled}, ${language})`, async ({
+    test(`three-week paths stay bounded across reload (release ${master}, packages ${packages}, ${language})`, async ({
       page,
     }) => {
       test.skip(!API, "API build required");
@@ -36,7 +41,9 @@ for (const enabled of [false, true])
       const posts: DecisionPreferences[] = [];
       const runIds: string[] = [];
       let reads = 0;
-      let advertised = enabled;
+      let release: boolean = master;
+      let advertised: boolean = packages;
+      const enabled = master && packages;
       await page.route("**/data/fixtures.json", (route) => route.fulfill({ json: openCalendar() }));
       await page.route(`${API}/api/v1/contributions/players`, (route) =>
         answer(route, {
@@ -51,7 +58,7 @@ for (const enabled of [false, true])
       await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
         answer(route, {
           contract_version: "league_capabilities_v1",
-          llmopt_vnext: true,
+          ...(release ? { llmopt_vnext: true } : {}),
           league_id: LEAGUE,
           capture_snapshot_id: squad.source_snapshot_id,
           season: squad.season,
@@ -130,15 +137,41 @@ for (const enabled of [false, true])
       );
       expect(posts.every((p) => p.no_hits)).toBe(true);
       expect(new Set(runIds).size).toBe(1);
-      expect(runIds[0]).toMatch(/^[0-9a-f]{32}$/);
+      if (master) expect(runIds[0]).toMatch(/^[0-9a-f]{32}$/);
+      else expect(runIds).toEqual(["missing", "missing", "missing"]);
       await expect(page.locator("[data-path-group]")).toHaveCount(enabled ? 2 : 0);
-      // A changed capability does not change this already confirmed run.
-      advertised = !enabled;
+      // Completed results keep the confirmed path mode while the master release is enabled.
+      advertised = !packages;
       await page.reload();
       await expect(page.getByRole("article")).toHaveCount(enabled ? 3 : 2);
       await expect.poll(() => reads).toBe(3);
       expect(posts).toHaveLength(3);
       await expect(page.locator("[data-path-group]")).toHaveCount(enabled ? 2 : 0);
+      if (enabled) {
+        release = false;
+        advertised = true;
+        await page.reload();
+        await expect(page.getByRole("article")).toHaveCount(2);
+        await expect(page.locator("[data-path-group]")).toHaveCount(0);
+        await expect.poll(() => reads).toBe(6);
+        expect(posts).toHaveLength(3);
+        // A reload after confirmation but before the main answer must not open a path on rollback.
+        await page.evaluate(() => {
+          const [key, raw] = Object.entries(sessionStorage).find(([k]) =>
+            k.startsWith("squadopt.llmopt:"),
+          )!;
+          const saved = JSON.parse(raw);
+          delete saved.confirmation.followups;
+          delete saved.confirmation.combined;
+          saved.confirmation.sending = true;
+          sessionStorage.setItem(key, JSON.stringify(saved));
+        });
+        await page.reload();
+        await expect.poll(() => reads).toBe(7);
+        await expect(page.getByRole("article")).toHaveCount(1);
+        await expect(page.locator("[data-path-group]")).toHaveCount(0);
+        expect(posts).toHaveLength(3);
+      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );

@@ -4,15 +4,18 @@ import { createRequire } from "node:module";
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import fixture from "../../../fixtures/device-plan/instances.json";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
+import { publicEntryCapabilities } from "../advice/adviceCapabilities";
 import type { AdviceClient } from "../advice/adviceClient";
 import { PATIENCE_EXHAUSTED, QUEUE_PATIENCE_MS } from "../advice/useAdviceJob";
 import { deviceAdviceClient } from "../device/adviceClient";
 import type { LpSolver } from "../device/lp/problem";
 import { replyTo } from "../device/replies";
+import { solvePlan } from "../device/solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "../device/types";
 import type { DeviceSolver } from "../device/useDevicePlan";
 import type { Constraint, PlanDraft } from "./intent";
 import type { EntryAdvice } from "../types";
+import { expectedNet } from "./planComparison";
 import {
   candidateRequest,
   computeRepairPlan,
@@ -49,14 +52,19 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function clientForFixture() {
+function clientForFixture(inputs = document) {
   const remote = {
+    readCapabilities: vi.fn().mockResolvedValue({
+      ...publicEntryCapabilities(squad),
+      llmoptVNext: true,
+      verifiedRepairs: true,
+    }),
     readAdvice: vi.fn(),
     requestAdvice: vi.fn(),
     readJob: vi.fn(),
     readPublished: vi.fn(),
   } satisfies AdviceClient;
-  const posted = vi.fn();
+  const posted = vi.fn<DeviceSolver["postMessage"]>();
   const client = deviceAdviceClient(
     remote,
     squad,
@@ -64,7 +72,7 @@ function clientForFixture() {
       contract_version: "provisional_league_ui_v1",
       generated_at_utc: "2026-11-20T00:00:00Z",
       source_kind: "example",
-      payload: document,
+      payload: inputs,
     }),
     () => {
       const worker: DeviceSolver = {
@@ -82,6 +90,50 @@ function clientForFixture() {
   );
   return { client, posted, remote };
 }
+
+it("solves just the mandatory transfer witness and its independent confirmation", async () => {
+  const target = 104;
+  const available = new Set([...entry.held, target]);
+  const tiny = { ...document, players: document.players.filter((p) => available.has(p.id)) };
+  const { client, posted, remote } = clientForFixture(tiny);
+  const dataId = await client.readDeviceDataId!();
+  const request = candidateRequest(
+    { hard: [{ kind: "buy_player", player_id: target, week: 1 }], soft: [] },
+    { squad, window: 1 },
+    { runId, dataId, failedBase: false },
+    "base",
+  )!;
+  expect(request.preferences.net_points_priority).toBe(true);
+  const core = solvePlan(solver, tiny, entry, undefined, null, {
+    preferences: request.preferences,
+  });
+  const compute = (query: typeof request) =>
+    computeRepairPlan(client, query, tiny.source_snapshot_id, dataId, new AbortController().signal);
+  const witness = await compute(request);
+  const confirmation = await compute(verificationRequest(request, witness)!);
+  expect(core.transfers_in).toEqual([target]);
+  for (const answer of [witness, confirmation]) {
+    const week = answer.plan_weeks![0]!;
+    expect(week.transfers_in.map((p) => p.player_id)).toEqual(core.transfers_in);
+    expect(week.transfers_out.map((p) => p.player_id)).toEqual(core.transfers_out);
+    expect(new Set(week.lineup!.starting_xi.map((p) => p.player_id))).toEqual(
+      new Set(core.starting_xi),
+    );
+    expect(week.lineup!.captain.player_id).toBe(core.captain);
+    expect(expectedNet(answer)).toBeCloseTo(
+      core.expected_own_points - core.transfer_hit_points,
+      10,
+    );
+    expect(answer.device_alternatives).toBeUndefined();
+  }
+  expect(matchesRepair(witness, confirmation)).toBe(true);
+  expect(posted).toHaveBeenCalledTimes(2);
+  for (const [input] of posted.mock.calls) {
+    expect(input.preferences).toEqual(request.preferences);
+    expect(input).not.toHaveProperty("alternatives");
+  }
+  expect(remote.requestAdvice).not.toHaveBeenCalled();
+});
 
 it.each([false, true])(
   "recalculates the preference-selected one-week witness (priority program: %s)",
@@ -129,6 +181,7 @@ it.each([false, true])(
     expect(matchesRepair(witness, result)).toBe(true);
     expect(matchesRepair(parent.envelope.payload, result)).toBe(false);
     expect(posted).toHaveBeenCalledTimes(2);
+    for (const [input] of posted.mock.calls) expect(input).not.toHaveProperty("alternatives");
     expect(remote.requestAdvice).not.toHaveBeenCalled();
   },
 );
@@ -235,6 +288,11 @@ it.each(["failed", "cancelled"] as const)(
     const client = {
       requestAdvice: vi.fn().mockResolvedValue({ kind: "job", jobId: "old" }),
       readJob: vi.fn().mockResolvedValue({ jobId: "old", status, errorCode: "RUN_CANCELLED" }),
+      readCapabilities: vi.fn().mockResolvedValue({
+        ...publicEntryCapabilities(squad),
+        llmoptVNext: true,
+        verifiedRepairs: true,
+      }),
       readAdvice: vi.fn(),
       readPublished: vi.fn(),
     } satisfies AdviceClient;
@@ -259,6 +317,11 @@ it("stops polling a queued repair at the normal queue deadline and on cancellati
     const client = {
       requestAdvice: vi.fn().mockResolvedValue({ kind: "job", jobId: "job", status: "queued" }),
       readJob: vi.fn().mockResolvedValue({ jobId: "job", status: "queued" }),
+      readCapabilities: vi.fn().mockResolvedValue({
+        ...publicEntryCapabilities(squad),
+        llmoptVNext: true,
+        verifiedRepairs: true,
+      }),
       readAdvice: vi.fn(),
       readPublished: vi.fn(),
     } satisfies AdviceClient;

@@ -7,7 +7,8 @@ and a stage of `base`, `followup` or `repair`.
 The server binds the ID to its own resolved context, league, member and window. It does
 not include the reference in the advice key or immutable computation spec.
 
-The current page saves identity before submitting, and reuses it after reload. Requests
+When the server enables run admission, the page saves the identity before submitting
+and reuses it after reload. Requests
 without a run reference, including member-panel preferences, keep their legacy V1
 admission outside the run budget. An identified repeated request returns its original job,
 including terminal failure. It never purchases another attempt in that run. Crash recovery
@@ -55,6 +56,10 @@ capture identity from immutable specs where available. It never resets a live bu
 
 The backend advertises `llmopt_vnext: true` on current league and public-entry
 capabilities only when `SQUADOPT_BACKEND_LLMOPT_VNEXT=1`. The default is 0.
+For a fresh three-preference draft, the default workflow can open four ordinary
+jobs for the main plan, two individual prices and the combined plan. A saved
+confirmation retains its transport when reopened. Rolling back the setting
+allows reads of existing results and prevents new run-owned computations.
 During rollback advice reads and existing run requests use the current capture
 to resolve their cache address. Without that capture, advice reads return HTTP 503.
 Job polling reads queue state independently of the capture. Cancellation remains
@@ -70,7 +75,9 @@ scoring and request identity unchanged.
 
 ## Verified repairs
 
-League and public-entry capabilities can advertise `verified_repairs: true`.
+League and public-entry capabilities can advertise `verified_repairs: true` when
+the master planning setting is on. An existing job may finish and cache its answer
+after rollback. The disabled setting refuses new candidate and selection work.
 Three-week candidates use a regular advice POST with the original run ID and
 `stage: "repair"`. Following a proved incompatible base, each candidate changes
 one rule of the original immutable request. A known missing chip right permits
