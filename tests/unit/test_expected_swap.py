@@ -9,6 +9,7 @@ from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning.expected_swap import propose_expected_swap
 from squadopt.planning.expected_window import optimize_expected_window
+from squadopt.planning.guarded import optimize_guarded_window
 from squadopt.planning.lineup_utility import expected_week_utility, rescore_expected_week
 from squadopt.planning.models import (
     ChipAvailability,
@@ -113,6 +114,56 @@ def call(problem, *, template=None, retained=None, **kwargs):
 
 def no_solve(*args, **kwargs):
     pytest.fail("A documented no-op must not start another CP solve.")
+
+
+@pytest.mark.parametrize(
+    "actual",
+    [pytest.param(24.058744962167573, id="gw8-3832237"), pytest.param(24.223909707394814, id="gw9-3832237")],
+)
+def test_five_free_transfers_return_a_protected_plan_without_another_solve(monkeypatch, actual):
+    horizon, initial, settings, transfer, _ = world()
+    initial = replace(initial, free_transfers=5)
+    settings = replace(settings, solver_deterministic_time_limit=60)
+    transfer = replace(transfer, banked_transfer_value_points=0)
+    protected = []
+
+    def completed_route(horizon, initial, settings, transfer, **kwargs):
+        assert not protected, "a stopped first phase must not start a second guarded solve"
+        assert settings.solver_deterministic_time_limit == 24
+        plan = optimize_guarded_window(horizon, initial, settings, transfer, **kwargs)
+        assert plan.has_solution
+        assert plan.diagnostics["incumbent_hint"]["claimed_objective_used"] is False
+        assert plan.diagnostics["incumbent_protection"]["version"] == "certified_fallback_v1"
+        protected.append(plan)
+        work = plan.diagnostics["sequential_incumbent"]
+        final_work = actual - work["seed_work"]
+        return replace(plan, diagnostics={
+            **plan.diagnostics,
+            "deterministic_time_used": final_work,
+            "sequential_incumbent": {**work, "actual_total": actual, "final_work_including_hold": final_work},
+        })
+
+    monkeypatch.setattr("squadopt.planning.expected_window.optimize_guarded_window", completed_route)
+    monkeypatch.setattr("squadopt.planning.expected_window.propose_expected_swap", no_solve)
+    result = optimize_expected_window(horizon, initial, settings, transfer)
+    assert result.solver_status is SolverStatus.FEASIBLE
+    assert len(protected) == 1
+    assert tuple(w.gameweek for w in result.weeks) == horizon.gameweeks
+    assert result.weeks[0].free_transfers_before == 5
+    for seen, saved in zip(result.weeks, protected[0].weeks, strict=True):
+        assert set(seen.selected_squad.player_id) == set(saved.selected_squad.player_id)
+        assert set(seen.transfers_in.player_id) == set(saved.transfers_in.player_id)
+        assert set(seen.transfers_out.player_id) == set(saved.transfers_out.player_id)
+        assert seen.bank_after_tenths == saved.bank_after_tenths
+        assert seen.transfer_hit_points == saved.transfer_hit_points
+        assert seen.free_transfers_for_next_gameweek == saved.free_transfers_for_next_gameweek
+    review = result.diagnostics["expected_lineup_window"]
+    assert review["configured_total"] == 60
+    assert review["actual_total"] == actual
+    assert review["ledger"][0]["cap"] == 24
+    assert review["ledger"][0]["actual"] == actual
+    assert review["optional_swap"]["status"] == "skipped"
+    assert result.diagnostics.get("best_objective_bound") is None
 
 
 @pytest.mark.parametrize("window", [3, 5])
