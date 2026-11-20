@@ -157,6 +157,7 @@ const en = {
     budget: "This run has used its allowance, so review the rules and start a new calculation.",
     wait: "The calculation timed out, so try again.",
     unconfirmed: "Check the changes again, or edit your rules to calculate a different plan.",
+    tooLarge: "Remove a rule or unlock a week to check these changes.",
     check: "Check changes",
     netPoints: "net points",
     changeRule: (before: string, after: string) => `Change “${before}” to “${after}”`,
@@ -415,6 +416,7 @@ const tr: typeof en = {
     wait: "Hesaplama süresi doldu, yeniden dene.",
     unconfirmed:
       "Değişiklikleri yeniden denetle veya başka bir plan hesaplamak için kuralları düzenle.",
+    tooLarge: "Bu değişiklikleri denetlemek için bir kuralı kaldır veya bir haftanın kilidini aç.",
     check: "Değişiklikleri denetle",
     netPoints: "net puan",
     changeRule: (before: string, after: string) =>

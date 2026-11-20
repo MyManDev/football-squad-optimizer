@@ -96,6 +96,7 @@ The Wildcard weeks list names explicit rules. A frozen week preserves its own
 chip separately. Only active fields are sent, and the ordinary 4096-byte POST
 limit applies to the entire candidate or pinned selection. An oversized
 candidate cannot start work and an oversized selection is never offered.
+The other candidate can still be checked and selected if its request fits.
 The first posted edit counts as a candidate whether it succeeds or fails.
 
 The ledger records up to two candidate answer keys and reserves capacity for

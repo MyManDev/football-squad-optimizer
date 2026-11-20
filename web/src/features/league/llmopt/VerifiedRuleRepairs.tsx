@@ -12,6 +12,7 @@ import {
   candidateRequest,
   computeRepairPlan,
   matchesRepair,
+  RepairEnvelopeTooLarge,
   verificationRequest,
   type RepairRun,
 } from "./repairComputation";
@@ -62,9 +63,9 @@ export function VerifiedRuleRepairs({
   const [busy, setBusy] = useState(false);
   const [checked, setChecked] = useState(false);
   const [pendingReplay, setPendingReplay] = useState<Witness | null>(null);
-  const [problem, setProblem] = useState<"unconfirmed" | "missing" | "budget" | "wait" | null>(
-    null,
-  );
+  const [problem, setProblem] = useState<
+    "unconfirmed" | "missing" | "budget" | "wait" | "tooLarge" | null
+  >(null);
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
   async function work(operation: (signal: AbortSignal) => Promise<void>) {
@@ -104,6 +105,7 @@ export function VerifiedRuleRepairs({
         (witness) => witness.run.runId === run.runId && witness.run.dataId === run.dataId,
       );
       setWitnesses(found);
+      let oversized = false;
       for (const choice of analysis.choices.slice(0, 2)) {
         if (stage === "repair" && !(await current(run))) throw new Error("RUN_CONTEXT_CHANGED");
         if (signal.aborted) return;
@@ -135,11 +137,16 @@ export function VerifiedRuleRepairs({
             setWitnesses([...found]);
           }
         } catch (error) {
+          if (error instanceof RepairEnvelopeTooLarge) {
+            oversized = true;
+            continue;
+          }
           const code = failureCode(error);
           if (code === "PLAN_NOT_FOUND") continue;
           throw error;
         }
       }
+      if (oversized && !found.length) setProblem("tooLarge");
     });
   }
   function select(witness: Witness) {

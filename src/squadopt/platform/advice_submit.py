@@ -627,10 +627,6 @@ class AdviceSubmitService:
                     or run.run_id in transaction.state["cancelled"]
                 )
                 original = None
-                if origin is not None and not known and not self._reader.llmopt_vnext:
-                    raise RunAdmissionError(
-                        "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
-                    )
                 if self._reader.llmopt_vnext or known:
                     transaction.bind(
                         run,
@@ -646,7 +642,9 @@ class AdviceSubmitService:
                         self._authorize_repair(
                             run, transaction, cache_key, request_spec(), preferences
                         )
-                    elif origin is not None:
+                    elif origin is not None and cache_key not in transaction.state["runs"][
+                        run.run_id
+                    ].get("repair_candidates", []):
                         transaction.repair_candidate = cache_key
                     if (
                         preference_bundle is not None
@@ -659,7 +657,7 @@ class AdviceSubmitService:
                     original = transaction.previous(run, cache_key)
                 if (
                     not self._reader.llmopt_vnext
-                    and run.stage == "repair"
+                    and (run.stage == "repair" or origin is not None)
                     and (not known or transaction.repair_candidate is not None)
                 ):
                     # A shared answer may be read normally. It becomes a new

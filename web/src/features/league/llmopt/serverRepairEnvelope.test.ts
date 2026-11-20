@@ -4,7 +4,7 @@ import { adviceRequestBody, type AdviceRequest } from "../advice/adviceClient";
 import { type PlanWeekNumber } from "../advice/decisionPreferences";
 import { type Constraint, type PlanDraft } from "./intent";
 import { summarizeRevision } from "./planRevision";
-import { candidateRequest, verificationRequest } from "./repairComputation";
+import { candidateRequest, RepairEnvelopeTooLarge, verificationRequest } from "./repairComputation";
 
 const team = mockEntrySquadEnvelopes[35249001]!.payload;
 const squad = {
@@ -86,17 +86,17 @@ it("checks UTF-8 bytes before posting candidates and before offering a witness f
       "base",
     )!;
   }
-  expect(() => envelope(70)).toThrow("RUN_REPAIR_INVALID");
+  expect(() => envelope(70)).toThrow(RepairEnvelopeTooLarge);
   // Find the valid candidate closest to the actual wire limit; no assumed roster size.
   let last = envelope(1);
   for (let width = 2; width <= 70; width++) {
     try {
       last = envelope(width);
     } catch (error) {
-      expect(error).toEqual(new Error("RUN_REPAIR_INVALID"));
+      expect(error).toBeInstanceOf(RepairEnvelopeTooLarge);
       break;
     }
   }
   expect(bytes(last)).toBeLessThanOrEqual(4096);
-  expect(() => verificationRequest(last, witness)).toThrow("RUN_REPAIR_INVALID");
+  expect(() => verificationRequest(last, witness)).toThrow(RepairEnvelopeTooLarge);
 });
