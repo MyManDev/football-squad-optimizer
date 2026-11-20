@@ -9,6 +9,7 @@ import {
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 import { holdModel, routeChat } from "./llmoptChat";
+import { observeCompletedJob, reloadQueuedJob, startQueuedJob } from "./queuedAdviceJob";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -145,6 +146,7 @@ test("a chat revision keeps week one and prices both exact comparisons after rel
     return answer(route, { status: "draft", draft: revisionDraft });
   });
   await page.route(`${API}/api/v1/advice-jobs/${JOB}`, (route) => {
+    if (route.request().method() === "OPTIONS") return answer(route, null);
     polls += 1;
     return answer(route, { job_id: JOB, status: completed ? "completed" : "queued" });
   });
@@ -216,6 +218,7 @@ test("a chat revision keeps week one and prices both exact comparisons after rel
     });
   });
 
+  await page.clock.install();
   await page.goto(PAGE);
 
   await holdModel(page);
@@ -251,7 +254,7 @@ test("a chat revision keeps week one and prices both exact comparisons after rel
   await expect(compute).toBeEnabled();
   expect(posts.map(({ kind }) => kind)).toEqual(["original"]);
 
-  await compute.click();
+  await startQueuedJob(page, JOB, compute, "en");
   await expect.poll(() => polls).toBeGreaterThan(0);
   const revisedPosts = posts.filter(({ kind }) => kind !== "original");
   expect(revisedPosts.map(({ kind }) => kind).sort()).toEqual(["with", "without"]);
@@ -277,10 +280,11 @@ test("a chat revision keeps week one and prices both exact comparisons after rel
   }
 
   const beforeReload = polls;
-  await page.reload();
+  await reloadQueuedJob(page, JOB);
   await expect.poll(() => polls).toBeGreaterThan(beforeReload);
   expect(posts).toHaveLength(3);
   completed = true;
+  await observeCompletedJob(page, JOB);
   await expect(ready("With player")).toBeVisible({ timeout: 15_000 });
 
   const assertComparisons = async () => {

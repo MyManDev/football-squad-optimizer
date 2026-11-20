@@ -22,6 +22,7 @@ import {
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks, openCalendar } from "./leagueMocks";
 import { holdModel, routeChat } from "./llmoptChat";
+import { observeCompletedJob, reloadQueuedJob, startQueuedJob } from "./queuedAdviceJob";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -137,6 +138,7 @@ for (const language of ["tr", "en"] as const)
           return result;
         }
         await page.route(`${API}/api/v1/advice-jobs/preference-bundle`, (route) => {
+          if (route.request().method() === "OPTIONS") return answer(route, null);
           polls += 1;
           return answer(route, {
             job_id: "preference-bundle",
@@ -212,6 +214,7 @@ for (const language of ["tr", "en"] as const)
           cache.set(key(body.preferences, bundle), parent);
           return answer(route, { job_id: "preference-bundle", status: "queued" }, 202);
         });
+        await page.clock.install();
         await page.goto(PAGE);
         await holdModel(page);
         await page
@@ -226,7 +229,13 @@ for (const language of ["tr", "en"] as const)
         expect(posts).toHaveLength(0);
         if (total)
           await expect(page.getByRole("spinbutton", { name: copy.totalLimit })).toHaveValue("1.5");
-        await page.getByRole("button", { name: copy.compute, exact: true }).click();
+        const job = "preference-bundle";
+        await startQueuedJob(
+          page,
+          job,
+          page.getByRole("button", { name: copy.compute, exact: true }),
+          language,
+        );
         await expect.poll(() => posts.length).toBe(2);
         expect(posts[0]!.run.stage).toBe("base");
         expect(posts[1]!.run).toEqual({ ...posts[0]!.run, stage: "followup" });
@@ -236,10 +245,11 @@ for (const language of ["tr", "en"] as const)
         );
         await expect.poll(() => polls).toBeGreaterThan(0);
         const before = polls;
-        await page.reload();
+        await reloadQueuedJob(page, job, language);
         await expect.poll(() => polls).toBeGreaterThan(before);
         expect(posts).toHaveLength(2);
         released = true;
+        await observeCompletedJob(page, job);
         await expect(
           page.getByRole("heading", { name: copy.combinedPlan, exact: true }),
         ).toBeVisible();
