@@ -274,6 +274,26 @@ export function addHistory(h: PlanHistory, plans: SavedPlan[]): PlanHistory {
   const first = plans.find((p) => retained.some((i) => i.id === p.id));
   return current.cursor < 0 && first ? selectHistory(current, first.id, false) : current;
 }
+/** Resolve only the labels presented in this message's catalogue. */
+export function planIdForLabel(context: PlanContext, label: unknown): string | undefined {
+  return context.plans.find(
+    (plan, index) => label === `P${index + 1}` && plan.data_id === context.data_id,
+  )?.plan_id;
+}
+
+export function currentPlanCommand(
+  sent: PlanContext | undefined,
+  current: PlanContext | undefined,
+  id: string,
+): boolean {
+  if (!sent || !current || current.kind !== sent.kind || current.data_id !== sent.data_id)
+    return false;
+  const index = sent.plans.findIndex(
+    (plan) => plan.plan_id === id && plan.data_id === sent.data_id,
+  );
+  return index >= 0 && planIdForLabel(current, `P${index + 1}`) === id;
+}
+
 export function planCatalogue(h: PlanHistory, shown: EntryAdvice[]): PlanContext | undefined {
   const selected = h.items.find((i) => i.id === h.navigation[h.cursor]);
   const data = selected && planData(selected.plan);

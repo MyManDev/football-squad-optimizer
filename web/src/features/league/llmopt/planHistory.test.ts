@@ -4,6 +4,7 @@ import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtu
 import {
   addHistory,
   checkedHistory,
+  currentPlanCommand,
   EMPTY_HISTORY,
   planCatalogue,
   planIdentity,
@@ -12,7 +13,7 @@ import {
   verifiedHistory,
 } from "./planHistory";
 import { commandDraft } from "./planCommand";
-import { preparePlans } from "./intent";
+import { intentAnswer, preparePlans } from "./intent";
 import { prepareRun, requestFor } from "./planRun";
 import { freezeReference } from "./planRevision";
 
@@ -104,6 +105,36 @@ it("catalogues only current data, in visible order, without computed figures", a
   expect(catalogue.plans.map((p) => p.plan_id)).toEqual([items[1]!.id, items[0]!.id]);
   expect(JSON.stringify(catalogue)).not.toMatch(/bank|points|999/);
   expect(catalogue.plans[0]!.weeks[0]!.players).toHaveLength(15);
+});
+it("resolves a checked label against the sent catalogue and verifies its current content", async () => {
+  const plans = [make(3), make(3), make(3)];
+  const rows = await Promise.all(
+    plans.map(async (plan, i) => {
+      plan.bank_after_tenths = i + 10;
+      return { id: await planIdentity(plan), plan };
+    }),
+  );
+  const history = addHistory(EMPTY_HISTORY, rows);
+  const sent = planCatalogue(history, plans)!;
+  const id = rows[1]!.id;
+  const response = { status: "plan", command: { plan_id: id, action: "select" }, plan_label: "P2" };
+  expect(intentAnswer(response, [], sent)).toEqual({ status: "plan", command: response.command });
+  expect(intentAnswer({ status: "plan", command: response.command }, [], sent)).toEqual({
+    status: "plan",
+    command: response.command,
+  });
+  const restored = await verifiedHistory(
+    checkedHistory(JSON.parse(JSON.stringify(history)), squad),
+  );
+  expect(currentPlanCommand(sent, planCatalogue(restored, plans), id)).toBe(true);
+  expect(
+    currentPlanCommand(sent, planCatalogue(history, [plans[1]!, plans[0]!, plans[2]!]), id),
+  ).toBe(false);
+  expect(currentPlanCommand(sent, { ...sent, data_id: "f".repeat(64) }, id)).toBe(false);
+  expect(currentPlanCommand(sent, undefined, id)).toBe(false);
+  for (const label of ["P1", "P4", "P02", id, null])
+    expect(() => intentAnswer({ ...response, plan_label: label }, [], sent)).toThrow();
+  expect(() => intentAnswer(response, [])).toThrow();
 });
 it("derives frozen weeks and substitutions from computed decisions", async () => {
   const p = make(3),
