@@ -466,6 +466,7 @@ class AdviceReadStore:
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
         transfer_packages: bool = False,
         preference_bundles: bool = False,
+        llmopt_vnext: bool = False,
     ) -> None:
         self._directory = directory
         self._cache = cache
@@ -487,6 +488,7 @@ class AdviceReadStore:
         self._available_windows = available_windows
         self._transfer_packages = transfer_packages
         self._preference_bundles = preference_bundles
+        self.llmopt_vnext = llmopt_vnext
 
     def current_capture_snapshot_id(self) -> str | None:
         context = self._context.current()
@@ -675,7 +677,6 @@ class AdviceReadStore:
         )
         document: dict[str, object] = {
             "contract_version": LEAGUE_CAPABILITIES_CONTRACT_VERSION,
-            "plan_data_id": advice_context_identity(context),
             "league_id": int(league_id),
             "capture_snapshot_id": context.capture_snapshot_id,
             "season": context.season,
@@ -701,14 +702,17 @@ class AdviceReadStore:
                 },
             },
         }
-        if self._preference_bundles:
+        if self.llmopt_vnext:
+            document["llmopt_vnext"] = True
+            document["plan_data_id"] = advice_context_identity(context)
+        if self.llmopt_vnext and self._preference_bundles:
             document["preference_bundles"] = {"version": BUNDLE_VERSION}
         if inputs.football is not None:
             document["models"] = list(PREDICTION_MODELS)
             document["decision_information"] = inputs.decision_information(
                 context.capture_snapshot_id
             )
-        if self._transfer_packages:
+        if self.llmopt_vnext and self._transfer_packages:
             document["transfer_packages"] = True
         validate_league_capabilities(document)
         return document

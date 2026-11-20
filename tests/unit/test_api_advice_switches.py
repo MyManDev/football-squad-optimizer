@@ -471,9 +471,12 @@ def test_capabilities_say_what_may_be_asked_right_now(tmp_path: Path) -> None:
     world = _world(tmp_path)
     url = f"/api/v1/leagues/{LEAGUE_ID}/capabilities"
     document = world["client"].get(url).json()
+    assert (
+        world["reader"].plan_data_id()
+        == "670ca0ec8dc7645572b6578b3a1957c8769c1fbf437b33b642ac9e3d84189269"
+    )
     assert document == {
         "contract_version": "league_capabilities_v1",
-        "plan_data_id": "670ca0ec8dc7645572b6578b3a1957c8769c1fbf437b33b642ac9e3d84189269",
         "league_id": LEAGUE_ID,
         "capture_snapshot_id": CONTEXT.capture_snapshot_id,
         "season": "2026-27",
@@ -525,7 +528,8 @@ def test_the_committed_capabilities_schema_matches_its_generator() -> None:
     assert committed == league_capabilities_schema()
 
 
-def test_enabled_package_capability_passes_runtime_and_committed_schema(tmp_path):
+@pytest.mark.parametrize("enabled", [False, True])
+def test_package_capability_follows_the_release_and_passes_the_committed_schema(tmp_path, enabled):
     _publish_members(tmp_path / "site")
     reader = AdviceReadStore(
         FileLeagueDirectory(tmp_path / "site"),
@@ -533,8 +537,12 @@ def test_enabled_package_capability_passes_runtime_and_committed_schema(tmp_path
         _Context(),
         {"saf-puan": False},
         transfer_packages=True,
+        llmopt_vnext=enabled,
     )
     document = reader.league_capabilities(LEAGUE_ID)
-    assert document["transfer_packages"] is True
+    if enabled:
+        assert document["transfer_packages"] is True
+    else:
+        assert "transfer_packages" not in document
     committed = json.loads(LEAGUE_CAPABILITIES_SCHEMA_PATH.read_text(encoding="utf-8"))
     jsonschema.validate(document, committed)

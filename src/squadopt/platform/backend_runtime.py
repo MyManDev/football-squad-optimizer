@@ -235,11 +235,23 @@ class BackendConfig:
     root, that the rotation table was coded from. The manager's word needs both this and
     ``artifact_root``."""
 
+    llmopt_vnext: bool = False
+
     def __post_init__(self) -> None:
+        if type(self.llmopt_vnext) is not bool:
+            raise BackendConfigError("The LLMOPT release control must be boolean.")
         if type(self.transfer_packages) is not bool or type(self.package_gate) is not bool:
             raise BackendConfigError("Package controls must be boolean.")
         if self.package_gate and not self.transfer_packages:
             raise BackendConfigError("The package gate requires packages.")
+
+    @property
+    def enabled_packages(self) -> bool:
+        return self.llmopt_vnext and self.transfer_packages
+
+    @property
+    def enabled_package_gate(self) -> bool:
+        return self.enabled_packages and self.package_gate
 
     @property
     def queue_root(self) -> Path:
@@ -304,6 +316,7 @@ class BackendConfig:
             allowed_origins=origins,
             public_entries=public_entries == "1",
             transfer_packages=_flag(source, "SQUADOPT_BACKEND_TRANSFER_PACKAGES"),
+            llmopt_vnext=_flag(source, "SQUADOPT_BACKEND_LLMOPT_VNEXT"),
             package_gate=_flag(source, "SQUADOPT_BACKEND_PACKAGE_GATE"),
             public_queue_limit=_positive_int(source, "SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT", 32),
             season=season,
@@ -533,8 +546,8 @@ class CaptureContextProvider:
             if held is None or held.context != context:
                 held = replace(
                     load_capture_context(identity),
-                    transfer_packages=self._config.transfer_packages,
-                    package_gate=self._config.package_gate,
+                    transfer_packages=self._config.enabled_packages,
+                    package_gate=self._config.enabled_package_gate,
                 )
                 self._context = held
                 self._switch_signature = None
@@ -860,7 +873,7 @@ def build_backend(
         config,
         repository_commit=_repository_commit(),
         fingerprint=configuration_fingerprint(
-            transfer_packages=config.transfer_packages, package_gate=config.package_gate
+            transfer_packages=config.enabled_packages, package_gate=config.enabled_package_gate
         ),
         log=component_log,
     )
@@ -874,8 +887,9 @@ def build_backend(
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
-        transfer_packages=config.transfer_packages,
+        transfer_packages=config.enabled_packages,
         preference_bundles=True,
+        llmopt_vnext=config.llmopt_vnext,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -905,8 +919,9 @@ def build_backend(
             public_inputs,
             switches=contexts,
             available_windows=contexts.available_windows,
-            transfer_packages=config.transfer_packages,
+            transfer_packages=config.enabled_packages,
             preference_bundles=True,
+            llmopt_vnext=config.llmopt_vnext,
         )
         public_submit = AdviceSubmitService(
             public_reader,

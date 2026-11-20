@@ -20,7 +20,9 @@ from squadopt.platform.advice_worker import build_advice_compute
 @pytest.mark.parametrize("window,weight", [(3, 0), (5, 20)])
 def test_observed_worker_preserves_member_choices(tmp_path, monkeypatch, window, weight):
     artifacts = tmp_path / "artifacts"
-    world = _deployment(tmp_path, monkeypatch, last_gameweek=6, artifact_root=artifacts)
+    world = _deployment(
+        tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=6, artifact_root=artifacts
+    )
     backend = world["backend"]
     identity = backend.contexts.identity()
     availability = identity.inputs.availability.copy()

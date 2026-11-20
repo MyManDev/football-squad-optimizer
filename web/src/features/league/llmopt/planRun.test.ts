@@ -120,6 +120,22 @@ describe("restoreRun", () => {
     expect(restored).toMatchObject({ baseRequest, slots, prices, inputs: { draft, held } });
   });
 
+  it("only restores the path mode for a bound three-week confirmation", () => {
+    const confirmation = { wildcardNotHeld: false, paths3w: true as const };
+    const three = { ...draft, window: 3 as const };
+    const bound = { ...confirmation, runId: "a".repeat(32) };
+    expect(
+      restoreRun({ draft: three, confirmation }, held, window)?.inputs.paths3w,
+    ).toBeUndefined();
+    expect(
+      restoreRun({ draft: { ...draft, window: 1 }, confirmation: bound }, held, window)?.inputs
+        .paths3w,
+    ).toBeUndefined();
+    expect(restoreRun({ draft: three, confirmation: bound }, held, window)?.inputs.paths3w).toBe(
+      true,
+    );
+  });
+
   it("restores nothing without a confirmation or once the required rules conflict", () => {
     expect(restoreRun({ draft }, held, window)).toBeNull();
     expect(restoreRun(null, held, window)).toBeNull();

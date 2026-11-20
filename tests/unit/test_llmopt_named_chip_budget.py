@@ -48,7 +48,9 @@ def test_named_chip_auxiliary_work_cannot_displace_the_admitted_main_search(
             "no_hits": True,
         },
     }
-    backend = world._deployment(tmp_path / "run", monkeypatch, last_gameweek=5)["backend"]
+    backend = world._deployment(tmp_path / "run", monkeypatch, last_gameweek=5, llmopt_vnext=True)[
+        "backend"
+    ]
     job, bound_answer = _cold_worker_answer(backend, confirmed_request(body))
     assert job.contract_version == "backend_jobs_v2"
     ledger = json.loads(backend.runs.path.read_bytes())

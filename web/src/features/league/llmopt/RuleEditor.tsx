@@ -47,7 +47,9 @@ export function RuleEditor({
   disabled,
   change,
   changes,
+  priorities = false,
 }: {
+  priorities?: boolean;
   draft: PlanDraft;
   players: CatalogPlayer[];
   copy: LLMOptCopy;
@@ -114,7 +116,7 @@ export function RuleEditor({
       rule = { ...rule, max_cost_tenths: maxCost };
       setCost("");
     }
-    if (strength === "soft" && priority !== undefined) rule = { ...rule, priority };
+    if (priorities && strength === "soft" && priority !== undefined) rule = { ...rule, priority };
     if (strength === "comparison") {
       apply({
         ...draft,
@@ -176,7 +178,7 @@ export function RuleEditor({
                             </>
                           )}
                         </span>
-                        {strength === "soft" && (
+                        {priorities && strength === "soft" && (
                           <label>
                             {copy.priority}
                             <select
@@ -240,7 +242,7 @@ export function RuleEditor({
           );
         })}
       </div>
-      {draft.soft.length > 0 && (
+      {priorities && draft.soft.length > 0 && (
         <div className={styles.editor}>
           <label>
             {copy.totalLimit}
@@ -384,7 +386,7 @@ export function RuleEditor({
             ))}
           </select>
         </label>
-        {strength === "soft" && (
+        {priorities && strength === "soft" && (
           <label>
             {copy.priority}
             <select

@@ -56,11 +56,12 @@ export function requestFor(
   squad: EntrySquad,
   forwarded: boolean | undefined,
   window: AdviceRequest["window"],
+  allowDevice = false,
 ): AdviceRequest {
+  const device = allowDevice && window === 1 && isDevicePlanEntry(squad.device_plan);
   return {
-    ...(window === 1 && isDevicePlanEntry(squad.device_plan)
-      ? { deviceRun: true, deviceAlternatives: true }
-      : {}),
+    deviceRun: device,
+    deviceAlternatives: device,
     publicEntry: forwarded,
     leagueId: squad.league_id,
     entryId: squad.entry.entry_id,
@@ -229,8 +230,11 @@ export function restoreRun(
     held,
     request: {
       ...requestForWindow(plans.window),
-      deviceRun: confirmation.deviceRun === true,
-      deviceAlternatives: confirmation.deviceAlternatives === true,
+      deviceRun: !!confirmation.runId && confirmation.deviceRun === true,
+      deviceAlternatives:
+        !!confirmation.runId &&
+        confirmation.deviceRun === true &&
+        confirmation.deviceAlternatives === true,
       ...(confirmation.runId
         ? {
             run: {
@@ -244,7 +248,9 @@ export function restoreRun(
     plans,
     wildcardNotHeld: confirmation.wildcardNotHeld,
     compareOnly: confirmation.compareOnly === true,
-    ...(confirmation.paths3w === true ? { paths3w: true as const } : {}),
+    ...(confirmation.runId && plans.window === 3 && confirmation.paths3w === true
+      ? { paths3w: true as const }
+      : {}),
     frozenWeeks,
     reference,
     bundleMode: confirmation.bundleMode === true,

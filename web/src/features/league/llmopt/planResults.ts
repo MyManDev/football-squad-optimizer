@@ -106,6 +106,7 @@ export interface ShownResult {
  */
 export function planResults({
   run,
+  showPaths,
   base,
   alternatives,
   priceReview,
@@ -113,6 +114,7 @@ export function planResults({
   explain,
 }: {
   run: PlanRun;
+  showPaths: boolean;
   base: ComputePhase;
   alternatives: readonly ComputePhase[];
   priceReview: readonly PriceReview[];
@@ -172,7 +174,7 @@ export function planResults({
       const previous = results.flatMap(({ state }) =>
         state.phase === "done" ? [state.envelope.payload] : [],
       );
-      const automatic = visibleAutomatic(state, baseAnswer, previous, run.inputs.paths3w);
+      const automatic = visibleAutomatic(state, baseAnswer, previous, showPaths);
       if (automatic)
         results.push({ title: automatic.kind === "roll" ? copy.rollPlan : copy.bankPlan, state });
     }

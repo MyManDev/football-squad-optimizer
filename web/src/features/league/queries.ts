@@ -1,7 +1,9 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 
+import type { AdviceClient } from "./advice/adviceClient";
 import { LeagueDataMissing } from "./dataErrors";
 import { loadSuggestionHistory } from "./history/historyData";
+import type { EntrySquad } from "./types";
 import { useLeague } from "./useLeague";
 
 /**
@@ -43,6 +45,15 @@ export const HELD_READ = {
  * read; every key names the league, so two leagues' documents never share a cache entry.
  */
 export const leagueKeys = {
+  restoredPlanCapabilities: (origin: string, forwarded: boolean, squad: EntrySquad) =>
+    [
+      "llmopt-release",
+      origin,
+      forwarded,
+      squad.league_id,
+      squad.entry.entry_id,
+      squad.source_snapshot_id,
+    ] as const,
   directory: () => ["league-directory"] as const,
   members: (leagueId: number) => ["provisional-league-members", leagueId] as const,
   scoreboard: (leagueId: number) => ["provisional-league-scoreboard", leagueId] as const,
@@ -53,6 +64,26 @@ export const leagueKeys = {
   suggestionHistory: (leagueId: number, entryId: number) =>
     ["suggestion-history", leagueId, entryId] as const,
 };
+
+/** Restoring unfinished work requires a current release decision, even with a warm cache. */
+export function useRestoredPlanCapabilities(
+  client: AdviceClient,
+  origin: string,
+  forwarded: boolean,
+  squad: EntrySquad,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: leagueKeys.restoredPlanCapabilities(origin, forwarded, squad),
+    queryFn: async ({ signal }) =>
+      (forwarded
+        ? await client.readPublicCapabilities?.(squad.league_id, squad.entry.entry_id, { signal })
+        : await client.readCapabilities?.(squad.league_id, { signal })) ?? null,
+    enabled: !!origin && enabled,
+    ...CAPABILITIES_READ,
+    refetchOnMount: "always",
+  });
+}
 
 export function useLeagueMembers() {
   const { league, tree } = useLeague();

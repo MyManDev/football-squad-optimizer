@@ -324,6 +324,7 @@ def measure_case(root, frozen, inputs, entry, scenario, window, producer):
         contexts,
         {"saf-puan": False},
         capabilities=menu_capabilities(),
+        llmopt_vnext=True,
         preference_bundles=True,
         preference_players=lambda *_: PreferencePlayers(
             frozenset(held), roster, frozenset(capture.inputs.players.team_id)
@@ -332,7 +333,10 @@ def measure_case(root, frozen, inputs, entry, scenario, window, producer):
     )
     submit = AdviceSubmitService(reader, queue, specs=specs, runs=runs)
     app = create_app(
-        advice_store=reader, advice_submit=submit, utc_now=lambda: datetime.fromisoformat(stamp)
+        advice_store=reader,
+        advice_submit=submit,
+        llmopt_vnext=reader.llmopt_vnext,
+        utc_now=lambda: datetime.fromisoformat(stamp),
     )
     compute = build_advice_compute(contexts, specs, cache=cache, runs=runs)
     route = f"/api/v1/leagues/{league}/entries/{entry}/advice"
@@ -389,7 +393,10 @@ def measure_case(root, frozen, inputs, entry, scenario, window, producer):
                 rebuilt = AdviceSubmitService(
                     reader, queue, specs=specs, runs=FileRunStore(root / "runs")
                 )
-                with TestClient(create_app(advice_store=reader, advice_submit=rebuilt)) as replay:
+                restarted = create_app(
+                    advice_store=reader, advice_submit=rebuilt, llmopt_vnext=reader.llmopt_vnext
+                )
+                with TestClient(restarted) as replay:
                     for _ in range(3):
                         repeated += 1
                         assert replay.post(route, json=body).status_code == 200
@@ -398,6 +405,7 @@ def measure_case(root, frozen, inputs, entry, scenario, window, producer):
                 state = tx.state["runs"][run_id]
                 ids = sorted(set(state["requests"].values()))
                 jobs = [queue.load(identifier) for identifier in ids]
+                assert all(job.contract_version == "backend_jobs_v2" for job in jobs)
                 receipts = [tx.state["jobs"][identifier]["receipt"] for identifier in ids]
                 allocations = [tx.state["jobs"][identifier]["limit"] for identifier in ids]
                 reserved = state["reserved"]
@@ -454,6 +462,7 @@ def main():
     producer = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     provenance = dict(
         producer_repository_commit=producer,
+        llmopt_vnext=True,
         source_sha256={path.as_posix(): digest(ROOT / path) for path in SOURCES},
         frozen_manifest_sha256=digest(ROOT / "docs/research/llmopt_phase1/inputs.json"),
     )
