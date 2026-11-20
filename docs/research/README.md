@@ -33,6 +33,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Topic | Entry point |
 | --- | --- |
 | Five-free-transfer accounting preflight | [Saved served-path probe and unresolved capture gap](llmopt_window_budget_probe.md) |
+| Five-free-transfer expected windows | [Paired results for the twenty frozen member-weeks](expected_window_guard.md) |
 | Fixture football candidate and observed planning | [Implementation and evidence contract](football_candidate_development.md) |
 | Private set-piece duties candidate | [Source, learned allocation, synthetic checks and real-use gates](football_set_piece_duties.md) |
 | Private tactical matchup candidate | [Source, model, synthetic checks and real-use gates](football_tactical_matchup_development.md) |
