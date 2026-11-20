@@ -18,6 +18,7 @@ import type { LpSolver } from "../lp/problem";
  * far slower than any measured one, or on a solve that has stopped making progress.
  */
 export const DEVICE_SOLVE_CEILING_SECONDS = 120;
+export const DEVICE_ALTERNATIVE_SECONDS = 15;
 
 /** How long the page waits for the solver to load before the ceiling starts. */
 export const DEVICE_LOAD_ALLOWANCE_SECONDS = 60;
@@ -43,7 +44,11 @@ export function withinCeiling(
     remainingSeconds: remaining,
     solve(problem, options) {
       const left = remaining();
-      return solver.solve(problem, { ...options, time_limit: Math.max(left, LEAST_SECONDS) });
+      const requested = typeof options?.time_limit === "number" ? options.time_limit : Infinity;
+      return solver.solve(problem, {
+        ...options,
+        time_limit: Math.min(requested, Math.max(left, LEAST_SECONDS)),
+      });
     },
   };
 }

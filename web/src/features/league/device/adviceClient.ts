@@ -1,12 +1,14 @@
 /** Advice transport for verified one-week device rules; credentials never enter it. */
 import type { AdviceClient, AdviceRequest, AdviceReadResult } from "../advice/adviceClient";
 import { checkedAdvice } from "../advice/adviceResponse";
+import { shownPriorityReference, type DevicePriorityReference } from "./priorityWitness";
 import { capabilitiesForPage, type AdviceCapabilities } from "../advice/adviceCapabilities";
 import { withRequestDeadline, type RequestOptions } from "../../../data/request";
 import { preferencesKey } from "../advice/decisionPreferences";
 import { bundleKey } from "../advice/preferenceBundle";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
+import { DEVICE_ENVELOPE_PREFIX, retainDeviceEnvelope } from "./envelopeCache";
 import { deviceSelection } from "./selection";
 import { isDevicePlanDocument, isDevicePlanEntry, type DevicePlanDocument } from "./types";
 import type { DeviceSolver } from "./useDevicePlan";
@@ -18,6 +20,7 @@ import {
   DeviceWorkRefused,
 } from "./workBudget";
 import {
+  DEVICE_ALTERNATIVE_SECONDS,
   DEVICE_LOAD_ALLOWANCE_SECONDS,
   DEVICE_REPLY_GRACE_SECONDS,
   DEVICE_SOLVE_CEILING_SECONDS,
@@ -34,6 +37,8 @@ export function deviceAdviceClient(
 ): AdviceClient {
   const memory = new Map<string, AdviceReadResult>();
   const pending = new Map<string, Promise<AdviceReadResult>>();
+  type Plan = Extract<AdviceReadResult, { kind: "advice" }>;
+  const listeners = new Map<string, Set<(plan: Plan) => void>>();
   const capabilityReads = new Map<string, Promise<AdviceCapabilities | null>>();
   const localRuns = new Set<string>();
   const closedLocalRuns = new Set<string>();
@@ -127,8 +132,10 @@ export function deviceAdviceClient(
     (request.gameweek === undefined || request.gameweek === squad.gameweek) &&
     // This transport rechecks the current server grant before starting a run-bound worker.
     deviceSelection(request, squad, true)?.kind === "plain";
-  const key = (request: AdviceRequest, fingerprint: string) =>
-    "llmopt-device-v1:" +
+  const workBinding = (request: AdviceRequest, fingerprint: string) =>
+    JSON.stringify([fingerprint, request.leagueId, request.entryId, request.window]);
+  const key = (request: AdviceRequest, fingerprint: string, reference?: DevicePriorityReference) =>
+    DEVICE_ENVELOPE_PREFIX +
     JSON.stringify([
       squad.source_snapshot_id,
       fingerprint,
@@ -140,10 +147,18 @@ export function deviceAdviceClient(
       request.deviceAlternatives ?? false,
       request.chip ?? null,
       preferencesKey(request.preferences),
+      ...(request.priorityMain && !request.preferenceBundle ? ["priority-main"] : []),
       ...(request.preferenceBundle ? [bundleKey(request.preferenceBundle)] : []),
+      ...(reference
+        ? [reference.squad, reference.startingXi, reference.captain, reference.proved]
+        : []),
     ]);
-  const cached = (request: AdviceRequest, fingerprint: string): AdviceReadResult => {
-    const address = key(request, fingerprint);
+  const cached = (
+    request: AdviceRequest,
+    fingerprint: string,
+    reference?: DevicePriorityReference,
+  ): AdviceReadResult => {
+    const address = key(request, fingerprint, reference);
     const held = memory.get(address);
     if (held) return held;
     try {
@@ -161,8 +176,74 @@ export function deviceAdviceClient(
     }
     return { kind: "not-computed" };
   };
+  const referenceFor = (request: AdviceRequest, fingerprint: string) => {
+    if (!request.preferenceBundle?.program) return undefined;
+    if (request.shownDeviceMain !== undefined)
+      return request.shownDeviceMain?.fingerprint === fingerprint
+        ? request.shownDeviceMain.decisions
+        : undefined;
+    // A restored client may have only the previously published device envelope.
+    const main = { ...request, preferenceBundle: undefined, priorityMain: true as const };
+    const held = cached(main, fingerprint);
+    const original =
+      held.kind === "advice" ? held : cached({ ...main, priorityMain: undefined }, fingerprint);
+    return original.kind === "advice"
+      ? shownPriorityReference(original.envelope.payload)
+      : undefined;
+  };
+  const readCached = (
+    request: AdviceRequest,
+    fingerprint: string,
+    reference?: DevicePriorityReference,
+  ) => {
+    const saved = cached(request, fingerprint, reference);
+    if (saved.kind === "advice") return saved;
+    if (reference) {
+      const old = cached(request, fingerprint);
+      return old.kind === "advice" &&
+        JSON.stringify(shownPriorityReference(old.envelope.payload)) === JSON.stringify(reference)
+        ? old
+        : saved;
+    }
+    if (!request.priorityMain || request.preferenceBundle) return saved;
+    const legacy = cached({ ...request, priorityMain: undefined }, fingerprint);
+    return legacy.kind === "advice" && legacy.envelope.payload.solver_status === "OPTIMAL"
+      ? legacy
+      : saved;
+  };
   const abort = () => new DOMException("The device request ended.", "AbortError");
+  const checkAnswerBinding = (id: string | undefined, binding: string) => {
+    if (!id) return;
+    if (closedLocalRuns.has(id)) throw new DeviceWorkRefused("RUN_CANCELLED");
+    let receipt;
+    try {
+      receipt = deviceWorkReceipt(id);
+    } catch (error) {
+      // Reading a checked answer or finishing paid work requires no new reservation.
+      if (error instanceof DeviceWorkRefused && error.code === "RUN_STORE_UNAVAILABLE") return;
+      throw error;
+    }
+    if (receipt?.closed) throw new DeviceWorkRefused("RUN_CANCELLED");
+    if (receipt && receipt.binding !== binding) throw new DeviceWorkRefused("RUN_CONTEXT_CHANGED");
+  };
   return {
+    prepareDeviceRun: async (request) => {
+      if (!eligible(request)) return false;
+      let fingerprint: string;
+      try {
+        ({ fingerprint } = await verified());
+      } catch {
+        return false;
+      }
+      try {
+        bindDeviceRun(request.run?.run_id, workBinding(request, fingerprint));
+        return true;
+      } catch (error) {
+        if (error instanceof DeviceWorkRefused && error.code === "RUN_STORE_UNAVAILABLE")
+          return false;
+        throw error;
+      }
+    },
     localRequestAllowanceMs: (request) =>
       eligible(request)
         ? (DEVICE_LOAD_ALLOWANCE_SECONDS +
@@ -187,7 +268,10 @@ export function deviceAdviceClient(
     readAdvice: async (request, options) => {
       if (!eligible(request)) return remote.readAdvice(request, options);
       try {
-        return cached(request, (await verified()).fingerprint);
+        const { fingerprint } = await verified();
+        const reference = referenceFor(request, fingerprint);
+        if (request.shownDeviceMain !== undefined && !reference) return { kind: "not-computed" };
+        return readCached(request, fingerprint, reference);
       } catch {
         return { kind: "not-computed" };
       }
@@ -225,27 +309,30 @@ export function deviceAdviceClient(
       } catch {
         return { kind: "unavailable", reason: "DEVICE_INPUTS_UNAVAILABLE" };
       }
-      const saved = cached(request, inputs.fingerprint);
-      const binding = JSON.stringify([
-        inputs.fingerprint,
-        request.leagueId,
-        request.entryId,
-        request.window,
-      ]);
+      const reference = referenceFor(request, inputs.fingerprint);
+      if (request.preferenceBundle?.program && !reference)
+        return { kind: "unavailable", reason: "RUN_BASE_REQUIRED" };
+      const saved = readCached(request, inputs.fingerprint, reference);
+      const binding = workBinding(request, inputs.fingerprint);
+      const address = key(request, inputs.fingerprint, reference);
+      const runningKey = address + ":" + (request.run?.run_id ?? "");
       if (saved.kind === "advice") {
         try {
-          if (request.run && deviceWorkReceipt(request.run.run_id))
-            bindDeviceRun(request.run.run_id, binding);
+          checkAnswerBinding(request.run?.run_id, binding);
         } catch (error) {
           return {
             kind: "unavailable",
             reason: error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED",
           };
         }
-        return saved;
+        if (!pending.has(runningKey)) return saved;
+        options?.onPlan?.(saved);
       }
-      const address = key(request, inputs.fingerprint);
-      const runningKey = address + ":" + (request.run?.run_id ?? "");
+      if (options?.onPlan) {
+        const updates = listeners.get(runningKey) ?? new Set();
+        updates.add(options.onPlan);
+        listeners.set(runningKey, updates);
+      }
       let work = pending.get(runningKey);
       if (!work) {
         work = (async (): Promise<AdviceReadResult> => {
@@ -263,70 +350,110 @@ export function deviceAdviceClient(
           reserveDeviceWork(request.run?.run_id, binding);
           const worker = createSolver();
           const id = ++sequence;
-          const answer = await new Promise<Parameters<typeof deviceAdviceEnvelope>[2]>(
-            (resolve, reject) => {
-              const finish = (
-                error?: unknown,
-                value?: Parameters<typeof deviceAdviceEnvelope>[2],
-              ) => {
-                clearTimeout(timer);
-                options?.signal?.removeEventListener("abort", cancelled);
-                worker.terminate();
-                if (error) reject(error);
-                else resolve(value!);
-              };
-              const cancelled = () => finish(abort());
-              const timer = setTimeout(
-                () => finish(new Error("Device solve did not complete.")),
-                (DEVICE_LOAD_ALLOWANCE_SECONDS +
-                  DEVICE_REPLY_GRACE_SECONDS +
-                  DEVICE_SOLVE_CEILING_SECONDS) *
-                  1000,
-              );
-              options?.signal?.addEventListener("abort", cancelled, { once: true });
-              worker.onmessage = ({ data }) => {
-                if (data.id !== id || data.kind === "ready") return;
-                if (data.kind === "answer") finish(undefined, data.answer);
-                else finish(new Error("Device solve did not prove this selection."));
-              };
-              worker.onerror = () => finish(new Error("The device solve failed."));
-              worker.postMessage({
-                id,
-                document,
-                ...(request.deviceAlternatives ? { alternatives: true } : {}),
-                entry: squad.device_plan!,
-                ...(request.preferences ? { preferences: request.preferences } : {}),
-                ...(request.preferenceBundle ? { preferenceBundle: request.preferenceBundle } : {}),
-              });
-            },
-          );
-          if (
-            request.run &&
-            (closedLocalRuns.has(request.run.run_id) ||
-              deviceWorkReceipt(request.run.run_id)?.closed)
-          )
-            throw new DeviceWorkRefused("RUN_CANCELLED");
-          const envelope = checkedAdvice(
-            deviceAdviceEnvelope(document, squad, answer, new Date(), request.leagueId),
-            request,
-          );
-          const stamp = (payload: typeof envelope.payload) => {
-            payload.device_input_fingerprint = inputs.fingerprint;
-            payload.device_alternatives?.forEach(stamp);
-            const bundle = payload.preference_bundle_result;
-            for (const component of [...(bundle?.components ?? []), bundle?.selected])
-              if (component?.payload) stamp(component.payload);
+          type Answer = Parameters<typeof deviceAdviceEnvelope>[2];
+          let generatedAt: Date | undefined;
+          const publish = (answer: Answer): Plan => {
+            checkAnswerBinding(request.run?.run_id, binding);
+            generatedAt ??= new Date();
+            const envelope = checkedAdvice(
+              deviceAdviceEnvelope(document, squad, answer, generatedAt, request.leagueId),
+              request,
+            );
+            const stamp = (payload: typeof envelope.payload) => {
+              payload.device_input_fingerprint = inputs.fingerprint;
+              payload.device_alternatives?.forEach(stamp);
+              const bundle = payload.preference_bundle_result;
+              for (const component of [...(bundle?.components ?? []), bundle?.selected])
+                if (component?.payload) stamp(component.payload);
+            };
+            stamp(envelope.payload);
+            const plan: Plan = { kind: "advice", envelope, source: "device" };
+            memory.set(address, plan);
+            retainDeviceEnvelope(address, JSON.stringify(envelope));
+            return plan;
           };
-          stamp(envelope.payload);
-          const result: AdviceReadResult = { kind: "advice", envelope, source: "device" };
-          memory.set(address, result);
-          try {
-            globalThis.sessionStorage?.setItem(address, JSON.stringify(envelope));
-          } catch {
-            /* Memory remains usable. */
-          }
-          return result;
-        })().finally(() => pending.delete(runningKey));
+          return new Promise<Plan>((resolve, reject) => {
+            let accepted: Plan | undefined;
+            let settled = false;
+            let main: Answer | undefined;
+            let solveDeadline = Infinity;
+            let optionalDeadline = Infinity;
+            const finish = (error?: unknown) => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              clearTimeout(optionalTimer);
+              options?.signal?.removeEventListener("abort", cancelled);
+              worker.terminate();
+              try {
+                checkAnswerBinding(request.run?.run_id, binding);
+              } catch (bindingError) {
+                reject(bindingError);
+                return;
+              }
+              if (options?.signal?.aborted || error instanceof DeviceWorkRefused || !accepted)
+                reject(error ?? abort());
+              else resolve(accepted);
+            };
+            const cancelled = () => finish(abort());
+            let optionalTimer: ReturnType<typeof setTimeout> | undefined;
+            const timer = setTimeout(
+              () => finish(new Error("Device solve did not complete.")),
+              (DEVICE_LOAD_ALLOWANCE_SECONDS +
+                DEVICE_REPLY_GRACE_SECONDS +
+                DEVICE_SOLVE_CEILING_SECONDS) *
+                1000,
+            );
+            options?.signal?.addEventListener("abort", cancelled, { once: true });
+            worker.onmessage = ({ data }) => {
+              if (settled || data.id !== id) return;
+              if (data.kind === "ready") {
+                solveDeadline = performance.now() + DEVICE_SOLVE_CEILING_SECONDS * 1000;
+                return;
+              }
+              if (accepted && performance.now() >= optionalDeadline) {
+                finish();
+                return;
+              }
+              try {
+                if (data.kind === "plan" && request.deviceAlternatives) {
+                  main ??= data.answer;
+                  accepted = publish({ ...main, alternatives: data.answer.alternatives ?? [] });
+                  for (const notify of listeners.get(runningKey) ?? []) notify(accepted);
+                  clearTimeout(optionalTimer);
+                  const started = performance.now();
+                  const remainingMs = Math.min(
+                    DEVICE_ALTERNATIVE_SECONDS * 1000,
+                    Math.max(0, solveDeadline - started),
+                  );
+                  optionalDeadline = started + remainingMs;
+                  optionalTimer = setTimeout(finish, remainingMs);
+                } else if (data.kind === "answer") {
+                  if (!accepted) accepted = publish(data.answer);
+                  finish();
+                } else finish(new Error("Device solve did not prove this selection."));
+              } catch (error) {
+                finish(error);
+              }
+            };
+            worker.onerror = () => finish(new Error("The device solve failed."));
+            worker.postMessage({
+              ...(reference ? { priorityReference: reference } : {}),
+              ...(request.priorityMain && !request.preferenceBundle
+                ? { priorityMain: true as const }
+                : {}),
+              id,
+              document,
+              ...(request.deviceAlternatives ? { alternatives: true } : {}),
+              entry: squad.device_plan!,
+              ...(request.preferences ? { preferences: request.preferences } : {}),
+              ...(request.preferenceBundle ? { preferenceBundle: request.preferenceBundle } : {}),
+            });
+          });
+        })().finally(() => {
+          pending.delete(runningKey);
+          listeners.delete(runningKey);
+        });
         pending.set(runningKey, work);
       }
       try {

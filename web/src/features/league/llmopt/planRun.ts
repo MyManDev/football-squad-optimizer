@@ -146,6 +146,8 @@ export function prepareRun(inputs: RunInputs): PlanRun {
   };
   const base = submit(baseline);
   const baseRequest = base?.run ? { ...base, run: { ...base.run, stage: "base" as const } } : base;
+  if (baseRequest?.deviceRun && inputs.bundleMode && draft.max_total_cost_tenths !== undefined)
+    baseRequest.priorityMain = true;
   if (draft.scenario) {
     const previous = prepareOriginalScenario(draft, held, plans.window, reference);
     const replay = submit(previous);

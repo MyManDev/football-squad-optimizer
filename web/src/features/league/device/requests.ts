@@ -6,7 +6,8 @@
 import type { DecisionPreferences } from "../advice/decisionPreferences";
 import type { PreferenceBundle } from "../advice/preferenceBundle";
 import { solvePreferenceBundle } from "./preferenceBundle";
-import { solveAlternatives } from "./alternatives";
+import type { DevicePriorityReference } from "./priorityWitness";
+import { solveAlternatives, transferDecisionId, type DeviceAlternative } from "./alternatives";
 import { orderedBench, viceCaptain } from "./publication/rows";
 import { solveChipGains } from "./chipForecast/gains";
 import type { LpSolver } from "./lp/problem";
@@ -24,6 +25,8 @@ import type {
 } from "./types";
 
 export interface DevicePlanRequest {
+  priorityMain?: true;
+  priorityReference?: DevicePriorityReference;
   preferenceBundle?: PreferenceBundle;
   alternatives?: boolean;
   preferences?: DecisionPreferences;
@@ -64,6 +67,8 @@ export function solveRequest(
     preferences,
     alternatives = false,
     preferenceBundle,
+    priorityReference,
+    priorityMain,
   }: Omit<DevicePlanRequest, "id">,
   now: () => number = () => performance.now(),
   onPlan?: (plan: DevicePlanAnswer) => void,
@@ -74,12 +79,22 @@ export function solveRequest(
       throw new DevicePlanRefused("unsupported preference execution combination", "plan");
     return solvePreferenceBundle(
       solver,
-      { document, entry, preferences, chip, bundle: preferenceBundle },
+      { document, entry, preferences, chip, bundle: preferenceBundle, priorityReference },
       (rules, choice) =>
         solveRequest(solver, { document, entry, preferences: rules, chip: choice }, now),
       now,
     );
   }
+  if (
+    priorityMain &&
+    !alternatives &&
+    !strategy &&
+    !top100Weight &&
+    !chipGains.length &&
+    chip === null &&
+    preferences?.net_points_priority
+  )
+    return solvePlan(solver, document, entry, now, null, { preferences }, "main");
   if (alternatives) {
     if (
       chip !== null ||
@@ -90,8 +105,9 @@ export function solveRequest(
     )
       throw new DevicePlanRefused("unsupported alternative combination", "plan");
     const baseline = solvePlan(solver, document, entry, now, null, { preferences });
+    let published: DevicePlanAnswer = { ...baseline, alternatives: [] };
+    onPlan?.(published);
     try {
-      const choices = solveAlternatives(solver, document, entry, preferences);
       const held = new Set(entry.held);
       const quantized = {
         ...document,
@@ -100,7 +116,7 @@ export function solveRequest(
           expected_points: player.coefficients[2] / document.rules.expected_points_scale,
         })),
       };
-      const answers = choices.map((choice, index): DevicePlanAnswer => {
+      const onAlternative = (choice: DeviceAlternative) => {
         const selected = new Set(choice.squad);
         const incoming = choice.squad.filter((id) => !held.has(id));
         const outgoing = entry.held.filter((id) => !selected.has(id));
@@ -118,9 +134,9 @@ export function solveRequest(
           ins.forEach((id, i) => moves.push({ in: id, out: outs[i]!, gain: null }));
         }
         const own = weekPoints(quantized, choice.squad, choice.startingXi, choice.captain, null);
-        return {
+        const answer: DevicePlanAnswer = {
           ...baseline,
-          ...(index > 0 ? { restricted: true } : {}),
+          restricted: true,
           objective_scaled: choice.objectiveScaled,
           objective: choice.netPoints,
           squad: choice.squad,
@@ -137,13 +153,28 @@ export function solveRequest(
           bank_after_tenths: choice.bankTenths,
           free_transfers_after: choice.freeTransfersAfter,
         };
+        published = { ...baseline, alternatives: [...published.alternatives!, answer] };
+        onPlan?.(published);
+      };
+      solveAlternatives(solver, document, entry, preferences, {
+        main: {
+          squad: baseline.squad,
+          startingXi: baseline.starting_xi,
+          captain: baseline.captain,
+          decisionId: transferDecisionId(baseline.squad, null),
+          objectiveScaled: baseline.objective_scaled,
+          netPoints: baseline.objective,
+          bankTenths: baseline.bank_after_tenths!,
+          hitPoints: baseline.transfer_hit_points,
+          freeTransfersAfter: baseline.free_transfers_after!,
+        },
+        onAlternative,
+        now,
       });
-      const [main, ...rest] = answers;
-      return { ...(main ?? baseline), alternatives: rest };
-    } catch (error) {
-      if (!(error instanceof DevicePlanRefused)) throw error;
-      return { ...baseline, alternatives: [] };
+    } catch {
+      // An invalid optional decision cannot revoke any completed plan.
     }
+    return published;
   }
   if (preferences && (chipGains.length || top100Weight || strategy))
     throw new DevicePlanRefused("unsupported preference combination", "plan");

@@ -38,17 +38,24 @@ export function deviceWorkReceipt(id: string): Receipt | undefined {
 }
 function write(id: string, receipt: Receipt) {
   try {
-    globalThis.sessionStorage.setItem(prefix + id, JSON.stringify(receipt));
+    // A new zero-unit receipt must leave room for all later reservations up to 84.
+    const value = JSON.stringify(receipt) + (receipt.units < 10 ? " " : "");
+    const key = prefix + id;
+    globalThis.sessionStorage.setItem(key, value);
+    if (globalThis.sessionStorage.getItem(key) !== value) throw new Error("Receipt not retained");
   } catch {
     throw new DeviceWorkRefused("RUN_STORE_UNAVAILABLE");
   }
 }
 export function bindDeviceRun(id: string | undefined, binding: string): void {
   if (!id || !/^[0-9a-f]{32}$/.test(id)) throw new DeviceWorkRefused("RUN_ID_REQUIRED");
-  const prior = deviceWorkReceipt(id) ?? { binding, units: 0, closed: false };
+  const prior = deviceWorkReceipt(id);
+  if (!prior) {
+    write(id, { binding, units: 0, closed: false });
+    return;
+  }
   if (prior.closed) throw new DeviceWorkRefused("RUN_CANCELLED");
   if (prior.binding !== binding) throw new DeviceWorkRefused("RUN_CONTEXT_CHANGED");
-  if (!deviceWorkReceipt(id)) write(id, prior);
 }
 export function reserveDeviceWork(id: string | undefined, binding: string): void {
   bindDeviceRun(id, binding);

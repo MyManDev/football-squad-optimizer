@@ -9,6 +9,7 @@ import type {
   AdviceJobStatus,
   AdviceReadResult,
   AdviceRequest,
+  AdviceRequestOptions,
   AdviceRequestResult,
 } from "./adviceClient";
 import { StaticOnlyAdviceClient } from "./adviceClient";
@@ -69,6 +70,9 @@ function Harness({
     <div>
       <output data-testid="phase">{describePhase(state)}</output>
       <output data-testid="standing">{describeStanding(state)}</output>
+      <output data-testid="alternatives">
+        {state.phase === "done" && state.deviceAlternativesPending ? "pending" : "settled"}
+      </output>
       <button type="button" onClick={reset}>
         reset
       </button>
@@ -102,6 +106,37 @@ function describeStanding(state: ComputePhase): string {
 const standing = () => JSON.parse(screen.getByTestId("standing").textContent || "null");
 
 describe("useAdviceJob", () => {
+  it.each(["completed", "failed"])(
+    "shows the main and holds repeat confirmation until optional work has %s",
+    async (outcome) => {
+      const client = new ScriptedClient();
+      const main = {
+        kind: "advice" as const,
+        envelope: mockEntryAdviceEnvelope(REQUEST.entryId, REQUEST.strategy, REQUEST.window),
+        source: "device" as const,
+      };
+      let settle!: () => void;
+      const requestAdvice = vi.fn((_request: AdviceRequest, options?: AdviceRequestOptions) => {
+        options?.onPlan?.(main);
+        return new Promise<AdviceRequestResult>((resolve, reject) => {
+          settle = () => {
+            if (outcome === "completed") resolve(main);
+            else reject(new Error("Optional search failed"));
+          };
+        });
+      });
+      client.requestAdvice = requestAdvice;
+      render(<Harness client={client} />);
+      await act(async () => screen.getByText("go").click());
+      expect(screen.getByTestId("phase")).toHaveTextContent("done:device");
+      expect(screen.getByTestId("alternatives")).toHaveTextContent("pending");
+      await act(async () => screen.getByText("go").click());
+      expect(requestAdvice).toHaveBeenCalledTimes(1);
+      await act(async () => settle());
+      expect(screen.getByTestId("phase")).toHaveTextContent("done:device");
+      expect(screen.getByTestId("alternatives")).toHaveTextContent("settled");
+    },
+  );
   it("reset and unmount abort the actual request", async () => {
     const client = new ScriptedClient();
     const signals: AbortSignal[] = [];

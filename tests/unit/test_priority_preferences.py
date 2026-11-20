@@ -425,6 +425,61 @@ def test_clock_cut_points_tie_keeps_completed_count_witness(
     assert include(2).identity in result.satisfied
 
 
+def test_all_true_feasible_count_and_deterministic_points_incumbent(
+    known_optimum_players, small_config, monkeypatch
+):
+    import squadopt.planning.optimizer as optimizer
+
+    horizon, state, config, settings, main = setup_case(known_optimum_players, small_config)
+    native = optimizer._solve
+    used = optimizer._deterministic_time_used
+    visits = []
+
+    def visit(model, solver):
+        visits.append(solver)
+        if len(visits) == 2:
+            # Pick a weaker midfielder for this count witness. It still proves
+            # the requested keeper count by satisfying every rule in the layer.
+            model = model.clone()
+            index = next(
+                i for i, var in enumerate(model.proto.variables) if var.name == "squad_gw1_5"
+            )
+            model.add(model.get_int_var_from_proto_index(index) == 1)
+            # The physical keeper satisfies the rule even before its one-way
+            # indicator was turned on by count search.
+            for i, var in enumerate(model.proto.variables):
+                if var.name in ("squad_gw1_1", "preference_0"):
+                    model.add(
+                        model.get_int_var_from_proto_index(i) == int(var.name == "squad_gw1_1")
+                    )
+        status = native(model, solver)
+        assert status == optimizer.cp_model.OPTIMAL
+        return status if len(visits) == 1 else optimizer.cp_model.FEASIBLE
+
+    monkeypatch.setattr(optimizer, "_solve", visit)
+    monkeypatch.setattr(
+        optimizer,
+        "_deterministic_time_used",
+        lambda solver, status: (
+            solver.parameters.max_deterministic_time if len(visits) == 3 else used(solver, status)
+        ),
+    )
+    outcome = optimize_priority_preferences(
+        horizon, state, config, settings, main, PriorityProgram((include(2),), 15)
+    )
+    assert outcome.completed_priorities == (2,)
+    assert outcome.budget_exhausted
+    assert outcome.satisfied == (include(2).identity,) and not outcome.unsearched
+    assert outcome.plan.objective_value == 30.5 and outcome.total_cost == 0.5
+    assert [
+        (p["status"], p["deterministic_stop"])
+        for p in outcome.plan.diagnostics["priority_search_phases"]
+    ] == [
+        ("FEASIBLE", False),
+        ("FEASIBLE", True),
+    ]
+
+
 def test_layers_share_one_wall_ceiling(known_optimum_players, small_config, monkeypatch):
     import squadopt.planning.optimizer as optimizer
 

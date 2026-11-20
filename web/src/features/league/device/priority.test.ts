@@ -5,6 +5,7 @@ import { checkedPreferences, type DecisionPreferences } from "../advice/decision
 import { priorityRuleIdentity, type PriorityProgram } from "../advice/preferenceBundle";
 import { solvePriorityPreferences } from "./priority";
 import { solvePlan } from "./solve/week";
+import { solveRequest } from "./requests";
 import type { LpSolver } from "./lp/problem";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
 
@@ -143,6 +144,161 @@ function oracle(rules: DecisionPreferences, request: PriorityProgram, allowance 
 }
 
 describe("device priority counts", () => {
+  it.each(["all", "incomplete", "fractional", "missing"])(
+    "certifies only complete integral all-true count incumbents (%s)",
+    (kind) => {
+      const main = solvePlan(solver, document, entry, () => 0, null, { preferences: hard });
+      const requested = {
+        max_total_cost_tenths: 0,
+        preferences: [
+          {
+            priority: 1 as const,
+            rules: checkedPreferences(
+              kind === "incomplete" ? { include_players: [2] } : { include_players: [5] },
+            ),
+          },
+        ],
+      };
+      let calls = 0;
+      const cutoff: LpSolver = {
+        solve: (lp, options) => {
+          calls++;
+          const result = solver.solve(lp, options);
+          if (calls !== 1) return result;
+          const columns = { ...result.Columns };
+          if (kind === "fractional") columns.s0 = { Primal: 0.51 };
+          if (kind === "missing") delete columns.s0;
+          return { ...result, Status: "Time limit reached", ObjectiveValue: 1e9, Columns: columns };
+        },
+      };
+      const metadata = solvePriorityPreferences(
+        cutoff,
+        document,
+        entry,
+        main,
+        requested,
+      ).priority_preferences!;
+      expect(metadata.completed_priorities).toEqual(kind === "all" ? [1] : []);
+      expect(metadata.unsearched).toHaveLength(kind === "all" ? 0 : 1);
+      expect(metadata.budget_exhausted).toBe(kind !== "all");
+      expect(calls).toBe(kind === "all" ? 2 : 1);
+    },
+  );
+
+  it.each(["Time limit reached", "Iteration limit reached", "Optimal"])(
+    "keeps the best completed witness and distinguishes a points stop (%s)",
+    (status) => {
+      const main = solvePlan(solver, document, entry, () => 0, null, { preferences: hard });
+      const requested = {
+        max_total_cost_tenths: 100,
+        preferences: [
+          { priority: 1 as const, rules: checkedPreferences({ include_players: [2] }) },
+          { priority: 2 as const, rules: checkedPreferences({ no_hits: true }) },
+        ],
+      };
+      let calls = 0;
+      const visited: LpSolver = {
+        solve: (lp, options) => {
+          calls++;
+          // The first certified keeper choice carries player 8. The second count tries a worse
+          // midfielder while retaining that forward. Both count witnesses attain the true bound.
+          const pins =
+            calls === 1
+              ? ["first_mid: c4 = 1", "first_fwd: s7 = 1"]
+              : calls === 2
+                ? ["second_mid: c5 = 1", "second_fwd: s7 = 1"]
+                : [];
+          const result = solver.solve(
+            lp.replace("Subject To", ["Subject To", ...pins].join("\n")),
+            options,
+          );
+          expect(result.Status).toBe("Optimal");
+          return calls === 3 ? { ...result, Status: status } : result;
+        },
+      };
+      const answer = solvePriorityPreferences(visited, document, entry, main, requested);
+      expect(answer.priority_preferences!.completed_priorities).toEqual([1, 2]);
+      expect(answer.priority_preferences!.budget_exhausted).toBe(status !== "Optimal");
+      expect(answer.objective_scaled).toBe(status === "Time limit reached" ? 290 : 300);
+      expect(answer.priority_preferences!.total_cost).toBe(status === "Time limit reached" ? 2 : 1);
+      expect(calls).toBe(3);
+    },
+  );
+
+  it("uses the remaining points allowance after a weaker count has no witness", () => {
+    const main = solvePlan(solver, document, entry, () => 0, null, { preferences: hard });
+    let calls = 0;
+    const seconds = [12, 10, 5];
+    const cut: LpSolver = {
+      remainingSeconds: () => seconds[calls] ?? 0,
+      solve(lp, options) {
+        calls++;
+        if (calls === 2) return { Status: "Time limit reached", Columns: {}, ObjectiveValue: 1e9 };
+        if (calls === 1) expect(options?.time_limit).toBe(9);
+        return solver.solve(lp, options);
+      },
+    };
+    const answer = solvePriorityPreferences(cut, document, entry, main, program);
+    expect(calls).toBe(3);
+    expect(answer.priority_preferences!.completed_priorities).toEqual([1]);
+    expect(answer.priority_preferences!.unsearched).toHaveLength(2);
+    expect(answer.priority_preferences!.budget_exhausted).toBe(true);
+    expect(answer.objective_scaled).toBe(300);
+  });
+
+  it("uses the unproved main actually returned by the worker as J and refuses an invalid or missing main", () => {
+    const input = { document, entry, preferences: hard };
+    let calls = 0;
+    const cutPrimary: LpSolver = {
+      solve(lp, options) {
+        calls++;
+        const result = solver.solve(
+          calls === 1 ? lp.replace("Subject To", "Subject To\nheld_mid: s5 = 1") : lp,
+          options,
+        );
+        return calls === 1
+          ? { ...result, Status: "Time limit reached", ObjectiveValue: 1e9 }
+          : result;
+      },
+    };
+    const main = solveRequest(cutPrimary, { ...input, priorityMain: true });
+    expect(main.restricted).toBe(true);
+    expect(main.objective_scaled).toBe(290);
+    const preferenceBundle = {
+      contract_version: "llmopt_preference_bundle_v1" as const,
+      slots: [],
+      prices: [],
+      choices: [],
+      program: {
+        max_total_cost_tenths: 0,
+        preferences: [{ priority: 2 as const, rules: checkedPreferences({ no_hits: true }) }],
+      },
+    };
+    const priorityReference = {
+      squad: main.squad,
+      startingXi: main.starting_xi,
+      captain: main.captain,
+      proved: false,
+    };
+    const result = solveRequest(solver, { ...input, preferenceBundle, priorityReference });
+    expect(result.squad).toEqual(main.squad);
+    expect(result.restricted).toBe(true);
+    const chosen = result.preference_bundle!.selected!.answer!;
+    expect(chosen.priority_preferences).toMatchObject({ reference_proved: false, total_cost: -2 });
+    expect(chosen.objective_scaled).toBe(310);
+    expect(() => solveRequest(solver, { ...input, preferenceBundle })).toThrow(
+      "missing confirmed main",
+    );
+    expect(() =>
+      solveRequest(solver, {
+        ...input,
+        preferenceBundle,
+        priorityReference: { ...priorityReference, captain: 999 },
+      }),
+    ).toThrow("Invalid main witness");
+    calls = 0;
+    expect(() => solveRequest(cutPrimary, input)).toThrow("Time limit reached");
+  });
   it.each([0, 10, 15, 100])("matches every package and legal lineup at concession %i", (limit) => {
     const request = { ...program, max_total_cost_tenths: limit };
     const main = solvePlan(solver, document, entry, () => 0, null, { preferences: hard });
