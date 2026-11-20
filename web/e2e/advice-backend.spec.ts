@@ -79,7 +79,8 @@ test("LLMOPT confirms, polls and displays a three-week worker plan across reload
     (response) => response.url() === `${league}/capabilities`,
   );
   await page.goto(`/league/${context.leagueId}/members/${context.entryId}/llmopt`);
-  expect((await (await capabilities).json()).llmopt_vnext === true).toBe(enabled);
+  const grant = (await (await capabilities).json()) as Record<string, unknown>;
+  expect(grant.llmopt_vnext === true).toBe(enabled);
   const words = LLMOPT_COPY.tr;
   await page.getByRole("combobox", { name: words.window, exact: true }).selectOption("3");
   const accepted = page.waitForResponse(
@@ -97,17 +98,24 @@ test("LLMOPT confirms, polls and displays a three-week worker plan across reload
   if (enabled) expect(body.run).toMatchObject({ contract_version: "llmopt_run_v1", stage: "base" });
   else expect(body.run).toBeUndefined();
   const { job_id } = await post.json();
-  const answer = (await (await completed).json()).payload;
+  const { payload: answer } = (await (await completed).json()) as LeagueViewEnvelope<EntryAdvice>;
   expect(answer.source_snapshot_id).toBe(context.snapshotId);
   expect(answer.plan_weeks).toHaveLength(3);
+  if (enabled) {
+    expect(grant.plan_data_id).toMatch(/^[0-9a-f]{64}$/);
+    expect(answer.plan_data_id).toBe(grant.plan_data_id);
+  } else {
+    expect(grant).not.toHaveProperty("plan_data_id");
+    expect(answer).not.toHaveProperty("plan_data_id");
+  }
   const job = await page.request.get(`${context.apiOrigin}/api/v1/advice-jobs/${job_id}`);
   expect(await job.json()).toMatchObject({ job_id, status: "completed" });
   const card = page.locator("article[data-plan-ready]").first();
   await expect(card).toBeVisible();
-  await expect(card).toContainText(answer.captain.short_name);
+  await expect(card).toContainText(answer.captain!.short_name);
   await page.reload();
   await expect(card).toBeVisible();
-  await expect(card).toContainText(answer.captain.short_name);
+  await expect(card).toContainText(answer.captain!.short_name);
 });
 
 test("member selections compute, reload uses cache, and a stopped backend leaves the published plan", async ({
