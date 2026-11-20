@@ -35,23 +35,8 @@ export interface RuleRepairContext {
   failureCode?: string | null;
 }
 
-const sentences = {
-  en: {
-    conflict: "These rules cannot all be met together.",
-    missing: "Some data needed to calculate this plan is missing.",
-    budget: "There is no computation left for this plan.",
-    wait: "The wait for this plan timed out.",
-  },
-  tr: {
-    conflict: "Bu kuralların tümü aynı anda uygulanamıyor.",
-    missing: "Bu planı hesaplamak için gereken bazı veriler eksik.",
-    budget: "Bu plan için hesaplama hakkı kalmadı.",
-    wait: "Bu plan için bekleme süresi doldu.",
-  },
-};
-
 export function repairSentence(language: Language, status: RepairStatus | "wait") {
-  return sentences[language][status];
+  return LLMOPT_COPY[language].repairs[status];
 }
 
 const missingCodes = new Set([
@@ -115,13 +100,7 @@ export function ruleRepairChoices(draft: PlanDraft, context: RuleRepairContext) 
           i !== index ? [rule] : replacement ? [replacement] : [],
         ),
       },
-      label: after
-        ? tr
-          ? `“${before}” kuralını “${after}” olarak değiştir`
-          : `Change “${before}” to “${after}”`
-        : tr
-          ? `“${before}” kuralını kaldır`
-          : `Remove “${before}”`,
+      label: after ? copy.repairs.changeRule(before, after) : copy.repairs.removeRule(before),
     };
   }
   const applies = (r: Constraint, week: PlanWeekNumber) =>
@@ -160,9 +139,7 @@ export function ruleRepairChoices(draft: PlanDraft, context: RuleRepairContext) 
     if (target < bank.tenths) {
       if (reachable != null) {
         const amount = money(bank.tenths, tr ? "tr-TR" : "en-GB");
-        conflictSentence = tr
-          ? `Bu kurallarla GW ${gameweek + atWeek - 1} sonunda kasada ${amount} kalamıyor.`
-          : `These rules cannot leave ${amount} in the bank after GW ${gameweek + atWeek - 1}.`;
+        conflictSentence = copy.repairs.bank(amount, gameweek + atWeek - 1);
       }
       const label = target
         ? copy.lowerBankMinimum(money(target, tr ? "tr-TR" : "en-GB"))
@@ -186,13 +163,10 @@ export function ruleRepairChoices(draft: PlanDraft, context: RuleRepairContext) 
     if (remainder.length) next.keep_weeks = remainder;
     else delete next.keep_weeks;
     const week = gameweek + fixed.week - 1;
-    if (conflict)
-      conflictSentence ??= tr
-        ? `GW ${week} için kilitlenen karar mevcut kurallarla uyuşmuyor.`
-        : `The locked decision for GW ${week} conflicts with the current rules.`;
+    if (conflict) conflictSentence ??= copy.repairs.frozen(week);
     (conflict ? known : possible).push({
       draft: next,
-      label: tr ? `GW ${week} kilidini kaldır` : `Unlock GW ${week}`,
+      label: copy.repairs.unlock(week),
     });
   }
   draft.hard.forEach((rule, index) => {
@@ -209,9 +183,7 @@ export function ruleRepairChoices(draft: PlanDraft, context: RuleRepairContext) 
       );
       if (notHeld || overlaps) {
         const week = gameweek + (rule.week ?? 1) - 1;
-        conflictSentence ??= tr
-          ? `Bu kadro GW ${week} için bu kurallarla Wildcard kullanamıyor.`
-          : `This squad cannot play its Wildcard in GW ${week} with these rules.`;
+        conflictSentence ??= copy.repairs.wildcard(week);
       }
       (notHeld || overlaps ? known : possible).push(editRule(index));
     } else if (rule.kind === "no_hits" || rule.kind === "hit_budget") {
@@ -221,9 +193,8 @@ export function ruleRepairChoices(draft: PlanDraft, context: RuleRepairContext) 
         paid > 0 &&
         (rule.kind === "no_hits" || (minimumHits !== undefined && minimumHits > ceiling));
       if (incompatible)
-        conflictSentence ??= tr
-          ? `GW ${gameweek} için gereken transferler ${ceiling} puanlık ceza sınırını aşıyor.`
-          : `The required transfers in GW ${gameweek} exceed the ${ceiling}-point hit limit.`;
+        conflictSentence ??=
+          ceiling === 0 ? copy.repairs.noHits(gameweek) : copy.repairs.hitLimit(gameweek, ceiling);
       const raised =
         rule.kind === "hit_budget" &&
         minimumHits !== undefined &&
@@ -270,9 +241,7 @@ export function ruleRepairChoices(draft: PlanDraft, context: RuleRepairContext) 
         sameScope || (feasibleCount !== undefined && feasibleCount !== rule.count);
       if (incompatible) {
         const name = ruleLabel(rule, players, copy);
-        conflictSentence ??= tr
-          ? `“${name}” kuralı diğer kadro şartlarıyla uyuşmuyor.`
-          : `“${name}” conflicts with the other squad requirements.`;
+        conflictSentence ??= copy.repairs.club(name);
       }
       const change =
         !sameScope &&

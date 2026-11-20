@@ -19,6 +19,7 @@ import { deviceWorkReceipt } from "../device/workBudget";
 import type { Constraint, PlanDraft } from "./intent";
 import type { EntryAdvice } from "../types";
 import { expectedNet } from "./planComparison";
+import { ruleRepairChoices } from "./ruleRepairChoices";
 import {
   candidateRequest,
   computeRepairPlan,
@@ -249,6 +250,44 @@ it("requires room for all three-week preference stages and allows a redundant pr
   );
   expect(alreadyRequired?.preferences.keep_players).toEqual([entry.held[0]]);
   expect(alreadyRequired?.run?.stage).toBe("repair");
+});
+
+it("binds both preflight club candidates to the same original using the page's choices", () => {
+  const sourceDraft: PlanDraft = {
+    window: 3,
+    soft: [],
+    hard: [
+      { kind: "hold_transfers" },
+      { kind: "club_count", club: "Club 1", count: 3 },
+      { kind: "club_count", club: "Club 1", count: 2 },
+    ],
+  };
+  const choices = ruleRepairChoices(sourceDraft, {
+    gameweek: squad.gameweek,
+    window: 3,
+    held: new Set(entry.held),
+    language: "en",
+    players: [],
+    frozen: [],
+  })!.choices;
+  expect(choices).toHaveLength(2);
+  const owner = { runId, dataId: "b".repeat(64), failedBase: false, sourceDraft };
+  const basis = { squad, window: 3 as const };
+  const [first, second] = choices.map(({ draft }, i) =>
+    candidateRequest(draft, basis, owner, i === 0 ? "base" : "repair")!,
+  );
+  expect(first!.preferences.club_counts?.[0]?.count).toBe(2);
+  expect(second!.preferences.club_counts?.[0]?.count).toBe(3);
+  const original = first!.run!.repair_origin!;
+  expect(original).toEqual(second!.run!.repair_origin);
+  expect(original.preferences.flatMap((p) => p.club_counts ?? []).map((r) => r.count)).toEqual([
+    3, 2,
+  ]);
+  expect(original.preferences.some((p) => p.hold_transfers)).toBe(true);
+  expect(original.preferences.some((p) => p.save_chips)).toBe(true);
+  expect(
+    candidateRequest(choices[0]!.draft, basis, { ...owner, failedBase: true }, "repair")!.run,
+  ).not.toHaveProperty("repair_origin");
 });
 
 it("accepts a complete feasible witness and refuses incomplete or unproved cached answers", async () => {

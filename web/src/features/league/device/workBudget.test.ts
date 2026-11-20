@@ -33,6 +33,28 @@ describe("durable device run capacity", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {});
     expect(() => bindDeviceRun(id, "capture")).toThrow("RUN_STORE_UNAVAILABLE");
   });
+  it("charges orphaned workers again under the same edit and retains room for selection", () => {
+    const edit = "1".repeat(64);
+    for (let n = 0; n < 18; n++) reserveDeviceWork(id, "capture");
+    expect(claimDeviceRepair(id, "capture", edit, false, false)).toBe(true);
+    expect(claimDeviceRepair(id, "capture", edit, false, false, "recover")).toBe(true);
+    expect(deviceWorkReceipt(id)).toMatchObject({ units: 80, repairCandidates: [edit] });
+    expect(() => claimDeviceRepair(id, "capture", edit, false, false, "recover")).toThrow(
+      "RUN_BUDGET_EXHAUSTED",
+    );
+    expect(claimDeviceRepair(id, "capture", edit, true, false)).toBe(true);
+    expect(() => claimDeviceRepair(id, "capture", edit, true, false, "recover")).toThrow(
+      "RUN_BUDGET_EXHAUSTED",
+    );
+    expect(() => claimDeviceRepair(id, "new capture", edit, true, false, "recover")).toThrow(
+      "RUN_CONTEXT_CHANGED",
+    );
+    closeDeviceWork(id);
+    expect(() => claimDeviceRepair(id, "capture", edit, true, false, "recover")).toThrow(
+      "RUN_CANCELLED",
+    );
+    expect(deviceWorkReceipt(id)).toMatchObject({ units: 84, repairSelection: edit, closed: true });
+  });
 
   it("leaves room in the first write for the entire run", () => {
     bindDeviceRun(id, "capture");

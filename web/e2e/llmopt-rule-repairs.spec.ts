@@ -1,10 +1,5 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
-import fixture from "../src/fixtures/device-plan/instances.json" with { type: "json" };
-import {
-  mockEntryAdviceEnvelope,
-  mockEntrySquadEnvelopes,
-  mockLeagueMembersEnvelope,
-} from "../src/fixtures/league";
+import { expect, test, type Page } from "@playwright/test";
+import { mockEntryAdviceEnvelope } from "../src/fixtures/league";
 import {
   checkedPreferences,
   preferenceScope,
@@ -13,138 +8,33 @@ import {
 import { LLMOPT_COPY } from "../src/features/league/llmopt/copy";
 import type { PlanDraft } from "../src/features/league/llmopt/intent";
 import { points } from "../src/lib/format";
-import { EXAMPLE_CLAIM } from "./identity";
-import { installLeagueMocks, openCalendar } from "./leagueMocks";
 import { holdModel, routeChat } from "./llmoptChat";
+import { startQueuedJob } from "./queuedAdviceJob";
+import {
+  ADVICE,
+  API,
+  DATA_ID,
+  ENTRY,
+  PAGE,
+  answer,
+  checkButton,
+  installMember,
+  instructions,
+} from "./llmoptRepairMocks";
 
-const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
-const ENTRY = EXAMPLE_CLAIM.entryId;
-const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
-const PAGE = `/league/${LEAGUE}/members/${ENTRY}/llmopt`;
-const ADVICE = `${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`;
-const DATA_ID = "a".repeat(64);
-const CORS = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, POST, OPTIONS",
-  "access-control-allow-headers": "content-type, idempotency-key",
-};
-
-const answer = (route: Route, json: unknown, status = 200) =>
-  route.request().method() === "OPTIONS"
-    ? route.fulfill({ status: 204, headers: CORS })
-    : route.fulfill({ json, status, headers: CORS });
-type Language = "tr" | "en";
 type Family = "club" | "bank" | "hit" | "frozen" | "chip";
 
-async function installMember(page: Page, language: Language, chipHistory = true) {
-  await installLeagueMocks(page);
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
-  const original = mockEntrySquadEnvelopes[ENTRY]!;
-  const block = { ...fixture.members[0]!.entry, bank_tenths: 26, free_transfers: 1 };
-  const table = {
-    ...fixture.document,
-    league_id: LEAGUE,
-    season: original.payload.season,
-    gameweek: original.payload.gameweek,
-    source_snapshot_id: original.payload.source_snapshot_id!,
-  };
-  const players = new Map(table.players.map((p) => [p.id, p]));
-  const held = block.held.map((id) => players.get(id)!);
-  const eleven = ["GK", "DEF", "MID", "FWD"].flatMap((position, i) =>
-    held.filter((p) => p.position === position).slice(0, [1, 3, 4, 3][i]),
-  );
-  const xi = new Set(eleven.map((p) => p.id));
-  const row = (p: (typeof held)[number]) => ({
-    ...original.payload.starting_xi[0]!,
-    player_id: p.id,
-    name: p.name,
-    short_name: p.short_name,
-    team: p.team,
-    position: p.position,
-    expected_points: p.expected_points,
-    is_captain: p === eleven[6],
-    is_vice_captain: p === eleven[5],
-  });
-  const squad = {
-    ...original.payload,
-    device_plan: block,
-    bank_tenths: block.bank_tenths,
-    free_transfers: 1,
-    free_transfers_known: true,
-    starting_xi: eleven.map(row),
-    bench: held.filter((p) => !xi.has(p.id)).map(row),
-  };
-  await page.route(`**/data/league/entries/${ENTRY}.json*`, (route) =>
-    route.fulfill({ json: { ...original, payload: squad } }),
-  );
-  await page.route("**/data/league/device-plan.json*", (route) =>
-    route.fulfill({
-      json: {
-        contract_version: "provisional_league_ui_v1",
-        generated_at_utc: original.generated_at_utc,
-        source_kind: "example",
-        payload: table,
-      },
-    }),
-  );
-  const calendar = openCalendar();
-  calendar.payload.gameweeks = [0, 1, 2].map((i) => ({
-    gameweek: squad.gameweek + i,
-    deadline_utc: "2999-01-01T00:00:00Z",
-    fixtures: [],
-  }));
-  await page.route("**/data/fixtures.json", (route) => route.fulfill({ json: calendar }));
-  await page.route(`${API}/api/v1/contributions/players`, (route) =>
-    answer(route, {
-      season: squad.season,
-      players: table.players.map(({ id, name, team }) => ({ id, name, team })),
-    }),
-  );
-  const release = { master: true, repairs: true };
-  await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
-    answer(route, {
-      contract_version: "league_capabilities_v1",
-      league_id: LEAGUE,
-      capture_snapshot_id: squad.source_snapshot_id,
-      season: squad.season,
-      gameweek: squad.gameweek,
-      strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
-      top100: { available: false, weights: [] },
-      managers_word: { available: false },
-      preferences: { available: true },
-      llmopt_vnext: release.master,
-      verified_repairs: release.repairs,
-      plan_data_id: DATA_ID,
-      chips: { held_by_entry: chipHistory ? { [ENTRY]: [] } : {} },
-    }),
-  );
-  return { squad, block, held, players, release };
-}
-
-async function instructions(page: Page, language: Language, text: string) {
-  await page
-    .getByRole("textbox", { name: language === "tr" ? "Plan talimatların" : "Plan instructions" })
-    .fill(text);
-  await page
-    .getByRole("button", { name: language === "tr" ? "Gönder" : "Send", exact: true })
-    .click();
-}
 const statusText = {
   en: {
-    missing: "Some data needed to calculate this plan is missing.",
-    budget: "There is no computation left for this plan.",
+    missing: "Try calculating again when the missing plan data is available.",
+    budget: "This run has used its allowance, so review the rules and start a new calculation.",
   },
   tr: {
-    missing: "Bu planı hesaplamak için gereken bazı veriler eksik.",
-    budget: "Bu plan için hesaplama hakkı kalmadı.",
+    missing: "Eksik plan verileri hazır olduğunda yeniden hesapla.",
+    budget:
+      "Bu çalışmanın hesaplama hakkı doldu, kuralları gözden geçirip yeni bir hesaplama başlat.",
   },
 };
-const checkButton = (page: Page, language: Language) =>
-  page.getByRole("button", {
-    name: language === "tr" ? "Değişiklikleri denetle" : "Check changes",
-    exact: true,
-  });
 async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
@@ -189,7 +79,7 @@ for (const language of ["en", "tr"] as const) {
       const conflicts: Record<Family, RegExp> = {
         club: /Club 1.*3.*(conflict|uyuşmuyor)/,
         bank: /3\.0m.*bank|kasada 3,0m/,
-        hit: /0-point hit limit|0 puanlık ceza sınırı/,
+        hit: /incur a hit your rules do not allow|puan cezası getiriyor ve kuralların buna izin vermiyor/,
         frozen: /locked decision for GW|GW \d+ için kilitlenen karar/,
         chip: /Wildcard.*GW|GW.*Wildcard/,
       };
@@ -289,6 +179,69 @@ for (const language of ["en", "tr"] as const) {
 }
 
 for (const language of ["tr", "en"] as const) {
+  test(`a saved server diagnosis survives rollback and reload in ${language}`, async ({ page }) => {
+    test.skip(!API, "API-origin build required");
+    const { release, block } = await installMember(page, language);
+    const jobId = "llmopt-bank-diagnosis";
+    const required = { tenths: 40, week: 2 };
+    await routeChat(page, API, (route) =>
+      answer(route, {
+        status: "draft",
+        draft: {
+          window: 3,
+          hard: [{ kind: "keep_player", player_id: block.held[0] }],
+          soft: [],
+          min_bank: required,
+        },
+      }),
+    );
+    let posts = 0;
+    let polls = 0;
+    await page.route(ADVICE, (route) => {
+      if (route.request().method() !== "POST")
+        return answer(route, { error: { code: "NOT_COMPUTED" } }, 404);
+      posts++;
+      if (posts === 1) return answer(route, { job_id: jobId, status: "queued" }, 202);
+      expect(route.request().postDataJSON().preferences.min_bank).toEqual({ tenths: 26, week: 2 });
+      return answer(route, { error: { code: "RUN_BUDGET_EXHAUSTED" } }, 409);
+    });
+    await page.route(`${API}/api/v1/advice-jobs/${jobId}`, (route) => {
+      if (route.request().method() === "GET") polls++;
+      return answer(route, {
+        job_id: jobId,
+        status: "failed",
+        error_code: "PLAN_NOT_FOUND",
+        infeasibility: {
+          repairs: [],
+          bank: { required: 40, reachable: 26, week: 2, exact: true },
+        },
+      });
+    });
+    await page.clock.install();
+    await page.goto(PAGE);
+    await holdModel(page);
+    await instructions(page, language, "Require a bank floor after the second week");
+    await startQueuedJob(
+      page,
+      jobId,
+      page.getByRole("button", { name: LLMOPT_COPY[language].compute, exact: true }),
+      language,
+      "failed",
+    );
+    const region = page.locator("[data-rule-repairs]");
+    const diagnosis = await region.getByRole("status").innerText();
+    expect(diagnosis).toMatch(language === "en" ? /4\.0m in the bank/ : /kasada 4,0m/);
+    await checkButton(page, language).click();
+    await expect(region.getByRole("status")).toHaveText(statusText[language].budget);
+    release.master = false;
+    await page.reload();
+    await expect(page.locator("[data-saved-conflict]")).toHaveText(diagnosis);
+    await expect(region).toHaveCount(0);
+    await expect(checkButton(page, language)).toHaveCount(0);
+    expect({ posts, polls }).toEqual({ posts: 2, polls: 1 });
+    await noOverflow(page);
+  });
+
   for (const removeCount of [2, 3]) {
     test(`choosing the change to the ${removeCount}-player rule preserves the other club count in ${language}`, async ({
       page,
@@ -494,6 +447,11 @@ for (const language of ["en", "tr"] as const) {
           await options.getByRole("button").click();
           await expect(region).toHaveCount(0);
           await expect(page.locator(`article[data-plan-id="${id}"]`)).toHaveCount(0);
+          expect(submitted).toHaveLength(mode === "refuses selection after rollback" ? 1 : 2);
+          await page.reload();
+          await expect(page.locator("[data-saved-conflict]")).toHaveText(/3\.0m.*bank|kasada 3,0m/);
+          await expect(region).toHaveCount(0);
+          await expect(checkButton(page, language)).toHaveCount(0);
           expect(submitted).toHaveLength(mode === "refuses selection after rollback" ? 1 : 2);
           await noOverflow(page);
           return;

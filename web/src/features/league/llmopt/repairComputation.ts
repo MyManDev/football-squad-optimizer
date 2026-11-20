@@ -1,10 +1,15 @@
 import { cancellableDelay, withRequestDeadline } from "../../../data/request";
-import type { AdviceClient, AdviceRequest } from "../advice/adviceClient";
+import {
+  adviceRequestBody,
+  type AdviceClient,
+  type AdviceRequest,
+  type RepairRuleFragment,
+} from "../advice/adviceClient";
 import { checkedAdvice } from "../advice/adviceResponse";
 import { checkedPreferences } from "../advice/decisionPreferences";
 import { PATIENCE_EXHAUSTED, PATIENCE_MS, QUEUE_PATIENCE_MS } from "../advice/useAdviceJob";
 import type { EntryAdvice, EntrySquad } from "../types";
-import { type PlanDraft, preparePlans } from "./intent";
+import { type Constraint, type PlanDraft, preparePlans, ruleFields } from "./intent";
 import { expectedNet, hasPlanLineup, plannedWeeks } from "./planComparison";
 import { planContent, planData } from "./planHistory";
 import { freezeReference, summarizeRevision, type PlanRevision } from "./planRevision";
@@ -16,6 +21,58 @@ export interface RepairRun {
   runId: string;
   dataId: string;
   failedBase: boolean;
+  sourceDraft?: PlanDraft;
+}
+
+function serverRepairEnvelope(request: PlanRequest): PlanRequest {
+  // Match the API's four-KiB POST gate, including UTF-8 club names and current lineup pins.
+  if (
+    request.window === 3 &&
+    new TextEncoder().encode(adviceRequestBody(request)).byteLength > 4096
+  )
+    throw new Error("RUN_REPAIR_INVALID");
+  return request;
+}
+
+/** An unresolved original can contain two rules that a single job could never serialize. */
+function originalRules(draft: PlanDraft, reference?: PlanRevision) {
+  const rules: Constraint[] = [...draft.hard];
+  if (
+    !draft.scenario &&
+    !draft.soft.length &&
+    draft.comparison?.kind === "include_player" &&
+    draft.comparison.both
+  ) {
+    rules.push({
+      kind: "avoid_player",
+      player_id: draft.comparison.player_id,
+      week: draft.comparison.week,
+    });
+  }
+  const frozen = frozenForDraft({ ...draft, window: 3 }, reference);
+  const wildcards = new Set(
+    rules.flatMap((rule) => (rule.kind === "wildcard" ? [rule.week ?? 1] : [])),
+  );
+  const fragments: RepairRuleFragment[] = [];
+  for (const rule of rules) {
+    if (rule.kind === "wildcard" || rule.kind === "hit_budget") continue;
+    const fields = Object.fromEntries(
+      Object.entries(ruleFields([rule])).filter(([, value]) =>
+        Array.isArray(value) ? value.length > 0 : value === true,
+      ),
+    );
+    fragments.push(rule.week ? { week_rules: [{ week: rule.week, rules: fields }] } : fields);
+  }
+  const hitCaps = rules.flatMap((rule) => (rule.kind === "hit_budget" ? [rule.points] : []));
+  if (!wildcards.size && !frozen.some((week) => week.chip === "wildcard"))
+    fragments.push({ save_chips: true });
+  if (hitCaps.length) fragments.push({ max_hit_points: Math.min(...hitCaps) });
+  if (draft.min_bank) fragments.push({ min_bank: draft.min_bank });
+  if (draft.scenario) fragments.push({ scenario: draft.scenario });
+  if (draft.soft.length || draft.scenario || reference?.compareOnly)
+    fragments.push({ net_points_priority: true });
+  for (const week of frozen) fragments.push({ frozen_weeks: [week] });
+  return { preferences: fragments, wildcard_weeks: [...wildcards].sort() };
 }
 
 export function candidateRequest(
@@ -65,13 +122,21 @@ export function candidateRequest(
   }
   // Keep the prepared objective and rules. A repair displays one witness for the edited draft.
   return (
-    request && {
+    request &&
+    serverRepairEnvelope({
       ...request,
-      run: { contract_version: "llmopt_run_v1", run_id: run.runId, stage },
+      run: {
+        contract_version: "llmopt_run_v1",
+        run_id: run.runId,
+        stage,
+        ...(window === 3 && !run.failedBase && run.sourceDraft
+          ? { repair_origin: originalRules(run.sourceDraft, reference) }
+          : {}),
+      },
       ...(window === 1
         ? { deviceRun: true, deviceAlternatives: false, deviceRepair: { dataId: run.dataId } }
         : { deviceRun: false }),
-    }
+    })
   );
 }
 
@@ -131,11 +196,11 @@ export function verificationRequest(
   const pins = freezeReference(revision, [1, 2, 3]);
   if (pins.length !== 3 || pins.some((week) => week.starting_xi?.length !== 11 || !week.captain))
     return null;
-  return {
+  return serverRepairEnvelope({
     ...request,
     run,
     preferences: checkedPreferences({ ...request.preferences, frozen_weeks: pins }),
-  };
+  });
 }
 
 /** POST on the same run even for a cache hit, so the server can bind the witness to this run. */

@@ -23,6 +23,7 @@ import {
 } from "react";
 import { Link, useParams } from "react-router";
 
+import { withRequestDeadline } from "../../../data/request";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { PageLoading } from "../../../design/components/PageLoading";
 import { useLanguage } from "../../../i18n/context";
@@ -747,12 +748,13 @@ function Workspace({
           (window) => requestFor(squad, forwarded, window),
         )?.baseRequest
       : undefined);
-  const analysis =
-    repairsEnabled && !draft.scenario
+  const heldChipsForRepair = currentCapabilities?.chipsByEntry?.[String(squad.entry.entry_id)];
+  const repairAnalysis =
+    currentCapabilities && (repairsEnabled || oldSearch) && !draft.scenario
       ? ruleRepairChoices(draft, {
           ...conflictContext,
           language,
-          heldChips: currentCapabilities.chipsByEntry?.[String(squad.entry.entry_id)] ?? null,
+          heldChips: heldChipsForRepair ?? (oldSearch && savedRun.wildcardNotHeld ? [] : null),
           freeTransfers: squad.free_transfers_known ? squad.free_transfers : null,
           heldClubs: new Map(
             [...squad.starting_xi, ...squad.bench].map((player) => [player.player_id, player.team]),
@@ -763,6 +765,16 @@ function Workspace({
           diagnosis: failureDetails,
         })
       : null;
+  const analysis = repairsEnabled ? repairAnalysis : null;
+  const savedConflict =
+    oldSearch && currentCapabilities && !repairsEnabled
+      ? repairAnalysis?.status === "conflict"
+        ? repairAnalysis.sentence
+        : copy.repairs.conflict
+      : null;
+  const retryRunId =
+    failure && analysis && analysis.status !== "conflict" ? failure.request.run?.run_id : undefined;
+  const mainBlocked = !!analysis && !retryRunId;
   async function repairData() {
     if (!deadlineOpen(deadline)) throw new Error("RUN_CONTEXT_CHANGED");
     const [fresh, grant] = await Promise.all([
@@ -803,7 +815,8 @@ function Workspace({
       confirmation: {
         ...confirmation,
         runId,
-        wildcardNotHeld: confirmation?.wildcardNotHeld ?? false,
+        wildcardNotHeld:
+          confirmation?.wildcardNotHeld ?? heldChipsForRepair?.includes("wildcard") === false,
         repairSearch: {
           dataId,
           failedBase,
@@ -816,7 +829,7 @@ function Workspace({
     };
     if (!writePlanSession(context, next)) throw new Error("RUN_STORE_UNAVAILABLE");
     session.save(next);
-    return { runId, dataId, failedBase };
+    return { runId, dataId, failedBase, sourceDraft: draft };
   }
   function acceptRepair(choice: RepairChoice, plan: EntryAdvice, id: string) {
     change(choice.draft, reference);
@@ -1002,7 +1015,7 @@ function Workspace({
       !squad.source_snapshot_id ||
       !deadlineOpen(deadline) ||
       !canCalculate ||
-      !!analysis
+      mainBlocked
     )
       return;
     confirming.current = true;
@@ -1017,7 +1030,7 @@ function Workspace({
           .then((read) => (read.isError ? null : read.data)),
       ]);
       if (!mounted.current) return;
-      if (!capabilities) {
+      if (!capabilities || (retryRunId && !capabilities.verifiedRepairs)) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
@@ -1067,6 +1080,24 @@ function Workspace({
       ) {
         setFeedback(copy.totalUnavailable);
         return;
+      }
+      if (retryRunId) {
+        if (!client.cancelRun || session.confirmation?.runId !== retryRunId) {
+          setFeedback(copy.serviceUnavailable);
+          return;
+        }
+        try {
+          await withRequestDeadline(async () => client.cancelRun?.(retryRunId));
+        } catch {
+          if (mounted.current) setFeedback(copy.serviceUnavailable);
+          return;
+        }
+        if (
+          !mounted.current ||
+          session.confirmation?.runId !== retryRunId ||
+          !deadlineOpen(deadline)
+        )
+          return;
       }
       const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
       const request = requestFor(squad, forwarded, plans.window, local);
@@ -1572,7 +1603,12 @@ function Workspace({
             {copy.scenarioReferenceRequired}
           </p>
         )}
-        {hardConflict && !analysis && (
+        {savedConflict && (
+          <p data-saved-conflict role="status" className={styles.notice}>
+            {savedConflict}
+          </p>
+        )}
+        {hardConflict && !analysis && !savedConflict && (
           <p role="alert" className={styles.notice}>
             {hardConflict}
           </p>
@@ -1620,7 +1656,7 @@ function Workspace({
             closed ||
             deadline === null ||
             !canCalculate ||
-            !!analysis ||
+            mainBlocked ||
             basisChanged
           }
           onClick={() => void compute()}

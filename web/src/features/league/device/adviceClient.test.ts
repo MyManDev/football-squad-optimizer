@@ -9,6 +9,7 @@ import { publicEntryCapabilities } from "../advice/adviceCapabilities";
 import type { PreferenceBundle } from "../advice/preferenceBundle";
 import type { AdviceClient, AdviceRequest } from "../advice/adviceClient";
 import { deviceAdviceClient } from "./adviceClient";
+import { DEVICE_ENVELOPE_PREFIX } from "./envelopeCache";
 import { deviceWorkReceipt } from "./workBudget";
 import { shownPriorityReference } from "./priorityWitness";
 import { planIdentity } from "../llmopt/planHistory";
@@ -103,6 +104,114 @@ function setup(deviceSolver: LpSolver = solver) {
 }
 
 describe("one-week advice transport with a real solver", () => {
+  it.each(["candidate", "selection"] as const)(
+    "recovers an aborted %s without a concurrent duplicate or a refund",
+    async (stage) => {
+      const { client, remote, load, posts, create } = setup();
+      const dataId = await client.readDeviceDataId!();
+      const candidate: AdviceRequest = {
+        ...request,
+        run: { ...request.run!, stage: "repair" },
+        deviceRepair: { dataId },
+      };
+      const verify = stage === "selection";
+      if (verify) expect((await client.requestAdvice(candidate)).kind).toBe("advice");
+      const attempt = { ...candidate, deviceRepair: { dataId, verify } };
+      const runId = request.run!.run_id;
+      let started!: () => void;
+      const posted = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const terminated = vi.fn();
+      const waiting = deviceAdviceClient(remote, squad, load, () => ({
+        onmessage: null,
+        terminate: terminated,
+        postMessage: started,
+      }));
+      const controller = new AbortController();
+      const first = waiting.requestAdvice(attempt, { signal: controller.signal });
+      await posted;
+      const reserved = deviceWorkReceipt(runId)!;
+      expect(reserved.units).toBe(verify ? 8 : 4);
+      // The concurrent client reaches the same address while the first worker is still alive.
+      let observed!: () => void;
+      const lookup = new Promise<void>((resolve) => {
+        observed = resolve;
+      });
+      const original = Storage.prototype.getItem;
+      const reads = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
+        this: Storage,
+        key,
+      ) {
+        if (key.startsWith(DEVICE_ENVELOPE_PREFIX)) observed();
+        return original.call(this, key);
+      });
+      const other = deviceAdviceClient(remote, squad, load, create);
+      const joined = Promise.allSettled([first, other.requestAdvice(attempt)]);
+      await lookup;
+      reads.mockRestore();
+      controller.abort();
+      const interrupted = {
+        status: "rejected",
+        reason: expect.objectContaining({ name: "AbortError" }),
+      };
+      expect(await joined).toMatchObject([interrupted, interrupted]);
+      expect(terminated).toHaveBeenCalledOnce();
+      expect(deviceWorkReceipt(runId)).toEqual(reserved);
+      expect(Object.keys(sessionStorage).some((key) => key.endsWith(":failure"))).toBe(false);
+      expect(posts).toHaveBeenCalledTimes(verify ? 1 : 0);
+      const resumed = deviceAdviceClient(remote, squad, load, create);
+      remote.readCapabilities.mockResolvedValue({ ...enabledCaps, verifiedRepairs: undefined });
+      expect(await resumed.requestAdvice(attempt)).toMatchObject({
+        reason: "LLMOPT_VNEXT_DISABLED",
+      });
+      expect(deviceWorkReceipt(runId)).toEqual(reserved);
+      remote.readCapabilities.mockResolvedValue(enabledCaps);
+      const recovered = await resumed.requestAdvice(attempt);
+      expect(recovered.kind).toBe("advice");
+      expect(await resumed.requestAdvice(attempt)).toEqual(recovered);
+      expect(deviceWorkReceipt(runId)).toEqual({ ...reserved, units: reserved.units + 4 });
+      expect(posts).toHaveBeenCalledTimes(verify ? 2 : 1);
+      expect(remote.requestAdvice).not.toHaveBeenCalled();
+    },
+  );
+
+  it("restores the exact storage left by a page that disappeared during selected replay", async () => {
+    const { client, remote, load, create, posts } = setup();
+    const dataId = await client.readDeviceDataId!();
+    const candidate: AdviceRequest = {
+      ...request,
+      run: { ...request.run!, stage: "repair" },
+      deviceRepair: { dataId },
+    };
+    const witness = await client.requestAdvice(candidate);
+    if (witness.kind !== "advice") throw new Error("Missing candidate witness");
+    const select = { ...candidate, deviceRepair: { dataId, verify: true } };
+    let snapshot: [string, string][] = [];
+    const original = deviceAdviceClient(remote, squad, load, () => {
+      snapshot = Object.keys(sessionStorage).map((key) => [key, sessionStorage.getItem(key)!]);
+      return create();
+    });
+    expect((await original.requestAdvice(select)).kind).toBe("advice");
+    sessionStorage.clear();
+    for (const [key, value] of snapshot) sessionStorage.setItem(key, value);
+    const runId = request.run!.run_id;
+    const abandoned = deviceWorkReceipt(runId)!;
+    expect(abandoned.units).toBe(8);
+    expect(abandoned.repairSelection).toBe(abandoned.repairCandidates![0]);
+    expect(Object.keys(sessionStorage).some((key) => key.endsWith(":selection"))).toBe(false);
+    const restored = deviceAdviceClient(remote, squad, load, create);
+    const replay = await restored.requestAdvice(select);
+    if (replay.kind !== "advice") throw new Error("Missing recovered selection");
+    expect(await planIdentity(replay.envelope.payload)).toBe(
+      await planIdentity(witness.envelope.payload),
+    );
+    expect(expectedNet(replay.envelope.payload)).toBe(expectedNet(witness.envelope.payload));
+    expect(await restored.requestAdvice(select)).toEqual(replay);
+    expect(deviceWorkReceipt(runId)).toEqual({ ...abandoned, units: 12 });
+    expect(posts).toHaveBeenCalledTimes(3);
+  });
+
   it("computes a repair and freshly verifies the selected content once across reload", async () => {
     const { client, remote, posts, load, create } = setup();
     const dataId = await client.readDeviceDataId!();

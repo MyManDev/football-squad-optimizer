@@ -6,15 +6,22 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from squadopt.contracts.repair_origin import RepairOrigin, repair_origin_schema
+
 
 @dataclass(frozen=True, slots=True)
 class RunReference:
     run_id: str
     stage: Literal["base", "followup", "repair"]
+    repair_origin: RepairOrigin | None = None
 
     @classmethod
     def parse(cls, value: object) -> RunReference:
-        if not isinstance(value, dict) or set(value) != {"contract_version", "run_id", "stage"}:
+        if not isinstance(value, dict) or set(value) - {"repair_origin"} != {
+            "contract_version",
+            "run_id",
+            "stage",
+        }:
             raise ValueError("Invalid planning run reference.")
         if value["contract_version"] != "llmopt_run_v1":
             raise ValueError("Unsupported planning run reference.")
@@ -23,7 +30,10 @@ class RunReference:
             raise ValueError("run_id must contain 32 lowercase hexadecimal digits.")
         if stage not in ("base", "followup", "repair"):
             raise ValueError("Unknown planning run stage.")
-        return cls(identifier, stage)
+        origin = RepairOrigin.parse(value["repair_origin"]) if "repair_origin" in value else None
+        if origin is not None and stage == "followup":
+            raise ValueError("Original repair rules apply only to candidates and selection.")
+        return cls(identifier, stage, origin)
 
 
 def run_capacity(window: int) -> float:
@@ -44,7 +54,10 @@ def run_reference_schema() -> dict[str, object]:
             "contract_version": {"type": "string", "const": "llmopt_run_v1"},
             "run_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
             "stage": {"type": "string", "enum": ["base", "followup", "repair"]},
+            "repair_origin": repair_origin_schema(),
         },
+        "if": {"required": ["repair_origin"]},
+        "then": {"properties": {"stage": {"enum": ["base", "repair"]}}},
         "required": ["contract_version", "run_id", "stage"],
         "additionalProperties": False,
     }

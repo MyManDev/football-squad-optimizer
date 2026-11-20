@@ -61,7 +61,16 @@ Three-week candidates use a regular advice POST with the original run ID and
 one rule of the original immutable request. A known missing chip right permits
 removing the chip requirement. Missing chip history and unfinished searches
 cannot start these repairs. For conflicts detected before submission, the
-first well-formed edited request supplies the base.
+first well-formed edited request supplies the base. Every candidate and selection
+then carries the same optional `run.repair_origin`, containing preference
+fragments and forced Wildcard weeks from the member's original draft. Fragments
+can retain incompatible rules that cannot share a normal job request. Their
+canonical scoped rules bind the original to the run, including on a cache hit.
+The Wildcard weeks list names explicit rules. A frozen week preserves its own
+chip separately. Only active fields are sent, and the ordinary 4096-byte POST
+limit applies to the entire candidate or pinned selection. An oversized
+candidate cannot start work and an oversized selection is never offered.
+The first posted edit counts as a candidate whether it succeeds or fails.
 
 The ledger records up to two candidate answer keys and reserves capacity for
 one selection. Cache hits retain the originating request and spend no units.

@@ -94,17 +94,23 @@ export function claimDeviceRepair(
   addressDigest: string,
   verify: boolean,
   cacheHit: boolean,
+  existing?: "recover",
 ): boolean {
   bindDeviceRun(id, binding);
   const prior = deviceWorkReceipt(id)!;
   const candidates = prior.repairCandidates ?? [];
+  const repeated = verify
+    ? prior.repairSelection === addressDigest
+    : candidates.includes(addressDigest);
+  if (repeated && existing !== "recover") return false;
   if (verify) {
-    if (prior.repairSelection === addressDigest) return false;
-    if (prior.repairSelection || !candidates.includes(addressDigest))
+    if ((prior.repairSelection && !repeated) || !candidates.includes(addressDigest))
       throw new DeviceWorkRefused("RUN_BASE_REQUIRED");
   } else {
-    if (candidates.includes(addressDigest)) return false;
-    if (prior.repairSelection || candidates.length >= 2)
+    if (
+      (prior.repairSelection && prior.repairSelection !== addressDigest) ||
+      (!repeated && candidates.length >= 2)
+    )
       throw new DeviceWorkRefused("RUN_BUDGET_EXHAUSTED");
   }
   const units = prior.units + (!verify && cacheHit ? 0 : workerUnits);
@@ -114,7 +120,7 @@ export function claimDeviceRepair(
     units,
     ...(verify
       ? { repairSelection: addressDigest }
-      : { repairCandidates: [...candidates, addressDigest] }),
+      : { repairCandidates: repeated ? candidates : [...candidates, addressDigest] }),
   });
   return true;
 }
