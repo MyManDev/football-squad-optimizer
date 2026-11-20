@@ -44,19 +44,23 @@ it.each(Object.keys(PROVIDERS) as OwnKeyProvider[])(
       expect((request.body.messages as { content: string }[])[0]!.content).toContain(
         JSON.stringify(schema),
       );
-    const visit = (node: unknown) => {
-      if (!node || typeof node !== "object") return;
-      if (Array.isArray(node)) {
-        node.forEach(visit);
+    const command = schema.properties.plan_command.anyOf[0];
+    expect(command.properties.plan_label).toEqual({
+      type: "string",
+      enum: Array.from({ length: 12 }, (_, i) => `P${i + 1}`),
+    });
+    expect(command.properties).not.toHaveProperty("plan_id");
+    const visit = (node: Record<string, unknown>) => {
+      if (Array.isArray(node.anyOf)) {
+        expect(Object.keys(node)).toEqual(["anyOf"]);
+        expect(node.anyOf.length).toBeGreaterThan(0);
+        node.anyOf.forEach(visit);
         return;
       }
-      const value = node as Record<string, unknown>;
-      if (value.properties)
-        for (const field of Object.values(
-          value.properties as Record<string, Record<string, unknown>>,
-        ))
-          expect(field).toHaveProperty("type");
-      Object.values(value).forEach(visit);
+      expect(node).toHaveProperty("type");
+      if (node.properties)
+        Object.values(node.properties as Record<string, Record<string, unknown>>).forEach(visit);
+      if (node.items) visit(node.items as Record<string, unknown>);
     };
     visit(schema);
   },
