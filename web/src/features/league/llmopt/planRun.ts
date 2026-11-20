@@ -2,6 +2,7 @@ import type { AdviceRequest } from "../advice/adviceClient";
 import { checkedPreferences, type FrozenPlanWeek } from "../advice/decisionPreferences";
 import { sameAdviceRequest } from "../advice/useAdviceJob";
 import type { EntrySquad } from "../types";
+import { isDevicePlanEntry } from "../device/types";
 import { needsThreeWeeks, preparePlans, type Constraint, type PlanDraft } from "./intent";
 import type { PlanRevision } from "./planRevision";
 import { frozenForDraft, matchingScenarioReference, prepareOriginalScenario } from "./planScenario";
@@ -53,8 +54,12 @@ export function requestFor(
   squad: EntrySquad,
   forwarded: boolean | undefined,
   window: AdviceRequest["window"],
+  allowDevice = false,
 ): AdviceRequest {
+  const device = allowDevice && window === 1 && isDevicePlanEntry(squad.device_plan);
   return {
+    deviceRun: device,
+    deviceAlternatives: device,
     publicEntry: forwarded,
     leagueId: squad.league_id,
     entryId: squad.entry.entry_id,
@@ -91,7 +96,29 @@ export function baseDraft(draft: PlanDraft): PlanDraft {
  * the reserved slots; a rule whose plan matches a slot already reserved shares that slot.
  */
 export function prepareRun(inputs: RunInputs): PlanRun {
-  const { draft, held, request, plans, wildcardNotHeld, frozenWeeks, reference } = inputs;
+  const {
+    draft,
+    held,
+    request: originalRequest,
+    plans,
+    wildcardNotHeld,
+    frozenWeeks,
+    reference,
+  } = inputs;
+  const request = { ...originalRequest };
+  if (
+    draft.scenario ||
+    [...draft.hard, ...draft.soft, ...(draft.comparison ? [draft.comparison] : [])].some(
+      (rule) => rule.kind === "wildcard",
+    )
+  )
+    request.deviceRun = false;
+  if (draft.soft.length || draft.scenario || draft.comparison) delete request.deviceAlternatives;
+  const preparedInputs =
+    originalRequest.deviceAlternatives !== request.deviceAlternatives ||
+    originalRequest.deviceRun !== request.deviceRun
+      ? { ...inputs, request }
+      : inputs;
   const pricing = !draft.scenario && draft.soft.length > 0;
   const compareBoth = !draft.scenario && draft.comparison?.both === true;
   const hardDraft = {
@@ -113,17 +140,19 @@ export function prepareRun(inputs: RunInputs): PlanRun {
     const addressed = request.run
       ? { ...request, run: { ...request.run, stage: "followup" as const } }
       : request;
-    return pricing || draft.scenario
+    return pricing || draft.scenario || (request.deviceAlternatives && !draft.comparison)
       ? pricedRequest(addressed, plan)
       : { ...addressed, ...plan, preferences: plan.preferences };
   };
   const base = submit(baseline);
   const baseRequest = base?.run ? { ...base, run: { ...base.run, stage: "base" as const } } : base;
+  if (baseRequest?.deviceRun && inputs.bundleMode && draft.max_total_cost_tenths !== undefined)
+    baseRequest.priorityMain = true;
   if (draft.scenario) {
     const previous = prepareOriginalScenario(draft, held, plans.window, reference);
     const replay = submit(previous);
     return {
-      inputs,
+      inputs: preparedInputs,
       scenario: true,
       baseTitle: "scenarioOptimized",
       baseRequest,
@@ -165,7 +194,7 @@ export function prepareRun(inputs: RunInputs): PlanRun {
           return { rule, outcome };
         });
   return {
-    inputs,
+    inputs: preparedInputs,
     baseTitle: !pricing && compareBoth ? "without" : "base",
     baseConflict: pricing ? plans.hardConflict : plans.baseConflict,
     baseRequest,
@@ -196,6 +225,11 @@ export function restoreRun(
     held,
     request: {
       ...requestForWindow(plans.window),
+      deviceRun: !!confirmation.runId && confirmation.deviceRun === true,
+      deviceAlternatives:
+        !!confirmation.runId &&
+        confirmation.deviceRun === true &&
+        confirmation.deviceAlternatives === true,
       ...(confirmation.runId
         ? {
             run: {

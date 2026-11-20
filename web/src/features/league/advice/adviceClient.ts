@@ -29,6 +29,16 @@ import { bundleKey, type PreferenceBundle } from "./preferenceBundle";
 import { checkedPlanInfeasibility, type PlanInfeasibility } from "./planInfeasibility";
 
 export interface AdviceRequest {
+  /** Local plan menu; never serialized to the advice service. */
+  deviceAlternatives?: boolean;
+  /** A run with an unsupported rule remains entirely on the service. */
+  deviceRun?: boolean;
+  /** Private device main for a confirmed total-allowance run. */
+  priorityMain?: true;
+  shownDeviceMain?: {
+    fingerprint: string;
+    decisions: import("../device/priorityWitness").DevicePriorityReference;
+  } | null;
   run?: { contract_version: "llmopt_run_v1"; run_id: string; stage: "base" | "followup" };
   /** Fetch and pin this public team's inputs only when computation is requested. */
   publicEntry?: boolean;
@@ -70,6 +80,8 @@ export type AdviceRequestResult =
 /** One click's identity: sent as `Idempotency-Key`, the same for every retry of that click. */
 export interface AdviceRequestOptions extends RequestOptions {
   idempotencyKey?: string;
+  /** A completed device plan available while optional alternatives continue. */
+  onPlan?: (result: Extract<AdviceReadResult, { kind: "advice" }>) => void;
 }
 
 export interface AdviceReadOptions extends RequestOptions {
@@ -78,6 +90,10 @@ export interface AdviceReadOptions extends RequestOptions {
 }
 
 export interface AdviceClient {
+  /** Bind a new local run without spending work before its location is confirmed. */
+  prepareDeviceRun?(request: AdviceRequest): Promise<boolean>;
+  /** Local computation waits for its worker ceiling; network transports keep their own deadline. */
+  localRequestAllowanceMs?(request: AdviceRequest): number | undefined;
   cancelRun?(runId: string): Promise<void>;
   /** Read an already-computed answer; never triggers computation. */
   readAdvice(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult>;

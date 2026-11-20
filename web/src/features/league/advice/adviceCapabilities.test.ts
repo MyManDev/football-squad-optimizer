@@ -36,6 +36,21 @@ const DOCUMENT = {
 };
 
 describe("league capabilities", () => {
+  it.each([undefined, false, true])(
+    "advertises grouped preferences only with the release setting %s",
+    (enabled) => {
+      const caps = checkedCapabilities(
+        {
+          ...DOCUMENT,
+          llmopt_vnext: enabled,
+          preference_bundles: { version: "llmopt_preference_bundle_v1" },
+        },
+        352490,
+      );
+      expect(caps.llmoptVNext === true).toBe(enabled === true);
+      expect(caps.preferenceBundles === true).toBe(enabled === true);
+    },
+  );
   it.each(["model_opportunity_reservation_v1", "model_opportunity_reservation_v2"])(
     "accepts published chip strategy %s and refuses unknown versions",
     (version) => {
