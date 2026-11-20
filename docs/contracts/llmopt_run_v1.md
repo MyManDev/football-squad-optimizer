@@ -67,11 +67,15 @@ available during rollback. A new run-owned computation returns HTTP 409
 with `LLMOPT_VNEXT_DISABLED`. Identity-free legacy requests continue to use
 their ordinary cache address and admission. A run already admitted can finish
 on the worker and publish its answer. The master setting does not enter the
-answer key or change a persisted computation specification. Both settings
-serve the same immutable cached document. Newly computed answers include
-`plan_data_id` for their source data in either setting. Older answers without
-it remain readable. This additive provenance leaves the ordinary plan decisions,
-scoring and request identity unchanged.
+answer key or change a persisted computation specification. With the setting
+off, ordinary API responses and cache entries retain the develop payload.
+With the setting on, a result can expose `plan_data_id` when its producing
+data is known. Older answers without that identifier remain readable.
+
+Run `python -m docs.research.llmopt_phase8.check_develop` to exercise the
+default workflow against the original develop worker and intent tests. The
+runner keeps their original shared fixtures and imports the implementation
+from the checkout under test.
 
 ## Verified repairs
 
