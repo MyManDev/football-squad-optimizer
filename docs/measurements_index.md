@@ -37,6 +37,12 @@
   and eight equal infeasibilities; maximum work 20.001169834987554/21 and
   120.00555450856191/122 units. Sequential local production solves, no network calls.
 
+- 2026-11-20: [Wildcard and Free Hit cache parity](research/llmopt_phase2_named_chip.md),
+  [record](research/llmopt_phase2_named_chip.json). In 16 paired one- and three-week
+  controls, the run-bound and legacy workers returned the same solver status, transfer
+  decisions, objective and published net points. All 16 pairs shared the same cache
+  address and immutable request, and the cached bytes matched in every pair.
+
 - 2026-11-18: [LLMOPT shared admission](research/llmopt_phase2_admission.md),
   [record](research/llmopt_phase2_admission.json): 20 frozen member-weeks, 40 runs,
   maximum four server jobs, zero additional jobs from 240 reconstructed-service repeats;
