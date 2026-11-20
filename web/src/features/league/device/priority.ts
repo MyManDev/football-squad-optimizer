@@ -18,23 +18,11 @@ import {
   type Solution,
 } from "./lp/problem";
 import { hardPreferenceRows, oneWeekPreferences } from "./preferences";
+import { checkedColumns, holds, referenceValues, valueOf, type Values } from "./priorityWitness";
 import { orderedBench, viceCaptain } from "./publication/rows";
 import { DevicePlanRefused, inSolverOrder } from "./solve/week";
 import { rebuilds, weekPoints } from "./strategies/chips";
 import type { DevicePlanAnswer, DevicePlanDocument, DevicePlanEntry } from "./types";
-
-type Values = Record<string, { Primal: number }>;
-const valueOf = (terms: readonly LpTerm[], values: Values) =>
-  terms.reduce((sum, item) => sum + item.coefficient * (values[item.variable]?.Primal ?? 0), 0);
-const holds = (rows: readonly LpRow[], values: Values) =>
-  rows.every((item) => {
-    const value = valueOf(item.terms, values);
-    return item.sense === "="
-      ? value === item.rhs
-      : item.sense === "<="
-        ? value <= item.rhs
-        : value >= item.rhs;
-  });
 
 /** The witness already settled by a count layer; no new search is used to publish it. */
 function answerFor(
@@ -165,19 +153,12 @@ export function solvePriorityPreferences(
   const soft = requested.map((item) =>
     hardPreferenceRows(document, entry, item.rules, baseline.chip),
   );
-  const makeValues = (answer: DevicePlanAnswer): Values => {
-    const values: Values = {};
-    document.players.forEach((p, i) => {
-      values[`s${i}`] = { Primal: Number(answer.squad.includes(p.id)) };
-      values[`x${i}`] = { Primal: Number(answer.starting_xi.includes(p.id)) };
-      values[`c${i}`] = { Primal: Number(answer.captain === p.id) };
-    });
-    const incoming = answer.squad.filter((id) => !entry.held.includes(id)).length;
-    values.paid = { Primal: Math.max(0, incoming - entry.free_transfers) };
-    values.moved = { Primal: Number(incoming > 0) };
-    return values;
-  };
-  let best = makeValues(baseline);
+  let best = referenceValues(document, entry, {
+    squad: baseline.squad,
+    startingXi: baseline.starting_xi,
+    captain: baseline.captain,
+    proved: !baseline.restricted,
+  });
   if (!holds(problem.rows, best))
     throw new Error("The required main witness does not fit this model.");
   // J is recomputed from the witness, never read from a numeric reference claim.
@@ -216,50 +197,66 @@ export function solvePriorityPreferences(
   });
   const completed: (1 | 2 | 3)[] = [];
   let exhausted = false;
-  const normalize = (solution: Solution): Values => {
-    const values = Object.fromEntries(
-      Object.entries(solution.Columns).map(([name, value]) => [
-        name,
-        { Primal: Math.round(value.Primal) },
-      ]),
-    );
+  const normalize = (solution: Solution): Values | null => {
+    const values = checkedColumns(problem, solution);
+    if (!values) return null;
     const incoming = document.players.reduce(
       (n, p, i) => n + Number(!entry.held.includes(p.id) && values[`s${i}`]?.Primal === 1),
       0,
     );
     values.paid = { Primal: Math.max(0, incoming - entry.free_transfers) };
-    return values;
+    soft.forEach((conditions, i) => {
+      values[`want${i}`] = { Primal: Number(holds(conditions, values)) };
+    });
+    return holds(problem.rows, values) ? values : null;
   };
+  soft.forEach((conditions, i) => {
+    best[`want${i}`] = { Primal: Number(holds(conditions, best)) };
+  });
+  const pointsReserve = (solver.remainingSeconds?.() ?? 0) / 4;
   for (const level of [1, 2, 3] as const) {
     const terms = requested.flatMap((item, i) =>
       item.priority === level ? [term(1, `want${i}`)] : [],
     );
     if (!terms.length) continue;
-    if ((solver.remainingSeconds?.() ?? Infinity) <= 0) {
+    const countSeconds = (solver.remainingSeconds?.() ?? Infinity) - pointsReserve;
+    if (countSeconds <= 0) {
       exhausted = true;
       break;
     }
     problem.objective = terms;
-    const solution = solver.solve(lpText(problem), EXACT);
-    if (solution.Status !== "Optimal") {
-      if (solution.Status !== "Time limit reached")
-        throw new DevicePlanRefused(solution.Status, "plan");
+    const solution = solver.solve(
+      lpText(problem),
+      Number.isFinite(countSeconds) ? { ...EXACT, time_limit: countSeconds } : EXACT,
+    );
+    if (!["Optimal", "Time limit reached", "Iteration limit reached"].includes(solution.Status))
+      throw new DevicePlanRefused(solution.Status, "plan");
+    const candidate = normalize(solution);
+    if (!candidate && solution.Status === "Optimal")
+      throw new DevicePlanRefused("invalid priority witness", "plan");
+    const count = candidate && valueOf(terms, candidate);
+    if (!candidate || count === null || (solution.Status !== "Optimal" && count !== terms.length)) {
       exhausted = true;
       break;
     }
-    best = normalize(solution);
-    const count = Math.round(solution.ObjectiveValue);
-    if (!holds(problem.rows, best)) throw new DevicePlanRefused("invalid priority witness", "plan");
+    if (valueOf(terms, best) !== count || valueOf(points, candidate) > valueOf(points, best))
+      best = candidate;
     problem.rows.push(row(`priority_fixed_${level}`, terms, "=", count));
     completed.push(level);
   }
-  if (!exhausted) {
+  if (completed.length) {
     if ((solver.remainingSeconds?.() ?? Infinity) <= 0) exhausted = true;
     else {
       problem.objective = points;
+      problem.rows.push(row("priority_incumbent", points, ">=", valueOf(points, best)));
       const solution = solver.solve(lpText(problem), EXACT);
-      if (solution.Status === "Optimal") best = normalize(solution);
-      else if (solution.Status === "Time limit reached") exhausted = true;
+      if (solution.Status === "Optimal" || solution.Status === "Iteration limit reached") {
+        const candidate = normalize(solution);
+        if (candidate) best = candidate;
+        else if (solution.Status === "Optimal")
+          throw new DevicePlanRefused("invalid points witness", "plan");
+        if (solution.Status !== "Optimal") exhausted = true;
+      } else if (solution.Status === "Time limit reached") exhausted = true;
       else throw new DevicePlanRefused(solution.Status, "plan");
     }
   }

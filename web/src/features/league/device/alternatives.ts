@@ -14,6 +14,7 @@ import {
 } from "./lp/problem";
 import { oneWeekPreferences } from "./preferences";
 import { inSolverOrder, DevicePlanRefused, type WeekSolution } from "./solve/week";
+import { DEVICE_ALTERNATIVE_SECONDS } from "./solve/ceiling";
 import { rebuilds } from "./strategies/chips";
 import type { DeviceChip, DevicePlanDocument, DevicePlanEntry } from "./types";
 
@@ -55,10 +56,16 @@ export function solveAlternatives(
     gap = DEFAULT_ALTERNATIVE_GAP,
     count = 3,
     chip = null,
+    main,
+    onAlternative,
+    now = () => performance.now(),
   }: {
     gap?: number;
     count?: number;
     chip?: DeviceChip | null;
+    main?: DeviceAlternative;
+    onAlternative?: (choice: DeviceAlternative) => void;
+    now?: () => number;
   } = {},
 ): DeviceAlternative[] {
   if (
@@ -97,8 +104,10 @@ export function solveAlternatives(
   const hit: LpTerm[] =
     rebuilds(chip) || document.rules.hit_points_charged === 0 ? [] : [term(-1, "paid")];
   const negativeMoves = arrivals.map((t) => term(-t.coefficient, t.variable));
-  const result: DeviceAlternative[] = [];
-  let floor: number | undefined;
+  const result: DeviceAlternative[] = main ? [main] : [];
+  let floor = main
+    ? Math.ceil(main.objectiveScaled - gap * document.rules.expected_points_scale)
+    : undefined;
   const scalar = (terms: LpTerm[], target: number) => row("unused", terms, ">=", target);
   const freeAfter = (moves: number) =>
     Math.min(
@@ -106,7 +115,8 @@ export function solveAlternatives(
       (rebuilds(chip) ? entry.free_transfers : Math.max(0, entry.free_transfers - moves)) + 1,
     );
 
-  for (let attempt = 0; attempt < count; attempt++) {
+  for (let attempt = result.length; attempt < count; attempt++) {
+    const deadline = now() + DEVICE_ALTERNATIVE_SECONDS * 1000;
     const problem = memberWeekProblem(document, entry, {
       chip,
       preferences: p,
@@ -202,7 +212,11 @@ export function solveAlternatives(
     for (const [tier, objective] of [points, bank, hit, negativeMoves].entries()) {
       problem.sense = "Maximize";
       problem.objective = objective;
-      const solved = solver.solve(lpText(problem), { ...EXACT, time_limit: 15 });
+      const model = lpText(problem);
+      const seconds = Math.min((deadline - now()) / 1000, solver.remainingSeconds?.() ?? Infinity);
+      if (seconds <= 0) return result;
+      const solved = solver.solve(model, { ...EXACT, time_limit: seconds });
+      if (now() >= deadline || (solver.remainingSeconds?.() ?? Infinity) <= 0) return result;
       if (solved.Status === "Infeasible" && tier === 0) break;
       if (solved.Status === "Infeasible")
         throw new Error("Resource tie break contradicts its completed optimum.");
@@ -242,6 +256,7 @@ export function solveAlternatives(
     )
       throw new Error("An excluded or dominated decision was returned.");
     result.push(candidate);
+    onAlternative?.(candidate);
   }
   return result;
 }

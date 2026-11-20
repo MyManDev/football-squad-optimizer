@@ -11,10 +11,12 @@ import { createRequire } from "node:module";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import fixture from "../../../fixtures/device-plan/instances.json";
+import { checkedPreferences } from "../advice/decisionPreferences";
 import type { LpSolver } from "./lp/problem";
 import { replyTo, type DevicePlanReply } from "./replies";
 import type { DevicePlanRequest } from "./requests";
 import { solvePlan } from "./solve/week";
+import { withinCeiling } from "./solve/ceiling";
 import type { DeviceChip, DevicePlanDocument, DevicePlanEntry } from "./types";
 
 const require = createRequire(import.meta.url);
@@ -67,6 +69,41 @@ function plainSolves(): number {
 }
 
 describe("the worker's replies", () => {
+  it.each(["deadline", "inconsistent tie break"] as const)(
+    "keeps the actual published main when an optional search ends by %s",
+    (stop) => {
+      const request = {
+        ...PLAIN,
+        alternatives: true,
+        preferences: checkedPreferences({ net_points_priority: true }),
+      };
+      const main = solvePlan(highs, document, entry, () => 0, null, {
+        preferences: request.preferences,
+      });
+      const posted: DevicePlanReply[] = [];
+      const granted: number[] = [];
+      let clock = 0;
+      const solver: LpSolver = {
+        solve(problem, options) {
+          if (!posted.length) return highs.solve(problem, options);
+          granted.push(Number(options?.time_limit));
+          if (stop === "inconsistent tie break" && granted.length === 2)
+            return { Status: "Infeasible", Columns: {}, ObjectiveValue: 0 };
+          const result = highs.solve(problem, options);
+          clock += 5_000;
+          return result;
+        },
+      };
+      const now = () => clock;
+      replyTo(withinCeiling(solver, 120, now), request, (reply) => posted.push(reply), now);
+      expect(granted).toEqual(stop === "deadline" ? [15, 10, 5] : [15, 10]);
+      const retained = { ...main, alternatives: [] };
+      expect(posted).toEqual([
+        { id: request.id, kind: "plan", answer: retained },
+        { id: request.id, kind: "answer", answer: retained },
+      ]);
+    },
+  );
   it("answer a request without chip gains once, as before", () => {
     const posted = replies(PLAIN);
     expect(posted.map((reply) => reply.kind)).toEqual(["answer"]);

@@ -22,6 +22,7 @@ import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { deviceAdviceClient } from "../device/adviceClient";
+import { shownPriorityReference } from "../device/priorityWitness";
 import { deviceSelection } from "../device/selection";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
@@ -629,7 +630,24 @@ function Workspace({
     return explainDraftConflict({ ...draft, hard: [...draft.hard, rule] }, conflictContext);
   }
 
-  const execution = useMemo(() => preferenceExecution(run), [run]);
+  const execution = useMemo(() => {
+    const request = preferenceExecution(run);
+    const base = jobs.states.base;
+    if (
+      request?.deviceRun &&
+      request.preferenceBundle?.program &&
+      base.phase === "done" &&
+      base.request === run?.baseRequest
+    ) {
+      const fingerprint = base.envelope.payload.device_input_fingerprint;
+      const decisions = shownPriorityReference(base.envelope.payload);
+      return {
+        ...request,
+        shownDeviceMain: fingerprint && decisions ? { fingerprint, decisions } : null,
+      };
+    }
+    return request;
+  }, [run, jobs.states.base]);
   const states = preferenceStates(jobs.states, run, execution);
   const bundleState = jobs.states.first;
   const bundleResult =
@@ -640,7 +658,10 @@ function Workspace({
     (state.phase === "failed" || state.phase === "unavailable") &&
     (state.reason === "RUN_BUDGET_EXHAUSTED" || state.reason === "RUN_CANCELLED");
   const incompleteRun = Object.values(states).some(capacityRefused);
-  const computing = Object.values(states).some(({ phase }) => isWorking(phase));
+  const computing = Object.values(states).some(
+    (state) =>
+      isWorking(state.phase) || (state.phase === "done" && state.deviceAlternativesPending),
+  );
   const editingLocked = checkingSquad || reading || (computing && !run?.inputs.request.run);
   const busy = editingLocked || computing;
   const replayProof =
@@ -970,13 +991,15 @@ function Workspace({
       ].filter((value): value is NonNullable<typeof value> => value != null);
       if (
         next.inputs.request.deviceRun === true &&
-        requests.some((query) => deviceSelection(query, squad)?.kind !== "plain")
+        (requests.some((query) => deviceSelection(query, squad)?.kind !== "plain") ||
+          !(await client.prepareDeviceRun?.(next.inputs.request)))
       ) {
         next = prepareRun({
           ...next.inputs,
           request: { ...next.inputs.request, deviceRun: false, deviceAlternatives: false },
         });
       }
+      if (!mounted.current) return;
       if (
         next.inputs.bundleMode &&
         next.baseRequest?.deviceRun === false &&

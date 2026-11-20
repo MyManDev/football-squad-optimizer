@@ -11,6 +11,7 @@ import type { AdviceClient, AdviceRequest } from "../advice/adviceClient";
 import { deviceAdviceClient } from "./adviceClient";
 import { deviceWorkReceipt } from "./workBudget";
 import { replyTo } from "./replies";
+import { solvePlan } from "./solve/week";
 import type { DeviceSolver } from "./useDevicePlan";
 import type { LpSolver } from "./lp/problem";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
@@ -147,6 +148,14 @@ describe("one-week advice transport with a real solver", () => {
     expect(result.kind).toBe("advice");
     if (result.kind !== "advice") throw new Error("No preference execution.");
     const selected = result.envelope.payload.preference_bundle_result?.selected?.payload;
+    if (main.kind !== "advice") throw new Error("No confirmed main.");
+    const shown = main.envelope.payload;
+    expect(posts.mock.calls[1]![0].priorityReference).toEqual({
+      squad: [...shown.starting_xi!, ...shown.bench!].map((p) => p.player_id).sort((a, b) => a - b),
+      startingXi: shown.starting_xi!.map((p) => p.player_id).sort((a, b) => a - b),
+      captain: shown.captain!.player_id,
+      proved: true,
+    });
     expect(selected?.priority_preferences?.completed_priorities).toEqual([1, 2, 3]);
     expect(selected?.priority_preferences?.total_cost).toBeLessThanOrEqual(1.5);
     expect(selected?.device_input_fingerprint).toBe(
@@ -155,6 +164,17 @@ describe("one-week advice transport with a real solver", () => {
     expect(posts).toHaveBeenCalledTimes(2);
     const reconstructed = deviceAdviceClient(remote, squad, load, create);
     expect(await reconstructed.requestAdvice(followup)).toEqual(result);
+    const decisions = posts.mock.calls[1]![0].priorityReference;
+    const pinned = {
+      ...followup,
+      shownDeviceMain: { decisions, fingerprint: shown.device_input_fingerprint! },
+    };
+    expect(await reconstructed.requestAdvice(pinned)).toEqual(result);
+    const stale = { ...pinned, shownDeviceMain: { decisions, fingerprint: "0".repeat(64) } };
+    expect(await reconstructed.requestAdvice(stale)).toMatchObject({
+      kind: "unavailable",
+      reason: "RUN_BASE_REQUIRED",
+    });
     expect(posts).toHaveBeenCalledTimes(2);
     expect(remote.requestAdvice).not.toHaveBeenCalled();
     expect((await client.readCapabilities?.(request.leagueId))?.devicePreferenceBundles).toBe(true);
@@ -213,6 +233,111 @@ describe("one-week advice transport with a real solver", () => {
     );
     expect(new Set(decisions).size).toBe(plans.length);
     expect(posts).toHaveBeenCalledTimes(1);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+
+  it("retains the real main across a stalled optional worker, a cache read and a restored tab", async () => {
+    const { remote, load } = setup();
+    const main = solvePlan(solver, document, entry, () => 0, null, {
+      preferences: request.preferences,
+    });
+    const menu = { ...request, deviceAlternatives: true };
+    let notified!: () => void;
+    const shown = new Promise<void>((resolve) => {
+      notified = resolve;
+    });
+    const terminate = vi.fn();
+    const worker: DeviceSolver = {
+      onmessage: null,
+      terminate,
+      postMessage: ({ id }) =>
+        queueMicrotask(() =>
+          worker.onmessage?.({
+            data: { id, kind: "plan", answer: { ...main, alternatives: [] } },
+          } as MessageEvent),
+        ),
+    };
+    const create = vi.fn(() => worker);
+    const client = deviceAdviceClient(remote, squad, load, create);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const response = client.requestAdvice(menu, { onPlan: notified });
+      await shown;
+      const published = await client.readAdvice(menu);
+      expect(published.kind).toBe("advice");
+      const restored = deviceAdviceClient(remote, squad, load, create);
+      expect(await restored.requestAdvice(menu)).toEqual(published);
+      await vi.advanceTimersByTimeAsync(14_999);
+      expect(terminate).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await response).toEqual(published);
+      expect(terminate).toHaveBeenCalledTimes(1);
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(remote.requestAdvice).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("delivers already reserved work when receipt storage closes but refuses another solve", async () => {
+    const { remote, load } = setup();
+    const main = solvePlan(solver, document, entry, () => 0, null, {
+      preferences: request.preferences,
+    });
+    const menu = { ...request, deviceAlternatives: true };
+    const id = request.run!.run_id;
+    let started!: (id: number) => void;
+    const posted = new Promise<number>((resolve) => {
+      started = resolve;
+    });
+    const worker: DeviceSolver = {
+      onmessage: null,
+      terminate: vi.fn(),
+      postMessage: (input) => started(input.id),
+    };
+    const create = vi.fn(() => worker);
+    const client = deviceAdviceClient(remote, squad, load, create);
+    expect(await client.prepareDeviceRun!(menu)).toBe(true);
+    expect(deviceWorkReceipt(id)?.units).toBe(0);
+    const onPlan = vi.fn();
+    const result = client.requestAdvice(menu, { onPlan });
+    const workerId = await posted;
+    const receipt = deviceWorkReceipt(id)!;
+    expect(receipt.units).toBe(4);
+    const key = "llmopt-device-work-v1:" + id;
+    const getItem = Storage.prototype.getItem;
+    const unreadable = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
+      this: Storage,
+      name,
+    ) {
+      if (name === key) throw new DOMException("Storage unavailable", "SecurityError");
+      return getItem.call(this, name);
+    });
+    worker.onmessage?.({
+      data: { id: workerId, kind: "plan", answer: { ...main, alternatives: [] } },
+    } as MessageEvent);
+    expect(onPlan).toHaveBeenCalledOnce();
+    const shown = onPlan.mock.calls[0]![0];
+    expect(shown.kind).toBe("advice");
+    worker.onerror?.(new Error("Optional search failed"));
+    expect(await result).toEqual(shown);
+    expect(await client.requestAdvice(menu)).toEqual(shown);
+    expect(await client.requestAdvice(request)).toEqual({
+      kind: "unavailable",
+      reason: "RUN_STORE_UNAVAILABLE",
+    });
+    unreadable.mockRestore();
+    expect(deviceWorkReceipt(id)).toEqual(receipt);
+    sessionStorage.setItem(key, JSON.stringify({ ...receipt, binding: "another capture" }));
+    expect(await client.requestAdvice(menu)).toEqual({
+      kind: "unavailable",
+      reason: "RUN_CONTEXT_CHANGED",
+    });
+    sessionStorage.setItem(key, JSON.stringify({ ...receipt, closed: true }));
+    expect(await client.requestAdvice(menu)).toEqual({
+      kind: "unavailable",
+      reason: "RUN_CANCELLED",
+    });
+    expect(create).toHaveBeenCalledTimes(1);
     expect(remote.requestAdvice).not.toHaveBeenCalled();
   });
   it("uses the public entry's release setting for a local one-week plan", async () => {
@@ -307,10 +432,20 @@ describe("one-week advice transport with a real solver", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("quota");
     });
+    expect(await client.prepareDeviceRun?.(request)).toBe(false);
     const result = await client.requestAdvice(request);
     expect(result).toMatchObject({ kind: "unavailable", reason: "RUN_STORE_UNAVAILABLE" });
     expect(posts).not.toHaveBeenCalled();
     expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it("binds the confirmed inputs without starting or reserving a worker", async () => {
+    const { client, posts, remote } = setup();
+    expect(await client.prepareDeviceRun?.(request)).toBe(true);
+    expect(deviceWorkReceipt(request.run!.run_id)).toMatchObject({ units: 0, closed: false });
+    expect(posts).not.toHaveBeenCalled();
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+    expect((await client.requestAdvice(request)).kind).toBe("advice");
+    expect(deviceWorkReceipt(request.run!.run_id)?.units).toBe(4);
   });
   it("keeps server work and cancellation usable when session storage is blocked", async () => {
     const { client, remote, posts } = setup();
