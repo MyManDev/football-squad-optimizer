@@ -110,3 +110,9 @@ Run-ledger/service tests cover concurrent admissions, five-plus requests, retrie
 terminal failure, reconstruction after restart, cached bases, base-first admission and
 cancellation races. Browser tests cover reload and edited drafts. Measurement uses the
 unchanged Phase 1 inputs; its records and commands are listed in the phase PR.
+
+The [paired named-chip replay](../../research/llmopt_phase2_named_chip.md) covers
+every Wildcard and Free Hit control in the frozen population at both windows. The
+run-bound direct search and the legacy seeded search produced the same status, weekly
+transfers, objective and published net points in all 16 cold pairs. Both workers wrote
+identical answer bytes under the same cache address in each of those pairs.
