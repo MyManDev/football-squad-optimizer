@@ -37,6 +37,7 @@ export interface PriorityResult {
   contract_version: "llmopt_priority_result_v1";
   satisfied: string[];
   left_out: string[];
+  unsearched?: string[];
   total_cost: number;
   completed_priorities: (1 | 2 | 3)[];
   reference_proved: boolean;
@@ -164,6 +165,7 @@ export function isPriorityResult(value: unknown): value is PriorityResult {
       "contract_version",
       "satisfied",
       "left_out",
+      ...(record(value) && Object.hasOwn(value, "unsearched") ? ["unsearched"] : []),
       "total_cost",
       "completed_priorities",
       "reference_proved",
@@ -178,7 +180,11 @@ export function isPriorityResult(value: unknown): value is PriorityResult {
     value.completed_priorities.length <= 3 &&
     new Set(value.completed_priorities).size === value.completed_priorities.length &&
     value.completed_priorities.every((level) => level === 1 || level === 2 || level === 3) &&
-    [value.satisfied, value.left_out].every(
+    [
+      value.satisfied,
+      value.left_out,
+      ...(Object.hasOwn(value, "unsearched") ? [value.unsearched] : []),
+    ].every(
       (rows) =>
         Array.isArray(rows) &&
         rows.length <= 16 &&
@@ -263,25 +269,38 @@ export function expandSelection(
   return checkedPreferences(value);
 }
 
-function checkedPriorityResult(value: unknown, program: PriorityProgram): PriorityResult {
-  if (!isPriorityResult(value)) throw new Error("Invalid priority outcome");
-  const identities: string[] = [];
-  for (const rows of [value.satisfied, value.left_out]) {
-    if (!Array.isArray(rows) || rows.length > 16) throw new Error("Invalid preference identities");
+export type PriorityOutcome = "applied" | "left-out" | "unsearched";
+
+/** Match result identities to the member's original rule order, including older partial answers. */
+export function priorityOutcomes(
+  value: PriorityResult,
+  program: PriorityProgram,
+): PriorityOutcome[] {
+  const outcomes = new Map<string, PriorityOutcome>();
+  for (const [status, rows] of [
+    ["applied", value.satisfied],
+    ["left-out", value.left_out],
+    ["unsearched", value.unsearched ?? []],
+  ] as const) {
     for (const identity of rows) {
-      if (typeof identity !== "string" || identity.length > 3000)
-        throw new Error("Invalid preference identity");
-      identities.push(preferencesKey(checkedPreferences(JSON.parse(identity))));
+      if (identity.length > 3000) throw new Error("Invalid preference identity");
+      const key = preferencesKey(checkedPreferences(JSON.parse(identity)));
+      if (outcomes.has(key)) throw new Error("Duplicate priority outcome");
+      outcomes.set(key, status);
     }
   }
-  const expected = program.preferences.map(({ rules }) => preferencesKey(rules));
-  if (
-    identities.length !== expected.length ||
-    new Set(identities).size !== identities.length ||
-    expected.some((identity) => !identities.includes(identity))
-  )
-    throw new Error("Priority outcome names another preference");
-  return value as unknown as PriorityResult;
+  if (outcomes.size !== program.preferences.length)
+    throw new Error("Invalid priority outcome count");
+  return program.preferences.map(({ priority, rules }) => {
+    const key = preferencesKey(rules);
+    const status = outcomes.get(key);
+    if (!status) throw new Error("Priority outcome names another preference");
+    outcomes.delete(key);
+    const searched = value.completed_priorities.includes(priority);
+    if (value.unsearched !== undefined && searched === (status === "unsearched"))
+      throw new Error("Priority outcome disagrees with completed priorities");
+    return searched ? status : "unsearched";
+  });
 }
 
 /** Response validation is supplied the ordinary advice checker, avoiding another parser. */
@@ -347,10 +366,9 @@ export function checkedBundleResult(
   const selection = request.program ? { preferences: {}, chip } : (choice?.selection ?? null);
   const selected = value.selected === null ? null : component(value.selected, selection);
   if (request.program && selected?.status === "done" && selected.payload) {
-    selected.payload.priority_preferences = checkedPriorityResult(
-      selected.payload.priority_preferences,
-      request.program,
-    );
+    const result = selected.payload.priority_preferences;
+    if (!isPriorityResult(result)) throw new Error("Invalid priority outcome");
+    priorityOutcomes(result, request.program);
   }
   if (request.program === null && request.choices.length && !choice)
     throw new Error("Unknown preference combination");

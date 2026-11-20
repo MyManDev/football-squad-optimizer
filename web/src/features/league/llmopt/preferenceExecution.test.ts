@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { preferencesKey } from "../advice/decisionPreferences";
-import { bundleKey, expandSelection } from "../advice/preferenceBundle";
+import {
+  bundleKey,
+  expandSelection,
+  isPriorityResult,
+  priorityOutcomes,
+  type PriorityResult,
+} from "../advice/preferenceBundle";
 import { combinedCandidates, prepareCombined } from "./combinedPlan";
 import { preparePlans, type PlanDraft } from "./intent";
 import { baseDraft, prepareRun, requestFor, restoreRun } from "./planRun";
@@ -31,6 +37,40 @@ function run(draft: PlanDraft, bundleMode = true) {
 }
 
 describe("one preference execution", () => {
+  it("distinguishes an unsearched priority even when an old plan happens to satisfy it", () => {
+    const program = preferenceExecution(
+      run({
+        hard: [],
+        soft: [
+          { kind: "keep_player", player_id: first, priority: 2 },
+          { kind: "avoid_player", player_id: second, priority: 1 },
+          { kind: "no_hits", priority: 1 },
+        ],
+        max_total_cost_tenths: 0,
+      }),
+    )!.preferenceBundle!.program!;
+    const ids = program.preferences.map(({ rules }) => JSON.stringify(rules));
+    const old: PriorityResult = {
+      contract_version: "llmopt_priority_result_v1",
+      satisfied: [ids[0]!, ids[1]!],
+      left_out: [ids[2]!],
+      total_cost: 0,
+      completed_priorities: [1],
+      reference_proved: false,
+      budget_exhausted: true,
+    };
+    const current = { ...old, satisfied: [ids[1]!], unsearched: [ids[0]!] };
+    for (const data of [old, current]) {
+      expect(isPriorityResult(data)).toBe(true);
+      expect(priorityOutcomes(data, program)).toEqual(["unsearched", "applied", "left-out"]);
+    }
+    expect(() => priorityOutcomes({ ...current, unsearched: [ids[2]!] }, program)).toThrow();
+    expect(() =>
+      priorityOutcomes({ ...current, unsearched: [ids[1]!], satisfied: [ids[0]!] }, program),
+    ).toThrow();
+    expect(() => priorityOutcomes({ ...current, unsearched: [] }, program)).toThrow();
+    expect(isPriorityResult({ ...current, unsearched: null })).toBe(false);
+  });
   it("packages two old prices and their combined choice without another request", () => {
     const prepared = run({
       hard: [],

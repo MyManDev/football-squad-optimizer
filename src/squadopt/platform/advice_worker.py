@@ -102,6 +102,7 @@ from squadopt.platform.advice_queue import (
     DEFAULT_LEASE_SECONDS,
     AdviceComputeRefused,
     JobQueue,
+    RetryBundleWork,
     run_advice_worker_once,
 )
 from squadopt.platform.advice_runs import FileRunStore, RunAdmissionError
@@ -671,12 +672,13 @@ def build_advice_compute(
         return payload
 
     def admitted_compute(job: AdviceJob) -> bytes:
+        budget = None
         try:
             # Joining an existing V1 job does not transfer its original consumer's
             # ownership. Only run-owned V2 work receives this durable allocation.
             # A running answer remains cacheable after its initiating run closes.
             budget = (
-                runs.allocation(job.job_id)
+                runs.allocation(job.job_id, attempt=job.attempt)
                 if runs is not None and job.contract_version == "backend_jobs_v2"
                 else None
             )
@@ -691,6 +693,10 @@ def build_advice_compute(
                 if budget is not None:
                     assert runs is not None
                     runs.finish(job.job_id, budget)
+        except (OSError, RuntimeError) as error:
+            if budget is not None and budget.journal is not None and job.attempt < max_attempts:
+                raise RetryBundleWork("Retry the admitted preference job.") from error
+            raise
         except RunAdmissionError as error:
             raise AdviceComputeRefused(error.code, str(error)) from error
         except WorkBudgetExhausted as error:
@@ -861,6 +867,8 @@ def run_advice_worker(
                 pulse.stop()
         failed_rounds = 0
         if job is not None:
+            if not job.is_terminal:
+                continue
             processed += 1
             if max_jobs is not None and processed >= max_jobs:
                 return processed

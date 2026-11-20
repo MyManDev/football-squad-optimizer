@@ -2221,6 +2221,14 @@
             },
             "total_cost": {
               "type": "number"
+            },
+            "unsearched": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array",
+              "uniqueItems": true
             }
           },
           "required": [

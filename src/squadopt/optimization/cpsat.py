@@ -113,8 +113,11 @@ def solve(model: cp_model.CpModel, solver: cp_model.CpSolver) -> int:
         )
     try:
         status = int(solver.solve(model))
-        if budget is not None:
-            budget.cp_used += deterministic_time_used(solver, status)
-        return status
+        used = deterministic_time_used(solver, status) if budget is not None else 0.0
     except Exception as error:
+        if budget is not None:
+            budget.abandon_cp()
         raise SolverExecutionError("CP-SAT failed while solving the squad model.") from error
+    if budget is not None:
+        budget.record_cp(used)
+    return status
