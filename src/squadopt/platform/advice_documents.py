@@ -628,6 +628,7 @@ def league_capabilities_schema() -> dict[str, Any]:
                     "Optional disabled-by-default three-week package and path capability."
                 ),
             },
+            "llmopt_vnext": {"type": "boolean"},
             "preferences": {
                 "type": "object",
                 "properties": {"available": {"type": "boolean"}},

@@ -37,10 +37,8 @@ export function useComputedPlans(
         setReady(true);
       })
       .catch(() => {
-        if (active) {
-          session.save({ ...latest.current, history: EMPTY_HISTORY });
-          setReady(true);
-        }
+        // A browser that cannot verify a stored digest can still keep the archive for a later visit.
+        if (active) setReady(false);
       });
     return () => {
       active = false;

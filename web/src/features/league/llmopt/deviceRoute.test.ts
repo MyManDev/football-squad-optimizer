@@ -12,9 +12,28 @@ const squad = {
 };
 const held = new Set([...squad.starting_xi, ...squad.bench].map((p) => p.player_id));
 const draft: PlanDraft = { hard: [], soft: [], window: 1 };
-const read = (window: 1 | 3 | 5) => requestFor(squad, false, window);
+const read = (window: 1 | 3 | 5) => requestFor(squad, false, window, true);
 const confirmation = { runId: "a".repeat(32), wildcardNotHeld: false };
 describe("pinned execution route", () => {
+  it("pins a cold one-week request to the server until device execution is granted", () => {
+    expect(requestFor(squad, false, 1)).toMatchObject({
+      deviceRun: false,
+      deviceAlternatives: false,
+    });
+    expect(read(1)).toMatchObject({ deviceRun: true, deviceAlternatives: true });
+    expect(read(3).deviceRun).toBe(false);
+  });
+  it("never resumes an unbound device marker as a new device run", () => {
+    const restored = restoreRun(
+      {
+        draft,
+        confirmation: { wildcardNotHeld: false, deviceRun: true, deviceAlternatives: true },
+      },
+      held,
+      read,
+    );
+    expect(restored?.baseRequest).toMatchObject({ deviceRun: false, deviceAlternatives: false });
+  });
   it("keeps a legacy confirmed server run on the server when device inputs appear", () => {
     expect(read(1).deviceRun).toBe(true);
     const restored = restoreRun({ draft, confirmation }, held, read);

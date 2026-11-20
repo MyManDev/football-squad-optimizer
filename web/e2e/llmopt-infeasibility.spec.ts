@@ -66,6 +66,7 @@ for (const failure of ["proven", "witnessed", "interrupted"] as const) {
         season: squad.season,
         gameweek: squad.gameweek,
         strategies: { "saf-puan": { windows: [1], requires_rival: false } },
+        ...(failure === "proven" ? { verified_repairs: true } : {}),
         preferences: { available: true },
         managers_word: { available: false },
         top100: { available: false, weights: [] },

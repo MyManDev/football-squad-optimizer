@@ -524,6 +524,10 @@ class AdviceSubmitService:
         try:
             resolved = run_resolved if run_resolved is not None else resolve()
         except AdviceInputsNotPreparedError as missing:
+            if run is not None and not self._reader.llmopt_vnext:
+                raise RunAdmissionError(
+                    "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
+                ) from missing
             if self._prepare_inputs is None:
                 raise
             if self._deadline_for is not None and datetime.fromisoformat(
@@ -587,7 +591,12 @@ class AdviceSubmitService:
             ).hexdigest()
             with self._runs.transaction(at_utc=at_utc) as transaction:
                 transaction.prune(context.capture_snapshot_id, self._queue)
-                if run is not None:
+                known = (
+                    run.run_id in transaction.state["runs"]
+                    or run.run_id in transaction.state["cancelled"]
+                )
+                original = None
+                if self._reader.llmopt_vnext or known:
                     transaction.bind(
                         run,
                         binding,
@@ -608,9 +617,18 @@ class AdviceSubmitService:
                         raise RunAdmissionError(
                             "RUN_BASE_CHANGED", "The main request does not match this run."
                         )
-                original = transaction.previous(run, cache_key) if run is not None else None
+                    original = transaction.previous(run, cache_key)
+                if (
+                    not self._reader.llmopt_vnext
+                    and run.stage == "repair"
+                    and (not known or transaction.repair_candidate is not None)
+                ):
+                    # A shared answer may be read normally. It becomes a new
+                    # candidate for a run only while repair admission is open.
+                    raise RunAdmissionError(
+                        "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
+                    )
                 if original is not None:
-                    assert run is not None
                     held = self._reader.cached(cache_key)
                     if held is not None:
                         record_hit(transaction, run, held)
@@ -621,6 +639,15 @@ class AdviceSubmitService:
                             "RUN_REQUEST_INCOMPLETE", "Confirm a new planning run."
                         )
                     return SubmitOutcome(kind="job", job=job)
+                if not self._reader.llmopt_vnext:
+                    held = self._reader.cached(cache_key)
+                    if held is not None:
+                        if run.stage == "repair":
+                            record_hit(transaction, run, held)
+                        return SubmitOutcome(kind="hit", payload=held)
+                    raise RunAdmissionError(
+                        "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
+                    )
                 return self.submit(
                     league_id=league_id,
                     entry_id=entry_id,

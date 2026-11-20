@@ -1,10 +1,11 @@
-import { expect, test, type Route } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 import {
   mockEntryAdviceEnvelope,
   mockEntrySquadEnvelopes,
   mockLeagueMembersEnvelope,
 } from "../src/fixtures/league";
+import { planIdentity, retainedPlan } from "../src/features/league/llmopt/planHistory";
 import { MESSAGES } from "../src/i18n/messages";
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
@@ -816,9 +817,15 @@ test("preferred players are priced individually and only shown within their exac
   );
 });
 
-test("accepted preferred players are combined into one plan after their single prices", async ({
-  page,
-}) => {
+for (const vNext of [false, true]) {
+  test(`accepted preferred players are combined after their single prices (release control ${vNext})`, async ({
+    page,
+  }) => {
+    await checkCombinedPrices(page, vNext);
+  });
+}
+
+async function checkCombinedPrices(page: Page, vNext: boolean) {
   test.skip(!API, "API build required");
   await installLeagueMocks(page);
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
@@ -846,6 +853,7 @@ test("accepted preferred players are combined into one plan after their single p
   );
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
     answer(route, {
+      ...(vNext ? { llmopt_vnext: true } : {}),
       contract_version: "league_capabilities_v1",
       league_id: LEAGUE,
       capture_snapshot_id: squad.source_snapshot_id,
@@ -917,6 +925,30 @@ test("accepted preferred players are combined into one plan after their single p
     .getByRole("textbox", { name: "Plan instructions" })
     .fill("No hits. The first two are worth up to 1.5 points each. Also prefer the third player.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
+  let archived: string | undefined;
+  if (!vNext) {
+    await expect(page.getByText("Instructions updated.", { exact: true })).toBeVisible();
+    const plan = retainedPlan(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1).payload);
+    archived = await planIdentity(plan);
+    await page.evaluate(
+      ({ id, plan }) => {
+        const [key, raw] = Object.entries(sessionStorage).find(([k]) =>
+          k.startsWith("squadopt.llmopt:"),
+        )!;
+        sessionStorage.setItem(
+          key,
+          JSON.stringify({
+            ...JSON.parse(raw),
+            history: { items: [{ id, plan }], navigation: [id], cursor: 0, explicit: true },
+          }),
+        );
+      },
+      { id: archived, plan },
+    );
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Selected plan", exact: true })).toBeVisible();
+    await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+  }
   await page.getByRole("button", { name: "Compute plans" }).click();
 
   const combined = page.getByRole("article").filter({
@@ -929,6 +961,11 @@ test("accepted preferred players are combined into one plan after their single p
   await expect(
     page.getByText("Applied in the plan with all preferences.", { exact: true }),
   ).toBeVisible();
+  if (!vNext) {
+    await expect(page.getByRole("heading", { name: "Selected plan", exact: true })).toHaveCount(0);
+    await expect(page.locator("article[data-plan-ready]")).toHaveCount(4);
+    await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+  }
   expect(posts).toHaveLength(4);
   expect(posts[3]?.preferences).toMatchObject({
     no_hits: true,
@@ -936,17 +973,28 @@ test("accepted preferred players are combined into one plan after their single p
     include_players: players.map(({ player_id }) => player_id),
   });
   for (const post of posts) expect(JSON.stringify(post)).not.toContain("max_cost_tenths");
-  expect(new Set(posts.map(({ run }) => run.run_id)).size).toBe(1);
-  expect(posts.map(({ run }) => run.stage)).toEqual(["base", "followup", "followup", "followup"]);
-  const runId = posts[0]!.run.run_id;
+  const runId = posts[0]!.run?.run_id;
+  if (vNext) {
+    expect(runId).toMatch(/^[a-f0-9]{32}$/);
+    expect(new Set(posts.map(({ run }) => run.run_id)).size).toBe(1);
+    expect(posts.map(({ run }) => run.stage)).toEqual(["base", "followup", "followup", "followup"]);
+  } else {
+    for (const post of posts) expect(post).not.toHaveProperty("run");
+  }
   await page.reload();
   await expect(combined.getByText("2.4 expected points lost against the base plan")).toBeVisible();
+  if (!vNext) {
+    await expect(page.getByRole("heading", { name: "Selected plan", exact: true })).toHaveCount(0);
+    await expect(page.locator("article[data-plan-ready]")).toHaveCount(4);
+    await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+  }
   expect(posts).toHaveLength(4);
   const retained = await page.evaluate(
     () => Object.entries(sessionStorage).find(([key]) => key.startsWith("squadopt.llmopt:"))?.[1],
   );
   expect(JSON.parse(retained!).confirmation.runId).toBe(runId);
-});
+  if (!vNext) expect(JSON.parse(retained!).history.navigation).toEqual([archived]);
+}
 
 test("a waiting run survives reload and an edit closes it without a follow-up", async ({
   page,
@@ -970,6 +1018,7 @@ test("a waiting run survives reload and an edit closes it without a follow-up", 
   );
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
     answer(route, {
+      llmopt_vnext: true,
       contract_version: "league_capabilities_v1",
       league_id: LEAGUE,
       capture_snapshot_id: squad.source_snapshot_id,

@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import fixture from "../../../fixtures/device-plan/instances.json";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
+import { publicEntryCapabilities } from "../advice/adviceCapabilities";
 import type { AdviceClient } from "../advice/adviceClient";
 import { PATIENCE_EXHAUSTED, QUEUE_PATIENCE_MS } from "../advice/useAdviceJob";
 import { deviceAdviceClient } from "../device/adviceClient";
@@ -51,6 +52,11 @@ afterEach(() => vi.unstubAllGlobals());
 
 function clientForFixture() {
   const remote = {
+    readCapabilities: vi.fn().mockResolvedValue({
+      ...publicEntryCapabilities(squad),
+      llmoptVNext: true,
+      verifiedRepairs: true,
+    }),
     readAdvice: vi.fn(),
     requestAdvice: vi.fn(),
     readJob: vi.fn(),
@@ -235,6 +241,11 @@ it.each(["failed", "cancelled"] as const)(
     const client = {
       requestAdvice: vi.fn().mockResolvedValue({ kind: "job", jobId: "old" }),
       readJob: vi.fn().mockResolvedValue({ jobId: "old", status, errorCode: "RUN_CANCELLED" }),
+      readCapabilities: vi.fn().mockResolvedValue({
+        ...publicEntryCapabilities(squad),
+        llmoptVNext: true,
+        verifiedRepairs: true,
+      }),
       readAdvice: vi.fn(),
       readPublished: vi.fn(),
     } satisfies AdviceClient;
@@ -259,6 +270,11 @@ it("stops polling a queued repair at the normal queue deadline and on cancellati
     const client = {
       requestAdvice: vi.fn().mockResolvedValue({ kind: "job", jobId: "job", status: "queued" }),
       readJob: vi.fn().mockResolvedValue({ jobId: "job", status: "queued" }),
+      readCapabilities: vi.fn().mockResolvedValue({
+        ...publicEntryCapabilities(squad),
+        llmoptVNext: true,
+        verifiedRepairs: true,
+      }),
       readAdvice: vi.fn(),
       readPublished: vi.fn(),
     } satisfies AdviceClient;

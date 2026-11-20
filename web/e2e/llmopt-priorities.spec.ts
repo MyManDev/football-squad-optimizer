@@ -78,6 +78,7 @@ for (const language of ["tr", "en"] as const)
             top100: { available: false, weights: [0] },
             managers_word: { available: false },
             preferences: { available: true },
+            llmopt_vnext: true,
             preference_bundles: { version: "llmopt_preference_bundle_v1" },
           }),
         );

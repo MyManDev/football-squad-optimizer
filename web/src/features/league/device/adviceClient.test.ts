@@ -5,6 +5,7 @@ import { beforeAll, beforeEach, afterEach, describe, it, expect, vi } from "vite
 import fixture from "../../../fixtures/device-plan/instances.json";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { checkedPreferences } from "../advice/decisionPreferences";
+import { publicEntryCapabilities } from "../advice/adviceCapabilities";
 import type { PreferenceBundle } from "../advice/preferenceBundle";
 import type { AdviceClient, AdviceRequest } from "../advice/adviceClient";
 import { deviceAdviceClient } from "./adviceClient";
@@ -61,6 +62,11 @@ const request: AdviceRequest = {
   run: { contract_version: "llmopt_run_v1", run_id: "d".repeat(32), stage: "base" },
   preferences: checkedPreferences({ keep_players: [entry.held[0]], net_points_priority: true }),
 };
+const enabledCaps = {
+  ...publicEntryCapabilities(squad),
+  llmoptVNext: true as const,
+  verifiedRepairs: true as const,
+};
 function setup(deviceSolver: LpSolver = solver) {
   const remote = {
     readAdvice: vi.fn().mockResolvedValue({ kind: "not-computed" }),
@@ -68,7 +74,8 @@ function setup(deviceSolver: LpSolver = solver) {
     requestAdvice: vi.fn().mockResolvedValue({ kind: "unavailable" }),
     readJob: vi.fn(),
     cancelRun: vi.fn(),
-    readCapabilities: vi.fn().mockResolvedValue(null),
+    readCapabilities: vi.fn().mockResolvedValue(enabledCaps),
+    readPublicCapabilities: vi.fn().mockResolvedValue({ ...enabledCaps, leagueId: 0 }),
   } satisfies AdviceClient;
   const posts = vi.fn();
   const create = () => {
@@ -130,11 +137,60 @@ describe("one-week advice transport with a real solver", () => {
     );
     expect(expectedNet(a.envelope.payload)).toBe(expectedNet(witness.envelope.payload));
     expect(posts).toHaveBeenCalledTimes(3);
+    remote.readCapabilities.mockResolvedValue(publicEntryCapabilities(squad));
     const restored = deviceAdviceClient(remote, squad, load, create);
     expect(await restored.requestAdvice(selected)).toEqual(a);
     expect(await restored.requestAdvice(candidate)).toEqual(witness);
     expect(posts).toHaveBeenCalledTimes(3);
     expect(deviceWorkReceipt(request.run!.run_id)?.units).toBe(12);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["no master", { ...enabledCaps, llmoptVNext: undefined }],
+    ["no repair support", { ...enabledCaps, verifiedRepairs: undefined }],
+    ["another capture", { ...enabledCaps, captureSnapshotId: "old" }],
+  ])("does not claim a repair candidate without matching permission: %s", async (_label, caps) => {
+    const { client, remote, posts } = setup();
+    const dataId = await client.readDeviceDataId!();
+    remote.readCapabilities.mockResolvedValue(caps);
+    const result = await client.requestAdvice({
+      ...request,
+      run: { ...request.run!, stage: "repair" },
+      deviceRepair: { dataId },
+    });
+    expect(result).toEqual({ kind: "unavailable", reason: "LLMOPT_VNEXT_DISABLED" });
+    expect(deviceWorkReceipt(request.run!.run_id)).toBeUndefined();
+    expect(posts).not.toHaveBeenCalled();
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it("rechecks repair support before verifying a selected witness or binding an ordinary cache hit", async () => {
+    const { client, remote, posts } = setup();
+    const dataId = await client.readDeviceDataId!();
+    const ordinary = await client.requestAdvice(request);
+    expect(ordinary.kind).toBe("advice");
+    const candidate: AdviceRequest = {
+      ...request,
+      run: { ...request.run!, stage: "repair" },
+      deviceRepair: { dataId },
+    };
+    const afterMain = deviceWorkReceipt(request.run!.run_id);
+    remote.readCapabilities.mockResolvedValue({ ...enabledCaps, verifiedRepairs: undefined });
+    const disabled = { kind: "unavailable", reason: "LLMOPT_VNEXT_DISABLED" };
+    expect(await client.requestAdvice(candidate)).toEqual(disabled);
+    expect(deviceWorkReceipt(request.run!.run_id)).toEqual(afterMain);
+    remote.readCapabilities.mockResolvedValue(enabledCaps);
+    const witness = await client.requestAdvice(candidate);
+    expect(witness).toEqual(ordinary);
+    const afterWitness = deviceWorkReceipt(request.run!.run_id);
+    expect(afterWitness?.repairCandidates).toHaveLength(1);
+    expect(afterWitness?.units).toBe(afterMain?.units);
+    remote.readCapabilities.mockResolvedValue({ ...enabledCaps, verifiedRepairs: undefined });
+    expect(
+      await client.requestAdvice({ ...candidate, deviceRepair: { dataId, verify: true } }),
+    ).toEqual(disabled);
+    expect(deviceWorkReceipt(request.run!.run_id)).toEqual(afterWitness);
+    expect(await client.requestAdvice(candidate)).toEqual(witness);
+    expect(posts).toHaveBeenCalledTimes(1);
     expect(remote.requestAdvice).not.toHaveBeenCalled();
   });
   it("pins failed and stale repair attempts to the device and reserves only once", async () => {
@@ -304,7 +360,7 @@ describe("one-week advice transport with a real solver", () => {
     expect(posts).toHaveBeenCalledTimes(1);
     expect(remote.requestAdvice).not.toHaveBeenCalled();
   });
-  it("has local one-week capabilities for an unpublished league", async () => {
+  it("uses the public entry's release setting for a local one-week plan", async () => {
     const { remote, create, load } = setup();
     const forwarded = { ...squad, league_id: 0 };
     const client = deviceAdviceClient(remote, forwarded, load, create);
@@ -316,6 +372,65 @@ describe("one-week advice transport with a real solver", () => {
     expect(result.kind).toBe("advice");
     if (result.kind === "advice") expect(result.envelope.payload.league_id).toBe(0);
     expect(remote.requestAdvice).not.toHaveBeenCalled();
+    expect(remote.readPublicCapabilities).toHaveBeenCalledWith(0, squad.entry.entry_id, {
+      signal: expect.anything(),
+    });
+    expect(remote.readCapabilities).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["no response", null],
+    ["missing release", publicEntryCapabilities(squad)],
+    ["disabled release", { ...enabledCaps, llmoptVNext: false }],
+    ["old capture", { ...enabledCaps, captureSnapshotId: "old" }],
+    ["another gameweek", { ...enabledCaps, gameweek: squad.gameweek + 1 }],
+  ])("does not advertise or start a local alternative with %s", async (_label, capabilities) => {
+    const { client, remote, posts } = setup();
+    remote.readCapabilities.mockResolvedValue(capabilities);
+    expect(
+      (await client.readCapabilities!(request.leagueId))?.devicePreferenceBundles,
+    ).toBeUndefined();
+    expect(await client.requestAdvice({ ...request, deviceAlternatives: true })).toMatchObject({
+      kind: "unavailable",
+      reason: "LLMOPT_VNEXT_DISABLED",
+    });
+    expect(deviceWorkReceipt(request.run!.run_id)).toBeUndefined();
+    expect(posts).not.toHaveBeenCalled();
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it("reads a saved session after rollback and refuses new work with the same run", async () => {
+    const { client, remote, posts, load, create } = setup();
+    const answer = await client.requestAdvice(request);
+    expect(answer.kind).toBe("advice");
+    const receipt = deviceWorkReceipt(request.run!.run_id);
+    expect(receipt!.units).toBeGreaterThan(0);
+    remote.readCapabilities.mockRejectedValue(new Error("offline"));
+    const restored = deviceAdviceClient(remote, squad, load, create);
+    expect(await restored.readAdvice(request)).toEqual(answer);
+    expect(await restored.requestAdvice(request)).toEqual(answer);
+    const next = await restored.requestAdvice({ ...request, deviceAlternatives: true });
+    expect(next).toEqual({ kind: "unavailable", reason: "LLMOPT_VNEXT_DISABLED" });
+    expect(deviceWorkReceipt(request.run!.run_id)).toEqual(receipt);
+    expect(posts).toHaveBeenCalledTimes(1);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it("shares an in-flight capability read and cancels before starting the worker", async () => {
+    const { client, remote, posts } = setup();
+    let resolve!: (value: typeof enabledCaps) => void;
+    remote.readCapabilities.mockReturnValue(
+      new Promise((accept) => {
+        resolve = accept;
+      }),
+    );
+    const capability = client.readCapabilities!(request.leagueId);
+    const calculation = client.requestAdvice(request);
+    await vi.waitFor(() => expect(remote.readCapabilities).toHaveBeenCalledTimes(1));
+    await client.cancelRun!(request.run!.run_id);
+    resolve(enabledCaps);
+    expect((await capability)?.devicePreferenceBundles).toBe(true);
+    expect(await calculation).toEqual({ kind: "unavailable", reason: "RUN_CANCELLED" });
+    expect(remote.readCapabilities).toHaveBeenCalledTimes(1);
+    expect(deviceWorkReceipt(request.run!.run_id)).toBeUndefined();
+    expect(posts).not.toHaveBeenCalled();
   });
   it("rejects another capture before starting a worker", async () => {
     const { remote, posts, create, load } = setup();

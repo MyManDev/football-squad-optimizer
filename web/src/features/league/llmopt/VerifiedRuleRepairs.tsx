@@ -104,6 +104,7 @@ export function VerifiedRuleRepairs({
       let stage: "repair" | "base" = run.failedBase ? "repair" : "base";
       const found: Witness[] = [];
       for (const choice of analysis.choices.slice(0, 2)) {
+        if (stage === "repair" && !(await current(run))) throw new Error("RUN_CONTEXT_CHANGED");
         if (signal.aborted) return;
         try {
           const request = candidateRequest(
@@ -124,6 +125,8 @@ export function VerifiedRuleRepairs({
           const net = expectedNet(answer);
           if (net === null || !verificationRequest(request, answer)) continue;
           const id = await planIdentity(answer);
+          if (signal.aborted) return;
+          if (!(await current(run))) throw new Error("RUN_CONTEXT_CHANGED");
           if (!signal.aborted) {
             found.push({ choice, request, answer, id, net, run });
             setWitnesses([...found]);

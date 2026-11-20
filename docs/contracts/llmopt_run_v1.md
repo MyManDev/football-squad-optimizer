@@ -53,7 +53,9 @@ capture identity from immutable specs where available. It never resets a live bu
 
 ## Verified repairs
 
-League and public-entry capabilities can advertise `verified_repairs: true`.
+League and public-entry capabilities can advertise `verified_repairs: true` when
+the master planning setting is on. An existing job may finish and cache its answer
+after rollback. The disabled setting refuses new candidate and selection work.
 Three-week candidates use a regular advice POST with the original run ID and
 `stage: "repair"`. Following a proved incompatible base, each candidate changes
 one rule of the original immutable request. A known missing chip right permits

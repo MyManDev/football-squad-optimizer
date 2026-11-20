@@ -49,7 +49,7 @@ export function candidateRequest(
     compareOnly: reference?.compareOnly === true,
     bundleMode: draft.soft.length > 0,
     wildcardNotHeld: false,
-    request: requestFor(squad, forwarded, window),
+    request: requestFor(squad, forwarded, window, window === 1),
   });
   let request = prepared.baseRequest;
   if (request && draft.soft.length) {

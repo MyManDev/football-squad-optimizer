@@ -207,6 +207,7 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
 def create_app(
     *,
     data_root: str | Path = DEFAULT_SITE_DATA_ROOT,
+    llmopt_vnext: bool = False,
     view_store: PublishedViewStore | None = None,
     advice_store: AdviceReadStore | None = None,
     advice_submit: AdviceSubmitService | None = None,
@@ -236,7 +237,8 @@ def create_app(
     identity_store = advice_store if advice_store is not None else public_advice_store
     application.include_router(
         intent_routes(
-            server_data_id=identity_store.plan_data_id if identity_store is not None else None
+            llmopt_vnext=llmopt_vnext,
+            server_data_id=identity_store.plan_data_id if identity_store is not None else None,
         )
     )
 
