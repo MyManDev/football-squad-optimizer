@@ -116,3 +116,9 @@ The one-week priority migration must separately compare the same twenty member-w
 and tiny independently enumerated transfer packages. Unsupported production rule
 families retain their service routing and are named in the phase report rather than
 being counted as a completed device handoff.
+
+The [hard-rule comparison](../../research/llmopt_phase4_rule_families.md) covers keep,
+avoid, buy, club counts, minimum bank, maximum hit and a frozen week in each of the
+twenty member-weeks. Both solvers return the same transfers and integer score in all
+130 feasible cases. They reject all ten cases in which the required purchases exceed
+the zero-hit limit. All 220 additional device plans satisfy the submitted constraints.
