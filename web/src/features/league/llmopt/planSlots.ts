@@ -107,11 +107,10 @@ export function followupRequests(run: PlanRun, basePlan: EntryAdvice): (Followup
         ?.find((week) => week.gameweek === basePlan.gameweek)
         ?.transfers_in.map((p) => p.player_id) ?? [];
     const delayed = run.inputs.paths3w ? delayedBuyPreferences(roll, players) : null;
-    if (!run.inputs.paths3w || delayed)
-      available.push({
-        request: { ...basis, preferences: delayed ?? roll },
-        alternative: delayed ? { kind: "delay", players } : { kind: "roll" },
-      });
+    available.push({
+      request: { ...basis, preferences: delayed ?? roll },
+      alternative: delayed ? { kind: "delay", players } : { kind: "roll" },
+    });
   }
   if (bank && bankFloor !== undefined)
     available.push({

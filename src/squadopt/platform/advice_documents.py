@@ -623,9 +623,11 @@ def league_capabilities_schema() -> dict[str, Any]:
             "plan_data_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "transfer_packages": {
                 "type": "boolean",
-                "description": (
-                    "Optional disabled-by-default three-week package and path capability."
-                ),
+                "description": "Whether transfer-package search is enabled.",
+            },
+            "three_week_paths": {
+                "type": "boolean",
+                "description": "Whether three-week path comparisons are enabled.",
             },
             "llmopt_vnext": {"type": "boolean"},
             "preferences": {

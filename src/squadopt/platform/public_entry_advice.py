@@ -63,6 +63,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
         switches: SwitchInputsProvider | None = None,
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
         transfer_packages: bool = False,
+        three_week_paths: bool = False,
         preference_bundles: bool = False,
         llmopt_vnext: bool = False,
     ) -> None:
@@ -76,6 +77,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
             switches=switches,
             available_windows=available_windows,
             transfer_packages=transfer_packages,
+            three_week_paths=three_week_paths,
             preference_bundles=preference_bundles,
             llmopt_vnext=llmopt_vnext,
         )

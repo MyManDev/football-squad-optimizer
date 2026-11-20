@@ -1818,15 +1818,18 @@ def test_package_switches_preserve_ordinary_worker_bytes_unless_the_master_and_p
     )
     question = {"strategy": COMPUTED_MODE, "window": 3}
     ordinary_key, ordinary_spec, ordinary_answer = None, None, None
-    active_keys = set()
-    for master, search, gate in (
-        (False, False, False),
-        (False, True, True),
-        (True, False, False),
-        (True, True, False),
-        (True, True, True),
+    active_keys = {}
+    for master, search, gate, paths in (
+        (False, False, False, False),
+        (False, True, True, True),
+        (True, False, False, False),
+        (True, False, False, True),
+        (True, True, False, False),
+        (True, True, False, True),
+        (True, True, True, False),
+        (True, True, True, True),
     ):
-        store = tmp_path / f"store-{master}-{search}-{gate}"
+        store = tmp_path / f"store-{int(master)}{int(search)}{int(gate)}{int(paths)}"
         store.mkdir()
         config = replace(
             original.config,
@@ -1834,6 +1837,7 @@ def test_package_switches_preserve_ordinary_worker_bytes_unless_the_master_and_p
             llmopt_vnext=master,
             transfer_packages=search,
             package_gate=gate,
+            three_week_paths=paths,
         )
         backend = build_backend(config)
         client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
@@ -1842,6 +1846,7 @@ def test_package_switches_preserve_ordinary_worker_bytes_unless_the_master_and_p
             response = client.get(capability_route)
             assert response.status_code == 200, response.text
             assert ("transfer_packages" in response.json()) is enabled
+            assert ("three_week_paths" in response.json()) is (master and paths)
             assert ("plan_data_id" in response.json()) is master
         queued = client.post(route, json=question)
         assert queued.status_code == 202, queued.text
@@ -1852,8 +1857,12 @@ def test_package_switches_preserve_ordinary_worker_bytes_unless_the_master_and_p
         assert capture.transfer_packages is enabled
         assert capture.package_gate is (enabled and gate)
         if enabled:
-            assert job.cache_key != ordinary_key and job.cache_key not in active_keys
-            active_keys.add(job.cache_key)
+            assert job.cache_key != ordinary_key
+            if gate in active_keys:
+                assert job.cache_key == active_keys[gate]
+            else:
+                assert job.cache_key not in active_keys.values()
+                active_keys[gate] = job.cache_key
             continue
         assert _work(backend) == 1
         read = client.get(route, params=question)

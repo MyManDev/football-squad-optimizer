@@ -237,10 +237,13 @@ class BackendConfig:
     ``artifact_root``."""
 
     llmopt_vnext: bool = False
+    three_week_paths: bool = False
 
     def __post_init__(self) -> None:
         if type(self.llmopt_vnext) is not bool:
             raise BackendConfigError("The LLMOPT release control must be boolean.")
+        if type(self.three_week_paths) is not bool:
+            raise BackendConfigError("The three-week path control must be boolean.")
         if type(self.transfer_packages) is not bool or type(self.package_gate) is not bool:
             raise BackendConfigError("Package controls must be boolean.")
         if self.package_gate and not self.transfer_packages:
@@ -253,6 +256,10 @@ class BackendConfig:
     @property
     def enabled_package_gate(self) -> bool:
         return self.enabled_packages and self.package_gate
+
+    @property
+    def enabled_three_week_paths(self) -> bool:
+        return self.llmopt_vnext and self.three_week_paths
 
     @property
     def queue_root(self) -> Path:
@@ -317,6 +324,7 @@ class BackendConfig:
             allowed_origins=origins,
             public_entries=public_entries == "1",
             transfer_packages=_flag(source, "SQUADOPT_BACKEND_TRANSFER_PACKAGES"),
+            three_week_paths=_flag(source, "SQUADOPT_BACKEND_THREE_WEEK_PATHS"),
             llmopt_vnext=_flag(source, "SQUADOPT_BACKEND_LLMOPT_VNEXT"),
             package_gate=_flag(source, "SQUADOPT_BACKEND_PACKAGE_GATE"),
             public_queue_limit=_positive_int(source, "SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT", 32),
@@ -889,6 +897,7 @@ def build_backend(
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
         transfer_packages=config.enabled_packages,
+        three_week_paths=config.enabled_three_week_paths,
         preference_bundles=True,
         llmopt_vnext=config.llmopt_vnext,
     )
@@ -921,6 +930,7 @@ def build_backend(
             switches=contexts,
             available_windows=contexts.available_windows,
             transfer_packages=config.enabled_packages,
+            three_week_paths=config.enabled_three_week_paths,
             preference_bundles=True,
             llmopt_vnext=config.llmopt_vnext,
         )
