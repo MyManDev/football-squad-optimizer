@@ -1,10 +1,11 @@
 # Measurements Index
 
-- 2026-11-20: [LLMOPT release acceptance and local workload](research/llmopt_phase8_closing.md)
-  and [80 paired cold and warm records](research/llmopt_phase8_load.json). Across the same
-  twenty member-weeks, enabling the release setting changed cold server work from 80 jobs
-  to zero at one week and from 80 to 40 at three weeks. Both three-week modes used 320
-  solver calls. All 80 warm repeats opened zero jobs and zero device workers.
+- 2026-11-21. On twenty frozen member-weeks, all 640 cold and warm release-workload
+  answers matched the prior record. Enabling the release setting changed cold server
+  jobs from 80 to zero at one week and from 80 to 40 at three weeks. Both three-week
+  arms used 320 solver calls. Median worker time per three-week job increased from
+  45.947 to 68.645 seconds. All 80 warm repeats opened zero jobs and zero device workers.
+  [Closing report](research/llmopt_phase8_closing.md), [per-run record](research/llmopt_phase8_load.json)
 
 - 2026-11-19: [LLMOPT bounded packages](research/llmopt_phase6_results.md),
   [record](research/llmopt_phase6_results.json): unchanged twenty-member full pool,
