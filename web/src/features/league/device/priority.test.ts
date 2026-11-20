@@ -164,9 +164,16 @@ describe("device priority counts", () => {
     expect(expected.packages).toContain(JSON.stringify(answer.squad));
     expect(metadata.total_cost).toBe((expected.reference - answer.objective_scaled) / 10);
     expect(metadata.completed_priorities).toEqual([1, 2, 3]);
+    expect(metadata.unsearched).toEqual([]);
     expect([...metadata.satisfied].sort()).toEqual(
       request.preferences
         .filter((_, i) => counts[i])
+        .map((p) => priorityRuleIdentity(p.rules))
+        .sort(),
+    );
+    expect([...metadata.left_out].sort()).toEqual(
+      request.preferences
+        .filter((_, i) => !counts[i])
         .map((p) => priorityRuleIdentity(p.rules))
         .sort(),
     );
@@ -227,11 +234,23 @@ describe("device priority counts", () => {
         return solver.solve(lp, options);
       },
     };
-    const answer = solvePriorityPreferences(limited, document, entry, main, program, () => 0);
+    const request = {
+      ...program,
+      preferences: [
+        ...preferences.slice(0, 2),
+        { rules: checkedPreferences({ no_hits: true }), priority: 3 as const },
+      ],
+    };
+    const answer = solvePriorityPreferences(limited, document, entry, main, request, () => 0);
     expect(calls).toBe(1);
     expect(answer.priority_preferences!.completed_priorities).toEqual([1]);
     expect(answer.priority_preferences!.budget_exhausted).toBe(true);
     expect(answer.priority_preferences!.total_cost).toBeLessThanOrEqual(1.5);
+    expect(answer.transfer_hit_points).toBe(0);
+    const ids = request.preferences.map((p) => priorityRuleIdentity(p.rules));
+    expect(answer.priority_preferences!.satisfied).toEqual([ids[0]]);
+    expect(answer.priority_preferences!.left_out).toEqual([]);
+    expect(answer.priority_preferences!.unsearched?.slice().sort()).toEqual(ids.slice(1).sort());
   });
   it("retains the last completed layer when the points tie break is interrupted", () => {
     const main = solvePlan(solver, document, entry, () => 0, null, { preferences: hard });

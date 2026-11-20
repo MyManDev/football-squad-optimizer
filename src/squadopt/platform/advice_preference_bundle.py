@@ -166,11 +166,15 @@ def compute_preference_bundle(
                     "payload": json.loads(held)["payload"],
                     "error_code": None,
                 }
-        allowance = job_capacity(spec.window)
-        if parent.remaining < allowance:
+        allowance = (
+            parent.remaining
+            if program is not None
+            else min(job_capacity(spec.window), parent.remaining)
+        )
+        if allowance <= 0:
             exhausted = True
             return {"status": "exhausted", "payload": None, "error_code": "RUN_BUDGET_EXHAUSTED"}
-        child_budget = WorkBudget(allowance)
+        child_budget = WorkBudget(allowance, journal=parent.journal)
         try:
             if program is None:
                 specs.put(key, child_spec)
@@ -182,7 +186,8 @@ def compute_preference_bundle(
                     _reference(main, spec) if program is not None else None,
                 )
             validate_advice_document(result)
-            if program is None:
+            if program is None and allowance == job_capacity(spec.window):
+                # A partial grant can change the incumbent under the ordinary answer key.
                 cache.put(key, result)
             return {"status": "done", "payload": json.loads(result)["payload"], "error_code": None}
         except WorkBudgetExhausted:
@@ -202,6 +207,7 @@ def compute_preference_bundle(
         finally:
             parent.cp_used += child_budget.cp_used
             parent.native_reserved += child_budget.native_reserved
+            parent.unconfirmed += child_budget.unconfirmed
             parent.calls += child_budget.calls
 
     components: list[dict[str, Any]] = [

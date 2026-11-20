@@ -15,7 +15,7 @@ from squadopt.contracts.preference_bundle import (
     priority_result_schema,
 )
 from squadopt.contracts.schema_paths import contract_schema_path
-from squadopt.platform.advice_documents import advice_read_schema
+from squadopt.platform.advice_documents import advice_read_schema, validate_advice_document
 from squadopt.platform.backend_runtime import build_backend
 
 
@@ -93,6 +93,7 @@ def test_three_priority_rules_use_two_real_server_jobs_and_resume_from_cache(
     selected = result["selected"]["payload"]
     metadata = selected["priority_preferences"]
     assert metadata["completed_priorities"] == [1, 2, 3]
+    assert metadata["unsearched"] == []
     assert len(metadata["satisfied"]) + len(metadata["left_out"]) == 3
     assert metadata["total_cost"] <= 100
     assert metadata["reference_proved"] is (
@@ -105,6 +106,11 @@ def test_three_priority_rules_use_two_real_server_jobs_and_resume_from_cache(
     }
     assert client.get(route, params=query).content == cached.content
     assert len(backend.queue.jobs()) == 2
+    historical = cached.json()
+    del historical["payload"]["preference_bundle_result"]["selected"]["payload"][
+        "priority_preferences"
+    ]["unsearched"]
+    validate_advice_document(json.dumps(historical).encode())
     with backend.runs.transaction() as tx:
         assert tx.state["jobs"][job.job_id]["receipt"]["calls"] >= 5
 
@@ -255,6 +261,50 @@ def test_legacy_individual_prices_and_combination_share_one_real_job(tmp_path, m
         receipt = tx.state["jobs"][job.job_id]["receipt"]
         assert receipt["calls"] > 3
         assert receipt["cp_used"] + receipt["native_reserved"] < (63 if window == 1 else 366)
+
+
+def test_every_admitted_bundle_fits_the_result_query(tmp_path, monkeypatch):
+    backend, client, route, body, run, held = _started(tmp_path, monkeypatch)
+    rules = [{"keep_players": [held[0]]}, {"avoid_players": [held[1]]}]
+    prices = [{"outcome": slot, "ceiling": ceiling} for slot in range(2) for ceiling in range(4)]
+    choices = []
+    # Four distinct ceilings per price produce five possible acceptance masks per slot.
+    masks = [0, 0b1000, 0b1100, 0b1110, 0b1111]
+    for first in masks:
+        for second in masks:
+            accepted = first | second << 4
+            patch = {**(rules[0] if first else {}), **(rules[1] if second else {})}
+            choices.append(
+                {
+                    "accepted": accepted,
+                    "applied": [i for i in range(len(prices)) if accepted & (1 << i)],
+                    "selection": {"preferences": patch, "chip": None} if patch else None,
+                }
+            )
+    bundle = {
+        "contract_version": BUNDLE_VERSION,
+        "slots": [{"preferences": rule, "chip": None} for rule in rules],
+        "prices": prices,
+        "choices": choices,
+        "program": None,
+    }
+    encoded = json.dumps(bundle, separators=(",", ":"))
+    request = json.dumps({**body, "run": run, "preference_bundle": bundle}, separators=(",", ":"))
+    assert 3000 < len(encoded) < len(request.encode()) <= 4096
+    accepted = client.post(route, content=request, headers={"Content-Type": "application/json"})
+    assert accepted.status_code == 202, accepted.text
+    assert world._work(backend) == 1
+    hit = client.post(route, content=request, headers={"Content-Type": "application/json"})
+    assert hit.status_code == 200, hit.text
+    params = {**body, "preferences": json.dumps(body["preferences"]), "preference_bundle": encoded}
+    read = client.get(route, params=params)
+    assert read.status_code == 200, read.text
+    assert read.content == hit.content
+    assert (
+        client.get(route, params={**params, "preference_bundle": encoded.ljust(4097)}).status_code
+        == 422
+    )
+    assert len(backend.queue.jobs()) == 2
 
 
 def test_missing_price_branch_is_rejected_before_opening_a_job(tmp_path, monkeypatch):

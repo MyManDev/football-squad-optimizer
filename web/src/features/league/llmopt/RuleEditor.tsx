@@ -201,7 +201,7 @@ export function RuleEditor({
                                 })
                               }
                             >
-                              <option value="">{copy.priorityLevels[2]}</option>
+                              <option value="">{copy.noPriority}</option>
                               {([1, 2, 3] as const).map((level) => (
                                 <option key={level} value={level}>
                                   {copy.priorityLevels[level]}
@@ -242,7 +242,7 @@ export function RuleEditor({
           );
         })}
       </div>
-      {priorities && draft.soft.length > 0 && (
+      {priorities && (draft.soft.length > 0 || draft.max_total_cost_tenths !== undefined) && (
         <div className={styles.editor}>
           <label>
             {copy.totalLimit}
@@ -399,7 +399,7 @@ export function RuleEditor({
                 )
               }
             >
-              <option value="">{copy.priorityLevels[2]}</option>
+              <option value="">{copy.noPriority}</option>
               {([1, 2, 3] as const).map((level) => (
                 <option key={level} value={level}>
                   {copy.priorityLevels[level]}
