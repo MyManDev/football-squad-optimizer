@@ -20,7 +20,7 @@ import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
-import { LEAGUE_READ, useEntrySquad } from "../queries";
+import { LEAGUE_READ, useEntrySquad, useRestoredPlanCapabilities } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
 import { combinedCandidates, prepareCombined } from "./combinedPlan";
@@ -278,23 +278,13 @@ function Workspace({
   const [restoredRun] = useState(() =>
     restoreRun(restored, held, (window) => requestFor(squad, forwarded, window)),
   );
-  const restoreCapabilities = useQuery({
-    queryKey: [
-      "llmopt-release",
-      ORIGIN,
-      forwarded === true,
-      squad.league_id,
-      squad.entry.entry_id,
-      squad.source_snapshot_id,
-    ],
-    queryFn: async ({ signal }) =>
-      (forwarded
-        ? await client.readPublicCapabilities?.(squad.league_id, squad.entry.entry_id, { signal })
-        : await client.readCapabilities?.(squad.league_id, { signal })) ?? null,
-    enabled: !!ORIGIN && !!restoredRun,
-    retry: false,
-    refetchOnMount: "always",
-  });
+  const restoreCapabilities = useRestoredPlanCapabilities(
+    client,
+    ORIGIN,
+    forwarded === true,
+    squad,
+    !!restoredRun,
+  );
   const [draft, setDraft] = useState<PlanDraft>(restored?.draft ?? EMPTY_DRAFT);
   const [reference, setReference] = useState<PlanRevision | undefined>(restored?.reference);
   const [message, setMessage] = useState("");

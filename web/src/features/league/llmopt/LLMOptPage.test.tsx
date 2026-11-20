@@ -172,23 +172,13 @@ function open(
   clients.push(client);
   client.setQueryData(FIXTURES_QUERY.queryKey, calendar);
   if (previousRelease !== undefined) {
-    client.setQueryData(
-      [
-        "llmopt-release",
-        ORIGIN,
-        false,
-        squad.league_id,
-        squad.entry.entry_id,
-        squad.source_snapshot_id,
-      ],
-      {
-        llmoptVNext: previousRelease,
-        leagueId: squad.league_id,
-        season: squad.season,
-        gameweek: squad.gameweek,
-        captureSnapshotId: squad.source_snapshot_id,
-      },
-    );
+    client.setQueryData(leagueKeys.restoredPlanCapabilities(ORIGIN, false, squad), {
+      llmoptVNext: previousRelease,
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      captureSnapshotId: squad.source_snapshot_id,
+    });
   }
   return render(
     <QueryClientProvider client={client}>
