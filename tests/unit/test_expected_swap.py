@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from squadopt.contracts.preferences import DecisionPreferences
-from squadopt.optimization import OptimizationConfig, SolverStatus
+from squadopt.optimization import OptimizationConfig, SolverExecutionError, SolverStatus
 from squadopt.planning.expected_swap import propose_expected_swap
 from squadopt.planning.expected_window import optimize_expected_window
 from squadopt.planning.guarded import optimize_guarded_window
@@ -118,7 +118,10 @@ def no_solve(*args, **kwargs):
 
 @pytest.mark.parametrize(
     "actual",
-    [pytest.param(24.058744962167573, id="gw8-3832237"), pytest.param(24.223909707394814, id="gw9-3832237")],
+    [
+        pytest.param(24.058744962167573, id="gw8-3832237"),
+        pytest.param(24.223909707394814, id="gw9-3832237"),
+    ],
 )
 def test_five_free_transfers_return_a_protected_plan_without_another_solve(monkeypatch, actual):
     horizon, initial, settings, transfer, _ = world()
@@ -137,13 +140,22 @@ def test_five_free_transfers_return_a_protected_plan_without_another_solve(monke
         protected.append(plan)
         work = plan.diagnostics["sequential_incumbent"]
         final_work = actual - work["seed_work"]
-        return replace(plan, diagnostics={
-            **plan.diagnostics,
-            "deterministic_time_used": final_work,
-            "sequential_incumbent": {**work, "actual_total": actual, "final_work_including_hold": final_work},
-        })
+        return replace(
+            plan,
+            diagnostics={
+                **plan.diagnostics,
+                "deterministic_time_used": final_work,
+                "sequential_incumbent": {
+                    **work,
+                    "actual_total": actual,
+                    "final_work_including_hold": final_work,
+                },
+            },
+        )
 
-    monkeypatch.setattr("squadopt.planning.expected_window.optimize_guarded_window", completed_route)
+    monkeypatch.setattr(
+        "squadopt.planning.expected_window.optimize_guarded_window", completed_route
+    )
     monkeypatch.setattr("squadopt.planning.expected_window.propose_expected_swap", no_solve)
     result = optimize_expected_window(horizon, initial, settings, transfer)
     assert result.solver_status is SolverStatus.FEASIBLE
@@ -164,6 +176,76 @@ def test_five_free_transfers_return_a_protected_plan_without_another_solve(monke
     assert review["ledger"][0]["actual"] == actual
     assert review["optional_swap"]["status"] == "skipped"
     assert result.diagnostics.get("best_objective_bound") is None
+
+
+@pytest.fixture(scope="module")
+def protected_phase():
+    horizon, initial, settings, transfer, _ = world()
+    initial = replace(initial, free_transfers=5)
+    settings = replace(settings, solver_deterministic_time_limit=60)
+    transfer = replace(transfer, banked_transfer_value_points=0)
+    plan = optimize_guarded_window(
+        horizon, initial, replace(settings, solver_deterministic_time_limit=24), transfer
+    )
+    assert plan.has_solution and plan.diagnostics["incumbent_protection"]
+    return horizon, initial, settings, transfer, plan
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "unprotected",
+        "partial",
+        "wrong_horizon",
+        "negative",
+        "nan",
+        "infinite",
+        "inconsistent",
+        "wall",
+    ],
+)
+def test_invalid_or_unverified_original_phase_cannot_be_retained(
+    monkeypatch, protected_phase, defect
+):
+    horizon, initial, settings, transfer, plan = protected_phase
+    work = plan.diagnostics["sequential_incumbent"]
+    actual = {"negative": -1.0, "nan": float("nan"), "infinite": float("inf")}.get(defect, 24.22)
+    final_work = actual - work["seed_work"]
+    diagnostics = {
+        **plan.diagnostics,
+        "deterministic_time_used": final_work,
+        "sequential_incumbent": {
+            **work,
+            "final_work_including_hold": final_work,
+            "actual_total": actual + (1 if defect == "inconsistent" else 0),
+        },
+    }
+    if defect == "unprotected":
+        del diagnostics["incumbent_protection"]
+        del diagnostics["incumbent_hint"]
+    elif defect == "partial":
+        plan = replace(plan, weeks=plan.weeks[:1])
+    elif defect == "wrong_horizon":
+        plan = replace(plan, horizon_fingerprint="f" * 64)
+    elif defect == "wall":
+        plan = replace(plan, solver_status=SolverStatus.FEASIBLE)
+        diagnostics["deterministic_time_budget_exhausted"] = False
+    calls = []
+
+    def first_phase(*args, **kwargs):
+        assert not calls, "a refused original phase must not start another solve"
+        calls.append(True)
+        return replace(plan, diagnostics=diagnostics)
+
+    monkeypatch.setattr("squadopt.planning.expected_window.optimize_guarded_window", first_phase)
+    monkeypatch.setattr("squadopt.planning.expected_window.propose_expected_swap", no_solve)
+    if defect == "wall":
+        with pytest.raises(SolverExecutionError, match="wall-clock"):
+            optimize_expected_window(horizon, initial, settings, transfer)
+    else:
+        with pytest.raises(ValueError, match="accounting"):
+            optimize_expected_window(horizon, initial, settings, transfer)
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize("window", [3, 5])
