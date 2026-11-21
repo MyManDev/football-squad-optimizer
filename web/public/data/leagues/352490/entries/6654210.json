@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-20T02:03:16Z",
+  "generated_at_utc": "2026-11-21T03:04:55Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -27,8 +27,8 @@
         "short_name": "Raya",
         "position": "GK",
         "team": "Arsenal",
-        "price_tenths": 62,
-        "expected_points": 3.690117445317198,
+        "price_tenths": 63,
+        "expected_points": 3.732934492331794,
         "event_points": null,
         "is_captain": false,
         "is_vice_captain": false,
@@ -312,7 +312,7 @@
     "purchase_prices_known": true,
     "squad_sell_value_tenths": 1002,
     "spendable_budget_tenths": 1002,
-    "source_snapshot_id": "fpl-live-20261120T020104Z-2150bca2c2c3",
+    "source_snapshot_id": "fpl-live-20261121T030214Z-3d3cac1a09b8",
     "squadopt_comparison": null,
     "data_quality": "complete",
     "missing_fields": [],
