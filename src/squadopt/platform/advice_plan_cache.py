@@ -9,6 +9,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+from squadopt.contracts.llmopt_run import workflow_enabled
 from squadopt.platform.advice_cache import AdviceCacheConflictError, FileAdviceCache
 
 
@@ -47,26 +48,40 @@ def _receipt_key(key: str, raw: bytes) -> str:
 
 
 class PlanAdviceCache:
-    def __init__(self, root: Path, *, llmopt_vnext: bool) -> None:
+    def __init__(
+        self, root: Path, *, llmopt_vnext: bool, llmopt_vnext_three_week: bool = False
+    ) -> None:
         self._answers = FileAdviceCache(root)
         self._receipts = FileAdviceCache(root / "plan-provenance")
         self._enabled = llmopt_vnext
+        self._three_week = llmopt_vnext_three_week
+
+    def _enabled_for(self, document: Any) -> bool:
+        payload = document.get("payload") if isinstance(document, dict) else None
+        return isinstance(payload, dict) and workflow_enabled(
+            payload.get("window", 0), master=self._enabled, three_week=self._three_week
+        )
 
     def get(self, key: str) -> bytes | None:
-        return self._get(key, include_provenance=self._enabled)
+        return self._get(key, private_witness=False)
 
     def repair_witness(self, key: str) -> bytes | None:
         """Read existing enabled provenance for private verification during rollback."""
-        return self._get(key, include_provenance=True)
+        return self._get(key, private_witness=True)
 
-    def _get(self, key: str, *, include_provenance: bool) -> bytes | None:
+    def _get(self, key: str, *, private_witness: bool) -> bytes | None:
         raw = self._answers.get(key)
         if raw is None:
             return None
         canonical, embedded = _separate(raw)
-        if not include_provenance:
-            # Also project any older worker's embedded metadata on rollback.
-            return canonical
+        document = None
+        if not private_witness:
+            if not self._enabled:
+                return canonical
+            if not self._three_week or embedded:
+                document = json.loads(raw)
+                if not self._enabled_for(document):
+                    return canonical
         if embedded:
             return raw
         receipt = self._receipts.get(_receipt_key(key, raw))
@@ -75,7 +90,10 @@ class PlanAdviceCache:
         identities = json.loads(receipt)
         if not isinstance(identities, dict) or not identities:
             return raw
-        document = json.loads(raw)
+        if document is None:
+            document = json.loads(raw)
+        if not private_witness and not self._enabled_for(document):
+            return canonical
         plans = dict(_plans(document))
         if not all(
             slot in plans and isinstance(identity, str) and re.fullmatch(r"[0-9a-f]{64}", identity)
@@ -88,7 +106,7 @@ class PlanAdviceCache:
 
     def put(self, key: str, payload: bytes) -> None:
         raw, identities = _separate(payload)
-        if self._enabled and identities:
+        if self._enabled and identities and self._enabled_for(json.loads(raw)):
             self._receipts.put(_receipt_key(key, raw), _encoded(identities))
         try:
             self._answers.put(key, raw)

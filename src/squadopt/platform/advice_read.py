@@ -40,6 +40,7 @@ from squadopt.contracts.league_tree import (
     find_league_tree,
     published_league_trees,
 )
+from squadopt.contracts.llmopt_run import workflow_enabled
 from squadopt.contracts.preference_bundle import BUNDLE_SWITCH, BUNDLE_VERSION, PreferenceBundle
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
@@ -470,6 +471,8 @@ class AdviceReadStore:
         preference_bundles: bool = False,
         verified_repairs: bool = False,
         llmopt_vnext: bool = False,
+        llmopt_vnext_three_week: bool = False,
+        window_context: Callable[[AdviceRequestContext, int], AdviceRequestContext] | None = None,
     ) -> None:
         self._directory = directory
         self._cache = cache
@@ -494,6 +497,16 @@ class AdviceReadStore:
         self._preference_bundles = preference_bundles
         self._verified_repairs = verified_repairs
         self.llmopt_vnext = llmopt_vnext
+        self.llmopt_vnext_three_week = llmopt_vnext_three_week
+        self._window_context = window_context
+
+    def workflow_enabled(self, window: int) -> bool:
+        return workflow_enabled(
+            window, master=self.llmopt_vnext, three_week=self.llmopt_vnext_three_week
+        )
+
+    def request_context(self, context: AdviceRequestContext, window: int) -> AdviceRequestContext:
+        return self._window_context(context, window) if self._window_context else context
 
     def current_capture_snapshot_id(self) -> str | None:
         context = self._context.current()
@@ -710,6 +723,8 @@ class AdviceReadStore:
         if self.llmopt_vnext:
             document["llmopt_vnext"] = True
             document["plan_data_id"] = advice_context_identity(context)
+        if self.workflow_enabled(3):
+            document["llmopt_vnext_three_week"] = True
         if self.llmopt_vnext and self._preference_bundles:
             document["preference_bundles"] = {"version": BUNDLE_VERSION}
         if self.llmopt_vnext and self._verified_repairs:
@@ -721,7 +736,7 @@ class AdviceReadStore:
             )
         if self.llmopt_vnext and self._transfer_packages:
             document["transfer_packages"] = True
-        if self.llmopt_vnext and self._three_week_paths:
+        if self.workflow_enabled(3) and self._three_week_paths:
             document["three_week_paths"] = True
         validate_league_capabilities(document)
         return document
@@ -1005,6 +1020,7 @@ class AdviceReadStore:
             model=model,
             preferences=preferences,
         )
+        context = self.request_context(context, window)
         key = advice_cache_key(
             advice_contract_version=context.advice_contract_version,
             capture_snapshot_id=context.capture_snapshot_id,

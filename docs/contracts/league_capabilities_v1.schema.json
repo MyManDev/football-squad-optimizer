@@ -110,6 +110,10 @@
     "llmopt_vnext": {
       "type": "boolean"
     },
+    "llmopt_vnext_three_week": {
+      "const": true,
+      "type": "boolean"
+    },
     "managers_word": {
       "additionalProperties": false,
       "properties": {

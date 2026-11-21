@@ -208,6 +208,7 @@ def create_app(
     *,
     data_root: str | Path = DEFAULT_SITE_DATA_ROOT,
     llmopt_vnext: bool = False,
+    llmopt_vnext_three_week: bool = False,
     view_store: PublishedViewStore | None = None,
     advice_store: AdviceReadStore | None = None,
     advice_submit: AdviceSubmitService | None = None,
@@ -238,6 +239,7 @@ def create_app(
     application.include_router(
         intent_routes(
             llmopt_vnext=llmopt_vnext,
+            llmopt_vnext_three_week=llmopt_vnext_three_week,
             server_data_id=identity_store.plan_data_id if identity_store is not None else None,
         )
     )

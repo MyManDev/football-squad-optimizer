@@ -43,7 +43,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Final, Protocol
 
@@ -400,6 +400,35 @@ class AdviceSubmitService:
                 transaction.legacy_consumer(outcome.job.job_id)
         return outcome
 
+    def _recorded_release_request(
+        self,
+        tx: RunTransaction,
+        run: RunReference,
+        spec: AdviceJobSpec,
+    ) -> ResolvedAdviceRequest | None:
+        """Recover only this run's exact request when rollback changed the package address."""
+        if self._specs is None:
+            return None
+        state = tx.state["runs"][run.run_id]
+        for key in dict.fromkeys(
+            (state["base"], *state["requests"], *state.get("repair_candidates", []))
+        ):
+            prior = self._specs.get(key)
+            if (
+                prior is None
+                or self._reader.request_context(prior.context, spec.window) != spec.context
+            ):
+                continue
+            switches = {name: dict(identity) for name, identity in spec.switches.items()}
+            if BUNDLE_SWITCH in switches:
+                switches = {
+                    **switches,
+                    BUNDLE_SWITCH: {**switches[BUNDLE_SWITCH], "base_key": state["base"]},
+                }
+            if replace(spec, context=prior.context, switches=switches) == prior:
+                return ResolvedAdviceRequest(key, prior.context, switches)
+        return None
+
     def _authorize_repair(
         self,
         run: RunReference,
@@ -437,7 +466,7 @@ class AdviceSubmitService:
             ):
                 return
         # New work, including a shared cached candidate, needs current permission.
-        if not self._reader.llmopt_vnext:
+        if not self._reader.workflow_enabled(spec.window):
             raise RunAdmissionError("LLMOPT_VNEXT_DISABLED", "This planning workflow is closed.")
         if base_ready and len(preferences.frozen_weeks) == 3 and run.repair_origin is None:
             raise rejected
@@ -493,6 +522,7 @@ class AdviceSubmitService:
         many keys or clients ask. The queue retains each joining key's request identity.
         """
 
+        enabled = self._reader.workflow_enabled(window)
         if run is not None and self._runs is None:
             raise RunAdmissionError("RUN_STORE_UNAVAILABLE", "Planning work is unavailable.")
         if preference_bundle is not None and (run is None or run.stage != "followup"):
@@ -536,7 +566,7 @@ class AdviceSubmitService:
         try:
             resolved = run_resolved if run_resolved is not None else resolve()
         except AdviceInputsNotPreparedError as missing:
-            if run is not None and not self._reader.llmopt_vnext:
+            if run is not None and not enabled:
                 raise RunAdmissionError(
                     "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
                 ) from missing
@@ -581,9 +611,7 @@ class AdviceSubmitService:
                 spec = request_spec()
                 if ref.stage == "repair":
                     witness = (
-                        document
-                        if self._reader.llmopt_vnext
-                        else self._reader.cached(cache_key, repair_witness=True)
+                        document if enabled else self._reader.cached(cache_key, repair_witness=True)
                     )
                     if witness is None or not current_repair_answer(
                         spec,
@@ -608,18 +636,21 @@ class AdviceSubmitService:
                 or (run.stage == "base" and not origin.permits(preferences, chip))
             ):
                 raise RunAdmissionError("RUN_REPAIR_INVALID", "This edit does not match the plan.")
-            binding = hashlib.sha256(
-                json.dumps(
-                    {
-                        "context": asdict(context),
-                        "league": league_id,
-                        "entry": entry_id,
-                        "window": window,
-                        **({"repair_origin": origin.facts} if origin is not None else {}),
-                    },
-                    sort_keys=True,
-                ).encode()
-            ).hexdigest()
+
+            def run_binding() -> str:
+                return hashlib.sha256(
+                    json.dumps(
+                        {
+                            "context": asdict(context),
+                            "league": league_id,
+                            "entry": entry_id,
+                            "window": window,
+                            **({"repair_origin": origin.facts} if origin is not None else {}),
+                        },
+                        sort_keys=True,
+                    ).encode()
+                ).hexdigest()
+
             with self._runs.transaction(at_utc=at_utc) as transaction:
                 transaction.prune(context.capture_snapshot_id, self._queue)
                 known = (
@@ -627,7 +658,15 @@ class AdviceSubmitService:
                     or run.run_id in transaction.state["cancelled"]
                 )
                 original = None
-                if self._reader.llmopt_vnext or known:
+                binding = run_binding()
+                saved = transaction.state["runs"].get(run.run_id)
+                if not enabled and saved is not None and binding != saved["binding"]:
+                    previous = self._recorded_release_request(transaction, run, request_spec())
+                    if previous is not None:
+                        resolved = previous
+                        cache_key, context = resolved.key, resolved.context
+                        binding = run_binding()
+                if enabled or known:
                     transaction.bind(
                         run,
                         binding,
@@ -636,7 +675,7 @@ class AdviceSubmitService:
                         self._queue,
                         capture=context.capture_snapshot_id,
                     )
-                    if self._reader.llmopt_vnext:
+                    if enabled:
                         transaction.release_failed_bundles(run.run_id, self._queue)
                     if run.stage == "repair":
                         self._authorize_repair(
@@ -656,7 +695,7 @@ class AdviceSubmitService:
                         )
                     original = transaction.previous(run, cache_key)
                 if (
-                    not self._reader.llmopt_vnext
+                    not enabled
                     and (run.stage == "repair" or origin is not None)
                     and (not known or transaction.repair_candidate is not None)
                 ):
@@ -676,7 +715,7 @@ class AdviceSubmitService:
                             "RUN_REQUEST_INCOMPLETE", "Confirm a new planning run."
                         )
                     return SubmitOutcome(kind="job", job=job)
-                if not self._reader.llmopt_vnext:
+                if not enabled:
                     held = self._reader.cached(cache_key)
                     if held is not None:
                         if run.stage == "repair":

@@ -22,9 +22,13 @@ from squadopt.platform.backend_runtime import build_backend
 
 
 def _started(tmp_path, monkeypatch, window=1, chip=None):
-    backend = world._deployment(tmp_path, monkeypatch, last_gameweek=5, llmopt_vnext=True)[
-        "backend"
-    ]
+    backend = world._deployment(
+        tmp_path,
+        monkeypatch,
+        last_gameweek=5,
+        llmopt_vnext=True,
+        llmopt_vnext_three_week=window == 3,
+    )["backend"]
     client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/advice"
     body = {
