@@ -75,6 +75,8 @@ test("LLMOPT confirms, polls and displays a three-week worker plan across reload
   const route = `${league}/entries/${context.entryId}/advice`;
   await page.goto(`/league/${context.leagueId}/members`);
   await pickMember(page, publishedMember(`${built}/league/members.json`, context.entryId));
+  // The picker records the member inside the view transition before navigation.
+  await expect(page.locator("[data-member-picker]")).toHaveCount(0);
   const capabilities = page.waitForResponse(
     (response) => response.url() === `${league}/capabilities`,
   );
