@@ -595,6 +595,7 @@ exhaustive_ignores = [
     "context",
     "contributions",
     "elite_capture",
+    "elite_season_capture",
     "file_advice_queue",
     "football_bundle",
     "football_minute_basis",
