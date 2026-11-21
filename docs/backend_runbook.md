@@ -104,18 +104,19 @@ SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json
 
 ### LLMOPT text interpretation
 
-The backend calls no model and holds no model key (ADR 0017). LLMOPT's chat is read by each
-member's own model: the member's browser makes the call with the member's key, and the
-backend only writes the call and checks the reply. There is nothing to configure, and the
-API reads no LLMOPT setting. A host that still has `/etc/squadopt/llmopt.env` from before
-18 November 2026 can delete it; the Compose file no longer reads it.
+The browser holds the member's provider credential in memory for the current visit. The
+backend prepares the request and validates the reply (ADR 0017). The API and worker read
+the server-side planning release settings from the active Compose environment. See the
+[one-week opening and rollback procedure](research/llmopt_one_week_opening.md). Deployments
+before 18 November 2026 used a separate `/etc/squadopt/llmopt.env` file.
 
 `POST /api/v1/llmopt/prompt` takes the member's message, the draft and the players, and
 returns the call the browser sends to the member's provider: `system`, `user`, `schema`,
 `schema_name` and `max_output_tokens`. The `user` text carries a shortlist of the players,
 not the whole roster. `POST /api/v1/llmopt/check` takes `{"request": ..., "reply": ...}`,
-rebuilds the shortlist and validates the model's reply, answering a draft or one question
-back, or 422 `REPLY_REFUSED`. Neither submits an advice job.
+rebuilds the shortlist and validates the reply. It can return a draft, a clarification or,
+when plan conversation is available, a selection from the current catalogue. An invalid
+reply can produce 422 `REPLY_REFUSED`. An accepted selection reuses the displayed plan.
 
 Both routes refuse with 400 `CREDENTIAL_REFUSED` any request carrying an `Authorization`,
 `x-api-key` or `x-goog-api-key` header, and allow 20 requests a minute per visitor each.
