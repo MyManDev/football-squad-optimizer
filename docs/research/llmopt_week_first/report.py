@@ -169,6 +169,15 @@ def render(record, historical):
                 ]
             )
             for case, sample in rows:
+                if (
+                    not 0
+                    < sample["first_visible_seconds"]
+                    <= sample["total_seconds"]
+                    <= sample["observer_seconds"]
+                ):
+                    issues.append(
+                        f"{case}/{release}/{cache}: timeline exceeds the independent observer."
+                    )
                 for slot in ("base", "combined"):
                     expected = h2[1, arm, case][cache]["answers"][slot]
                     opening = json.loads(expected["path"])
@@ -305,7 +314,10 @@ def render(record, historical):
         "Both visible decisions are checked against the H2 chip and held squad after transfers. "
         "The worker count comes from the browser. Each warm restore must reuse its cached "
         "results without starting a worker or publishing a server job. "
-        "Durations use a monotonic clock. The median and the "
+        "Only Date is fixed for deadline decisions. Navigation, performance timing, animation "
+        "frames and timers use Chromium's native clock. The recording also verifies that each "
+        "pass finishes inside the independent monotonic interval observed by the browser driver. "
+        "The median and the "
         "nearest-rank 95th percentile over 20 samples are reported independently for each arm.",
         "### Members and stages at the one-week total-time tail",
         " ".join(tail_notes),
