@@ -574,10 +574,8 @@ class CaptureContextProvider:
 
         The argument is the entire ``AdviceRequestContext`` rather than a capture id, and
         all seven fields enter the cache key. A recognized package fingerprint selects
-        its recorded calculation on the same capture, handoff and commit. Matching on the capture alone left three ways to compute an answer with
-        inputs the key does not describe: a redeployed commit, a changed configuration, and
-        a republished handoff. Answering "here is the current bundle" to a question about
-        any other context is the silent-corruption path this exists to close.
+        its recorded calculation on the same capture, handoff and commit. A match on capture
+        alone could pair the key with a different deployment, configuration or handoff.
         """
 
         identity = self.identity()
