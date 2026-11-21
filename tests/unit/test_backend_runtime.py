@@ -183,6 +183,21 @@ def test_the_queue_and_the_cache_come_from_one_configured_store(tmp_path: Path) 
     assert config.queue_root != config.cache_root
 
 
+@pytest.mark.parametrize("value,enabled", [(None, False), ("0", False), ("1", True), ("bad", None)])
+def test_llmopt_release_control_requires_explicit_opt_in(tmp_path, value, enabled):
+    environment = {
+        f"SQUADOPT_BACKEND_{name}_ROOT": str(tmp_path / name.lower())
+        for name in ("STORE", "SITE_DATA", "SNAPSHOT", "HANDOFF")
+    }
+    if value is not None:
+        environment["SQUADOPT_BACKEND_LLMOPT_VNEXT"] = value
+    if enabled is None:
+        with pytest.raises(BackendConfigError, match="LLMOPT_VNEXT"):
+            BackendConfig.from_environment(environment)
+    else:
+        assert BackendConfig.from_environment(environment).llmopt_vnext is enabled
+
+
 def test_missing_configuration_names_every_variable_at_once() -> None:
     with pytest.raises(BackendConfigError) as error:
         BackendConfig.from_environment({"SQUADOPT_BACKEND_STORE_ROOT": "/mnt/store"})

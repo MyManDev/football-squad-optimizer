@@ -1,5 +1,22 @@
 # Measurements Index
 
+- 2026-11-19: [LLMOPT real solver budget controls](research/llmopt_phase2_solver_budget.md),
+  [record](research/llmopt_phase2_solver_budget.json): twenty frozen member-weeks at
+  both windows; 40/40 original statuses and decisions, 32 equal numeric objectives
+  and eight equal infeasibilities; maximum work 20.001169834987554/21 and
+  120.00555450856191/122 units. Sequential local production solves, no network calls.
+
+- 2026-11-20: [Wildcard and Free Hit cache parity](research/llmopt_phase2_named_chip.md),
+  [record](research/llmopt_phase2_named_chip.json). In 16 paired one- and three-week
+  controls, the run-bound and legacy workers returned the same solver status, transfer
+  decisions, objective and published net points. All 16 pairs shared the same cache
+  address and immutable request, and the cached bytes matched in every pair.
+
+- 2026-11-18: [LLMOPT shared admission](research/llmopt_phase2_admission.md),
+  [record](research/llmopt_phase2_admission.json): 20 frozen member-weeks, 40 runs,
+  maximum four server jobs, zero additional jobs from 240 reconstructed-service repeats;
+  synthetic completions, no solver-quality or latency claim.
+
 One line per committed real-data measurement artifact: what it is, what it found, and
 where it came from. Every artifact here is measurement-only in the sense that matters —
 **nothing in this index promoted a model or changed the operational control** — but one row

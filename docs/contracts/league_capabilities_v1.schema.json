@@ -107,6 +107,9 @@
       "minimum": 0,
       "type": "integer"
     },
+    "llmopt_vnext": {
+      "type": "boolean"
+    },
     "managers_word": {
       "additionalProperties": false,
       "properties": {

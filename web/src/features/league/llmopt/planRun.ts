@@ -109,11 +109,15 @@ export function prepareRun(inputs: RunInputs): PlanRun {
       wildcardUnavailable = true;
       return null;
     }
+    const addressed = request.run
+      ? { ...request, run: { ...request.run, stage: "followup" as const } }
+      : request;
     return pricing || draft.scenario
-      ? pricedRequest(request, plan)
-      : { ...request, ...plan, preferences: plan.preferences };
+      ? pricedRequest(addressed, plan)
+      : { ...addressed, ...plan, preferences: plan.preferences };
   };
-  const baseRequest = submit(baseline);
+  const base = submit(baseline);
+  const baseRequest = base?.run ? { ...base, run: { ...base.run, stage: "base" as const } } : base;
   if (draft.scenario) {
     const previous = prepareOriginalScenario(draft, held, plans.window, reference);
     const replay = submit(previous);
@@ -131,7 +135,7 @@ export function prepareRun(inputs: RunInputs): PlanRun {
       wildcardUnavailable,
     };
   }
-  const automaticBasis = pricing || !compareBoth ? baseRequest : submit(hard);
+  const automaticBasis = pricing || !compareBoth ? base : submit(hard);
   const slots: ReservedAlternative[] = [];
   function addExplicit(plan: PreparedPlan | null, conflict: boolean, title: ExplicitTitle) {
     const request = submit(plan);
@@ -186,7 +190,18 @@ export function restoreRun(
   return prepareRun({
     draft,
     held,
-    request: requestForWindow(plans.window),
+    request: {
+      ...requestForWindow(plans.window),
+      ...(confirmation.runId
+        ? {
+            run: {
+              contract_version: "llmopt_run_v1" as const,
+              run_id: confirmation.runId,
+              stage: "base" as const,
+            },
+          }
+        : {}),
+    },
     plans,
     wildcardNotHeld: confirmation.wildcardNotHeld,
     frozenWeeks,

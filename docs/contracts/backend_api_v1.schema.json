@@ -817,6 +817,32 @@
             }
           ]
         },
+        "run": {
+          "additionalProperties": false,
+          "properties": {
+            "contract_version": {
+              "const": "llmopt_run_v1",
+              "type": "string"
+            },
+            "run_id": {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string"
+            },
+            "stage": {
+              "enum": [
+                "base",
+                "followup"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "contract_version",
+            "run_id",
+            "stage"
+          ],
+          "type": "object"
+        },
         "strategy": {
           "pattern": "^[a-z][a-z0-9._-]{0,63}$",
           "type": "string"

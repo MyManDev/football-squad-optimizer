@@ -32,6 +32,9 @@ checks a candidate against the copies the accepted site carries.
 
 | File | Written by | Read by | Test that holds the file to the code |
 | --- | --- | --- | --- |
+| `llmopt_run_v1.schema.json` | `run_reference_schema()` in `src/squadopt/contracts/llmopt_run.py` | Advice POST validation and durable admission; [lifecycle](llmopt_run_v1.md) | `tests/unit/test_llmopt_work_budget.py`, `tests/unit/test_api_advice_post.py` |
+| `llmopt_run_ledger_v2.schema.json` | `run_ledger_schema()` in `src/squadopt/contracts/llmopt_run.py` | Internal capture retirement, bounded cancellations and anonymous consumer ownership | `tests/unit/test_llmopt_run_retention.py`, `tests/unit/test_llmopt_legacy_join.py` |
+| `backend_jobs_v2.schema.json` | `backend_jobs_schema("backend_jobs_v2")` in `src/squadopt/platform/jobs_contract.py` | Run-owned jobs; V1 remains unchanged | `tests/unit/test_llmopt_work_budget.py`, `tests/unit/test_api_advice_post.py` |
 | `advice_read_v1.schema.json` | `advice_read_schema()` in `src/squadopt/platform/advice_documents.py` | The advice validator in the same module; the website's runtime counterpart, `web/src/features/league/advice/adviceShape.ts` | `tests/unit/test_api_advice_routes.py` |
 | `artifact_record_v1.schema.json` | `artifact_record_schema()` in `src/squadopt/platform/artifacts.py` | The artifact registry of the installed CLI | `tests/unit/test_platform_artifact_registry.py` |
 | `backend_api_v1.schema.json` | `backend_api_schema()` in `src/squadopt/platform/api_contract.py` | The HTTP API's request and response documents | `tests/unit/test_backend_api_contract.py` |
@@ -52,6 +55,7 @@ it.
 
 | File | Contract | Producer or subject | Tests |
 | --- | --- | --- | --- |
+| `advice_job_view_v2.schema.json`, [run lifecycle](llmopt_run_v1.md) | Run-owned public job views, including terminal cancellation | `AdviceSubmitService.public_job_view` | `tests/unit/test_api_advice_post.py::test_run_owned_public_job_views_conform_in_every_lifecycle_state` |
 | [member_baseline_record_v1.md](member_baseline_record_v1.md) | One independent server baseline per entry and capture, shared by tracked leagues | `src/squadopt/application/advice_record.py`, `src/squadopt/application/league_publication.py` | `tests/unit/test_tracked_baselines.py`, `tests/unit/test_advice_record.py` |
 | `league_member_movement_v1.schema.json` | A member's captured rank movement in the league views | `src/squadopt/application/league_views.py` | `tests/unit/test_league_views.py` |
 | `member_week_horizon_v1.md`, `member_week_horizon_v1.schema.json` | The optional `series-horizon.json` beside a league's scoreboard; published, no page reads it | `src/squadopt/application/weekly_suggestion_eval.py` | `tests/unit/test_member_week_horizon_contract.py`, `tests/unit/test_weekly_suggestion_eval.py` |

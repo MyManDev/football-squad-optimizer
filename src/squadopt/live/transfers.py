@@ -38,6 +38,7 @@ from squadopt.optimization import (
     SolverStatus,
     wall_clock_stopped_the_search,
 )
+from squadopt.optimization.work_budget import current_work_budget
 from squadopt.planning import (
     CHIP_NAMES,
     ChipAvailability,
@@ -969,6 +970,20 @@ def _plan_named_chip_window(
         "linearization_level": linearization_level,
         "preferences": preferences,
     }
+    if current_work_budget() is not None:
+        # An admitted job reserves one requested model, including its hold probe,
+        # native witness and CP fallback. The unbound legacy seed sequence also
+        # solves a separate no-chip model and several replays; it cannot spend
+        # that reservation before the requested chip search starts (ADR 0018).
+        return optimize_transfer_plan(
+            horizon,
+            state,
+            settings,
+            policy,
+            chips=chips,
+            protect_hold=True,
+            **restrictions,
+        )
     without_preferences = (
         replace(preferences, wildcard_week=None)
         if preferences is not None and preferences.wildcard_week is not None

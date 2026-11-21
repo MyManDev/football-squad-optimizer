@@ -51,9 +51,14 @@ function storage(): Storage | null {
   }
 }
 
+function jobStorageKey(request: AdviceRequest): string {
+  const key = PREFIX + adviceRequestKey(request);
+  return request.run ? `${key}:run:${request.run.run_id}:${request.run.stage}` : key;
+}
+
 export function rememberJob(request: AdviceRequest, job: StoredAdviceJob): void {
   try {
-    storage()?.setItem(PREFIX + adviceRequestKey(request), JSON.stringify(job));
+    storage()?.setItem(jobStorageKey(request), JSON.stringify(job));
   } catch {
     // Nothing to resume after a reload; the wait itself is unaffected.
   }
@@ -61,7 +66,7 @@ export function rememberJob(request: AdviceRequest, job: StoredAdviceJob): void 
 
 export function recallJob(request: AdviceRequest): StoredAdviceJob | null {
   try {
-    const raw = storage()?.getItem(PREFIX + adviceRequestKey(request));
+    const raw = storage()?.getItem(jobStorageKey(request));
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<StoredAdviceJob> | null;
     if (
@@ -84,7 +89,7 @@ export function recallJob(request: AdviceRequest): StoredAdviceJob | null {
 
 export function forgetJob(request: AdviceRequest): void {
   try {
-    storage()?.removeItem(PREFIX + adviceRequestKey(request));
+    storage()?.removeItem(jobStorageKey(request));
   } catch {
     // Already gone, as far as this page can tell.
   }
