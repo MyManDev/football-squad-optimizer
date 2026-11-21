@@ -237,6 +237,9 @@ class IntentRequest:
     reference_captains: tuple[tuple[int, int], ...] = ()
     plan_context: dict[str, Any] | None = None
 
+    def workflow_enabled(self, *, master: bool, three_week: bool) -> bool:
+        return workflow_enabled(self.draft.get("window", 1), master=master, three_week=three_week)
+
 
 def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}

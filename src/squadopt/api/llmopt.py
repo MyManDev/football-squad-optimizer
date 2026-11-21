@@ -13,7 +13,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from squadopt.contracts.llmopt_run import workflow_enabled
 from squadopt.platform import ApiError, ApiErrorResponse
 from squadopt.platform.advice_submit import FixedWindowRateLimiter, client_address_bucket
 from squadopt.platform.llmopt_intent import (
@@ -106,10 +105,8 @@ def intent_routes(
                 llmopt_vnext=llmopt_vnext,
                 llmopt_vnext_three_week=llmopt_vnext_three_week,
             )
-            enabled = workflow_enabled(
-                intent.draft.get("window", 1),
-                master=llmopt_vnext,
-                three_week=llmopt_vnext_three_week,
+            enabled = intent.workflow_enabled(
+                master=llmopt_vnext, three_week=llmopt_vnext_three_week
             )
             call = await run_in_threadpool(prompt_for, intent, llmopt_vnext=enabled)
         except _Refusal as refusal:
@@ -131,10 +128,8 @@ def intent_routes(
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
         try:
-            enabled = workflow_enabled(
-                intent.draft.get("window", 1),
-                master=llmopt_vnext,
-                three_week=llmopt_vnext_three_week,
+            enabled = intent.workflow_enabled(
+                master=llmopt_vnext, three_week=llmopt_vnext_three_week
             )
             result = await run_in_threadpool(
                 check_reply,
