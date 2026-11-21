@@ -106,6 +106,19 @@ it("catalogues only current data, in visible order, without computed figures", a
   expect(JSON.stringify(catalogue)).not.toMatch(/bank|points|999/);
   expect(catalogue.plans[0]!.weeks[0]!.players).toHaveLength(15);
 });
+it("omits closed windows from a mixed archive on the same capture", async () => {
+  const rows = await Promise.all(
+    [make(1), make(3)].map(async (plan) => ({ plan, id: await planIdentity(plan) })),
+  );
+  const history = addHistory(EMPTY_HISTORY, rows);
+  const shown = rows.map(({ plan }) => plan);
+  const oneWeek = (window: number) => window === 1;
+  expect(planCatalogue(history, shown, oneWeek)?.plans.map((p) => p.plan_id)).toEqual([
+    rows[0]!.id,
+  ]);
+  expect(planCatalogue(selectHistory(history, rows[1]!.id), shown, oneWeek)).toBeUndefined();
+  expect(planCatalogue(history, shown)?.plans).toHaveLength(2);
+});
 it("resolves a checked label against the sent catalogue and verifies its current content", async () => {
   const plans = [make(3), make(3), make(3)];
   const rows = await Promise.all(

@@ -7,6 +7,7 @@ import {
   AdviceCapabilitiesError,
   capabilitiesForPage,
   checkedCapabilities,
+  llmoptEnabledForWindow,
 } from "./adviceCapabilities";
 
 /** The committed contract the service validates its own document against. */
@@ -52,20 +53,26 @@ describe("league capabilities", () => {
   it.each([undefined, false, true])(
     "decodes path and package grants independently under release %s",
     (release) => {
-      for (const packages of [undefined, false, true]) {
-        for (const paths of [undefined, false, true]) {
-          const caps = checkedCapabilities(
-            {
-              ...DOCUMENT,
-              llmopt_vnext: release,
-              transfer_packages: packages,
-              three_week_paths: paths,
-            },
-            DOCUMENT.league_id,
-          );
-          expect(caps.transferPackages).toBe(release && packages ? true : undefined);
-          expect(caps.threeWeekPaths).toBe(release && paths ? true : undefined);
-          expect(caps.verifiedRepairs).toBeUndefined();
+      for (const second of [undefined, false, true]) {
+        for (const packages of [undefined, false, true]) {
+          for (const paths of [undefined, false, true]) {
+            const caps = checkedCapabilities(
+              {
+                ...DOCUMENT,
+                llmopt_vnext: release,
+                llmopt_vnext_three_week: second,
+                transfer_packages: packages,
+                three_week_paths: paths,
+              },
+              DOCUMENT.league_id,
+            );
+            expect(caps.transferPackages).toBe(release && packages ? true : undefined);
+            expect(caps.threeWeekPaths).toBe(release && second && paths ? true : undefined);
+            expect(llmoptEnabledForWindow(caps, 1)).toBe(release === true);
+            expect(llmoptEnabledForWindow(caps, 3)).toBe(release === true && second === true);
+            expect(llmoptEnabledForWindow(caps, 5)).toBe(false);
+            expect(caps.verifiedRepairs).toBeUndefined();
+          }
         }
       }
     },
@@ -74,6 +81,14 @@ describe("league capabilities", () => {
     expect(() =>
       checkedCapabilities({ ...DOCUMENT, three_week_paths: "1" }, DOCUMENT.league_id),
     ).toThrow(AdviceCapabilitiesError);
+  });
+  it("does not infer three-week permission from a malformed or stale grant", () => {
+    const caps = checkedCapabilities(
+      { ...DOCUMENT, llmopt_vnext: true, llmopt_vnext_three_week: "true" },
+      DOCUMENT.league_id,
+    );
+    expect(llmoptEnabledForWindow(caps, 3)).toBe(false);
+    expect(llmoptEnabledForWindow(null, 3)).toBe(false);
   });
   it.each([undefined, false, true])(
     "advertises grouped preferences only with the release setting %s",

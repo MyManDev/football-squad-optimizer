@@ -854,7 +854,7 @@ async function checkCombinedPrices(page: Page, vNext: boolean) {
   );
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
     answer(route, {
-      ...(vNext ? { llmopt_vnext: true } : {}),
+      ...(vNext ? { llmopt_vnext: true, llmopt_vnext_three_week: true } : {}),
       contract_version: "league_capabilities_v1",
       league_id: LEAGUE,
       capture_snapshot_id: squad.source_snapshot_id,
@@ -1004,7 +1004,7 @@ test("a waiting run survives reload and an edit closes it without a follow-up", 
   await installLeagueMocks(page);
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
   const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
-  const posts: { run: { run_id: string; stage: string } }[] = [];
+  const posts: { window: number; run?: { run_id: string; stage: string } }[] = [];
   const cancelled: string[] = [];
   let polls = 0;
   await page.route(`${API}/api/v1/contributions/players`, (route) =>
@@ -1034,13 +1034,23 @@ test("a waiting run survives reload and an edit closes it without a follow-up", 
   await routeChat(page, API, (route) =>
     answer(route, {
       status: "draft",
-      draft: { hard: [{ kind: "no_hits" }], soft: [] },
+      draft: {
+        window: route.request().postDataJSON()?.message.includes("three weeks") ? 3 : 1,
+        hard: [{ kind: "no_hits" }],
+        soft: [],
+      },
     }),
   );
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
     if (route.request().method() === "OPTIONS") return answer(route, null);
     if (route.request().method() !== "POST") return route.fulfill({ status: 404, headers: CORS });
     posts.push(route.request().postDataJSON());
+    if (posts.at(-1)!.window === 3)
+      return route.fulfill({
+        status: 503,
+        headers: CORS,
+        json: { error: { code: "MODEL_INPUTS_UNAVAILABLE" } },
+      });
     return route.fulfill({
       status: 202,
       headers: CORS,
@@ -1074,7 +1084,7 @@ test("a waiting run survives reload and an edit closes it without a follow-up", 
   );
   await expect.poll(() => posts.length).toBe(1);
   await expect.poll(() => polls).toBeGreaterThan(0);
-  const identifier = posts[0]!.run.run_id;
+  const identifier = posts[0]!.run!.run_id;
   await reloadQueuedJob(page, "waiting-main");
   await expect.poll(() => polls).toBeGreaterThan(1);
   expect(posts).toHaveLength(1);
@@ -1083,6 +1093,18 @@ test("a waiting run survives reload and an edit closes it without a follow-up", 
   await expect.poll(() => cancelled).toEqual([identifier]);
   await expect(page.getByRole("region", { name: "Plans" })).toHaveCount(0);
   expect(posts).toHaveLength(1);
+  // The same tab still has a one-week grant. Its next, three-week calculation uses
+  // the legacy request and never attempts a repair or a follow-up from the old run.
+  await holdModel(page);
+  await page.getByRole("textbox", { name: "Plan instructions" }).fill("No hits over three weeks.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByRole("button", { name: "Compute plans" }).click();
+  await expect.poll(() => posts.length).toBe(2);
+  expect(posts[1]).toMatchObject({ window: 3 });
+  expect(posts[1]).not.toHaveProperty("run");
+  expect(posts[1]).not.toHaveProperty("preference_bundle");
+  expect(cancelled).toEqual([identifier]);
+  await expect(page.locator("[data-rule-repairs]")).toHaveCount(0);
 });
 
 for (const locale of ["tr", "en"] as const) {
