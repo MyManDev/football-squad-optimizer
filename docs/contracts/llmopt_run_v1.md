@@ -7,7 +7,8 @@ and a stage of `base`, `followup` or `repair`.
 The server binds the ID to its own resolved context, league, member and window. It does
 not include the reference in the advice key or immutable computation spec.
 
-The current page saves identity before submitting, and reuses it after reload. Requests
+When the server enables run admission, the page saves the identity before submitting
+and reuses it after reload. Requests
 without a run reference, including member-panel preferences, keep their legacy V1
 admission outside the run budget. An identified repeated request returns its original job,
 including terminal failure. It never purchases another attempt in that run. Crash recovery
@@ -50,6 +51,31 @@ The internal [ledger v2](llmopt_run_ledger_v2.schema.json) adds capture identity
 anonymous-consumer ownership. Old-capture runs with no open jobs are removed together
 with unreferenced allocations. V1 migration preserves existing work receipts and recovers
 capture identity from immutable specs where available. It never resets a live budget.
+
+## Workflow selection
+
+The backend advertises `llmopt_vnext: true` on current league and public-entry
+capabilities only when `SQUADOPT_BACKEND_LLMOPT_VNEXT=1`. The default is 0.
+For a fresh three-preference draft, the default workflow can open four ordinary
+jobs for the main plan, two individual prices and the combined plan. A saved
+confirmation retains its transport when reopened. Rolling back the setting
+allows reads of existing results and prevents new run-owned computations.
+During rollback advice reads and existing run requests use the current capture
+to resolve their cache address. Without that capture, advice reads return HTTP 503.
+Job polling reads queue state independently of the capture. Cancellation remains
+available during rollback. A new run-owned computation returns HTTP 409
+with `LLMOPT_VNEXT_DISABLED`. Identity-free legacy requests continue to use
+their ordinary cache address and admission. A run already admitted can finish
+on the worker and publish its answer. The master setting does not enter the
+answer key or change a persisted computation specification. With the setting
+off, ordinary API responses and cache entries retain the develop payload.
+With the setting on, a result can expose `plan_data_id` when its producing
+data is known. Older answers without that identifier remain readable.
+
+Run `python -m docs.research.llmopt_phase8.check_develop` to exercise the
+default workflow against the original develop worker and intent tests. The
+runner keeps their original shared fixtures and imports the implementation
+from the checkout under test.
 
 ## Verified repairs
 

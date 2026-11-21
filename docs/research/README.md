@@ -32,6 +32,8 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 
 | Topic | Entry point |
 | --- | --- |
+| LLMOPT release acceptance and local cold and warm work | [Twenty-member comparison and closing report](llmopt_phase8_closing.md) |
+| LLMOPT manual provider acceptance | [Owner checklist for seven hosted providers and Local](llmopt_provider_acceptance.md) |
 | LLMOPT bounded packages and three-week paths | [Phase 6 full-pool comparison](llmopt_phase6_results.md) |
 | LLMOPT one-week device parity and alternatives | [Phase 4 probe and scope](llmopt_phase4/README.md) |
 | LLMOPT one-week device priority execution | [Twenty-control comparison](llmopt_phase4_priority_audit.md) |
