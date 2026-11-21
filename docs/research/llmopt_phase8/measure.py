@@ -5,6 +5,7 @@ import hashlib
 import json
 import subprocess
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime
 from functools import cache as memoized
 from pathlib import Path
@@ -35,6 +36,7 @@ RESEARCH = HERE.parent
 OUTPUT = RESEARCH / "llmopt_phase8_load.json"
 CHECKPOINT = ROOT / ".codex-tmp/phase8-checkpoint.json"
 FLAG = "SQUADOPT_BACKEND_LLMOPT_VNEXT"
+THREE_WEEK_FLAG = "SQUADOPT_BACKEND_LLMOPT_VNEXT_THREE_WEEK"
 
 
 def sha(path):
@@ -141,12 +143,21 @@ def complete(queue, cache, compute, runs, stamp, label):
     }
 
 
-def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only=False):
-    # Only the same three ordinary soft rules are compared between modes. The
-    # Phase 1 standalone tight-bank and named-chip stress scenarios are different workloads.
+@dataclass
+class FrozenRuntime:
+    app: object
+    queue: ObservedQueue
+    cache: PlanAdviceCache
+    compute: object
+    runs: FileRunStore
+    stamp: str
+    specs: FileAdviceJobSpecStore
+
+
+def runtime(root, frozen, inputs, entry, enabled, three_week, producer, **app_options):
+    """Construct the real local API and worker against the same frozen inputs."""
     context, stamp = make_capture(frozen, inputs, entry, "normal", producer)
     contexts = FrozenContexts(context)
-    table = inputs.table
     block = inputs.members[entry]
     config = BackendConfig.from_environment(
         {
@@ -155,10 +166,15 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
                 for key in ("STORE", "SITE_DATA", "SNAPSHOT", "HANDOFF")
             },
             FLAG: str(int(enabled)),
+            THREE_WEEK_FLAG: str(int(three_week)),
         }
     )
     queue = ObservedQueue(root / "queue")
-    cache = PlanAdviceCache(root / "answers", llmopt_vnext=config.llmopt_vnext)
+    cache = PlanAdviceCache(
+        root / "answers",
+        llmopt_vnext=config.llmopt_vnext,
+        llmopt_vnext_three_week=config.llmopt_vnext_three_week,
+    )
     specs = FileAdviceJobSpecStore(root / "specs")
 
     def capture_for_key(key):
@@ -179,6 +195,7 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
         preference_bundles=True,
         verified_repairs=config.llmopt_vnext,
         llmopt_vnext=config.llmopt_vnext,
+        llmopt_vnext_three_week=config.llmopt_vnext_three_week,
         preference_players=lambda *_: PreferencePlayers(frozenset(block["held"]), roster, names),
         chip_availability=lambda *_: {entry: ()},
     )
@@ -194,13 +211,24 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
         advice_store=reader,
         advice_submit=submit,
         llmopt_vnext=config.llmopt_vnext,
+        llmopt_vnext_three_week=config.llmopt_vnext_three_week,
         utc_now=lambda: datetime.fromisoformat(stamp),
+        **app_options,
     )
     compute = build_advice_compute(
-        contexts, specs, cache=cache, runs=runs, llmopt_vnext=config.llmopt_vnext
+        contexts,
+        specs,
+        cache=cache,
+        runs=runs,
+        llmopt_vnext=config.llmopt_vnext,
+        llmopt_vnext_three_week=config.llmopt_vnext_three_week,
     )
-    case = f"gw{inputs.gameweek}-{entry}"
-    identifier = hashlib.sha256(f"{case}:{window}:{enabled}".encode()).hexdigest()[:32]
+    return FrozenRuntime(app, queue, cache, compute, runs, stamp, specs)
+
+
+def frozen_documents(frozen, inputs, entry):
+    table = inputs.table
+    block = inputs.members[entry]
     published = publication(frozen["source_commit"], "device-plan")
     squad = publication(frozen["source_commit"], f"entries/{entry}")
     if squad["device_plan"] != block or squad["source_snapshot_id"] != table["source_snapshot_id"]:
@@ -210,20 +238,34 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
         for p, frozen_player in zip(published["players"], table["players"], strict=True)
     ) or any(published[key] != value for key, value in table.items() if key != "players"):
         raise ValueError("Published table differs from the frozen solver inputs.")
+    return published, squad
+
+
+def replay(
+    root, frozen, inputs, entry, window, enabled, producer, *, three_week=None, setup_only=False
+):
+    # The historical workload compared both windows enabled with both windows disabled.
+    three_week = enabled if three_week is None else three_week
+    local = runtime(root, frozen, inputs, entry, enabled, three_week, producer)
+    queue = local.queue
+    published, squad = frozen_documents(frozen, inputs, entry)
+    case = f"gw{inputs.gameweek}-{entry}"
+    identifier = hashlib.sha256(f"{case}:{window}:{enabled}".encode()).hexdigest()[:32]
     initial = {
         "document": published,
         "squad": squad,
-        "block": block,
+        "block": inputs.members[entry],
         "entryId": entry,
         "window": window,
         "enabled": enabled,
+        "threeWeek": three_week,
         "runId": identifier,
         "setupOnly": setup_only,
     }
     passes = {}
     current = None
     with (
-        TestClient(app) as client,
+        TestClient(local.app) as client,
         subprocess.Popen(
             ["node", ".codex-tmp/phase8-workload.mjs"],
             cwd=ROOT,
@@ -261,6 +303,11 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
                             "status": response.status_code,
                             **({"job_id": result["job_id"]} if "job_id" in result else {}),
                             **({"error": result["error"].get("code")} if "error" in result else {}),
+                            **(
+                                {"body": json.loads(event["body"])}
+                                if enabled and not three_week and event.get("body")
+                                else {}
+                            ),
                         }
                     )
                     send({"status": response.status_code, "body": result})
@@ -275,7 +322,15 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
                         if not job.is_terminal:
                             queued.add(identifier)
                     completed = [
-                        complete(queue, cache, compute, runs, stamp, event["label"]) for _ in queued
+                        complete(
+                            queue,
+                            local.cache,
+                            local.compute,
+                            local.runs,
+                            local.stamp,
+                            event["label"],
+                        )
+                        for _ in queued
                     ]
                     if {job["job_id"] for job in completed} != queued:
                         raise ValueError("Worker drained a different job than the submitted stage.")
@@ -315,7 +370,7 @@ def replay(root, frozen, inputs, entry, window, enabled, producer, *, setup_only
         "case": case,
         "window": window,
         "release": "on" if enabled else "off",
-        "run_id": initial["runId"] if enabled else None,
+        "run_id": initial["runId"] if enabled and (window == 1 or three_week) else None,
         **passes,
     }
 

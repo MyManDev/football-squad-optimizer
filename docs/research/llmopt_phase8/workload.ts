@@ -40,7 +40,8 @@ async function driver(op, data = {}) {
   return read();
 }
 const initial = await read();
-const { block, document, squad, window, runId, enabled } = initial;
+const { block, document, squad, window, runId, enabled, threeWeek } = initial;
+const advanced = enabled && (window === 1 || threeWeek);
 const require = createRequire(resolve("web/package.json"));
 const storage = new Map();
 Object.defineProperty(globalThis, "sessionStorage", {
@@ -174,6 +175,7 @@ async function replay(cache) {
   if (
     !caps ||
     (caps.llmoptVNext === true) !== enabled ||
+    (caps.llmoptVNextThreeWeek === true) !== (enabled && threeWeek) ||
     (caps.verifiedRepairs === true) !== enabled ||
     (caps.preferenceBundles === true) !== enabled ||
     (caps.devicePreferenceBundles === true) !== enabled ||
@@ -200,8 +202,8 @@ async function replay(cache) {
   if (
     device !== (enabled && window === 1) ||
     run.inputs.paths3w !== undefined ||
-    !!run.baseRequest.run !== enabled ||
-    !!execution !== enabled ||
+    !!run.baseRequest.run !== advanced ||
+    !!execution !== advanced ||
     (device ? !receipt || receipt.closed || receipt.units !== (before?.units ?? 0) : !!receipt) ||
     deviceWork.length !== workStart
   )
@@ -211,6 +213,7 @@ async function replay(cache) {
   if (initial.setupOnly) return { cache, setup: true };
   let stages = [];
   async function stage(label, requests) {
+    const stageStart = performance.now();
     const pending = [];
     for (const request of requests) {
       // Compute presses submit via the public transport, which serves a warm answer directly.
@@ -253,6 +256,7 @@ async function replay(cache) {
     }
     stages.push({
       label,
+      elapsed_seconds: (performance.now() - stageStart) / 1000,
       submissions: pending.map(({ outcome }) => outcome.kind),
       returned_job_ids: jobs,
       job_ids: drained,
