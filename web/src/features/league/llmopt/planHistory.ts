@@ -294,12 +294,17 @@ export function currentPlanCommand(
   return index >= 0 && planIdForLabel(current, `P${index + 1}`) === id;
 }
 
-export function planCatalogue(h: PlanHistory, shown: EntryAdvice[]): PlanContext | undefined {
-  const selected = h.items.find((i) => i.id === h.navigation[h.cursor]);
+export function planCatalogue(
+  h: PlanHistory,
+  shown: EntryAdvice[],
+  allowWindow: (window: number) => boolean = () => true,
+): PlanContext | undefined {
+  const eligible = h.items.filter((i) => allowWindow(i.plan.window));
+  const selected = eligible.find((i) => i.id === h.navigation[h.cursor]);
   const data = selected && planData(selected.plan);
   if (!data) return undefined;
   const order = shown.map(planContent);
-  const items = h.items
+  const items = eligible
     .filter((i) => {
       const d = planData(i.plan);
       return d?.kind === data.kind && d.id === data.id;

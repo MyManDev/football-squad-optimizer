@@ -87,7 +87,7 @@ export async function installMember(page: Page, language: Language, chipHistory 
       players: table.players.map(({ id, name, team }) => ({ id, name, team })),
     }),
   );
-  const release = { master: true, repairs: true };
+  const release = { master: true, threeWeek: false, repairs: true };
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
     answer(route, {
       contract_version: "league_capabilities_v1",
@@ -99,6 +99,7 @@ export async function installMember(page: Page, language: Language, chipHistory 
       top100: { available: false, weights: [] },
       managers_word: { available: false },
       preferences: { available: true },
+      ...(release.threeWeek ? { llmopt_vnext_three_week: true } : {}),
       ...(release.master
         ? { llmopt_vnext: true, verified_repairs: release.repairs, plan_data_id: DATA_ID }
         : {}),

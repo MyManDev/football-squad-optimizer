@@ -182,6 +182,7 @@ for (const language of ["tr", "en"] as const) {
   test(`a saved server diagnosis survives rollback and reload in ${language}`, async ({ page }) => {
     test.skip(!API, "API-origin build required");
     const { release, block } = await installMember(page, language);
+    release.threeWeek = true;
     const jobId = "llmopt-bank-diagnosis";
     const required = { tenths: 40, week: 2 };
     await routeChat(page, API, (route) =>
@@ -291,12 +292,14 @@ for (const language of ["en", "tr"] as const) {
     "refuses search after rollback",
     "discards a candidate completed after rollback",
     "refuses selection after rollback",
+    "refuses selection after only three weeks closes",
     "discards a replay completed after rollback",
     "keeps the first witness when the second change exhausts capacity",
   ] as const) {
     test(`three-week repair ${mode} in ${language} on a phone`, async ({ page }) => {
       test.skip(!API, "API-origin build required");
       const { squad, release } = await installMember(page, language);
+      release.threeWeek = true;
       const copy = LLMOPT_COPY[language];
       const twoCandidates =
         mode === "keeps the first witness when the second change exhausts capacity" ||
@@ -439,20 +442,21 @@ for (const language of ["en", "tr"] as const) {
         await expect(options.getByRole("button")).toBeEnabled();
         const id = await options.getAttribute("data-repair-plan");
         expect(Number(await options.getAttribute("data-repair-net"))).toBeCloseTo(3 * score, 8);
-        if (
+        const selectionRefused =
           mode === "refuses selection after rollback" ||
-          mode === "discards a replay completed after rollback"
-        ) {
+          mode === "refuses selection after only three weeks closes";
+        if (selectionRefused || mode === "discards a replay completed after rollback") {
           if (mode === "refuses selection after rollback") release.repairs = false;
+          if (mode === "refuses selection after only three weeks closes") release.threeWeek = false;
           await options.getByRole("button").click();
           await expect(region).toHaveCount(0);
           await expect(page.locator(`article[data-plan-id="${id}"]`)).toHaveCount(0);
-          expect(submitted).toHaveLength(mode === "refuses selection after rollback" ? 1 : 2);
+          expect(submitted).toHaveLength(selectionRefused ? 1 : 2);
           await page.reload();
           await expect(page.locator("[data-saved-conflict]")).toHaveText(/3\.0m.*bank|kasada 3,0m/);
           await expect(region).toHaveCount(0);
           await expect(checkButton(page, language)).toHaveCount(0);
-          expect(submitted).toHaveLength(mode === "refuses selection after rollback" ? 1 : 2);
+          expect(submitted).toHaveLength(selectionRefused ? 1 : 2);
           await noOverflow(page);
           return;
         }

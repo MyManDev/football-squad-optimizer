@@ -1,4 +1,8 @@
-import { capabilitiesForPage, type AdviceCapabilities } from "../advice/adviceCapabilities";
+import {
+  capabilitiesForPage,
+  llmoptEnabledForWindow,
+  type AdviceCapabilities,
+} from "../advice/adviceCapabilities";
 import type { AdviceClient } from "../advice/adviceClient";
 import { deviceSelection } from "../device/selection";
 import type { EntrySquad } from "../types";
@@ -13,10 +17,10 @@ export function confirmationProblem(
   const hasPriority = draft.soft.some(({ priority }) => priority !== undefined);
   const hasTotal = draft.max_total_cost_tenths !== undefined;
   const grouped =
-    capabilities.llmoptVNext === true &&
+    llmoptEnabledForWindow(capabilities, window) &&
     (capabilities.preferenceBundles === true ||
       (window === 1 && capabilities.devicePreferenceBundles === true));
-  if (!grouped && (hasPriority || hasTotal)) return "serviceUnavailable";
+  if (!grouped && (hasPriority || hasTotal)) return "individualLimitsOnly";
   if (hasPriority && !hasTotal) return "totalRequired";
   if (
     hasTotal &&
@@ -51,12 +55,11 @@ export async function prepareConfirmedRun(
   // Public entries may have no chip history until their inputs are pinned.
   const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
   const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
+  const enabled = llmoptEnabledForWindow(capabilities, plans.window);
   const localBundle =
-    capabilities.llmoptVNext === true &&
-    plans.window === 1 &&
-    capabilities.devicePreferenceBundles === true;
+    enabled && plans.window === 1 && capabilities.devicePreferenceBundles === true;
   const request = requestFor(squad, forwarded, plans.window, localBundle);
-  if (capabilities.llmoptVNext !== true) return prepareRun({ ...inputs, wildcardNotHeld, request });
+  if (!enabled) return prepareRun({ ...inputs, wildcardNotHeld, request });
   if (!runId) return null;
   request.run = { contract_version: "llmopt_run_v1", run_id: runId, stage: "base" };
   let next = prepareRun({
