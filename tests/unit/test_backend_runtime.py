@@ -891,6 +891,7 @@ def test_packages_disabled_identity_and_separate_gate_are_server_owned(tmp_path)
                     {
                         **env,
                         "SQUADOPT_BACKEND_LLMOPT_VNEXT": master,
+                        "SQUADOPT_BACKEND_LLMOPT_VNEXT_THREE_WEEK": "1",
                         "SQUADOPT_BACKEND_TRANSFER_PACKAGES": packages,
                         "SQUADOPT_BACKEND_PACKAGE_GATE": gate,
                         "SQUADOPT_BACKEND_THREE_WEEK_PATHS": paths,

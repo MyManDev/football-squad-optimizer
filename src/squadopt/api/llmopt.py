@@ -13,6 +13,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from squadopt.contracts.llmopt_run import workflow_enabled
 from squadopt.platform import ApiError, ApiErrorResponse
 from squadopt.platform.advice_submit import FixedWindowRateLimiter, client_address_bucket
 from squadopt.platform.llmopt_intent import (
@@ -89,6 +90,7 @@ def intent_routes(
     *,
     keyless_per_minute: int = KEYLESS_PER_MINUTE,
     llmopt_vnext: bool = False,
+    llmopt_vnext_three_week: bool = False,
     server_data_id: Callable[[], str | None] | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1/llmopt")
@@ -100,9 +102,16 @@ def intent_routes(
     async def intent_prompt(request: Request) -> JSONResponse:
         try:
             intent = parse_intent_request(
-                await _keyless_body(request, prompt_limiter), llmopt_vnext=llmopt_vnext
+                await _keyless_body(request, prompt_limiter),
+                llmopt_vnext=llmopt_vnext,
+                llmopt_vnext_three_week=llmopt_vnext_three_week,
             )
-            call = await run_in_threadpool(prompt_for, intent, llmopt_vnext=llmopt_vnext)
+            enabled = workflow_enabled(
+                intent.draft.get("window", 1),
+                master=llmopt_vnext,
+                three_week=llmopt_vnext_three_week,
+            )
+            call = await run_in_threadpool(prompt_for, intent, llmopt_vnext=enabled)
         except _Refusal as refusal:
             return refusal.response
         except IntentValidationError as error:
@@ -113,15 +122,27 @@ def intent_routes(
     async def intent_check(request: Request) -> JSONResponse:
         try:
             intent, reply = parse_check_request(
-                await _keyless_body(request, check_limiter), llmopt_vnext=llmopt_vnext
+                await _keyless_body(request, check_limiter),
+                llmopt_vnext=llmopt_vnext,
+                llmopt_vnext_three_week=llmopt_vnext_three_week,
             )
         except _Refusal as refusal:
             return refusal.response
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
         try:
+            enabled = workflow_enabled(
+                intent.draft.get("window", 1),
+                master=llmopt_vnext,
+                three_week=llmopt_vnext_three_week,
+            )
             result = await run_in_threadpool(
-                check_reply, intent, reply, server_data_id=server_data_id, llmopt_vnext=llmopt_vnext
+                check_reply,
+                intent,
+                reply,
+                server_data_id=server_data_id,
+                llmopt_vnext=enabled,
+                llmopt_vnext_three_week=llmopt_vnext_three_week,
             )
         except PlanDataChanged:
             return _error(422, "PLAN_DATA_CHANGED", "Recalculate the plans to select one.")

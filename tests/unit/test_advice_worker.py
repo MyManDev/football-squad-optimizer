@@ -1819,34 +1819,39 @@ def test_package_switches_preserve_ordinary_worker_bytes_unless_the_master_and_p
     question = {"strategy": COMPUTED_MODE, "window": 3}
     ordinary_key, ordinary_spec, ordinary_answer = None, None, None
     active_keys = {}
-    for master, search, gate, paths in (
-        (False, False, False, False),
-        (False, True, True, True),
-        (True, False, False, False),
-        (True, False, False, True),
-        (True, True, False, False),
-        (True, True, False, True),
-        (True, True, True, False),
-        (True, True, True, True),
+    for master, three_week, search, gate, paths in (
+        (False, False, False, False, False),
+        (False, True, True, True, True),
+        (True, False, True, True, True),
+        (True, True, False, False, False),
+        (True, True, False, False, True),
+        (True, True, True, False, False),
+        (True, True, True, False, True),
+        (True, True, True, True, False),
+        (True, True, True, True, True),
     ):
-        store = tmp_path / f"store-{int(master)}{int(search)}{int(gate)}{int(paths)}"
+        store = (
+            tmp_path / f"store-{int(master)}{int(three_week)}{int(search)}{int(gate)}{int(paths)}"
+        )
         store.mkdir()
         config = replace(
             original.config,
             store_root=store,
             llmopt_vnext=master,
+            llmopt_vnext_three_week=three_week,
             transfer_packages=search,
             package_gate=gate,
             three_week_paths=paths,
         )
         backend = build_backend(config)
         client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
-        enabled = master and search
+        enabled = master and three_week and search
         for capability_route in capability_routes:
             response = client.get(capability_route)
             assert response.status_code == 200, response.text
-            assert ("transfer_packages" in response.json()) is enabled
-            assert ("three_week_paths" in response.json()) is (master and paths)
+            assert ("transfer_packages" in response.json()) is (master and search)
+            assert ("llmopt_vnext_three_week" in response.json()) is (master and three_week)
+            assert ("three_week_paths" in response.json()) is (master and three_week and paths)
             assert ("plan_data_id" in response.json()) is master
         queued = client.post(route, json=question)
         assert queued.status_code == 202, queued.text
@@ -1871,12 +1876,13 @@ def test_package_switches_preserve_ordinary_worker_bytes_unless_the_master_and_p
         assert len(backend.queue.jobs()) == 1
         canonical = FileAdviceCache(config.cache_root).get(job.cache_key)
         assert canonical is not None
-        if master:
+        if master and three_week:
             versioned = read.json()
             assert versioned["payload"].pop("plan_data_id") == advice_context_identity(spec.context)
             assert versioned == json.loads(canonical)
         else:
             assert read.content == canonical
+            assert not (config.cache_root / "plan-provenance").exists()
         if ordinary_key is None:
             ordinary_key, ordinary_spec, ordinary_answer = job.cache_key, spec, canonical
         else:
@@ -1935,6 +1941,7 @@ def _work(backend: Any, jobs: int = 1) -> int:
             runs=backend.runs,
             cache=backend.cache,
             llmopt_vnext=backend.config.llmopt_vnext,
+            llmopt_vnext_three_week=backend.config.llmopt_vnext_three_week,
         ),
         should_stop=_stop_after(3 * jobs + 3),
         max_jobs=jobs,
@@ -1966,7 +1973,12 @@ def test_calendar_limits_member_windows_before_queueing(running, chip, window):
 
 def test_three_week_plan_can_buy_a_player_back_and_include_a_captured_blank(tmp_path, monkeypatch):
     backend = _deployment(
-        tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4, blank_decision_week=4
+        tmp_path,
+        monkeypatch,
+        llmopt_vnext=True,
+        llmopt_vnext_three_week=True,
+        last_gameweek=4,
+        blank_decision_week=4,
     )["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     league = f"/api/v1/leagues/{LEAGUE_ID}"
@@ -2014,7 +2026,9 @@ def test_an_opening_buy_of_an_owned_player_is_refused_before_queueing(confirmed_
 def test_llmopt_replans_after_a_frozen_wildcard_and_keeps_the_following_lineup(
     tmp_path, monkeypatch
 ):
-    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
+    backend = _deployment(
+        tmp_path, monkeypatch, llmopt_vnext=True, llmopt_vnext_three_week=True, last_gameweek=4
+    )["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3, "chip": "wildcard"}
@@ -2052,7 +2066,9 @@ def test_llmopt_replans_after_a_frozen_wildcard_and_keeps_the_following_lineup(
 def test_frozen_paid_moves_can_exceed_the_default_advice_cap_only_in_that_week(
     tmp_path, monkeypatch
 ):
-    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
+    backend = _deployment(
+        tmp_path, monkeypatch, llmopt_vnext=True, llmopt_vnext_three_week=True, last_gameweek=4
+    )["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     preferences = {
@@ -2232,7 +2248,9 @@ def test_llmopt_constraints_round_trip_through_the_advice_worker(
 
 
 def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
+    backend = _deployment(
+        tmp_path, monkeypatch, llmopt_vnext=True, llmopt_vnext_three_week=True, last_gameweek=4
+    )["backend"]
     message = (
         "Bu hafta transferi sakla, haftaya Player 1002'yi al. Üç haftada en fazla 4 puan ceza öde."
     )
@@ -2315,7 +2333,9 @@ def test_llmopt_weekly_chat_reaches_the_solver_and_cached_three_week_plan(tmp_pa
 
 
 def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
+    backend = _deployment(
+        tmp_path, monkeypatch, llmopt_vnext=True, llmopt_vnext_three_week=True, last_gameweek=4
+    )["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3}
@@ -2358,7 +2378,9 @@ def test_llmopt_resource_variants_return_distinct_legal_first_actions(tmp_path, 
 
 
 def test_llmopt_prices_a_preference_on_the_same_three_week_net_points_basis(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
+    backend = _deployment(
+        tmp_path, monkeypatch, llmopt_vnext=True, llmopt_vnext_three_week=True, last_gameweek=4
+    )["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3}
@@ -2517,7 +2539,9 @@ def test_llmopt_proves_bank_shortfall_and_the_lower_floor_can_be_solved(confirme
 
 
 def test_llmopt_only_offers_a_deferral_witness_with_other_rules_preserved(tmp_path, monkeypatch):
-    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=4)["backend"]
+    backend = _deployment(
+        tmp_path, monkeypatch, llmopt_vnext=True, llmopt_vnext_three_week=True, last_gameweek=4
+    )["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     selection = {"strategy": "saf-puan", "window": 3}

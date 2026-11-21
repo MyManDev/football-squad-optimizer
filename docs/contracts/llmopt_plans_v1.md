@@ -3,7 +3,9 @@
 See [ADR 0021](../architecture/decisions/0021-llmopt-plan-context.md).
 
 The page uses the optional `plan_context` when current server capabilities grant
-`llmopt_vnext`. With the release setting off, prompt/check use the original draft
+`llmopt_vnext` for one week. For three weeks they must also grant
+`llmopt_vnext_three_week`. A dated draft takes the window its rules require.
+With its window closed, prompt/check use the original draft
 contract. Existing stored results remain readable after a rollback.
 The optional context travels only through prompt/check. Its bounded catalogue
 contains plan/data identifiers and already-computed decisions, without point or resource

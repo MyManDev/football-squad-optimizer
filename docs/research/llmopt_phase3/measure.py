@@ -325,6 +325,7 @@ def measure_case(root, frozen, inputs, entry, scenario, window, producer):
         {"saf-puan": False},
         capabilities=menu_capabilities(),
         llmopt_vnext=True,
+        llmopt_vnext_three_week=True,
         preference_bundles=True,
         preference_players=lambda *_: PreferencePlayers(
             frozenset(held), roster, frozenset(capture.inputs.players.team_id)
@@ -336,6 +337,7 @@ def measure_case(root, frozen, inputs, entry, scenario, window, producer):
         advice_store=reader,
         advice_submit=submit,
         llmopt_vnext=reader.llmopt_vnext,
+        llmopt_vnext_three_week=reader.llmopt_vnext_three_week,
         utc_now=lambda: datetime.fromisoformat(stamp),
     )
     compute = build_advice_compute(contexts, specs, cache=cache, runs=runs)
@@ -394,7 +396,10 @@ def measure_case(root, frozen, inputs, entry, scenario, window, producer):
                     reader, queue, specs=specs, runs=FileRunStore(root / "runs")
                 )
                 restarted = create_app(
-                    advice_store=reader, advice_submit=rebuilt, llmopt_vnext=reader.llmopt_vnext
+                    advice_store=reader,
+                    advice_submit=rebuilt,
+                    llmopt_vnext=reader.llmopt_vnext,
+                    llmopt_vnext_three_week=reader.llmopt_vnext_three_week,
                 )
                 with TestClient(restarted) as replay:
                     for _ in range(3):
@@ -463,6 +468,7 @@ def main():
     provenance = dict(
         producer_repository_commit=producer,
         llmopt_vnext=True,
+        llmopt_vnext_three_week=True,
         source_sha256={path.as_posix(): digest(ROOT / path) for path in SOURCES},
         frozen_manifest_sha256=digest(ROOT / "docs/research/llmopt_phase1/inputs.json"),
     )

@@ -80,6 +80,7 @@ def replay(root, inputs, entry, window, producer):
                 Context(context),
                 {"saf-puan": False},
                 llmopt_vnext=True,
+                llmopt_vnext_three_week=True,
                 preference_players=lambda *_: PreferencePlayers(frozenset(held), frozenset(held)),
             ),
             queue,

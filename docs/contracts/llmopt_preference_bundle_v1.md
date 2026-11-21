@@ -3,7 +3,9 @@
 ADR 0019 defines the execution after the main plan. The optional `preference_bundle`
 field uses the existing advice POST and cache GET. The full backend advertises
 `preference_bundles.version = llmopt_preference_bundle_v1` when the server enables
-`SQUADOPT_BACKEND_LLMOPT_VNEXT`. The default uses the original unbound pricing requests.
+`SQUADOPT_BACKEND_LLMOPT_VNEXT`. A three-week bundle also requires
+`llmopt_vnext_three_week: true` for its capture. A closed window uses the
+original unbound pricing requests.
 A restored confirmation checks the current server setting before starting another stage.
 During rollback, clients can still poll jobs and read stored bundle results for the current capture.
 
