@@ -55,7 +55,6 @@ try {
       deviceWorkers++;
   });
   page.setDefaultTimeout(30_000);
-  await page.clock.setFixedTime(new Date(input.asOfUtc));
   await page.addInitScript(
     ({
       origin,
@@ -66,7 +65,31 @@ try {
       leagueName,
       draft,
       deadline,
+      asOfUtc,
     }) => {
+      // Pin the football deadline calendar only. Each document keeps its native navigation
+      // time origin, frame callbacks, performance clock and timers, including after reload.
+      const RealDate = Date;
+      const snapshotTime = RealDate.parse(asOfUtc);
+      if (!Number.isFinite(snapshotTime))
+        throw new Error("Invalid capture timestamp");
+      window.Date = new Proxy(RealDate, {
+        construct(target, args, newTarget) {
+          return Reflect.construct(
+            target,
+            args.length ? args : [snapshotTime],
+            newTarget,
+          );
+        },
+        apply() {
+          return new RealDate(snapshotTime).toString();
+        },
+        get(target, name, receiver) {
+          return name === "now"
+            ? () => snapshotTime
+            : Reflect.get(target, name, receiver);
+        },
+      });
       localStorage.setItem("squadopt.language", "en");
       localStorage.setItem("squadopt.league", String(leagueId));
       sessionStorage.setItem(
@@ -167,6 +190,7 @@ try {
       throw new Error(
         "The local measurement segment could not start: " + boundary.status(),
       );
+    const observedStart = performance.now();
     try {
       if (pass === "cold") {
         await page.goto(
@@ -223,6 +247,15 @@ try {
       };
     });
     result[pass].device_workers = deviceWorkers - workersBefore;
+    result[pass].observer_seconds = (performance.now() - observedStart) / 1000;
+    if (result[pass].total_seconds > result[pass].observer_seconds) {
+      throw new Error(
+        input.case +
+          " " +
+          pass +
+          ": the page timeline exceeds the independent observation interval",
+      );
+    }
   }
   if (blocked.length)
     throw new Error("Unexpected network paths: " + blocked.join(", "));
