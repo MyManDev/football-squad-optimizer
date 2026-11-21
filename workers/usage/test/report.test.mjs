@@ -161,8 +161,16 @@ describe("reading the rows", () => {
   });
 
   it("says when the limit cut the rows off", async () => {
-    const { truncated } = await read(answer({ data: [{}], rows_before_limit_at_least: ROW_LIMIT + 5 }));
+    const full = Array.from({ length: ROW_LIMIT }, () => ({}));
+    const { truncated } = await read(answer({ data: full, rows_before_limit_at_least: ROW_LIMIT + 5 }));
     assert.equal(truncated, true);
+  });
+
+  it("is not cut off because the API read more rows than it grouped into", async () => {
+    // On 18 Nov 2026 a grouped answer of a few hundred rows came with a far larger
+    // rows_before_limit_at_least, and the report called a complete range partial.
+    const { truncated } = await read(answer({ data: [{}, {}], rows_before_limit_at_least: 1908 }));
+    assert.equal(truncated, false);
   });
 
   it("throws on a refused or shapeless answer", async () => {

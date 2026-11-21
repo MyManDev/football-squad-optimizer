@@ -122,8 +122,10 @@ export function rowsFromAnswer(answer) {
   if (answer === null || typeof answer !== "object" || !Array.isArray(answer.data)) {
     throw new Error("Analytics Engine's answer has no data rows");
   }
-  const before = Number(answer.rows_before_limit_at_least ?? answer.data.length);
-  return { rows: answer.data, truncated: answer.data.length >= ROW_LIMIT || before > answer.data.length };
+  // Only a full page of rows says the limit cut the range off. The SQL API's
+  // `rows_before_limit_at_least` counts the rows it read before grouping, not the groups, so
+  // it is above the answer's length on every grouped query and said nothing here.
+  return { rows: answer.data, truncated: answer.data.length >= ROW_LIMIT };
 }
 
 /** Events and distinct visits per value of `key`, among the rows `keep` accepts, largest first. */
