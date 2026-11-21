@@ -543,6 +543,7 @@ def test_package_and_path_capabilities_are_independent_under_the_release(
         transfer_packages=packages,
         three_week_paths=paths,
         llmopt_vnext=enabled,
+        llmopt_vnext_three_week=True,
     )
     document = reader.league_capabilities(LEAGUE_ID)
     for field, active in (("transfer_packages", packages), ("three_week_paths", paths)):

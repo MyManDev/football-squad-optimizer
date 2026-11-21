@@ -80,6 +80,7 @@ let LLMOptPage: typeof Page;
 let roster: "ok" | "fail" | "late";
 let releaseRoster: () => void;
 let releaseEnabled: boolean;
+let threeWeekEnabled: boolean;
 let bundlesOffered: boolean;
 let repairsOffered: boolean;
 let rosterGate: Promise<void>;
@@ -94,6 +95,7 @@ beforeAll(async () => {
 beforeEach(() => {
   jobs.length = 0;
   releaseEnabled = true;
+  threeWeekEnabled = false;
   bundlesOffered = false;
   repairsOffered = false;
   roster = "ok";
@@ -121,6 +123,7 @@ beforeEach(() => {
           top100: { available: false, weights: [0] },
           managers_word: { available: false },
           ...(releaseEnabled ? { llmopt_vnext: true } : {}),
+          ...(threeWeekEnabled ? { llmopt_vnext_three_week: true } : {}),
           ...(repairsOffered ? { verified_repairs: true } : {}),
           ...(bundlesOffered
             ? { preference_bundles: { version: "llmopt_preference_bundle_v1" } }
@@ -744,7 +747,11 @@ describe("a reload keeps the saved session", () => {
     expect(await screen.findByText(outsiderRule, { exact: true })).toBeVisible();
   });
 
-  async function reloadConfirmed(confirmation: Record<string, unknown>, previousRelease?: boolean) {
+  async function reloadConfirmed(
+    confirmation: Record<string, unknown>,
+    previousRelease?: boolean,
+    window: 1 | 3 = 1,
+  ) {
     open();
     await ready();
     await addRule("hold_transfers");
@@ -752,7 +759,11 @@ describe("a reload keeps the saved session", () => {
     const [key, session] = savedSession();
     sessionStorage.setItem(
       key,
-      JSON.stringify({ ...session, confirmation: { runId: "a".repeat(32), ...confirmation } }),
+      JSON.stringify({
+        ...session,
+        draft: { ...(session.draft as Record<string, unknown>), window },
+        confirmation: { runId: "a".repeat(32), ...confirmation },
+      }),
     );
     jobs.length = 0;
     open("en", model, CALENDAR, previousRelease);
@@ -779,6 +790,52 @@ describe("a reload keeps the saved session", () => {
     expect(base.readCached.mock.calls[0]![0].run?.run_id).toBe("a".repeat(32));
     for (const job of jobs) expect(job.compute).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [false, false],
+    [false, true],
+    [true, false],
+    [true, true],
+  ])(
+    "reads an answered, identity-free three-week session with master=%s and three weeks=%s",
+    async (master, threeWeek) => {
+      releaseEnabled = master!;
+      threeWeekEnabled = threeWeek!;
+      const base = await reloadConfirmed(
+        { runId: undefined, wildcardNotHeld: false },
+        undefined,
+        3,
+      );
+      await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+      const request = base.readCached.mock.calls[0]![0];
+      expect(request.window).toBe(3);
+      expect(request).not.toHaveProperty("run");
+      expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+    },
+  );
+
+  it.each([
+    [false, false],
+    [false, true],
+    [true, false],
+    [true, true],
+  ])(
+    "resumes an interrupted three-week submission only with both grants (master=%s, three weeks=%s)",
+    async (master, threeWeek) => {
+      releaseEnabled = master!;
+      threeWeekEnabled = threeWeek!;
+      const base = await reloadConfirmed({ wildcardNotHeld: false, sending: true }, true, 3);
+      const allowed = master && threeWeek;
+      const method = allowed ? base.compute : base.readCached;
+      await waitFor(() => expect(method).toHaveBeenCalledTimes(1));
+      expect(method.mock.calls[0]![0]).toMatchObject({
+        window: 3,
+        run: { run_id: "a".repeat(32) },
+      });
+      expect(base.resume).toHaveBeenCalledTimes(1);
+      if (!allowed) expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+    },
+  );
 
   it.each([false, true])(
     "uses the current release setting %s for the first explicit comparison",
@@ -813,6 +870,7 @@ describe("a reload keeps the saved session", () => {
   );
 
   it("says how long a 3-week plan takes while it is computed", async () => {
+    threeWeekEnabled = true;
     open();
     await ready();
     await addRule("hold_transfers");
@@ -1040,15 +1098,24 @@ describe("the plan with all preferences", () => {
     await ready();
   }
 
-  it.each([false, true])(
-    "gates priority editing and grouped admission on the master setting %s",
-    async (enabled) => {
-      releaseEnabled = enabled;
+  it.each([
+    [1, false, false],
+    [1, true, false],
+    [3, false, false],
+    [3, false, true],
+    [3, true, false],
+    [3, true, true],
+  ] as const)(
+    "gates priority editing and grouped admission for %i weeks with master=%s, three weeks=%s",
+    async (window, master, threeWeek) => {
+      releaseEnabled = master;
+      threeWeekEnabled = threeWeek;
+      const enabled = master && (window === 1 || threeWeek);
       bundlesOffered = true;
       intent.mockImplementation(() =>
         Response.json({
           status: "draft",
-          draft: { hard: [], soft, max_total_cost_tenths: 15 },
+          draft: { window, hard: [], soft, max_total_cost_tenths: 15 },
         }),
       );
       open();
@@ -1074,10 +1141,57 @@ describe("the plan with all preferences", () => {
         expect(request.preferenceBundle?.program?.preferences).toHaveLength(3);
         expect(jobs.slice(2).every((job) => !job.compute.mock.calls.length)).toBe(true);
       } else {
-        await screen.findByText(en.serviceUnavailable);
+        await screen.findByText(en.individualLimitsOnly);
+        expect(screen.getByRole("button", { name: en.compute })).toBeDisabled();
         expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
         expect(savedSession()[1]).toMatchObject({ draft: { max_total_cost_tenths: 15 } });
       }
+    },
+  );
+
+  it.each(["en", "tr"] as const)(
+    "keeps a priority draft when changing windows until the member explicitly clears its unsupported settings in %s",
+    async (language) => {
+      bundlesOffered = true;
+      const copy = LLMOPT_COPY[language];
+      const hard = [{ kind: "save_chips" }];
+      const preference = { kind: "include_player", player_id: OUTSIDER.id, max_cost_tenths: 10 };
+      const draft = {
+        hard,
+        soft: [{ ...preference, priority: 2 }],
+        max_total_cost_tenths: 15,
+        window: 1,
+      };
+      intent.mockImplementation(() => Response.json({ status: "draft", draft }));
+      open(language);
+      await ready();
+      await sendMessage("Prefer this player", language);
+      await screen.findByText(copy.understood);
+      const windowSelect = () => screen.getByRole("combobox", { name: copy.window });
+      const clear = () => screen.getByRole("button", { name: copy.clearPrioritySettings });
+      await userEvent.selectOptions(windowSelect(), "3");
+      expect(await screen.findByText(copy.individualLimitsOnly)).toBeVisible();
+      expect(savedSession()[1].draft).toEqual({ ...draft, window: 3 });
+      await userEvent.selectOptions(windowSelect(), "1");
+      expect(await screen.findByRole("spinbutton", { name: copy.totalLimit })).toHaveValue(1.5);
+      expect(screen.getByRole("combobox", { name: new RegExp(copy.priority) })).toHaveValue("2");
+      await userEvent.selectOptions(windowSelect(), "3");
+      cleanup();
+      open(language);
+      await ready();
+      await screen.findByText(copy.individualLimitsOnly);
+      expect(screen.getByRole("button", { name: copy.compute })).toBeDisabled();
+      await userEvent.click(clear());
+      expect(savedSession()[1].draft).toEqual({ window: 3, hard, soft: [preference] });
+      expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+      await userEvent.click(screen.getByRole("button", { name: copy.compute }));
+      await waitFor(() => expect(jobs.some((job) => job.compute.mock.calls.length > 0)).toBe(true));
+      for (const job of jobs)
+        for (const [request] of job.compute.mock.calls) {
+          expect(request.window).toBe(3);
+          expect(request).not.toHaveProperty("run");
+          expect(request).not.toHaveProperty("preferenceBundle");
+        }
     },
   );
 

@@ -184,7 +184,9 @@ def test_llmopt_run_has_four_lifetime_jobs_across_terminal_retries_and_restart(
     tmp_path, window, capacity
 ):
     root = tmp_path / "runs"
-    client, cache, queue = _world(tmp_path, runs=FileRunStore(root), preference_players=_players)
+    client, cache, queue = _world(
+        tmp_path, runs=FileRunStore(root), preference_players=_players, llmopt_vnext_three_week=True
+    )
     base = {**BODY, "window": window, "run": _run_ref()}
     first = client.post(ADVICE_URL, json=base)
     assert first.status_code == 202, first.text
@@ -218,7 +220,12 @@ def test_llmopt_run_has_four_lifetime_jobs_across_terminal_retries_and_restart(
                 "failed", at_utc="2026-08-27T12:01:00Z", error=JobError("ADVICE_FAILED", "Stopped.")
             )
         )
-        restarted, _, _ = _world(tmp_path, runs=FileRunStore(root), preference_players=_players)
+        restarted, _, _ = _world(
+            tmp_path,
+            runs=FileRunStore(root),
+            preference_players=_players,
+            llmopt_vnext_three_week=True,
+        )
         repeated = restarted.post(ADVICE_URL, json=request)
         assert repeated.json()["job_id"] == accepted.json()["job_id"]
     refused = client.post(
@@ -354,6 +361,7 @@ def _world(
     metrics: AdviceMetrics | None = None,
     submit_services: list[AdviceSubmitService] | None = None,
     llmopt_vnext: bool = True,
+    llmopt_vnext_three_week: bool = False,
     utc_now: Callable[[], datetime] = lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
     preference_players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None]
     | None = None,
@@ -369,6 +377,7 @@ def _world(
         {"saf-puan": False, "fark-yarat": True},
         preference_players=preference_players,
         llmopt_vnext=llmopt_vnext,
+        llmopt_vnext_three_week=llmopt_vnext_three_week,
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
     if submit_services is not None:

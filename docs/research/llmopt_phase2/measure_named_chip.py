@@ -138,6 +138,7 @@ def run_arm(root, capture, stamp, inputs, entry, request, *, bound):
         {"saf-puan": False},
         capabilities=menu_capabilities(),
         llmopt_vnext=bound,
+        llmopt_vnext_three_week=bound,
         preference_players=lambda *_: PreferencePlayers(
             held, frozenset(players.player_id), frozenset(players.team_id)
         ),

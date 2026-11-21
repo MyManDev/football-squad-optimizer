@@ -72,6 +72,7 @@ from squadopt.application.football_participation import INHERITED_ZERO_LIMIT, pa
 from squadopt.application.football_roles import role_forecast_summary
 from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.llmopt_run import workflow_enabled
 from squadopt.contracts.preference_bundle import BUNDLE_SWITCH
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.contracts.priority_preferences import PriorityProgram, PriorityReference
@@ -338,6 +339,7 @@ def build_advice_compute(
     public_inputs: PublicEntryInputs | None = None,
     runs: FileRunStore | None = None,
     llmopt_vnext: bool = False,
+    llmopt_vnext_three_week: bool = False,
 ) -> Callable[[AdviceJob], bytes]:
     """Return the callback that turns one claimed job into the bytes it will be served as.
 
@@ -467,7 +469,9 @@ def build_advice_compute(
             ):
                 raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unsupported public team request.")
             identity = contexts.identity()
-            if identity is None or identity.context != spec.context:
+            if identity is None or (
+                identity.context != spec.context and not contexts.matches(identity, spec.context)
+            ):
                 raise AdviceComputeRefused(
                     "CONTEXT_UNAVAILABLE", "The capture changed before computation."
                 )
@@ -670,7 +674,7 @@ def build_advice_compute(
             advice["official_injuries"] = capture.switches.official_injuries.public_record(
                 _injury_fact_ids(advice)
             )
-        if llmopt_vnext:
+        if workflow_enabled(spec.window, master=llmopt_vnext, three_week=llmopt_vnext_three_week):
             advice["plan_data_id"] = advice_context_identity(spec.context)
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
@@ -712,9 +716,16 @@ def build_advice_compute(
             finally:
                 if budget is not None:
                     assert runs is not None
-                    runs.finish(
-                        job.job_id, budget, rollback_answer=None if llmopt_vnext else result
-                    )
+                    rollback_answer = result
+                    if (
+                        result is not None
+                        and llmopt_vnext
+                        and (
+                            llmopt_vnext_three_week or json.loads(result)["payload"]["window"] == 1
+                        )
+                    ):
+                        rollback_answer = None
+                    runs.finish(job.job_id, budget, rollback_answer=rollback_answer)
         except (OSError, RuntimeError) as error:
             if budget is not None and budget.journal is not None and job.attempt < max_attempts:
                 raise RetryBundleWork("Retry the admitted preference job.") from error
@@ -1133,6 +1144,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 public_inputs=running.public_inputs,
                 runs=running.runs,
                 llmopt_vnext=running.config.llmopt_vnext,
+                llmopt_vnext_three_week=running.config.llmopt_vnext_three_week,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.

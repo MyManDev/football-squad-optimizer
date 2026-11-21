@@ -23,7 +23,8 @@ test("an explicit main retry closes its failed run and submits the unchanged rul
   page,
 }) => {
   test.skip(!API, "API-origin build required");
-  await installMember(page, "tr");
+  const { release } = await installMember(page, "tr");
+  release.threeWeek = true;
   const copy = LLMOPT_COPY.tr;
   const events: string[] = [];
   const submissions: AdviceRequest[] = [];
@@ -78,7 +79,8 @@ test("a transient candidate failure and a mismatched replay preserve checked cha
   page,
 }) => {
   test.skip(!API, "API-origin build required");
-  const { squad } = await installMember(page, "en");
+  const { squad, release } = await installMember(page, "en");
+  release.threeWeek = true;
   const copy = LLMOPT_COPY.en.repairs;
   const counts = [3, 2].map((count) => ({ kind: "club_count", club: "Club 1", count }));
   await routeChat(page, API, (route) =>

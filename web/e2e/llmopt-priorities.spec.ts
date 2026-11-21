@@ -85,6 +85,7 @@ for (const language of ["tr", "en"] as const)
             managers_word: { available: false },
             preferences: { available: true },
             llmopt_vnext: true,
+            ...(window === 3 ? { llmopt_vnext_three_week: true } : {}),
             preference_bundles: { version: "llmopt_preference_bundle_v1" },
           }),
         );
@@ -229,6 +230,18 @@ for (const language of ["tr", "en"] as const)
         expect(posts).toHaveLength(0);
         if (total)
           await expect(page.getByRole("spinbutton", { name: copy.totalLimit })).toHaveValue("1.5");
+        if (window === 1 && total) {
+          const selector = page.getByRole("combobox", { name: copy.window, exact: true });
+          await selector.selectOption("3");
+          await expect(page.getByText(copy.individualLimitsOnly)).toBeVisible();
+          await expect(
+            page.getByRole("button", { name: copy.clearPrioritySettings }),
+          ).toBeEnabled();
+          await expect(page.getByRole("button", { name: copy.compute })).toBeDisabled();
+          await selector.selectOption("1");
+          await expect(page.getByRole("spinbutton", { name: copy.totalLimit })).toHaveValue("1.5");
+          expect(posts).toHaveLength(0);
+        }
         const job = "preference-bundle";
         await startQueuedJob(
           page,

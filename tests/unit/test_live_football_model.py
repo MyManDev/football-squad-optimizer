@@ -254,6 +254,7 @@ def test_public_football_plan_keeps_a_frozen_second_week_lineup(tmp_path, monkey
         tmp_path,
         monkeypatch,
         llmopt_vnext=True,
+        llmopt_vnext_three_week=True,
         last_gameweek=6,
         artifact_root=artifacts,
         public_entries=True,
@@ -315,7 +316,12 @@ def test_public_football_plan_keeps_a_frozen_second_week_lineup(tmp_path, monkey
 def test_absence_scenario_benches_the_player_only_in_its_target_week(tmp_path, monkeypatch, model):
     artifacts = tmp_path / "artifacts"
     world = _deployment(
-        tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=6, artifact_root=artifacts
+        tmp_path,
+        monkeypatch,
+        llmopt_vnext=True,
+        llmopt_vnext_three_week=True,
+        last_gameweek=6,
+        artifact_root=artifacts,
     )
     backend = world["backend"]
     if model == "football":

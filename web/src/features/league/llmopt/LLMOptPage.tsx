@@ -30,7 +30,7 @@ import { useLanguage } from "../../../i18n/context";
 import { money } from "../../../lib/format";
 import { entryAddress, memberAddress } from "../../../lib/leagueAddresses";
 import { useFixtures } from "../../fixtures/data";
-import { capabilitiesForPage } from "../advice/adviceCapabilities";
+import { capabilitiesForPage, llmoptEnabledForWindow } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { deviceAdviceClient } from "../device/adviceClient";
 import { shownPriorityReference } from "../device/priorityWitness";
@@ -496,7 +496,7 @@ function Workspace({
   }
   async function currentGrant() {
     const caps = await readCurrentCapabilities();
-    return caps?.llmoptVNext === true ? caps : undefined;
+    return llmoptEnabledForWindow(caps, plans.window) ? caps : undefined;
   }
 
   async function send(event: FormEvent<HTMLFormElement>) {
@@ -518,7 +518,11 @@ function Workspace({
     setReading(true);
     setFeedback("");
     try {
-      const catalogue = vNext ? planCatalogue(computed.history, shownPlans) : undefined;
+      const catalogue = vNext
+        ? planCatalogue(computed.history, shownPlans, (window) =>
+            llmoptEnabledForWindow(currentCapabilities, window),
+          )
+        : undefined;
       const previous = selectedReference ?? reference ?? revised;
       const answer = await intentSource.interpret(
         {
@@ -533,7 +537,11 @@ function Workspace({
           ...(catalogue && {
             confirmCatalogueRollback: async () => {
               const caps = await readCurrentCapabilities();
-              return !!caps && caps.llmoptVNext !== true;
+              return (
+                !!caps &&
+                (!llmoptEnabledForWindow(caps, plans.window) ||
+                  catalogue.plans.some((plan) => !llmoptEnabledForWindow(caps, plan.weeks.length)))
+              );
             },
           }),
         },
@@ -552,7 +560,9 @@ function Workspace({
           setFeedback(copy.serviceUnavailable);
           return;
         }
-        const currentCatalogue = planCatalogue(session.history, displayedPlans.current);
+        const currentCatalogue = planCatalogue(session.history, displayedPlans.current, (window) =>
+          llmoptEnabledForWindow(availability.grant, window),
+        );
         if (
           !currentCatalogue ||
           !availability.matches(currentCatalogue.kind, currentCatalogue.data_id) ||
@@ -720,15 +730,19 @@ function Workspace({
   });
   const currentCapabilities =
     restoreCapabilities.isFetchedAfterMount && !restoreCapabilities.isError ? restoreMode : null;
-  const vNext = currentCapabilities?.llmoptVNext === true;
+  const vNext = llmoptEnabledForWindow(currentCapabilities, plans.window);
   const prioritiesEnabled =
-    currentCapabilities?.llmoptVNext === true &&
-    (currentCapabilities.preferenceBundles === true ||
-      (plans.window === 1 && currentCapabilities.devicePreferenceBundles === true));
+    vNext &&
+    (currentCapabilities?.preferenceBundles === true ||
+      (plans.window === 1 && currentCapabilities?.devicePreferenceBundles === true));
+  const incompatiblePriorities =
+    !!currentCapabilities &&
+    confirmationProblem(draft, plans.window, currentCapabilities) === "individualLimitsOnly";
   const canContinue =
     (run !== restoredRun && !run?.inputs.request.run) ||
     (!!currentCapabilities &&
-      (currentCapabilities.llmoptVNext === true) === !!run?.inputs.request.run &&
+      llmoptEnabledForWindow(currentCapabilities, run?.inputs.request.window ?? plans.window) ===
+        !!run?.inputs.request.run &&
       (!run?.inputs.request.deviceRun || currentCapabilities.devicePreferenceBundles === true) &&
       (!run?.inputs.paths3w || currentCapabilities.threeWeekPaths === true) &&
       (!run?.inputs.bundleMode ||
@@ -1035,7 +1049,11 @@ function Workspace({
           .then((read) => (read.isError ? null : read.data)),
       ]);
       if (!currentConfirmation()) return;
-      if (!capabilities || (retryRunId && !capabilities.verifiedRepairs)) {
+      if (
+        !capabilities ||
+        (retryRunId &&
+          (!llmoptEnabledForWindow(capabilities, plans.window) || !capabilities.verifiedRepairs))
+      ) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
@@ -1066,7 +1084,7 @@ function Workspace({
       }
       const problem = confirmationProblem(draft, plans.window, capabilities);
       if (problem) {
-        setFeedback(copy[problem]);
+        if (problem !== "individualLimitsOnly") setFeedback(copy[problem]);
         return;
       }
       if (retryRunId) {
@@ -1087,7 +1105,9 @@ function Workspace({
         )
           return;
       }
-      const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
+      const runId = llmoptEnabledForWindow(capabilities, plans.window)
+        ? crypto.randomUUID().replaceAll("-", "")
+        : undefined;
       const next = await prepareConfirmedRun(
         { draft, held, plans, frozenWeeks: frozen, reference },
         squad,
@@ -1305,8 +1325,12 @@ function Workspace({
     vNext ? shownPlans : [],
     session.confirmation?.runId,
   );
+  const selectableHistory = computed.history.items.filter((item) =>
+    llmoptEnabledForWindow(currentCapabilities, item.plan.window),
+  );
+  const selectedEnabled = !!computed.selected && selectableHistory.includes(computed.selected);
   const selectedReference =
-    vNext && computed.history.explicit && computed.selected
+    vNext && selectedEnabled && computed.history.explicit && computed.selected
       ? summarizeRevision(computed.selected.plan)
       : undefined;
   const restoredArchive =
@@ -1314,11 +1338,18 @@ function Workspace({
     run === restoredRun &&
     (!restored.confirmation || !!restored.confirmation.runId);
   const historical =
-    (vNext || restoredArchive) &&
+    ((vNext && selectedEnabled) || restoredArchive) &&
     computed.selected &&
     !shownPlans.some((p) => planContent(p) === planContent(computed.selected!.plan));
   async function selectComputed(history: PlanHistory) {
-    if (vNext && (await currentGrant()) && mounted.current) applySelection(history);
+    const target = history.items.find((item) => item.id === history.navigation[history.cursor]);
+    if (
+      vNext &&
+      target &&
+      llmoptEnabledForWindow(await currentGrant(), target.plan.window) &&
+      mounted.current
+    )
+      applySelection(history);
   }
   function applySelection(history: PlanHistory) {
     if (!history.items.some((p) => p.id === history.navigation[history.cursor])) return;
@@ -1326,7 +1357,10 @@ function Workspace({
     session.save({ draft, reference, confirmation: session.confirmation, history });
   }
   const planProps = (plan: EntryAdvice) => {
-    const id = vNext ? computed.idFor(plan) : undefined;
+    const id =
+      vNext && llmoptEnabledForWindow(currentCapabilities, plan.window)
+        ? computed.idFor(plan)
+        : undefined;
     return id
       ? {
           planId: id,
@@ -1477,6 +1511,24 @@ function Workspace({
           change={change}
           changes={changes}
         />
+        {incompatiblePriorities && (
+          <div>
+            <p className={styles.notice} role="status">
+              {copy.individualLimitsOnly}
+            </p>
+            <button
+              className={styles.secondary}
+              type="button"
+              disabled={editingLocked}
+              onClick={() => {
+                const soft = draft.soft.map(({ priority: _priority, ...rule }) => rule);
+                change({ ...draft, soft, max_total_cost_tenths: undefined });
+              }}
+            >
+              {copy.clearPrioritySettings}
+            </button>
+          </div>
+        )}
         {(Boolean(draft.keep_weeks?.length) || bankRule || removedRevision.length > 0) && (
           <div className={styles.ruleGroup}>
             <h3>{copy.revisionRules}</h3>
@@ -1612,6 +1664,7 @@ function Workspace({
             closed ||
             deadline === null ||
             !canCalculate ||
+            incompatiblePriorities ||
             mainBlocked ||
             basisChanged
           }
@@ -1638,16 +1691,16 @@ function Workspace({
           </p>
         )}
       </section>
-      {vNext && computed.history.items.length > 0 && (
+      {vNext && selectableHistory.length > 0 && (
         <section className={styles.revision} aria-label={copy.planHistory}>
           <label>
             {copy.planHistory}{" "}
             <select
-              value={computed.selected?.id ?? ""}
+              value={selectedEnabled ? computed.selected?.id : ""}
               disabled={editingLocked}
               onChange={(event) => selectComputed(computed.choose(event.target.value))}
             >
-              {computed.history.items.map((item, index) => (
+              {selectableHistory.map((item, index) => (
                 <option key={item.id} value={item.id}>
                   {copy.savedPlan(index + 1)}
                 </option>
@@ -1656,7 +1709,12 @@ function Workspace({
           </label>
           <button
             type="button"
-            disabled={editingLocked || computed.history.cursor <= 0}
+            disabled={
+              editingLocked ||
+              !selectableHistory.some(
+                (item) => item.id === computed.history.navigation[computed.history.cursor - 1],
+              )
+            }
             onClick={() => selectComputed(computed.move(-1))}
           >
             {copy.undoPlan}
@@ -1664,7 +1722,10 @@ function Workspace({
           <button
             type="button"
             disabled={
-              editingLocked || computed.history.cursor >= computed.history.navigation.length - 1
+              editingLocked ||
+              !selectableHistory.some(
+                (item) => item.id === computed.history.navigation[computed.history.cursor + 1],
+              )
             }
             onClick={() => selectComputed(computed.move(1))}
           >
@@ -1675,8 +1736,8 @@ function Workspace({
       {historical && computed.selected && !computing && (
         <PlanResult
           title={copy.selectedPlan}
-          planId={vNext ? computed.selected.id : undefined}
-          selected={vNext}
+          planId={vNext && selectedEnabled ? computed.selected.id : undefined}
+          selected={vNext && selectedEnabled}
           state={{
             phase: "done",
             source: "api-cache",
@@ -1692,11 +1753,19 @@ function Workspace({
         />
       )}
       {reference && !draft.scenario && (
-        <RevisionComparison previous={reference} revised={revised} planContextEnabled={vNext} />
+        <RevisionComparison
+          previous={reference}
+          revised={revised}
+          planContextEnabled={
+            vNext && llmoptEnabledForWindow(currentCapabilities, reference.window)
+          }
+        />
       )}
       {reference && run?.scenario && scenarioDescription && (
         <ScenarioComparison
-          planContextEnabled={vNext}
+          planContextEnabled={
+            vNext && llmoptEnabledForWindow(currentCapabilities, reference.window)
+          }
           reference={reference}
           replay={states.first}
           optimized={baseState}
