@@ -81,6 +81,7 @@ let roster: "ok" | "fail" | "late";
 let releaseRoster: () => void;
 let releaseEnabled: boolean;
 let bundlesOffered: boolean;
+let repairsOffered: boolean;
 let rosterGate: Promise<void>;
 let intent: Mock<(body: Record<string, unknown>) => Response>;
 const clients: QueryClient[] = [];
@@ -94,6 +95,7 @@ beforeEach(() => {
   jobs.length = 0;
   releaseEnabled = true;
   bundlesOffered = false;
+  repairsOffered = false;
   roster = "ok";
   rosterGate = new Promise<void>((resolve) => (releaseRoster = resolve));
   intent = vi.fn(
@@ -119,6 +121,7 @@ beforeEach(() => {
           top100: { available: false, weights: [0] },
           managers_word: { available: false },
           ...(releaseEnabled ? { llmopt_vnext: true } : {}),
+          ...(repairsOffered ? { verified_repairs: true } : {}),
           ...(bundlesOffered
             ? { preference_bundles: { version: "llmopt_preference_bundle_v1" } }
             : {}),
@@ -215,6 +218,52 @@ async function sendMessage(text: string, language: "en" | "tr" = "en") {
   await waitFor(() => expect(send).toBeEnabled());
   await user.click(send);
 }
+
+it.each([
+  ["PATIENCE_EXHAUSTED", "wait"],
+  ["RUN_BUDGET_EXHAUSTED", "budget"],
+  ["MODEL_INPUTS_UNAVAILABLE", "missing"],
+] as const)(
+  "closes the previous main after an explicit retry of %s without editing the draft",
+  async (reason, notice) => {
+    repairsOffered = true;
+    const normalFetch = globalThis.fetch;
+    const cancelled: string[] = [];
+    let allowCancel = false;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const id = String(input).match(/\/runs\/([a-f0-9]{32})\/cancel$/)?.[1];
+      if (!id) return normalFetch(input, init);
+      expect(init?.method).toBe("POST");
+      cancelled.push(id);
+      return Promise.resolve(new Response("{}", { status: allowCancel ? 200 : 503 }));
+    });
+    open();
+    await ready();
+    await addRule("no_hits");
+    await userEvent.click(screen.getByRole("button", { name: en.compute }));
+    const base = jobs[0]!;
+    await waitFor(() => expect(base.compute).toHaveBeenCalledTimes(1));
+    const first = base.compute.mock.calls[0]![0];
+    act(() => base.show({ phase: "failed", request: first, reason }));
+    expect(await screen.findByText(en.repairs[notice])).toBeVisible();
+    const retry = screen.getByRole("button", { name: en.compute });
+    expect(retry).toBeEnabled();
+    expect(cancelled).toEqual([]);
+    await userEvent.click(retry);
+    await screen.findByText(en.serviceUnavailable);
+    expect(base.compute).toHaveBeenCalledTimes(1);
+    allowCancel = true;
+    await userEvent.click(retry);
+    await waitFor(() => expect(base.compute).toHaveBeenCalledTimes(2));
+    expect(cancelled).toEqual([first.run!.run_id, first.run!.run_id]);
+    const fresh = base.compute.mock.calls[1]![0];
+    expect(fresh.run?.run_id).toMatch(/^[0-9a-f]{32}$/);
+    expect(fresh.run?.run_id).not.toBe(first.run!.run_id);
+    expect(fresh.preferences).toEqual(first.preferences);
+    expect(fresh.run?.stage).toBe("base");
+    expect(jobs.slice(1).every((job) => !job.compute.mock.calls.length)).toBe(true);
+  },
+);
 
 describe("chat keyboard focus", () => {
   it.each(["clarification", "refusal"])("returns to the chat after a %s", async (outcome) => {

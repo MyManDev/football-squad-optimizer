@@ -53,11 +53,18 @@ class PlanAdviceCache:
         self._enabled = llmopt_vnext
 
     def get(self, key: str) -> bytes | None:
+        return self._get(key, include_provenance=self._enabled)
+
+    def repair_witness(self, key: str) -> bytes | None:
+        """Read existing enabled provenance for private verification during rollback."""
+        return self._get(key, include_provenance=True)
+
+    def _get(self, key: str, *, include_provenance: bool) -> bytes | None:
         raw = self._answers.get(key)
         if raw is None:
             return None
         canonical, embedded = _separate(raw)
-        if not self._enabled:
+        if not include_provenance:
             # Also project any older worker's embedded metadata on rollback.
             return canonical
         if embedded:

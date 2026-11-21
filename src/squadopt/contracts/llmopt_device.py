@@ -63,7 +63,14 @@ def device_extension_schema() -> dict[str, object]:
         ),
         "properties": {
             "preferences": preferences_schema(),
-            "priorityMain": {"type": "boolean", "const": True},
+            "priorityMain": {
+                "type": "boolean",
+                "const": True,
+                "description": (
+                    "Compute the hard-rule main. A repair candidate can also supply a priority "
+                    "program to solve against this main in the same worker."
+                ),
+            },
             "priorityReference": {
                 "type": "object",
                 "additionalProperties": False,

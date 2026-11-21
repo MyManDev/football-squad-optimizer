@@ -10,7 +10,8 @@
 
 import type { LpSolver } from "./lp/problem";
 import { solveRequest, type DevicePlanRequest } from "./requests";
-import { DevicePlanRefused } from "./solve/week";
+import { DevicePlanRefused, DeviceWeekInfeasible } from "./solve/week";
+import { MissingDevicePreferenceInput } from "./preferences";
 import type { DeviceChip, DevicePlanAnswer } from "./types";
 
 export type DevicePlanReply =
@@ -27,8 +28,8 @@ export type DevicePlanReply =
       /** The whole run's solving time: the plain plan and every chip. */
       seconds: number;
     }
-  | { id: number; kind: "refused"; status: string; stage: string }
-  | { id: number; kind: "failed" };
+  | { id: number; kind: "refused"; status: string; stage: string; primaryInfeasible?: true }
+  | { id: number; kind: "failed"; inputsUnavailable?: true };
 
 export function replyTo(
   solver: LpSolver,
@@ -57,11 +58,20 @@ export function replyTo(
       reply = request.alternatives
         ? { id, kind: "answer", answer: planned }
         : { id, kind: "gains", gains: null, seconds: (now() - started) / 1000 };
+    } else if (error instanceof DevicePlanRefused) {
+      reply = {
+        id,
+        kind: "refused",
+        status: error.status,
+        stage: error.stage,
+        ...(error instanceof DeviceWeekInfeasible ? { primaryInfeasible: true } : {}),
+      };
     } else {
-      reply =
-        error instanceof DevicePlanRefused
-          ? { id, kind: "refused", status: error.status, stage: error.stage }
-          : { id, kind: "failed" };
+      reply = {
+        id,
+        kind: "failed",
+        ...(error instanceof MissingDevicePreferenceInput ? { inputsUnavailable: true } : {}),
+      };
     }
   }
   post(reply);

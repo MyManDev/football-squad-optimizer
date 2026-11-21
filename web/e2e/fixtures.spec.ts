@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import fixtures from "../public/data/fixtures.json" with { type: "json" };
+import { dismissOpening } from "./dismissOpening";
 import { claimMember, shippedClaim } from "./identity";
 import { contrastRatio } from "../src/design/contrastRatio";
 import { FIXTURES_COPY } from "../src/features/fixtures/fixturesCopy";
@@ -112,6 +113,7 @@ for (const width of [1280, 1600])
     expect(main.x + main.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(scrollsSideways)).toBe(false);
 
+    await dismissOpening(page);
     await page.getByRole("navigation").getByRole("link", { name: "Fikstür", exact: true }).click();
     await expect(page).toHaveURL("/fixtures");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fikstür");
@@ -157,6 +159,7 @@ test("a phone reaches the fixture list from its bar and never scrolls sideways",
   await expect(bar).toBeVisible();
   expect((await bar.boundingBox())!.height).toBe(56);
   // No page offers a fixture sheet here, so the bar's 'Fikstür' is a link to the list.
+  await dismissOpening(page);
   await bar.getByRole("link", { name: "Fikstür", exact: true }).click();
   await expect(page).toHaveURL("/fixtures");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fikstür");
@@ -225,6 +228,7 @@ for (const language of ["tr", "en"] as const)
       await everyTargetFits();
 
       // The other view, by its name, and a club of it.
+      await dismissOpening(page);
       await main.getByRole("radio", { name: copy.teamView, exact: true }).click();
       await expect(page).toHaveURL(/view=team/);
       await main.getByRole("radio", { name: /^TOT / }).click();
@@ -340,6 +344,7 @@ test("the keyboard moves through the choices and stays on them, and Back leaves 
   await page.clock.setFixedTime(new Date(CLOCK));
   await page.goto(LEAGUE_PAGE);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Analizi");
+  await dismissOpening(page);
   await page.getByRole("navigation").getByRole("link", { name: "Fikstür", exact: true }).click();
   await expect(page).toHaveURL("/fixtures");
   const main = page.getByRole("main");

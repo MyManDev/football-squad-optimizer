@@ -389,7 +389,8 @@
     },
     "priorityMain": {
       "type": "boolean",
-      "const": true
+      "const": true,
+      "description": "Compute the hard-rule main. A repair candidate can also supply a priority program to solve against this main in the same worker."
     },
     "priorityReference": {
       "type": "object",

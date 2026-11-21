@@ -1,9 +1,378 @@
 {
   "additionalProperties": false,
+  "if": {
+    "required": [
+      "repair_origin"
+    ]
+  },
   "properties": {
     "contract_version": {
       "const": "llmopt_run_v1",
       "type": "string"
+    },
+    "repair_origin": {
+      "additionalProperties": false,
+      "properties": {
+        "preferences": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "avoid_players": {
+                "items": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "maxItems": 17,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "club_counts": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "club": {
+                      "maxLength": 80,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "count": {
+                      "maximum": 3,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "scope": {
+                      "enum": [
+                        "squad",
+                        "transfers_in"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "club",
+                    "count"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 16,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "frozen_weeks": {
+                "items": {
+                  "additionalProperties": false,
+                  "dependentRequired": {
+                    "captain": [
+                      "starting_xi"
+                    ],
+                    "starting_xi": [
+                      "captain"
+                    ]
+                  },
+                  "properties": {
+                    "captain": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "chip": {
+                      "enum": [
+                        null,
+                        "wildcard",
+                        "freehit",
+                        "bboost",
+                        "3xc"
+                      ]
+                    },
+                    "starting_xi": {
+                      "items": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 11,
+                      "minItems": 11,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "transfers_in": {
+                      "items": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "transfers_out": {
+                      "items": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "week": {
+                      "maximum": 3,
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "week",
+                    "transfers_in",
+                    "transfers_out",
+                    "chip"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 3,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "hold_opening_transfers": {
+                "type": "boolean"
+              },
+              "hold_transfers": {
+                "type": "boolean"
+              },
+              "include_players": {
+                "items": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "maxItems": 15,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "keep_players": {
+                "items": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "maxItems": 15,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "max_hit_points": {
+                "maximum": 60,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "min_bank": {
+                "additionalProperties": false,
+                "properties": {
+                  "tenths": {
+                    "maximum": 10000,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "week": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "tenths"
+                ],
+                "type": "object"
+              },
+              "min_opening_bank_tenths": {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "net_points_priority": {
+                "type": "boolean"
+              },
+              "no_hits": {
+                "type": "boolean"
+              },
+              "save_chips": {
+                "type": "boolean"
+              },
+              "scenario": {
+                "additionalProperties": false,
+                "else": {
+                  "not": {
+                    "required": [
+                      "tenths"
+                    ]
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "kind": {
+                      "const": "price_increase"
+                    }
+                  }
+                },
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "price_increase",
+                      "unavailable"
+                    ]
+                  },
+                  "player_id": {
+                    "maximum": 9007199254740991,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "tenths": {
+                    "maximum": 10000,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "week": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "player_id"
+                ],
+                "then": {
+                  "required": [
+                    "tenths"
+                  ]
+                },
+                "type": "object"
+              },
+              "week_rules": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "rules": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "avoid_players": {
+                          "items": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "maxItems": 17,
+                          "type": "array",
+                          "uniqueItems": true
+                        },
+                        "buy_players": {
+                          "items": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "maxItems": 15,
+                          "type": "array",
+                          "uniqueItems": true
+                        },
+                        "club_counts": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "club": {
+                                "maxLength": 80,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "count": {
+                                "maximum": 3,
+                                "minimum": 1,
+                                "type": "integer"
+                              },
+                              "scope": {
+                                "enum": [
+                                  "squad",
+                                  "transfers_in"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "club",
+                              "count"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 16,
+                          "type": "array",
+                          "uniqueItems": true
+                        },
+                        "hold_transfers": {
+                          "type": "boolean"
+                        },
+                        "include_players": {
+                          "items": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "maxItems": 15,
+                          "type": "array",
+                          "uniqueItems": true
+                        },
+                        "keep_players": {
+                          "items": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "maxItems": 15,
+                          "type": "array",
+                          "uniqueItems": true
+                        },
+                        "no_hits": {
+                          "type": "boolean"
+                        },
+                        "save_chips": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "week": {
+                      "maximum": 3,
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "week",
+                    "rules"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 3,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "wildcard_week": {
+                "enum": [
+                  2,
+                  3
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "wildcard_weeks": {
+          "items": {
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "preferences",
+        "wildcard_weeks"
+      ],
+      "type": "object"
     },
     "run_id": {
       "pattern": "^[0-9a-f]{32}$",
@@ -12,7 +381,8 @@
     "stage": {
       "enum": [
         "base",
-        "followup"
+        "followup",
+        "repair"
       ],
       "type": "string"
     }
@@ -22,5 +392,15 @@
     "run_id",
     "stage"
   ],
+  "then": {
+    "properties": {
+      "stage": {
+        "enum": [
+          "base",
+          "repair"
+        ]
+      }
+    }
+  },
   "type": "object"
 }

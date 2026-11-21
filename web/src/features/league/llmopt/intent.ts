@@ -239,7 +239,7 @@ function playerIds(rules: readonly Constraint[], kind: PlayerKind) {
   return [...new Set(rules.flatMap((rule) => (rule.kind === kind ? [rule.player_id] : [])))];
 }
 
-function ruleFields(rules: readonly Constraint[]) {
+export function ruleFields(rules: readonly Constraint[]) {
   const buy = playerIds(rules, "buy_player");
   return {
     keep_players: playerIds(rules, "keep_player"),

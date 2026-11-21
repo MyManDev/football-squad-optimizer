@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { dismissOpening } from "./dismissOpening";
 import { claimMember, shippedClaim } from "./identity";
 
 // The league pages stand behind the league number and "Sen kimsin?"; the visitor in this
@@ -48,7 +49,10 @@ test.describe("a visitor who has said who they are", () => {
     // every deadline of the season.
     await page.clock.setFixedTime(new Date("2026-08-01T00:00:00Z"));
     await page.goto(`/league/${member.leagueId}/members/${member.entryId}?mode=saf-puan&window=3`);
-    await page.getByRole("button", { name: /EN.*English/ }).click();
+    const english = page.getByRole("button", { name: /EN.*English/ });
+    await expect(english).toBeVisible();
+    await dismissOpening(page);
+    await english.click();
 
     // The page's title is the member's team, so the words that change stand under it.
     await expect(page.getByRole("heading", { level: 2, name: "Plan Settings" })).toBeVisible();
@@ -75,6 +79,9 @@ test.describe("a visitor who has said who they are", () => {
 test("the sidebar's 'Find Your League' leads to the step without a member", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
   await page.goto("/fixtures");
-  await page.getByRole("link", { name: "Find Your League", exact: true }).click();
+  const findLeague = page.getByRole("link", { name: "Find Your League", exact: true });
+  await expect(findLeague).toBeVisible();
+  await dismissOpening(page);
+  await findLeague.click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Who are you?");
 });

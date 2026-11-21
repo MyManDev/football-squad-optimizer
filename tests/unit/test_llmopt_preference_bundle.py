@@ -1,5 +1,6 @@
 """The public API and real worker execute preferences in one admitted follow-up."""
 
+import hashlib
 import json
 from dataclasses import replace
 
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 from tests.fixtures.backend_app import app_for_capture
 from tests.unit import test_advice_worker as world
 
+from squadopt.contracts.llmopt_run import RunReference
 from squadopt.contracts.preference_bundle import (
     BUNDLE_VERSION,
     preference_bundle_schema,
@@ -115,10 +117,11 @@ def test_three_priority_rules_use_two_real_server_jobs_and_resume_from_cache(
         assert tx.state["jobs"][job.job_id]["receipt"]["calls"] >= 5
 
 
+@pytest.mark.parametrize("window", [1, 3])
 def test_rollback_drains_and_reads_the_original_bundle_without_admitting_new_work(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, window
 ):
-    opened, on, route, body, run, held = _started(tmp_path, monkeypatch)
+    opened, on, route, body, run, held = _started(tmp_path, monkeypatch, window)
     closed = build_backend(replace(opened.config, llmopt_vnext=False))
     off = TestClient(app_for_capture(closed, world.world_module.GW2_CAPTURED_AT))
     program = {"preferences": [{"rules": {"keep_players": [held[0]]}}], "max_total_cost_tenths": 5}
@@ -147,6 +150,25 @@ def test_rollback_drains_and_reads_the_original_bundle_without_admitting_new_wor
         == off.post(route, json=request).content
         == expected.content
     )
+    job = opened.queue.load(queued.json()["job_id"])
+    with opened.runs.transaction() as tx:
+        ledger = tx.state["jobs"][job.job_id]
+        receipt = ledger["receipt"]
+        assert receipt["finished"] and receipt["attempt"] == 1 and receipt["calls"] > 0
+        assert "answer_sha256" not in receipt
+        if window == 3:
+            # Earlier aggregate receipts could include an exact digest. They remain
+            # readable but cannot certify an ordinary candidate from this run.
+            assert ledger["limit"] == 366
+            ledger["receipt"] = {
+                "cp_used": receipt["cp_used"],
+                "native_reserved": receipt["native_reserved"],
+                "calls": receipt["calls"],
+                "answer_sha256": hashlib.sha256(expected.content).hexdigest(),
+            }
+            assert not tx.completed_answer(
+                RunReference(run["run_id"], "repair"), job.cache_key, expected.content, opened.queue
+            )
     changed = {**bundle, "program": {**program, "max_total_cost_tenths": 6}}
     refused = off.post(route, json={**request, "preference_bundle": changed})
     assert refused.status_code == 409 and refused.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
@@ -172,9 +194,11 @@ def test_bundle_capability_follows_release_on_league_and_public_routes(
             assert state["llmopt_vnext"] is True
             assert state["preference_bundles"] == {"version": BUNDLE_VERSION}
             assert state["plan_data_id"] == backend.reader.plan_data_id()
+            assert state["verified_repairs"] is True
         else:
             assert "llmopt_vnext" not in state and "preference_bundles" not in state
             assert "plan_data_id" not in state
+            assert "verified_repairs" not in state
 
 
 def test_bundle_requires_the_original_completed_main_before_admission(tmp_path, monkeypatch):

@@ -31,14 +31,14 @@ test("a queued SquadOpt plan still starts after its five-week solve budget has e
   page,
 }) => {
   test.skip(!apiOrigin, NO_SERVICE);
-  await page.clock.install();
-  const { dock, job } = await askForPlan(page, "en", QUEUED_BEHIND_TWO);
+  const { dock, poll } = await askForPlan(page, "en", QUEUED_BEHIND_TWO);
   await expect(dock.getByText(COMPUTE_COPY.en.queueAhead(2), { exact: false })).toBeVisible();
 
-  await page.clock.fastForward(11 * 60_000);
+  // A changed worker count proves that the page consumed the new queued reply.
+  await poll({ ...QUEUED_BEHIND_TWO, workers: { busy: 2, total: 3 } }, 11 * 60_000);
   await expect(dock.getByText(COMPUTE_COPY.en.queueAhead(2), { exact: false })).toBeVisible();
-  job.says = RUNNING_ONE_OF_THREE;
-  await page.clock.fastForward(5000);
+  await expect(dock.getByText(COMPUTE_COPY.en.workersBusy(2, 3), { exact: true })).toBeVisible();
+  await poll(RUNNING_ONE_OF_THREE, 5_000);
   await expect(dock.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "33");
 });
 
@@ -95,6 +95,7 @@ async function installService(page: Page, view: object): Promise<{ says: object 
 
 /** Opens the member's page and asks for a plan nobody published; the job then says `view`. */
 async function askForPlan(page: Page, language: Language, view: object) {
+  await page.clock.install();
   await installLeagueMocks(page);
   await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
   const job = await installService(page, view);
@@ -106,8 +107,39 @@ async function askForPlan(page: Page, language: Language, view: object) {
   await expect(settings.getByRole("radio", { name: /^5 / })).toBeChecked();
   await expect(settings.getByRole("radio", { name: "20", exact: true })).toBeChecked();
   await expect(page).toHaveURL(/window=5.*top100=20/);
-  await settings.getByRole("button", { name: copy.computeButton, exact: true }).click();
-  return { dock: page.locator("[data-compute-dock]"), job };
+  const [accepted] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname.endsWith("/advice"),
+    ),
+    settings.getByRole("button", { name: copy.computeButton, exact: true }).click(),
+  ]);
+  expect(accepted.status()).toBe(202);
+  expect(await accepted.json()).toMatchObject({ job_id: JOB });
+  const dock = page.locator("[data-compute-dock]");
+  await expect(
+    dock
+      .getByText(copy.computeQueued, { exact: true })
+      .or(dock.getByText(copy.computeRunning, { exact: true })),
+  ).toBeVisible();
+
+  async function poll(nextView = view, elapsed = 2_000) {
+    job.says = nextView;
+    const [request] = await Promise.all([
+      page.waitForRequest(
+        (request) =>
+          request.method() === "GET" &&
+          new URL(request.url()).pathname === `/api/v1/advice-jobs/${JOB}`,
+      ),
+      page.clock.fastForward(elapsed),
+    ]);
+    const response = await request.response();
+    expect(response?.status()).toBe(200);
+    expect(await response!.json()).toMatchObject({ job_id: JOB, ...nextView });
+  }
+  await poll();
+  return { dock, poll };
 }
 
 /** The boxes of the bar, its fill and its stage in hand, read at one moment: an answer redraws. */
@@ -136,7 +168,7 @@ for (const language of ["tr", "en"] as const) {
   }) => {
     test.skip(!apiOrigin, NO_SERVICE);
     await page.setViewportSize({ width: 375, height: 667 });
-    const { dock, job } = await askForPlan(page, language, QUEUED_BEHIND_TWO);
+    const { dock, poll } = await askForPlan(page, language, QUEUED_BEHIND_TWO);
     const main = page.locator("main");
 
     await expect(dock.getByText(computeCopy.queueAhead(2), { exact: false })).toBeVisible();
@@ -149,11 +181,11 @@ for (const language of ["tr", "en"] as const) {
       ),
     ).toBeVisible();
 
-    job.says = QUEUED_NEXT;
+    await poll(QUEUED_NEXT);
     await expect(dock.getByText(computeCopy.queueNext, { exact: false })).toBeVisible();
     await expect(dock.getByRole("progressbar")).toHaveCount(0);
 
-    job.says = RUNNING_ONE_OF_THREE;
+    await poll(RUNNING_ONE_OF_THREE);
     const bar = dock.getByRole("progressbar", { name: copy.computeRunning });
     await expect(bar).toHaveAttribute("aria-valuenow", "33");
     await expect(bar).toHaveAttribute("aria-valuemax", "100");
@@ -181,12 +213,12 @@ for (const language of ["tr", "en"] as const) {
     page,
   }) => {
     test.skip(!apiOrigin, NO_SERVICE);
-    const { dock, job } = await askForPlan(page, language, { status: "queued" });
+    const { dock, poll } = await askForPlan(page, language, { status: "queued" });
 
     await expect(dock.getByText(copy.computeQueued, { exact: true })).toBeVisible();
     await expect(dock.getByRole("progressbar")).toHaveCount(0);
 
-    job.says = { status: "running" };
+    await poll({ status: "running" });
     const bar = dock.getByRole("progressbar", { name: copy.computeRunning });
     await expect(bar).toBeVisible();
     await expect(bar).not.toHaveAttribute("aria-valuenow");
@@ -217,11 +249,12 @@ for (const colorScheme of ["light", "dark"] as const) {
 
 test("each answer from the service sends one pulse, and nothing loops", async ({ page }) => {
   test.skip(!apiOrigin, NO_SERVICE);
-  const { dock } = await askForPlan(page, "tr", RUNNING_ONE_OF_THREE);
+  const { dock, poll } = await askForPlan(page, "tr", RUNNING_ONE_OF_THREE);
   const inHand = dock.locator("[data-stage-now]");
   await expect(inHand).toBeAttached();
   // Each answer draws the stage anew, and its pulse runs once and ends.
   const first = await inHand.evaluateHandle((node) => node);
+  await poll();
   await page.waitForFunction((node) => !node?.isConnected, first, { timeout: 7000 });
   await expect
     .poll(() =>
@@ -237,11 +270,12 @@ test("each answer from the service sends one pulse, and nothing loops", async ({
 test("under reduced motion no pulse runs, and the fill and the count stay", async ({ page }) => {
   test.skip(!apiOrigin, NO_SERVICE);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  const { dock } = await askForPlan(page, "tr", RUNNING_ONE_OF_THREE);
+  const { dock, poll } = await askForPlan(page, "tr", RUNNING_ONE_OF_THREE);
   const inHand = dock.locator("[data-stage-now]");
   await expect(inHand).toBeAttached();
   await expect(dock).toContainText("%33");
   const first = await inHand.evaluateHandle((node) => node);
+  await poll();
   await page.waitForFunction((node) => !node?.isConnected, first, { timeout: 7000 });
   expect(await inHand.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0);
   const [track, solved] = await parts(dock.getByRole("progressbar"));
@@ -251,12 +285,12 @@ test("under reduced motion no pulse runs, and the fill and the count stay", asyn
 test("under reduced motion a job with nothing to count draws no bar", async ({ page }) => {
   test.skip(!apiOrigin, NO_SERVICE);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  const { dock, job } = await askForPlan(page, "tr", { status: "running" });
+  const { dock, poll } = await askForPlan(page, "tr", { status: "running" });
   await expect(
     dock.getByText(MESSAGES.tr.leagueMembers.computeRunning, { exact: true }),
   ).toBeVisible();
   await expect(dock.getByRole("progressbar")).toHaveCount(0);
-  job.says = RUNNING_ONE_OF_THREE;
+  await poll(RUNNING_ONE_OF_THREE);
   await expect(dock.getByRole("progressbar")).toBeVisible();
 });
 

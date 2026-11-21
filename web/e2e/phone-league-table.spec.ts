@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
+import { atRest } from "./atRest";
 import { installLeagueMocks } from "./leagueMocks";
 
 const copy = MESSAGES.tr.leagueMembers;
@@ -51,6 +52,8 @@ for (const width of [390, 414]) {
 
     test("every row is a thumb's height and opens the member's page", async ({ page }) => {
       const rows = page.locator("#league-member-list tbody tr");
+      // Read the tap targets after the staggered row translations finish.
+      await atRest(page);
       for (const row of await rows.all()) {
         const box = (await row.boundingBox())!;
         expect(box.height).toBeGreaterThanOrEqual(44);

@@ -36,6 +36,19 @@ const DOCUMENT = {
 };
 
 describe("league capabilities", () => {
+  it("requires both release and verified repairs for repair work", () => {
+    for (const release of [undefined, false, true])
+      for (const repairs of [undefined, false, true])
+        expect(
+          checkedCapabilities(
+            { ...DOCUMENT, llmopt_vnext: release, verified_repairs: repairs },
+            352490,
+          ).verifiedRepairs,
+        ).toBe(release && repairs ? true : undefined);
+    expect(() => checkedCapabilities({ ...DOCUMENT, verified_repairs: "true" }, 352490)).toThrow(
+      AdviceCapabilitiesError,
+    );
+  });
   it.each([undefined, false, true])(
     "decodes path and package grants independently under release %s",
     (release) => {
@@ -52,6 +65,7 @@ describe("league capabilities", () => {
           );
           expect(caps.transferPackages).toBe(release && packages ? true : undefined);
           expect(caps.threeWeekPaths).toBe(release && paths ? true : undefined);
+          expect(caps.verifiedRepairs).toBeUndefined();
         }
       }
     },

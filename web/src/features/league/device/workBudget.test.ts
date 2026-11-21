@@ -1,13 +1,59 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { bindDeviceRun, closeDeviceWork, deviceWorkReceipt, reserveDeviceWork } from "./workBudget";
+import {
+  bindDeviceRun,
+  closeDeviceWork,
+  deviceWorkReceipt,
+  reserveDeviceWork,
+  claimDeviceRepair,
+} from "./workBudget";
 
 beforeEach(() => sessionStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 const id = "b".repeat(32);
 describe("durable device run capacity", () => {
+  it("retains a selection allowance and never reserves a third candidate or a second selection", () => {
+    const first = "1".repeat(64),
+      second = "2".repeat(64),
+      third = "3".repeat(64);
+    for (let attempt = 0; attempt < 18; attempt++) reserveDeviceWork(id, "inputs");
+    expect(claimDeviceRepair(id, "inputs", first, false, false)).toBe(true);
+    expect(claimDeviceRepair(id, "inputs", first, false, false)).toBe(false);
+    expect(claimDeviceRepair(id, "inputs", second, false, false)).toBe(true);
+    expect(() => claimDeviceRepair(id, "inputs", third, false, false)).toThrow(
+      "RUN_BUDGET_EXHAUSTED",
+    );
+    expect(() => reserveDeviceWork(id, "inputs")).toThrow("RUN_BUDGET_EXHAUSTED");
+    expect(claimDeviceRepair(id, "inputs", second, true, false)).toBe(true);
+    expect(claimDeviceRepair(id, "inputs", second, true, false)).toBe(false);
+    expect(() => claimDeviceRepair(id, "inputs", first, true, false)).toThrow("RUN_BASE_REQUIRED");
+    expect(deviceWorkReceipt(id)?.units).toBe(84);
+  });
+
   it("binds only when the capacity record survives a read back", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {});
     expect(() => bindDeviceRun(id, "capture")).toThrow("RUN_STORE_UNAVAILABLE");
+  });
+  it("charges orphaned workers again under the same edit and retains room for selection", () => {
+    const edit = "1".repeat(64);
+    for (let n = 0; n < 18; n++) reserveDeviceWork(id, "capture");
+    expect(claimDeviceRepair(id, "capture", edit, false, false)).toBe(true);
+    expect(claimDeviceRepair(id, "capture", edit, false, false, "recover")).toBe(true);
+    expect(deviceWorkReceipt(id)).toMatchObject({ units: 80, repairCandidates: [edit] });
+    expect(() => claimDeviceRepair(id, "capture", edit, false, false, "recover")).toThrow(
+      "RUN_BUDGET_EXHAUSTED",
+    );
+    expect(claimDeviceRepair(id, "capture", edit, true, false)).toBe(true);
+    expect(() => claimDeviceRepair(id, "capture", edit, true, false, "recover")).toThrow(
+      "RUN_BUDGET_EXHAUSTED",
+    );
+    expect(() => claimDeviceRepair(id, "new capture", edit, true, false, "recover")).toThrow(
+      "RUN_CONTEXT_CHANGED",
+    );
+    closeDeviceWork(id);
+    expect(() => claimDeviceRepair(id, "capture", edit, true, false, "recover")).toThrow(
+      "RUN_CANCELLED",
+    );
+    expect(deviceWorkReceipt(id)).toMatchObject({ units: 84, repairSelection: edit, closed: true });
   });
 
   it("leaves room in the first write for the entire run", () => {
@@ -19,7 +65,10 @@ describe("durable device run capacity", () => {
       if (value.length > size) throw new DOMException("Full", "QuotaExceededError");
       write.call(this, k, value);
     });
-    for (let n = 0; n < 21; n++) reserveDeviceWork(id, "capture");
+    for (let n = 0; n < 18; n++) reserveDeviceWork(id, "capture");
+    expect(claimDeviceRepair(id, "capture", "1".repeat(64), false, false)).toBe(true);
+    expect(claimDeviceRepair(id, "capture", "2".repeat(64), false, false)).toBe(true);
+    expect(claimDeviceRepair(id, "capture", "2".repeat(64), true, false)).toBe(true);
     expect(deviceWorkReceipt(id)?.units).toBe(84);
   });
   it("retains reservations across reconstructed readers and refuses the next attempt", () => {

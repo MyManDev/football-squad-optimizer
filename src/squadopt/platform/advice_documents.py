@@ -621,6 +621,7 @@ def league_capabilities_schema() -> dict[str, Any]:
             "league_id": {"type": "integer", "minimum": 0},
             "capture_snapshot_id": {"type": "string", "minLength": 1},
             "plan_data_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "verified_repairs": {"type": "boolean", "const": True},
             "transfer_packages": {
                 "type": "boolean",
                 "description": "Whether transfer-package search is enabled.",

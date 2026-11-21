@@ -60,6 +60,13 @@ proof flag. The worker reconstructs J from those decisions. The private bundle
 cache also binds these decisions and proof status. An earlier cached answer is
 reusable when its own published main matches. Neither field enters an HTTP request.
 
+A verified repair candidate with a total allowance combines `priorityMain: true`
+with the priority program in one worker request. The worker solves the edited
+hard rules once, then uses that main for the priority calculation. Selection
+sends the same program with the `priorityReference` from the candidate's saved
+parent answer. The worker checks those decisions against the edited hard rules
+and computes the preferred plan again under one new worker reservation.
+
 The browser offers `devicePreferenceBundles` for one week after current server
 capabilities grant `llmopt_vnext` and the matching device inputs are available.
 A missing or disabled grant keeps fresh confirmations on the original service path.

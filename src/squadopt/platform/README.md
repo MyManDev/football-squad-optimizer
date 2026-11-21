@@ -93,7 +93,7 @@ The file job queue, the worker loop and what keeps them observable and recoverab
 | `file_advice_queue.py` | The recoverable file queue, with fenced, short metadata transactions. |
 | `queue_contracts.py` | Adapter-neutral queue operations and attempt ownership errors. |
 | `jobs_contract.py` | The job lifecycle contract, `backend_jobs_v1`. |
-| `advice_job_spec.py` | What a queued job is for, stored beside the queue rather than inside it. |
+| `advice_job_spec.py` | The immutable request for a queued job and the checks that bind a repair or selected plan to its originating request and capture. |
 | `advice_cache.py` | The immutable-key answer cache behind a protocol, and the cache key. |
 | `advice_plan_cache.py` | Stores plan provenance separately from the immutable answer and exposes it when the planning release is enabled. |
 | `_damaged_entry.py` | Moves aside bytes at a create-once address that do not parse, rather than answering from them. |
