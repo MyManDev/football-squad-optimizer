@@ -334,6 +334,9 @@ const raised = (kind: "goal" | "assist") =>
 
 describe("the LIVE page's reads", () => {
   it("opens with one read of each document and the week the bundle names", async () => {
+    // Open the afternoon board after the member's last match, outside automatic follow.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.parse("2026-11-21T21:00:00Z"));
     const forwarder = fakeForwarder([answered(live("2026-11-21T15:30:00Z"))]);
     const { loadTable } = renderLive({ forwarder });
     expect(await rows()).toHaveLength(15);
