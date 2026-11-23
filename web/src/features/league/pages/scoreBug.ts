@@ -13,7 +13,8 @@ export interface ScoreCell {
  * The score bug's cells for one member: the rank among the league's members, the season
  * total, last week net of the hits taken (as the member list nets it), and, when the
  * member's squad document is at hand, the bank and the free transfers. A cell whose number
- * is absent is left out, never shown as 0.
+ * is absent is left out, never shown as 0. A page whose deadline has passed hands no squad,
+ * because those two are the resources of the decision that is over.
  */
 export function scoreBugCells(
   entry: EntryView,
