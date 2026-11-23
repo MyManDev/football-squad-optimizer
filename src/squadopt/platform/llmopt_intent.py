@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-from collections import Counter
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from typing import Any, Final
@@ -714,17 +713,37 @@ def _claims_computed_value(question: str) -> bool:
     return False
 
 
-def _reviewed_priorities(draft: Mapping[str, Any]) -> Counter[frozenset[tuple[str, Any]]]:
-    # The same reviewed preference may be moved to a different week or given an individual limit.
-    return Counter(
-        frozenset(
-            (field, value)
-            for field, value in rule.items()
-            if field not in ("week", "max_cost_tenths")
+def _preference_subject(rule: Mapping[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in rule.items() if k not in ("week", "priority", "max_cost_tenths")}
+
+
+def _carry_reviewed_settings(draft: dict[str, Any], previous: Mapping[str, Any]) -> None:
+    """Keep reviewed settings until the member clears them in the closed window."""
+    total = "max_total_cost_tenths"
+    if total in draft and draft[total] != previous.get(total):
+        raise IntentValidationError("This planning workflow is closed.")
+    if total in previous:
+        draft[total] = previous[total]
+    remaining = list(previous["soft"])
+    # Match explicit priorities first so a blank field cannot consume another rule's priority.
+    for rule in sorted(draft["soft"], key=lambda rule: "priority" not in rule):
+        subject = _preference_subject(rule)
+        matches = (
+            old
+            for old in remaining
+            if _preference_subject(old) == subject
+            and ("priority" not in rule or rule["priority"] == old.get("priority"))
         )
-        for rule in draft["soft"]
-        if "priority" in rule
-    )
+        old = min(matches, key=lambda old: old.get("week") != rule.get("week"), default=None)
+        if old is None:
+            if "priority" in rule:
+                raise IntentValidationError("This planning workflow is closed.")
+            continue
+        remaining.remove(old)
+        for field in ("priority", "max_cost_tenths"):
+            if field in old:
+                rule.setdefault(field, old[field])
+    draft["soft"].extend(remaining)
 
 
 def _validate_result(
@@ -785,19 +804,12 @@ def _validate_result(
         previous_window=previous_window,
         previous_draft=previous_draft,
     )
-    closed_group = not three_week_priorities and draft.get("window") == 3 and _priority_draft(draft)
-    if closed_group:
-        # Moving an existing draft has the same effect as changing the window selector.
-        # The member can review and clear carried settings before confirming the legacy plan.
-        if (
-            previous_draft is None
-            or previous_window == 3
-            or (
-                "max_total_cost_tenths" in draft
-                and draft["max_total_cost_tenths"] != previous_draft.get("max_total_cost_tenths")
-            )
-            or not _reviewed_priorities(draft) <= _reviewed_priorities(previous_draft)
-        ):
+    if not three_week_priorities and draft.get("window") == 3:
+        if previous_window != 3 and previous_draft is not None and _priority_draft(previous_draft):
+            _carry_reviewed_settings(draft, previous_draft)
+            # Carried preferences count toward the rule limit and cannot duplicate a hard rule.
+            draft = _draft(draft, player_ids, clubs)
+        elif _priority_draft(draft):
             raise IntentValidationError("This planning workflow is closed.")
     elif any("priority" in rule for rule in draft["soft"]) and "max_total_cost_tenths" not in draft:
         return {
