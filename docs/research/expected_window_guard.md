@@ -2,7 +2,7 @@
 
 The expected-window planner now returns complete three-week plans for both frozen
 five-free-transfer cases. The other 18 member-weeks retained their decisions and
-scores exactly. Both local passes used the unchanged Phase 1 inputs and the same
+scores exactly in the 23 November replay on the merged planning stack. Both local passes used the unchanged Phase 1 inputs and the same
 60 deterministic units and 1,800-second wall ceiling per window.
 [Frozen inputs](llmopt_phase1/inputs.json) · [Before and after measurements](expected_window_guard.json)
 
@@ -34,7 +34,13 @@ For each of the other 18 cases the original, before and after results agree on
 solver status, objective, all three measures above and the weekly canonical
 decision digest. That digest includes squad membership, transfers, chip, starting
 XI, ordered bench, captain, vice-captain, bank, hits, next free transfers and
-weekly raw and expected points. The comparison uses exact equality. The two new
+weekly raw and expected points. Sorting those 18 cases by member-week and serializing
+their result fields with sorted keys and compact JSON produced 14,197 identical
+UTF-8 bytes before and after the change. Their SHA-256 is
+`7a2fddc2da8a69841916cb22386dbb65a193e198282f58bc70d785968801bf5d`.
+The compared fields are `has_solution`, `solver_status`, `objective`,
+`decision_sha256`, `weekly_points`, `raw_xi_net_points`,
+`expected_lineup_net_points` and `selection_utility`. The two new
 plans have no earlier completed score for a gain calculation.
 
 ## Inputs and execution
@@ -49,26 +55,33 @@ completed. Reproducing the operational GW8 and GW9 dispatch would require
 the corresponding ready bundles.
 [Earlier served-path probe](llmopt_window_budget_probe.md) · [Phase 1 protocol](llmopt_phase1_baseline.md)
 
-Both passes ran serially with one solver thread and zero attempted network
+On 23 November 2026, the reference pass ran from 21:09 to 21:36 UTC and the
+fixed pass from 21:36 to 22:05 UTC. Both used one solver thread and zero attempted network
 connections. Tests and CI ran outside the measurement intervals. The before pass
-made 219 CP-SAT calls and 40 native calls in 1,657.6 seconds. The after pass
-made 237 CP-SAT calls and 42 native calls in 1,781.2 seconds, including the
+made 219 CP-SAT calls and 40 native calls in 1,594.4 seconds. The after pass
+made 237 CP-SAT calls and 42 native calls in 1,734.6 seconds, including the
 second proposal in both recovered cases. Times sum the measured local case
 durations. All reported points come from the frozen forecasts.
 
 ## Reproduction
 
-Use the same Python environment for both revisions. On
-`b464cd6577c23a99e448a115ccb9c5410357e01c`, save the before results to a
-path accessible from both checkouts.
+Use the same Python environment for both revisions. The reference checkout
+`5fd51faf0c5c15ddeb84ed0fb9af8ce6070032db` adds the runner and regression
+tests to `f073b45712991ca829dcee0d3f6bdba9f44dd440`. Its production source
+matches that develop revision. Save the before results to a path accessible
+from both checkouts.
 
 ```powershell
 $env:PYTHONPATH = 'src'
 python -m scripts.measure_expected_window_guard --output ../guard-before.json
 ```
 
-On `031e02e339612a9fe1661206978ff99f396bc5c5`, compare all 20 cases against
-that file. For a single-case reproduction on the before revision, add
+On `9bdffe16cdee398fe807ff58f8deb89798548b77`, compare all 20 cases against
+that file. When replaying from a later rebase, the JSON includes the normalized
+source hashes for both measured checkouts. Use the last test revision before
+the planning fix for the reference, and the completed planning fix for the
+second run. Both require the recorded runner and input hashes.
+For a single-case reproduction on the before revision, add
 `--case gw8-3832237` and give the partial run a separate output path.
 
 ```powershell

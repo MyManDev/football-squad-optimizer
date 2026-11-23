@@ -1,15 +1,15 @@
 {
-  "repository_commit": "031e02e339612a9fe1661206978ff99f396bc5c5",
+  "repository_commit": "9bdffe16cdee398fe807ff58f8deb89798548b77",
   "runner_sha256": "f6bc94e8aca41b0c4dec15fd5e05f61b10ddfa5f2c65ea1633ac443ca6a7988e",
   "phase1_archive_sha256": "1f4fda58e1de8f9e81bca3fd5f7af305c9f45ff10a37911275571779e6614af8",
   "input_manifest_sha256": "6657f32ba8b06f9a08c620092228aa3b07cd966ba6f480780046f2860be87ac9",
   "frozen_route": "Phase 1 expected_comparison.single, full available-appearance pool",
   "source_sha256": {
-    "src/squadopt/planning/expected_window.py": "88d17d0d0688794248af0f2814d1d31194a571fa16ad4c75c54474417835a0b1",
-    "src/squadopt/planning/expected_swap.py": "ab64ae121a6e1ec66a832c0ac980305b48a99b1cd2afeea6d466f43b12a762ac",
+    "src/squadopt/planning/expected_window.py": "b4b76cfca5f131e170dbc90fbbc0167c72613612f54019d4196dbc80129003c1",
+    "src/squadopt/planning/expected_swap.py": "f043f4ec04a4eff6a06539b6c6a84263224a099aff83d961da3e1984c9450369",
     "src/squadopt/planning/guarded.py": "c7f4b09b76692a24f1caadd5fcb363437f87086fc3636fcaede2acf6faaa70d9",
     "src/squadopt/planning/segmented.py": "42d85fe0a84f572cbaff32db5f2d767afef6d796982085c86ed83795efc138d1",
-    "src/squadopt/planning/optimizer.py": "6c1f78f0f14d5aa5a357784b76814db1d119085b425359eafe0eafdc25c3049a"
+    "src/squadopt/planning/optimizer.py": "cf93b1c6d354d62ee2643ec88264a1d5e50482300438283cd74c54801c3ab9d1"
   },
   "network_attempts": 0,
   "complete": true,
@@ -52,6 +52,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -67,6 +68,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -77,10 +79,11 @@
             "backend": "cp-sat",
             "status": "OPTIMAL",
             "configured_deterministic_units": 0.8,
-            "deterministic_units": 0.31058130994873306,
+            "deterministic_units": 0.310581309948733,
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -91,11 +94,12 @@
           {
             "backend": "cp-sat",
             "status": "UNKNOWN",
-            "configured_deterministic_units": 0.489418690051267,
+            "configured_deterministic_units": 0.48941869005126704,
             "deterministic_units": 0.5346536499986353,
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -110,6 +114,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -125,6 +130,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -139,6 +145,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "_hint_incumbent",
@@ -148,7 +155,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 647.5657822999638,
+            "wall_cap_seconds": 647.6365063999983,
             "threads": 1
           },
           {
@@ -159,6 +166,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve_window_model",
@@ -173,13 +181,14 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve"
             ]
           }
         ],
-        "seconds": 55.315974900033325
+        "seconds": 53.13479460000235
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -246,6 +255,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -261,6 +271,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -275,6 +286,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -290,6 +302,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -304,6 +317,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -319,6 +333,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -333,6 +348,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "_hint_incumbent",
@@ -342,7 +358,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 647.5722381999949,
+            "wall_cap_seconds": 647.6035018000039,
             "threads": 1
           },
           {
@@ -353,6 +369,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve_window_model",
@@ -367,6 +384,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve"
@@ -380,6 +398,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -395,6 +414,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -409,6 +429,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -424,6 +445,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -438,6 +460,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -453,6 +476,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -467,6 +491,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "_hint_incumbent",
@@ -476,7 +501,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 971.6301224000053,
+            "wall_cap_seconds": 971.6419196999996,
             "threads": 1
           },
           {
@@ -487,6 +512,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve_window_model",
@@ -501,13 +527,14 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve"
             ]
           }
         ],
-        "seconds": 134.09398230002262
+        "seconds": 131.40722549999919
       },
       "unchanged": false
     },
@@ -549,6 +576,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -564,6 +592,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -578,6 +607,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -593,6 +623,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -607,6 +638,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -622,6 +654,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -636,6 +669,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "_hint_incumbent",
@@ -645,7 +679,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 647.6112922999891,
+            "wall_cap_seconds": 647.6261328000037,
             "threads": 1
           },
           {
@@ -656,6 +690,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve_window_model",
@@ -670,13 +705,14 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve"
             ]
           }
         ],
-        "seconds": 59.31834870000603
+        "seconds": 55.97491920000175
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -743,6 +779,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -758,6 +795,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -772,6 +810,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -787,6 +826,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -801,6 +841,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -816,6 +857,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -830,6 +872,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "_hint_incumbent",
@@ -839,7 +882,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 647.6224762999918,
+            "wall_cap_seconds": 647.6337455999965,
             "threads": 1
           },
           {
@@ -850,6 +893,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve_window_model",
@@ -864,6 +908,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve"
@@ -877,6 +922,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -892,6 +938,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -906,6 +953,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -921,6 +969,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -935,6 +984,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -950,6 +1000,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "plan_in_segments",
               "optimize_transfer_plan",
@@ -964,6 +1015,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "_hint_incumbent",
@@ -973,7 +1025,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 971.6181368000107,
+            "wall_cap_seconds": 971.6257585999992,
             "threads": 1
           },
           {
@@ -984,6 +1036,7 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve_window_model",
@@ -998,13 +1051,14 @@
             "threads": 1,
             "call_path": [
               "optimize_expected_window",
+              "_retained_expected_window",
               "optimize_guarded_window",
               "optimize_transfer_plan",
               "solve"
             ]
           }
         ],
-        "seconds": 114.98676890000934
+        "seconds": 111.06989420000173
       },
       "unchanged": false
     },
@@ -1140,7 +1194,7 @@
             "threads": 1
           }
         ],
-        "seconds": 68.075213300006
+        "seconds": 64.0129023000045
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -1268,7 +1322,7 @@
             "threads": 1
           }
         ],
-        "seconds": 66.86758820002433
+        "seconds": 65.29722230000334
       },
       "unchanged": true
     },
@@ -1404,7 +1458,7 @@
             "threads": 1
           }
         ],
-        "seconds": 64.8499565999955
+        "seconds": 61.635234500005026
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -1532,7 +1586,7 @@
             "threads": 1
           }
         ],
-        "seconds": 64.43439589999616
+        "seconds": 62.4089055000004
       },
       "unchanged": true
     },
@@ -1668,7 +1722,7 @@
             "threads": 1
           }
         ],
-        "seconds": 72.41332420002436
+        "seconds": 68.43963230000372
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -1796,7 +1850,7 @@
             "threads": 1
           }
         ],
-        "seconds": 72.03807670000242
+        "seconds": 69.6889228
       },
       "unchanged": true
     },
@@ -1932,7 +1986,7 @@
             "threads": 1
           }
         ],
-        "seconds": 79.96345889999066
+        "seconds": 75.16376190000301
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -2060,7 +2114,7 @@
             "threads": 1
           }
         ],
-        "seconds": 78.31937400001334
+        "seconds": 76.23526280000078
       },
       "unchanged": true
     },
@@ -2196,7 +2250,7 @@
             "threads": 1
           }
         ],
-        "seconds": 83.91688640002394
+        "seconds": 78.94421180000063
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -2324,7 +2378,7 @@
             "threads": 1
           }
         ],
-        "seconds": 82.46931199997198
+        "seconds": 80.63612450000073
       },
       "unchanged": true
     },
@@ -2449,7 +2503,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 647.6361632000189,
+            "wall_cap_seconds": 647.6465727000032,
             "threads": 1
           },
           {
@@ -2518,7 +2572,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 971.6398165999562,
+            "wall_cap_seconds": 971.6487803999989,
             "threads": 1
           },
           {
@@ -2538,7 +2592,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 868.824917149992,
+            "wall_cap_seconds": 870.278417249996,
             "threads": 1
           },
           {
@@ -2556,7 +2610,7 @@
             "threads": 1
           }
         ],
-        "seconds": 80.17968620004831
+        "seconds": 76.28396269999939
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -2660,7 +2714,7 @@
             "backend": "cp-sat",
             "status": "UNKNOWN",
             "configured_deterministic_units": 0.4240412292581085,
-            "deterministic_units": 0.42438212699889877,
+            "deterministic_units": 0.4243821269988987,
             "threads": 1
           },
           {
@@ -2673,7 +2727,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 647.6285479000071,
+            "wall_cap_seconds": 647.6409529000011,
             "threads": 1
           },
           {
@@ -2742,7 +2796,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 971.6303580999956,
+            "wall_cap_seconds": 971.6498390999986,
             "threads": 1
           },
           {
@@ -2762,7 +2816,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 869.1801133500121,
+            "wall_cap_seconds": 870.1701235500004,
             "threads": 1
           },
           {
@@ -2780,7 +2834,7 @@
             "threads": 1
           }
         ],
-        "seconds": 79.45705500000622
+        "seconds": 76.81097559999762
       },
       "unchanged": true
     },
@@ -2831,7 +2885,7 @@
         "selection_utility": 170.16448866711443,
         "error": null,
         "accounting_failures": [],
-        "actual_units": 45.37919338814576,
+        "actual_units": 45.379193388145765,
         "phase_work": [
           {
             "phase": "legacy_proposal",
@@ -2842,7 +2896,7 @@
           {
             "phase": "zero_bonus_proposal",
             "cap": 36.0,
-            "actual": 23.158307773465264,
+            "actual": 23.158307773465268,
             "status": "OPTIMAL"
           }
         ],
@@ -2947,7 +3001,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 971.6478007999831,
+            "wall_cap_seconds": 971.6361362000025,
             "threads": 1
           },
           {
@@ -2961,11 +3015,11 @@
             "backend": "cp-sat",
             "status": "OPTIMAL",
             "configured_deterministic_units": 32.39999993,
-            "deterministic_units": 19.918200913821074,
+            "deterministic_units": 19.918200913821078,
             "threads": 1
           }
         ],
-        "seconds": 78.32006659999024
+        "seconds": 74.05069470000308
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -3008,7 +3062,7 @@
         "selection_utility": 170.16448866711443,
         "error": null,
         "accounting_failures": [],
-        "actual_units": 45.37919338814576,
+        "actual_units": 45.379193388145765,
         "phase_work": [
           {
             "phase": "legacy_proposal",
@@ -3019,7 +3073,7 @@
           {
             "phase": "zero_bonus_proposal",
             "cap": 36.0,
-            "actual": 23.158307773465264,
+            "actual": 23.158307773465268,
             "status": "OPTIMAL"
           }
         ],
@@ -3124,7 +3178,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 971.6336180000217,
+            "wall_cap_seconds": 971.6285085000054,
             "threads": 1
           },
           {
@@ -3138,11 +3192,11 @@
             "backend": "cp-sat",
             "status": "OPTIMAL",
             "configured_deterministic_units": 32.39999993,
-            "deterministic_units": 19.918200913821074,
+            "deterministic_units": 19.918200913821078,
             "threads": 1
           }
         ],
-        "seconds": 77.71411890001036
+        "seconds": 79.48213360000227
       },
       "unchanged": true
     },
@@ -3278,7 +3332,7 @@
             "threads": 1
           }
         ],
-        "seconds": 95.64698889997089
+        "seconds": 90.84976020000613
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -3406,7 +3460,7 @@
             "threads": 1
           }
         ],
-        "seconds": 94.80258670001058
+        "seconds": 94.97264859999996
       },
       "unchanged": true
     },
@@ -3570,7 +3624,7 @@
             "threads": 1
           }
         ],
-        "seconds": 94.77503810002236
+        "seconds": 88.00136329999805
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -3726,7 +3780,7 @@
             "threads": 1
           }
         ],
-        "seconds": 93.6595322000212
+        "seconds": 90.90601169999718
       },
       "unchanged": true
     },
@@ -3862,7 +3916,7 @@
             "threads": 1
           }
         ],
-        "seconds": 83.29234530002577
+        "seconds": 82.2295832000018
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -3990,7 +4044,7 @@
             "threads": 1
           }
         ],
-        "seconds": 83.0779664000147
+        "seconds": 80.69235879999906
       },
       "unchanged": true
     },
@@ -4102,7 +4156,7 @@
             "backend": "cp-sat",
             "status": "OPTIMAL",
             "configured_deterministic_units": 20.59999999,
-            "deterministic_units": 12.27802176709425,
+            "deterministic_units": 12.278021767094248,
             "threads": 1
           },
           {
@@ -4154,7 +4208,7 @@
             "threads": 1
           }
         ],
-        "seconds": 70.72463400004199
+        "seconds": 69.89165990000038
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -4310,7 +4364,7 @@
             "threads": 1
           }
         ],
-        "seconds": 70.50803839997388
+        "seconds": 68.81632179999724
       },
       "unchanged": true
     },
@@ -4488,7 +4542,7 @@
             "threads": 1
           }
         ],
-        "seconds": 61.79898789996514
+        "seconds": 60.045335100003285
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -4558,7 +4612,7 @@
             "backend": "cp-sat",
             "status": "UNKNOWN",
             "configured_deterministic_units": 0.5078351692580068,
-            "deterministic_units": 0.5575987639985228,
+            "deterministic_units": 0.5575987639985227,
             "threads": 1
           },
           {
@@ -4658,7 +4712,7 @@
             "threads": 1
           }
         ],
-        "seconds": 61.96813400002429
+        "seconds": 59.08543940000527
       },
       "unchanged": true
     },
@@ -4822,7 +4876,7 @@
             "threads": 1
           }
         ],
-        "seconds": 57.15185500000371
+        "seconds": 54.65825209999457
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -4978,7 +5032,7 @@
             "threads": 1
           }
         ],
-        "seconds": 56.15945869998541
+        "seconds": 54.64927110000281
       },
       "unchanged": true
     },
@@ -5114,7 +5168,7 @@
             "threads": 1
           }
         ],
-        "seconds": 85.97150280000642
+        "seconds": 84.25979730000108
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -5242,7 +5296,7 @@
             "threads": 1
           }
         ],
-        "seconds": 85.58549230004428
+        "seconds": 82.64607849999447
       },
       "unchanged": true
     },
@@ -5367,7 +5421,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 647.6308747000294,
+            "wall_cap_seconds": 647.6373249000026,
             "threads": 1
           },
           {
@@ -5436,7 +5490,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 971.6285210000351,
+            "wall_cap_seconds": 971.6254737999989,
             "threads": 1
           },
           {
@@ -5456,7 +5510,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 853.4695058999932,
+            "wall_cap_seconds": 854.7275528499958,
             "threads": 1
           },
           {
@@ -5474,7 +5528,7 @@
             "threads": 1
           }
         ],
-        "seconds": 114.99051440000767
+        "seconds": 112.12750360000064
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -5591,7 +5645,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 647.6365657999995,
+            "wall_cap_seconds": 647.6320979000011,
             "threads": 1
           },
           {
@@ -5660,7 +5714,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 971.6131355999969,
+            "wall_cap_seconds": 971.6243911999991,
             "threads": 1
           },
           {
@@ -5680,7 +5734,7 @@
           {
             "backend": "highs-native",
             "status": "Optimal",
-            "wall_cap_seconds": 853.3655874000106,
+            "wall_cap_seconds": 855.6129129000001,
             "threads": 1
           },
           {
@@ -5698,7 +5752,7 @@
             "threads": 1
           }
         ],
-        "seconds": 115.63431059999857
+        "seconds": 110.2296034999963
       },
       "unchanged": true
     },
@@ -5834,7 +5888,7 @@
             "threads": 1
           }
         ],
-        "seconds": 123.58957630000077
+        "seconds": 121.1148375000048
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -5962,7 +6016,7 @@
             "threads": 1
           }
         ],
-        "seconds": 122.6139686999959
+        "seconds": 119.0967948999969
       },
       "unchanged": true
     },
@@ -6098,7 +6152,7 @@
             "threads": 1
           }
         ],
-        "seconds": 102.31345760001568
+        "seconds": 100.72075310000218
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -6226,7 +6280,7 @@
             "threads": 1
           }
         ],
-        "seconds": 101.48220399999991
+        "seconds": 98.8243455999982
       },
       "unchanged": true
     },
@@ -6318,7 +6372,7 @@
             "backend": "cp-sat",
             "status": "UNKNOWN",
             "configured_deterministic_units": 0.5004411317444473,
-            "deterministic_units": 0.5576795339985221,
+            "deterministic_units": 0.5576795339985222,
             "threads": 1
           },
           {
@@ -6418,7 +6472,7 @@
             "threads": 1
           }
         ],
-        "seconds": 124.97854700003518
+        "seconds": 122.85315840000112
       },
       "frozen_match_before": true,
       "criteria_met": true,
@@ -6602,17 +6656,17 @@
             "threads": 1
           }
         ],
-        "seconds": 125.32979599997634
+        "seconds": 121.62245750000147
       },
       "unchanged": true
     }
   ],
-  "before_repository_commit": "b464cd6577c23a99e448a115ccb9c5410357e01c",
+  "before_repository_commit": "5fd51faf0c5c15ddeb84ed0fb9af8ce6070032db",
   "before_source_sha256": {
-    "src/squadopt/planning/expected_window.py": "fff34270ee98243339c164a10323672b75c283d8efdb13e01f8ce2d3bf4a5931",
-    "src/squadopt/planning/expected_swap.py": "ba08a1dd23c2cb3bed78400e87d41e779c6b3639c6384b5fd1ff7fac4bfe1e7a",
+    "src/squadopt/planning/expected_window.py": "fc91bff03586520c74d6741dde36b31ca49da528aadc09ea6dddc3182d24932e",
+    "src/squadopt/planning/expected_swap.py": "4cdf8d52b13e7c4db7a2e49bfb85345ec40f502fb0598b1a56599a4a42be97d5",
     "src/squadopt/planning/guarded.py": "e0805347028387c16cca00558cb0664aa68873aec010e5e751bb1350d2d17d6d",
     "src/squadopt/planning/segmented.py": "a737c5f75e6a6771fb601ef086350343687e0cc36533a787c1cb92259c2ddfa3",
-    "src/squadopt/planning/optimizer.py": "91f9207cff6af4cd4330523affd794b3b368d0e7fd1a2a9c6c4bfa0e41554d58"
+    "src/squadopt/planning/optimizer.py": "972962ee5cc7b57406da11fcfa577ad27175d647c700b31e91333c65bb2022cd"
   }
 }
