@@ -60,6 +60,13 @@ describe("the squad shown once its week is played", () => {
     expect(shown.chips!.states.bboost).toEqual(chips.states.bboost);
   });
 
+  it("no longer states the free transfers, which were the passed deadline's", () => {
+    const counted = { ...squad, free_transfers: 1, free_transfers_known: true } as EntrySquad;
+    expect(squadWithPlayedWeek(counted, lineup("wildcard")).free_transfers_known).toBe(false);
+    expect(squadWithPlayedWeek(counted, null).free_transfers_known).toBe(false);
+    expect(counted.free_transfers_known).toBe(true);
+  });
+
   it("keeps an uncaptured history uncaptured", () => {
     const unknown = { ...squad, chips_used: null, chips: undefined } as unknown as EntrySquad;
     const shown = squadWithPlayedWeek(unknown, lineup("wildcard"));
