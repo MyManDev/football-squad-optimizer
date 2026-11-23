@@ -12,6 +12,7 @@ import type { LiveActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek, Position, WeekLive } from "../../liveScore/weekLive";
 import { forecastSource } from "../device/chipForecast/member";
 import { DEVICE_PLAN_TABLE_CONTRACT_VERSION, type DevicePlanDocument } from "../device/types";
+import { matchesOver } from "./matchPhase";
 import { memberLineup, type PlayedLineup } from "./memberLineup";
 
 const POSITIONS: readonly string[] = ["GK", "DEF", "MID", "FWD"];
@@ -49,6 +50,13 @@ export interface MemberLiveScore {
    * read against.
    */
   forecast: number;
+  /**
+   * How many of the week's matches are over at the read's source time, by the rule the LIVE
+   * page groups its picks with (`matchPhase`). FPL's own `finished` turns true only once a
+   * match's bonus is checked, so the score's `fixtures_finished` says when the bonus is in,
+   * and this says how far the week has been played.
+   */
+  matchesOver: number;
 }
 
 /** The forecast of the fielded eleven, on the same net basis as the live score. */
@@ -129,6 +137,7 @@ export function memberLiveScore({
       names,
       lineup,
       forecast: forecastPoints(lineup, member),
+      matchesOver: matchesOver({ live, activity, table, fixtures }),
       activity: activity === null ? null : playerActivities(activity, member.pick_order),
     },
   };
