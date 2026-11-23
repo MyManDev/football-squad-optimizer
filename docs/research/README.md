@@ -32,6 +32,9 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 
 | Topic | Entry point |
 | --- | --- |
+| LLMOPT one-week device parity and alternatives | [Phase 4 probe and scope](llmopt_phase4/README.md) |
+| LLMOPT one-week device priority execution | [Twenty-control comparison](llmopt_phase4_priority_audit.md) |
+| LLMOPT one-week hard rules | [Seven rule families across twenty member-weeks](llmopt_phase4_rule_families.md) |
 | LLMOPT priorities and one preference job | [Frozen twenty-member API/worker replay](llmopt_phase3_jobs.md) and [implementation](llmopt_phase3_status.md) |
 | LLMOPT shared run admission | [Local admission replay](llmopt_phase2/README.md) |
 | Five-free-transfer accounting preflight | [Saved served-path probe and unresolved capture gap](llmopt_window_budget_probe.md) |

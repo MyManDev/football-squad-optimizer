@@ -18,6 +18,9 @@ import { entryAddress, memberAddress } from "../../../lib/leagueAddresses";
 import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
+import { deviceAdviceClient } from "../device/adviceClient";
+import { shownPriorityReference } from "../device/priorityWitness";
+import { deviceSelection } from "../device/selection";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { priorityOutcomes } from "../advice/preferenceBundle";
@@ -277,7 +280,13 @@ function Workspace({
     ...p,
     held: held.has(p.id),
   }));
-  const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
+  const client = useMemo(
+    () =>
+      deviceAdviceClient(createAdviceClient(tree.entryAdvice), squad, () =>
+        tree.devicePlan(squad.source_snapshot_id),
+      ),
+    [tree, squad],
+  );
   const jobs = usePlanJobs(client, squad.source_snapshot_id);
   const { controls } = jobs;
   const [restored] = useState(() => checkedPlanSession(saved, players, squad.gameweek));
@@ -548,7 +557,24 @@ function Workspace({
     return explainDraftConflict({ ...draft, hard: [...draft.hard, rule] }, conflictContext);
   }
 
-  const execution = useMemo(() => preferenceExecution(run), [run]);
+  const execution = useMemo(() => {
+    const request = preferenceExecution(run);
+    const base = jobs.states.base;
+    if (
+      request?.deviceRun &&
+      request.preferenceBundle?.program &&
+      base.phase === "done" &&
+      base.request === run?.baseRequest
+    ) {
+      const fingerprint = base.envelope.payload.device_input_fingerprint;
+      const decisions = shownPriorityReference(base.envelope.payload);
+      return {
+        ...request,
+        shownDeviceMain: fingerprint && decisions ? { fingerprint, decisions } : null,
+      };
+    }
+    return request;
+  }, [run, jobs.states.base]);
   const states = preferenceStates(jobs.states, run, execution);
   const bundleState = jobs.states.first;
   const bundleResult =
@@ -559,7 +585,10 @@ function Workspace({
     (state.phase === "failed" || state.phase === "unavailable") &&
     (state.reason === "RUN_BUDGET_EXHAUSTED" || state.reason === "RUN_CANCELLED");
   const incompleteRun = Object.values(states).some(capacityRefused);
-  const computing = Object.values(states).some(({ phase }) => isWorking(phase));
+  const computing = Object.values(states).some(
+    (state) =>
+      isWorking(state.phase) || (state.phase === "done" && state.deviceAlternativesPending),
+  );
   const editingLocked = checkingSquad || reading || (computing && !run?.inputs.request.run);
   const busy = editingLocked || computing;
   const replayProof =
@@ -621,12 +650,18 @@ function Workspace({
   const currentCapabilities =
     restoreCapabilities.isFetchedAfterMount && !restoreCapabilities.isError ? restoreMode : null;
   const prioritiesEnabled =
-    currentCapabilities?.llmoptVNext === true && currentCapabilities.preferenceBundles === true;
+    currentCapabilities?.llmoptVNext === true &&
+    (currentCapabilities.preferenceBundles === true ||
+      (plans.window === 1 && currentCapabilities.devicePreferenceBundles === true));
   const canContinue =
     run !== restoredRun ||
     (!!currentCapabilities &&
       (currentCapabilities.llmoptVNext === true) === !!run?.inputs.request.run &&
-      (!run?.inputs.bundleMode || prioritiesEnabled));
+      (!run?.inputs.request.deviceRun || currentCapabilities.devicePreferenceBundles === true) &&
+      (!run?.inputs.bundleMode ||
+        (run.inputs.request.deviceRun
+          ? currentCapabilities.devicePreferenceBundles === true
+          : currentCapabilities.preferenceBundles === true)));
   useEffect(() => {
     if (!run || run !== restoredRun || (!!ORIGIN && !restoreCapabilities.isFetchedAfterMount))
       return;
@@ -806,12 +841,8 @@ function Workspace({
           : client.readCapabilities?.(squad.league_id),
       ]);
       if (!mounted.current) return;
-      if (!capabilities?.preferences) {
+      if (!capabilities) {
         setFeedback(copy.serviceUnavailable);
-        return;
-      }
-      if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
-        setFeedback(copy.windowUnavailable);
         return;
       }
       if (
@@ -831,7 +862,20 @@ function Workspace({
         session.save({ draft });
         return;
       }
-      const grouped = capabilities.llmoptVNext === true && capabilities.preferenceBundles === true;
+      if (!capabilities.preferences) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
+      if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
+        setFeedback(copy.windowUnavailable);
+        return;
+      }
+      const local =
+        capabilities.llmoptVNext === true &&
+        capabilities.devicePreferenceBundles === true &&
+        plans.window === 1;
+      const grouped =
+        capabilities.llmoptVNext === true && (capabilities.preferenceBundles === true || local);
       const hasPriority = draft.soft.some(({ priority }) => priority !== undefined);
       if (!grouped && (hasPriority || draft.max_total_cost_tenths !== undefined)) {
         setFeedback(copy.serviceUnavailable);
@@ -849,12 +893,12 @@ function Workspace({
         return;
       }
       const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
-      const request = requestFor(squad, forwarded, plans.window);
+      const request = requestFor(squad, forwarded, plans.window, local);
       if (runId) request.run = { contract_version: "llmopt_run_v1", run_id: runId, stage: "base" };
       // A public team may have no chip list until its FPL inputs are pinned.
       const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
       const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
-      const next = prepareRun({
+      let next = prepareRun({
         draft,
         held,
         request,
@@ -864,6 +908,34 @@ function Workspace({
         reference,
         bundleMode: grouped && draft.soft.length > 0 && !draft.scenario,
       });
+      const execution = preferenceExecution(next);
+      const requests = [
+        next.baseRequest,
+        ...next.slots.map((slot) => slot.request),
+        execution,
+      ].filter((value): value is NonNullable<typeof value> => value != null);
+      if (
+        next.inputs.request.deviceRun === true &&
+        (requests.some((query) => deviceSelection(query, squad)?.kind !== "plain") ||
+          !(await client.prepareDeviceRun?.(next.inputs.request)))
+      ) {
+        next = prepareRun({
+          ...next.inputs,
+          request: { ...next.inputs.request, deviceRun: false, deviceAlternatives: false },
+        });
+      }
+      if (!mounted.current) return;
+      if (
+        next.inputs.bundleMode &&
+        next.baseRequest?.deviceRun === false &&
+        !capabilities.preferenceBundles
+      ) {
+        if (draft.max_total_cost_tenths !== undefined) {
+          setFeedback(copy.serviceUnavailable);
+          return;
+        }
+        next = prepareRun({ ...next.inputs, bundleMode: false });
+      }
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
       if (
         !next.baseRequest &&
@@ -882,6 +954,8 @@ function Workspace({
           ...(runId ? { runId } : {}),
           wildcardNotHeld,
           sending: true as const,
+          deviceRun: next.baseRequest?.deviceRun ?? false,
+          deviceAlternatives: next.baseRequest?.deviceAlternatives ?? false,
           ...(next.inputs.bundleMode ? { bundleMode: true as const } : {}),
         },
       };

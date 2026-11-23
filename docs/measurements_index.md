@@ -1,5 +1,29 @@
 # Measurements Index
 
+- 2026-11-19: [LLMOPT device priorities](research/llmopt_phase4_priority_audit.md),
+  [record](research/llmopt_phase4_priority_audit.json): the original twenty frozen
+  controls, 16/16 equal feasible objectives and priority outcomes plus four equal
+  infeasibilities. Eight transfer decisions differ at equal scores; maximum complete
+  device bundle 7.165 seconds. Sequential local calls, zero jobs and network calls. #1468.
+
+- 2026-11-19: [LLMOPT original-control scope audit](research/llmopt_phase4_scope_audit.md),
+  [record](research/llmopt_phase4_scope_audit.json): 20 frozen member-weeks, 60 local
+  comparisons. Exact original controls replay 20/20; device equality is 15/16 feasible
+  plus four infeasibilities. The unproved zero-bank 52.310 differs from the device's
+  52.978. Active server profile matches 16/16 controls plus four infeasibilities and
+  20/20 no-added-rule cases. No extra keep rule, server jobs or live measurement.
+
+- 2026-11-19: [LLMOPT device parity and scope](research/llmopt_phase4/README.md),
+  [record](research/llmopt_phase4_parity.json): twenty frozen member-weeks, forty local
+  comparisons, forty equal model and published objectives, forty identical transfer
+  decisions with a keep-first-held-player constraint; no server jobs or live measurements.
+
+- 2026-11-20. Seven one-week hard-rule families covered all 20 frozen member-weeks.
+  The server and device returned the same score and transfers in 130 feasible
+  comparisons. Both proved the other ten infeasible. All 220 device alternatives
+  satisfied the submitted rules. [Comparison](research/llmopt_phase4_rule_families.md),
+  [record](research/llmopt_phase4_rule_families.json). #1468.
+
 - 2026-11-20. LLMOPT priorities on twenty frozen member-weeks produced 80 local
   API/worker run records at both windows and in both modes. At three weeks 10/20
   completed all three layers, or 10/16 with a feasible main. Their preference jobs

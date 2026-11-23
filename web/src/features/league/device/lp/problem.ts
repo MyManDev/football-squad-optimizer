@@ -37,6 +37,8 @@ export interface LpProblem {
 
 /** The one-shot solver this model needs: HiGHS's legacy `solve` over LP text. */
 export interface LpSolver {
+  /** Remaining time of the enclosing worker attempt, when bounded by its adapter. */
+  remainingSeconds?: () => number;
   solve(
     problem: string,
     options?: Record<string, unknown>,

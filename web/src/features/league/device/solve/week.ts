@@ -15,6 +15,13 @@ import {
 import { chosenIds, EXACT, lpText, row, type LpRow, type LpSolver } from "../lp/problem";
 import { attributedMoves, orderedBench, viceCaptain } from "../publication/rows";
 import { rebuilds, weekPoints } from "../strategies/chips";
+import {
+  checkedColumns,
+  holds,
+  referenceValues,
+  valueOf as modelValue,
+  type DevicePriorityReference,
+} from "../priorityWitness";
 import type { DevicePlanAnswer, DevicePlanDocument, DevicePlanEntry } from "../types";
 
 export class DevicePlanRefused extends Error {
@@ -38,6 +45,7 @@ export function inSolverOrder(published: DevicePlanDocument): DevicePlanDocument
 
 /** What the primary and tie-break solves settled: the fifteen, the eleven, the captain. */
 export interface WeekSolution {
+  unproved?: true;
   objectiveScaled: number;
   squad: number[];
   startingXi: number[];
@@ -53,10 +61,38 @@ export function solveWeek(
   document: DevicePlanDocument,
   entry: DevicePlanEntry,
   options: MemberWeekOptions = {},
+  priorityMain = false,
 ): WeekSolution | null {
   const ids = document.players.map((p) => p.id);
-  const first = solver.solve(lpText(memberWeekProblem(document, entry, options)), EXACT);
+  const problem = memberWeekProblem(document, entry, options);
+  const remaining = solver.remainingSeconds?.();
+  const first = solver.solve(
+    lpText(problem),
+    priorityMain && remaining !== undefined && Number.isFinite(remaining)
+      ? { ...EXACT, time_limit: remaining * 0.75 }
+      : EXACT,
+  );
   if (first.Status === "Infeasible") return null;
+  if (
+    priorityMain &&
+    (first.Status === "Time limit reached" || first.Status === "Iteration limit reached")
+  ) {
+    const values = checkedColumns(problem, first);
+    if (!values) throw new DevicePlanRefused(first.Status, "plan");
+    const physical = { ...first, Columns: values };
+    const squad = chosenIds(physical, ids, "s"),
+      startingXi = chosenIds(physical, ids, "x");
+    const captain = chosenIds(physical, ids, "c")[0]!;
+    const witness = referenceValues(document, entry, { squad, startingXi, captain, proved: false });
+    if (!holds(problem.rows, witness)) throw new DevicePlanRefused(first.Status, "plan");
+    return {
+      squad,
+      startingXi,
+      captain,
+      objectiveScaled: modelValue(problem.objective, witness),
+      unproved: true,
+    };
+  }
   if (first.Status !== "Optimal") throw new DevicePlanRefused(first.Status, "plan");
   const primaryValue = Math.round(first.ObjectiveValue);
 
@@ -74,6 +110,11 @@ export function solveWeek(
       ),
       EXACT,
     );
+    if (
+      priorityMain &&
+      (tier.Status === "Time limit reached" || tier.Status === "Iteration limit reached")
+    )
+      break;
     if (tier.Status !== "Optimal") throw new DevicePlanRefused(tier.Status, "tie-break");
     fixed.push(
       row(`fix${fixed.length}`, rankSum(ids.length, prefix), "=", Math.round(tier.ObjectiveValue)),
@@ -179,11 +220,64 @@ export function solvePlan(
   entry: DevicePlanEntry,
   now: () => number = () => performance.now(),
   chip: DevicePlanAnswer["chip"] = null,
+  extra: Pick<MemberWeekOptions, "preferences"> = {},
+  priority?: "main" | DevicePriorityReference,
 ): DevicePlanAnswer {
   const started = now();
-  const document = inSolverOrder(published);
-  const solution = solveWeek(solver, document, entry, { chip });
+  const ordered = inSolverOrder(published);
+  const document = extra.preferences?.net_points_priority
+    ? {
+        ...ordered,
+        players: ordered.players.map((player) => ({
+          ...player,
+          expected_points: player.coefficients[2] / ordered.rules.expected_points_scale,
+        })),
+      }
+    : ordered;
+  let solution: WeekSolution | null;
+  if (priority && priority !== "main") {
+    const problem = memberWeekProblem(document, entry, { chip, ...extra });
+    const values = referenceValues(document, entry, priority);
+    if (!holds(problem.rows, values)) throw new DevicePlanRefused("invalid main witness", "plan");
+    solution = {
+      squad: priority.squad,
+      startingXi: priority.startingXi,
+      captain: priority.captain,
+      objectiveScaled: modelValue(problem.objective, values),
+      ...(priority.proved ? {} : { unproved: true }),
+    };
+  } else solution = solveWeek(solver, document, entry, { chip, ...extra }, priority === "main");
   if (solution === null) throw new DevicePlanRefused("Infeasible", "plan");
   const answer = answerFrom(solver, document, entry, solution, { chip });
-  return { ...answer, seconds: (now() - started) / 1000 };
+  const sold = new Set(answer.transfers_out),
+    bought = new Set(answer.transfers_in);
+  const proceeds = document.players.reduce(
+    (total, player) =>
+      total +
+      (sold.has(player.id) ? (entry.sell_tenths[String(player.id)] ?? player.buy_tenths) : 0),
+    0,
+  );
+  const cost = document.players.reduce(
+    (total, player) => total + (bought.has(player.id) ? player.buy_tenths : 0),
+    0,
+  );
+  return {
+    ...answer,
+    ...(solution.unproved ? { restricted: true } : {}),
+    seconds: (now() - started) / 1000,
+    ...(extra.preferences
+      ? {
+          preferences: extra.preferences,
+          free_transfers_before: entry.free_transfers,
+          bank_after_tenths:
+            chip === "freehit" ? entry.bank_tenths : entry.bank_tenths + proceeds - cost,
+          free_transfers_after: Math.min(
+            document.rules.max_free_transfers,
+            (rebuilds(chip)
+              ? entry.free_transfers
+              : Math.max(0, entry.free_transfers - bought.size)) + 1,
+          ),
+        }
+      : {}),
+  };
 }

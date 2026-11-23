@@ -57,6 +57,8 @@ export interface AdviceCapabilities {
   /** The settings the service would accept now; zero is always one of them. */
   preferences?: boolean;
   preferenceBundles?: boolean;
+  /** Browser-private support; it does not advertise a server capability at three weeks. */
+  devicePreferenceBundles?: true;
   models?: ("current" | "football")[];
   top100Weights: Top100Weight[];
   managersWord: boolean;
@@ -185,7 +187,8 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
     season: value.season,
     gameweek: value.gameweek as number,
     strategies,
-    ...(record(value.preference_bundles) &&
+    ...(value.llmopt_vnext === true &&
+    record(value.preference_bundles) &&
     value.preference_bundles.version === "llmopt_preference_bundle_v1"
       ? { preferenceBundles: true }
       : {}),
