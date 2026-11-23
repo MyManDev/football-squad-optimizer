@@ -1,6 +1,6 @@
 # Observing the one-week opening
 
-Use the same observation interval before and after a setting change. Record the interval, the source of each count and its denominator. Keep only aggregate numbers. Leave an unavailable count blank. The frozen comparison establishes local behavior on twenty member-weeks. It made no provider calls. [Measured workload](llmopt_week_first.md)
+Use the same observation interval before and after a setting change. Record the interval, the source of each count and its denominator. Keep only aggregate numbers. Leave an unavailable count blank. The frozen comparison establishes local behavior on twenty member-weeks. It made no provider calls. [Measured workload](https://github.com/MyManDev/football-squad-optimizer/blob/4cf24ae4f984643295bd3ce835ce01152f6ca151/docs/research/llmopt_week_first.md)
 
 | Event | Where the owner can see it | Counting scope |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ print(count)
 
 ### Model replies rejected by the checker
 
-For a known one-week sample, count completed `POST /api/v1/llmopt/check` responses with HTTP 422 and `error.code == "REPLY_REFUSED"`. Count each response once. To report a share of replies validated, divide by successful checks plus `REPLY_REFUSED` and `PLAN_DATA_CHANGED` checks. Keep the stale-plan outcome separate. A malformed check request yields `VALIDATION_FAILED`. Credential, rate-limit and provider failures are separate outcomes. A clarification can pass validation. The checker exports no counter for this distinction. The API's `advice_rejected_total` counts specific advice lookup errors. HTTP status alone cannot identify a rejected model reply or its draft window. A local fixture can tally the response code without storing either body or contacting a provider. [Checker branches](../../src/squadopt/api/llmopt.py) · [Keyless fixtures](../../tests/unit/test_llmopt_keyless_routes.py) · [Browser submission](../../web/src/features/league/llmopt/intentSource.ts)
+For a known one-week sample, count completed `POST /api/v1/llmopt/check` responses with HTTP 422 and `error.code == "REPLY_REFUSED"`. Count each response once, including a reply refused because its planning window was closed. The shared code includes these refusals in the rejected-reply total. It does not identify which provider responses were malformed. To report a share of replies validated, divide by successful checks plus `REPLY_REFUSED` and `PLAN_DATA_CHANGED` checks. Keep the stale-plan outcome separate. A malformed check request yields `VALIDATION_FAILED`. Credential, rate-limit and provider failures are separate outcomes. A clarification can pass validation. The checker exports no counter for this distinction. The API's `advice_rejected_total` counts specific advice lookup errors. HTTP status alone cannot identify a rejected model reply or its draft window. A local fixture can tally the response code without storing either body or contacting a provider. [Checker branches](../../src/squadopt/api/llmopt.py) · [Keyless fixtures](../../tests/unit/test_llmopt_keyless_routes.py) · [Browser submission](../../web/src/features/league/llmopt/intentSource.ts)
 
 ### Device plans routed to the server
 

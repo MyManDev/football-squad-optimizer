@@ -110,6 +110,26 @@ the server-side planning release settings from the active Compose environment. S
 [one-week opening and rollback procedure](research/llmopt_one_week_opening.md). Deployments
 before 18 November 2026 used a separate `/etc/squadopt/llmopt.env` file.
 
+Keep the master closed until the per-window site and backend release from #1481 is
+serving. An older open tab can receive HTTP 409 for a three-week calculation or 422
+for its three-week plan catalogue. Reload it to pick up the matching site. A new
+chat with no selected window starts with the one-week schema. Selecting **3 weeks**
+before the first message requests the ordinary three-week schema.
+
+For either opening and for turn-off, obtain the owner's approval at each environment
+edit and again at each API and worker recreation. Append any missing switch as a
+single active assignment. Immediately before recreating the worker confirm that the
+running job count is zero. Its shutdown grace period is 180 seconds. After any
+release rollback, read all five values again in the active file, the API and the
+worker, then check the current capability document. The opening procedure gives
+the commands and expected values.
+
+After closing, cached answers keep their keys and are served with `plan_data_id`
+stripped. The store retains `cache/plan-provenance/` and `runs/ledger.json`.
+A member with a grouped draft sees a notice and a disabled **Compute plans** until
+they clear its priority and total-limit settings. Closed-window `REPLY_REFUSED`
+responses count with rejected replies. [Observation counts](research/llmopt_one_week_observation.md)
+
 `POST /api/v1/llmopt/prompt` takes the member's message, the draft and the players, and
 returns the call the browser sends to the member's provider: `system`, `user`, `schema`,
 `schema_name` and `max_output_tokens`. The `user` text carries a shortlist of the players,
