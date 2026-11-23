@@ -528,6 +528,32 @@ describe("the brand", () => {
   });
 });
 
+describe("the usage zones of the shell", () => {
+  const zoneOf = (element: Element) => element.closest("[data-zone]")?.getAttribute("data-zone");
+
+  it("sit on the sidebar's parts, never on the box as tall as the window", () => {
+    stubLayout("desktop");
+    renderShell({ path: OWN, identity: CLAIMED });
+    // A zone's cells are a 20 by 20 grid over its box: over the whole sidebar, whose height
+    // follows the window, a click recorded at one height lands between the items at another.
+    expect(sidebar()).not.toHaveAttribute("data-zone");
+    expect(screen.getByRole("navigation", { name: TR.primary })).toHaveAttribute(
+      "data-zone",
+      "nav-links",
+    );
+    for (const link of navLinks()) expect(zoneOf(link)).toBe("nav-links");
+    expect(zoneOf(within(sidebar()).getByRole("link", { name: TR.home }))).toBe("nav-brand");
+    expect(zoneOf(screen.getByRole("button", { name: TR.changeMember }))).toBe("nav-member");
+    expect(zoneOf(screen.getByRole("link", { name: TR.privacy }))).toBe("nav-settings");
+  });
+
+  it("give the phone bar a word of its own, apart from a page's top bar", () => {
+    stubLayout("phone");
+    renderShell({ path: OWN, identity: CLAIMED });
+    expect(screen.getByRole("banner")).toHaveAttribute("data-zone", "phone-bar");
+  });
+});
+
 describe("the app shell on a phone", () => {
   it("opens the sidebar from the phone bar as a modal drawer and closes it with Escape", async () => {
     stubLayout("phone");

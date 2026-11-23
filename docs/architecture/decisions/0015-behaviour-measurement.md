@@ -72,6 +72,13 @@ which version 1 counted as `other`). `lang`, `device` and `session` as ADR 0014.
 does not know is refused, and a test in the web suite compares the two lists as it does for pages
 and tools.
 
+*Amended 2026-11-23:* `nav-brand`, `nav-member`, `nav-links`, `nav-settings`, `phone-bar`,
+`llmopt-model`, `llmopt-instructions`, `llmopt-rule-list`, `llmopt-rules`, `llmopt-plan`,
+`llmopt-compute` and `llmopt-results` were added, because a large zone's 20 by 20 cells did not
+sit on its controls: `nav` was a box as tall as the window and `llmopt` the whole page, and the
+phone bar shared `topbar` with the member page's own top bar. No element carries `nav` or
+`llmopt` any more; both stay in the list so older events are still taken and read.
+
 ### The dataset's columns
 
 `blob1` to `blob6` keep version 1's meaning (`page`, `tool`, `step`, `lang`, `device`,

@@ -1,7 +1,8 @@
 /**
  * The figures the admin page draws from a usage report (ADR 0016): the totals' shares, the
  * funnel, scroll depth read as "at least this far", the speed ratings and the clicks of one
- * page and device by zone. Pure arithmetic over the report's shape, so each is tested alone.
+ * page and device by tool and zone. Pure arithmetic over the report's shape, so each is tested
+ * alone.
  */
 import {
   USAGE_DEPTHS,
@@ -155,21 +156,39 @@ export function scrollFor(report: UsageReport, page: string, device: string): Us
 
 export interface ZoneClicks {
   zone: string;
+  /** The tool word, "" for a page with no tool, null when the report did not say. */
+  tool: string | null;
   clicks: number;
   rage: number;
   dead: number;
 }
 
-/** One page and device's clicks summed by zone, busiest first. */
+/**
+ * One page and device's clicks summed by tool and zone, busiest first. The member page's tools
+ * share page `member`, so a zone of one tool is a row apart from the same zone of another, as
+ * the heatmap mode draws them; an older report's rows, with no tool, make rows of their own.
+ */
 export function clicksByZone(report: UsageReport, page: string, device: string): ZoneClicks[] {
   const zones = new Map<string, ZoneClicks>();
   for (const cell of report.behaviour.clicks) {
     if (cell.page !== page || cell.device !== device) continue;
-    const zone = zones.get(cell.zone) ?? { zone: cell.zone, clicks: 0, rage: 0, dead: 0 };
+    const key = JSON.stringify([cell.tool, cell.zone]);
+    const zone = zones.get(key) ?? {
+      zone: cell.zone,
+      tool: cell.tool,
+      clicks: 0,
+      rage: 0,
+      dead: 0,
+    };
     zone.clicks += cell.events;
     zone.rage += cell.marks.rage;
     zone.dead += cell.marks.dead;
-    zones.set(cell.zone, zone);
+    zones.set(key, zone);
   }
-  return [...zones.values()].sort((a, b) => b.clicks - a.clicks || a.zone.localeCompare(b.zone));
+  return [...zones.values()].sort(
+    (a, b) =>
+      b.clicks - a.clicks ||
+      a.zone.localeCompare(b.zone) ||
+      (a.tool ?? "").localeCompare(b.tool ?? ""),
+  );
 }

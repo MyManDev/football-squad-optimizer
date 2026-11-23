@@ -95,9 +95,18 @@ export const KINDS = new Set(["click", "scroll", "vital", "error", "arrival"]);
 /**
  * The part of a page a click landed in, from the nearest `data-zone` around it; `page` when
  * there is none, so a component without a zone still counts.
+ *
+ * A word is never taken out: `nav` (the whole sidebar, as tall as the window) and `llmopt` (the
+ * whole LLMOPT page) are no longer placed on any element since 2026-11-23, when smaller zones
+ * replaced them, but an older tab still sends them and the record keeps their rows.
  */
 export const ZONES = new Set([
   "nav",
+  "nav-brand",
+  "nav-member",
+  "nav-links",
+  "nav-settings",
+  "phone-bar",
   "topbar",
   "entry-form",
   "league-list",
@@ -125,6 +134,13 @@ export const ZONES = new Set([
   "vs",
   "live",
   "llmopt",
+  "llmopt-model",
+  "llmopt-instructions",
+  "llmopt-rule-list",
+  "llmopt-rules",
+  "llmopt-plan",
+  "llmopt-compute",
+  "llmopt-results",
   "reminder",
   "fixtures",
   "contribute",
