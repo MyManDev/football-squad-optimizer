@@ -8,7 +8,7 @@ import pytest
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.optimization import OptimizationConfig, SolverExecutionError, SolverStatus
 from squadopt.planning.expected_swap import propose_expected_swap
-from squadopt.planning.expected_window import optimize_expected_window
+from squadopt.planning.expected_window import extend_expected_packages, optimize_expected_window
 from squadopt.planning.guarded import optimize_guarded_window
 from squadopt.planning.lineup_utility import expected_week_utility, rescore_expected_week
 from squadopt.planning.models import (
@@ -176,7 +176,6 @@ def test_five_free_transfers_return_a_protected_plan_without_another_solve(monke
     assert review["ledger"][0]["actual"] == actual
     assert review["optional_swap"]["status"] == "skipped"
     assert result.diagnostics.get("best_objective_bound") is None
-    from squadopt.planning.expected_window import extend_expected_packages
 
     # Reopening the package gate cannot spend more work after a protected stop.
     for gate in (False, True):
@@ -264,6 +263,49 @@ def test_invalid_or_unverified_original_phase_cannot_be_retained(
         with pytest.raises(ValueError, match="accounting"):
             optimize_expected_window(horizon, initial, settings, transfer)
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize("overshoot,retained", [(0.000084823, True), (0.02, False)])
+def test_original_proposal_applies_shared_stop_to_its_protected_receipt(
+    monkeypatch, protected_phase, overshoot, retained
+):
+    from squadopt.optimization.work_budget import WorkBudget, work_budget
+
+    horizon, initial, settings, transfer, plan = protected_phase
+    work = plan.diagnostics["sequential_incumbent"]
+    shared = WorkBudget(122)
+    shared.reserve_native(70 * 30)
+    shared.record_cp(shared.cp_limit(122 - 70 - 24.22 + overshoot))
+
+    def finish_original(*args, **kwargs):
+        assert shared.cp_limit(24) == 24
+        shared.record_cp(24.22)
+        return replace(
+            plan,
+            diagnostics={
+                **plan.diagnostics,
+                "sequential_incumbent": {
+                    **work,
+                    "actual_total": 24.22,
+                    "final_work_including_hold": 24.22 - work["seed_work"],
+                },
+            },
+        )
+
+    monkeypatch.setattr(
+        "squadopt.planning.expected_window.optimize_guarded_window", finish_original
+    )
+    with work_budget(shared):
+        if retained:
+            result = optimize_expected_window(horizon, initial, settings, transfer)
+            review = result.diagnostics["expected_lineup_window"]
+            assert review["actual_total"] == 24.22
+            assert review["shared_used"] == shared.cp_used + shared.native_reserved
+            assert review["shared_limit"] == 122
+        else:
+            with pytest.raises(ValueError, match="accounting"):
+                optimize_expected_window(horizon, initial, settings, transfer)
+    assert shared.remaining == 0 and shared.calls == 3
 
 
 @pytest.mark.parametrize("window", [3, 5])
