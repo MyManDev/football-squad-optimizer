@@ -20,6 +20,7 @@ import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
+import { priorityOutcomes } from "../advice/preferenceBundle";
 import { LEAGUE_READ, useEntrySquad, useRestoredPlanCapabilities } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
@@ -48,6 +49,11 @@ import { expectedNet, samePlan } from "./planComparison";
 import { BANK_FLOOR, KEEP_WEEK, SCENARIO, draftChanges, type DraftChanges } from "./planChanges";
 import { explainDraftConflict } from "./planConflicts";
 import { planResults, preferencePrice } from "./planResults";
+import {
+  preferenceExecution,
+  preferencePlanProblem,
+  preferenceStates,
+} from "./preferenceExecution";
 import {
   referenceCaptains,
   referenceWeeks,
@@ -283,7 +289,7 @@ function Workspace({
     ORIGIN,
     forwarded === true,
     squad,
-    !!restoredRun,
+    true,
   );
   const [draft, setDraft] = useState<PlanDraft>(restored?.draft ?? EMPTY_DRAFT);
   const [reference, setReference] = useState<PlanRevision | undefined>(restored?.reference);
@@ -542,7 +548,13 @@ function Workspace({
     return explainDraftConflict({ ...draft, hard: [...draft.hard, rule] }, conflictContext);
   }
 
-  const { states } = jobs;
+  const execution = useMemo(() => preferenceExecution(run), [run]);
+  const states = preferenceStates(jobs.states, run, execution);
+  const bundleState = jobs.states.first;
+  const bundleResult =
+    execution && bundleState.phase === "done"
+      ? bundleState.envelope.payload.preference_bundle_result
+      : undefined;
   const capacityRefused = (state: ComputePhase) =>
     (state.phase === "failed" || state.phase === "unavailable") &&
     (state.reason === "RUN_BUDGET_EXHAUSTED" || state.reason === "RUN_CANCELLED");
@@ -569,13 +581,15 @@ function Workspace({
   const phases = Object.values(states).map(({ phase }) => phase);
   const knownRequestsStarted =
     !run ||
-    (ALTERNATIVE_SLOTS.every(
-      (slot, index) =>
-        (run.slots[index]?.kind !== "explicit" && !savedRun?.followups?.[index]) ||
-        (run.scenario && savedReplayProof) ||
-        states[slot].phase !== "idle",
-    ) &&
-      (!savedRun?.combined?.length || states.combined.phase !== "idle"));
+    (execution
+      ? bundleState.phase !== "idle"
+      : ALTERNATIVE_SLOTS.every(
+          (slot, index) =>
+            (run.slots[index]?.kind !== "explicit" && !savedRun?.followups?.[index]) ||
+            (run.scenario && savedReplayProof) ||
+            states[slot].phase !== "idle",
+        ) &&
+        (!savedRun?.combined?.length || states.combined.phase !== "idle"));
   const settled =
     knownRequestsStarted &&
     !phases.includes("requesting") &&
@@ -604,12 +618,15 @@ function Workspace({
     gameweek: squad.gameweek,
     snapshotId: squad.source_snapshot_id,
   });
+  const currentCapabilities =
+    restoreCapabilities.isFetchedAfterMount && !restoreCapabilities.isError ? restoreMode : null;
+  const prioritiesEnabled =
+    currentCapabilities?.llmoptVNext === true && currentCapabilities.preferenceBundles === true;
   const canContinue =
     run !== restoredRun ||
-    (!!restoreMode &&
-      restoreCapabilities.isFetchedAfterMount &&
-      !restoreCapabilities.isError &&
-      (restoreMode.llmoptVNext === true) === !!run?.inputs.request.run);
+    (!!currentCapabilities &&
+      (currentCapabilities.llmoptVNext === true) === !!run?.inputs.request.run &&
+      (!run?.inputs.bundleMode || prioritiesEnabled));
   useEffect(() => {
     if (!run || run !== restoredRun || (!!ORIGIN && !restoreCapabilities.isFetchedAfterMount))
       return;
@@ -656,6 +673,7 @@ function Workspace({
   useEffect(() => {
     if (
       !run?.inputs.request.run ||
+      execution ||
       incompleteRun ||
       baseState.phase !== "done" ||
       baseState.request !== run.baseRequest
@@ -689,6 +707,36 @@ function Workspace({
     deadline,
     controls,
     incompleteRun,
+    execution,
+    canContinue,
+  ]);
+
+  useEffect(() => {
+    if (
+      !execution ||
+      !run ||
+      incompleteRun ||
+      baseState.phase !== "done" ||
+      baseState.request !== run.baseRequest ||
+      bundleState.phase !== "idle"
+    )
+      return;
+    if (run === restoredRun) {
+      if (controls.first.resume?.(execution)) return;
+      if (canContinue && session.confirmation?.sending && deadlineOpen(deadline))
+        controls.first.compute(execution);
+      else controls.first.readCached?.(execution);
+    } else if (canContinue) controls.first.compute(execution);
+  }, [
+    execution,
+    run,
+    restoredRun,
+    incompleteRun,
+    baseState,
+    bundleState,
+    controls,
+    session,
+    deadline,
     canContinue,
   ]);
 
@@ -697,6 +745,7 @@ function Workspace({
     if (
       !canContinue ||
       !run?.automaticBasis ||
+      execution ||
       incompleteRun ||
       baseState.phase !== "done" ||
       baseState.request !== run.baseRequest ||
@@ -730,6 +779,7 @@ function Workspace({
     reference,
     clarification,
     incompleteRun,
+    execution,
     canContinue,
   ]);
 
@@ -781,6 +831,23 @@ function Workspace({
         session.save({ draft });
         return;
       }
+      const grouped = capabilities.llmoptVNext === true && capabilities.preferenceBundles === true;
+      const hasPriority = draft.soft.some(({ priority }) => priority !== undefined);
+      if (!grouped && (hasPriority || draft.max_total_cost_tenths !== undefined)) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
+      if (hasPriority && draft.max_total_cost_tenths === undefined) {
+        setFeedback(copy.totalRequired);
+        return;
+      }
+      if (
+        draft.max_total_cost_tenths !== undefined &&
+        (draft.scenario || !draft.soft.length || draft.soft.some(({ kind }) => kind === "wildcard"))
+      ) {
+        setFeedback(copy.totalUnavailable);
+        return;
+      }
       const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
       const request = requestFor(squad, forwarded, plans.window);
       if (runId) request.run = { contract_version: "llmopt_run_v1", run_id: runId, stage: "base" };
@@ -795,6 +862,7 @@ function Workspace({
         wildcardNotHeld,
         frozenWeeks: frozen,
         reference,
+        bundleMode: grouped && draft.soft.length > 0 && !draft.scenario,
       });
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
       if (
@@ -810,7 +878,12 @@ function Workspace({
       const confirmed = {
         draft,
         reference,
-        confirmation: { ...(runId ? { runId } : {}), wildcardNotHeld, sending: true as const },
+        confirmation: {
+          ...(runId ? { runId } : {}),
+          wildcardNotHeld,
+          sending: true as const,
+          ...(next.inputs.bundleMode ? { bundleMode: true as const } : {}),
+        },
       };
       if (runId && !writePlanSession(context, confirmed)) {
         setFeedback(copy.serviceUnavailable);
@@ -836,7 +909,7 @@ function Workspace({
   }
 
   const baseAnswer = baseState.phase === "done" ? baseState.envelope.payload : undefined;
-  const alternatives = alternativeStates(jobs);
+  const alternatives = alternativeStates({ ...jobs, states });
   const priceReview =
     run?.prices.map((target) => {
       const price = preferencePrice(
@@ -870,6 +943,7 @@ function Workspace({
     const confirmed = session.confirmation;
     if (
       !run ||
+      execution ||
       incompleteRun ||
       !canContinue ||
       !singlesIn ||
@@ -904,12 +978,18 @@ function Workspace({
     reference,
     clarification,
     incompleteRun,
+    execution,
     canContinue,
   ]);
   // A rule with no slot of its own is priced in the plan with all preferences, or named as
   // left out of it.
+  const program = execution?.preferenceBundle?.program;
   const combined =
-    run && savedRun?.combined ? prepareCombined(run, savedRun.combined).applied : undefined;
+    bundleResult?.selected?.status === "done"
+      ? bundleResult.applied
+      : run && savedRun?.combined
+        ? prepareCombined(run, savedRun.combined).applied
+        : undefined;
   const combinedPending =
     !closed &&
     (isWorking(baseState.phase) ||
@@ -923,22 +1003,37 @@ function Workspace({
     return combinedPending ? { key, label, ceiling, status: "pending" } : price;
   });
   const softRules = run?.inputs.draft.soft ?? [];
-  const combinedRules = (keep: boolean) =>
-    softRules.flatMap((rule, index) =>
-      combined?.includes(index) === keep
-        ? [{ key: String(index), label: ruleLabel(rule, players, copy) }]
-        : [],
-    );
   const combinedState = states.combined;
+  const priorityResult =
+    combinedState.phase === "done"
+      ? combinedState.envelope.payload.priority_preferences
+      : undefined;
+  const outcomes =
+    program && priorityResult ? priorityOutcomes(priorityResult, program) : undefined;
+  const combinedRules = softRules.map((rule, index) => ({
+    label: ruleLabel(rule, players, copy),
+    outcome: program
+      ? outcomes?.[index]
+      : combined?.includes(index)
+        ? ("applied" as const)
+        : ("left-out" as const),
+  }));
+  if (!program)
+    combinedRules.sort(
+      (a, b) => Number(a.outcome === "left-out") - Number(b.outcome === "left-out"),
+    );
+  const problem = program ? preferencePlanProblem(bundleState) : undefined;
   const combinedNet =
     combinedState.phase === "done" ? expectedNet(combinedState.envelope.payload) : null;
   const baseNet = baseAnswer ? expectedNet(baseAnswer) : null;
   const combinedCost =
-    combinedNet === null || baseNet === null
-      ? undefined
-      : samePlan(baseState, combinedState)
-        ? 0
-        : Math.max(0, baseNet - combinedNet);
+    combinedState.phase === "done" && combinedState.envelope.payload.priority_preferences
+      ? combinedState.envelope.payload.priority_preferences.total_cost
+      : combinedNet === null || baseNet === null
+        ? undefined
+        : samePlan(baseState, combinedState)
+          ? 0
+          : Math.max(0, baseNet - combinedNet);
   const { results, same } = run
     ? planResults({
         run,
@@ -1088,6 +1183,7 @@ function Workspace({
           </p>
         )}
         <RuleEditor
+          priorities={prioritiesEnabled}
           draft={draft}
           players={players}
           copy={copy}
@@ -1307,13 +1403,17 @@ function Workspace({
                   reviseDisabled={editingLocked}
                 />
               ))}
-            {combined && combined.length > 0 && !capacityRefused(combinedState) && (
+            {(priorityResult ||
+              problem ||
+              (!!combined?.length && !capacityRefused(combinedState))) && (
               <PlanResult
                 title={copy.combinedPlan}
                 state={combinedState}
                 squad={squad}
                 baseline={baseAnswer}
-                diagnosis={diagnosis(combinedState)}
+                diagnosis={
+                  diagnosis(combinedState) ?? (problem && <p role="status">{copy[problem]}</p>)
+                }
                 onRevise={
                   combinedState.phase === "done"
                     ? () => revisePlan(combinedState.envelope.payload)
@@ -1322,15 +1422,17 @@ function Workspace({
                 reviseDisabled={editingLocked}
               >
                 <CombinedRules
-                  applied={combinedRules(true)}
-                  leftOut={combinedRules(false)}
+                  rules={combinedRules}
+                  unanswered={!!problem}
                   cost={combinedCost}
                   infeasible={combinedState.phase === "failed" && !!combinedState.infeasibility}
                 />
               </PlanResult>
             )}
           </div>
-          {incompleteRun && <p role="status">{copy.unfinishedPlans}</p>}
+          {incompleteRun && problem !== "combinedExhausted" && (
+            <p role="status">{copy.unfinishedPlans}</p>
+          )}
           {same && (
             <p role="status" className={styles.muted}>
               {copy.same}

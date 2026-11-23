@@ -68,6 +68,7 @@ from squadopt.application.entries import EntryError, EntryPicksProvider, held_sq
 from squadopt.application.manager_words import ManagerWords
 from squadopt.application.top100_weight import Top100Counts
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
+from squadopt.contracts.priority_preferences import PriorityProgram, PriorityReference
 from squadopt.live import Projection, RecommendationInputs, SeasonRules
 from squadopt.optimization import SolverExecutionError
 from squadopt.planning import TransferPlanningError
@@ -343,6 +344,8 @@ def advise_menu_entry(
     chip_forecast_source: ForecastSource | None = None,
     on_document: DocumentSolved | None = None,
     include_resource_state: bool = False,
+    priority_program: PriorityProgram | None = None,
+    priority_reference: PriorityReference | None = None,
 ) -> dict[str, object]:
     """Compute one document of the member menu from the member's own picks.
 
@@ -379,6 +382,8 @@ def advise_menu_entry(
         chip_forecast_source=chip_forecast_source,
         report=report,
         include_resource_state=include_resource_state,
+        priority_program=priority_program,
+        priority_reference=priority_reference,
     )
     if report is not None:
         report(request)
@@ -399,6 +404,8 @@ def _advise_menu_entry(
     chip_forecast_source: ForecastSource | None,
     report: DocumentSolved | None,
     include_resource_state: bool,
+    priority_program: PriorityProgram | None = None,
+    priority_reference: PriorityReference | None = None,
 ) -> dict[str, object]:
     """``advise_menu_entry`` itself; ``report`` hears of each document this one solves first."""
 
@@ -447,6 +454,8 @@ def _advise_menu_entry(
             counts=top100_counts,
             preferences=request.preferences,
             include_resource_state=include_resource_state,
+            priority_program=priority_program,
+            priority_reference=priority_reference,
         )
         if football_weighted_window:
             assert top100_counts is not None

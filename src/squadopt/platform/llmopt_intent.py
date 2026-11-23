@@ -93,8 +93,7 @@ Use soft for wishes (e.g. "if possible", "mümkünse", "tercihen"). Ask for clar
 before choosing when the intent or player is ambiguous. Do not silently omit unsupported
 requirements or resolve a contradiction by weakening it.
 
-List soft rules in the manager's priority order. Preserve their order on follow-up unless
-the manager changes it. A soft rule may carry max_cost_tenths, the most total expected
+{soft_rule_order} A soft rule may carry max_cost_tenths, the most total expected
 net points the manager will give up over the selected window to satisfy that rule.
 Convert an exact point allowance to tenths: 1.5 or 1,5 points becomes 15, and zero becomes
 0. Use null when a wish has no stated cost. Use this field only on a soft rule, and only
@@ -187,6 +186,17 @@ clarification use status "clarification", set draft to null, and ask one short
 question in the requested locale. Never echo unrelated personal text.
 """
 
+_VNEXT_INTENT_INSTRUCTIONS: Final = """\
+An explicit priority is an integer: 1 for highest, 2 for normal, 3 for lowest. Set priority
+to null when no priority was stated; do not infer different strengths from writing order.
+The draft's max_total_cost_tenths is the total expected net-point allowance for all wishes
+together, from 0 through 1000 integer tenths. It overrides individual price ceilings for
+that calculation. With priorities but no total allowance, ask how many points in total
+the manager would give up. With a total allowance and optional Wildcard, ask which to
+remove; that combination is unsupported. Do not invent a total allowance. A 1.5-point
+allowance for all preferences is max_total_cost_tenths 15, not three separate allowances.
+"""
+
 
 class IntentValidationError(ValueError):
     """The incoming or proposed JSON does not match the intent contract."""
@@ -270,7 +280,7 @@ def _constraint(
 ) -> dict[str, Any]:
     fields = {"kind", "player_id", "club", "count", "scope", "week", "points"}
     if soft:
-        fields.add("max_cost_tenths")
+        fields.update(("max_cost_tenths", "priority"))
     if comparison:
         fields.add("both")
     if model and isinstance(value, dict):
@@ -283,6 +293,10 @@ def _constraint(
     if not isinstance(kind, str) or kind not in _KINDS:
         raise IntentValidationError("Unsupported intent constraint.")
     result: dict[str, Any] = {"kind": kind}
+    if "priority" in value:
+        if type(value["priority"]) is not int or value["priority"] not in (1, 2, 3):
+            raise IntentValidationError("Priority must be from 1 through 3.")
+        result["priority"] = value["priority"]
     # The strict schema makes a model fill every field of every rule, and a model often
     # writes a filler ("scope": "squad" on a player rule) where a null belongs. A field that
     # has no meaning for the rule's kind is therefore dropped from a model's reply, never
@@ -356,23 +370,28 @@ def _draft(
     previous_window: int | None = None,
     previous_draft: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    fields = {
+        "hard",
+        "soft",
+        "comparison",
+        "window",
+        "keep_weeks",
+        "min_bank",
+        "scenario",
+        "max_total_cost_tenths",
+    }
     if model and isinstance(value, dict):
         # A partial reply retains reviewed rules and selections. Lists use [] to clear;
         # the optional comparison, bank floor and scenario use null to clear.
         previous = previous_draft or {}
-        optional = ("comparison", "min_bank", "scenario")
+        optional = ("comparison", "min_bank", "scenario", "max_total_cost_tenths")
         value = {
             "hard": previous.get("hard", []),
             "soft": previous.get("soft", []),
             **{key: previous[key] for key in ("keep_weeks", *optional) if key in previous},
             **{key: item for key, item in value.items() if item is not None or key in optional},
         }
-    if (
-        not isinstance(value, dict)
-        or not {"hard", "soft"} <= value.keys()
-        or value.keys()
-        - {"hard", "soft", "comparison", "window", "keep_weeks", "min_bank", "scenario"}
-    ):
+    if not isinstance(value, dict) or not {"hard", "soft"} <= value.keys() or value.keys() - fields:
         raise IntentValidationError("Invalid constraint draft.")
     window = value.get("window")
     if (window is None and not model and "window" in value) or (
@@ -395,6 +414,13 @@ def _draft(
             for item in soft
         ],
     }
+    total = value.get("max_total_cost_tenths")
+    if total is not None:
+        if type(total) is not int or not 0 <= total <= _MAX_COST_TENTHS:
+            raise IntentValidationError("Invalid total concession.")
+        result["max_total_cost_tenths"] = total
+    elif not model and "max_total_cost_tenths" in value:
+        raise IntentValidationError("Invalid total concession.")
     constraints = (*result["hard"], *result["soft"])
     unique = {
         (
@@ -590,6 +616,27 @@ def _validate_result(
         previous_window=previous_window,
         previous_draft=previous_draft,
     )
+    if any("priority" in rule for rule in draft["soft"]) and "max_total_cost_tenths" not in draft:
+        return {
+            "status": "clarification",
+            "message": (
+                "Bu tercihler için toplam kaç puandan vazgeçebilirsin?"
+                if locale == "tr"
+                else "How many points in total would you give up for these preferences?"
+            ),
+        }
+    if "max_total_cost_tenths" in draft and (
+        not draft["soft"] or any(rule["kind"] == "wildcard" for rule in draft["soft"])
+    ):
+        return {
+            "status": "clarification",
+            "message": (
+                "Toplam puan s\u0131n\u0131r\u0131n\u0131 hangi Wildcard "
+                "d\u0131ş\u0131ndaki tercihlere uygulayal\u0131m?"
+                if locale == "tr"
+                else "Which preferences other than Wildcard should use the total point limit?"
+            ),
+        }
     scenario = draft.get("scenario")
     if scenario is not None and scenario.get("week", 1) not in reference_weeks:
         question = (
@@ -692,7 +739,9 @@ def _validated(
     )
 
 
-def check_reply(request: IntentRequest, reply: object) -> dict[str, Any]:
+def check_reply(
+    request: IntentRequest, reply: object, *, llmopt_vnext: bool = True
+) -> dict[str, Any]:
     """Validate a reply the member's own model gave to the call ``prompt_for`` wrote.
 
     The shortlist is rebuilt from the request, so no state is kept between the prompt and
@@ -701,6 +750,11 @@ def check_reply(request: IntentRequest, reply: object) -> dict[str, Any]:
     """
     if isinstance(reply, str):
         reply = read_intent_json(reply)
+    if not llmopt_vnext and (
+        _priority_draft(request.draft)
+        or (isinstance(reply, dict) and _priority_draft(reply.get("draft")))
+    ):
+        raise IntentValidationError("This planning workflow is closed.")
     return _validated(request, _shortlist(request), reply)
 
 
@@ -730,10 +784,14 @@ _CONSTRAINT_PROPERTIES: Final = {
     "points": {"type": ["integer", "null"]},
 }
 _CONSTRAINT_LIST: Final = {"type": "array", "items": _schema_object(_CONSTRAINT_PROPERTIES)}
-_SOFT_CONSTRAINT_LIST: Final = {
+_SOFT_CONSTRAINT_LIST: Final[dict[str, Any]] = {
     "type": "array",
     "items": _schema_object(
-        {**_CONSTRAINT_PROPERTIES, "max_cost_tenths": {"type": ["integer", "null"]}}
+        {
+            **_CONSTRAINT_PROPERTIES,
+            "max_cost_tenths": {"type": ["integer", "null"]},
+            "priority": {"anyOf": [{"type": "integer", "enum": [1, 2, 3]}, {"type": "null"}]},
+        }
     ),
 }
 _COMPARISON_SCHEMA: Final = _schema_object({**_CONSTRAINT_PROPERTIES, "both": {"type": "boolean"}})
@@ -741,6 +799,9 @@ _DRAFT_SCHEMA: Final = _schema_object(
     {
         "hard": _CONSTRAINT_LIST,
         "soft": _SOFT_CONSTRAINT_LIST,
+        "max_total_cost_tenths": {
+            "anyOf": [{"type": "integer", "minimum": 0, "maximum": 1000}, {"type": "null"}]
+        },
         "comparison": {"anyOf": [_COMPARISON_SCHEMA, {"type": "null"}]},
         "window": {"type": ["integer", "null"], "enum": [*_WINDOWS, None]},
         "keep_weeks": {"type": "array", "items": {"type": "integer", "enum": list(_WEEKS)}},
@@ -803,7 +864,37 @@ class IntentCall:
         }
 
 
-def intent_call(request: IntentRequest) -> IntentCall:
+def _priority_draft(draft: object) -> bool:
+    return isinstance(draft, dict) and (
+        draft.get("max_total_cost_tenths") is not None
+        or (
+            isinstance(draft.get("soft"), list)
+            and any(
+                isinstance(rule, dict) and rule.get("priority") is not None
+                for rule in draft["soft"]
+            )
+        )
+    )
+
+
+def intent_reply_schema(*, llmopt_vnext: bool = True) -> dict[str, Any]:
+    """Strict reply fields shared by every provider adapter."""
+    if not llmopt_vnext:
+        draft = dict(_DRAFT_SCHEMA["properties"])
+        del draft["max_total_cost_tenths"]
+        rules = dict(_SOFT_CONSTRAINT_LIST["items"]["properties"])
+        del rules["priority"]
+        draft["soft"] = {"type": "array", "items": _schema_object(rules)}
+        return _schema_object(
+            {
+                **_RESULT_SCHEMA["properties"],
+                "draft": {"anyOf": [_schema_object(draft), {"type": "null"}]},
+            }
+        )
+    return _RESULT_SCHEMA
+
+
+def intent_call(request: IntentRequest, *, llmopt_vnext: bool = True) -> IntentCall:
     """The call for a request whose players are already the shortlist."""
     context: dict[str, Any] = {
         "message": request.message,
@@ -821,9 +912,22 @@ def intent_call(request: IntentRequest) -> IntentCall:
             "message": request.clarification.message,
             "question": request.clarification.question,
         }
-    return IntentCall(_SYSTEM_PROMPT, json.dumps(context, ensure_ascii=False), _RESULT_SCHEMA)
+    if not llmopt_vnext and _priority_draft(request.draft):
+        raise IntentValidationError("This planning workflow is closed.")
+    schema = intent_reply_schema(llmopt_vnext=llmopt_vnext)
+    order = (
+        "Preserve the reviewed soft-rule order on follow-up unless the manager changes it."
+        if llmopt_vnext
+        else "List soft rules in the manager's priority order. "
+        "Preserve their order on follow-up unless\n"
+        "the manager changes it."
+    )
+    system = _SYSTEM_PROMPT.replace("{soft_rule_order}", order)
+    if llmopt_vnext:
+        system += "\n" + _VNEXT_INTENT_INSTRUCTIONS
+    return IntentCall(system, json.dumps(context, ensure_ascii=False), schema)
 
 
-def prompt_for(request: IntentRequest) -> IntentCall:
+def prompt_for(request: IntentRequest, *, llmopt_vnext: bool = True) -> IntentCall:
     """The call a model is asked for this request: its players are the shortlist."""
-    return intent_call(replace(request, players=_shortlist(request)))
+    return intent_call(replace(request, players=_shortlist(request)), llmopt_vnext=llmopt_vnext)

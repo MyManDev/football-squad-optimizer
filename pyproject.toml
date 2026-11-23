@@ -570,6 +570,7 @@ exhaustive_ignores = [
     "advice_job_spec",
     "advice_load",
     "advice_observability",
+    "advice_preference_bundle",
     "advice_queue",
     "advice_read",
     "advice_runs",

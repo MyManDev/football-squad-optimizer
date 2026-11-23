@@ -36,6 +36,8 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "decision_information",  # provenance: bound inputs, for explicit recalculation
         "preferences",  # inputs: canonical user constraints applied by the producer
         "preferences_scope",  # inputs: these constraints bind every selected week
+        "priority_preferences",  # producer result: checked count layers, cost and reference status
+        "preference_bundle_result",  # worker result: bounded components and selected plan
         "bank_after_tenths",  # resources: remaining bank after the computed first week
         "free_transfers_after",  # resources: transfers carried into the following week
         "selection_top100_weight",  # inputs: selection weight, not a measured points cost

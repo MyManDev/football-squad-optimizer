@@ -7,7 +7,7 @@ with `squadopt.api`, that may import web frameworks, network clients, model SDKs
 (the contract "Frameworks, network and databases stay in api and platform"). No package below
 it in the layer order imports it, and it imports no laboratory module.
 
-Its 67 Python files serve several deployment units: 51 implementation modules and 4
+Its 68 Python files serve several deployment units: 52 implementation modules and 4
 aliases at old paths in the flat folder, the package file, and the seven subpackages of ADR
 0011, of which `storage/` holds the four shared durable-state modules and the six others their
 package file only.
@@ -88,6 +88,7 @@ The file job queue, the worker loop and what keeps them observable and recoverab
 | Module | What it does |
 | --- | --- |
 | `advice_worker.py` | The worker process: what one job means, and the loop that keeps claiming jobs. |
+| `advice_preference_bundle.py` | Sequential preference components inside one admitted worker job, sharing its reserved capacity and cached main reference. |
 | `advice_queue.py` | Worker orchestration and compatibility imports for the advice queue. |
 | `file_advice_queue.py` | The recoverable file queue, with fenced, short metadata transactions. |
 | `queue_contracts.py` | Adapter-neutral queue operations and attempt ownership errors. |

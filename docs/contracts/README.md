@@ -32,6 +32,10 @@ checks a candidate against the copies the accepted site carries.
 
 | File | Written by | Read by | Test that holds the file to the code |
 | --- | --- | --- | --- |
+| `llmopt_priority_program_v1.schema.json` | `priority_program_schema()` in `src/squadopt/contracts/priority_preferences.py` | [Priority program](llmopt_priority_program_v1.md), contained in one preference job | `tests/unit/test_priority_preferences.py`, `tests/unit/test_llmopt_preference_bundle.py` |
+| `llmopt_preference_bundle_v1.schema.json` | `preference_bundle_schema()` in `src/squadopt/contracts/preference_bundle.py` | [One preference execution](llmopt_preference_bundle_v1.md), immutable after main admission | `tests/unit/test_llmopt_preference_bundle.py` |
+| `llmopt_preference_result_v1.schema.json`, `llmopt_priority_result_v1.schema.json` | Result generators in `src/squadopt/contracts/preference_bundle.py` | Computed components, completed layers and signed total cost | `tests/unit/test_llmopt_preference_bundle.py`, `preferenceExecution.test.ts` |
+| `llmopt_intent_v1.schema.json` | `_RESULT_SCHEMA` in `src/squadopt/platform/llmopt_intent.py` | Typed interpretation, optional priority and total allowance | `tests/unit/test_llmopt_intent.py`, `prioritySchema.test.ts` |
 | `llmopt_run_v1.schema.json` | `run_reference_schema()` in `src/squadopt/contracts/llmopt_run.py` | Advice POST validation and durable admission; [lifecycle](llmopt_run_v1.md) | `tests/unit/test_llmopt_work_budget.py`, `tests/unit/test_api_advice_post.py` |
 | `llmopt_run_ledger_v2.schema.json` | `run_ledger_schema()` in `src/squadopt/contracts/llmopt_run.py` | Internal capture retirement, bounded cancellations and anonymous consumer ownership | `tests/unit/test_llmopt_run_retention.py`, `tests/unit/test_llmopt_legacy_join.py` |
 | `backend_jobs_v2.schema.json` | `backend_jobs_schema("backend_jobs_v2")` in `src/squadopt/platform/jobs_contract.py` | Run-owned jobs; V1 remains unchanged | `tests/unit/test_llmopt_work_budget.py`, `tests/unit/test_api_advice_post.py` |

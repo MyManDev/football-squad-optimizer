@@ -45,6 +45,7 @@ export interface RunInputs {
   wildcardNotHeld: boolean;
   frozenWeeks?: readonly FrozenPlanWeek[];
   reference?: PlanRevision;
+  bundleMode?: boolean;
 }
 
 /** The advice request for this member and window, before any rule is applied. */
@@ -144,22 +145,25 @@ export function prepareRun(inputs: RunInputs): PlanRun {
   if (pricing && compareBoth) addExplicit(plans.base, plans.baseConflict, "without");
   if (draft.comparison)
     addExplicit(plans.alternative, plans.alternativeConflict, compareBoth ? "with" : "alternative");
-  const prices = draft.soft.map((rule): PriceTarget => {
-    if (compareBoth) return { rule, outcome: "skipped" };
-    const branch = preparePlans({ ...hardDraft, soft: [rule] }, held, frozenWeeks);
-    if (branch.alternativeConflict) return { rule, outcome: "conflict" };
-    if (!branch.alternative) return { rule, outcome: "same" };
-    const request = submit(branch.alternative);
-    if (!request) return { rule, outcome: "unavailable" };
-    const existing = slots.findIndex(
-      (slot) => slot.request && sameAdviceRequest(slot.request, request),
-    );
-    if (existing >= 0) return { rule, outcome: existing };
-    if (slots.length === ALTERNATIVE_COUNT) return { rule, outcome: "skipped" };
-    const outcome = slots.length;
-    slots.push({ kind: "priced", request });
-    return { rule, outcome };
-  });
+  const prices =
+    draft.max_total_cost_tenths !== undefined
+      ? []
+      : draft.soft.map((rule): PriceTarget => {
+          if (compareBoth) return { rule, outcome: "skipped" };
+          const branch = preparePlans({ ...hardDraft, soft: [rule] }, held, frozenWeeks);
+          if (branch.alternativeConflict) return { rule, outcome: "conflict" };
+          if (!branch.alternative) return { rule, outcome: "same" };
+          const request = submit(branch.alternative);
+          if (!request) return { rule, outcome: "unavailable" };
+          const existing = slots.findIndex(
+            (slot) => slot.request && sameAdviceRequest(slot.request, request),
+          );
+          if (existing >= 0) return { rule, outcome: existing };
+          if (slots.length === ALTERNATIVE_COUNT) return { rule, outcome: "skipped" };
+          const outcome = slots.length;
+          slots.push({ kind: "priced", request });
+          return { rule, outcome };
+        });
   return {
     inputs,
     baseTitle: !pricing && compareBoth ? "without" : "base",
@@ -206,5 +210,6 @@ export function restoreRun(
     wildcardNotHeld: confirmation.wildcardNotHeld,
     frozenWeeks,
     reference,
+    bundleMode: confirmation.bundleMode === true,
   });
 }

@@ -100,6 +100,10 @@ class AdviceComputeRefused(ValueError):
         self.infeasibility = infeasibility
 
 
+class RetryBundleWork(RuntimeError):
+    """Repeat an interrupted bundle inside its current job and remaining allocation."""
+
+
 def _utc_stamp() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -238,6 +242,8 @@ def _run_advice_worker_once(
             budget_seconds=complete_retry_seconds,
             log=log,
         )
+    except RetryBundleWork:
+        return queue.requeue(job, at_utc=terminal_at_utc())
     except AdviceCacheError as error:
         # Different bytes under a complete key: a determinism defect, recorded as
         # exactly that — never retried, never papered over.

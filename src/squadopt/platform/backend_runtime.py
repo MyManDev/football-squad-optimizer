@@ -858,6 +858,7 @@ def build_backend(
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
+        preference_bundles=True,
         llmopt_vnext=config.llmopt_vnext,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
@@ -888,6 +889,7 @@ def build_backend(
             public_inputs,
             switches=contexts,
             available_windows=contexts.available_windows,
+            preference_bundles=True,
             llmopt_vnext=config.llmopt_vnext,
         )
         public_submit = AdviceSubmitService(
