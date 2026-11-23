@@ -508,6 +508,7 @@ function Workspace({
       !chatReady ||
       interpret.current ||
       checkingSquad ||
+      incompatiblePriorities ||
       roster.isPending ||
       limit
     )
@@ -736,8 +737,22 @@ function Workspace({
     (currentCapabilities?.preferenceBundles === true ||
       (plans.window === 1 && currentCapabilities?.devicePreferenceBundles === true));
   const incompatiblePriorities =
-    !!currentCapabilities &&
-    confirmationProblem(draft, plans.window, currentCapabilities) === "individualLimitsOnly";
+    restoreCapabilities.isFetchedAfterMount &&
+    !!restoreMode &&
+    confirmationProblem(draft, plans.window, restoreMode) === "individualLimitsOnly";
+  const refetchGrant = restoreCapabilities.refetch;
+  useEffect(() => {
+    if (!incompatiblePriorities) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void refetchGrant({ cancelRefetch: false });
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [incompatiblePriorities, refetchGrant]);
   const canContinue =
     (run !== restoredRun && !run?.inputs.request.run) ||
     (!!currentCapabilities &&
@@ -1466,6 +1481,7 @@ function Workspace({
               !ORIGIN ||
               !chatReady ||
               editingLocked ||
+              incompatiblePriorities ||
               roster.isPending ||
               limit !== null ||
               !message.trim()
@@ -1531,6 +1547,14 @@ function Workspace({
               }}
             >
               {copy.clearPrioritySettings}
+            </button>
+            <button
+              className={styles.textButton}
+              type="button"
+              disabled={restoreCapabilities.isFetching}
+              onClick={() => void refetchGrant({ cancelRefetch: false })}
+            >
+              {copy.checkPriorityAvailability}
             </button>
           </div>
         )}

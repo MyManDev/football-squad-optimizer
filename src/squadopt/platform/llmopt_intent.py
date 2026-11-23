@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
+from collections import Counter
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from typing import Any, Final
@@ -204,6 +205,8 @@ that calculation. With priorities but no total allowance, ask how many points in
 the manager would give up. With a total allowance and optional Wildcard, ask which to
 remove; that combination is unsupported. Do not invent a total allowance. A 1.5-point
 allowance for all preferences is max_total_cost_tenths 15, not three separate allowances.
+When a manager moves a one-week draft to three weeks, including by naming week 2 or 3,
+return the updated draft with its reviewed priorities and total, even if no total was set.
 
 When choosing a displayed plan, freezing its transfer/week, or replacing one of its
 players, use only plan_context identifiers. Without that catalogue ask for clarification;
@@ -711,6 +714,19 @@ def _claims_computed_value(question: str) -> bool:
     return False
 
 
+def _reviewed_priorities(draft: Mapping[str, Any]) -> Counter[frozenset[tuple[str, Any]]]:
+    # The same reviewed preference may be moved to a different week or given an individual limit.
+    return Counter(
+        frozenset(
+            (field, value)
+            for field, value in rule.items()
+            if field not in ("week", "max_cost_tenths")
+        )
+        for rule in draft["soft"]
+        if "priority" in rule
+    )
+
+
 def _validate_result(
     value: object,
     candidates: tuple[dict[str, Any], ...],
@@ -769,9 +785,21 @@ def _validate_result(
         previous_window=previous_window,
         previous_draft=previous_draft,
     )
-    if not three_week_priorities and draft.get("window") == 3 and _priority_draft(draft):
-        raise IntentValidationError("This planning workflow is closed.")
-    if any("priority" in rule for rule in draft["soft"]) and "max_total_cost_tenths" not in draft:
+    closed_group = not three_week_priorities and draft.get("window") == 3 and _priority_draft(draft)
+    if closed_group:
+        # Moving an existing draft has the same effect as changing the window selector.
+        # The member can review and clear carried settings before confirming the legacy plan.
+        if (
+            previous_draft is None
+            or previous_window == 3
+            or (
+                "max_total_cost_tenths" in draft
+                and draft["max_total_cost_tenths"] != previous_draft.get("max_total_cost_tenths")
+            )
+            or not _reviewed_priorities(draft) <= _reviewed_priorities(previous_draft)
+        ):
+            raise IntentValidationError("This planning workflow is closed.")
+    elif any("priority" in rule for rule in draft["soft"]) and "max_total_cost_tenths" not in draft:
         return {
             "status": "clarification",
             "message": (

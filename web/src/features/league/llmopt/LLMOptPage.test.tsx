@@ -1195,9 +1195,69 @@ describe("the plan with all preferences", () => {
     },
   );
 
+  it.each(["en", "tr"] as const)(
+    "offers to clear reviewed settings after chat changes to a closed window in %s",
+    async (language) => {
+      bundlesOffered = true;
+      const copy = LLMOPT_COPY[language];
+      const reviewed = { kind: "keep_player", player_id: OWNED[0]!.player_id, priority: 1 };
+      const soft = [{ ...reviewed, ...(language === "tr" ? { week: 2 } : {}) }];
+      const initial = { window: 1, soft: [reviewed], hard: [], max_total_cost_tenths: 10 };
+      const moved = { ...initial, window: 3, soft };
+      intent.mockReturnValueOnce(Response.json({ status: "draft", draft: initial }));
+      intent.mockReturnValueOnce(Response.json({ status: "draft", draft: moved }));
+      open(language);
+      await ready();
+      await sendMessage(language === "tr" ? "Bu oyuncuyu tut" : "Keep this player", language);
+      await screen.findByText(copy.understood);
+      await sendMessage(
+        language === "tr" ? "Onu ikinci hafta tut" : "Make it three weeks",
+        language,
+      );
+      expect(await screen.findByText(copy.individualLimitsOnly)).toBeVisible();
+      expect(screen.queryByText(copy.refusals.replyInvalid)).toBeNull();
+      expect(screen.getByRole("button", { name: copy.compute })).toBeDisabled();
+      const input = screen.getByRole("textbox", { name: copy.chat });
+      await userEvent.type(input, "3");
+      expect(screen.getByRole("button", { name: copy.send })).toBeDisabled();
+      fireEvent.submit(input.closest("form")!);
+      expect(intent).toHaveBeenCalledTimes(2);
+      expect(savedSession()[1].draft).toEqual(moved);
+      await userEvent.click(screen.getByRole("button", { name: copy.clearPrioritySettings }));
+      expect(screen.getByRole("button", { name: copy.compute })).toBeEnabled();
+      expect(screen.getByRole("button", { name: copy.send })).toBeEnabled();
+      expect(savedSession()[1].draft).toEqual({
+        window: 3,
+        hard: [],
+        soft: soft.map(({ priority: _priority, ...rule }) => rule),
+      });
+      expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+    },
+  );
+
+  it.each(["focus", "availability button"] as const)(
+    "reopens a reviewed one-week draft on %s without reloading or submitting work",
+    async (refresh) => {
+      releaseEnabled = false;
+      const draft = { hard: [], soft, max_total_cost_tenths: 15 };
+      await reloadWith(draft, { wildcardNotHeld: false });
+      const check = () => screen.getByRole("button", { name: en.checkPriorityAvailability });
+      await screen.findByText(en.individualLimitsOnly);
+      expect(screen.getByRole("button", { name: en.compute })).toBeDisabled();
+      releaseEnabled = true;
+      bundlesOffered = true;
+      if (refresh === "focus") fireEvent.focus(window);
+      else await userEvent.click(check());
+      await waitFor(() => expect(screen.queryByText(en.individualLimitsOnly)).toBeNull());
+      expect(screen.getByRole("button", { name: en.compute })).toBeEnabled();
+      expect(savedSession()[1].draft).toEqual(draft);
+      expect(intent).not.toHaveBeenCalled();
+      expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+    },
+  );
+
   it("a restored priority run reads its saved preference result after rollback without admitting another stage", async () => {
     releaseEnabled = false;
-    bundlesOffered = true;
     await reloadWith(
       { hard: [], soft, max_total_cost_tenths: 15 },
       { wildcardNotHeld: false, bundleMode: true, sending: true },
@@ -1208,6 +1268,12 @@ describe("the plan with all preferences", () => {
     expect(
       jobs[1]!.readCached.mock.calls[0]![0].preferenceBundle?.program?.preferences,
     ).toHaveLength(3);
+    expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+    expect(screen.getByText(en.individualLimitsOnly)).toBeVisible();
+    expect(screen.getByRole("button", { name: en.compute })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: en.clearPrioritySettings }));
+    expect(savedSession()[1].draft).toEqual({ hard: [], soft });
+    expect(screen.queryByText(en.individualLimitsOnly)).toBeNull();
     expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
   });
 

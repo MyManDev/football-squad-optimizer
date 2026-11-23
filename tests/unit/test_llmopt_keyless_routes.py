@@ -49,6 +49,53 @@ def _draft(player_id: int = 1, **extra: Any) -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize("dated", [False, True])
+@pytest.mark.parametrize("priority,total", [(True, None), (False, 0), (True, 15)])
+def test_chat_moves_reviewed_settings_to_a_closed_window_for_editing(dated, priority, total):
+    preference = {"kind": "keep_player", "player_id": 1}
+    if priority:
+        preference["priority"] = 1
+    reviewed = {"hard": [], "soft": [preference], "window": 1}
+    if total is not None:
+        reviewed["max_total_cost_tenths"] = total
+    body = {
+        **_request(),
+        "draft": reviewed,
+        "message": "Keep Salah in week 2" if dated else "Plan three weeks",
+    }
+    proposal = {"soft": [{**preference, "week": 2}]} if dated else {"window": 3}
+    with TestClient(create_app(llmopt_vnext=True, llmopt_vnext_three_week=False)) as client:
+        assert client.post(PROMPT, json=body).status_code == 200
+        checked = client.post(
+            CHECK, json={"request": body, "reply": {"status": "draft", "draft": proposal}}
+        )
+        expected = {**reviewed, **proposal, "window": 3}
+        assert checked.status_code == 200, checked.text
+        assert checked.json() == {"status": "draft", "draft": expected}
+        assert client.post(PROMPT, json={**body, "draft": expected}).status_code == 422
+
+
+@pytest.mark.parametrize("priority,total", [(2, 15), (1, 20)])
+def test_chat_cannot_add_grouped_settings_while_moving_to_a_closed_window(priority, total):
+    preference = {"kind": "keep_player", "player_id": 1}
+    reviewed = {"hard": [], "soft": [{**preference, "priority": 1}], "max_total_cost_tenths": 15}
+    proposal = {
+        "window": 3,
+        "soft": [{**preference, "priority": priority}],
+        "max_total_cost_tenths": total,
+    }
+    with TestClient(create_app(llmopt_vnext=True, llmopt_vnext_three_week=False)) as client:
+        checked = client.post(
+            CHECK,
+            json={
+                "request": {**_request(), "draft": reviewed},
+                "reply": {"status": "draft", "draft": proposal},
+            },
+        )
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "REPLY_REFUSED"
+
+
 @pytest.mark.parametrize(
     ("name", "message", "locale"),
     [
