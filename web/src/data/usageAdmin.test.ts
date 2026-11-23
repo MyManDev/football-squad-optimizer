@@ -118,8 +118,27 @@ describe("the report's shape", () => {
     expect(parsed?.behaviour.clicks[0]!.marks.dead).toBe(0);
   });
 
+  it("reads a row's tool, and a row with none as an older Worker's (null)", () => {
+    const report = usageReportFixture() as unknown as Record<string, any>;
+    delete report.behaviour.clicks[1].tool;
+    delete report.behaviour.frustration[0].tool;
+    const parsed = parseUsageReport(report)!;
+    expect(parsed.behaviour.clicks.map((cell) => cell.tool)).toEqual([
+      "week",
+      null,
+      "week",
+      "chips",
+      "week",
+      "",
+      "week",
+    ]);
+    expect(parsed.behaviour.frustration[0]!.tool).toBeNull();
+    expect(parsed.behaviour.frustration[1]!.tool).toBe("week");
+  });
+
   it.each<[string, (report: Record<string, any>) => void]>([
     ["a missing list", (report) => delete report.tools],
+    ["a tool that is not a word", (report) => (report.behaviour.clicks[0].tool = 3)],
     ["a negative count", (report) => (report.visits = -1)],
     ["a count as text", (report) => (report.pages[0].visits = "3")],
     ["a cell past the grid", (report) => (report.behaviour.clicks[0].cell = 400)],

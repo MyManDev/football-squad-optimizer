@@ -99,8 +99,8 @@ MORNING_30, MORNING_31, FINAL_9 = "morning-2026-10-30", "morning-2026-10-31", "f
         (
             "2026-11-01T02:00Z",
             [MORNING_31, FINAL_9],
-            "morning 10 morning-2026-11-01",
-            "today's morning run for gameweek 10",
+            "none 10",
+            "gameweek 9 is not finished and checked yet; morning runs for gameweek 10 wait for it",
         ),
     ],
 )
@@ -172,10 +172,17 @@ RESUME = "morning runs resume at 2026-10-02T02:00Z"
             "morning 6 morning-2026-10-02",
             "today's morning run for gameweek 6",
         ),
-        # Once the window holds the deadline the flags no longer matter.
+        # Inside the window a morning still waits for the gameweek before to settle.
         (
             "2026-10-03T02:00Z",
             False,
+            [],
+            "none 6",
+            "gameweek 5 is not finished and checked yet; morning runs for gameweek 6 wait for it",
+        ),
+        (
+            "2026-10-03T02:00Z",
+            True,
             [],
             "morning 6 morning-2026-10-03",
             "today's morning run for gameweek 6",
@@ -237,7 +244,12 @@ def test_a_gap_before_the_first_gameweek_waits_and_the_window_is_an_option() -> 
     )
     events = gate.schedule_events(_bootstrap(GAP))
     wide = gate.decide(
-        events, datetime.fromisoformat("2026-09-25T02:00:00Z"), "2026-27", [], window_days=22
+        events,
+        datetime.fromisoformat("2026-09-25T02:00:00Z"),
+        "2026-27",
+        [],
+        settled={5},
+        window_days=22,
     )
     assert (wide.action, wide.marker) == ("morning", "morning-2026-09-25")
     assert gate.build_parser().parse_args([]).lead_window_days == gate.LEAD_WINDOW_DAYS
@@ -890,6 +902,8 @@ def test_each_run_records_its_duration_and_peak_memory_in_one_json_line(
 ) -> None:
     host = _Host(minutes=131)
     assert _started(tmp_path, host) == 0
+    # The next morning's run needs GW9 settled, or it waits for it and starts nothing.
+    (tmp_path / "bootstrap.json").write_bytes(_bootstrap(DEADLINES, settled={9}))
     assert _main(tmp_path, "2026-11-01T02:00:00Z", _Host(pull_exit=1, minutes=2)) == 2
     lines = (tmp_path / gate.MEASUREMENTS).read_text(encoding="utf-8").splitlines()
     first, second = (json.loads(line) for line in lines)
@@ -952,3 +966,46 @@ def test_the_largest_process_is_read_in_bytes_once_a_child_has_ended() -> None:
     largest = gate.largest_process()
     assert largest is not None and largest >= 64 * 2**20
     assert inspect.signature(gate.main).parameters["peaks"].default is gate.memory_peaks
+
+
+#: GW12 of 2026-27 closed on Thursday 27 November, six days after GW11's Saturday deadline:
+#: the deadline was inside the window while GW11 was still being played.
+MIDWEEK = {11: "2026-11-21T11:00:00Z", 12: "2026-11-27T18:30:00Z"}
+
+
+@pytest.mark.parametrize(
+    "now,settled,expected,reason",
+    [
+        (
+            "2026-11-22T02:00Z",
+            set(),
+            "none 12",
+            "gameweek 11 is not finished and checked yet; morning runs for gameweek 12 wait for it",
+        ),
+        (
+            "2026-11-25T02:00Z",
+            {11},
+            "morning 12 morning-2026-11-25",
+            "today's morning run for gameweek 12",
+        ),
+        # The final run does not wait: it is the decision, and it starts 8 h before the deadline.
+        (
+            "2026-11-27T10:30Z",
+            set(),
+            "final 12 final-2026-27-gw12",
+            "the final run for gameweek 12",
+        ),
+    ],
+)
+def test_a_morning_run_waits_for_the_gameweek_before_to_be_finished_and_checked(
+    now: str, settled: set[int], expected: str, reason: str
+) -> None:
+    """Each morning between GW11's and GW12's deadlines started a run that stopped at the
+    handoff (a mid-gameweek capture) and raised an alarm, from 21 to 23 November 2026."""
+
+    events = gate.schedule_events(_bootstrap(MIDWEEK, settled=settled))
+    decision = gate.decide(
+        events, datetime.fromisoformat(now), "2026-27", [], settled=settled, lead_hours=8.0
+    )
+    said = " ".join((decision.action, str(decision.gameweek), decision.marker)).strip()
+    assert (said, decision.reason) == (expected, reason)
