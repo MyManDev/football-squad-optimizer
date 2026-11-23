@@ -95,6 +95,7 @@ The file job queue, the worker loop and what keeps them observable and recoverab
 | `jobs_contract.py` | The job lifecycle contract, `backend_jobs_v1`. |
 | `advice_job_spec.py` | What a queued job is for, stored beside the queue rather than inside it. |
 | `advice_cache.py` | The immutable-key answer cache behind a protocol, and the cache key. |
+| `advice_plan_cache.py` | Stores plan provenance separately from the immutable answer and exposes it when the planning release is enabled. |
 | `_damaged_entry.py` | Moves aside bytes at a create-once address that do not parse, rather than answering from them. |
 | `worker_heartbeat.py` | Each worker reports that it is alive, and readiness asks whether any worker is. |
 | `worker_metrics.py` | A worker-owned Prometheus listener; no counters are shared with the API process. |

@@ -54,6 +54,7 @@ from squadopt.live import SeasonRules, read_season_rules
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, readiness_report
+from squadopt.platform.advice_plan_cache import PlanAdviceCache
 from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
@@ -768,7 +769,7 @@ class AdviceBackend:
 
     config: BackendConfig
     queue: FileJobQueue
-    cache: FileAdviceCache
+    cache: PlanAdviceCache
     reader: AdviceReadStore
     submit: AdviceSubmitService
     contexts: CaptureContextProvider
@@ -832,7 +833,7 @@ def build_backend(
     component_log = log if log is not None else AdviceLog("backend")
     metrics = metrics if metrics is not None else AdviceMetrics()
     queue = FileJobQueue(config.queue_root)
-    cache = FileAdviceCache(config.cache_root)
+    cache = PlanAdviceCache(config.cache_root, llmopt_vnext=config.llmopt_vnext)
     specs = FileAdviceJobSpecStore(config.spec_root)
 
     def stored_capture(key: str) -> str | None:

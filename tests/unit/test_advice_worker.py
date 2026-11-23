@@ -60,7 +60,7 @@ from squadopt.platform.advice_queue import (
     FileJobQueue,
     run_advice_worker_once,
 )
-from squadopt.platform.advice_read import AdviceRequestContext
+from squadopt.platform.advice_read import AdviceRequestContext, advice_context_identity
 from squadopt.platform.advice_worker import build_advice_compute, run_advice_worker
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 from squadopt.platform.jobs_contract import AdviceJob
@@ -1807,12 +1807,54 @@ def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str,
     )
 
 
+@pytest.mark.parametrize("producer_enabled", [False, True])
+def test_provenance_follows_the_worker_and_current_grant_across_restarts(
+    tmp_path, monkeypatch, producer_enabled
+) -> None:
+    backend = _deployment(tmp_path, monkeypatch, llmopt_vnext=producer_enabled)["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    response = client.post(route, json=body)
+    assert response.status_code == 202
+    assert _work(backend) == 1
+    job = backend.queue.load(response.json()["job_id"])
+    spec = backend.job_specs.get(job.cache_key)
+    canonical = FileAdviceCache(backend.config.cache_root).get(job.cache_key)
+    assert canonical is not None and "plan_data_id" not in json.loads(canonical)["payload"]
+    receipt_dir = backend.config.cache_root / "plan-provenance"
+    assert receipt_dir.exists() is producer_enabled
+    for enabled in (not producer_enabled, producer_enabled):
+        reopened = build_backend(replace(backend.config, llmopt_vnext=enabled))
+        with TestClient(app_for_capture(reopened, world_module.GW2_CAPTURED_AT)) as client:
+            key, _ = reopened.reader.resolve_key(league_id=LEAGUE_ID, entry_id=ENTRY_ID, **body)
+            assert key == job.cache_key
+            get = client.get(route, params=body)
+            post = client.post(route, json=body)
+            assert get.status_code == post.status_code == 200
+            assert get.content == post.content
+            if enabled and producer_enabled:
+                versioned = get.json()
+                assert versioned["payload"].pop("plan_data_id") == advice_context_identity(
+                    spec.context
+                )
+                assert versioned == json.loads(canonical)
+            else:
+                assert get.content == canonical
+            assert len(reopened.queue.jobs()) == 1
+            assert FileAdviceCache(backend.config.cache_root).get(key) == canonical
+
+
 def _work(backend: Any, jobs: int = 1) -> int:
     return run_advice_worker(
         backend.queue,
         backend.cache,
         build_advice_compute(
-            backend.contexts, backend.job_specs, runs=backend.runs, cache=backend.cache
+            backend.contexts,
+            backend.job_specs,
+            runs=backend.runs,
+            cache=backend.cache,
+            llmopt_vnext=backend.config.llmopt_vnext,
         ),
         should_stop=_stop_after(3 * jobs + 3),
         max_jobs=jobs,

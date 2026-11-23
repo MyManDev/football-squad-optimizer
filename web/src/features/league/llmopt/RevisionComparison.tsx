@@ -34,12 +34,14 @@ function MetricRow({
 export function RevisionComparison({
   previous,
   revised,
+  planContextEnabled,
   scenario,
   introduction,
   children,
 }: {
   previous: PlanRevision;
   revised?: PlanRevision;
+  planContextEnabled: boolean;
   scenario?: boolean;
   introduction?: ReactNode;
   children?: ReactNode;
@@ -48,6 +50,10 @@ export function RevisionComparison({
   const { language, locale, messages } = useLanguage();
   const copy = LLMOPT_COPY[language];
   const comparable = previous.window === revised?.window;
+  const sumHits = (plan?: PlanRevision) =>
+    plan && plan.weeks.length === plan.window && plan.weeks.every((w) => w.hits !== undefined)
+      ? plan.weeks.reduce((sum, w) => sum + w.hits!, 0)
+      : undefined;
   const previousEnd = previous.weeks[previous.window - 1];
   const revisedEnd = revised?.weeks[revised.window - 1];
   const beforeWindow = previous.window === 1 ? copy.oneWeek : copy.threeWeeks;
@@ -85,6 +91,16 @@ export function RevisionComparison({
             format={(value) => points(value, 1, locale)}
             delta={(value) => signedPoints(value, 1, locale)}
           />
+          {planContextEnabled && (
+            <MetricRow
+              label={copy.totalHits}
+              before={sumHits(previous)}
+              after={sumHits(revised)}
+              comparable={comparable}
+              format={number}
+              delta={(value) => signedPoints(value, 0, locale)}
+            />
+          )}
           <MetricRow
             label={copy.finalBank}
             before={previousEnd?.bank}
@@ -113,6 +129,42 @@ export function RevisionComparison({
                   {copy.week} {gameweek}
                 </th>
               </tr>
+              {planContextEnabled && (
+                <>
+                  <MetricRow
+                    label={copy.net}
+                    before={before?.net}
+                    after={after?.net}
+                    comparable={comparable}
+                    format={(value) => points(value, 1, locale)}
+                    delta={(value) => signedPoints(value, 1, locale)}
+                  />
+                  <MetricRow
+                    label={copy.hits}
+                    before={before?.hits}
+                    after={after?.hits}
+                    comparable={comparable}
+                    format={number}
+                    delta={(value) => signedPoints(value, 0, locale)}
+                  />
+                  <MetricRow
+                    label={copy.bank}
+                    before={before?.bank}
+                    after={after?.bank}
+                    comparable={comparable}
+                    format={budget}
+                    delta={(value) => (value > 0 ? "+" : "") + budget(value)}
+                  />
+                  <MetricRow
+                    label={copy.transfers}
+                    before={before?.freeTransfers}
+                    after={after?.freeTransfers}
+                    comparable={comparable}
+                    format={number}
+                    delta={(value) => signedPoints(value, 0, locale)}
+                  />
+                </>
+              )}
               <tr>
                 <th scope="row">{copy.clubTransfers}</th>
                 <td>{transferNames(before?.incoming)}</td>

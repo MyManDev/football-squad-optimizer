@@ -471,6 +471,19 @@ def test_late_cache_hit_is_served_without_checking_deadline(
     assert not queue.jobs()
 
 
+def test_saved_answer_without_plan_provenance_remains_readable_after_changing_modes(tmp_path):
+    client, cache, queue = _world(tmp_path, llmopt_vnext=False)
+    held = _valid_advice_document()
+    assert "plan_data_id" not in json.loads(held)["payload"]
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    run_advice_worker_once(queue, cache, lambda _job: held, at_utc="2026-08-27T12:01:00Z")
+    for enabled in (True, False):
+        restarted, _, queue = _world(tmp_path, llmopt_vnext=enabled)
+        assert restarted.get(ADVICE_URL, params=BODY).content == held
+        assert restarted.post(ADVICE_URL, json=BODY).content == held
+        assert len(queue.jobs()) == 1
+
+
 def test_the_whole_story_get_404_post_202_worker_poll_second_post_200(
     tmp_path: Path,
 ) -> None:

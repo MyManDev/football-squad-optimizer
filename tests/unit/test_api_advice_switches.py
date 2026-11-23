@@ -471,6 +471,10 @@ def test_capabilities_say_what_may_be_asked_right_now(tmp_path: Path) -> None:
     world = _world(tmp_path)
     url = f"/api/v1/leagues/{LEAGUE_ID}/capabilities"
     document = world["client"].get(url).json()
+    assert (
+        world["reader"].plan_data_id()
+        == "670ca0ec8dc7645572b6578b3a1957c8769c1fbf437b33b642ac9e3d84189269"
+    )
     assert document == {
         "contract_version": "league_capabilities_v1",
         "league_id": LEAGUE_ID,

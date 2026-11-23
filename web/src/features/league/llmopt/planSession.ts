@@ -1,3 +1,5 @@
+import { checkedHistory, EMPTY_HISTORY, type PlanHistory } from "./planHistory";
+import type { EntrySquad } from "../types";
 import {
   MAX_MESSAGE_LENGTH,
   MAX_QUESTION_LENGTH,
@@ -13,6 +15,7 @@ export const ALTERNATIVE_COUNT = 2;
 export type StartedAlternative = { kind: "priced" | "roll" } | { kind: "bank"; floor: number };
 
 export interface PlanConfirmation {
+  compareOnly?: boolean;
   deviceRun?: boolean;
   deviceAlternatives?: boolean;
   bundleMode?: true;
@@ -31,6 +34,7 @@ export interface PlanConfirmation {
 }
 
 export interface PlanSession {
+  history?: PlanHistory;
   draft: PlanDraft;
   clarification?: Clarification;
   confirmation?: PlanConfirmation;
@@ -145,6 +149,7 @@ export function createPlanSessionMemory(): PlanSessionMemory {
 export interface PlanSessionStore {
   /** The confirmed run as last saved; absent while the draft has not been calculated. */
   readonly confirmation: PlanConfirmation | undefined;
+  readonly history: PlanHistory;
   /** Saves the whole session. A session saved without a confirmation clears the run's. */
   save(session: PlanSession): void;
   /** Calls the listener after each save, so the page can render from the saved run. */
@@ -155,14 +160,22 @@ export function createPlanSessionStore(
   context: PlanSessionContext | null,
   confirmation?: PlanConfirmation,
   memory?: PlanSessionMemory,
+  history: PlanHistory = EMPTY_HISTORY,
 ): PlanSessionStore {
   let current = confirmation;
+  let retained = history;
   const listeners = new Set<() => void>();
   return {
+    get history() {
+      return retained;
+    },
     get confirmation() {
       return current;
     },
     save(session) {
+      retained = session.history ?? retained;
+      if (session.history !== undefined || retained.items.length)
+        session = { ...session, history: retained };
       current = session.confirmation;
       if (memory && context) memory.save(context, session);
       else writePlanSession(context, session);
@@ -195,6 +208,7 @@ export function checkedPlanSession(
   value: unknown,
   players: readonly CatalogPlayer[],
   gameweek: number,
+  squad?: EntrySquad,
 ): PlanSession | null {
   if (!value || typeof value !== "object") return null;
   const { draft, confirmation, clarification, reference } = value as Partial<PlanSession>;
@@ -202,6 +216,7 @@ export function checkedPlanSession(
     const session: PlanSession = {
       draft: checkedDraft(draft, players),
       reference: checkedPlanRevision(reference, gameweek),
+      ...(squad ? { history: checkedHistory((value as PlanSession).history, squad) } : {}),
     };
     if (
       typeof clarification?.message === "string" &&
@@ -225,6 +240,9 @@ export function checkedPlanSession(
           ? { runId: confirmation.runId }
           : {}),
         wildcardNotHeld: confirmation.wildcardNotHeld,
+        ...(typeof confirmation.compareOnly === "boolean"
+          ? { compareOnly: confirmation.compareOnly }
+          : {}),
         ...(typeof confirmation.deviceRun === "boolean"
           ? { deviceRun: confirmation.deviceRun }
           : {}),

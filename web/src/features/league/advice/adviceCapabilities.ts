@@ -47,6 +47,7 @@ export interface StrategyCapability {
 }
 
 export interface AdviceCapabilities {
+  planDataId?: string;
   llmoptVNext?: true;
   decisionInformation?: DecisionInformation;
   leagueId: number;
@@ -98,6 +99,11 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   if (!record(value.strategies) || !record(value.top100) || !record(value.managers_word)) {
     throw new AdviceCapabilitiesError("The capabilities have no strategies or switches.");
   }
+  if (
+    value.plan_data_id !== undefined &&
+    (typeof value.plan_data_id !== "string" || !/^[0-9a-f]{64}$/.test(value.plan_data_id))
+  )
+    throw new AdviceCapabilitiesError("Invalid plan data identity.");
   const strategies: Record<string, StrategyCapability> = {};
   for (const [slug, row] of Object.entries(value.strategies)) {
     if (
@@ -182,6 +188,9 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       ? {}
       : { preferences: record(value.preferences) && value.preferences.available === true }),
     ...(value.models === undefined ? {} : { models: value.models as ("current" | "football")[] }),
+    ...(value.llmopt_vnext === true && typeof value.plan_data_id === "string"
+      ? { planDataId: value.plan_data_id }
+      : {}),
     leagueId,
     captureSnapshotId: value.capture_snapshot_id,
     season: value.season,

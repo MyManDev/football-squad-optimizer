@@ -166,6 +166,9 @@ export function deviceAdviceClient(
       if (raw) {
         const envelope = checkedAdvice(JSON.parse(raw), request);
         if (envelope.payload.source_snapshot_id === squad.source_snapshot_id) {
+          envelope.payload.device_input_fingerprint = fingerprint;
+          for (const option of envelope.payload.device_alternatives ?? [])
+            option.device_input_fingerprint = fingerprint;
           const result: AdviceReadResult = { kind: "advice", envelope, source: "device" };
           memory.set(address, result);
           return result;
@@ -227,6 +230,10 @@ export function deviceAdviceClient(
     if (receipt && receipt.binding !== binding) throw new DeviceWorkRefused("RUN_CONTEXT_CHANGED");
   };
   return {
+    readDeviceDataId: async () => {
+      published = undefined;
+      return (await verified()).fingerprint;
+    },
     prepareDeviceRun: async (request) => {
       if (!eligible(request)) return false;
       let fingerprint: string;

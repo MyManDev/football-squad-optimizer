@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import developSchema from "../../../../../tests/fixtures/llmopt_develop_prompt_schema.json";
 
 import { requestsCarrying, sentRequests, watchKeyLeaks } from "../../../testSupport/keyLeaks";
 import { EMPTY_DRAFT, intentRefusal } from "./intent";
@@ -31,14 +32,31 @@ const REQUEST: IntentRequest = {
   referenceWeeks: [1],
 };
 const DRAFT = { hard: [{ kind: "no_hits" }], soft: [] };
+const DATA = "a".repeat(64);
+const PLAN = "1".repeat(64);
+const planContext: NonNullable<IntentRequest["planContext"]> = {
+  data_id: DATA,
+  kind: "server",
+  selected_plan_id: PLAN,
+  plans: [
+    {
+      plan_id: PLAN,
+      data_id: DATA,
+      weeks: [
+        { week: 1, transfers_in: [], transfers_out: [], chip: null, captain: 1, players: [1] },
+      ],
+    },
+  ],
+};
 
 /** The backend's two keyless routes and the member's provider, as one fetch. */
 function ownKeyFetch(
   check: () => Response = () => new Response(JSON.stringify({ status: "draft", draft: DRAFT })),
+  prompt: (body: Record<string, unknown>) => Response = () => Response.json(CALL),
 ) {
-  const fetch = vi.fn(async (input: RequestInfo | URL) => {
+  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url === `${ORIGIN}/api/v1/llmopt/prompt`) return new Response(JSON.stringify(CALL));
+    if (url === `${ORIGIN}/api/v1/llmopt/prompt`) return prompt(JSON.parse(init!.body as string));
     if (url === PROVIDER)
       return new Response(
         JSON.stringify({
@@ -55,6 +73,80 @@ function ownKeyFetch(
 }
 
 describe("ownKeyIntentSource", () => {
+  it("uses the develop provider schema exactly once when an open session encounters a confirmed rollback", async () => {
+    setOwnKey({ provider: "openai", model: "gpt-5-mini", key: KEY });
+    const confirmCatalogueRollback = vi.fn(async () => true);
+    const fetch = ownKeyFetch(undefined, (body) =>
+      body.plan_context
+        ? Response.json({ error: { code: "VALIDATION_FAILED" } }, { status: 422 })
+        : Response.json({ ...CALL, schema: developSchema }),
+    );
+    const result = await ownKeyIntentSource(ORIGIN).interpret(
+      { ...REQUEST, planContext, confirmCatalogueRollback },
+      new AbortController().signal,
+    );
+    expect(result).toEqual({ status: "draft", draft: DRAFT });
+    expect(confirmCatalogueRollback).toHaveBeenCalledOnce();
+    const requests = sentRequests(fetch);
+    expect(requests.map((r) => r.url)).toEqual([
+      `${ORIGIN}/api/v1/llmopt/prompt`,
+      `${ORIGIN}/api/v1/llmopt/prompt`,
+      PROVIDER,
+      `${ORIGIN}/api/v1/llmopt/check`,
+    ]);
+    const first = JSON.parse(requests[0]!.body);
+    const second = JSON.parse(requests[1]!.body);
+    expect(first).toEqual({ ...second, plan_context: planContext });
+    expect(second).not.toHaveProperty("plan_context");
+    const provider = JSON.parse(requests[2]!.body);
+    expect(provider.response_format.json_schema.schema).toEqual(developSchema);
+    expect(JSON.stringify(provider.messages)).not.toContain(DATA);
+    expect(JSON.parse(requests[3]!.body).request).toEqual(second);
+  });
+  it("keeps a catalogue validation refusal when the same master is still enabled", async () => {
+    const confirmCatalogueRollback = vi.fn(async () => false);
+    const fetch = ownKeyFetch(undefined, () =>
+      Response.json({ error: { code: "VALIDATION_FAILED" } }, { status: 422 }),
+    );
+    await expect(
+      ownKeyIntentSource(ORIGIN).interpret(
+        { ...REQUEST, planContext, confirmCatalogueRollback },
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(confirmCatalogueRollback).toHaveBeenCalledOnce();
+    expect(sentRequests(fetch).map((r) => r.url)).toEqual([`${ORIGIN}/api/v1/llmopt/prompt`]);
+  });
+  it("drops a departed archived captain from the confirmed rollback prompt while keeping current captains", async () => {
+    setOwnKey({ provider: "openai", model: "gpt-5-mini", key: KEY });
+    const historical = structuredClone(planContext);
+    const first = historical.plans[0]!.weeks[0]!;
+    first.captain = 2;
+    first.players = [2];
+    const request: IntentRequest = {
+      ...REQUEST,
+      planContext: historical,
+      referenceWeeks: [1, 2],
+      referenceCaptains: [
+        { week: 1, player_id: 2 },
+        { week: 2, player_id: 1 },
+      ],
+      confirmCatalogueRollback: async () => true,
+    };
+    const fetch = ownKeyFetch(undefined, (body) =>
+      body.plan_context ||
+      JSON.stringify(body.reference_captains) !== JSON.stringify([{ week: 2, player_id: 1 }])
+        ? Response.json({ error: { code: "VALIDATION_FAILED" } }, { status: 422 })
+        : Response.json(CALL),
+    );
+    const result = await ownKeyIntentSource(ORIGIN).interpret(
+      request,
+      new AbortController().signal,
+    );
+    expect(result).toEqual({ status: "draft", draft: DRAFT });
+    expect(sentRequests(fetch).filter(({ url }) => url === PROVIDER)).toHaveLength(1);
+    expect(request.referenceCaptains).toHaveLength(2);
+  });
   it("asks the site for the call, sends it to the provider with the key, and has the site check the reply", async () => {
     setOwnKey({ provider: "openai", model: "gpt-5-mini", key: KEY });
     const fetch = ownKeyFetch();
@@ -97,6 +189,25 @@ describe("ownKeyIntentSource", () => {
     await expect(
       ownKeyIntentSource(ORIGIN).interpret(REQUEST, new AbortController().signal),
     ).resolves.toEqual({ status: "clarification", message: "Which week?" });
+  });
+  it("never resends a provider reply or a refused check after a catalogue prompt succeeded", async () => {
+    setOwnKey({ provider: "openai", model: "gpt-5-mini", key: KEY });
+    const confirmCatalogueRollback = vi.fn(async () => true);
+    const fetch = ownKeyFetch(() =>
+      Response.json({ error: { code: "VALIDATION_FAILED" } }, { status: 422 }),
+    );
+    await expect(
+      ownKeyIntentSource(ORIGIN).interpret(
+        { ...REQUEST, planContext, confirmCatalogueRollback },
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(confirmCatalogueRollback).not.toHaveBeenCalled();
+    expect(sentRequests(fetch).map((r) => r.url)).toEqual([
+      `${ORIGIN}/api/v1/llmopt/prompt`,
+      PROVIDER,
+      `${ORIGIN}/api/v1/llmopt/check`,
+    ]);
   });
 
   it("reads the check's REPLY_REFUSED as the model giving no readable answer", async () => {

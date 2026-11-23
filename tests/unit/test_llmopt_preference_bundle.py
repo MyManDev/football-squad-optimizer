@@ -171,8 +171,10 @@ def test_bundle_capability_follows_release_on_league_and_public_routes(
         if enabled:
             assert state["llmopt_vnext"] is True
             assert state["preference_bundles"] == {"version": BUNDLE_VERSION}
+            assert state["plan_data_id"] == backend.reader.plan_data_id()
         else:
             assert "llmopt_vnext" not in state and "preference_bundles" not in state
+            assert "plan_data_id" not in state
 
 
 def test_bundle_requires_the_original_completed_main_before_admission(tmp_path, monkeypatch):

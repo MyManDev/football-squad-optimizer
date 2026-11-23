@@ -10,10 +10,19 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from typing import Any, Final
 
+from squadopt.contracts.llmopt_plans import (
+    MAX_PLAYER_ID,
+    PLAN_LABELS,
+    checked_plan_command,
+    checked_plan_context,
+    plan_command_schema,
+    plan_players_current,
+    provider_plan_context,
+)
 from squadopt.contracts.preferences import PlanScenario
 from squadopt.data.claim_identity import normalise_claim_name
 
@@ -24,7 +33,6 @@ _MAX_ROSTER: Final = 1000
 _MAX_CLUBS: Final = 32
 _MAX_CANDIDATES: Final = 64
 _MAX_CONSTRAINTS: Final = 16
-_MAX_SAFE_ID: Final = 2**53 - 1
 _WINDOWS: Final = (1, 3)
 _WEEKS: Final = (1, 2, 3)
 _MAX_HIT_POINTS: Final = 60
@@ -195,11 +203,19 @@ that calculation. With priorities but no total allowance, ask how many points in
 the manager would give up. With a total allowance and optional Wildcard, ask which to
 remove; that combination is unsupported. Do not invent a total allowance. A 1.5-point
 allowance for all preferences is max_total_cost_tenths 15, not three separate allowances.
+
+When choosing a displayed plan, freezing its transfer/week, or replacing one of its
+players, use only plan_context identifiers. Without that catalogue ask for clarification;
+do not invent a plan identifier or translate a plan selection into unrelated constraints.
 """
 
 
 class IntentValidationError(ValueError):
     """The incoming or proposed JSON does not match the intent contract."""
+
+
+class PlanDataChanged(IntentValidationError):
+    """The selected plan's players or data version are no longer current."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,6 +234,7 @@ class IntentRequest:
     clubs: tuple[str, ...] = ()
     reference_weeks: tuple[int, ...] = ()
     reference_captains: tuple[tuple[int, int], ...] = ()
+    plan_context: dict[str, Any] | None = None
 
 
 def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -245,7 +262,7 @@ def _text(value: object, maximum: int) -> str:
 
 
 def _player_id(value: object) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not 0 < value <= _MAX_SAFE_ID:
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 < value <= MAX_PLAYER_ID:
         raise IntentValidationError("Invalid player ID.")
     return value
 
@@ -523,10 +540,15 @@ def _reference_weeks(value: object) -> tuple[int, ...]:
 
 
 def _reference_captains(
-    value: object, weeks: tuple[int, ...], roster_ids: set[int]
+    value: object, weeks: tuple[int, ...], roster_ids: set[int], history: dict[str, Any] | None
 ) -> tuple[tuple[int, int], ...]:
     if not isinstance(value, list) or len(value) > len(weeks):
         raise IntentValidationError("Invalid reference captains.")
+    archived = {
+        (week["week"], week["captain"])
+        for plan in (history["plans"] if history else ())
+        for week in plan["weeks"]
+    }
     captains: dict[int, int] = {}
     for row in value:
         if not isinstance(row, dict) or row.keys() != {"week", "player_id"}:
@@ -537,19 +559,22 @@ def _reference_captains(
             type(week) is not int
             or week not in weeks
             or week in captains
-            or player not in roster_ids
+            or (player not in roster_ids and (week, player) not in archived)
         ):
             raise IntentValidationError("Reference captain does not match a solved week or roster.")
         captains[week] = player
-    return tuple(sorted(captains.items()))
+    return tuple(
+        sorted((week, player) for week, player in captains.items() if player in roster_ids)
+    )
 
 
-def parse_intent_request(value: object) -> IntentRequest:
+def parse_intent_request(value: object, *, llmopt_vnext: bool = True) -> IntentRequest:
     required = {"message", "locale", "draft", "players"}
     if (
         not isinstance(value, dict)
         or not required <= value.keys()
-        or value.keys() - (required | {"clarification", "reference_weeks", "reference_captains"})
+        or value.keys()
+        - (required | {"clarification", "reference_weeks", "reference_captains", "plan_context"})
     ):
         raise IntentValidationError("Invalid intent request.")
     locale = value["locale"]
@@ -573,6 +598,14 @@ def parse_intent_request(value: object) -> IntentRequest:
             _text(previous["question"], _MAX_QUESTION),
         )
     weeks = _reference_weeks(value.get("reference_weeks", []))
+    plan_context = None
+    if "plan_context" in value:
+        try:
+            plan_context = checked_plan_context(
+                value["plan_context"], None if llmopt_vnext else ids
+            )
+        except ValueError as error:
+            raise IntentValidationError(str(error)) from None
     return IntentRequest(
         _text(value["message"], INTENT_MAX_MESSAGE),
         locale,
@@ -581,8 +614,84 @@ def parse_intent_request(value: object) -> IntentRequest:
         clarification,
         clubs,
         weeks,
-        _reference_captains(value.get("reference_captains", []), weeks, ids),
+        _reference_captains(
+            value.get("reference_captains", []), weeks, ids, plan_context if llmopt_vnext else None
+        ),
+        plan_context,
     )
+
+
+def _claims_computed_value(question: str) -> bool:
+    """Detect a number attributed to a result, leaving numerical rule questions intact."""
+    text = _fold_text(question)
+    number = r"[+\-\u2212]?\d+(?:[.,]\d+)?"
+    money = rf"(?:£\s*{number}(?:\s*m)?|{number}\s*(?:m|million|milyon))\b"
+    amount = rf"(?:{money}|{number}\b)"
+    plan = r"\b(?:plan|option|alternative|result|p\d+)(?:\s+(?:#?\d+|[a-z]\b))?"
+    metric = r"(?:points?|score|bank|balance|budget|hits?|penalt(?:y|ies)|(?:free )?transfers?)"
+    modal = r"(?:(?:will|would|could|might|may|can)\s+|is (?:expected|projected|predicted) to\s+)"
+    result_verb = r"(?:earn|gain|cost|use|make|leave|give|yield|get|save|return|have|be worth)"
+    en_claim = (
+        rf"{plan}\s+(?:(?:already|currently)\s+)?"
+        rf"(?:(?:scores|scored|{modal}score)\s+{number}\b|"
+        rf"(?:earns|earned|gains|gained|costs|uses|used|makes|made|leaves|left|"
+        rf"gives|gave|yields|gets|saves|returns|returned|has|had|is worth|{modal}{result_verb})"
+        rf"\s+(?:(?:you|us|me)\s+)?"
+        rf"(?:{money}|{number}\s+(?:(?:net|remaining|expected|projected)\s+)?{metric}\b|"
+        rf"{number}\s+in\s+the\s+bank\b|(?:an?\s+)?(?:remaining\s+)?{metric}\s+of\s+{amount}))"
+    )
+    # A labelled result also makes a claim without an action verb.
+    plan_value = rf"{plan}\s*[:=]\s*(?:{money}|{number}\s+(?:net\s+)?(?:{metric}|puan)\b)"
+    label = (
+        rf"(?:{plan}['\u2019]s\s+(?:(?:expected|projected|remaining|net)\s+)?{metric}|"
+        rf"\b(?:expected|projected|calculated|predicted)\s+(?:net\s+)?{metric}|"
+        rf"\b(?:plan(?:in|inin)?|p\d+)(?:\s+\d+['\u2019]?(?:in|nin)?)?\s+"
+        rf"(?:(?:beklenen|net|kalan|toplam)\s+)?(?:puani|skoru|bakiyesi|butcesi|cezasi)|"
+        rf"\b(?:hesaplanan|beklenen|tahmini)\s+(?:net\s+)?(?:puani?|skoru?|bakiye(?:si)?))"
+        rf"\s*(?:(?:is|are|was|were|of)\s+|[:=]\s*)?{amount}\b"
+    )
+    # Turkish puts the indicative result verb after the quantity. A rule question
+    # about a requested limit uses an optative or conditional ending instead.
+    tr_claim = (
+        rf"(?:{money}|{number}\s+(?:(?:net\s+)?puan(?:lik)?|(?:ucretsiz\s+)?transfer|"
+        rf"oyuncu|ceza|para))\s+(?:(?:kasada|bankada|butcede|daha\s+fazla)\s+)?"
+        r"(?:aliyor|aldi|alacak|alir|alabilir|sagliyor|sagladi|saglayacak|saglayabilir|"
+        r"getiriyor|getirdi|getirecek|getirebilir|kazandiriyor|kazandirdi|kazandiracak|"
+        r"kazaniyor|kazandi|kazanacak|"
+        r"kaybettiriyor|kaybetti|birakiyor|birakti|birakacak|kaliyor|kaldi|harciyor|harcadi|"
+        r"kullaniyor|kullandi|yapiyor|yapti|veriyor|verdi|tutuyor)\b"
+    )
+    for match in re.finditer(rf"{en_claim}|{plan_value}|(?P<label>{label})|{tr_claim}", text):
+        before = text[: match.start()]
+        if match.lastgroup == "label":
+            # A requested metric takes its value from the member. Match immediately
+            # beside this quantity so another claim in the same reply is still checked.
+            after = text[match.end() :]
+            target_before = re.search(
+                r"\b(?:do you (?:want|prefer)|would you (?:like|prefer)|are you aiming for|"
+                r"is your (?:target|goal|minimum|maximum)|"
+                r"should (?:we|i) (?:target|require|aim for|use|set))"
+                r"\s+(?:(?:a|an|the|your|minimum|maximum)\s+)*$",
+                before,
+            )
+            target_after = re.search(r"\bis\s+(?:(?:a|an|the)\s+)?$", before) and re.match(
+                r"\s+(?:points?\s+)?(?:your|the)\s+(?:target|goal|minimum|maximum)\b", after
+            )
+            if (target_before or target_after) and not re.search(
+                r"\b(?:is|are|was|were)\b|[:=]", match.group()
+            ):
+                continue
+            if re.match(
+                r"\s+(?:puan\s+)?(?:hedefin(?:iz)?\s+mi|olsun\s+mu|"
+                r"olmasini\s+(?:ister\s+misin|istiyor\s+musun)|"
+                r"olarak\s+(?:belirleyelim|ayarlayalim)\s+mi)\b",
+                after,
+            ):
+                continue
+        # A conditional example in a rule question has no asserted outcome.
+        if not re.search(r"\b(?:if|suppose|assuming|eger)\b[^,;.!?]*$", before):
+            return True
+    return False
 
 
 def _validate_result(
@@ -594,17 +703,43 @@ def _validate_result(
     previous_draft: Mapping[str, Any] | None = None,
     reference_weeks: tuple[int, ...] = (),
     locale: str = "en",
+    plan_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if (
         not isinstance(value, dict)
         or "status" not in value
-        or value.keys() - {"status", "draft", "message"}
+        or value.keys() - {"status", "draft", "message", "plan_command"}
     ):
         raise IntentValidationError("Invalid intent result.")
+    if value["status"] == "plan":
+        if plan_context is None or value.get("draft") is not None:
+            raise IntentValidationError("A plan command requires a current catalogue.")
+        try:
+            command = checked_plan_command(value.get("plan_command"), plan_context)
+        except ValueError as error:
+            raise IntentValidationError(str(error)) from None
+        if command["action"] == "substitute":
+            roster = {player["id"] for player in candidates}
+            if command["player_id"] not in roster or command["replacement_id"] not in roster:
+                raise IntentValidationError("Substitution is outside the supplied roster.")
+        return {
+            "status": "plan",
+            "plan_label": value["plan_command"]["plan_label"],
+            "command": command,
+        }
+    if value.get("plan_command") is not None:
+        raise IntentValidationError("Unexpected plan command.")
     # A provider that does not enforce the schema may leave out the part its answer has no
     # use for, so the status decides which part is read. A draft's message is not read.
     if value["status"] == "clarification" and value.get("draft") is None:
-        return {"status": "clarification", "message": _text(value.get("message"), _MAX_QUESTION)}
+        question = _text(value.get("message"), _MAX_QUESTION)
+        if plan_context is not None and _claims_computed_value(question):
+            question = (
+                "Hangi plan\u0131 ya da oyuncuyu kastediyorsun?"
+                if locale == "tr"
+                else "Which plan or player do you mean?"
+            )
+        return {"status": "clarification", "message": question}
     if value["status"] != "draft":
         raise IntentValidationError("Invalid draft status.")
     player_ids = {player["id"] for player in candidates}
@@ -681,6 +816,13 @@ def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
     previous = (*request.draft["hard"], *request.draft["soft"], request.draft.get("comparison", {}))
     retained = {item.get("player_id") for item in previous}
     retained.update(player for _, player in request.reference_captains)
+    if request.plan_context is not None:
+        for plan in request.plan_context["plans"]:
+            for week in plan["weeks"]:
+                retained.update(week["transfers_in"])
+                retained.update(week["transfers_out"])
+                if week["captain"] is not None:
+                    retained.add(week["captain"])
     if (scenario := request.draft.get("scenario")) is not None:
         retained.add(scenario["player_id"])
     text = _tokens(request.message)
@@ -736,11 +878,16 @@ def _validated(
         previous_draft=request.draft,
         reference_weeks=request.reference_weeks,
         locale=request.locale,
+        plan_context=request.plan_context,
     )
 
 
 def check_reply(
-    request: IntentRequest, reply: object, *, llmopt_vnext: bool = True
+    request: IntentRequest,
+    reply: object,
+    *,
+    server_data_id: str | Callable[[], str | None] | None = None,
+    llmopt_vnext: bool = True,
 ) -> dict[str, Any]:
     """Validate a reply the member's own model gave to the call ``prompt_for`` wrote.
 
@@ -751,18 +898,37 @@ def check_reply(
     if isinstance(reply, str):
         reply = read_intent_json(reply)
     if not llmopt_vnext and (
-        _priority_draft(request.draft)
-        or (isinstance(reply, dict) and _priority_draft(reply.get("draft")))
+        request.plan_context is not None
+        or _priority_draft(request.draft)
+        or (
+            isinstance(reply, dict)
+            and (
+                "plan_command" in reply
+                or reply.get("status") == "plan"
+                or _priority_draft(reply.get("draft"))
+            )
+        )
     ):
         raise IntentValidationError("This planning workflow is closed.")
-    return _validated(request, _shortlist(request), reply)
+    result = _validated(request, _shortlist(request), reply)
+    if result["status"] == "plan" and request.plan_context is not None:
+        selected = request.plan_context["plans"][PLAN_LABELS.index(result["plan_label"])]
+        if not plan_players_current(selected, {p["id"] for p in request.players}):
+            raise PlanDataChanged("A player in the selected plan is no longer in the roster.")
+        if request.plan_context["kind"] == "server":
+            current = server_data_id() if callable(server_data_id) else server_data_id
+            if request.plan_context["data_id"] != current:
+                raise PlanDataChanged("The plan data has been superseded or is unavailable.")
+    return result
 
 
-def parse_check_request(value: object) -> tuple[IntentRequest, object]:
+def parse_check_request(
+    value: object, *, llmopt_vnext: bool = True
+) -> tuple[IntentRequest, object]:
     """The intent request and the model's reply from a check body."""
     if not isinstance(value, dict) or value.keys() != {"request", "reply"}:
         raise IntentValidationError("Invalid check request.")
-    return parse_intent_request(value["request"]), value["reply"]
+    return parse_intent_request(value["request"], llmopt_vnext=llmopt_vnext), value["reply"]
 
 
 def _schema_object(properties: dict[str, Any]) -> dict[str, Any]:
@@ -814,7 +980,7 @@ _DRAFT_SCHEMA: Final = _schema_object(
                     }
                 ),
                 {"type": "null"},
-            ]
+            ],
         },
         "scenario": {
             "anyOf": [
@@ -827,7 +993,7 @@ _DRAFT_SCHEMA: Final = _schema_object(
                     }
                 ),
                 {"type": "null"},
-            ]
+            ],
         },
     }
 )
@@ -877,7 +1043,9 @@ def _priority_draft(draft: object) -> bool:
     )
 
 
-def intent_reply_schema(*, llmopt_vnext: bool = True) -> dict[str, Any]:
+def intent_reply_schema(
+    *, with_plans: bool = False, llmopt_vnext: bool = True, plan_count: int = len(PLAN_LABELS)
+) -> dict[str, Any]:
     """Strict reply fields shared by every provider adapter."""
     if not llmopt_vnext:
         draft = dict(_DRAFT_SCHEMA["properties"])
@@ -891,7 +1059,15 @@ def intent_reply_schema(*, llmopt_vnext: bool = True) -> dict[str, Any]:
                 "draft": {"anyOf": [_schema_object(draft), {"type": "null"}]},
             }
         )
-    return _RESULT_SCHEMA
+    if not with_plans:
+        return _RESULT_SCHEMA
+    return _schema_object(
+        {
+            **_RESULT_SCHEMA["properties"],
+            "status": {"type": "string", "enum": ["draft", "clarification", "plan"]},
+            "plan_command": plan_command_schema(plan_count),
+        }
+    )
 
 
 def intent_call(request: IntentRequest, *, llmopt_vnext: bool = True) -> IntentCall:
@@ -912,9 +1088,13 @@ def intent_call(request: IntentRequest, *, llmopt_vnext: bool = True) -> IntentC
             "message": request.clarification.message,
             "question": request.clarification.question,
         }
-    if not llmopt_vnext and _priority_draft(request.draft):
+    if not llmopt_vnext and (request.plan_context is not None or _priority_draft(request.draft)):
         raise IntentValidationError("This planning workflow is closed.")
-    schema = intent_reply_schema(llmopt_vnext=llmopt_vnext)
+    schema = intent_reply_schema(
+        with_plans=request.plan_context is not None,
+        llmopt_vnext=llmopt_vnext,
+        plan_count=len(request.plan_context["plans"]) if request.plan_context else 0,
+    )
     order = (
         "Preserve the reviewed soft-rule order on follow-up unless the manager changes it."
         if llmopt_vnext
@@ -925,6 +1105,19 @@ def intent_call(request: IntentRequest, *, llmopt_vnext: bool = True) -> IntentC
     system = _SYSTEM_PROMPT.replace("{soft_rule_order}", order)
     if llmopt_vnext:
         system += "\n" + _VNEXT_INTENT_INSTRUCTIONS
+    if request.plan_context is not None:
+        context["plan_context"] = provider_plan_context(request.plan_context)
+        system += """
+The supplied plan_context lists computed plans in their displayed order and the selected
+plan label. For 'use the second plan' / 'ikinci plan\u0131 kullan', return status plan and action
+select with that exact plan_label. For 'bu transferi sabitle' use freeze_transfer, its incoming
+player_id and relative week. For 'bu haftay\u0131 koru' use freeze_week. For 'bu oyuncu yerine
+şunu alsam' use substitute, the existing player_id and replacement_id from players.
+Use the selected plan when no other is specified. Never invent identifiers or decisions.
+Ask when a reference is ambiguous. Return only the identifier and rule/action fields.
+Set draft and message to null for a plan command. Never return scores, prices, gains,
+resources, computed answers or an explanation. For an ordinary draft set plan_command null.
+"""
     return IntentCall(system, json.dumps(context, ensure_ascii=False), schema)
 
 
