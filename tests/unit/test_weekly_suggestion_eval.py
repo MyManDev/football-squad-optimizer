@@ -196,6 +196,26 @@ def test_dual_stores_keep_the_original_digest_and_serve_the_second_league(tmp_pa
         )
 
 
+def test_the_original_league_reads_the_baseline_of_a_week_it_published_as_a_device_menu(tmp_path):
+    # Published as a device menu, the original league writes no legacy record for the week;
+    # the one plain control the run recorded for the member is what its history reads.
+    baseline = _baseline()
+    record_member_advice(tmp_path / "baselines", baseline)
+    assert (
+        review.select_record(
+            tmp_path / "records",
+            baseline_record_root=tmp_path / "baselines",
+            season=SEASON,
+            gameweek=4,
+            entry_id=101,
+            league_id=352490,
+            deadline_utc=DEADLINE,
+            published={(101, 4): "capture-a"},
+        )
+        == baseline
+    )
+
+
 @pytest.mark.parametrize("fault", ["source", "generated_at_utc"])
 def test_legacy_record_cannot_hide_a_broken_baseline(tmp_path, fault):
     baseline = _baseline()
