@@ -50,7 +50,12 @@ const BEYOND = 100_000;
  * Once the week is closed (`closed`) the decision's heading reads LIVE WEEK and holds the
  * week being played, not a move, so its link is named so too.
  */
-export function MemberSections({ closed = false }: { closed?: boolean } = {}) {
+export function MemberSections({
+  closedName,
+}: {
+  /** The first section's heading on a closed week, as the page words it; absent on an open one. */
+  closedName?: string;
+} = {}) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const [found, setFound] = useState<readonly SectionKey[]>([]);
@@ -104,7 +109,7 @@ export function MemberSections({ closed = false }: { closed?: boolean } = {}) {
   }, []);
 
   const names: Record<SectionKey, string> = {
-    move: closed ? copy.liveWeek : copy.sectionMove,
+    move: closedName ?? copy.sectionMove,
     squad: copy.sectionSquad,
   };
   // The holder stays when nothing is linked: the page's scroll padding counts the strip.
