@@ -213,7 +213,7 @@ describe("the sections", () => {
       ["Picker: name taken", "70%"],
       ["Returning visits", "50%"],
       ["Phone visits", "75%"],
-      ["Rage and dead clicks", "15.6%"],
+      ["Rage and dead clicks", "14.2%"],
     ]) {
       expect(within(totals).getByText(label).nextElementSibling).toHaveTextContent(value!);
     }
@@ -253,9 +253,12 @@ describe("the sections", () => {
       ["CLS", "member", "Phone", "140", "0.08Good", "90%", "5%", "5%"],
     ]);
     expect(rows("Errors")).toEqual([["Failed to load", "member", "7", "6"]]);
+    // The member page's tools share page `member`; each tool's zone is a row of its own.
     expect(rows("Clicks by zone")).toEqual([
-      ["decision", "50", "6", "4"],
-      ["pitch", "25", "0", "5"],
+      ["decision", "week", "50", "6", "4"],
+      ["pitch", "week", "25", "0", "5"],
+      ["decision", "chips", "7", "0", "0"],
+      ["page", "week", "3", "0", "0"],
     ]);
   });
 
@@ -265,12 +268,12 @@ describe("the sections", () => {
     await screen.findByRole("heading", { name: "Totals" });
     const clicks = region("Clicks by zone");
     fireEvent.change(within(clicks).getByLabelText("Device"), { target: { value: "desktop" } });
-    expect(rows("Clicks by zone")).toEqual([["squad", "9", "0", "0"]]);
+    expect(rows("Clicks by zone")).toEqual([["squad", "week", "9", "0", "0"]]);
     // The scroll section reads the same choice: no desktop scroll was sent.
     expect(within(region("Scroll depth")).getByText("none")).toBeVisible();
     fireEvent.change(within(clicks).getByLabelText("Page"), { target: { value: "league" } });
     fireEvent.change(within(clicks).getByLabelText("Device"), { target: { value: "phone" } });
-    expect(rows("Clicks by zone")).toEqual([["member-table", "12", "0", "0"]]);
+    expect(rows("Clicks by zone")).toEqual([["member-table", "(no tool)", "12", "0", "0"]]);
     expect(rows("Scroll depth")[9]).toEqual(["at least 100% seen", "10", "100%"]);
   });
 

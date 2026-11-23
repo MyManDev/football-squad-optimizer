@@ -154,7 +154,7 @@ export function RuleEditor({
 
   return (
     <>
-      <div className={styles.rules}>
+      <div className={styles.rules} data-zone="llmopt-rule-list">
         {columns.map(({ strength, rules }) => {
           const removed = (changes?.removed ?? []).flatMap((item) =>
             item.group === strength && "rule" in item ? [item.rule] : [],
@@ -268,7 +268,7 @@ export function RuleEditor({
           </label>
         </div>
       )}
-      <form onSubmit={add} className={styles.editor}>
+      <form onSubmit={add} className={styles.editor} data-zone="llmopt-rules">
         <label>
           {copy.rule}
           <select

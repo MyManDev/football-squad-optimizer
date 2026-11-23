@@ -80,7 +80,7 @@ describe("the totals", () => {
       claimShare: 0.7,
       returningShare: 0.5,
       phoneShare: 0.75,
-      frustrationShare: 15 / 96,
+      frustrationShare: 15 / 106,
     });
   });
 
@@ -115,11 +115,25 @@ describe("one page and device", () => {
     });
   });
 
-  it("sums the clicks by zone", () => {
+  it("sums the clicks by tool and zone", () => {
     expect(clicksByZone(usageReportFixture(), "member", "phone")).toEqual([
-      { zone: "decision", clicks: 50, rage: 6, dead: 4 },
-      { zone: "pitch", clicks: 25, rage: 0, dead: 5 },
+      { zone: "decision", tool: "week", clicks: 50, rage: 6, dead: 4 },
+      { zone: "pitch", tool: "week", clicks: 25, rage: 0, dead: 5 },
+      { zone: "decision", tool: "chips", clicks: 7, rage: 0, dead: 0 },
+      { zone: "page", tool: "week", clicks: 3, rage: 0, dead: 0 },
     ]);
     expect(clicksByZone(usageReportFixture(), "member", "tablet")).toEqual([]);
+  });
+
+  it("keeps an older report's rows, with no tool, in rows of their own", () => {
+    const report = usageReportFixture();
+    report.behaviour.clicks = report.behaviour.clicks.map((cell) => ({ ...cell, tool: null }));
+    expect(clicksByZone(report, "member", "phone")[0]).toEqual({
+      zone: "decision",
+      tool: null,
+      clicks: 57,
+      rage: 6,
+      dead: 4,
+    });
   });
 });

@@ -23,6 +23,11 @@ import {
 /** The parts of the site a click is told against, as `workers/usage/src/rules.js` lists them. */
 export const USAGE_ZONES = [
   "nav",
+  "nav-brand",
+  "nav-member",
+  "nav-links",
+  "nav-settings",
+  "phone-bar",
   "topbar",
   "entry-form",
   "league-list",
@@ -50,6 +55,13 @@ export const USAGE_ZONES = [
   "vs",
   "live",
   "llmopt",
+  "llmopt-model",
+  "llmopt-instructions",
+  "llmopt-rule-list",
+  "llmopt-rules",
+  "llmopt-plan",
+  "llmopt-compute",
+  "llmopt-results",
   "reminder",
   "fixtures",
   "contribute",
@@ -57,6 +69,16 @@ export const USAGE_ZONES = [
 ] as const;
 
 export type UsageZone = (typeof USAGE_ZONES)[number];
+
+/**
+ * Words no component carries any more, kept in the list so an older tab's events are still
+ * taken and the record's rows still read. On 2026-11-23 `nav` (the whole sidebar, as tall as
+ * the window) gave way to `nav-brand`, `nav-member`, `nav-links` and `nav-settings`, and
+ * `llmopt` (the whole page) to the `llmopt-` zones, because a large box's cells did not sit
+ * on its controls. The heatmap mode draws a word only over an element that carries it, so
+ * these rows are counted in the admin page and never drawn over the newer, smaller boxes.
+ */
+export const RETIRED_USAGE_ZONES: readonly UsageZone[] = ["nav", "llmopt"];
 
 /** The other closed lists of version 2, as the Worker keeps them. */
 export const USAGE_KINDS = ["click", "scroll", "vital", "error", "arrival"] as const;

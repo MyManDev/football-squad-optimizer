@@ -420,7 +420,7 @@ export function PageShell({
         {layout === "phone" ? (
           <header
             className={styles.phoneBar}
-            data-zone="topbar"
+            data-zone="phone-bar"
             inert={overlay}
             data-phone-bar
             data-live={live !== null || undefined}
@@ -503,7 +503,6 @@ export function PageShell({
         ) : null}
         <aside
           id="sidebar"
-          data-zone="nav"
           className={styles.sidebar}
           aria-label={copy.sidebar}
           data-mode={mode}
@@ -516,7 +515,7 @@ export function PageShell({
             aria-modal={drawerOpen ? true : undefined}
             aria-label={drawerOpen ? copy.menu : undefined}
           >
-            <div className={styles.brandRow}>
+            <div className={styles.brandRow} data-zone="nav-brand">
               <Link
                 to="/"
                 className={styles.brand}
@@ -543,7 +542,7 @@ export function PageShell({
             </div>
             <div className={styles.body}>
               {own !== null && !rail ? (
-                <div className={styles.who}>
+                <div className={styles.who} data-zone="nav-member">
                   <p className={styles.whoText} id="sidebar-member">
                     {memberLine}
                   </p>
@@ -560,7 +559,7 @@ export function PageShell({
                 </div>
               ) : null}
               {own !== null && rail ? (
-                <div className={styles.whoRail}>
+                <div className={styles.whoRail} data-zone="nav-member">
                   <button
                     ref={whoRailRef}
                     type="button"
@@ -580,7 +579,12 @@ export function PageShell({
                   </p>
                 </div>
               ) : null}
-              <nav ref={navRef} aria-label={copy.primary} className={styles.nav}>
+              <nav
+                ref={navRef}
+                aria-label={copy.primary}
+                className={styles.nav}
+                data-zone="nav-links"
+              >
                 <span ref={markerRef} className={styles.navMarker} aria-hidden="true" />
                 {items.map((item) => (
                   <Link
@@ -596,7 +600,7 @@ export function PageShell({
                   </Link>
                 ))}
               </nav>
-              <div className={styles.footer}>
+              <div className={styles.footer} data-zone="nav-settings">
                 <LanguageToggle vertical={rail} />
                 <ThemeToggle vertical={rail} />
                 {rail ? null : (

@@ -17,11 +17,15 @@
 //   device_solves               { events, visits }
 //   behaviour                   version 2 events:
 //     events, visits
-//     clicks                    [{ page, device, zone, cell, events,
+//     clicks                    [{ page, tool, device, zone, cell, events,
 //                                  marks: { none, rage, dead }, targets: { control, plain } }]
-//                               by page, device, zone and cell; `cell` is row * 20 + column of
-//                               the 20 by 20 grid over the zone
-//     frustration               [{ page, zone, clicks, rage, dead }], most rage and dead first
+//                               by page, tool, device, zone and cell; `cell` is row * 20 +
+//                               column of the 20 by 20 grid over the zone; `tool` is the
+//                               event's `tool` word ("" on a page with no tool), so the member
+//                               page's tools, which share page `member`, stay apart (added
+//                               2026-11-23; a reader of an older answer finds no `tool`)
+//     frustration               [{ page, tool, zone, clicks, rage, dead }], by page, tool and
+//                               zone, most rage and dead first
 //     scroll                    [{ page, device, events,
 //                                  depth: { "0", "10", ..., "100" }, dwell: { s5, ..., long } }]
 //                               page views by the deepest tenth seen and by time on the page
@@ -122,8 +126,10 @@ export function rowsFromAnswer(answer) {
   if (answer === null || typeof answer !== "object" || !Array.isArray(answer.data)) {
     throw new Error("Analytics Engine's answer has no data rows");
   }
-  const before = Number(answer.rows_before_limit_at_least ?? answer.data.length);
-  return { rows: answer.data, truncated: answer.data.length >= ROW_LIMIT || before > answer.data.length };
+  // Only a full page of rows says the limit cut the range off. The SQL API's
+  // `rows_before_limit_at_least` counts the rows it read before grouping, not the groups, so
+  // it is above the answer's length on every grouped query and said nothing here.
+  return { rows: answer.data, truncated: answer.data.length >= ROW_LIMIT };
 }
 
 /** Events and distinct visits per value of `key`, among the rows `keep` accepts, largest first. */
@@ -251,25 +257,25 @@ function behaviourSummary(rows) {
 
   const cells = grouped(
     clicks,
-    ["page", "device", "zone", "cell"],
+    ["page", "tool", "device", "zone", "cell"],
     () => ({ events: 0, marks: zeros(MARKS), targets: zeros(TARGETS) }),
     (entry, click) => {
       entry.events += click.events;
       if (click.mark in entry.marks) entry.marks[click.mark] += click.events;
       if (click.target in entry.targets) entry.targets[click.target] += click.events;
     },
-  ).sort(byKeys(["page", "device", "zone", "cell"]));
+  ).sort(byKeys(["page", "tool", "device", "zone", "cell"]));
 
   const frustration = grouped(
     clicks,
-    ["page", "zone"],
+    ["page", "tool", "zone"],
     () => ({ clicks: 0, rage: 0, dead: 0 }),
     (entry, click) => {
       entry.clicks += click.events;
       if (click.mark === "rage") entry.rage += click.events;
       if (click.mark === "dead") entry.dead += click.events;
     },
-  ).sort((a, b) => b.rage + b.dead - (a.rage + a.dead) || byKeys(["page", "zone"])(a, b));
+  ).sort((a, b) => b.rage + b.dead - (a.rage + a.dead) || byKeys(["page", "tool", "zone"])(a, b));
 
   const scroll = grouped(
     of("scroll"),

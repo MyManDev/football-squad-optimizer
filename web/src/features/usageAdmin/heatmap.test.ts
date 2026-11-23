@@ -22,9 +22,11 @@ afterEach(() => {
 
 const clicks = usageReportFixture().behaviour.clicks;
 
+const WEEK = { page: "member", tool: "week" };
+
 describe("the cells a choice selects", () => {
-  it("keeps one page and device, by zone and cell", () => {
-    const { zones, max, total } = selectCells(clicks, "member", "phone", "all");
+  it("keeps one page, tool and device, by zone and cell", () => {
+    const { zones, max, total, untooled } = selectCells(clicks, WEEK, "phone", "all");
     expect([...zones.keys()]).toEqual(["decision", "pitch"]);
     expect([...zones.get("decision")!]).toEqual([
       [0, 40],
@@ -32,13 +34,46 @@ describe("the cells a choice selects", () => {
     ]);
     expect(max).toBe(40);
     expect(total).toBe(75);
+    expect(untooled).toBe(false);
+  });
+
+  it("leaves another tool of the same page out", () => {
+    // Every tool of a member's page is page `member`: the chips tool's click in the same
+    // zone and cell is that tool's alone.
+    const chips = selectCells(clicks, { page: "member", tool: "chips" }, "phone", "all");
+    expect([...chips.zones.keys()]).toEqual(["decision"]);
+    expect([...chips.zones.get("decision")!]).toEqual([[0, 7]]);
+    expect(chips.total).toBe(7);
+    expect(chips.outside).toBe(0);
+    expect(selectCells(clicks, { page: "member", tool: "duel" }, "phone", "all").total).toBe(0);
+  });
+
+  it("counts the clicks in no zone apart and never draws them", () => {
+    const { zones, total, outside } = selectCells(clicks, WEEK, "phone", "all");
+    expect(zones.has("page")).toBe(false);
+    expect(outside).toBe(3);
+    expect(total).toBe(75);
+    expect(selectCells(clicks, WEEK, "phone", "rage").outside).toBe(0);
+  });
+
+  it("keeps a row with no tool, from an older Worker, on its page alone, and says so", () => {
+    const older = clicks.map((cell) => ({ ...cell, tool: null }));
+    const chips = selectCells(older, { page: "member", tool: "chips" }, "phone", "all");
+    expect([...chips.zones.get("decision")!]).toEqual([
+      [0, 47],
+      [21, 10],
+    ]);
+    expect(chips.total).toBe(82);
+    expect(chips.outside).toBe(3);
+    expect(chips.untooled).toBe(true);
+    expect(selectCells(older, { page: "league", tool: "" }, "phone", "all").total).toBe(12);
   });
 
   it("reads a mark's own count and leaves zero cells out", () => {
-    const rage = selectCells(clicks, "member", "phone", "rage");
+    const rage = selectCells(clicks, WEEK, "phone", "rage");
     expect([...rage.zones.keys()]).toEqual(["decision"]);
     expect(rage.total).toBe(6);
-    const dead = selectCells(clicks, "member", "phone", "dead");
+    const dead = selectCells(clicks, WEEK, "phone", "dead");
     expect(dead.total).toBe(9);
     expect(dead.max).toBe(5);
   });
@@ -113,31 +148,22 @@ describe("the live page", () => {
     return element;
   }
 
-  it("draws each drawn zone over its box in the document, and the page over the document", () => {
+  it("draws each drawn zone over its box in the document, and nothing for clicks in no zone", () => {
     vi.stubGlobal("scrollX", 0);
     vi.stubGlobal("scrollY", 500);
     zone("decision", { left: 20, top: -100, width: 400, height: 400 });
     zone("pitch", { left: 0, top: 0, width: 0, height: 0 });
     zone("squad", { left: 0, top: 0, width: 100, height: 100 });
-    vi.spyOn(document.documentElement, "scrollWidth", "get").mockReturnValue(1000);
-    vi.spyOn(document.documentElement, "scrollHeight", "get").mockReturnValue(4000);
-    const selection = selectCells(
-      [
-        ...clicks,
-        { ...clicks[0]!, zone: "page", cell: 399, events: 4, marks: { none: 4, rage: 0, dead: 0 } },
-      ],
-      "member",
-      "phone",
-      "all",
-    );
+    // An element that names `page` is no zone's box either.
+    zone("page", { left: 0, top: 0, width: 1000, height: 4000 });
+    const selection = selectCells(clicks, WEEK, "phone", "all");
+    expect(selection.outside).toBe(3);
     const layer = document.createElement("div");
     const cells = measureCells(selection, layer);
     expect(layer.hidden).toBe(false);
     expect(
       cells.map(({ left, top, width, height, count }) => [left, top, width, height, count]),
     ).toEqual([
-      // The page's grid over the whole document, drawn first.
-      [950, 3800, 50, 200, 4],
       // The decision zone, 100 px above the viewport with the page scrolled 500 px.
       [20, 400, 20, 20, 40],
       [40, 420, 20, 20, 10],
