@@ -150,8 +150,13 @@ describe("a version 2 event", () => {
   it("names exactly the kinds and words ADR 0015 lists", () => {
     const sorted = (set) => [...set].sort();
     assert.deepEqual(sorted(KINDS), ["arrival", "click", "error", "scroll", "vital"]);
-    assert.equal(ZONES.size, 32);
+    assert.equal(ZONES.size, 44);
     for (const zone of ["nav", "decision", "pitch", "member-picker", "llmopt", "contribute", "page"]) assert.ok(ZONES.has(zone));
+    // Added on 2026-11-23 for smaller boxes; the words they replaced stay readable above.
+    for (const zone of [
+      "nav-brand", "nav-member", "nav-links", "nav-settings", "phone-bar",
+      "llmopt-model", "llmopt-instructions", "llmopt-rule-list", "llmopt-rules", "llmopt-plan", "llmopt-compute", "llmopt-results",
+    ]) assert.ok(ZONES.has(zone), zone);
     assert.deepEqual(sorted(TARGETS), ["control", "plain"]);
     assert.deepEqual(sorted(MARKS), ["dead", "none", "rage"]);
     assert.deepEqual(sorted(DWELLS), ["long", "s15", "s180", "s30", "s5", "s60", "s600"]);

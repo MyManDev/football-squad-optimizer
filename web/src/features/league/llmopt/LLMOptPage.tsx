@@ -230,7 +230,7 @@ function RosterHold({
   roster: UseQueryResult<CatalogPlayer[]>;
 }) {
   return (
-    <div className={styles.page} data-zone="llmopt">
+    <div className={styles.page}>
       <PageHeader squad={squad} />
       <RosterRetry roster={roster} />
     </div>
@@ -861,7 +861,7 @@ function Workspace({
   };
 
   return (
-    <div className={styles.page} data-zone="llmopt">
+    <div className={styles.page}>
       <PageHeader squad={squad} />
       {!ORIGIN && (
         <p className={styles.notice} role="status">
@@ -898,7 +898,12 @@ function Workspace({
             ))}
           </ol>
         )}
-        <form className={styles.chat} ref={chatForm} onSubmit={(event) => void send(event)}>
+        <form
+          className={styles.chat}
+          ref={chatForm}
+          onSubmit={(event) => void send(event)}
+          data-zone="llmopt-instructions"
+        >
           <label htmlFor="llmopt-message">{copy.chat}</label>
           <textarea
             id="llmopt-message"
@@ -930,7 +935,7 @@ function Workspace({
             </button>
           )}
         </form>
-        <label className={styles.windowChoice}>
+        <label className={styles.windowChoice} data-zone="llmopt-plan">
           {copy.window}
           <select
             value={plans.window}
@@ -1062,6 +1067,7 @@ function Workspace({
           className={styles.primary}
           ref={computeButton}
           type="button"
+          data-zone="llmopt-compute"
           disabled={
             busy ||
             clarification !== undefined ||
@@ -1131,6 +1137,7 @@ function Workspace({
       {run && !run.scenario && (
         <section
           className={styles.results}
+          data-zone="llmopt-results"
           aria-label={copy.results}
           aria-busy={isWorking(baseState.phase)}
         >

@@ -743,11 +743,12 @@ describe("the zones the components carry", () => {
     return found;
   }
 
-  it("are words of the list, and every word but the page is placed", () => {
+  it("are words of the list, and every word but the page and the retired ones is placed", () => {
     const words = placed();
+    const retired: readonly string[] = behaviour.RETIRED_USAGE_ZONES;
     for (const word of words) expect(behaviour.USAGE_ZONES, word).toContain(word);
     for (const word of behaviour.USAGE_ZONES) {
-      if (word !== "page") expect(words.has(word), word).toBe(true);
+      if (word !== "page") expect(words.has(word), word).toBe(!retired.includes(word));
     }
   });
 });

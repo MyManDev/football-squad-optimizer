@@ -29,15 +29,16 @@ type Read =
 /**
  * The heatmap mode (ADR 0016): for a browser marked as an admin's, a small button that draws
  * the record's clicks over the page being looked at, cell by cell over each zone's live box,
- * for a chosen device class, mark and range. It asks whether the person may read the record
- * once a page load and shows nothing unless the answer is yes. Nothing it draws takes a
- * pointer, so the page under it works as usual.
+ * for a chosen device class, mark and range. Only the clicks of the page and tool the address
+ * names are drawn; clicks in no zone are counted in the panel instead. It asks whether the
+ * person may read the record once a page load and shows nothing unless the answer is yes.
+ * Nothing it draws takes a pointer, so the page under it works as usual.
  */
 export function HeatmapMode() {
   const { language, locale } = useLanguage();
   const copy = USAGE_ADMIN_COPY[language];
   const { pathname } = useLocation();
-  const page = usagePlace(pathname).page;
+  const { page, tool } = usagePlace(pathname);
 
   const [admin, setAdmin] = useState(false);
   useEffect(() => {
@@ -79,9 +80,9 @@ export function HeatmapMode() {
     return {
       days,
       state: "ok",
-      selection: selectCells(read.answer.value.behaviour.clicks, page, device, mark),
+      selection: selectCells(read.answer.value.behaviour.clicks, { page, tool }, device, mark),
     };
-  }, [read, days, page, device, mark]);
+  }, [read, days, page, tool, device, mark]);
   const selection = current?.state === "ok" ? current.selection : null;
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -147,7 +148,7 @@ export function HeatmapMode() {
       ? copy.heatLoading
       : current.state === "failed"
         ? copy.heatFailed
-        : current.selection.total === 0
+        : current.selection.total === 0 && current.selection.outside === 0
           ? copy.heatEmpty
           : copy.heatTotal(count.format(current.selection.total));
 
@@ -180,7 +181,7 @@ export function HeatmapMode() {
               {copy.close}
             </button>
           </header>
-          <p className={styles.line}>{copy.heatPage(page)}</p>
+          <p className={styles.line}>{copy.heatPage(page, tool)}</p>
           <Choice
             label={copy.device}
             options={DEVICES.map((value) => ({ value, text: copy.deviceNames[value] }))}
@@ -202,6 +203,12 @@ export function HeatmapMode() {
           <p className={styles.line} role="status">
             {status}
           </p>
+          {selection !== null && selection.outside > 0 ? (
+            <p className={styles.line}>{copy.heatOutside(count.format(selection.outside))}</p>
+          ) : null}
+          {selection !== null && selection.untooled ? (
+            <p className={styles.line}>{copy.heatUntooled}</p>
+          ) : null}
           <div className={styles.legend} aria-hidden="true">
             <span>{copy.legendFew}</span>
             <span className={styles.ramp} />

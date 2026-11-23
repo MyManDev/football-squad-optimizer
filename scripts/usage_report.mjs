@@ -85,11 +85,14 @@ const counts = (map, suffix = "") =>
     .map(([word, count]) => `${word}${suffix} ${count}`)
     .join(", ");
 
-/** The click table in text: one line per page, device and zone, with its busiest cells. */
+/** A tool word as the text prints it: the empty word of a page with no tool is named. */
+const toolName = (tool) => tool || "(no tool)";
+
+/** The click table in text: one line per page, tool, device and zone, with its busiest cells. */
 function clickLines(cells) {
   const zones = grouped(
     cells,
-    ["page", "device", "zone"],
+    ["page", "tool", "device", "zone"],
     () => ({ events: 0, rage: 0, dead: 0, cells: [] }),
     (entry, cell) => {
       entry.events += cell.events;
@@ -104,7 +107,7 @@ function clickLines(cells) {
       .slice(0, 5)
       .map(({ cell, events }) => `r${Math.floor(cell / GRID)}c${cell % GRID} ${events}`)
       .join(", ");
-    return [zone.page, zone.device, zone.zone, `${zone.events} clicks`, `${zone.rage} rage`, `${zone.dead} dead`, `busiest: ${busiest}`];
+    return [zone.page, toolName(zone.tool), zone.device, zone.zone, `${zone.events} clicks`, `${zone.rage} rage`, `${zone.dead} dead`, `busiest: ${busiest}`];
   });
 }
 
@@ -113,11 +116,21 @@ function renderBehaviour(behaviour) {
   return [
     `Behaviour: ${behaviour.events} events in ${behaviour.visits} visits`,
     "",
-    ...grid("Clicks by page, device and zone (cells as row and column of the 20 by 20 grid)", clickLines(behaviour.clicks)),
+    ...grid(
+      "Clicks by page, tool, device and zone (cells as row and column of the 20 by 20 grid)",
+      clickLines(behaviour.clicks),
+    ),
     "",
     ...grid(
-      "Rage and dead clicks by page and zone",
-      behaviour.frustration.map(({ page, zone, clicks, rage, dead }) => [page, zone, `${clicks} clicks`, `${rage} rage`, `${dead} dead`]),
+      "Rage and dead clicks by page, tool and zone",
+      behaviour.frustration.map(({ page, tool, zone, clicks, rage, dead }) => [
+        page,
+        toolName(tool),
+        zone,
+        `${clicks} clicks`,
+        `${rage} rage`,
+        `${dead} dead`,
+      ]),
     ),
     "",
     ...grid(

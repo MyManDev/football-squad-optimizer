@@ -28,8 +28,15 @@ export interface UsageTally {
   visits: number;
 }
 
+/**
+ * The tool a click row names: the event's `tool` word, "" on a page with no tool, or null when
+ * the answer did not say (a Worker from before 2026-11-23, whose rows merged a page's tools).
+ */
+export type UsageRowTool = string | null;
+
 export interface UsageClickCell {
   page: string;
+  tool: UsageRowTool;
   device: string;
   zone: string;
   cell: number;
@@ -40,6 +47,7 @@ export interface UsageClickCell {
 
 export interface UsageFrustration {
   page: string;
+  tool: UsageRowTool;
   zone: string;
   clicks: number;
   rage: number;
@@ -178,6 +186,10 @@ function counts(value: unknown, words: readonly string[]): Record<string, number
   return out;
 }
 
+/** A row's tool: its word, or null when an older answer left the field out. */
+const toolOf = (entry: Shape): UsageRowTool =>
+  entry.tool === undefined ? null : need(entry.tool, isText);
+
 const tally = (entry: Shape): UsageTally => ({
   name: need(entry.name, isText),
   events: need(entry.events, isCount),
@@ -197,6 +209,7 @@ function behaviourOf(value: unknown): UsageReport["behaviour"] {
       if (!Number.isInteger(cell) || cell >= 400) throw new ShapeError();
       return {
         page: need(entry.page, isText),
+        tool: toolOf(entry),
         device: need(entry.device, isText),
         zone: need(entry.zone, isText),
         cell,
@@ -207,6 +220,7 @@ function behaviourOf(value: unknown): UsageReport["behaviour"] {
     }),
     frustration: list(behaviour.frustration, (entry) => ({
       page: need(entry.page, isText),
+      tool: toolOf(entry),
       zone: need(entry.zone, isText),
       clicks: need(entry.clicks, isCount),
       rage: need(entry.rage, isCount),
