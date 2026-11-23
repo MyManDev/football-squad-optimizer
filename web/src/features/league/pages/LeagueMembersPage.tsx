@@ -2,6 +2,7 @@ import { memberAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { Link } from "react-router";
 import { Fragment, type CSSProperties } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useShellLayout } from "../../../design/shell/layout";
@@ -18,7 +19,9 @@ import { leagueRace } from "../race/leagueRace";
 import { LeagueRaceCard } from "../race/LeagueRaceCard";
 import { LeagueDataMissing } from "../data";
 import { useLeagueIdentity } from "../identity/useLeagueIdentity";
-import { useEntrySquad, useLeagueMembers, useLeagueScoreboard } from "../queries";
+import { chipsWithPlayedWeek, type PlayedLineup } from "../live/memberLineup";
+import { entryBundleQuery } from "../forwarded/reads";
+import { LEAGUE_READ, useEntrySquad, useLeagueMembers, useLeagueScoreboard } from "../queries";
 import { follower, gapToLeader, leaderTotal, netWeekPoints } from "../standing";
 import type {
   EntrySquad,
@@ -49,6 +52,16 @@ export function LeagueMembersPage() {
     query.data?.payload.season,
     query.data?.payload.gameweek,
   );
+  // The viewer's chips are published from before the deadline. Once it has passed, the bundle
+  // the member's page and the LIVE pill read names the chip played at it: one read, held under
+  // their key, and none at all while the week is open or nobody has said who they are.
+  const gameweek = query.data?.payload.gameweek ?? null;
+  const viewerBundle = useQuery({
+    ...entryBundleQuery(viewer?.entryId ?? 0, gameweek),
+    enabled: viewer !== null && gameweek !== null && deadlinePassed !== null,
+    ...LEAGUE_READ,
+  });
+  const played = viewerBundle.data?.document.current_week ?? null;
   if (query.isPending) return <EmptyState title={copy.loading} />;
   if (query.isError) {
     const missing = query.error instanceof LeagueDataMissing;
@@ -69,6 +82,9 @@ export function LeagueMembersPage() {
       viewerSquadPending={viewer !== null && viewerSquad.isPending}
       fixtures={fixtures.data ?? null}
       deadlinePassed={deadlinePassed !== null}
+      viewerPlayedWeek={
+        deadlinePassed !== null && played !== null && played.gameweek === gameweek ? played : null
+      }
       scoreboard={scoreboard.isError ? null : (scoreboard.data?.payload ?? null)}
     />
   );
@@ -93,6 +109,7 @@ export function LeagueMembersView({
   viewerSquadPending = false,
   fixtures = null,
   deadlinePassed = false,
+  viewerPlayedWeek = null,
   scoreboard = null,
 }: {
   envelope: LeagueViewEnvelope<LeagueMembers>;
@@ -105,6 +122,8 @@ export function LeagueMembersView({
   fixtures?: FixturesPayload | null;
   /** The calendar's deadline for this gameweek has passed. */
   deadlinePassed?: boolean;
+  /** The viewer's week played at that deadline, once read: the chip it names was played. */
+  viewerPlayedWeek?: Pick<PlayedLineup, "active_chip" | "gameweek"> | null;
 }) {
   const { locale, messages } = useLanguage();
   const leagueId = useLeagueId();
@@ -123,7 +142,11 @@ export function LeagueMembersView({
     viewerRow && viewerSquad?.payload.entry.entry_id === viewerRow.entry_id
       ? viewerSquad.payload
       : null;
-  const chips = squad ? viewerChipLines(squad) : null;
+  const chips = squad
+    ? viewerChipLines(
+        viewerPlayedWeek ? { ...squad, ...chipsWithPlayedWeek(squad, viewerPlayedWeek) } : squad,
+      )
+    : null;
   const deadline = gameweekDeadline(fixtures, view.season, view.gameweek);
   const cells = viewerRow ? scoreBugCells(viewerRow, rows.length, squad, locale, copy) : [];
   const count = (value: number) => points(value, 0, locale);
