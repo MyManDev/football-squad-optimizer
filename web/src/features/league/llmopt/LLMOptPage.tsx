@@ -34,7 +34,7 @@ import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { deviceAdviceClient } from "../device/adviceClient";
 import { shownPriorityReference } from "../device/priorityWitness";
-import { deviceSelection } from "../device/selection";
+import { confirmationProblem, prepareConfirmedRun } from "./releaseRun";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import { priorityOutcomes } from "../advice/preferenceBundle";
@@ -83,7 +83,6 @@ import {
 } from "./planRevision";
 import {
   baseDraft,
-  prepareRun,
   requestFor,
   restoreRun,
   type BaseTitle,
@@ -375,7 +374,7 @@ function Workspace({
   const computeButton = useRef<HTMLButtonElement>(null);
   const interpret = useRef<AbortController | null>(null);
   const nextChatLine = useRef(conversation.length);
-  const confirming = useRef(false);
+  const confirming = useRef<symbol | null>(null);
   const mounted = useRef(true);
 
   // Follow new replies within the list, without moving the page or taking an older
@@ -435,6 +434,10 @@ function Workspace({
   // An edit keeps the plan the member compares against; only Revise picks another. Before any
   // plan was picked, the first edit after a result compares against the plan shown.
   function change(next: PlanDraft, previous = selectedReference ?? reference ?? revised) {
+    if (confirming.current) {
+      confirming.current = null;
+      setCheckingSquad(false);
+    }
     const abandoned = session.confirmation?.runId;
     const hadOpenWork = Object.values(jobs.states).some(({ phase }) => isWorking(phase));
     if (abandoned)
@@ -1018,7 +1021,9 @@ function Workspace({
       mainBlocked
     )
       return;
-    confirming.current = true;
+    const attempt = Symbol();
+    confirming.current = attempt;
+    const currentConfirmation = () => mounted.current && confirming.current === attempt;
     setFeedback("");
     setChanges(null);
     setCheckingSquad(true);
@@ -1029,7 +1034,7 @@ function Workspace({
           .refetch({ cancelRefetch: false })
           .then((read) => (read.isError ? null : read.data)),
       ]);
-      if (!mounted.current) return;
+      if (!currentConfirmation()) return;
       if (!capabilities || (retryRunId && !capabilities.verifiedRepairs)) {
         setFeedback(copy.serviceUnavailable);
         return;
@@ -1059,26 +1064,9 @@ function Workspace({
         setFeedback(copy.windowUnavailable);
         return;
       }
-      const local =
-        capabilities.llmoptVNext === true &&
-        capabilities.devicePreferenceBundles === true &&
-        plans.window === 1;
-      const grouped =
-        capabilities.llmoptVNext === true && (capabilities.preferenceBundles === true || local);
-      const hasPriority = draft.soft.some(({ priority }) => priority !== undefined);
-      if (!grouped && (hasPriority || draft.max_total_cost_tenths !== undefined)) {
-        setFeedback(copy.serviceUnavailable);
-        return;
-      }
-      if (hasPriority && draft.max_total_cost_tenths === undefined) {
-        setFeedback(copy.totalRequired);
-        return;
-      }
-      if (
-        draft.max_total_cost_tenths !== undefined &&
-        (draft.scenario || !draft.soft.length || draft.soft.some(({ kind }) => kind === "wildcard"))
-      ) {
-        setFeedback(copy.totalUnavailable);
+      const problem = confirmationProblem(draft, plans.window, capabilities);
+      if (problem) {
+        setFeedback(copy[problem]);
         return;
       }
       if (retryRunId) {
@@ -1089,63 +1077,29 @@ function Workspace({
         try {
           await withRequestDeadline(async () => client.cancelRun?.(retryRunId));
         } catch {
-          if (mounted.current) setFeedback(copy.serviceUnavailable);
+          if (currentConfirmation()) setFeedback(copy.serviceUnavailable);
           return;
         }
         if (
-          !mounted.current ||
+          !currentConfirmation() ||
           session.confirmation?.runId !== retryRunId ||
           !deadlineOpen(deadline)
         )
           return;
       }
       const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
-      const request = requestFor(squad, forwarded, plans.window, local);
-      if (runId) request.run = { contract_version: "llmopt_run_v1", run_id: runId, stage: "base" };
-      // A public team may have no chip list until its FPL inputs are pinned.
-      const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
-      const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
-      let next = prepareRun({
-        draft,
-        held,
-        request,
-        plans,
-        wildcardNotHeld,
-        frozenWeeks: frozen,
-        reference,
-        compareOnly: !!runId && reference?.compareOnly === true,
-        bundleMode: grouped && draft.soft.length > 0 && !draft.scenario,
-        ...(runId && capabilities.threeWeekPaths === true && plans.window === 3
-          ? { paths3w: true as const }
-          : {}),
-      });
-      const execution = preferenceExecution(next);
-      const requests = [
-        next.baseRequest,
-        ...next.slots.map((slot) => slot.request),
-        execution,
-      ].filter((value): value is NonNullable<typeof value> => value != null);
-      if (
-        next.inputs.request.deviceRun === true &&
-        (requests.some((query) => deviceSelection(query, squad)?.kind !== "plain") ||
-          !(await client.prepareDeviceRun?.(next.inputs.request)))
-      ) {
-        next = prepareRun({
-          ...next.inputs,
-          request: { ...next.inputs.request, deviceRun: false, deviceAlternatives: false },
-        });
-      }
-      if (!mounted.current) return;
-      if (
-        next.inputs.bundleMode &&
-        next.baseRequest?.deviceRun === false &&
-        !capabilities.preferenceBundles
-      ) {
-        if (draft.max_total_cost_tenths !== undefined) {
-          setFeedback(copy.serviceUnavailable);
-          return;
-        }
-        next = prepareRun({ ...next.inputs, bundleMode: false });
+      const next = await prepareConfirmedRun(
+        { draft, held, plans, frozenWeeks: frozen, reference },
+        squad,
+        forwarded,
+        capabilities,
+        runId,
+        client.prepareDeviceRun,
+      );
+      if (!currentConfirmation() || !deadlineOpen(deadline)) return;
+      if (!next) {
+        setFeedback(copy.serviceUnavailable);
+        return;
       }
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
       if (
@@ -1163,7 +1117,7 @@ function Workspace({
         reference,
         confirmation: {
           ...(runId ? { runId } : {}),
-          wildcardNotHeld,
+          wildcardNotHeld: next.inputs.wildcardNotHeld,
           ...(next.inputs.paths3w ? { paths3w: true as const } : {}),
           sending: true as const,
           compareOnly: next.inputs.compareOnly === true,
@@ -1188,10 +1142,12 @@ function Workspace({
         });
       }
     } catch {
-      if (mounted.current) setFeedback(copy.squadUnavailable);
+      if (currentConfirmation()) setFeedback(copy.squadUnavailable);
     } finally {
-      confirming.current = false;
-      if (mounted.current) setCheckingSquad(false);
+      if (confirming.current === attempt) {
+        confirming.current = null;
+        if (mounted.current) setCheckingSquad(false);
+      }
     }
   }
 
