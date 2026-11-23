@@ -82,7 +82,7 @@ reaches, and a backticked name is not a link.
 | [Published fixture difficulty, live](published_difficulty_live_prereg.md) | Runner described in [the live runner](published_difficulty_live_runner.md); no record yet |
 | [Available attacking shares](football_available_shares_prereg.md) | No record names it yet |
 | [Mean-reversion discount for later plan weeks](mean_reversion_discount_prereg.md) | Recorded in [mean-reversion discount](mean_reversion_discount.md): measured, not certified |
-| [The member planner's hit margin on the component forecast](component_hit_margin_prereg.md) | No record yet |
+| [The member planner's hit margin on the component forecast](component_hit_margin_prereg.md) | Recorded in [hit margin on the component forecast](component_hit_margin.md): unsupported, no default moved |
 | [HiGHS on the current window model](window_solver_highs_current_prereg.md) | Recorded in [HiGHS on the current window model at GW7](window_solver_highs_current.md): a switch is supported on the server, device verdict carried from #1083 |
 | [Team-match block resampler for component scenarios](team_match_block_sampler_prereg.md) | Recorded in [the calibration reading](team_match_block_sampler.md) and [the fidelity diagnostic](team_match_block_sampler_fidelity.md) |
 | [Rank-conditional shrinkage of expected points](rank_conditional_shrinkage_prereg.md) | Recorded in [rank-conditional shrinkage](rank_conditional_shrinkage.md): measured, not certified |
