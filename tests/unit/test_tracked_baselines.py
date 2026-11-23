@@ -1,4 +1,4 @@
-"""Full-menu controls are shared; a device publication starts no member solve."""
+"""Full-menu controls are shared; a device menu gets one recorded control and no menu."""
 
 import functools
 import json
@@ -83,10 +83,7 @@ def test_shared_member_has_one_server_solve_and_one_record(tmp_path, monkeypatch
     assert records[0] in result.output_paths
 
 
-@pytest.mark.parametrize("record", [False, True])
-def test_device_publication_never_solves_a_baseline_even_when_recording(
-    tmp_path, monkeypatch, record
-):
+def _device_run(tmp_path, *, record):
     operation = world(
         tmp_path,
         league_ids=TWO,
@@ -97,6 +94,20 @@ def test_device_publication_never_solves_a_baseline_even_when_recording(
     operation.request = replace(operation.request, device_league_ids=TWO, workers=8)
     operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
     operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
+    return operation
+
+
+def _device_trees_hold_no_plan(operation):
+    for league in TWO:
+        tree = operation.paths.out / "data/leagues" / str(league)
+        assert (tree / "entries/101.json").is_file()
+        index = json.loads((tree / "advice/101/index.json").read_bytes())["payload"]
+        assert index["menu"] == "device"
+        assert list((tree / "advice/101").rglob("*.json")) == [tree / "advice/101/index.json"]
+
+
+def test_a_device_publication_that_records_nothing_starts_no_member_solve(tmp_path, monkeypatch):
+    operation = _device_run(tmp_path, record=False)
 
     def no_member_solve(*args, **kwargs):
         pytest.fail("A device-only publication started an unrequested member solve")
@@ -108,13 +119,75 @@ def test_device_publication_never_solves_a_baseline_even_when_recording(
     assert result.value["advice_recorded"] is False
     assert not list(operation.paths.baselines.rglob("advice.json"))
     assert not list(operation.paths.records.rglob("advice.json"))
+    _device_trees_hold_no_plan(operation)
     for league in TWO:
-        tree = operation.paths.out / "data/leagues" / str(league)
-        assert (tree / "entries/101.json").is_file()
-        index = json.loads((tree / "advice/101/index.json").read_bytes())["payload"]
-        assert index["menu"] == "device"
-        assert list((tree / "advice/101").rglob("*.json")) == [tree / "advice/101/index.json"]
         assert result.value["leagues"][str(league)]["advice_recorded"] is False
+
+
+def test_a_recording_device_publication_solves_one_control_a_member_and_records_it(
+    tmp_path, monkeypatch
+):
+    operation = _device_run(tmp_path, record=True)
+    original = league_publication.solve_member_control
+    calls = []
+
+    def solve(picks, *args, **kwargs):
+        calls.append(picks.entry_id)
+        return original(picks, *args, **kwargs)
+
+    def no_page_solve(*args, **kwargs):
+        pytest.fail("A device page solved a member")
+
+    monkeypatch.setattr(league_publication, "solve_member_control", solve)
+    monkeypatch.setattr(league_views, "solve_member_control", no_page_solve)
+    result = operation._league()
+    # The member of both leagues is solved once, and the menu is still the device's.
+    assert calls == [101]
+    assert result.value["baselines"]["entries"] == 1
+    assert result.value["advice_recorded"] is True
+    records = list(operation.paths.baselines.rglob("advice.json"))
+    assert len(records) == 1
+    assert json.loads(records[0].read_bytes())["contract_version"] == (
+        MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+    )
+    assert not list(operation.paths.records.rglob("advice.json"))
+    _device_trees_hold_no_plan(operation)
+    for league in TWO:
+        assert result.value["leagues"][str(league)]["advice_recorded"] is True
+
+
+def test_a_device_publication_still_publishes_when_its_baseline_batch_fails(tmp_path, monkeypatch):
+    operation = _device_run(tmp_path, record=True)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("the batch broke")
+
+    monkeypatch.setattr(weekly_operations, "prepare_tracked_baselines", broken)
+    result = operation._league()
+    assert result.value["advice_recorded"] is False
+    assert result.value["baselines"]["entries"] == 0
+    assert not list(operation.paths.baselines.rglob("advice.json"))
+    _device_trees_hold_no_plan(operation)
+
+
+def test_a_full_menu_run_stops_when_its_baseline_batch_fails(tmp_path, monkeypatch):
+    operation = world(
+        tmp_path,
+        league_ids=TWO,
+        pages={352490: (101,), 7: (101,)},
+        seeded_from=TWO,
+        record_advice=True,
+    )
+    operation.request = replace(operation.request, device_league_ids=(7,), workers=8)
+    operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
+    operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("the batch broke")
+
+    monkeypatch.setattr(weekly_operations, "prepare_tracked_baselines", broken)
+    with pytest.raises(RuntimeError, match="the batch broke"):
+        operation._league()
 
 
 def test_mixed_capture_batch_is_refused_before_solving(tmp_path, monkeypatch):
