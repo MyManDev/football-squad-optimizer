@@ -80,6 +80,8 @@ describe("one timeline with a rank change", () => {
     expect(screen.getByRole("button", { name: COPY.raceNext })).toBeDisabled();
     step(COPY.racePrevious);
     expect(screen.getByText(COPY.raceWeek(2))).toBeInTheDocument();
+    // The list is headed by the week stepped to, never by "this week".
+    expect(screen.getByRole("heading", { name: COPY.raceMoved(2) })).toBeInTheDocument();
     const moved = [...container.querySelectorAll("li[data-move]")].map((row) => [
       row.getAttribute("data-move"),
       row.textContent,
@@ -90,7 +92,7 @@ describe("one timeline with a rank change", () => {
     ]);
     step(COPY.racePrevious);
     expect(screen.getByText(COPY.raceWeek(1))).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: COPY.raceMoved })).toBeNull();
+    expect(screen.queryByRole("heading", { name: COPY.raceMoved(1) })).toBeNull();
     expect(screen.queryByText(COPY.raceNoMoves)).toBeNull();
     expect(screen.getByRole("button", { name: COPY.racePrevious })).toBeDisabled();
   });
