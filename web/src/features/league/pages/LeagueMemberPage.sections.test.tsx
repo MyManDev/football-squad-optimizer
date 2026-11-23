@@ -200,13 +200,17 @@ describe.each(["tr", "en"] as const)("the phone's section strip (%s)", (language
     expect(document.getElementById("kadro")).not.toBeNull();
   });
 
-  it("keeps both on a closed week, the first named as its heading is: LIVE WEEK", () => {
+  it("keeps both on a closed week, the first named as its heading is: the week", () => {
     phone();
     show(language, { deadlinePassed: "2026-09-18T17:30:00Z" });
     expect(document.getElementById("plan-settings")).toBeNull();
     const links = within(strip(language)).getAllByRole("link");
-    expect(links.map((anchor) => anchor.textContent)).toEqual([copy.liveWeek, copy.sectionSquad]);
-    expect(target(links[0]!)).toHaveTextContent(copy.liveWeek);
+    // No match is played here, so the heading names the week, and the strip says the same.
+    const heading = links[0]!.textContent!;
+    expect(heading).toMatch(/[0-9]/);
+    expect(heading).not.toBe(copy.liveWeek);
+    expect(target(links[0]!)).toHaveTextContent(heading);
+    expect(links.map((anchor) => anchor.textContent)).toEqual([heading, copy.sectionSquad]);
   });
 
   it("marks the section being read as the current location as the page scrolls", () => {
