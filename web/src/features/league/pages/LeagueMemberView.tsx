@@ -525,7 +525,7 @@ function LeagueMemberContent({
           />
         ) : null,
     },
-    chips: { title: copy.chipsAndTransfers, body: <MemberResourceCards squad={view} /> },
+    chips: { title: copy.chipsAndTransfers, body: <MemberResourceCards squad={displayedSquad} /> },
     card: {
       title: copy.cardTitle,
       body:

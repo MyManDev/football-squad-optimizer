@@ -39,11 +39,58 @@ export function memberLineup(
   };
 }
 
-/** Clear historical event points until this page's live week has actually been read. */
+/**
+ * The chip record with the live week's chip written in. The published record is read before
+ * the deadline, so a chip the member played at it still stands as available there; the live
+ * read names the chip, and the record shown after the deadline says it was played that week.
+ */
+function chipsWithPlayedWeek(
+  squad: EntrySquad,
+  lineup: PlayedLineup,
+): Pick<EntrySquad, "chips_used" | "chips"> {
+  const chip = lineup.active_chip;
+  const week = lineup.gameweek;
+  if (!chip) return { chips_used: squad.chips_used, chips: squad.chips };
+  const played = squad.chips_used?.[chip] ?? [];
+  const chips_used =
+    squad.chips_used === null || played.includes(week)
+      ? squad.chips_used
+      : { ...squad.chips_used, [chip]: [...played, week].sort((a, b) => a - b) };
+  const windows = squad.chips?.known ? squad.chips.states[chip] : undefined;
+  if (!squad.chips || !windows) return { chips_used, chips: squad.chips };
+  const halves = { ...windows };
+  for (const half of ["first_half", "second_half"] as const) {
+    const window = halves[half];
+    if (
+      window &&
+      window.state !== "used" &&
+      window.start_event <= week &&
+      week <= window.stop_event
+    )
+      halves[half] = { ...window, state: "used", gameweek: week };
+  }
+  return {
+    chips_used,
+    chips: { ...squad.chips, states: { ...squad.chips.states, [chip]: halves } },
+  };
+}
+
+/**
+ * The squad a page shows once its deadline has passed. The free transfer count was the
+ * passed deadline's, so it is no longer stated. With the live week read, the picks and the
+ * chip are the ones played; until then the historical event points are cleared.
+ */
 export function squadWithPlayedWeek(squad: EntrySquad, lineup: PlayedLineup | null): EntrySquad {
-  if (lineup !== null) return { ...squad, ...lineup };
+  if (lineup !== null)
+    return {
+      ...squad,
+      ...lineup,
+      ...chipsWithPlayedWeek(squad, lineup),
+      free_transfers_known: false,
+    };
   return {
     ...squad,
+    free_transfers_known: false,
     starting_xi: squad.starting_xi.map((player) => ({ ...player, event_points: null })),
     bench: squad.bench.map((player) => ({ ...player, event_points: null })),
   };
