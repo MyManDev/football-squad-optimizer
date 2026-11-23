@@ -426,6 +426,7 @@ the #980 forwarder is built on Cloudflare.
 
 - [Frozen football window totals](research/football_window_totals.md): paired 1/3/5-week player sums from saved development forecasts; no model promotion.
 - [Planner policy chain protocol](research/planner_policy_chain_prereg.md): a prospective, stateful comparison of the routed multi-week planner, the full-window solver it replaced and the one-week path on realized points, over constructed squads with known purchase lots; read after GW20 (interim, no verdict) and GW38 (final); no record yet.
+- [Hit margin on the component forecast, protocol](research/component_hit_margin_prereg.md): the member planner's planning hit cost, 4 to 12, on the lookahead-1 season chain walked on the Phase C component base and on the form-window control beside it, four development seasons, chips off; three readings fixed in advance (move, confirmed, unsupported); no record yet.
 
 ## Operational acceptance
 

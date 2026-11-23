@@ -74,11 +74,84 @@ So a far week's ranking regresses toward the position mean while its level stays
 a blank week stays zero through the fixture count, as under the naive rule. At
 ``rho = 1`` the rule is the naive rule exactly. Measurement only: the candidate of
 ``docs/research/mean_reversion_discount_prereg.md``."""
+SUPPLIED_DECISION_WEEK_PROJECTION_RULE: Final = "supplied_decision_week_v1"
+"""A forecast of the decision gameweek itself, supplied by the caller and taken as it stands.
+
+The three rules above project from the form-window control, a per-gameweek level that the
+calendar then scales. A model that forecasts the gameweek it decides for has already read
+that gameweek's fixtures, so its number is not scaled again: a double is in the forecast, and
+a team without a fixture projects zero, as under every rule. Such a forecast says nothing
+about a later week, so the rule plans one gameweek and refuses a longer horizon. The tables
+arrive as a `DecisionWeekProjections`; the candidate pool, the opening squad and every
+decision are then built on them instead of on the control."""
 PROJECTION_RULES: Final = (
     NAIVE_PROJECTION_RULE,
     CALENDAR_BLIND_PROJECTION_RULE,
     MEAN_REVERSION_PROJECTION_RULE,
+    SUPPLIED_DECISION_WEEK_PROJECTION_RULE,
 )
+DECISION_WEEK_PROJECTION_COLUMNS: Final = (
+    "player_id",
+    "name",
+    "team_id",
+    "position",
+    "price_tenths",
+    "expected_points",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionWeekProjections:
+    """One season's supplied forecasts, a table per decision gameweek.
+
+    ``model_version`` names the forecast in every horizon the season builds from it. Each
+    table holds `DECISION_WEEK_PROJECTION_COLUMNS` with one row a player, the panel's own
+    player and team labels, and a finite forecast for every row.
+    """
+
+    model_version: str
+    tables: Mapping[int, pd.DataFrame]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.model_version, str) or not self.model_version.strip():
+            raise ExperimentConfigurationError("model_version must be a non-empty string.")
+        if not isinstance(self.tables, Mapping) or not self.tables:
+            raise ExperimentConfigurationError(
+                "tables must map at least one decision gameweek to its projection table."
+            )
+        kept: dict[int, pd.DataFrame] = {}
+        for gameweek, table in self.tables.items():
+            if isinstance(gameweek, bool) or not isinstance(gameweek, int) or gameweek < 1:
+                raise ExperimentConfigurationError(
+                    f"A decision gameweek must be a positive integer, got {gameweek!r}."
+                )
+            if not isinstance(table, pd.DataFrame):
+                raise ExperimentConfigurationError(
+                    f"The projection of gameweek {gameweek} must be a pandas DataFrame."
+                )
+            missing = [
+                column for column in DECISION_WEEK_PROJECTION_COLUMNS if column not in table.columns
+            ]
+            if missing:
+                raise ExperimentConfigurationError(
+                    f"The projection of gameweek {gameweek} is missing columns {missing!r}."
+                )
+            chosen = table.loc[:, list(DECISION_WEEK_PROJECTION_COLUMNS)].copy(deep=True)
+            if chosen.empty or bool(chosen["player_id"].duplicated().any()):
+                raise ExperimentConfigurationError(
+                    f"The projection of gameweek {gameweek} must hold one row a player."
+                )
+            points = pd.to_numeric(chosen["expected_points"], errors="coerce")
+            if bool(points.isna().any()) or not all(
+                math.isfinite(float(value)) for value in points.tolist()
+            ):
+                raise ExperimentConfigurationError(
+                    f"The projection of gameweek {gameweek} has a player without a finite forecast."
+                )
+            chosen["expected_points"] = points.astype("float64")
+            kept[gameweek] = chosen.reset_index(drop=True)
+        object.__setattr__(self, "model_version", self.model_version.strip())
+        object.__setattr__(self, "tables", MappingProxyType(kept))
 
 
 def validate_mean_reversion_factor(projection_rule: str, factor: float | None) -> float | None:
@@ -363,14 +436,34 @@ class DecisionSeason:
         cross_season_config: CrossSeasonConfig | None,
         projection_rule: str = NAIVE_PROJECTION_RULE,
         mean_reversion_factor: float | None = None,
+        decision_projections: DecisionWeekProjections | None = None,
     ) -> None:
         """``fixture_counts``: one row per (gameweek, team_id) with the known number
-        of fixtures, using the panel's own team labels."""
+        of fixtures, using the panel's own team labels. ``decision_projections`` is
+        required under ``supplied_decision_week_v1`` and refused under every other rule,
+        so a supplied forecast can never be set on a rule that would ignore it."""
 
         if projection_rule not in PROJECTION_RULES:
             raise ExperimentConfigurationError(
                 f"projection_rule must be one of {PROJECTION_RULES!r}, got {projection_rule!r}."
             )
+        supplied = projection_rule == SUPPLIED_DECISION_WEEK_PROJECTION_RULE
+        if decision_projections is not None and not isinstance(
+            decision_projections, DecisionWeekProjections
+        ):
+            raise ExperimentConfigurationError(
+                "decision_projections must be a DecisionWeekProjections."
+            )
+        if supplied and decision_projections is None:
+            raise ExperimentConfigurationError(
+                f"{SUPPLIED_DECISION_WEEK_PROJECTION_RULE!r} needs decision_projections."
+            )
+        if not supplied and decision_projections is not None:
+            raise ExperimentConfigurationError(
+                f"decision_projections is read only under "
+                f"{SUPPLIED_DECISION_WEEK_PROJECTION_RULE!r}; {projection_rule!r} refuses one."
+            )
+        self._decision_projections = decision_projections
         self._projection_rule = projection_rule
         self._mean_reversion_factor = validate_mean_reversion_factor(
             projection_rule, mean_reversion_factor
@@ -434,6 +527,13 @@ class DecisionSeason:
             raise ExperimentExecutionError(
                 f"Gameweek {gameweek} has no decision point in {self._season}."
             )
+        if self._decision_projections is not None:
+            table = self._decision_projections.tables.get(gameweek)
+            if table is None:
+                raise ExperimentExecutionError(
+                    f"No projection was supplied for gameweek {gameweek} of {self._season}."
+                )
+            return table.copy(deep=True)
         return build_projection_table(
             self._features,
             season=self._season,
@@ -477,8 +577,14 @@ class DecisionSeason:
         pool: pd.DataFrame,
         gameweeks: tuple[int, ...],
     ) -> ProjectionHorizon:
+        supplied = self._decision_projections
+        if supplied is not None and len(gameweeks) != 1:
+            raise ExperimentExecutionError(
+                f"{SUPPLIED_DECISION_WEEK_PROJECTION_RULE!r} forecasts the decision gameweek "
+                f"only; a horizon of {len(gameweeks)} gameweeks has no forecast for the rest."
+            )
         rows: list[dict[str, object]] = []
-        columns = ("player_id", "name", "team_id", "position", "price_tenths", "expected_points")
+        columns = DECISION_WEEK_PROJECTION_COLUMNS
         rho = self._mean_reversion_factor
         means = (
             self._position_means(gameweeks[0])
@@ -490,7 +596,9 @@ class DecisionSeason:
                 *(pool[column].tolist() for column in columns), strict=True
             ):
                 count = self._fixture_counts.get((gameweek, team_id), 0)
-                if self._projection_rule == CALENDAR_BLIND_PROJECTION_RULE:
+                if supplied is not None or self._projection_rule == CALENDAR_BLIND_PROJECTION_RULE:
+                    # No scaling: the blind control ignores a double by rule, and a supplied
+                    # forecast has already counted it. A team without a fixture is zero.
                     projected = float(expected) * min(count, 1)
                 elif means is None or offset == 0:
                     # The naive rule, and the mean-reversion rule's decision week, which
@@ -514,12 +622,22 @@ class DecisionSeason:
                         "home_fixture_count": 0,
                     }
                 )
+        if supplied is not None and rows and not any(row["fixture_count"] for row in rows):
+            # Every team blank in a played gameweek is a label mismatch, not a calendar.
+            raise ExperimentExecutionError(
+                f"No pool row of gameweek {gameweeks[0]} has a fixture under the supplied "
+                "projection's team labels; they must be the panel's own."
+            )
         return ProjectionHorizon(
             pd.DataFrame(rows),
             season=self._season,
             source_snapshot_id=f"panel@{self._season}-gw{gameweeks[0]:02d}",
-            model_name="deterministic_baseline",
-            model_version=f"form_window_{self._form_window:02d}_v1",
+            model_name="deterministic_baseline" if supplied is None else "supplied_decision_week",
+            model_version=(
+                f"form_window_{self._form_window:02d}_v1"
+                if supplied is None
+                else supplied.model_version
+            ),
             feature_contract_version=FEATURE_GENERATION_CONTRACT_VERSION,
             post_processing_contract_version=self._projection_rule,
         )
