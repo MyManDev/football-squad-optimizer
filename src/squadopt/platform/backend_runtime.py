@@ -54,6 +54,7 @@ from squadopt.live import SeasonRules, read_season_rules
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, readiness_report
+from squadopt.platform.advice_plan_cache import PlanAdviceCache
 from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
@@ -62,6 +63,7 @@ from squadopt.platform.advice_read import (
     FileLeagueDirectory,
     PreferencePlayers,
 )
+from squadopt.platform.advice_runs import FileRunStore
 from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRateLimiter
 from squadopt.platform.advice_switches import (
     AdviceSwitchInputs,
@@ -139,7 +141,9 @@ def computable_strategies() -> dict[str, bool]:
     return {slug: value.requires_rival for slug, value in advice_capabilities().items()}
 
 
-def configuration_fingerprint() -> str:
+def configuration_fingerprint(
+    *, transfer_packages: bool = False, package_gate: bool = False
+) -> str:
     """SHA-256 of the settings that can change an answer.
 
     Paths are deliberately absent. Where the store is mounted is deployment placement, not
@@ -170,6 +174,11 @@ def configuration_fingerprint() -> str:
             if slug in STRATEGY_CATALOG
         },
     }
+    if transfer_packages:
+        document["transfer_packages"] = {
+            "version": "transfer_packages_v1",
+            "open_gate": package_gate,
+        }
     encoded = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -214,6 +223,8 @@ class BackendConfig:
     rate_limit: int = DEFAULT_RATE_LIMIT
     rate_window_seconds: float = DEFAULT_RATE_WINDOW_SECONDS
     max_open_jobs_per_client: int = 4
+    transfer_packages: bool = False
+    package_gate: bool = False
     public_entries: bool = False
     public_queue_limit: int = 32
     artifact_root: Path | None = None
@@ -224,6 +235,31 @@ class BackendConfig:
     """The club-news fixture file, or a club-news capture directory under the snapshot
     root, that the rotation table was coded from. The manager's word needs both this and
     ``artifact_root``."""
+
+    llmopt_vnext: bool = False
+    three_week_paths: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.llmopt_vnext) is not bool:
+            raise BackendConfigError("The LLMOPT release control must be boolean.")
+        if type(self.three_week_paths) is not bool:
+            raise BackendConfigError("The three-week path control must be boolean.")
+        if type(self.transfer_packages) is not bool or type(self.package_gate) is not bool:
+            raise BackendConfigError("Package controls must be boolean.")
+        if self.package_gate and not self.transfer_packages:
+            raise BackendConfigError("The package gate requires packages.")
+
+    @property
+    def enabled_packages(self) -> bool:
+        return self.llmopt_vnext and self.transfer_packages
+
+    @property
+    def enabled_package_gate(self) -> bool:
+        return self.enabled_packages and self.package_gate
+
+    @property
+    def enabled_three_week_paths(self) -> bool:
+        return self.llmopt_vnext and self.three_week_paths
 
     @property
     def queue_root(self) -> Path:
@@ -287,6 +323,10 @@ class BackendConfig:
             handoff_root=values["handoff_root"],
             allowed_origins=origins,
             public_entries=public_entries == "1",
+            transfer_packages=_flag(source, "SQUADOPT_BACKEND_TRANSFER_PACKAGES"),
+            three_week_paths=_flag(source, "SQUADOPT_BACKEND_THREE_WEEK_PATHS"),
+            llmopt_vnext=_flag(source, "SQUADOPT_BACKEND_LLMOPT_VNEXT"),
+            package_gate=_flag(source, "SQUADOPT_BACKEND_PACKAGE_GATE"),
             public_queue_limit=_positive_int(source, "SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT", 32),
             season=season,
             rate_limit=_positive_int(source, "SQUADOPT_BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT),
@@ -299,6 +339,13 @@ class BackendConfig:
             artifact_root=Path(artifact_root) if artifact_root else None,
             club_news_source=Path(club_news_source) if club_news_source else None,
         )
+
+
+def _flag(source: Mapping[str, str], variable: str) -> bool:
+    value = source.get(variable, "0").strip()
+    if value not in {"0", "1"}:
+        raise BackendConfigError(f"{variable} must be 0 or 1.")
+    return value == "1"
 
 
 def _positive_int(source: Mapping[str, str], variable: str, default: int) -> int:
@@ -506,7 +553,11 @@ class CaptureContextProvider:
         with self._lock:
             held = self._context
             if held is None or held.context != context:
-                held = load_capture_context(identity)
+                held = replace(
+                    load_capture_context(identity),
+                    transfer_packages=self._config.enabled_packages,
+                    package_gate=self._config.enabled_package_gate,
+                )
                 self._context = held
                 self._switch_signature = None
             return self._with_current_switches(held)
@@ -753,7 +804,7 @@ class AdviceBackend:
 
     config: BackendConfig
     queue: FileJobQueue
-    cache: FileAdviceCache
+    cache: PlanAdviceCache
     reader: AdviceReadStore
     submit: AdviceSubmitService
     contexts: CaptureContextProvider
@@ -765,6 +816,7 @@ class AdviceBackend:
     public_inputs: PublicEntryInputs | None = None
     public_reader: PublicEntryAdviceReader | None = None
     public_submit: AdviceSubmitService | None = None
+    runs: FileRunStore | None = None
 
     def queue_depth(self) -> int:
         """Open work, not history: a terminal job is not something a member waits for."""
@@ -773,7 +825,7 @@ class AdviceBackend:
 
     def jobs_by_status(self) -> dict[str, int]:
         """One current store read inside the owning API, never in the status script."""
-        counts = dict.fromkeys(("queued", "running", "completed", "failed"), 0)
+        counts = dict.fromkeys(("queued", "running", "completed", "failed", "cancelled"), 0)
         for job in self.queue.jobs():
             counts[job.status] += 1
         return counts
@@ -816,14 +868,22 @@ def build_backend(
     component_log = log if log is not None else AdviceLog("backend")
     metrics = metrics if metrics is not None else AdviceMetrics()
     queue = FileJobQueue(config.queue_root)
-    cache = FileAdviceCache(config.cache_root)
+    cache = PlanAdviceCache(config.cache_root, llmopt_vnext=config.llmopt_vnext)
     specs = FileAdviceJobSpecStore(config.spec_root)
+
+    def stored_capture(key: str) -> str | None:
+        spec = specs.get(key)
+        return spec.context.capture_snapshot_id if spec is not None else None
+
+    runs = FileRunStore(config.store_root / "runs", capture_for_key=stored_capture)
     liveness = WorkerLiveness(config.worker_root, queue)
     gate = probe if probe is not None else StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
         config,
         repository_commit=_repository_commit(),
-        fingerprint=configuration_fingerprint(),
+        fingerprint=configuration_fingerprint(
+            transfer_packages=config.enabled_packages, package_gate=config.enabled_package_gate
+        ),
         log=component_log,
     )
     reader = AdviceReadStore(
@@ -836,6 +896,11 @@ def build_backend(
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
+        transfer_packages=config.enabled_packages,
+        three_week_paths=config.enabled_three_week_paths,
+        preference_bundles=True,
+        verified_repairs=config.llmopt_vnext,
+        llmopt_vnext=config.llmopt_vnext,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -851,6 +916,7 @@ def build_backend(
         # The job view's place in line and worker counts come from the look /ready holds.
         job_look=liveness.look,
         job_progress=queue.progress,
+        runs=runs,
     )
     public_inputs = None
     public_reader = None
@@ -864,6 +930,11 @@ def build_backend(
             public_inputs,
             switches=contexts,
             available_windows=contexts.available_windows,
+            transfer_packages=config.enabled_packages,
+            three_week_paths=config.enabled_three_week_paths,
+            preference_bundles=True,
+            verified_repairs=config.llmopt_vnext,
+            llmopt_vnext=config.llmopt_vnext,
         )
         public_submit = AdviceSubmitService(
             public_reader,
@@ -877,6 +948,7 @@ def build_backend(
             job_progress=queue.progress,
             prepare_inputs=public_inputs.prepare,
             max_open_jobs=config.public_queue_limit,
+            runs=runs,
         )
     return AdviceBackend(
         config=config,
@@ -893,6 +965,7 @@ def build_backend(
         public_inputs=public_inputs,
         public_reader=public_reader,
         public_submit=public_submit,
+        runs=runs,
     )
 
 

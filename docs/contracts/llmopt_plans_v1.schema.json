@@ -1,0 +1,461 @@
+{
+  "$defs": {
+    "checked_selection": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "enum": [
+                "select",
+                "freeze_transfer",
+                "freeze_week",
+                "substitute"
+              ],
+              "type": "string"
+            },
+            "plan_id": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "player_id": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "replacement_id": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "week": {
+              "enum": [
+                1,
+                2,
+                3
+              ],
+              "type": "integer"
+            }
+          },
+          "required": [
+            "plan_id",
+            "action"
+          ],
+          "type": "object"
+        },
+        "plan_label": {
+          "enum": [
+            "P1",
+            "P2",
+            "P3",
+            "P4",
+            "P5",
+            "P6",
+            "P7",
+            "P8",
+            "P9",
+            "P10",
+            "P11",
+            "P12"
+          ],
+          "type": "string"
+        },
+        "status": {
+          "const": "plan",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "plan_label",
+        "command"
+      ],
+      "type": "object"
+    },
+    "command": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "enum": [
+                "select",
+                "freeze_transfer",
+                "freeze_week",
+                "substitute"
+              ],
+              "type": "string"
+            },
+            "plan_label": {
+              "enum": [
+                "P1",
+                "P2",
+                "P3",
+                "P4",
+                "P5",
+                "P6",
+                "P7",
+                "P8",
+                "P9",
+                "P10",
+                "P11",
+                "P12"
+              ],
+              "type": "string"
+            },
+            "player_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "replacement_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "week": {
+              "anyOf": [
+                {
+                  "enum": [
+                    1,
+                    2,
+                    3
+                  ],
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "plan_label",
+            "action",
+            "week",
+            "player_id",
+            "replacement_id"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "context": {
+      "additionalProperties": false,
+      "properties": {
+        "data_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "device",
+            "server"
+          ],
+          "type": "string"
+        },
+        "plans": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "data_id": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "plan_id": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "weeks": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "captain": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "chip": {
+                      "enum": [
+                        null,
+                        "wildcard",
+                        "freehit",
+                        "bboost",
+                        "3xc"
+                      ],
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "players": {
+                      "items": {
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "transfers_in": {
+                      "items": {
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "transfers_out": {
+                      "items": {
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "week": {
+                      "enum": [
+                        1,
+                        2,
+                        3
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "week",
+                    "transfers_in",
+                    "transfers_out",
+                    "players",
+                    "chip",
+                    "captain"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 3,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "plan_id",
+              "data_id",
+              "weeks"
+            ],
+            "type": "object"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "type": "array"
+        },
+        "selected_plan_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "data_id",
+        "kind",
+        "selected_plan_id",
+        "plans"
+      ],
+      "type": "object"
+    },
+    "provider_context": {
+      "additionalProperties": false,
+      "properties": {
+        "plans": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "plan_label": {
+                "enum": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4",
+                  "P5",
+                  "P6",
+                  "P7",
+                  "P8",
+                  "P9",
+                  "P10",
+                  "P11",
+                  "P12"
+                ],
+                "type": "string"
+              },
+              "weeks": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "captain": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "chip": {
+                      "enum": [
+                        null,
+                        "wildcard",
+                        "freehit",
+                        "bboost",
+                        "3xc"
+                      ],
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "players": {
+                      "items": {
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "transfers_in": {
+                      "items": {
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "transfers_out": {
+                      "items": {
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxItems": 15,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "week": {
+                      "enum": [
+                        1,
+                        2,
+                        3
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "week",
+                    "transfers_in",
+                    "transfers_out",
+                    "players",
+                    "chip",
+                    "captain"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 3,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "plan_label",
+              "weeks"
+            ],
+            "type": "object"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "type": "array"
+        },
+        "selected_plan_label": {
+          "anyOf": [
+            {
+              "enum": [
+                "P1",
+                "P2",
+                "P3",
+                "P4",
+                "P5",
+                "P6",
+                "P7",
+                "P8",
+                "P9",
+                "P10",
+                "P11",
+                "P12"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "selected_plan_label",
+        "plans"
+      ],
+      "type": "object"
+    },
+    "session_extension": {
+      "additionalProperties": true,
+      "properties": {
+        "compareOnly": {
+          "type": "boolean"
+        },
+        "explicit": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://squadopt.dev/contracts/llmopt_plans_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/context"
+    },
+    {
+      "$ref": "#/$defs/provider_context"
+    },
+    {
+      "$ref": "#/$defs/command"
+    },
+    {
+      "$ref": "#/$defs/checked_selection"
+    }
+  ],
+  "title": "LLMOPT computed-plan conversation"
+}

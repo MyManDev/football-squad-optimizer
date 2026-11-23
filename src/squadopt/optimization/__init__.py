@@ -16,6 +16,7 @@ from squadopt.optimization.models import (
     OptimizationValidationError,
     SolverExecutionError,
     SolverStatus,
+    SolverWallTimeLimit,
     SquadOptimizationError,
 )
 from squadopt.optimization.optimizer import optimize_squad, wall_clock_stopped_the_search
@@ -31,6 +32,7 @@ __all__ = [
     "Position",
     "SolverExecutionError",
     "SolverStatus",
+    "SolverWallTimeLimit",
     "SquadCandidateSet",
     "SquadOptimizationError",
     "decision_signature",

@@ -25,12 +25,13 @@ from squadopt.application.advice_variants import _rebased_weeks, weighted_horizo
 from squadopt.application.entries import EntryError, EntryPicksProvider, held_squad_from_picks
 from squadopt.application.top100_weight import Top100Counts
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
+from squadopt.contracts.priority_preferences import PriorityProgram, PriorityReference
 from squadopt.live import Projection, RecommendationInputs, SeasonRules
 from squadopt.live.chip_strategy import strategy_chip_availability
 from squadopt.live.transfers import plan_transfer_horizon
 from squadopt.optimization import (
     OptimizationConfig,
-    SolverExecutionError,
+    SolverWallTimeLimit,
     wall_clock_stopped_the_search,
 )
 from squadopt.planning import ChipAvailability
@@ -52,6 +53,10 @@ def advise_chip_strategy(
     preferences: DecisionPreferences = NO_PREFERENCES,
     chip_tail_forecast: ChipTailForecast | None = None,
     include_resource_state: bool = False,
+    transfer_packages: bool = False,
+    package_gate: bool = False,
+    priority_program: PriorityProgram | None = None,
+    priority_reference: PriorityReference | None = None,
 ) -> dict[str, object]:
     if chip_tail_forecast is not None and chip != "auto":
         raise EntryError("A dated chip tail requires the automatic chip strategy.")
@@ -117,9 +122,13 @@ def advise_chip_strategy(
         chip_tail_forecast=chip_tail_forecast,
         linearization_level=WINDOW_LINEARIZATION_LEVEL,
         preferences=preferences,
+        transfer_packages=transfer_packages,
+        package_gate=package_gate,
+        priority_program=priority_program,
+        priority_reference=priority_reference,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
-        raise SolverExecutionError("Chip strategy reached its wall-clock safety limit.")
+        raise SolverWallTimeLimit("Chip strategy reached its wall-clock safety limit.")
     scenario = preferences.scenario
     opening_absence = scenario is not None and scenario.kind == "unavailable" and scenario.week == 1
     if scenario is not None and scenario.kind == "unavailable":
@@ -149,6 +158,8 @@ def advise_chip_strategy(
         include_resource_state=include_resource_state,
     )
     first = shown[0]
+    if priority_program is not None:
+        payload["priority_preferences"] = plan.diagnostics["priority_preferences"]
     if (
         include_resource_state
         and preferences.min_opening_bank_tenths is not None

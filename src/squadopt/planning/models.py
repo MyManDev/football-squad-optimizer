@@ -516,6 +516,8 @@ class TransferPlanningConfig:
     supplied sale paths unchanged. A fee in [0, 1] tracks each new acquisition;
     original holdings retain their supplied sale paths until first sold.
     """
+    transfer_packages: bool = False
+    package_gate: bool = False
     allow_two_free_transfers: bool = False
     """Under a one-move cap, allow a second move only from two banked free transfers.
 
@@ -534,6 +536,10 @@ class TransferPlanningConfig:
             raise TransferPlanningConfigurationError(
                 "wildcard_preserves_free_transfers must be a boolean."
             )
+        if not isinstance(self.transfer_packages, bool) or not isinstance(self.package_gate, bool):
+            raise TransferPlanningConfigurationError("Package controls must be boolean.")
+        if self.package_gate and not self.transfer_packages:
+            raise TransferPlanningConfigurationError("The package gate requires packages.")
         if not isinstance(self.allow_two_free_transfers, bool):
             raise TransferPlanningConfigurationError("allow_two_free_transfers must be a boolean.")
         if self.max_transfers_per_gameweek is not None:
@@ -652,6 +658,11 @@ class TransferPlanningConfig:
             payload["acquisition_sell_on_fee"] = float(self.acquisition_sell_on_fee).hex()
         if self.allow_two_free_transfers:
             payload["allow_two_free_transfers"] = True
+        if self.transfer_packages:
+            payload["transfer_packages"] = {
+                "version": "transfer_packages_v1",
+                "open_gate": self.package_gate,
+            }
         if self.transfer_caps_by_gameweek:
             payload["transfer_caps_by_gameweek"] = dict(self.transfer_caps_by_gameweek)
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")

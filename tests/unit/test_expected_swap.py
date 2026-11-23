@@ -478,3 +478,365 @@ def test_original_proposals_ties_and_gross_recycled_caps_remain_honest(monkeypat
     assert (
         sum(expected_week_utility(w, problem[3]) * 0.9**i for i, w in enumerate(result.weeks)) >= 0
     )
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_package_disabled_and_closed_gate_preserve_whole_legacy_result(monkeypatch, enabled):
+    from squadopt.planning import expected_window
+
+    problem = world()
+    baseline = replace(
+        problem[-1],
+        diagnostics={
+            **problem[-1].diagnostics,
+            "expected_lineup_window": {"optional_swap": {"reason": "original_routes_incomplete"}},
+        },
+    )
+    calls = []
+
+    def retained(h, initial, config, policy, **kwargs):
+        calls.append(policy)
+        assert not policy.transfer_packages and not policy.package_gate
+        return baseline
+
+    monkeypatch.setattr(expected_window, "_retained_expected_window", retained)
+    monkeypatch.setattr(expected_window, "propose_expected_swap", no_solve)
+    policy = replace(problem[3], transfer_packages=enabled)
+    result = optimize_expected_window(*problem[:3], policy)
+    assert result.weeks == baseline.weeks and len(calls) == 1
+    if not enabled:
+        assert result is baseline
+        assert "transfer_packages_v1" not in result.diagnostics
+    else:
+        assert result.diagnostics["transfer_packages_v1"]["reason"] == "original_routes_incomplete"
+
+
+def test_real_funding_pair_keeps_negative_single_and_original_resource_path():
+    from squadopt.planning.expected_packages import pick_package
+
+    horizon, initial, config, transfer, baseline = world()
+    table = horizon.table.copy()
+    table.loc[table.player_id.eq(16), ["buy_price_tenths", "sell_price_tenths"]] = [80, 80]
+    table.loc[
+        table.player_id.eq(17), ["buy_price_tenths", "sell_price_tenths", "expected_points"]
+    ] = [20, 20, 0]
+    horizon = PlanningHorizon(table)
+    initial = replace(initial, free_transfers=2)
+    transfer = replace(transfer, max_transfers_per_gameweek=1, allow_two_free_transfers=True)
+    result, phase = call(
+        (horizon, initial, config, transfer, baseline),
+        package_picker=pick_package,
+        deterministic_reserve=1,
+    )
+    assert result is not None and phase["checked_pair_packages"] > 0
+    first = result.weeks[0]
+    assert set(first.transfers_in.player_id) == {16, 17}
+    assert set(first.transfers_out.player_id) == {14, 15}
+    assert first.bank_before_tenths == 5 and first.bank_after_tenths == 5
+    assert first.free_transfers_before == 2 and first.paid_transfer_count == 0
+    assert first.transfer_hit_points == 0 and len(result.weeks) == 3
+    assert phase["actual"] <= phase["cap"] + 0.01
+    assert phase["solver_deterministic_limit"] == phase["cap"] - 1
+    for week in result.weeks:
+        assert week.bank_after_tenths >= 0
+        assert week.transfer_hit_points == 4 * week.paid_transfer_count
+        assert set(week.starting_xi.player_id) | set(week.bench.player_id) == set(
+            week.selected_squad.player_id
+        )
+
+
+@pytest.mark.parametrize(
+    "rules",
+    [
+        {"keep_players": [14]},
+        {"avoid_players": [16]},
+        {"include_players": [14]},
+        {"no_hits": True},
+        {"max_hit_points": 0},
+        {"week_rules": [{"week": 1, "rules": {"buy_players": [13]}}]},
+    ],
+)
+def test_package_checks_whole_package_mandatory_rules_and_hits(rules):
+    from squadopt.planning.expected_packages import legal_package
+
+    h, initial, config, transfer, _ = world()
+    first = h.table.loc[h.table.gameweek.eq(1)].set_index("player_id", drop=False)
+    initial = replace(initial, free_transfers=0)
+    assert not legal_package(
+        first, initial, config, transfer, DecisionPreferences.parse(rules), (14, 15), (16, 17), 1
+    )
+
+
+def test_package_gate_still_refuses_work_without_original_slack(monkeypatch):
+    from squadopt.planning import expected_window
+
+    problem = world()
+    review = {
+        "configured_total": 5.0,
+        "actual_total": 4.5,
+        "lineup_evaluations": 6,
+        "lineup_evaluation_cap": 1153,
+        "optional_swap": {"reason": "original_routes_incomplete"},
+    }
+    baseline = replace(
+        problem[-1], diagnostics={**problem[-1].diagnostics, "expected_lineup_window": review}
+    )
+    monkeypatch.setattr(
+        expected_window, "_retained_expected_window", lambda *args, **kwargs: baseline
+    )
+    monkeypatch.setattr(expected_window, "propose_expected_swap", no_solve)
+    result = optimize_expected_window(
+        *problem[:3], replace(problem[3], transfer_packages=True, package_gate=True)
+    )
+    assert result.weeks == baseline.weeks
+    assert result.diagnostics["transfer_packages_v1"]["reason"] == "no_remaining_budget"
+
+
+@pytest.mark.parametrize(
+    "raw,expected,selection,accepted",
+    [(1, 1, 1, True), (-1, 2, 2, False), (1, -1, 2, False), (1, 1, -1, False), (0, 0, 0, False)],
+)
+def test_packages_keep_completed_incumbent_unless_every_reported_metric_is_safe(
+    monkeypatch, raw, expected, selection, accepted
+):
+    from squadopt.planning import expected_window
+
+    problem = world()
+    review = {
+        "configured_total": 5.0,
+        "actual_total": 1.0,
+        "lineup_evaluations": 6,
+        "lineup_evaluation_cap": 1153,
+        "optional_swap": {"reason": "retained"},
+        "ledger": [],
+        "candidates": [],
+        "chosen": "initial_single_swap",
+    }
+    baseline = replace(
+        problem[-1], diagnostics={**problem[-1].diagnostics, "expected_lineup_window": review}
+    )
+    first = baseline.weeks[0]
+    candidate = replace(
+        baseline,
+        weeks=(
+            replace(
+                first,
+                projected_score=first.projected_score + raw,
+                lineup_expectation={
+                    **first.lineup_expectation,
+                    "expected_net_points": first.lineup_expectation["expected_net_points"]
+                    + expected,
+                },
+            ),
+            *baseline.weeks[1:],
+        ),
+        diagnostics={
+            **baseline.diagnostics,
+            "terminal_banked_transfer_value": selection - expected,
+        },
+    )
+    monkeypatch.setattr(
+        expected_window, "_retained_expected_window", lambda *args, **kwargs: baseline
+    )
+    phase = {
+        "actual": 0.1,
+        "cap": 1.0,
+        "hold_score_calls": 0,
+        "lineup_search": {"evaluations": 3, "weeks": [{"states_evaluated": 1}] * 3},
+    }
+    monkeypatch.setattr(
+        expected_window, "propose_expected_swap", lambda *args, **kwargs: (candidate, phase)
+    )
+    result = optimize_expected_window(*problem[:3], replace(problem[3], transfer_packages=True))
+    assert result.diagnostics["transfer_packages_v1"]["accepted"] is accepted
+    assert result.weeks == (candidate if accepted else baseline).weeks
+    assert result.diagnostics["expected_lineup_window"]["actual_total"] == 1.1
+
+
+def test_real_package_continuation_matches_complete_enabled_call():
+    from time import perf_counter
+
+    from squadopt.planning.expected_window import (
+        _retained_expected_window,
+        extend_expected_packages,
+        package_metrics,
+    )
+
+    problem = world()
+    h, initial, config, policy, _ = problem
+    policy = replace(policy, banked_transfer_value_points=0)
+    enabled = replace(policy, transfer_packages=True, package_gate=True)
+    start = perf_counter()
+    prefix = _retained_expected_window(h, initial, config, policy)
+    continued = extend_expected_packages(
+        h, initial, config, enabled, prefix, elapsed_seconds=perf_counter() - start
+    )
+    complete = optimize_expected_window(h, initial, config, enabled)
+    assert package_metrics(continued, policy) == package_metrics(complete, policy)
+    for a, b in zip(continued.weeks, complete.weeks, strict=True):
+        assert tuple(a.transfers_in.player_id) == tuple(b.transfers_in.player_id)
+        assert tuple(a.transfers_out.player_id) == tuple(b.transfers_out.player_id)
+        assert a.bank_after_tenths == b.bank_after_tenths
+        assert a.free_transfers_for_next_gameweek == b.free_transfers_for_next_gameweek
+    for plan in (continued, complete):
+        review = plan.diagnostics["transfer_packages_v1"]
+        assert review["accepted_metrics"] == package_metrics(plan, policy)
+
+
+@pytest.mark.parametrize("native_spent,expected_cap", [(52, 540.0), (62, 0.0)])
+def test_package_reserves_shared_native_and_cp_work_before_start(
+    monkeypatch, native_spent, expected_cap
+):
+    from squadopt.optimization.work_budget import WorkBudget, work_budget
+    from squadopt.planning import expected_window
+
+    problem = world()
+    h, initial, config, policy, plan = problem
+    config = replace(config, solver_deterministic_time_limit=60, solver_time_limit_seconds=1800)
+    review = {
+        "configured_total": 60.0,
+        "actual_total": 30.0,
+        "lineup_evaluations": 6,
+        "lineup_evaluation_cap": 1153,
+        "optional_swap": {"reason": "original_routes_incomplete"},
+        "ledger": [],
+        "candidates": [],
+        "chosen": "legacy_proposal",
+    }
+    baseline = replace(plan, diagnostics={**plan.diagnostics, "expected_lineup_window": review})
+    monkeypatch.setattr(expected_window, "_retained_expected_window", lambda *a, **k: baseline)
+    calls = []
+
+    def optional(*args, **kwargs):
+        calls.append(kwargs)
+        return None, {
+            "actual": 0.0,
+            "cap": 0.0,
+            "hold_score_calls": 0,
+            "lineup_search": None,
+            "reason": "no_candidate",
+        }
+
+    monkeypatch.setattr(expected_window, "propose_expected_swap", optional)
+    allocation = WorkBudget(122, cp_used=30, native_reserved=native_spent)
+    with work_budget(allocation):
+        result = optimize_expected_window(
+            h, initial, config, replace(policy, transfer_packages=True, package_gate=True)
+        )
+    if expected_cap:
+        assert len(calls) == 1 and calls[0]["wall_slack"] <= expected_cap
+        # Native primary gets half the wall allocation. The full CP cap and an
+        # additional unit still fit even when the primary uses its whole reserve.
+        assert calls[0]["wall_slack"] / 60 + 30 + 1 <= 122 - 30 - native_spent
+    else:
+        assert not calls
+        assert (
+            result.diagnostics["transfer_packages_v1"]["reason"]
+            == "no_remaining_native_and_cp_allocation"
+        )
+
+
+@pytest.mark.parametrize("overshoot,retained", [(0.000084823, True), (0.02, False)])
+def test_optional_shared_cutoff_keeps_checked_plan_and_unrounded_charge(
+    monkeypatch, tmp_path, overshoot, retained
+):
+    import json
+    from contextlib import nullcontext
+
+    from squadopt.contracts.llmopt_run import RunReference
+    from squadopt.optimization.work_budget import WorkBudgetExhausted, work_budget
+    from squadopt.planning import expected_window
+    from squadopt.platform.advice_queue import FileJobQueue
+    from squadopt.platform.advice_runs import FileRunStore
+
+    horizon, initial, config, policy, hold = world()
+    policy = replace(policy, banked_transfer_value_points=0)
+    # Preserve the closing week's lineup. The opening week remains eligible for a
+    # package and the baseline leaves some lineup evaluations for the optional phase.
+    preferences = DecisionPreferences.parse(
+        {
+            "frozen_weeks": [
+                {
+                    "week": 3,
+                    "transfers_in": [],
+                    "transfers_out": [],
+                    "starting_xi": hold.weeks[-1].starting_xi.player_id.tolist(),
+                    "captain": int(hold.weeks[-1].captain.player_id),
+                    "chip": None,
+                }
+            ]
+        }
+    )
+    baseline = optimize_expected_window(horizon, initial, config, policy, preferences=preferences)
+    review = baseline.diagnostics["expected_lineup_window"]
+    assert baseline.has_solution and tuple(w.gameweek for w in baseline.weeks) == horizon.gameweeks
+    assert "transfer_packages_v1" not in baseline.diagnostics
+    slack = review["configured_total"] - review["actual_total"]
+    # Replay the observed 122.000084823 boundary with controlled solver accounting.
+    # Native reservations and CP grants all go through the ordinary shared meter.
+    runs = FileRunStore(tmp_path / "runs")
+    ref, key, job = RunReference("a" * 32, "base"), "c" * 64, "d" * 32
+    with runs.transaction() as tx:
+        tx.bind(ref, "b" * 64, 3, key, FileJobQueue(tmp_path / "jobs"))
+        tx.reserve(ref, key, job)
+    shared = runs.allocation(job)
+    assert shared is not None and shared.limit == 122
+    shared.reserve_native(1800)
+    shared.record_cp(shared.cp_limit(shared.limit - 60 - slack - 3))
+    cp_before = shared.cp_used
+    attempts = []
+
+    def spend_optional(*args, **kwargs):
+        attempts.append("package")
+        shared.reserve_native(60)
+        shared.reserve_native(60)
+        grant = shared.cp_limit(kwargs["deterministic_slack"])
+        assert grant == pytest.approx(slack - 1)
+        shared.record_cp(grant + overshoot)
+        shared.cp_limit(1)  # The next solve is refused before it starts.
+        pytest.fail("The exhausted allocation admitted another solve.")
+
+    monkeypatch.setattr(expected_window, "propose_expected_swap", spend_optional)
+    enabled = replace(policy, transfer_packages=True, package_gate=True)
+    result = None
+    outcome = (
+        nullcontext()
+        if retained
+        else pytest.raises(ValueError, match="Invalid deterministic-work accounting")
+    )
+    with work_budget(shared), outcome:
+        result = expected_window.extend_expected_packages(
+            horizon,
+            initial,
+            config,
+            enabled,
+            baseline,
+            elapsed_seconds=0.0,
+            preferences=preferences,
+        )
+    assert (result is not None) == retained
+    shared_used = shared.cp_used + shared.native_reserved
+    if result is not None:
+        assert result.weeks is baseline.weeks
+        assert result.objective_value == baseline.objective_value
+        assert result.solver_status == baseline.solver_status
+        record = result.diagnostics["transfer_packages_v1"]
+        assert record["reason"] == "shared_work_exhausted" and record["accepted"] is False
+        assert record["accepted_metrics"] == expected_window.package_metrics(baseline, policy)
+        assert record["additional_cp_work"] == shared.cp_used - cp_before
+        assert record["actual_total"] == pytest.approx(
+            review["actual_total"] + shared.cp_used - cp_before
+        )
+        assert record["shared_limit"] == 122 and record["shared_used"] == shared_used
+    # The optional CP phase itself still fits in both cases. Only the shared
+    # allocation distinguishes the reported native stop from the larger error.
+    assert review["actual_total"] + shared.cp_used - cp_before < review["configured_total"]
+    assert shared_used == pytest.approx(122 + overshoot, rel=0, abs=1e-12)
+    assert shared.remaining == 0
+    assert attempts == ["package"] and shared.calls == 5
+    with pytest.raises(WorkBudgetExhausted):
+        shared.reserve_native(1)
+    runs.finish(job, shared)
+    receipt = json.loads(runs.path.read_bytes())["jobs"][job]["receipt"]
+    assert receipt == {"calls": 5, "cp_used": shared.cp_used, "native_reserved": 64}
+    assert receipt["cp_used"] + receipt["native_reserved"] == shared_used

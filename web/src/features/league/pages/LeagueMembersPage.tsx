@@ -148,7 +148,10 @@ export function LeagueMembersView({
       )
     : null;
   const deadline = gameweekDeadline(fixtures, view.season, view.gameweek);
-  const cells = viewerRow ? scoreBugCells(viewerRow, rows.length, squad, locale, copy) : [];
+  // As on the member's page: past the deadline the bank and the free transfers are left out.
+  const cells = viewerRow
+    ? scoreBugCells(viewerRow, rows.length, deadlinePassed ? null : squad, locale, copy)
+    : [];
   const count = (value: number) => points(value, 0, locale);
   const race =
     scoreboard !== null ? leagueRace(scoreboard, view.members, view.scored_gameweek) : null;

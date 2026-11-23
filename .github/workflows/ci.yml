@@ -156,7 +156,7 @@ jobs:
   device_engines:
     name: device engines (Playwright)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     container:
       image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       # Firefox requires the browser user to own GitHub's mounted home directory.
@@ -197,8 +197,9 @@ jobs:
       - name: Device spec on Chromium, WebKit and Firefox
         # The expanded 219-case suite completed in 11m19s; a queue run reached 214 cases
         # without an assertion failure before the old 12-minute step limit expired. LIVE's two
-        # specs took the suite to 324 cases, past 16 minutes.
-        timeout-minutes: 26
+        # specs took the suite to 324 cases, past 16 minutes; it now runs close to 20, and a
+        # slow runner adds half again.
+        timeout-minutes: 40
         shell: bash
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/device-engines.json
@@ -218,7 +219,7 @@ jobs:
   web:
     name: web (node 22)
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 50
     defaults:
       run:
         working-directory: web
@@ -342,7 +343,10 @@ jobs:
         run: npx playwright install chromium
 
       - name: Playwright smoke
-        timeout-minutes: 15
+        # The smoke takes about 12.5 minutes on develop. On 23 Nov 2026 a runner that took 4m35s
+        # over the unit tests (2m50s as a rule) ran it into the old 15-minute limit with no
+        # assertion failed.
+        timeout-minutes: 25
         env:
           VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run e2e

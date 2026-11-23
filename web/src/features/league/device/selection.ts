@@ -8,6 +8,8 @@
 
 import type { AdviceRequest } from "../advice/adviceClient";
 import type { EntrySquad } from "../types";
+import { oneWeekPreferences } from "./preferences";
+import { oneWeekBundle } from "./preferenceBundle";
 import {
   hasCompleteStartingXi,
   isDeviceChip,
@@ -55,17 +57,43 @@ export function deviceChip(
 export function deviceSelection(
   request: AdviceRequest,
   squad: Pick<EntrySquad, "chips" | "device_plan">,
+  allowRunPreferences = request.deviceRun === true,
 ): DeviceSelection | null {
   if (
+    // Ordinary member links have no confirmed run. Their preferences are served remotely.
+    ((request.preferences || request.preferenceBundle) && (!request.run || !allowRunPreferences)) ||
     request.window !== 1 ||
     (request.managersWord ?? false) ||
-    (request.model ?? "current") !== "current" ||
-    request.preferences
+    (request.model ?? "current") !== "current"
   ) {
     return null;
   }
   const chip = deviceChip(request, squad);
   if (chip === undefined) return null;
+  if (request.preferences) {
+    try {
+      oneWeekPreferences(request.preferences);
+    } catch {
+      return null;
+    }
+    // These combinations have not passed the frozen twenty-member parity gate.
+    if (chip !== null || request.strategy !== "saf-puan" || (request.top100Weight ?? 0) !== 0)
+      return null;
+  }
+  if (request.preferenceBundle) {
+    try {
+      const bundle = oneWeekBundle(request.preferenceBundle, request.preferences);
+      if (
+        chip !== null ||
+        [...bundle.slots, ...bundle.choices.map((choice) => choice.selection)].some(
+          (selection) => selection?.chip != null,
+        )
+      )
+        return null;
+    } catch {
+      return null;
+    }
+  }
   const rivalEntryId = request.rivalEntryId ?? null;
   const weight = request.top100Weight ?? 0;
   if (weight !== 0) {

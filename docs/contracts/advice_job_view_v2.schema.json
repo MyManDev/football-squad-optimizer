@@ -1,0 +1,227 @@
+{
+  "$id": "https://squadopt.dev/contracts/advice_job_view_v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempt": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "contract_version": {
+      "const": "advice_job_view_v2",
+      "type": "string"
+    },
+    "created_at_utc": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "error_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "infeasibility": {
+      "additionalProperties": false,
+      "properties": {
+        "bank": {
+          "additionalProperties": false,
+          "properties": {
+            "exact": {
+              "type": "boolean"
+            },
+            "reachable": {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "required": {
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "week": {
+              "maximum": 3,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "required",
+            "reachable",
+            "exact"
+          ],
+          "type": "object"
+        },
+        "repairs": {
+          "items": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "lower_bank_floor"
+                  },
+                  "tenths": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "tenths"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "from_week": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "const": "defer_purchase"
+                  },
+                  "player_id": {
+                    "maximum": 9007199254740991,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "to_week": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "player_id",
+                  "from_week",
+                  "to_week"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "release_purchase"
+                  },
+                  "player_id": {
+                    "maximum": 9007199254740991,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "week": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "player_id",
+                  "week"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "maxItems": 3,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "repairs"
+      ],
+      "type": "object"
+    },
+    "job_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "type": "string"
+    },
+    "progress": {
+      "additionalProperties": false,
+      "properties": {
+        "done": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "done",
+        "total"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "queue_position": {
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "cancelled",
+        "completed",
+        "failed",
+        "queued",
+        "running"
+      ],
+      "type": "string"
+    },
+    "updated_at_utc": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "workers": {
+      "additionalProperties": false,
+      "properties": {
+        "busy": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "busy",
+        "total"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "job_id",
+    "status",
+    "created_at_utc",
+    "updated_at_utc",
+    "attempt",
+    "contract_version",
+    "error_code",
+    "queue_position",
+    "progress",
+    "workers"
+  ],
+  "title": "Run-owned advice job public view",
+  "type": "object"
+}

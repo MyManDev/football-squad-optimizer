@@ -10,6 +10,8 @@
  * strategy), and the tie-break tier that holds the primary value and ranks.
  */
 
+import type { DecisionPreferences } from "../../advice/decisionPreferences";
+import { hardPreferenceRows, oneWeekPreferences } from "../preferences";
 import type { DeviceChip, DevicePlanDocument, DevicePlanEntry, DevicePlanPlayer } from "../types";
 import { chipCoefficients, rebuilds } from "../strategies/chips";
 
@@ -35,6 +37,9 @@ export interface TieBreak {
 }
 
 export interface MemberWeekOptions {
+  preferences?: DecisionPreferences;
+  excludedSquads?: readonly (readonly number[])[];
+  minimumObjectiveScaled?: number;
   chip?: DeviceChip | null;
   /** The points the plan is chosen on, when not the base ones (a Top 100 weight). */
   choice?: CoefficientChoice;
@@ -81,7 +86,13 @@ export function memberWeekProblem(
 ): LpProblem {
   const { players, rules } = document;
   const chip = options.chip ?? null;
-  const hitCostScaled = options.hitCostScaled ?? rules.hit_cost_scaled;
+  const preferences = oneWeekPreferences(options.preferences);
+  const hitCostScaled =
+    options.hitCostScaled ??
+    (preferences?.net_points_priority
+      ? (rules.hit_charged_scaled ??
+        Math.round(rules.hit_points_charged * rules.expected_points_scale))
+      : rules.hit_cost_scaled);
   const heldSet = new Set(entry.held);
   const s = (i: number) => variable("s", i);
   const x = (i: number) => variable("x", i);
@@ -176,7 +187,36 @@ export function memberWeekProblem(
       rows.push(row("overlap_hi", shared, "<=", options.overlap.maximum));
   }
 
-  const primary = primaryObjective(document, chip, hitCostScaled, options.choice);
+  rows.push(...hardPreferenceRows(document, entry, preferences, chip));
+  for (const [k, excluded] of (options.excludedSquads ?? []).entries()) {
+    const named = new Set(excluded);
+    if (
+      named.size !== rules.squad_size ||
+      named.size !== excluded.length ||
+      [...named].some((id) => !players.some((p) => p.id === id))
+    )
+      throw new Error("Invalid excluded transfer decision.");
+    rows.push(
+      row(
+        `exclude${k}`,
+        ones(indices.filter((i) => named.has(players[i]!.id)).map(s)),
+        "<=",
+        rules.squad_size - 1,
+      ),
+    );
+  }
+  const choice =
+    options.choice ??
+    (preferences?.net_points_priority
+      ? (player: DevicePlanPlayer): [number, number, number] =>
+          chipCoefficients(
+            { ...player, coefficients: [0, player.coefficients[2], player.coefficients[2]] },
+            chip,
+          )
+      : undefined);
+  const primary = primaryObjective(document, chip, hitCostScaled, choice);
+  if (options.minimumObjectiveScaled !== undefined)
+    rows.push(row("point_floor", primary, ">=", options.minimumObjectiveScaled));
   let sense: LpProblem["sense"] = "Maximize";
   let objective = primary;
   const tieBreak = options.tieBreak ?? null;

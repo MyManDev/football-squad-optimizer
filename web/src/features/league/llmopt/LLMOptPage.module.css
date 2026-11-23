@@ -51,6 +51,7 @@
 
 .chat textarea,
 .editor select,
+.ruleGroup select,
 .editor input:not([type="checkbox"]),
 .windowChoice select {
   border: 1px solid var(--color-line);
@@ -124,6 +125,7 @@
 
 .chat textarea:focus-visible,
 .editor select:focus-visible,
+.ruleGroup select:focus-visible,
 .editor input:not([type="checkbox"]):focus-visible,
 .windowChoice select:focus-visible,
 .workspace button:focus-visible {
@@ -262,6 +264,10 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
 }
 
+.planGrid > [data-path-group] {
+  grid-column: 1 / -1;
+}
+
 .ruleGroup {
   border-top: 1px solid var(--color-line);
   padding-top: var(--space-2);
@@ -277,12 +283,26 @@
 
 .ruleGroup li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   margin-bottom: var(--space-1);
   padding-left: var(--space-2);
   background: var(--color-surface);
+}
+
+.ruleGroup li > span {
+  flex: 1 1 10rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ruleGroup li > label {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .changeMark {

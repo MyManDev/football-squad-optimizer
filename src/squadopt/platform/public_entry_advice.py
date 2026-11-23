@@ -19,6 +19,7 @@ from squadopt.application.advice import AdviseEntryRequest
 from squadopt.application.advice_capabilities import menu_capabilities
 from squadopt.application.advice_menu import held_member_chips, held_member_squad
 from squadopt.application.capture_entries import CapturePicksProvider
+from squadopt.contracts.preference_bundle import PreferenceBundle
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.live import RecommendationInputs, read_season_rules
@@ -61,6 +62,11 @@ class PublicEntryAdviceReader(AdviceReadStore):
         *,
         switches: SwitchInputsProvider | None = None,
         available_windows: Callable[[AdviceRequestContext], tuple[int, ...]] | None = None,
+        transfer_packages: bool = False,
+        three_week_paths: bool = False,
+        preference_bundles: bool = False,
+        verified_repairs: bool = False,
+        llmopt_vnext: bool = False,
     ) -> None:
         menu = menu_capabilities()
         super().__init__(
@@ -71,6 +77,11 @@ class PublicEntryAdviceReader(AdviceReadStore):
             capabilities=menu,
             switches=switches,
             available_windows=available_windows,
+            transfer_packages=transfer_packages,
+            three_week_paths=three_week_paths,
+            preference_bundles=preference_bundles,
+            verified_repairs=verified_repairs,
+            llmopt_vnext=llmopt_vnext,
         )
         self._contexts = context
         self._public_inputs = inputs
@@ -175,7 +186,33 @@ class PublicEntryAdviceReader(AdviceReadStore):
         chip: str | None = None,
         model: str = "current",
         preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
     ) -> ResolvedAdviceRequest:
+        if preference_bundle is not None:
+            return self._bundle_request(
+                preference_bundle,
+                lambda selected, selected_chip: self.resolve(
+                    league_id=league_id,
+                    entry_id=entry_id,
+                    strategy=strategy,
+                    window=window,
+                    rival_entry_id=rival_entry_id,
+                    top100_weight=top100_weight,
+                    managers_word=managers_word,
+                    chip=selected_chip,
+                    model=model,
+                    preferences=selected,
+                ),
+                main=preferences,
+                chip=chip,
+                league_id=league_id,
+                entry_id=entry_id,
+                strategy=strategy,
+                window=window,
+                rival_entry_id=rival_entry_id,
+                top100_weight=top100_weight,
+                managers_word=managers_word,
+            )
         self._check_ids(league_id, entry_id)
         if type(window) is not int:
             raise UnsupportedAdviceRequestError("A public team needs a league and team number.")

@@ -36,6 +36,60 @@ const DOCUMENT = {
 };
 
 describe("league capabilities", () => {
+  it("requires both release and verified repairs for repair work", () => {
+    for (const release of [undefined, false, true])
+      for (const repairs of [undefined, false, true])
+        expect(
+          checkedCapabilities(
+            { ...DOCUMENT, llmopt_vnext: release, verified_repairs: repairs },
+            352490,
+          ).verifiedRepairs,
+        ).toBe(release && repairs ? true : undefined);
+    expect(() => checkedCapabilities({ ...DOCUMENT, verified_repairs: "true" }, 352490)).toThrow(
+      AdviceCapabilitiesError,
+    );
+  });
+  it.each([undefined, false, true])(
+    "decodes path and package grants independently under release %s",
+    (release) => {
+      for (const packages of [undefined, false, true]) {
+        for (const paths of [undefined, false, true]) {
+          const caps = checkedCapabilities(
+            {
+              ...DOCUMENT,
+              llmopt_vnext: release,
+              transfer_packages: packages,
+              three_week_paths: paths,
+            },
+            DOCUMENT.league_id,
+          );
+          expect(caps.transferPackages).toBe(release && packages ? true : undefined);
+          expect(caps.threeWeekPaths).toBe(release && paths ? true : undefined);
+          expect(caps.verifiedRepairs).toBeUndefined();
+        }
+      }
+    },
+  );
+  it("refuses a malformed path grant", () => {
+    expect(() =>
+      checkedCapabilities({ ...DOCUMENT, three_week_paths: "1" }, DOCUMENT.league_id),
+    ).toThrow(AdviceCapabilitiesError);
+  });
+  it.each([undefined, false, true])(
+    "advertises grouped preferences only with the release setting %s",
+    (enabled) => {
+      const caps = checkedCapabilities(
+        {
+          ...DOCUMENT,
+          llmopt_vnext: enabled,
+          preference_bundles: { version: "llmopt_preference_bundle_v1" },
+        },
+        352490,
+      );
+      expect(caps.llmoptVNext === true).toBe(enabled === true);
+      expect(caps.preferenceBundles === true).toBe(enabled === true);
+    },
+  );
   it.each(["model_opportunity_reservation_v1", "model_opportunity_reservation_v2"])(
     "accepts published chip strategy %s and refuses unknown versions",
     (version) => {

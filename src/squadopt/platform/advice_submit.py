@@ -35,18 +35,29 @@ is the discipline around that one write:
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
+import json
 import math
 import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Final, Protocol
 
+from squadopt.contracts.llmopt_run import RunReference as RunReference
+from squadopt.contracts.preference_bundle import BUNDLE_SWITCH, PreferenceBundle
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
-from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
+from squadopt.platform.advice_job_spec import (
+    AdviceJobSpec,
+    AdviceJobSpecStore,
+    current_repair_answer,
+    replays_witness,
+    same_repair_scope,
+    single_rule_edit,
+)
 from squadopt.platform.advice_queue import JobQueue
 from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
@@ -55,6 +66,8 @@ from squadopt.platform.advice_read import (
     AdviceRequestContext,
     ResolvedAdviceRequest,
 )
+from squadopt.platform.advice_runs import FileRunStore, RunTransaction
+from squadopt.platform.advice_runs import RunAdmissionError as RunAdmissionError
 from squadopt.platform.api_contract import (
     ApiCommandRequest,
     BackendApiContractError,
@@ -212,6 +225,7 @@ class AdviceSubmitService:
         job_progress: Callable[[AdviceJob], JobProgress | None] | None = None,
         prepare_inputs: Callable[[AdviceRequestContext, int], None] | None = None,
         max_open_jobs: int | None = None,
+        runs: FileRunStore | None = None,
     ) -> None:
         if max_open_jobs_per_client < 1:
             raise ValueError("max_open_jobs_per_client must be at least 1.")
@@ -228,6 +242,7 @@ class AdviceSubmitService:
         self._job_progress = job_progress
         self._prepare_inputs = prepare_inputs
         self._max_open_jobs = max_open_jobs
+        self._runs = runs
         # Only the admission callback accesses this map, under the queue transaction.
         # Addresses never enter queue/spec documents; process restart forgets ownership.
         self._client_jobs: dict[str, str] = {}
@@ -278,7 +293,9 @@ class AdviceSubmitService:
                 progress = None
         workers = look.workers if look is not None else None
         view: dict[str, object] = {
-            "contract_version": "advice_job_view_v1",
+            "contract_version": "advice_job_view_v2"
+            if record.contract_version == "backend_jobs_v2"
+            else "advice_job_view_v1",
             "job_id": record.job_id,
             "status": record.status,
             "created_at_utc": record.created_at_utc,
@@ -292,6 +309,18 @@ class AdviceSubmitService:
         if record.error is not None and record.error.infeasibility is not None:
             view["infeasibility"] = record.error.infeasibility
         return view
+
+    def cancel_run(self, run_id: str, *, at_utc: str, client_bucket: str = "unknown") -> None:
+        # Reuse the strict reference parser so IDs can never become arbitrary store paths.
+        RunReference.parse({"contract_version": "llmopt_run_v1", "run_id": run_id, "stage": "base"})
+        if self._runs is None:
+            raise RunAdmissionError("RUN_STORE_UNAVAILABLE", "Planning work is unavailable.")
+        bucket = client_address_bucket(client_bucket)
+        if self._limiter is not None and not self._limiter.allow(f"ip:{bucket}"):
+            raise self._rate_limited()
+        self._runs.cancel(
+            run_id, self._queue, at_utc, capture=self._reader.current_capture_snapshot_id()
+        )
 
     def submit(
         self,
@@ -309,6 +338,148 @@ class AdviceSubmitService:
         chip: str | None = None,
         model: str = "current",
         preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
+        run: RunReference | None = None,
+        run_tx: RunTransaction | None = None,
+        run_resolved: ResolvedAdviceRequest | None = None,
+        admission_charged: bool = False,
+    ) -> SubmitOutcome:
+        """Submit work and durably acknowledge anonymous V2 consumers."""
+
+        def ask(transaction: RunTransaction | None, charged: bool) -> SubmitOutcome:
+            return self._submit(
+                league_id=league_id,
+                entry_id=entry_id,
+                strategy=strategy,
+                window=window,
+                rival_entry_id=rival_entry_id,
+                idempotency_key=idempotency_key,
+                client_bucket=client_bucket,
+                at_utc=at_utc,
+                top100_weight=top100_weight,
+                managers_word=managers_word,
+                chip=chip,
+                model=model,
+                preferences=preferences,
+                preference_bundle=preference_bundle,
+                run=run,
+                run_tx=transaction,
+                run_resolved=run_resolved,
+                admission_charged=charged,
+            )
+
+        outcome = ask(run_tx, admission_charged)
+        if (
+            run is not None
+            or self._runs is None
+            or outcome.job is None
+            or outcome.job.contract_version != "backend_jobs_v2"
+        ):
+            return outcome
+        # The queue/admission locks have been released. Preserve ledger -> queue
+        # ordering without serializing independent legacy admissions on the ledger.
+        with self._runs.transaction(at_utc=at_utc) as transaction:
+            joined = self._queue.load(outcome.job.job_id)
+            if joined is None:
+                raise RunAdmissionError("RUN_REQUEST_INCOMPLETE", "Please retry this request.")
+            if joined.status == "cancelled":
+                # Cancellation won before the anonymous join was acknowledged.
+                # Retry under the ledger lock: a new V2 producer cannot race this
+                # admission, and a new V1 job keeps the legacy execution policy.
+                outcome = ask(transaction, True)
+            else:
+                outcome = SubmitOutcome(kind="job", job=joined)
+            if outcome.job is not None and outcome.job.contract_version == "backend_jobs_v2":
+                if (
+                    not outcome.job.is_terminal
+                    and outcome.job.job_id not in transaction.state["jobs"]
+                ):
+                    raise RunAdmissionError(
+                        "RUN_STORE_UNAVAILABLE", "The admitted work is unavailable."
+                    )
+                transaction.legacy_consumer(outcome.job.job_id)
+        return outcome
+
+    def _authorize_repair(
+        self,
+        run: RunReference,
+        tx: RunTransaction,
+        key: str,
+        spec: AdviceJobSpec,
+        preferences: DecisionPreferences,
+    ) -> None:
+        state = tx.state["runs"][run.run_id]
+        candidates = state.get("repair_candidates", [])
+        if key in candidates:
+            return
+        rejected = RunAdmissionError("RUN_REPAIR_INVALID", "This edit does not match the plan.")
+        if self._specs is None or (base := self._specs.get(state["base"])) is None:
+            raise rejected
+        if not same_repair_scope(base, spec):
+            raise rejected
+        base_id = state["requests"].get(state["base"])
+        job = self._queue.load(base_id) if base_id is not None else None
+        base_ready = state["base_cached"] or (job is not None and job.status == "completed")
+        # A selection must replay one of this run's completed candidate documents.
+        sources = [*candidates, *([state["base"]] if base_ready else [])]
+        for source in sources:
+            answer = self._reader.cached(source, repair_witness=True)
+            prior = self._specs.get(source)
+            if (
+                answer is not None
+                and prior is not None
+                and replays_witness(
+                    prior,
+                    spec,
+                    answer,
+                    completed_here=tx.completed_answer(run, source, answer, self._queue),
+                )
+            ):
+                return
+        # New work, including a shared cached candidate, needs current permission.
+        if not self._reader.llmopt_vnext:
+            raise RunAdmissionError("LLMOPT_VNEXT_DISABLED", "This planning workflow is closed.")
+        if base_ready and len(preferences.frozen_weeks) == 3 and run.repair_origin is None:
+            raise rejected
+        error = job.error if job is not None else None
+        if run.repair_origin is not None:
+            permitted = run.repair_origin.permits(preferences, spec.switch("chip").get("chip"))
+        else:
+            permitted = single_rule_edit(
+                base,
+                spec,
+                known_chip_conflict=error is not None and error.code == "CHIP_NOT_HELD",
+                diagnosed=error.infeasibility["repairs"] if error and error.infeasibility else (),
+            )
+        if not permitted:
+            raise rejected
+        # An origin-bound first candidate is already recorded, whatever its outcome.
+        limit = 2 if run.repair_origin is not None or not base_ready else 1
+        if len(candidates) >= limit:
+            raise RunAdmissionError("RUN_BUDGET_EXHAUSTED", "The completed plans are available.")
+        tx.repair_candidate = key
+
+    def _submit(
+        self,
+        *,
+        league_id: int,
+        entry_id: int,
+        strategy: str,
+        window: int,
+        rival_entry_id: int | None,
+        idempotency_key: str | None,
+        client_bucket: str,
+        at_utc: str,
+        top100_weight: int = 0,
+        managers_word: bool = False,
+        chip: str | None = None,
+        model: str = "current",
+        preferences: DecisionPreferences = NO_PREFERENCES,
+        preference_bundle: PreferenceBundle | None = None,
+        run: RunReference | None = None,
+        run_tx: RunTransaction | None = None,
+        run_resolved: ResolvedAdviceRequest | None = None,
+        admission_charged: bool = False,
     ) -> SubmitOutcome:
         """Validate, answer from the cache, rate-limit, dedupe, and enqueue, in that order.
 
@@ -322,6 +493,10 @@ class AdviceSubmitService:
         many keys or clients ask. The queue retains each joining key's request identity.
         """
 
+        if run is not None and self._runs is None:
+            raise RunAdmissionError("RUN_STORE_UNAVAILABLE", "Planning work is unavailable.")
+        if preference_bundle is not None and (run is None or run.stage != "followup"):
+            raise RunAdmissionError("RUN_BASE_REQUIRED", "Compute the main plan first.")
         client_bucket = client_address_bucket(client_bucket)
         if self._store_ready is not None and not self._store_ready():
             # Refuse before validating: a queue write onto a store that has failed its
@@ -353,13 +528,18 @@ class AdviceSubmitService:
                 chip=chip,
                 model=model,
                 preferences=preferences,
+                preference_bundle=preference_bundle,
             )
 
         limiter = self._limiter
-        charged = False
+        charged = admission_charged
         try:
-            resolved = resolve()
+            resolved = run_resolved if run_resolved is not None else resolve()
         except AdviceInputsNotPreparedError as missing:
+            if run is not None and not self._reader.llmopt_vnext:
+                raise RunAdmissionError(
+                    "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
+                ) from missing
             if self._prepare_inputs is None:
                 raise
             if self._deadline_for is not None and datetime.fromisoformat(
@@ -382,8 +562,153 @@ class AdviceSubmitService:
                 self._prepare_inputs(missing.context, team)
             resolved = resolve()
         cache_key, context = resolved.key, resolved.context
+
+        def request_spec() -> AdviceJobSpec:
+            return AdviceJobSpec(
+                league_id=int(league_id),
+                entry_id=int(entry_id),
+                strategy=strategy,
+                window=int(window),
+                context=context,
+                rival_entry_id=rival_entry_id
+                if self._reader.strategy_uses_rival(strategy)
+                else None,
+                switches=resolved.switches,
+            )
+
+        def record_hit(tx: RunTransaction, ref: RunReference, document: bytes) -> None:
+            if window == 3 and ref.stage in ("base", "repair") and self._specs is not None:
+                spec = request_spec()
+                if ref.stage == "repair":
+                    witness = (
+                        document
+                        if self._reader.llmopt_vnext
+                        else self._reader.cached(cache_key, repair_witness=True)
+                    )
+                    if witness is None or not current_repair_answer(
+                        spec,
+                        json.loads(witness)["payload"],
+                        completed_here=(
+                            self._specs.get(cache_key) == spec
+                            and tx.completed_answer(ref, cache_key, witness, self._queue)
+                        ),
+                    ):
+                        raise RunAdmissionError("RUN_CONTEXT_CHANGED", "The planning data changed.")
+                # Imported answers may have no queue record. Store the immutable spec
+                # before publishing the run's reference to its cached witness.
+                self._specs.put(cache_key, spec)
+            tx.cached(ref)
+
+        if run is not None and run_tx is None:
+            assert self._runs is not None
+            origin = run.repair_origin
+            if origin is not None and (
+                window != 3
+                or preference_bundle is not None
+                or (run.stage == "base" and not origin.permits(preferences, chip))
+            ):
+                raise RunAdmissionError("RUN_REPAIR_INVALID", "This edit does not match the plan.")
+            binding = hashlib.sha256(
+                json.dumps(
+                    {
+                        "context": asdict(context),
+                        "league": league_id,
+                        "entry": entry_id,
+                        "window": window,
+                        **({"repair_origin": origin.facts} if origin is not None else {}),
+                    },
+                    sort_keys=True,
+                ).encode()
+            ).hexdigest()
+            with self._runs.transaction(at_utc=at_utc) as transaction:
+                transaction.prune(context.capture_snapshot_id, self._queue)
+                known = (
+                    run.run_id in transaction.state["runs"]
+                    or run.run_id in transaction.state["cancelled"]
+                )
+                original = None
+                if self._reader.llmopt_vnext or known:
+                    transaction.bind(
+                        run,
+                        binding,
+                        window,
+                        cache_key,
+                        self._queue,
+                        capture=context.capture_snapshot_id,
+                    )
+                    if self._reader.llmopt_vnext:
+                        transaction.release_failed_bundles(run.run_id, self._queue)
+                    if run.stage == "repair":
+                        self._authorize_repair(
+                            run, transaction, cache_key, request_spec(), preferences
+                        )
+                    elif origin is not None and cache_key not in transaction.state["runs"][
+                        run.run_id
+                    ].get("repair_candidates", []):
+                        transaction.repair_candidate = cache_key
+                    if (
+                        preference_bundle is not None
+                        and transaction.state["runs"][run.run_id]["base"]
+                        != resolved.switches[BUNDLE_SWITCH]["base_key"]
+                    ):
+                        raise RunAdmissionError(
+                            "RUN_BASE_CHANGED", "The main request does not match this run."
+                        )
+                    original = transaction.previous(run, cache_key)
+                if (
+                    not self._reader.llmopt_vnext
+                    and (run.stage == "repair" or origin is not None)
+                    and (not known or transaction.repair_candidate is not None)
+                ):
+                    # A shared answer may be read normally. It becomes a new
+                    # candidate for a run only while repair admission is open.
+                    raise RunAdmissionError(
+                        "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
+                    )
+                if original is not None:
+                    held = self._reader.cached(cache_key)
+                    if held is not None:
+                        record_hit(transaction, run, held)
+                        return SubmitOutcome(kind="hit", payload=held)
+                    job = self._queue.load(original)
+                    if job is None:
+                        raise RunAdmissionError(
+                            "RUN_REQUEST_INCOMPLETE", "Confirm a new planning run."
+                        )
+                    return SubmitOutcome(kind="job", job=job)
+                if not self._reader.llmopt_vnext:
+                    held = self._reader.cached(cache_key)
+                    if held is not None:
+                        if run.stage == "repair":
+                            record_hit(transaction, run, held)
+                        return SubmitOutcome(kind="hit", payload=held)
+                    raise RunAdmissionError(
+                        "LLMOPT_VNEXT_DISABLED", "This planning workflow is closed."
+                    )
+                return self.submit(
+                    league_id=league_id,
+                    entry_id=entry_id,
+                    strategy=strategy,
+                    window=window,
+                    rival_entry_id=rival_entry_id,
+                    idempotency_key=idempotency_key,
+                    client_bucket=client_bucket,
+                    at_utc=at_utc,
+                    top100_weight=top100_weight,
+                    managers_word=managers_word,
+                    chip=chip,
+                    model=model,
+                    preferences=preferences,
+                    preference_bundle=preference_bundle,
+                    run=run,
+                    run_tx=transaction,
+                    run_resolved=resolved,
+                    admission_charged=charged,
+                )
         cached = self._reader.cached(cache_key)
         if cached is not None:
+            if run is not None and run_tx is not None:
+                record_hit(run_tx, run, cached)
             return SubmitOutcome(kind="hit", payload=cached)
         entry_bucket = f"entry:{context.capture_snapshot_id}:{entry_id}"
         if not charged and limiter is not None and not limiter.allow(f"ip:{client_bucket}"):
@@ -443,11 +768,24 @@ class AdviceSubmitService:
                                 "This Idempotency-Key was already used for a different request."
                             )
                         if not job.is_terminal:
+                            if run is not None and run_tx is not None:
+                                run_tx.reserve(
+                                    run,
+                                    cache_key,
+                                    job.job_id,
+                                    preference_bundle=preference_bundle is not None,
+                                )
+                            if run_tx is not None and (
+                                run is None or job.contract_version == "backend_jobs_v1"
+                            ):
+                                run_tx.legacy_consumer(job.job_id)
                             return SubmitOutcome(kind="job", job=job)
                         # Terminal replay of the same request: the cache answers when it
                         # can; a failed job means the same key may honestly try again.
                         replay = self._reader.cached(cache_key)
                         if replay is not None:
+                            if run is not None and run_tx is not None:
+                                record_hit(run_tx, run, replay)
                             return SubmitOutcome(kind="hit", payload=replay)
                         break
 
@@ -464,6 +802,7 @@ class AdviceSubmitService:
                 created_at_utc=at_utc,
                 updated_at_utc=at_utc,
                 idempotency_key=command.idempotency_key,
+                contract_version="backend_jobs_v2" if run is not None else "backend_jobs_v1",
             )
 
             @contextmanager
@@ -487,6 +826,13 @@ class AdviceSubmitService:
                 # can admit in between.
                 if limiter is not None and not limiter.has_room(entry_bucket):
                     raise self._rate_limited()
+                if run is not None and run_tx is not None:
+                    run_tx.reserve(
+                        run,
+                        cache_key,
+                        record.job_id,
+                        preference_bundle=preference_bundle is not None,
+                    )
                 self._client_jobs[record.job_id] = client_bucket
                 try:
                     yield
@@ -508,24 +854,7 @@ class AdviceSubmitService:
                     # record lands, and a claimed job whose request cannot be read is a job
                     # nobody can answer. The rival is normalized exactly as the cache key
                     # normalizes it, so requests that share an address share a meaning.
-                    self._specs.put(
-                        cache_key,
-                        AdviceJobSpec(
-                            league_id=int(league_id),
-                            entry_id=int(entry_id),
-                            strategy=strategy,
-                            window=int(window),
-                            context=context,
-                            rival_entry_id=(
-                                rival_entry_id
-                                if self._reader.strategy_uses_rival(strategy)
-                                else None
-                            ),
-                            # Exactly what entered the key: the switch values and the identity
-                            # of the inputs they were accepted against.
-                            switches=resolved.switches,
-                        ),
-                    )
+                    self._specs.put(cache_key, request_spec())
 
             # Completion publishes cache bytes and removes the open reservation under the
             # same lock as this final cache check and enqueue decision. An earlier miss must
@@ -534,5 +863,13 @@ class AdviceSubmitService:
                 record, read_cached=self._reader.cached, admit=admit, prepare=prepare
             )
             if isinstance(winner, bytes):
+                if run is not None and run_tx is not None:
+                    record_hit(run_tx, run, winner)
                 return SubmitOutcome(kind="hit", payload=winner)
+            if run is not None and run_tx is not None:
+                run_tx.reserve(
+                    run, cache_key, winner.job_id, preference_bundle=preference_bundle is not None
+                )
+            if run_tx is not None and (run is None or winner.contract_version == "backend_jobs_v1"):
+                run_tx.legacy_consumer(winner.job_id)
             return SubmitOutcome(kind="job", job=winner)

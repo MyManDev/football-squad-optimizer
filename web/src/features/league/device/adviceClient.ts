@@ -1,0 +1,622 @@
+/** Advice transport for verified one-week device rules; credentials never enter it. */
+import type {
+  AdviceClient,
+  AdviceRequest,
+  AdviceReadResult,
+  AdviceRequestResult,
+} from "../advice/adviceClient";
+import { checkedAdvice } from "../advice/adviceResponse";
+import { shownPriorityReference, type DevicePriorityReference } from "./priorityWitness";
+import { capabilitiesForPage, type AdviceCapabilities } from "../advice/adviceCapabilities";
+import { withRequestDeadline, type RequestOptions } from "../../../data/request";
+import { preferencesKey } from "../advice/decisionPreferences";
+import { bundleKey } from "../advice/preferenceBundle";
+import type { EntrySquad, LeagueViewEnvelope } from "../types";
+import { deviceAdviceEnvelope } from "./deviceAdvice";
+import { DEVICE_ENVELOPE_PREFIX, retainDeviceEnvelope } from "./envelopeCache";
+import { deviceSelection } from "./selection";
+import { isDevicePlanDocument, isDevicePlanEntry, type DevicePlanDocument } from "./types";
+import type { DeviceSolver } from "./useDevicePlan";
+import {
+  reserveDeviceWork,
+  claimDeviceRepair,
+  bindDeviceRun,
+  closeDeviceWork,
+  deviceWorkReceipt,
+  DeviceWorkRefused,
+} from "./workBudget";
+import {
+  DEVICE_ALTERNATIVE_SECONDS,
+  DEVICE_LOAD_ALLOWANCE_SECONDS,
+  DEVICE_REPLY_GRACE_SECONDS,
+  DEVICE_SOLVE_CEILING_SECONDS,
+} from "./solve/ceiling";
+
+function repairRequest(request: AdviceRequest) {
+  return (
+    request.deviceRepair !== undefined || (request.window === 1 && request.run?.stage === "repair")
+  );
+}
+
+async function sha256(value: string) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function refused(reason: string): AdviceRequestResult {
+  return {
+    kind: "unavailable",
+    reason,
+    ...(reason === "PLAN_NOT_FOUND" ? { infeasibility: { repairs: [] } } : {}),
+  };
+}
+
+function isAbort(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+// Clients recreated in the same document share live repair workers. A full reload
+// ends those workers and leaves only the charged reservation and durable result.
+const pendingRepairs = new Map<string, Promise<AdviceReadResult>>();
+
+export function deviceAdviceClient(
+  remote: AdviceClient,
+  squad: EntrySquad,
+  load: () => Promise<LeagueViewEnvelope<DevicePlanDocument>>,
+  createSolver: () => DeviceSolver = () =>
+    new Worker(new URL("./deviceSolver.worker.ts", import.meta.url), {
+      type: "module",
+    }) as unknown as DeviceSolver,
+): AdviceClient {
+  const memory = new Map<string, AdviceReadResult>();
+  const failures = new Map<string, string>();
+  const pending = new Map<string, Promise<AdviceReadResult>>();
+  type Plan = Extract<AdviceReadResult, { kind: "advice" }>;
+  const listeners = new Map<string, Set<(plan: Plan) => void>>();
+  const capabilityReads = new Map<string, Promise<AdviceCapabilities | null>>();
+  const localRuns = new Set<string>();
+  const closedLocalRuns = new Set<string>();
+  const block = squad.device_plan;
+  const owned = new Set([...squad.starting_xi, ...squad.bench].map((player) => player.player_id));
+  const consistentBlock =
+    isDevicePlanEntry(block) &&
+    owned.size === block.held.length &&
+    block.held.every((id) => owned.has(id)) &&
+    block.bank_tenths === squad.bank_tenths &&
+    (!squad.free_transfers_known || block.free_transfers === squad.free_transfers);
+  let sequence = 0;
+  let published: Promise<{ document: DevicePlanDocument; fingerprint: string }> | undefined;
+  const verified = () =>
+    (published ??= (async () => {
+      const document = (await load()).payload;
+      if (
+        !isDevicePlanDocument(document) ||
+        document.source_snapshot_id !== squad.source_snapshot_id ||
+        document.season !== squad.season ||
+        document.gameweek !== squad.gameweek
+      )
+        throw new Error("The device inputs do not match the requested capture.");
+      const roster = new Set(document.players.map(({ id }) => id));
+      if (!block || !block.held.every((id) => roster.has(id)))
+        throw new Error("A held player is missing from the device projections.");
+      const fingerprint = await sha256(JSON.stringify({ document, entry: squad.device_plan }));
+      return { document, fingerprint };
+    })().catch((error) => {
+      published = undefined;
+      throw error;
+    }));
+  const withLocal = (remoteCaps: AdviceCapabilities | null): AdviceCapabilities | null => {
+    const caps = capabilitiesForPage(remoteCaps, {
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      snapshotId: squad.source_snapshot_id,
+    });
+    if (!caps && remoteCaps) {
+      // The page needs the changed capture to prompt for a reload. It grants no local work.
+      return { ...remoteCaps, llmoptVNext: undefined, devicePreferenceBundles: undefined };
+    }
+    if (caps?.llmoptVNext !== true || !consistentBlock || !squad.source_snapshot_id) return caps;
+    return {
+      ...caps,
+      preferences: true,
+      devicePreferenceBundles: true,
+      strategies: {
+        ...caps.strategies,
+        "saf-puan": {
+          requiresRival: false,
+          windows: caps.preferences
+            ? [...new Set([1 as const, ...(caps.strategies["saf-puan"]?.windows ?? [])])]
+            : [1],
+        },
+      },
+    };
+  };
+  const readCapabilities = (leagueId: number, entryId?: number, options?: RequestOptions) =>
+    withRequestDeadline(async () => {
+      const key = JSON.stringify([leagueId, entryId ?? null]);
+      let read = capabilityReads.get(key);
+      if (!read) {
+        // A dismissed view cannot cancel a concurrent confirmation's read. The
+        // underlying HTTP call keeps its own timeout. Only concurrent reads share it.
+        read = withRequestDeadline(async (signal) => {
+          const remoteCaps =
+            entryId === undefined
+              ? await remote.readCapabilities?.(leagueId, { signal })
+              : await remote.readPublicCapabilities?.(leagueId, entryId, { signal });
+          return withLocal(remoteCaps ?? null);
+        })
+          .catch(() => null)
+          .finally(() => capabilityReads.delete(key));
+        capabilityReads.set(key, read);
+      }
+      return read;
+    }, options);
+  const eligible = (request: AdviceRequest) =>
+    request.run !== undefined &&
+    request.deviceRun !== false &&
+    squad.source_snapshot_id !== null &&
+    consistentBlock &&
+    request.leagueId === squad.league_id &&
+    request.entryId === squad.entry.entry_id &&
+    (request.season === undefined || request.season === squad.season) &&
+    (request.gameweek === undefined || request.gameweek === squad.gameweek) &&
+    // This transport rechecks the current server grant before starting a run-bound worker.
+    deviceSelection(request, squad, true)?.kind === "plain";
+  const workBinding = (request: AdviceRequest, fingerprint: string) =>
+    JSON.stringify([fingerprint, request.leagueId, request.entryId, request.window]);
+  const key = (request: AdviceRequest, fingerprint: string, reference?: DevicePriorityReference) =>
+    DEVICE_ENVELOPE_PREFIX +
+    JSON.stringify([
+      squad.source_snapshot_id,
+      fingerprint,
+      request.leagueId,
+      request.entryId,
+      request.strategy,
+      request.window,
+      request.deviceRun ?? true,
+      request.deviceAlternatives ?? false,
+      request.chip ?? null,
+      preferencesKey(request.preferences),
+      ...(request.priorityMain && !request.preferenceBundle ? ["priority-main"] : []),
+      ...(request.preferenceBundle ? [bundleKey(request.preferenceBundle)] : []),
+      ...(reference
+        ? [reference.squad, reference.startingXi, reference.captain, reference.proved]
+        : []),
+    ]);
+  const cached = (
+    request: AdviceRequest,
+    fingerprint: string,
+    address = key(request, fingerprint),
+  ): AdviceReadResult => {
+    const held = memory.get(address);
+    if (held) return held;
+    try {
+      const raw = globalThis.sessionStorage?.getItem(address);
+      if (raw) {
+        const envelope = checkedAdvice(JSON.parse(raw), request);
+        if (
+          repairRequest(request) &&
+          !address.startsWith(DEVICE_ENVELOPE_PREFIX) &&
+          envelope.payload.device_input_fingerprint !== fingerprint
+        )
+          return { kind: "not-computed" };
+        if (envelope.payload.source_snapshot_id === squad.source_snapshot_id) {
+          envelope.payload.device_input_fingerprint = fingerprint;
+          for (const option of envelope.payload.device_alternatives ?? [])
+            option.device_input_fingerprint = fingerprint;
+          const result: AdviceReadResult = { kind: "advice", envelope, source: "device" };
+          memory.set(address, result);
+          return result;
+        }
+      }
+    } catch {
+      /* Recompute an unreadable cached answer on the device. */
+    }
+    return { kind: "not-computed" };
+  };
+  function rememberRepair(address: string, result: Plan) {
+    memory.set(address, result);
+    try {
+      globalThis.sessionStorage.setItem(address, JSON.stringify(result.envelope));
+    } catch {
+      /* A reload can recover a missing answer within the remaining capacity. */
+    }
+  }
+  const referenceFor = (request: AdviceRequest, fingerprint: string) => {
+    if (!request.preferenceBundle?.program) return undefined;
+    if (request.shownDeviceMain !== undefined)
+      return request.shownDeviceMain?.fingerprint === fingerprint
+        ? request.shownDeviceMain.decisions
+        : undefined;
+    // A restored client may have only the previously published device envelope.
+    const main = { ...request, preferenceBundle: undefined, priorityMain: true as const };
+    const held = cached(main, fingerprint);
+    const original =
+      held.kind === "advice" ? held : cached({ ...main, priorityMain: undefined }, fingerprint);
+    return original.kind === "advice"
+      ? shownPriorityReference(original.envelope.payload)
+      : undefined;
+  };
+  const readCached = (
+    request: AdviceRequest,
+    fingerprint: string,
+    reference?: DevicePriorityReference,
+  ) => {
+    const saved = cached(request, fingerprint, key(request, fingerprint, reference));
+    if (saved.kind === "advice") return saved;
+    if (reference) {
+      const old = cached(request, fingerprint);
+      return old.kind === "advice" &&
+        JSON.stringify(shownPriorityReference(old.envelope.payload)) === JSON.stringify(reference)
+        ? old
+        : saved;
+    }
+    if (!request.priorityMain || request.preferenceBundle) return saved;
+    const legacy = cached({ ...request, priorityMain: undefined }, fingerprint);
+    return legacy.kind === "advice" && legacy.envelope.payload.solver_status === "OPTIMAL"
+      ? legacy
+      : saved;
+  };
+  const abort = () => new DOMException("The device request ended.", "AbortError");
+  const checkAnswerBinding = (id: string | undefined, binding: string) => {
+    if (!id) return;
+    if (closedLocalRuns.has(id)) throw new DeviceWorkRefused("RUN_CANCELLED");
+    let receipt;
+    try {
+      receipt = deviceWorkReceipt(id);
+    } catch (error) {
+      // Reading a checked answer or finishing paid work requires no new reservation.
+      if (error instanceof DeviceWorkRefused && error.code === "RUN_STORE_UNAVAILABLE") return;
+      throw error;
+    }
+    if (receipt?.closed) throw new DeviceWorkRefused("RUN_CANCELLED");
+    if (receipt && receipt.binding !== binding) throw new DeviceWorkRefused("RUN_CONTEXT_CHANGED");
+  };
+  return {
+    readDeviceDataId: async () => {
+      published = undefined;
+      return (await verified()).fingerprint;
+    },
+    prepareDeviceRun: async (request) => {
+      if (!eligible(request)) return false;
+      let fingerprint: string;
+      try {
+        ({ fingerprint } = await verified());
+      } catch {
+        return false;
+      }
+      try {
+        bindDeviceRun(request.run?.run_id, workBinding(request, fingerprint));
+        return true;
+      } catch (error) {
+        if (error instanceof DeviceWorkRefused && error.code === "RUN_STORE_UNAVAILABLE")
+          return false;
+        throw error;
+      }
+    },
+    localRequestAllowanceMs: (request) =>
+      eligible(request)
+        ? (DEVICE_LOAD_ALLOWANCE_SECONDS +
+            DEVICE_REPLY_GRACE_SECONDS +
+            DEVICE_SOLVE_CEILING_SECONDS) *
+          1000
+        : undefined,
+    readPublished: (request, options) =>
+      repairRequest(request)
+        ? Promise.resolve({ kind: "not-computed" })
+        : remote.readPublished(request, options),
+    readJob: (id, options) => remote.readJob(id, options),
+    readCapabilities: (id, options) => readCapabilities(id, undefined, options),
+    readPublicCapabilities: (id, entry, options) => readCapabilities(id, entry, options),
+    cancelRun: async (id) => {
+      let local = localRuns.has(id);
+      try {
+        local = closeDeviceWork(id) || local;
+      } catch {
+        // An unavailable local receipt must not prevent cancelling a server job.
+      }
+      if (local) closedLocalRuns.add(id);
+      else await remote.cancelRun?.(id);
+    },
+    readAdvice: async (request, options) => {
+      // Only requestAdvice can check the selection receipt and distinguish a verified replay
+      // from an ordinary cached plan at the very same computation address.
+      if (repairRequest(request)) return { kind: "not-computed" };
+      if (!eligible(request)) return remote.readAdvice(request, options);
+      try {
+        const { fingerprint } = await verified();
+        const reference = referenceFor(request, fingerprint);
+        if (request.shownDeviceMain !== undefined && !reference) return { kind: "not-computed" };
+        return readCached(request, fingerprint, reference);
+      } catch {
+        return { kind: "not-computed" };
+      }
+    },
+    requestAdvice: async (request, options) => {
+      const repair = repairRequest(request);
+      const verify = request.deviceRepair?.verify === true;
+      if (
+        !request.run &&
+        (repair || request.deviceRun || request.deviceAlternatives || request.preferenceBundle)
+      )
+        return { kind: "unavailable", reason: "RUN_ID_REQUIRED" };
+      if (request.run && closedLocalRuns.has(request.run.run_id))
+        return { kind: "unavailable", reason: "RUN_CANCELLED" };
+      if (!eligible(request)) {
+        if (repair) return refused("DEVICE_INPUTS_UNAVAILABLE");
+        if (request.deviceRun === true || request.deviceAlternatives === true)
+          return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
+        if (request.run) {
+          if (localRuns.has(request.run.run_id))
+            return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
+          if (request.deviceRun !== false) {
+            try {
+              if (deviceWorkReceipt(request.run.run_id))
+                return { kind: "unavailable", reason: "RUN_CONTEXT_CHANGED" };
+            } catch {
+              /* Unavailable device storage does not disable server work. */
+            }
+          }
+        }
+        return remote.requestAdvice(request, options);
+      }
+      if (options?.signal?.aborted) throw abort();
+      if (request.run) localRuns.add(request.run.run_id);
+      let inputs: Awaited<ReturnType<typeof verified>>;
+      try {
+        if (repair) published = undefined;
+        inputs = await verified();
+      } catch {
+        return { kind: "unavailable", reason: "DEVICE_INPUTS_UNAVAILABLE" };
+      }
+      if (request.deviceRepair && request.deviceRepair.dataId !== inputs.fingerprint)
+        return refused("RUN_CONTEXT_CHANGED");
+      const priorityRepair = repair && !!request.preferenceBundle?.program;
+      const reference = repair ? undefined : referenceFor(request, inputs.fingerprint);
+      if (!repair && request.preferenceBundle?.program && !reference)
+        return refused("RUN_BASE_REQUIRED");
+      const binding = workBinding(request, inputs.fingerprint);
+      const address = key(request, inputs.fingerprint, reference);
+      const addressDigest = repair ? await sha256(address) : undefined;
+      const repairKey =
+        addressDigest && `llmopt-device-repair-v1:${request.run!.run_id}:${addressDigest}`;
+      const privateKey = repairKey && repairKey + (verify ? ":selection" : ":candidate");
+      const runningKey = privateKey || address + ":" + (request.run?.run_id ?? "");
+      const active = privateKey ? pendingRepairs : pending;
+      // A total-mode repair first establishes its own edited main under its private receipt.
+      const saved = priorityRepair ? undefined : readCached(request, inputs.fingerprint, reference);
+      if (!repair && saved?.kind === "advice") {
+        try {
+          checkAnswerBinding(request.run?.run_id, binding);
+        } catch (error) {
+          return {
+            kind: "unavailable",
+            reason: error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED",
+          };
+        }
+        if (!pending.has(runningKey)) return saved;
+        options?.onPlan?.(saved);
+      }
+      if (!repair && options?.onPlan) {
+        const updates = listeners.get(runningKey) ?? new Set();
+        updates.add(options.onPlan);
+        listeners.set(runningKey, updates);
+      }
+      let claimed = false;
+      let work = active.get(runningKey);
+      if (!work) {
+        work = (async (): Promise<AdviceReadResult> => {
+          const document = inputs.document;
+          if (options?.signal?.aborted) throw abort();
+          function priorRepair(address: string) {
+            const repeated = cached(request, inputs.fingerprint, address);
+            if (repeated.kind === "advice") return repeated;
+            let reason = failures.get(address);
+            if (!reason) {
+              try {
+                reason = globalThis.sessionStorage.getItem(address + ":failure") ?? undefined;
+              } catch {
+                throw new DeviceWorkRefused("RUN_STORE_UNAVAILABLE");
+              }
+            }
+            if (reason) throw new DeviceWorkRefused(reason);
+            return undefined;
+          }
+          if (addressDigest && privateKey) {
+            const receipt = deviceWorkReceipt(request.run!.run_id);
+            const attempted = verify
+              ? receipt?.repairSelection === addressDigest
+              : receipt?.repairCandidates?.includes(addressDigest);
+            if (attempted) {
+              bindDeviceRun(request.run!.run_id, binding);
+              const outcome = priorRepair(privateKey);
+              if (outcome) return outcome;
+            }
+          }
+          const caps = await readCapabilities(
+            request.leagueId,
+            request.publicEntry ? request.entryId : undefined,
+            options,
+          );
+          if (
+            caps?.llmoptVNext !== true ||
+            caps.devicePreferenceBundles !== true ||
+            (repair && caps.verifiedRepairs !== true)
+          )
+            throw new DeviceWorkRefused("LLMOPT_VNEXT_DISABLED");
+          if (options?.signal?.aborted) throw abort();
+          if (request.run && closedLocalRuns.has(request.run.run_id))
+            throw new DeviceWorkRefused("RUN_CANCELLED");
+          let workerReference = reference;
+          if (addressDigest && privateKey) {
+            if (verify) {
+              const prior = cached(request, inputs.fingerprint, repairKey + ":candidate");
+              if (prior.kind !== "advice") throw new DeviceWorkRefused("RUN_BASE_REQUIRED");
+              if (priorityRepair) {
+                workerReference = shownPriorityReference(prior.envelope.payload);
+                if (!workerReference) throw new DeviceWorkRefused("RUN_BASE_REQUIRED");
+              }
+            }
+            const useSaved = !verify && saved?.kind === "advice";
+            claimed = claimDeviceRepair(
+              request.run!.run_id,
+              binding,
+              addressDigest,
+              verify,
+              useSaved,
+              "recover",
+            );
+            if (useSaved) {
+              rememberRepair(privateKey, saved);
+              return saved;
+            }
+          } else reserveDeviceWork(request.run?.run_id, binding);
+          const worker = createSolver();
+          const id = ++sequence;
+          type Answer = Parameters<typeof deviceAdviceEnvelope>[2];
+          let generatedAt: Date | undefined;
+          const publish = (answer: Answer): Plan => {
+            checkAnswerBinding(request.run?.run_id, binding);
+            generatedAt ??= new Date();
+            const envelope = checkedAdvice(
+              deviceAdviceEnvelope(document, squad, answer, generatedAt, request.leagueId),
+              request,
+            );
+            const stamp = (payload: typeof envelope.payload) => {
+              payload.device_input_fingerprint = inputs.fingerprint;
+              payload.device_alternatives?.forEach(stamp);
+              const bundle = payload.preference_bundle_result;
+              for (const component of [...(bundle?.components ?? []), bundle?.selected])
+                if (component?.payload) stamp(component.payload);
+            };
+            stamp(envelope.payload);
+            const plan: Plan = { kind: "advice", envelope, source: "device" };
+            if (privateKey) rememberRepair(privateKey, plan);
+            if (!repair || (!verify && !priorityRepair && !request.deviceAlternatives)) {
+              memory.set(address, plan);
+              retainDeviceEnvelope(address, JSON.stringify(envelope));
+            }
+            return plan;
+          };
+          return new Promise<Plan>((resolve, reject) => {
+            let accepted: Plan | undefined;
+            let settled = false;
+            let main: Answer | undefined;
+            let solveDeadline = Infinity;
+            let optionalDeadline = Infinity;
+            const finish = (error?: unknown) => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              clearTimeout(optionalTimer);
+              options?.signal?.removeEventListener("abort", cancelled);
+              worker.terminate();
+              try {
+                checkAnswerBinding(request.run?.run_id, binding);
+              } catch (bindingError) {
+                reject(bindingError);
+                return;
+              }
+              if (options?.signal?.aborted || error instanceof DeviceWorkRefused || !accepted)
+                reject(error ?? abort());
+              else resolve(accepted);
+            };
+            const cancelled = () => finish(abort());
+            let optionalTimer: ReturnType<typeof setTimeout> | undefined;
+            const timer = setTimeout(
+              () => finish(accepted ? undefined : new DeviceWorkRefused("RUN_BUDGET_EXHAUSTED")),
+              (DEVICE_LOAD_ALLOWANCE_SECONDS +
+                DEVICE_REPLY_GRACE_SECONDS +
+                DEVICE_SOLVE_CEILING_SECONDS) *
+                1000,
+            );
+            options?.signal?.addEventListener("abort", cancelled, { once: true });
+            worker.onmessage = ({ data }) => {
+              if (settled || data.id !== id) return;
+              if (data.kind === "ready") {
+                solveDeadline = performance.now() + DEVICE_SOLVE_CEILING_SECONDS * 1000;
+                return;
+              }
+              if (accepted && performance.now() >= optionalDeadline) {
+                finish();
+                return;
+              }
+              try {
+                if (data.kind === "plan" && !repair && request.deviceAlternatives) {
+                  main ??= data.answer;
+                  accepted = publish({ ...main, alternatives: data.answer.alternatives ?? [] });
+                  for (const notify of listeners.get(runningKey) ?? []) notify(accepted);
+                  clearTimeout(optionalTimer);
+                  const started = performance.now();
+                  const remainingMs = Math.min(
+                    DEVICE_ALTERNATIVE_SECONDS * 1000,
+                    Math.max(0, solveDeadline - started),
+                  );
+                  optionalDeadline = started + remainingMs;
+                  optionalTimer = setTimeout(finish, remainingMs);
+                } else if (data.kind === "answer") {
+                  if (!accepted) accepted = publish(data.answer);
+                  finish();
+                } else if (accepted) finish();
+                else if (data.kind === "refused" && data.primaryInfeasible)
+                  finish(new DeviceWorkRefused("PLAN_NOT_FOUND"));
+                else if (
+                  data.kind === "refused" &&
+                  (data.status === "Time limit reached" ||
+                    data.status === "Iteration limit reached")
+                )
+                  finish(new DeviceWorkRefused("RUN_BUDGET_EXHAUSTED"));
+                else if (data.kind === "failed" && data.inputsUnavailable)
+                  finish(new DeviceWorkRefused("DEVICE_INPUTS_UNAVAILABLE"));
+                else finish(new DeviceWorkRefused("DEVICE_PLAN_FAILED"));
+              } catch (error) {
+                finish(error);
+              }
+            };
+            worker.onerror = () => finish(new Error("The device solve failed."));
+            worker.postMessage({
+              ...(workerReference ? { priorityReference: workerReference } : {}),
+              ...((priorityRepair && !verify) || (request.priorityMain && !request.preferenceBundle)
+                ? { priorityMain: true as const }
+                : {}),
+              id,
+              document,
+              ...(!repair && request.deviceAlternatives ? { alternatives: true } : {}),
+              entry: squad.device_plan!,
+              ...(request.preferences ? { preferences: request.preferences } : {}),
+              ...(request.preferenceBundle ? { preferenceBundle: request.preferenceBundle } : {}),
+            });
+          });
+        })()
+          .catch((error: unknown) => {
+            if (claimed && privateKey && !isAbort(error)) {
+              const reason = error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED";
+              failures.set(privateKey, reason);
+              try {
+                globalThis.sessionStorage.setItem(privateKey + ":failure", reason);
+              } catch {
+                /* The attempted work remains charged if the failure cannot be retained. */
+              }
+            }
+            throw error;
+          })
+          .finally(() => {
+            active.delete(runningKey);
+            listeners.delete(runningKey);
+          });
+        active.set(runningKey, work);
+      }
+      try {
+        const result = await work;
+        return result.kind === "advice"
+          ? result
+          : { kind: "unavailable", reason: "DEVICE_PLAN_FAILED" };
+      } catch (error) {
+        const reason = error instanceof DeviceWorkRefused ? error.code : "DEVICE_PLAN_FAILED";
+        if (options?.signal?.aborted || (privateKey && isAbort(error))) throw error;
+        return refused(reason);
+      }
+    },
+  };
+}

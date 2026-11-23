@@ -11,8 +11,9 @@ from time import perf_counter
 from typing import Final
 
 import pandas as pd
-from ortools.sat.python import cp_model
+from ortools.sat.python import cp_model, cp_model_helper
 
+from squadopt.contracts.llmopt_run import job_capacity
 from squadopt.contracts.plan_infeasibility import BankInfeasibility, PlanInfeasibility, PlanRepair
 from squadopt.contracts.preferences import (
     NO_PREFERENCES,
@@ -20,6 +21,7 @@ from squadopt.contracts.preferences import (
     FrozenPlanWeek,
     WeekRules,
 )
+from squadopt.contracts.priority_preferences import PriorityProgram
 from squadopt.optimization import (
     InvalidConfigurationError,
     OptimizationConfig,
@@ -55,6 +57,12 @@ from squadopt.optimization.decisions import (
     verify_solution as _verify_solution,
 )
 from squadopt.optimization.validation import validate_players
+from squadopt.optimization.work_budget import (
+    WorkBudget,
+    WorkBudgetExhausted,
+    current_work_budget,
+    work_budget,
+)
 from squadopt.planning.acquisition import AcquisitionSales
 from squadopt.planning.chip_tail import ChipTailTable
 from squadopt.planning.models import (
@@ -276,6 +284,8 @@ def _build_model(
     transfer_config: TransferPlanningConfig,
     chips: ChipAvailability,
     chip_tail: ChipTailTable | None = None,
+    *,
+    exact_chip_bonuses: bool = False,
 ) -> _PlanArtifacts:
     model = cp_model.CpModel()
     player_count = len(players_by_week[0])
@@ -561,8 +571,8 @@ def _build_model(
         bench_boost = chip_vars[week_index].get("bboost")
         if bench_boost is not None:
             # Under a bench boost every squad member scores in full: add each bench
-            # player's unweighted remainder. Upper bounds suffice because the remainder
-            # is non-negative and the objective is maximised.
+            # player's unweighted remainder. Counts and certificates cannot rely
+            # on the points objective to activate the bonus.
             for player_index, (_, starter_coefficient, _) in enumerate(coefficients):
                 if starter_coefficient == 0:
                     continue
@@ -570,6 +580,10 @@ def _build_model(
                 model.add(boosted <= bench_boost)
                 model.add(boosted <= squads[player_index])
                 model.add(boosted <= 1 - starters[player_index])
+                if exact_chip_bonuses:
+                    model.add(
+                        boosted >= bench_boost + squads[player_index] - starters[player_index] - 1
+                    )
                 objective_terms.append(discount_weight * starter_coefficient * boosted)
         triple_captain = chip_vars[week_index].get("3xc")
         if triple_captain is not None:
@@ -579,6 +593,8 @@ def _build_model(
                 tripled = model.new_bool_var(f"tripled_gw{gameweek}_{player_index}")
                 model.add(tripled <= triple_captain)
                 model.add(tripled <= captains[player_index])
+                if exact_chip_bonuses:
+                    model.add(tripled >= triple_captain + captains[player_index] - 1)
                 objective_terms.append(discount_weight * captain_coefficient * tripled)
 
         # The bank the next week starts from reverts with the squad under a free hit.
@@ -1244,7 +1260,8 @@ def diagnose_infeasible_preferences(
         candidate: DecisionPreferences, bank: cp_model.IntVar | None = None
     ) -> tuple[cp_model.CpSolver, SolverStatus] | None:
         nonlocal remaining_probes
-        if remaining_probes == 0:
+        budget = current_work_budget()
+        if remaining_probes == 0 or (budget is not None and budget.remaining <= 0):
             return None
         model = replace(base, model=base.model.clone())
         _apply_decision_preferences(model, state, optimization, transfer, candidate)
@@ -2003,4 +2020,299 @@ def optimize_transfer_plan(
         optimization_config,
         settings,
         diagnostics,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class PriorityPlanOutcome:
+    """Computed choices and internal completion state; no provider-generated values."""
+
+    plan: TransferPlanResult
+    satisfied: tuple[str, ...]
+    left_out: tuple[str, ...]
+    unsearched: tuple[str, ...]
+    total_cost: float
+    completed_priorities: tuple[int, ...]
+    reference_proved: bool
+    budget_exhausted: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _PrioritySearch:
+    solver: cp_model.CpSolver
+    status: SolverStatus
+    deterministic_stop: bool
+    limited_by_admission: bool
+
+    @property
+    def has_solution(self) -> bool:
+        return self.status in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}
+
+
+def _priority_predicate(
+    constraints: Sequence[cp_model_helper.ConstraintProto],
+    model: cp_model.CpModel,
+    solver: cp_model.CpSolver,
+) -> bool:
+    def value(index: int) -> int:
+        return int(solver.value(model.get_int_var_from_proto_index(index)))
+
+    for constraint in constraints:
+        if constraint.has_linear():
+            row = constraint.linear
+            total = sum(value(v) * c for v, c in zip(row.vars, row.coeffs, strict=True))
+            if not any(
+                low <= total <= high
+                for low, high in zip(list(row.domain)[::2], list(row.domain)[1::2], strict=True)
+            ):
+                return False
+        elif constraint.has_bool_or():
+            if not any(
+                value(literal) if literal >= 0 else 1 - value(-literal - 1)
+                for literal in constraint.bool_or.literals
+            ):
+                return False
+        else:
+            raise SolverExecutionError("Unsupported soft-rule predicate.")
+    return True
+
+
+def optimize_priority_preferences(
+    horizon: PlanningHorizon,
+    initial_state: InitialSquadState,
+    optimization_config: OptimizationConfig,
+    transfer_config: TransferPlanningConfig,
+    reference: TransferPlanResult,
+    program: PriorityProgram,
+    *,
+    hard: DecisionPreferences = NO_PREFERENCES,
+    chips: ChipAvailability | None = None,
+    work_limit: float | None = None,
+) -> PriorityPlanOutcome:
+    """Solve count layers and points inside one admitted job, certifying reference decisions.
+
+    This core is not an advice-transport entry point. The caller must provide the
+    server-computed reference from the same net-points model. Its claimed numeric
+    objective is ignored: certification recomputes J from the model's coefficients.
+    An existing worker allocation is retained, never replaced by a fresh allowance.
+    """
+    if not isinstance(program, PriorityProgram):
+        raise TransferPlanningValidationError("A validated priority program is required.")
+    if work_limit is None:
+        work_limit = 3 * job_capacity(len(horizon.gameweeks))
+    if not 0 < work_limit < float("inf"):
+        raise TransferPlanningValidationError("A finite positive work limit is required.")
+    settings = transfer_config.for_net_points()
+    denominator = Decimal(str(settings.hit_points_charged)).as_integer_ratio()[1]
+    config = replace(
+        optimization_config,
+        bench_weight=0.0,
+        expected_points_scale=lcm(optimization_config.expected_points_scale, denominator),
+    )
+    verified = horizon.validated_copy()
+    tables = _validated_week_tables(verified, config)
+    initial_ids = _validate_initial_state(initial_state, tables[0], config, settings)
+    rights = ChipAvailability() if chips is None else chips
+    artifacts = _build_model(
+        tables, initial_ids, initial_state, config, settings, rights, exact_chip_bonuses=True
+    )
+    for table in tables:
+        table["expected_points"] = [
+            scale_expected_points(points, config.expected_points_scale)
+            / config.expected_points_scale
+            for points in table.expected_points
+        ]
+    _apply_decision_preferences(artifacts, initial_state, config, settings, hard)
+    flags: list[cp_model.IntVar] = []
+    predicates: list[list[cp_model_helper.ConstraintProto]] = []
+    for index, rule in enumerate(program.preferences):
+        start = len(artifacts.model.proto.constraints)
+        _apply_decision_preferences(artifacts, initial_state, config, settings, rule.rules)
+        conditions = list(artifacts.model.proto.constraints)[start:]
+        flag = artifacts.model.new_bool_var(f"preference_{index}")
+        for condition in conditions:
+            if not (condition.has_linear() or condition.has_bool_or()):
+                raise TransferPlanningValidationError("Unsupported soft-rule constraint.")
+            condition.enforcement_literal.append(flag.index)
+        predicates.append(conditions)
+        flags.append(flag)
+    divisor = settings.objective_weight_scale * config.expected_points_scale
+    budget = current_work_budget()
+    if budget is None:
+        budget = WorkBudget(work_limit)
+    start_work = budget.cp_used + budget.native_reserved
+    work_end = start_work + min(work_limit, budget.remaining)
+    completed: list[int] = []
+    exhausted = False
+    deadline = perf_counter() + config.solver_time_limit_seconds
+    selected_search_status = "OPTIMAL"
+    selected_deterministic_stop = False
+    phases: list[dict[str, object]] = []
+    with work_budget(budget):
+        # Preserve the existing ceiling for the fixed-decision certificate. Only the
+        # count and points searches can need the bundle's larger allocation.
+        certificate_limit = 20.0 if len(verified.gameweeks) == 1 else 60.0
+        witness, _ = _hint_incumbent(
+            artifacts,
+            reference,
+            verified,
+            initial_state,
+            settings,
+            config,
+            config.solver_time_limit_seconds,
+            min(work_limit, budget.remaining, certificate_limit),
+        )
+        reference_value = int(witness.value(artifacts.primary_objective))
+        floor = reference_value - program.max_total_cost_tenths * divisor // 10
+        artifacts.model.add(artifacts.primary_objective >= floor)
+        selected = witness
+        # Leave a points pass even when a count consumes all the work or time offered to it.
+        count_work_end = work_end - (work_end - budget.cp_used - budget.native_reserved) / 4
+        count_deadline = deadline - max(0.0, deadline - perf_counter()) / 4
+
+        def search(priority: int, objective: cp_model.LinearExpr) -> _PrioritySearch | None:
+            remaining = min(
+                budget.remaining,
+                (count_work_end if priority else work_end)
+                - budget.cp_used
+                - budget.native_reserved,
+            )
+            wall_remaining = (count_deadline if priority else deadline) - perf_counter()
+            if remaining <= 0 or wall_remaining <= 0:
+                return None
+            artifacts.model.maximize(objective)
+            candidate = cp_model.CpSolver()
+            configure_solver(candidate, config, wall_remaining, remaining)
+            candidate.parameters.linearization_level = 2
+            try:
+                raw_status = _solve(artifacts.model, candidate)
+                status = _map_solver_status(raw_status)
+            except WorkBudgetExhausted:
+                return None
+            used = _deterministic_time_used(candidate, raw_status)
+            effective_limit = candidate.parameters.max_deterministic_time
+            deterministic_stop = used >= effective_limit - MIN_TIEBREAK_DETERMINISTIC_TIME
+            phases.append(
+                {
+                    "priority": priority,
+                    "status": status.name,
+                    "work_limit": effective_limit,
+                    "work_used": used,
+                    "deterministic_stop": deterministic_stop,
+                }
+            )
+            return _PrioritySearch(
+                candidate, status, deterministic_stop, effective_limit < remaining
+            )
+
+        def hint(solver: cp_model.CpSolver) -> None:
+            # A witness may predate the last frozen count. Set its indicators from
+            # the actual decisions when seeding the next search.
+            flag_values = {
+                flag.index: int(_priority_predicate(conditions, artifacts.model, solver))
+                for flag, conditions in zip(flags, predicates, strict=True)
+            }
+            artifacts.model.clear_hints()  # type: ignore[no-untyped-call]
+            for index in range(len(artifacts.model.proto.variables)):
+                var = artifacts.model.get_int_var_from_proto_index(index)
+                artifacts.model.add_hint(var, flag_values.get(index, int(solver.value(var))))
+
+        points = artifacts.primary_objective
+        for priority in sorted({row.priority for row in program.preferences}):
+            indices = [i for i, row in enumerate(program.preferences) if row.priority == priority]
+            objective = cp_model.LinearExpr.sum([flags[i] for i in indices])
+            phase = search(priority, objective)
+            if phase is None or not phase.has_solution:
+                exhausted = True
+                break
+            count = int(phase.solver.value(objective))
+            if phase.status is not SolverStatus.OPTIMAL and count != len(indices):
+                # The one-way indicators may still be zero in an interrupted
+                # incumbent. Its physical decisions can prove the same upper bound.
+                if all(
+                    _priority_predicate(predicates[i], artifacts.model, phase.solver)
+                    for i in indices
+                ):
+                    count = len(indices)
+                else:
+                    exhausted = True
+                    break
+            artifacts.model.add(objective == count)
+            completed.append(priority)
+            # A certified decision can meet this count even if its old flag
+            # assignment did not declare the tier's preferences.
+            previous_count = sum(
+                _priority_predicate(predicates[i], artifacts.model, selected) for i in indices
+            )
+            if previous_count != count or phase.solver.value(points) > selected.value(points):
+                selected = phase.solver
+            selected_deterministic_stop = phase.deterministic_stop
+            hint(selected)
+
+        if completed:
+            # Admission can hold part of one large call for restart safety. If that
+            # call hits its granted cap, give one final solve the still-unspent work.
+            for attempt in range(2):
+                artifacts.model.add(points >= int(selected.value(points)))
+                phase = search(0, points)
+                if phase is None:
+                    exhausted = True
+                    break
+                if phase.status is SolverStatus.OPTIMAL or (
+                    phase.has_solution and phase.deterministic_stop
+                ):
+                    selected = phase.solver
+                    selected_search_status = phase.status.name
+                    selected_deterministic_stop = phase.deterministic_stop
+                if phase.status is SolverStatus.OPTIMAL:
+                    break
+                if attempt == 0 and phase.limited_by_admission and phase.deterministic_stop:
+                    hint(selected)
+                    continue
+                exhausted = True
+                break
+        value = int(selected.value(artifacts.primary_objective))
+        diagnostics: dict[str, object] = {
+            "configuration_fingerprint": settings.configuration_fingerprint,
+            "chip_availability_fingerprint": rights.availability_fingerprint,
+            "reference_proved": reference.solver_status is SolverStatus.OPTIMAL,
+            "primary_search_status": selected_search_status,
+            "deterministic_time_budget_exhausted": selected_deterministic_stop,
+            "priority_search_phases": phases,
+            "completed_priorities": tuple(completed),
+            "scaled_model_objective_value": value / divisor,
+            "deterministic_time_used": budget.cp_used + budget.native_reserved - start_work,
+            "decision_preferences": hard.payload(),
+        }
+        plan = _extract_plan(
+            selected,
+            SolverStatus.FEASIBLE,
+            artifacts,
+            verified,
+            initial_state,
+            config,
+            settings,
+            diagnostics,
+        )
+        satisfied = tuple(
+            row.identity
+            for row, conditions in zip(program.preferences, predicates, strict=True)
+            if row.priority in completed
+            and _priority_predicate(conditions, artifacts.model, selected)
+        )
+    return PriorityPlanOutcome(
+        plan=plan,
+        satisfied=satisfied,
+        left_out=tuple(
+            row.identity
+            for row in program.preferences
+            if row.priority in completed and row.identity not in satisfied
+        ),
+        unsearched=tuple(
+            row.identity for row in program.preferences if row.priority not in completed
+        ),
+        total_cost=(reference_value - value) / divisor,
+        completed_priorities=tuple(completed),
+        reference_proved=reference.solver_status is SolverStatus.OPTIMAL,
+        budget_exhausted=exhausted,
     )

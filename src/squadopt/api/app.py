@@ -52,12 +52,15 @@ from squadopt.platform.advice_submit import (
     MalformedIdempotencyKeyError,
     OpenJobLimitedError,
     RateLimitedError,
+    RunAdmissionError,
+    RunReference,
 )
 from squadopt.platform.api_contract import (
     ADVISE_CHIPS,
     ADVISE_TOP100_WEIGHTS,
     BackendApiContractError,
     DecisionPreferences,
+    PreferenceBundle,
 )
 from squadopt.platform.contributions import ContributionStore
 from squadopt.platform.public_entry_advice import PublicEntryAdviceReader
@@ -116,6 +119,8 @@ class AdviceSelection:
     chip: str | None
     model: str
     preferences: DecisionPreferences
+    run: RunReference | None = None
+    preference_bundle: PreferenceBundle | None = None
 
 
 def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
@@ -146,6 +151,8 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
         "chip",
         "model",
         "preferences",
+        "run",
+        "preference_bundle",
     }
     unexpected = set(fields) - allowed
     if unexpected:
@@ -182,14 +189,25 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
     try:
         preferences = DecisionPreferences.parse(fields.get("preferences", {}))
         preferences.validate_selection(strategy, word, chip, top100_weight=weight)
+        run = RunReference.parse(fields["run"]) if "run" in fields else None
+        bundle = (
+            PreferenceBundle.parse(fields["preference_bundle"])
+            if "preference_bundle" in fields
+            else None
+        )
+        if run is not None and window not in (1, 3):
+            raise ValueError("Planning runs support one or three weeks.")
     except ValueError as error:
         raise BackendApiContractError(str(error)) from error
-    return AdviceSelection(strategy, window, rival, weight, word, chip, model, preferences)
+    return AdviceSelection(
+        strategy, window, rival, weight, word, chip, model, preferences, run, bundle
+    )
 
 
 def create_app(
     *,
     data_root: str | Path = DEFAULT_SITE_DATA_ROOT,
+    llmopt_vnext: bool = False,
     view_store: PublishedViewStore | None = None,
     advice_store: AdviceReadStore | None = None,
     advice_submit: AdviceSubmitService | None = None,
@@ -216,7 +234,38 @@ def create_app(
         description="Read-only access to published SquadOpt application views.",
         version=BACKEND_API_VERSION,
     )
-    application.include_router(intent_routes())
+    identity_store = advice_store if advice_store is not None else public_advice_store
+    application.include_router(
+        intent_routes(
+            llmopt_vnext=llmopt_vnext,
+            server_data_id=identity_store.plan_data_id if identity_store is not None else None,
+        )
+    )
+
+    @application.exception_handler(RunAdmissionError)
+    async def planning_run_error(_request: Request, error: RunAdmissionError) -> JSONResponse:
+        return _contract_error(409, error.code, str(error))
+
+    @application.post("/api/v1/llmopt/runs/{run_id}/cancel")
+    def cancel_planning_run(run_id: str, request: Request) -> JSONResponse:
+        if advice_submit is None:
+            return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
+        current = datetime.now(UTC) if utc_now is None else utc_now()
+        try:
+            advice_submit.cancel_run(
+                run_id,
+                at_utc=current.astimezone(UTC).isoformat(),
+                client_bucket=request.client.host if request.client else "unknown",
+            )
+        except ValueError as error:
+            if isinstance(error, (RunAdmissionError, RateLimitedError)):
+                raise
+            return _contract_error(422, "VALIDATION_FAILED", str(error))
+        return JSONResponse(
+            {"contract_version": "llmopt_run_v1", "run_id": run_id, "closed": True},
+            headers={"Cache-Control": "no-store"},
+        )
+
     if contributions is not None:
         from squadopt.api.contributions import ContributionError, contribution_routes
 
@@ -501,6 +550,7 @@ def create_app(
         chip: Annotated[str | None, Query()] = None,
         model: Annotated[str, Query()] = "current",
         preferences: Annotated[str | None, Query(max_length=3000)] = None,
+        preference_bundle: Annotated[str | None, Query(max_length=ADVICE_BODY_MAX_BYTES)] = None,
     ) -> Response:
         if league_id == 0 and not request.url.path.startswith("/api/v1/public/"):
             return _contract_error(422, "VALIDATION_FAILED", "A league id must be positive.")
@@ -520,6 +570,11 @@ def create_app(
                     "chip": chip,
                     "model": model,
                     "preferences": json.loads(preferences) if preferences is not None else {},
+                    **(
+                        {"preference_bundle": json.loads(preference_bundle)}
+                        if preference_bundle is not None
+                        else {}
+                    ),
                 }
             )
         except ValueError as error:
@@ -536,6 +591,7 @@ def create_app(
                 chip=selection.chip,
                 model=selection.model,
                 preferences=selection.preferences,
+                preference_bundle=selection.preference_bundle,
             )
         except AdviceNotComputedError:
             if metrics is not None:
@@ -624,6 +680,8 @@ def create_app(
             chip=selection.chip,
             model=selection.model,
             preferences=selection.preferences,
+            preference_bundle=selection.preference_bundle,
+            run=selection.run,
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             if metrics is not None:

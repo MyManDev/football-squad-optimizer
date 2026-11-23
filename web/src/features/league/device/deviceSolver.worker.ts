@@ -20,7 +20,7 @@ self.onmessage = async (event: MessageEvent<DevicePlanRequest>) => {
   try {
     loaded = await highs();
   } catch {
-    self.postMessage({ id, kind: "failed" } satisfies DevicePlanReply);
+    self.postMessage({ id, kind: "failed", inputsUnavailable: true } satisfies DevicePlanReply);
     return;
   }
   // The page shows the solver as loading until here, and as computing from here.

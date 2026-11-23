@@ -2,6 +2,7 @@ import type { AdviceRequest } from "../advice/adviceClient";
 import { checkedPreferences, type FrozenPlanWeek } from "../advice/decisionPreferences";
 import { sameAdviceRequest } from "../advice/useAdviceJob";
 import type { EntrySquad } from "../types";
+import { isDevicePlanEntry } from "../device/types";
 import { needsThreeWeeks, preparePlans, type Constraint, type PlanDraft } from "./intent";
 import type { PlanRevision } from "./planRevision";
 import { frozenForDraft, matchingScenarioReference, prepareOriginalScenario } from "./planScenario";
@@ -38,6 +39,8 @@ export interface PlanRun {
 }
 
 export interface RunInputs {
+  paths3w?: true;
+  compareOnly?: boolean;
   draft: PlanDraft;
   held: ReadonlySet<number>;
   request: AdviceRequest;
@@ -45,6 +48,7 @@ export interface RunInputs {
   wildcardNotHeld: boolean;
   frozenWeeks?: readonly FrozenPlanWeek[];
   reference?: PlanRevision;
+  bundleMode?: boolean;
 }
 
 /** The advice request for this member and window, before any rule is applied. */
@@ -52,8 +56,12 @@ export function requestFor(
   squad: EntrySquad,
   forwarded: boolean | undefined,
   window: AdviceRequest["window"],
+  allowDevice = false,
 ): AdviceRequest {
+  const device = allowDevice && window === 1 && isDevicePlanEntry(squad.device_plan);
   return {
+    deviceRun: device,
+    deviceAlternatives: device,
     publicEntry: forwarded,
     leagueId: squad.league_id,
     entryId: squad.entry.entry_id,
@@ -90,7 +98,31 @@ export function baseDraft(draft: PlanDraft): PlanDraft {
  * the reserved slots; a rule whose plan matches a slot already reserved shares that slot.
  */
 export function prepareRun(inputs: RunInputs): PlanRun {
-  const { draft, held, request, plans, wildcardNotHeld, frozenWeeks, reference } = inputs;
+  const {
+    draft,
+    held,
+    compareOnly = false,
+    request: originalRequest,
+    plans,
+    wildcardNotHeld,
+    frozenWeeks,
+    reference,
+  } = inputs;
+  const request = { ...originalRequest };
+  if (
+    draft.scenario ||
+    [...draft.hard, ...draft.soft, ...(draft.comparison ? [draft.comparison] : [])].some(
+      (rule) => rule.kind === "wildcard",
+    )
+  )
+    request.deviceRun = false;
+  if (draft.soft.length || draft.scenario || draft.comparison || compareOnly)
+    delete request.deviceAlternatives;
+  const preparedInputs =
+    originalRequest.deviceAlternatives !== request.deviceAlternatives ||
+    originalRequest.deviceRun !== request.deviceRun
+      ? { ...inputs, request }
+      : inputs;
   const pricing = !draft.scenario && draft.soft.length > 0;
   const compareBoth = !draft.scenario && draft.comparison?.both === true;
   const hardDraft = {
@@ -109,16 +141,25 @@ export function prepareRun(inputs: RunInputs): PlanRun {
       wildcardUnavailable = true;
       return null;
     }
-    return pricing || draft.scenario
-      ? pricedRequest(request, plan)
-      : { ...request, ...plan, preferences: plan.preferences };
+    const addressed = request.run
+      ? { ...request, run: { ...request.run, stage: "followup" as const } }
+      : request;
+    return pricing ||
+      draft.scenario ||
+      compareOnly ||
+      (request.deviceAlternatives && !draft.comparison)
+      ? pricedRequest(addressed, plan)
+      : { ...addressed, ...plan, preferences: plan.preferences };
   };
-  const baseRequest = submit(baseline);
+  const base = submit(baseline);
+  const baseRequest = base?.run ? { ...base, run: { ...base.run, stage: "base" as const } } : base;
+  if (baseRequest?.deviceRun && inputs.bundleMode && draft.max_total_cost_tenths !== undefined)
+    baseRequest.priorityMain = true;
   if (draft.scenario) {
     const previous = prepareOriginalScenario(draft, held, plans.window, reference);
     const replay = submit(previous);
     return {
-      inputs,
+      inputs: preparedInputs,
       scenario: true,
       baseTitle: "scenarioOptimized",
       baseRequest,
@@ -131,7 +172,7 @@ export function prepareRun(inputs: RunInputs): PlanRun {
       wildcardUnavailable,
     };
   }
-  const automaticBasis = pricing || !compareBoth ? baseRequest : submit(hard);
+  const automaticBasis = compareOnly ? null : pricing || !compareBoth ? base : submit(hard);
   const slots: ReservedAlternative[] = [];
   function addExplicit(plan: PreparedPlan | null, conflict: boolean, title: ExplicitTitle) {
     const request = submit(plan);
@@ -140,24 +181,27 @@ export function prepareRun(inputs: RunInputs): PlanRun {
   if (pricing && compareBoth) addExplicit(plans.base, plans.baseConflict, "without");
   if (draft.comparison)
     addExplicit(plans.alternative, plans.alternativeConflict, compareBoth ? "with" : "alternative");
-  const prices = draft.soft.map((rule): PriceTarget => {
-    if (compareBoth) return { rule, outcome: "skipped" };
-    const branch = preparePlans({ ...hardDraft, soft: [rule] }, held, frozenWeeks);
-    if (branch.alternativeConflict) return { rule, outcome: "conflict" };
-    if (!branch.alternative) return { rule, outcome: "same" };
-    const request = submit(branch.alternative);
-    if (!request) return { rule, outcome: "unavailable" };
-    const existing = slots.findIndex(
-      (slot) => slot.request && sameAdviceRequest(slot.request, request),
-    );
-    if (existing >= 0) return { rule, outcome: existing };
-    if (slots.length === ALTERNATIVE_COUNT) return { rule, outcome: "skipped" };
-    const outcome = slots.length;
-    slots.push({ kind: "priced", request });
-    return { rule, outcome };
-  });
+  const prices =
+    draft.max_total_cost_tenths !== undefined
+      ? []
+      : draft.soft.map((rule): PriceTarget => {
+          if (compareBoth) return { rule, outcome: "skipped" };
+          const branch = preparePlans({ ...hardDraft, soft: [rule] }, held, frozenWeeks);
+          if (branch.alternativeConflict) return { rule, outcome: "conflict" };
+          if (!branch.alternative) return { rule, outcome: "same" };
+          const request = submit(branch.alternative);
+          if (!request) return { rule, outcome: "unavailable" };
+          const existing = slots.findIndex(
+            (slot) => slot.request && sameAdviceRequest(slot.request, request),
+          );
+          if (existing >= 0) return { rule, outcome: existing };
+          if (slots.length === ALTERNATIVE_COUNT) return { rule, outcome: "skipped" };
+          const outcome = slots.length;
+          slots.push({ kind: "priced", request });
+          return { rule, outcome };
+        });
   return {
-    inputs,
+    inputs: preparedInputs,
     baseTitle: !pricing && compareBoth ? "without" : "base",
     baseConflict: pricing ? plans.hardConflict : plans.baseConflict,
     baseRequest,
@@ -177,7 +221,7 @@ export function restoreRun(
   held: ReadonlySet<number>,
   requestForWindow: (window: AdviceRequest["window"]) => AdviceRequest,
 ): PlanRun | null {
-  if (!restored?.confirmation) return null;
+  if (!restored?.confirmation || restored.confirmation.repairSearch) return null;
   const { draft, confirmation, reference } = restored;
   const frozenWeeks = frozenForDraft(draft, reference);
   const plans = preparePlans(baseDraft(draft), held, frozenWeeks);
@@ -186,10 +230,31 @@ export function restoreRun(
   return prepareRun({
     draft,
     held,
-    request: requestForWindow(plans.window),
+    request: {
+      ...requestForWindow(plans.window),
+      deviceRun: !!confirmation.runId && confirmation.deviceRun === true,
+      deviceAlternatives:
+        !!confirmation.runId &&
+        confirmation.deviceRun === true &&
+        confirmation.deviceAlternatives === true,
+      ...(confirmation.runId
+        ? {
+            run: {
+              contract_version: "llmopt_run_v1" as const,
+              run_id: confirmation.runId,
+              stage: "base" as const,
+            },
+          }
+        : {}),
+    },
     plans,
     wildcardNotHeld: confirmation.wildcardNotHeld,
+    compareOnly: confirmation.compareOnly === true,
+    ...(confirmation.runId && plans.window === 3 && confirmation.paths3w === true
+      ? { paths3w: true as const }
+      : {}),
     frozenWeeks,
     reference,
+    bundleMode: confirmation.bundleMode === true,
   });
 }

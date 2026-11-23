@@ -107,6 +107,9 @@
       "minimum": 0,
       "type": "integer"
     },
+    "llmopt_vnext": {
+      "type": "boolean"
+    },
     "managers_word": {
       "additionalProperties": false,
       "properties": {
@@ -128,6 +131,23 @@
       },
       "type": "array",
       "uniqueItems": true
+    },
+    "plan_data_id": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "preference_bundles": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "llmopt_preference_bundle_v1",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "type": "object"
     },
     "preferences": {
       "additionalProperties": false,
@@ -173,6 +193,10 @@
       },
       "type": "object"
     },
+    "three_week_paths": {
+      "description": "Whether three-week path comparisons are enabled.",
+      "type": "boolean"
+    },
     "top100": {
       "additionalProperties": false,
       "properties": {
@@ -194,6 +218,14 @@
         "weights"
       ],
       "type": "object"
+    },
+    "transfer_packages": {
+      "description": "Whether transfer-package search is enabled.",
+      "type": "boolean"
+    },
+    "verified_repairs": {
+      "const": true,
+      "type": "boolean"
     }
   },
   "required": [

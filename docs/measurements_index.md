@@ -1,5 +1,66 @@
 # Measurements Index
 
+- 2026-11-21. On twenty frozen member-weeks, all 640 cold and warm release-workload
+  answers matched the prior record. Enabling the release setting changed cold server
+  jobs from 80 to zero at one week and from 80 to 40 at three weeks. Both three-week
+  arms used 320 solver calls. Median worker time per three-week job increased from
+  45.947 to 68.645 seconds. All 80 warm repeats opened zero jobs and zero device workers.
+  [Closing report](research/llmopt_phase8_closing.md), [per-run record](research/llmopt_phase8_load.json)
+
+- 2026-11-19: [LLMOPT bounded packages](research/llmopt_phase6_results.md),
+  [record](research/llmopt_phase6_results.json): unchanged twenty-member full pool,
+  18 computed and two inherited errors in each arm; raw eleven, expected net and
+  selection-utility gains all zero. Sixteen opened-gate proposals retain the incumbent.
+  One inherited 122.000084823-unit base overrun remains visible. Both controls default off.
+
+- 2026-11-19: [LLMOPT device priorities](research/llmopt_phase4_priority_audit.md),
+  [record](research/llmopt_phase4_priority_audit.json): the original twenty frozen
+  controls, 16/16 equal feasible objectives and priority outcomes plus four equal
+  infeasibilities. Eight transfer decisions differ at equal scores; maximum complete
+  device bundle 7.165 seconds. Sequential local calls, zero jobs and network calls. #1468.
+
+- 2026-11-19: [LLMOPT original-control scope audit](research/llmopt_phase4_scope_audit.md),
+  [record](research/llmopt_phase4_scope_audit.json): 20 frozen member-weeks, 60 local
+  comparisons. Exact original controls replay 20/20; device equality is 15/16 feasible
+  plus four infeasibilities. The unproved zero-bank 52.310 differs from the device's
+  52.978. Active server profile matches 16/16 controls plus four infeasibilities and
+  20/20 no-added-rule cases. No extra keep rule, server jobs or live measurement.
+
+- 2026-11-19: [LLMOPT device parity and scope](research/llmopt_phase4/README.md),
+  [record](research/llmopt_phase4_parity.json): twenty frozen member-weeks, forty local
+  comparisons, forty equal model and published objectives, forty identical transfer
+  decisions with a keep-first-held-player constraint; no server jobs or live measurements.
+
+- 2026-11-20. Seven one-week hard-rule families covered all 20 frozen member-weeks.
+  The server and device returned the same score and transfers in 130 feasible
+  comparisons. Both proved the other ten infeasible. All 220 device alternatives
+  satisfied the submitted rules. [Comparison](research/llmopt_phase4_rule_families.md),
+  [record](research/llmopt_phase4_rule_families.json). #1468.
+
+- 2026-11-20. LLMOPT priorities on twenty frozen member-weeks produced 80 local
+  API/worker run records at both windows and in both modes. At three weeks 10/20
+  completed all three layers, or 10/16 with a feasible main. Their preference jobs
+  charged 2,660.992 of 5,856 available units across the 16 eligible runs. No run
+  exceeded two server jobs and 192 repeats opened zero extra jobs. #1467.
+  [Measurement](research/llmopt_phase3_jobs.md), [record](research/llmopt_phase3_jobs.json)
+
+- 2026-11-19: [LLMOPT real solver budget controls](research/llmopt_phase2_solver_budget.md),
+  [record](research/llmopt_phase2_solver_budget.json): twenty frozen member-weeks at
+  both windows; 40/40 original statuses and decisions, 32 equal numeric objectives
+  and eight equal infeasibilities; maximum work 20.001169834987554/21 and
+  120.00555450856191/122 units. Sequential local production solves, no network calls.
+
+- 2026-11-20: [Wildcard and Free Hit cache parity](research/llmopt_phase2_named_chip.md),
+  [record](research/llmopt_phase2_named_chip.json). In 16 paired one- and three-week
+  controls, the run-bound and legacy workers returned the same solver status, transfer
+  decisions, objective and published net points. All 16 pairs shared the same cache
+  address and immutable request, and the cached bytes matched in every pair.
+
+- 2026-11-18: [LLMOPT shared admission](research/llmopt_phase2_admission.md),
+  [record](research/llmopt_phase2_admission.json): 20 frozen member-weeks, 40 runs,
+  maximum four server jobs, zero additional jobs from 240 reconstructed-service repeats;
+  synthetic completions, no solver-quality or latency claim.
+
 One line per committed real-data measurement artifact: what it is, what it found, and
 where it came from. Every artifact here is measurement-only in the sense that matters —
 **nothing in this index promoted a model or changed the operational control** — but one row

@@ -32,7 +32,11 @@ only a new capture holds the new members' picks.
 
 With `--record-advice` or `--publish`, the league stage prepares one server baseline for
 each distinct tracked entry in the capture before rendering its leagues. Full and device
-menus reuse that baseline; a device page performs no additional member solve. The independent
+menus reuse that baseline; a device page performs no additional member solve. A run whose
+leagues are all device menus prepares the same batch, one plain one-week control per member,
+so its weekly history has a system side; if the batch itself fails there, the run still
+publishes, records nothing and logs `tick.week.baselines.failed`. A run with a full menu
+stops on that failure, because its pages need the controls. The independent
 records live under `data/member_baselines/<season>/gw<NN>/entry-<id>/<snapshot id>/`, carry
 their real publication clock and solver status, and are written only after the member page.
 The receipt's `baselines` block reports distinct entries, refusals and preparation time. An

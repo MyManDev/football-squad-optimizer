@@ -6,6 +6,7 @@ own key, and ``/check`` validates the reply (ADR 0017). The backend never receiv
 key, so both routes refuse any request that carries one.
 """
 
+from collections.abc import Callable
 from typing import Final
 
 from fastapi import APIRouter, Request
@@ -17,6 +18,7 @@ from squadopt.platform.advice_submit import FixedWindowRateLimiter, client_addre
 from squadopt.platform.llmopt_intent import (
     INTENT_BODY_MAX_BYTES,
     IntentValidationError,
+    PlanDataChanged,
     check_reply,
     parse_check_request,
     parse_intent_request,
@@ -83,7 +85,12 @@ async def _keyless_body(request: Request, limiter: FixedWindowRateLimiter) -> ob
     return body
 
 
-def intent_routes(*, keyless_per_minute: int = KEYLESS_PER_MINUTE) -> APIRouter:
+def intent_routes(
+    *,
+    keyless_per_minute: int = KEYLESS_PER_MINUTE,
+    llmopt_vnext: bool = False,
+    server_data_id: Callable[[], str | None] | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/api/v1/llmopt")
     # Each keyless route counts on its own: one message is one prompt and one check.
     prompt_limiter = FixedWindowRateLimiter(keyless_per_minute, 60)
@@ -92,24 +99,32 @@ def intent_routes(*, keyless_per_minute: int = KEYLESS_PER_MINUTE) -> APIRouter:
     @router.post("/prompt")
     async def intent_prompt(request: Request) -> JSONResponse:
         try:
-            intent = parse_intent_request(await _keyless_body(request, prompt_limiter))
+            intent = parse_intent_request(
+                await _keyless_body(request, prompt_limiter), llmopt_vnext=llmopt_vnext
+            )
+            call = await run_in_threadpool(prompt_for, intent, llmopt_vnext=llmopt_vnext)
         except _Refusal as refusal:
             return refusal.response
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
-        call = await run_in_threadpool(prompt_for, intent)
         return JSONResponse(call.payload(), headers={"Cache-Control": "no-store"})
 
     @router.post("/check")
     async def intent_check(request: Request) -> JSONResponse:
         try:
-            intent, reply = parse_check_request(await _keyless_body(request, check_limiter))
+            intent, reply = parse_check_request(
+                await _keyless_body(request, check_limiter), llmopt_vnext=llmopt_vnext
+            )
         except _Refusal as refusal:
             return refusal.response
         except IntentValidationError as error:
             return _error(422, "VALIDATION_FAILED", str(error))
         try:
-            result = await run_in_threadpool(check_reply, intent, reply)
+            result = await run_in_threadpool(
+                check_reply, intent, reply, server_data_id=server_data_id, llmopt_vnext=llmopt_vnext
+            )
+        except PlanDataChanged:
+            return _error(422, "PLAN_DATA_CHANGED", "Recalculate the plans to select one.")
         except IntentValidationError:
             return _error(422, "REPLY_REFUSED", "The model's reply is not a valid draft.")
         return JSONResponse(result, headers={"Cache-Control": "no-store"})

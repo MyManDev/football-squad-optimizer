@@ -105,6 +105,7 @@ def app_for_backend(
 
     return create_app(
         data_root=backend.config.site_data_root,
+        llmopt_vnext=backend.config.llmopt_vnext,
         advice_store=backend.reader,
         advice_submit=backend.submit,
         public_advice_store=backend.public_reader,

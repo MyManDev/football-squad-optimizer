@@ -1,3 +1,16 @@
+import { PlanPathGroups } from "./PlanPathGroups";
+import { useComputedPlans } from "./useComputedPlans";
+import {
+  addHistory,
+  currentPlanCommand,
+  planCatalogue,
+  planContent,
+  retainedPlan,
+  selectHistory,
+  type PlanHistory,
+} from "./planHistory";
+import { readPlanAvailability } from "./planAvailability";
+import { commandDraft } from "./planCommand";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   useEffect,
@@ -10,6 +23,7 @@ import {
 } from "react";
 import { Link, useParams } from "react-router";
 
+import { withRequestDeadline } from "../../../data/request";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { PageLoading } from "../../../design/components/PageLoading";
 import { useLanguage } from "../../../i18n/context";
@@ -18,17 +32,25 @@ import { entryAddress, memberAddress } from "../../../lib/leagueAddresses";
 import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
+import { deviceAdviceClient } from "../device/adviceClient";
+import { shownPriorityReference } from "../device/priorityWitness";
+import { confirmationProblem, prepareConfirmedRun } from "./releaseRun";
 import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import type { ComputePhase } from "../advice/useAdviceJob";
-import { LEAGUE_READ, useEntrySquad } from "../queries";
+import { priorityOutcomes } from "../advice/preferenceBundle";
+import { LEAGUE_READ, useEntrySquad, useRestoredPlanCapabilities } from "../queries";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { useLeague } from "../useLeague";
 import { combinedCandidates, prepareCombined } from "./combinedPlan";
 import { CombinedRules } from "./CombinedRules";
 import { LLMOPT_COPY, ruleLabel } from "./copy";
 import { InfeasibilityResult } from "./InfeasibilityResult";
+import { VerifiedRuleRepairs } from "./VerifiedRuleRepairs";
+import { ruleRepairChoices, type RepairChoice } from "./ruleRepairChoices";
+import type { RepairRun } from "./repairComputation";
 import {
   EMPTY_DRAFT,
+  checkedDraft,
   IntentError,
   MAX_MESSAGE_LENGTH,
   intentRefusal,
@@ -49,6 +71,11 @@ import { BANK_FLOOR, KEEP_WEEK, SCENARIO, draftChanges, type DraftChanges } from
 import { explainDraftConflict } from "./planConflicts";
 import { planResults, preferencePrice } from "./planResults";
 import {
+  preferenceExecution,
+  preferencePlanProblem,
+  preferenceStates,
+} from "./preferenceExecution";
+import {
   referenceCaptains,
   referenceWeeks,
   summarizeRevision,
@@ -56,7 +83,6 @@ import {
 } from "./planRevision";
 import {
   baseDraft,
-  prepareRun,
   requestFor,
   restoreRun,
   type BaseTitle,
@@ -69,6 +95,7 @@ import {
   checkedPlanSession,
   createPlanSessionMemory,
   createPlanSessionStore,
+  writePlanSession,
   type PlanSessionContext,
   type PlanSessionMemory,
 } from "./planSession";
@@ -270,12 +297,25 @@ function Workspace({
     ...p,
     held: held.has(p.id),
   }));
-  const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
+  const client = useMemo(
+    () =>
+      deviceAdviceClient(createAdviceClient(tree.entryAdvice), squad, () =>
+        tree.devicePlan(squad.source_snapshot_id),
+      ),
+    [tree, squad],
+  );
   const jobs = usePlanJobs(client, squad.source_snapshot_id);
   const { controls } = jobs;
-  const [restored] = useState(() => checkedPlanSession(saved, players, squad.gameweek));
+  const [restored] = useState(() => checkedPlanSession(saved, players, squad.gameweek, squad));
   const [restoredRun] = useState(() =>
     restoreRun(restored, held, (window) => requestFor(squad, forwarded, window)),
+  );
+  const restoreCapabilities = useRestoredPlanCapabilities(
+    client,
+    ORIGIN,
+    forwarded === true,
+    squad,
+    true,
   );
   const [draft, setDraft] = useState<PlanDraft>(restored?.draft ?? EMPTY_DRAFT);
   const [reference, setReference] = useState<PlanRevision | undefined>(restored?.reference);
@@ -314,7 +354,9 @@ function Workspace({
   }, [heldModel]);
   const [run, setRun] = useState<PlanRun | null>(restoredRun);
   const [changes, setChanges] = useState<DraftChanges | null>(null);
-  const [session] = useState(() => createPlanSessionStore(context, restored?.confirmation, memory));
+  const [session] = useState(() =>
+    createPlanSessionStore(context, restored?.confirmation, memory, restored?.history),
+  );
   // The saved run, read again after each save.
   const savedRun = useSyncExternalStore(session.subscribe, () => session.confirmation);
   // Keep a validated restore above the keyed workspace too. This also records a draft
@@ -332,7 +374,7 @@ function Workspace({
   const computeButton = useRef<HTMLButtonElement>(null);
   const interpret = useRef<AbortController | null>(null);
   const nextChatLine = useRef(conversation.length);
-  const confirming = useRef(false);
+  const confirming = useRef<symbol | null>(null);
   const mounted = useRef(true);
 
   // Follow new replies within the list, without moving the page or taking an older
@@ -391,7 +433,19 @@ function Workspace({
 
   // An edit keeps the plan the member compares against; only Revise picks another. Before any
   // plan was picked, the first edit after a result compares against the plan shown.
-  function change(next: PlanDraft, previous = reference ?? revised) {
+  function change(next: PlanDraft, previous = selectedReference ?? reference ?? revised) {
+    if (confirming.current) {
+      confirming.current = null;
+      setCheckingSquad(false);
+    }
+    const abandoned = session.confirmation?.runId;
+    const hadOpenWork = Object.values(jobs.states).some(({ phase }) => isWorking(phase));
+    if (abandoned)
+      void client.cancelRun?.(abandoned).catch(() => {
+        // A terminal run has nothing left to stop. Its bookkeeping must not replace
+        // the feedback for a repair or edit the member has already selected.
+        if (hadOpenWork) setFeedback(copy.serviceUnavailable);
+      });
     for (const job of Object.values(controls)) job.reset();
     setRun(null);
     setFeedback("");
@@ -420,6 +474,31 @@ function Workspace({
     session.save({ draft, reference, clarification: next, confirmation: session.confirmation });
   }
 
+  function recordExchange(text: string, reply: string) {
+    const userLine = nextChatLine.current++;
+    const replyLine = nextChatLine.current++;
+    setConversation((before) => [
+      ...before.slice(-18),
+      { id: userLine, role: "user", message: text },
+      { id: replyLine, role: "assistant", message: reply },
+    ]);
+    setMessage("");
+  }
+  async function readCurrentCapabilities() {
+    const read = await restoreCapabilities.refetch({ cancelRefetch: false });
+    if (read.isError) return undefined;
+    return capabilitiesForPage(read.data, {
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      snapshotId: squad.source_snapshot_id,
+    });
+  }
+  async function currentGrant() {
+    const caps = await readCurrentCapabilities();
+    return caps?.llmoptVNext === true ? caps : undefined;
+  }
+
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = message.trim();
@@ -434,12 +513,13 @@ function Workspace({
     )
       return;
     const controller = new AbortController();
-    const previous = reference ?? revised;
     interpret.current = controller;
     restoreChatFocus.current = event.currentTarget.contains(document.activeElement);
     setReading(true);
     setFeedback("");
     try {
+      const catalogue = vNext ? planCatalogue(computed.history, shownPlans) : undefined;
+      const previous = selectedReference ?? reference ?? revised;
       const answer = await intentSource.interpret(
         {
           message: text,
@@ -449,11 +529,47 @@ function Workspace({
           clarification,
           referenceWeeks: referenceWeeks(previous),
           referenceCaptains: referenceCaptains(previous),
+          planContext: catalogue,
+          ...(catalogue && {
+            confirmCatalogueRollback: async () => {
+              const caps = await readCurrentCapabilities();
+              return !!caps && caps.llmoptVNext !== true;
+            },
+          }),
         },
         controller.signal,
       );
       if (controller.signal.aborted) return;
-      if (answer.status === "draft") {
+      if (answer.status === "plan") {
+        if (!catalogue) throw new IntentError(422, "REPLY_REFUSED");
+        const availability = await readPlanAvailability(
+          catalogue.kind,
+          currentGrant,
+          client.readDeviceDataId,
+        );
+        if (controller.signal.aborted) return;
+        if (!availability.grant) {
+          setFeedback(copy.serviceUnavailable);
+          return;
+        }
+        const currentCatalogue = planCatalogue(session.history, displayedPlans.current);
+        if (
+          !currentCatalogue ||
+          !availability.matches(currentCatalogue.kind, currentCatalogue.data_id) ||
+          !currentPlanCommand(catalogue, currentCatalogue, answer.command.plan_id)
+        ) {
+          recordExchange(text, copy.planDataChanged);
+          return;
+        }
+        const item = session.history.items.find((p) => p.id === answer.command.plan_id);
+        try {
+          const result = commandDraft(answer.command, currentCatalogue, item?.plan, draft, players);
+          if (result.draft) change(checkedDraft(result.draft, players), result.reference);
+          else applySelection(computed.choose(answer.command.plan_id));
+        } catch {
+          throw new IntentError(422, "REPLY_REFUSED");
+        }
+      } else if (answer.status === "draft") {
         change(answer.draft, previous);
         setChanges(draftChanges(draft, answer.draft));
       } else {
@@ -469,16 +585,13 @@ function Workspace({
         });
       }
       const reply = answer.status === "clarification" ? answer.message : copy.understood;
-      const userLine = nextChatLine.current++;
-      const replyLine = nextChatLine.current++;
-      setConversation((before) => [
-        ...before.slice(-18),
-        { id: userLine, role: "user", message: text },
-        { id: replyLine, role: "assistant", message: reply },
-      ]);
-      setMessage("");
+      recordExchange(text, reply);
     } catch (error) {
       if (controller.signal.aborted) return;
+      if (error instanceof IntentError && error.code === "PLAN_DATA_CHANGED") {
+        recordExchange(text, copy.planDataChanged);
+        return;
+      }
       const refusal = intentRefusal(error);
       if (
         (refusal === "limited" || refusal === "providerLimited") &&
@@ -526,9 +639,40 @@ function Workspace({
     return explainDraftConflict({ ...draft, hard: [...draft.hard, rule] }, conflictContext);
   }
 
-  const { states } = jobs;
-  const computing = Object.values(states).some(({ phase }) => isWorking(phase));
-  const busy = checkingSquad || reading || computing;
+  const execution = useMemo(() => {
+    const request = preferenceExecution(run);
+    const base = jobs.states.base;
+    if (
+      request?.deviceRun &&
+      request.preferenceBundle?.program &&
+      base.phase === "done" &&
+      base.request === run?.baseRequest
+    ) {
+      const fingerprint = base.envelope.payload.device_input_fingerprint;
+      const decisions = shownPriorityReference(base.envelope.payload);
+      return {
+        ...request,
+        shownDeviceMain: fingerprint && decisions ? { fingerprint, decisions } : null,
+      };
+    }
+    return request;
+  }, [run, jobs.states.base]);
+  const states = preferenceStates(jobs.states, run, execution);
+  const bundleState = jobs.states.first;
+  const bundleResult =
+    execution && bundleState.phase === "done"
+      ? bundleState.envelope.payload.preference_bundle_result
+      : undefined;
+  const capacityRefused = (state: ComputePhase) =>
+    (state.phase === "failed" || state.phase === "unavailable") &&
+    (state.reason === "RUN_BUDGET_EXHAUSTED" || state.reason === "RUN_CANCELLED");
+  const incompleteRun = Object.values(states).some(capacityRefused);
+  const computing = Object.values(states).some(
+    (state) =>
+      isWorking(state.phase) || (state.phase === "done" && state.deviceAlternativesPending),
+  );
+  const editingLocked = checkingSquad || reading || (computing && !run?.inputs.request.run);
+  const busy = editingLocked || computing;
   const replayProof =
     run?.scenario && states.first.phase === "failed" && states.first.infeasibility !== undefined;
   const savedReplayProof =
@@ -546,32 +690,178 @@ function Workspace({
   // Once every request of the run has a job or an answer, a reload resumes or reads it.
   // Before a restored run has started its jobs, every slot is idle and nothing is settled.
   const phases = Object.values(states).map(({ phase }) => phase);
-  const settled = !phases.includes("requesting") && phases.some((phase) => phase !== "idle");
+  const knownRequestsStarted =
+    !run ||
+    (execution
+      ? bundleState.phase !== "idle"
+      : ALTERNATIVE_SLOTS.every(
+          (slot, index) =>
+            (run.slots[index]?.kind !== "explicit" && !savedRun?.followups?.[index]) ||
+            (run.scenario && savedReplayProof) ||
+            states[slot].phase !== "idle",
+        ) &&
+        (!savedRun?.combined?.length || states.combined.phase !== "idle"));
+  const settled =
+    knownRequestsStarted &&
+    !phases.includes("requesting") &&
+    phases.some((phase) => phase !== "idle");
   useEffect(() => {
     if (!settled || !session.confirmation?.sending) return;
     const answered = { ...session.confirmation };
     delete answered.sending;
     session.save({ draft, reference, clarification, confirmation: answered });
   }, [settled, session, draft, reference, clarification]);
+  const baseState = states.base;
+  const restoreMode = capabilitiesForPage(restoreCapabilities.data, {
+    leagueId: squad.league_id,
+    season: squad.season,
+    gameweek: squad.gameweek,
+    snapshotId: squad.source_snapshot_id,
+  });
+  const currentCapabilities =
+    restoreCapabilities.isFetchedAfterMount && !restoreCapabilities.isError ? restoreMode : null;
+  const vNext = currentCapabilities?.llmoptVNext === true;
+  const prioritiesEnabled =
+    currentCapabilities?.llmoptVNext === true &&
+    (currentCapabilities.preferenceBundles === true ||
+      (plans.window === 1 && currentCapabilities.devicePreferenceBundles === true));
+  const canContinue =
+    (run !== restoredRun && !run?.inputs.request.run) ||
+    (!!currentCapabilities &&
+      (currentCapabilities.llmoptVNext === true) === !!run?.inputs.request.run &&
+      (!run?.inputs.request.deviceRun || currentCapabilities.devicePreferenceBundles === true) &&
+      (!run?.inputs.paths3w || currentCapabilities.threeWeekPaths === true) &&
+      (!run?.inputs.bundleMode ||
+        (run.inputs.request.deviceRun
+          ? currentCapabilities.devicePreferenceBundles === true
+          : currentCapabilities.preferenceBundles === true)));
+  const repairsEnabled = vNext && currentCapabilities?.verifiedRepairs === true;
+  const oldSearch = savedRun?.repairSearch;
+  const failure =
+    baseState.phase === "failed" || baseState.phase === "unavailable" ? baseState : null;
+  const failureCode = failure?.reason ?? oldSearch?.failureCode;
+  const failureDetails = failure?.phase === "failed" ? failure.infeasibility : oldSearch?.diagnosis;
+  const diagnosedRequest =
+    failure?.request ??
+    run?.baseRequest ??
+    (oldSearch?.diagnosis && savedRun
+      ? restoreRun(
+          { draft, reference, confirmation: { ...savedRun, repairSearch: undefined } },
+          held,
+          (window) => requestFor(squad, forwarded, window),
+        )?.baseRequest
+      : undefined);
+  const heldChipsForRepair = currentCapabilities?.chipsByEntry?.[String(squad.entry.entry_id)];
+  const repairAnalysis =
+    currentCapabilities && (repairsEnabled || oldSearch) && !draft.scenario
+      ? ruleRepairChoices(draft, {
+          ...conflictContext,
+          language,
+          heldChips: heldChipsForRepair ?? (oldSearch && savedRun.wildcardNotHeld ? [] : null),
+          freeTransfers: squad.free_transfers_known ? squad.free_transfers : null,
+          heldClubs: new Map(
+            [...squad.starting_xi, ...squad.bench].map((player) => [player.player_id, player.team]),
+          ),
+          bankTenths: squad.bank_tenths,
+          request: diagnosedRequest ?? undefined,
+          failureCode,
+          diagnosis: failureDetails,
+        })
+      : null;
+  const analysis = repairsEnabled ? repairAnalysis : null;
+  const savedConflict =
+    oldSearch && currentCapabilities && !repairsEnabled
+      ? repairAnalysis?.status === "conflict"
+        ? repairAnalysis.sentence
+        : copy.repairs.conflict
+      : null;
+  const retryRunId =
+    failure && analysis && analysis.status !== "conflict" ? failure.request.run?.run_id : undefined;
+  const mainBlocked = !!analysis && !retryRunId;
+  async function repairData() {
+    if (!deadlineOpen(deadline)) throw new Error("RUN_CONTEXT_CHANGED");
+    const [fresh, grant] = await Promise.all([
+      tree.entrySquad(squad.entry.entry_id),
+      currentGrant(),
+    ]);
+    if (
+      !mounted.current ||
+      !grant?.verifiedRepairs ||
+      squadBasis(fresh.payload) !== squadBasis(squad) ||
+      !deadlineOpen(deadline)
+    )
+      throw new Error("RUN_CONTEXT_CHANGED");
+    const dataId = plans.window === 1 ? await client.readDeviceDataId?.() : grant.planDataId;
+    if (!dataId || !/^[0-9a-f]{64}$/.test(dataId)) throw new Error("INPUTS_UNAVAILABLE");
+    return dataId;
+  }
+  async function beginRepair(signal: AbortSignal): Promise<RepairRun> {
+    const dataId = await repairData();
+    if (signal.aborted || !deadlineOpen(deadline)) throw new Error("RUN_CANCELLED");
+    const confirmation = session.confirmation;
+    if (confirmation?.repairSearch && confirmation.repairSearch.dataId !== dataId)
+      throw new Error("RUN_CONTEXT_CHANGED");
+    const runId = confirmation?.runId ?? crypto.randomUUID().replaceAll("-", "");
+    const failedBase =
+      confirmation?.repairSearch?.failedBase ??
+      !!(
+        confirmation?.runId &&
+        run &&
+        failure?.phase === "failed" &&
+        ((failure.reason === "PLAN_NOT_FOUND" && failure.infeasibility) ||
+          (failure.reason === "CHIP_NOT_HELD" && failure.terminalJobId))
+      );
+    const next = {
+      draft,
+      reference,
+      history: session.history,
+      confirmation: {
+        ...confirmation,
+        runId,
+        wildcardNotHeld:
+          confirmation?.wildcardNotHeld ?? heldChipsForRepair?.includes("wildcard") === false,
+        repairSearch: {
+          dataId,
+          failedBase,
+          diagnosis: failureDetails,
+          ...(failureCode === "PLAN_NOT_FOUND" || failureCode === "CHIP_NOT_HELD"
+            ? { failureCode: failureCode as "PLAN_NOT_FOUND" | "CHIP_NOT_HELD" }
+            : {}),
+        },
+      },
+    };
+    if (!writePlanSession(context, next)) throw new Error("RUN_STORE_UNAVAILABLE");
+    session.save(next);
+    return { runId, dataId, failedBase, sourceDraft: draft };
+  }
+  function acceptRepair(choice: RepairChoice, plan: EntryAdvice, id: string) {
+    change(choice.draft, reference);
+    const history = selectHistory(
+      addHistory(session.history, [{ id, plan: retainedPlan(plan) }]),
+      id,
+    );
+    session.save({ draft: choice.draft, reference, history });
+  }
   const diagnosis = (state: ComputePhase) =>
-    state.phase === "failed" && state.infeasibility ? (
+    state.phase === "failed" && state.infeasibility && !repairsEnabled ? (
       <InfeasibilityResult
         diagnosis={state.infeasibility}
         request={state.request}
         draft={draft}
         players={players}
-        disabled={busy}
+        disabled={editingLocked}
         change={applyRepair}
       />
     ) : undefined;
-  const baseState = states.base;
   useEffect(() => {
-    if (!run || run !== restoredRun) return;
+    if (!run || run !== restoredRun || (!!ORIGIN && !restoreCapabilities.isFetchedAfterMount))
+      return;
     let active = true;
     // A reload can land before a started job's id was stored, which leaves nothing to resume.
     // Such a slot asks again while the deadline is open: the service answers a computed request
     // from its cache and joins a request still running to its open job.
-    const askAgain = restored?.confirmation?.sending === true && deadlineOpen(deadline);
+    const askAgain =
+      canContinue && restored?.confirmation?.sending === true && deadlineOpen(deadline);
     const restore = (request: PlanRequest, job: JobControls) => {
       if (job.resume?.(request)) return;
       if (askAgain) job.compute(request);
@@ -581,27 +871,108 @@ function Workspace({
     queueMicrotask(() => {
       if (!active) return;
       if (run.baseRequest) restore(run.baseRequest, controls.base);
-      const followups = restored?.confirmation?.followups;
-      ALTERNATIVE_SLOTS.forEach((slot, index) => {
-        const request = restoredSlot(run, index, followups?.[index]);
-        // A replay the saved run proved infeasible is shown from that proof, not asked again.
-        if (request && !(run.scenario && savedReplayProof)) restore(request, controls[slot]);
-      });
-      const savedCombined = restored?.confirmation?.combined;
-      if (savedCombined?.length) {
-        const { request } = prepareCombined(run, savedCombined);
-        if (request) restore(request, controls.combined);
+      if (!run.inputs.request.run) {
+        ALTERNATIVE_SLOTS.forEach((name, index) => {
+          const request = restoredSlot(run, index, restored?.confirmation?.followups?.[index]);
+          if (request && !(run.scenario && savedReplayProof)) restore(request, controls[name]);
+        });
+        if (restored?.confirmation?.combined?.length) {
+          const { request } = prepareCombined(run, restored.confirmation.combined);
+          if (request) restore(request, controls.combined);
+        }
       }
     });
     return () => {
       active = false;
     };
-  }, [run, restoredRun, restored, savedReplayProof, deadline, controls]);
+  }, [
+    run,
+    restoredRun,
+    restored,
+    savedReplayProof,
+    deadline,
+    controls,
+    restoreCapabilities.isFetchedAfterMount,
+    canContinue,
+  ]);
+
+  useEffect(() => {
+    if (
+      !run?.inputs.request.run ||
+      execution ||
+      incompleteRun ||
+      baseState.phase !== "done" ||
+      baseState.request !== run.baseRequest
+    )
+      return;
+    const confirmed = session.confirmation;
+    const restoring = run === restoredRun;
+    const restore = (request: PlanRequest, slot: JobControls) => {
+      if (slot.resume?.(request)) return;
+      if (canContinue && confirmed?.sending && deadlineOpen(deadline)) slot.compute(request);
+      else slot.readCached?.(request);
+    };
+    ALTERNATIVE_SLOTS.forEach((name, index) => {
+      const slot = run.slots[index];
+      if (restoring) {
+        const request = restoredSlot(run, index, confirmed?.followups?.[index]);
+        if (request && !(run.scenario && savedReplayProof)) restore(request, controls[name]);
+      } else if (canContinue && slot?.kind === "explicit" && slot.request)
+        controls[name].compute(slot.request);
+    });
+    if (restoring && confirmed?.combined?.length) {
+      const { request } = prepareCombined(run, confirmed.combined);
+      if (request) restore(request, controls.combined);
+    }
+  }, [
+    run,
+    restoredRun,
+    baseState,
+    session,
+    savedReplayProof,
+    deadline,
+    controls,
+    incompleteRun,
+    execution,
+    canContinue,
+  ]);
+
+  useEffect(() => {
+    if (
+      !execution ||
+      !run ||
+      incompleteRun ||
+      baseState.phase !== "done" ||
+      baseState.request !== run.baseRequest ||
+      bundleState.phase !== "idle"
+    )
+      return;
+    if (run === restoredRun) {
+      if (controls.first.resume?.(execution)) return;
+      if (canContinue && session.confirmation?.sending && deadlineOpen(deadline))
+        controls.first.compute(execution);
+      else controls.first.readCached?.(execution);
+    } else if (canContinue) controls.first.compute(execution);
+  }, [
+    execution,
+    run,
+    restoredRun,
+    incompleteRun,
+    baseState,
+    bundleState,
+    controls,
+    session,
+    deadline,
+    canContinue,
+  ]);
 
   useEffect(() => {
     const confirmed = session.confirmation;
     if (
+      !canContinue ||
       !run?.automaticBasis ||
+      execution ||
+      incompleteRun ||
       baseState.phase !== "done" ||
       baseState.request !== run.baseRequest ||
       !confirmed ||
@@ -624,7 +995,19 @@ function Workspace({
       const followup = followups[index];
       if (followup) controls[slot].compute(followup.request);
     });
-  }, [baseState, run, deadline, controls, session, draft, reference, clarification]);
+  }, [
+    baseState,
+    run,
+    deadline,
+    controls,
+    session,
+    draft,
+    reference,
+    clarification,
+    incompleteRun,
+    execution,
+    canContinue,
+  ]);
 
   async function compute() {
     if (
@@ -634,27 +1017,26 @@ function Workspace({
       !ORIGIN ||
       !squad.source_snapshot_id ||
       !deadlineOpen(deadline) ||
-      !canCalculate
+      !canCalculate ||
+      mainBlocked
     )
       return;
-    confirming.current = true;
+    const attempt = Symbol();
+    confirming.current = attempt;
+    const currentConfirmation = () => mounted.current && confirming.current === attempt;
     setFeedback("");
     setChanges(null);
     setCheckingSquad(true);
     try {
       const [fresh, capabilities] = await Promise.all([
         tree.entrySquad(squad.entry.entry_id),
-        forwarded
-          ? client.readPublicCapabilities?.(squad.league_id, squad.entry.entry_id)
-          : client.readCapabilities?.(squad.league_id),
+        restoreCapabilities
+          .refetch({ cancelRefetch: false })
+          .then((read) => (read.isError ? null : read.data)),
       ]);
-      if (!mounted.current) return;
-      if (!capabilities?.preferences) {
+      if (!currentConfirmation()) return;
+      if (!capabilities || (retryRunId && !capabilities.verifiedRepairs)) {
         setFeedback(copy.serviceUnavailable);
-        return;
-      }
-      if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
-        setFeedback(copy.windowUnavailable);
         return;
       }
       if (
@@ -674,19 +1056,51 @@ function Workspace({
         session.save({ draft });
         return;
       }
-      const request = requestFor(squad, forwarded, plans.window);
-      // A public team may have no chip list until its FPL inputs are pinned.
-      const heldChips = capabilities.chipsByEntry?.[String(squad.entry.entry_id)];
-      const wildcardNotHeld = heldChips !== undefined && !heldChips.includes("wildcard");
-      const next = prepareRun({
-        draft,
-        held,
-        request,
-        plans,
-        wildcardNotHeld,
-        frozenWeeks: frozen,
-        reference,
-      });
+      if (!capabilities.preferences) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
+      if (!capabilities.strategies["saf-puan"]?.windows.includes(plans.window)) {
+        setFeedback(copy.windowUnavailable);
+        return;
+      }
+      const problem = confirmationProblem(draft, plans.window, capabilities);
+      if (problem) {
+        setFeedback(copy[problem]);
+        return;
+      }
+      if (retryRunId) {
+        if (!client.cancelRun || session.confirmation?.runId !== retryRunId) {
+          setFeedback(copy.serviceUnavailable);
+          return;
+        }
+        try {
+          await withRequestDeadline(async () => client.cancelRun?.(retryRunId));
+        } catch {
+          if (currentConfirmation()) setFeedback(copy.serviceUnavailable);
+          return;
+        }
+        if (
+          !currentConfirmation() ||
+          session.confirmation?.runId !== retryRunId ||
+          !deadlineOpen(deadline)
+        )
+          return;
+      }
+      const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
+      const next = await prepareConfirmedRun(
+        { draft, held, plans, frozenWeeks: frozen, reference },
+        squad,
+        forwarded,
+        capabilities,
+        runId,
+        client.prepareDeviceRun,
+      );
+      if (!currentConfirmation() || !deadlineOpen(deadline)) return;
+      if (!next) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
       if (next.wildcardUnavailable) setFeedback(copy.wildcardUnavailable);
       if (
         !next.baseRequest &&
@@ -698,25 +1112,47 @@ function Workspace({
       }
       for (const slot of ALTERNATIVE_SLOTS) controls[slot].reset();
       controls.combined.reset();
+      const confirmed = {
+        draft,
+        reference,
+        confirmation: {
+          ...(runId ? { runId } : {}),
+          wildcardNotHeld: next.inputs.wildcardNotHeld,
+          ...(next.inputs.paths3w ? { paths3w: true as const } : {}),
+          sending: true as const,
+          compareOnly: next.inputs.compareOnly === true,
+          deviceRun: next.baseRequest?.deviceRun ?? false,
+          deviceAlternatives: next.baseRequest?.deviceAlternatives ?? false,
+          ...(next.inputs.bundleMode ? { bundleMode: true as const } : {}),
+        },
+      };
+      if (runId && !writePlanSession(context, confirmed)) {
+        setFeedback(copy.serviceUnavailable);
+        return;
+      }
       setRun(next);
-      session.save({ draft, reference, confirmation: { wildcardNotHeld, sending: true } });
+      session.save(confirmed);
       if (next.baseRequest) {
         controls.base.compute(next.baseRequest);
       } else controls.base.reset();
-      ALTERNATIVE_SLOTS.forEach((name, index) => {
-        const slot = next.slots[index];
-        if (slot?.kind === "explicit" && slot.request) controls[name].compute(slot.request);
-      });
+      if (!runId) {
+        ALTERNATIVE_SLOTS.forEach((name, index) => {
+          const slot = next.slots[index];
+          if (slot?.kind === "explicit" && slot.request) controls[name].compute(slot.request);
+        });
+      }
     } catch {
-      if (mounted.current) setFeedback(copy.squadUnavailable);
+      if (currentConfirmation()) setFeedback(copy.squadUnavailable);
     } finally {
-      confirming.current = false;
-      if (mounted.current) setCheckingSquad(false);
+      if (confirming.current === attempt) {
+        confirming.current = null;
+        if (mounted.current) setCheckingSquad(false);
+      }
     }
   }
 
   const baseAnswer = baseState.phase === "done" ? baseState.envelope.payload : undefined;
-  const alternatives = alternativeStates(jobs);
+  const alternatives = alternativeStates({ ...jobs, states });
   const priceReview =
     run?.prices.map((target) => {
       const price = preferencePrice(
@@ -750,6 +1186,9 @@ function Workspace({
     const confirmed = session.confirmation;
     if (
       !run ||
+      execution ||
+      incompleteRun ||
+      !canContinue ||
       !singlesIn ||
       !confirmed ||
       confirmed.followups === undefined ||
@@ -781,11 +1220,19 @@ function Workspace({
     draft,
     reference,
     clarification,
+    incompleteRun,
+    execution,
+    canContinue,
   ]);
   // A rule with no slot of its own is priced in the plan with all preferences, or named as
   // left out of it.
+  const program = execution?.preferenceBundle?.program;
   const combined =
-    run && savedRun?.combined ? prepareCombined(run, savedRun.combined).applied : undefined;
+    bundleResult?.selected?.status === "done"
+      ? bundleResult.applied
+      : run && savedRun?.combined
+        ? prepareCombined(run, savedRun.combined).applied
+        : undefined;
   const combinedPending =
     !closed &&
     (isWorking(baseState.phase) ||
@@ -799,25 +1246,42 @@ function Workspace({
     return combinedPending ? { key, label, ceiling, status: "pending" } : price;
   });
   const softRules = run?.inputs.draft.soft ?? [];
-  const combinedRules = (keep: boolean) =>
-    softRules.flatMap((rule, index) =>
-      combined?.includes(index) === keep
-        ? [{ key: String(index), label: ruleLabel(rule, players, copy) }]
-        : [],
-    );
   const combinedState = states.combined;
+  const priorityResult =
+    combinedState.phase === "done"
+      ? combinedState.envelope.payload.priority_preferences
+      : undefined;
+  const outcomes =
+    program && priorityResult ? priorityOutcomes(priorityResult, program) : undefined;
+  const combinedRules = softRules.map((rule, index) => ({
+    label: ruleLabel(rule, players, copy),
+    outcome: program
+      ? outcomes?.[index]
+      : combined?.includes(index)
+        ? ("applied" as const)
+        : ("left-out" as const),
+  }));
+  if (!program)
+    combinedRules.sort(
+      (a, b) => Number(a.outcome === "left-out") - Number(b.outcome === "left-out"),
+    );
+  const problem = program ? preferencePlanProblem(bundleState) : undefined;
   const combinedNet =
     combinedState.phase === "done" ? expectedNet(combinedState.envelope.payload) : null;
   const baseNet = baseAnswer ? expectedNet(baseAnswer) : null;
   const combinedCost =
-    combinedNet === null || baseNet === null
-      ? undefined
-      : samePlan(baseState, combinedState)
-        ? 0
-        : Math.max(0, baseNet - combinedNet);
+    combinedState.phase === "done" && combinedState.envelope.payload.priority_preferences
+      ? combinedState.envelope.payload.priority_preferences.total_cost
+      : combinedNet === null || baseNet === null
+        ? undefined
+        : samePlan(baseState, combinedState)
+          ? 0
+          : Math.max(0, baseNet - combinedNet);
+  const showPaths = vNext && run?.inputs.paths3w === true;
   const { results, same } = run
     ? planResults({
         run,
+        showPaths,
         base: baseState,
         alternatives,
         priceReview,
@@ -825,6 +1289,52 @@ function Workspace({
         explain: explainBranchConflict,
       })
     : { results: [], same: false };
+  const shownPlans = [
+    ...(run?.scenario && states.first.phase === "done" ? [states.first.envelope.payload] : []),
+    ...(baseAnswer ? [baseAnswer] : []),
+    ...results.flatMap(({ state }) => (state.phase === "done" ? [state.envelope.payload] : [])),
+    ...(combinedState.phase === "done" ? [combinedState.envelope.payload] : []),
+  ];
+  const displayedPlans = useRef(shownPlans);
+  useLayoutEffect(() => {
+    displayedPlans.current = shownPlans;
+  });
+  const computed = useComputedPlans(
+    session,
+    { draft, reference, clarification, confirmation: session.confirmation },
+    vNext ? shownPlans : [],
+    session.confirmation?.runId,
+  );
+  const selectedReference =
+    vNext && computed.history.explicit && computed.selected
+      ? summarizeRevision(computed.selected.plan)
+      : undefined;
+  const restoredArchive =
+    !!restored?.history &&
+    run === restoredRun &&
+    (!restored.confirmation || !!restored.confirmation.runId);
+  const historical =
+    (vNext || restoredArchive) &&
+    computed.selected &&
+    !shownPlans.some((p) => planContent(p) === planContent(computed.selected!.plan));
+  async function selectComputed(history: PlanHistory) {
+    if (vNext && (await currentGrant()) && mounted.current) applySelection(history);
+  }
+  function applySelection(history: PlanHistory) {
+    if (!history.items.some((p) => p.id === history.navigation[history.cursor])) return;
+    setClarification(undefined);
+    session.save({ draft, reference, confirmation: session.confirmation, history });
+  }
+  const planProps = (plan: EntryAdvice) => {
+    const id = vNext ? computed.idFor(plan) : undefined;
+    return id
+      ? {
+          planId: id,
+          selected: computed.selected?.id === id,
+          onSelect: () => selectComputed(computed.choose(id)),
+        }
+      : {};
+  };
   const alternative = results.find(({ state }) => state.phase === "done")?.state;
   const revisionAnswer =
     baseAnswer ?? (alternative?.phase === "done" ? alternative.envelope.payload : undefined);
@@ -919,7 +1429,12 @@ function Workspace({
             className={styles.primary}
             type="submit"
             disabled={
-              !ORIGIN || !chatReady || busy || roster.isPending || limit !== null || !message.trim()
+              !ORIGIN ||
+              !chatReady ||
+              editingLocked ||
+              roster.isPending ||
+              limit !== null ||
+              !message.trim()
             }
           >
             {reading ? copy.interpreting : copy.send}
@@ -928,7 +1443,7 @@ function Workspace({
             <button
               className={styles.secondary}
               type="button"
-              disabled={busy}
+              disabled={editingLocked}
               onClick={() => setQuestion()}
             >
               {copy.dismissQuestion}
@@ -939,7 +1454,7 @@ function Workspace({
           {copy.window}
           <select
             value={plans.window}
-            disabled={busy}
+            disabled={editingLocked}
             onChange={(event) => change({ ...draft, window: event.target.value === "3" ? 3 : 1 })}
           >
             <option value={1} disabled={needsThreeWeeks(draft)}>
@@ -959,10 +1474,11 @@ function Workspace({
           </p>
         )}
         <RuleEditor
+          priorities={prioritiesEnabled}
           draft={draft}
           players={players}
           copy={copy}
-          disabled={busy}
+          disabled={editingLocked}
           change={change}
           changes={changes}
         />
@@ -981,7 +1497,7 @@ function Workspace({
                     <button
                       className={styles.remove}
                       type="button"
-                      disabled={busy}
+                      disabled={editingLocked}
                       aria-label={`${copy.remove} · ${label}`}
                       onClick={() => {
                         const keep = draft.keep_weeks?.filter((item) => item !== week);
@@ -1002,7 +1518,7 @@ function Workspace({
                   <button
                     className={styles.remove}
                     type="button"
-                    disabled={busy}
+                    disabled={editingLocked}
                     aria-label={`${copy.remove} · ${bankRule}`}
                     onClick={() => change({ ...draft, min_bank: undefined })}
                   >
@@ -1029,7 +1545,7 @@ function Workspace({
                   <button
                     className={styles.remove}
                     type="button"
-                    disabled={busy}
+                    disabled={editingLocked}
                     aria-label={`${copy.remove} · ${scenarioDescription}`}
                     onClick={() => change({ ...draft, scenario: undefined })}
                   >
@@ -1048,10 +1564,36 @@ function Workspace({
             {copy.scenarioReferenceRequired}
           </p>
         )}
-        {hardConflict && (
+        {savedConflict && (
+          <p data-saved-conflict role="status" className={styles.notice}>
+            {savedConflict}
+          </p>
+        )}
+        {hardConflict && !analysis && !savedConflict && (
           <p role="alert" className={styles.notice}>
             {hardConflict}
           </p>
+        )}
+        {analysis && (
+          <VerifiedRuleRepairs
+            key={JSON.stringify([draft, reference, squad.source_snapshot_id, language])}
+            analysis={analysis}
+            client={client}
+            squad={squad}
+            window={plans.window}
+            forwarded={forwarded}
+            reference={reference}
+            disabled={
+              editingLocked || computing || closed || basisChanged || !deadlineOpen(deadline)
+            }
+            begin={beginRepair}
+            current={async (owner) =>
+              session.confirmation?.runId === owner.runId &&
+              (await repairData()) === owner.dataId &&
+              session.confirmation?.runId === owner.runId
+            }
+            apply={acceptRepair}
+          />
         )}
         {closed && (
           <p role="status" className={styles.notice}>
@@ -1076,6 +1618,7 @@ function Workspace({
             closed ||
             deadline === null ||
             !canCalculate ||
+            mainBlocked ||
             basisChanged
           }
           onClick={() => void compute()}
@@ -1101,11 +1644,65 @@ function Workspace({
           </p>
         )}
       </section>
+      {vNext && computed.history.items.length > 0 && (
+        <section className={styles.revision} aria-label={copy.planHistory}>
+          <label>
+            {copy.planHistory}{" "}
+            <select
+              value={computed.selected?.id ?? ""}
+              disabled={editingLocked}
+              onChange={(event) => selectComputed(computed.choose(event.target.value))}
+            >
+              {computed.history.items.map((item, index) => (
+                <option key={item.id} value={item.id}>
+                  {copy.savedPlan(index + 1)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={editingLocked || computed.history.cursor <= 0}
+            onClick={() => selectComputed(computed.move(-1))}
+          >
+            {copy.undoPlan}
+          </button>
+          <button
+            type="button"
+            disabled={
+              editingLocked || computed.history.cursor >= computed.history.navigation.length - 1
+            }
+            onClick={() => selectComputed(computed.move(1))}
+          >
+            {copy.redoPlan}
+          </button>
+        </section>
+      )}
+      {historical && computed.selected && !computing && (
+        <PlanResult
+          title={copy.selectedPlan}
+          planId={vNext ? computed.selected.id : undefined}
+          selected={vNext}
+          state={{
+            phase: "done",
+            source: "api-cache",
+            request: requestFor(squad, forwarded, computed.selected.plan.window as 1 | 3),
+            envelope: {
+              contract_version: "provisional_league_ui_v1",
+              generated_at_utc: "2000-01-01T00:00:00Z",
+              source_kind: "live",
+              payload: computed.selected.plan,
+            },
+          }}
+          squad={squad}
+        />
+      )}
       {reference && !draft.scenario && (
-        <RevisionComparison previous={reference} revised={revised} />
+        <RevisionComparison previous={reference} revised={revised} planContextEnabled={vNext} />
       )}
       {reference && run?.scenario && scenarioDescription && (
         <ScenarioComparison
+          planContextEnabled={vNext}
           reference={reference}
           replay={states.first}
           optimized={baseState}
@@ -1117,6 +1714,7 @@ function Workspace({
             {!savedReplayProof && (
               <PlanResult
                 title={copy.scenarioOriginal}
+                {...(states.first.phase === "done" ? planProps(states.first.envelope.payload) : {})}
                 state={states.first}
                 squad={squad}
                 conflict={replayConflict}
@@ -1125,6 +1723,7 @@ function Workspace({
             )}
             <PlanResult
               title={copy.scenarioOptimized}
+              {...(baseAnswer ? planProps(baseAnswer) : {})}
               state={baseState}
               squad={squad}
               conflict={run.baseConflict}
@@ -1134,7 +1733,7 @@ function Workspace({
           </div>
         </ScenarioComparison>
       )}
-      {run && !run.scenario && (
+      {run && !run.scenario && (!historical || computing) && (
         <section
           className={styles.results}
           data-zone="llmopt-results"
@@ -1142,8 +1741,13 @@ function Workspace({
           aria-busy={isWorking(baseState.phase)}
         >
           <h2>{copy.results}</h2>
-          <div className={styles.planGrid}>
-            {(run.baseRequest || run.baseConflict) && (
+          <PlanPathGroups
+            enabled={showPaths}
+            runId={run.inputs.request.run?.run_id}
+            className={styles.planGrid}
+            label={copy.openingDecision}
+          >
+            {(run.baseRequest || run.baseConflict) && !capacityRefused(baseState) && !analysis && (
               <PlanResult
                 title={copy[run.baseTitle]}
                 state={baseState}
@@ -1153,50 +1757,66 @@ function Workspace({
                   run.baseConflict ? explainBranchConflict(run.baseTitle) : undefined
                 }
                 diagnosis={diagnosis(baseState)}
-                prices={priceRows}
+                prices={
+                  incompleteRun ? priceRows.filter(({ status }) => status === "priced") : priceRows
+                }
+                {...(baseAnswer ? planProps(baseAnswer) : {})}
                 onRevise={baseAnswer ? () => revisePlan(baseAnswer) : undefined}
-                reviseDisabled={busy}
+                reviseDisabled={editingLocked}
               />
             )}
-            {results.map(({ title, state, conflict, conflictMessage }) => (
-              <PlanResult
-                key={title}
-                title={title}
-                state={state}
-                squad={squad}
-                baseline={baseAnswer}
-                conflict={conflict}
-                conflictMessage={conflictMessage}
-                diagnosis={diagnosis(state)}
-                onRevise={
-                  state.phase === "done" ? () => revisePlan(state.envelope.payload) : undefined
-                }
-                reviseDisabled={busy}
-              />
-            ))}
-            {combined && combined.length > 0 && (
+            {results
+              .filter(({ state }) => !capacityRefused(state))
+              .map(({ title, state, conflict, conflictMessage }) => (
+                <PlanResult
+                  key={title}
+                  title={title}
+                  state={state}
+                  squad={squad}
+                  baseline={baseAnswer}
+                  conflict={conflict}
+                  conflictMessage={conflictMessage}
+                  diagnosis={diagnosis(state)}
+                  {...(state.phase === "done" ? planProps(state.envelope.payload) : {})}
+                  onRevise={
+                    state.phase === "done" ? () => revisePlan(state.envelope.payload) : undefined
+                  }
+                  reviseDisabled={editingLocked}
+                />
+              ))}
+            {(priorityResult ||
+              problem ||
+              (!!combined?.length && !capacityRefused(combinedState))) && (
               <PlanResult
                 title={copy.combinedPlan}
                 state={combinedState}
                 squad={squad}
                 baseline={baseAnswer}
-                diagnosis={diagnosis(combinedState)}
+                diagnosis={
+                  diagnosis(combinedState) ?? (problem && <p role="status">{copy[problem]}</p>)
+                }
+                {...(combinedState.phase === "done"
+                  ? planProps(combinedState.envelope.payload)
+                  : {})}
                 onRevise={
                   combinedState.phase === "done"
                     ? () => revisePlan(combinedState.envelope.payload)
                     : undefined
                 }
-                reviseDisabled={busy}
+                reviseDisabled={editingLocked}
               >
                 <CombinedRules
-                  applied={combinedRules(true)}
-                  leftOut={combinedRules(false)}
+                  rules={combinedRules}
+                  unanswered={!!problem}
                   cost={combinedCost}
                   infeasible={combinedState.phase === "failed" && !!combinedState.infeasibility}
                 />
               </PlanResult>
             )}
-          </div>
+          </PlanPathGroups>
+          {incompleteRun && !analysis && problem !== "combinedExhausted" && (
+            <p role="status">{copy.unfinishedPlans}</p>
+          )}
           {same && (
             <p role="status" className={styles.muted}>
               {copy.same}

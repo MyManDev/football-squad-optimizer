@@ -47,6 +47,11 @@ export interface StrategyCapability {
 }
 
 export interface AdviceCapabilities {
+  verifiedRepairs?: true;
+  transferPackages?: true;
+  threeWeekPaths?: true;
+  planDataId?: string;
+  llmoptVNext?: true;
   decisionInformation?: DecisionInformation;
   leagueId: number;
   captureSnapshotId: string;
@@ -55,6 +60,9 @@ export interface AdviceCapabilities {
   strategies: Record<string, StrategyCapability>;
   /** The settings the service would accept now; zero is always one of them. */
   preferences?: boolean;
+  preferenceBundles?: boolean;
+  /** Browser-private support; it does not advertise a server capability at three weeks. */
+  devicePreferenceBundles?: true;
   models?: ("current" | "football")[];
   top100Weights: Top100Weight[];
   managersWord: boolean;
@@ -94,6 +102,17 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   if (!record(value.strategies) || !record(value.top100) || !record(value.managers_word)) {
     throw new AdviceCapabilitiesError("The capabilities have no strategies or switches.");
   }
+  if (
+    value.plan_data_id !== undefined &&
+    (typeof value.plan_data_id !== "string" || !/^[0-9a-f]{64}$/.test(value.plan_data_id))
+  )
+    throw new AdviceCapabilitiesError("Invalid plan data identity.");
+  if (value.transfer_packages !== undefined && typeof value.transfer_packages !== "boolean")
+    throw new AdviceCapabilitiesError("Invalid transfer package capability.");
+  if (value.verified_repairs !== undefined && typeof value.verified_repairs !== "boolean")
+    throw new AdviceCapabilitiesError("Invalid verified repair capability.");
+  if (value.three_week_paths !== undefined && typeof value.three_week_paths !== "boolean")
+    throw new AdviceCapabilitiesError("Invalid three-week path capability.");
   const strategies: Record<string, StrategyCapability> = {};
   for (const [slug, row] of Object.entries(value.strategies)) {
     if (
@@ -170,6 +189,10 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   )
     throw new AdviceCapabilitiesError("Invalid decision information.");
   return {
+    ...(value.llmopt_vnext === true && value.verified_repairs === true
+      ? { verifiedRepairs: true as const }
+      : {}),
+    ...(value.llmopt_vnext === true ? { llmoptVNext: true as const } : {}),
     ...(value.decision_information === undefined
       ? {}
       : { decisionInformation: value.decision_information as DecisionInformation }),
@@ -177,11 +200,25 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       ? {}
       : { preferences: record(value.preferences) && value.preferences.available === true }),
     ...(value.models === undefined ? {} : { models: value.models as ("current" | "football")[] }),
+    ...(value.llmopt_vnext === true && typeof value.plan_data_id === "string"
+      ? { planDataId: value.plan_data_id }
+      : {}),
+    ...(value.llmopt_vnext === true && value.transfer_packages === true
+      ? { transferPackages: true }
+      : {}),
+    ...(value.llmopt_vnext === true && value.three_week_paths === true
+      ? { threeWeekPaths: true }
+      : {}),
     leagueId,
     captureSnapshotId: value.capture_snapshot_id,
     season: value.season,
     gameweek: value.gameweek as number,
     strategies,
+    ...(value.llmopt_vnext === true &&
+    record(value.preference_bundles) &&
+    value.preference_bundles.version === "llmopt_preference_bundle_v1"
+      ? { preferenceBundles: true }
+      : {}),
     top100Weights: [0, ...new Set(offered)],
     managersWord: value.managers_word.available,
     ...(chipStrategyWindows === undefined ? {} : { chipStrategyWindows }),

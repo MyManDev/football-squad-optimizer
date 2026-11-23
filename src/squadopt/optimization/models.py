@@ -32,6 +32,10 @@ class SolverExecutionError(SquadOptimizationError):
     """Raised when the generated model or solver fails unexpectedly."""
 
 
+class SolverWallTimeLimit(SolverExecutionError):
+    """The planner stopped at its wall-clock safety limit."""
+
+
 class SolverStatus(StrEnum):
     """Solver-independent termination status."""
 
