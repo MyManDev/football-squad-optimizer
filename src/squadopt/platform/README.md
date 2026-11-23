@@ -112,6 +112,7 @@ captured bytes, not a live endpoint.
 | `fpl_capture.py` | One immutable FPL deadline capture. |
 | `cohort_capture.py` | Captures the official overall elite cohort before a gameweek deadline. |
 | `elite_capture.py` | Captures a frozen elite cohort's previous-gameweek picks before the deadline. |
+| `elite_season_capture.py` | Keeps the season history, transfers and scored-week picks of every manager a stored elite cohort names; adds only what the store lacks. |
 | `official_injury_capture.py` | A bounded capture of the official league injury widget, without a model call. |
 | `benchmark_capture.py` | Private weekly Benchmark V2 receipts, kept apart from published decisions. |
 | `capture_measurement.py` | Offline availability calibration and a paired late-capture audit; changes no projection. |

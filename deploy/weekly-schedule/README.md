@@ -105,7 +105,10 @@ deadlines from the public bootstrap and starts at most one weekly run
   model call (D3), and no manager's word: it passes no `--rotation`, so its index says
   `no_evidence_this_run` and its pages offer no word. It is skipped when the final run would
   start before it could finish, and late after 7 h (`--run-hours 7`): the run itself, then,
-  from GW11, its release and the backend's move in the same tick.
+  from GW11, its release and the backend's move in the same tick. It also waits until the
+  gameweek before is finished and checked: a deadline inside the window can come while the
+  previous gameweek is still being played (GW12 closed six days after GW11), and a capture
+  then is mid-gameweek, which the handoff refuses.
 - **The final run** once a gameweek, with club news, which its manager's word reads
   (`--rotation --rotation-capture <its capture>`). It starts 8 h before the deadline on this
   host (`--final-lead-hours 8`). D2 chose 4 h, but the first run here, on 2026-11-04, took

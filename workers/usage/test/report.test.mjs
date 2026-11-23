@@ -40,9 +40,9 @@ const row = (session, step, page, tool, events = 1, lang = "tr", device = "phone
 });
 
 /** A version 2 row: the kind in `step`, its words in the details and its number in `measure`. */
-const behaviour = (session, kind, words, measure, { events = 1, page = "member", device = "phone" } = {}) => ({
+const behaviour = (session, kind, words, measure, { events = 1, page = "member", device = "phone", tool } = {}) => ({
   page,
-  tool: page === "member" ? "week" : "",
+  tool: tool ?? (page === "member" ? "week" : ""),
   step: kind,
   lang: "tr",
   device,
@@ -161,8 +161,16 @@ describe("reading the rows", () => {
   });
 
   it("says when the limit cut the rows off", async () => {
-    const { truncated } = await read(answer({ data: [{}], rows_before_limit_at_least: ROW_LIMIT + 5 }));
+    const full = Array.from({ length: ROW_LIMIT }, () => ({}));
+    const { truncated } = await read(answer({ data: full, rows_before_limit_at_least: ROW_LIMIT + 5 }));
     assert.equal(truncated, true);
+  });
+
+  it("is not cut off because the API read more rows than it grouped into", async () => {
+    // On 18 Nov 2026 a grouped answer of a few hundred rows came with a far larger
+    // rows_before_limit_at_least, and the report called a complete range partial.
+    const { truncated } = await read(answer({ data: [{}, {}], rows_before_limit_at_least: 1908 }));
+    assert.equal(truncated, false);
   });
 
   it("throws on a refused or shapeless answer", async () => {
@@ -233,21 +241,46 @@ describe("the behaviour summary", () => {
     assert.equal(report.visits, 3);
   });
 
-  it("counts clicks by page, device, zone and cell, with their marks and targets", () => {
+  it("counts clicks by page, tool, device, zone and cell, with their marks and targets", () => {
     assert.deepEqual(report.clicks, [
-      { page: "league", device: "phone", zone: "nav", cell: 3, events: 1, marks: { none: 1, rage: 0, dead: 0 }, targets: { control: 1, plain: 0 } },
-      { page: "member", device: "desktop", zone: "page", cell: 0, events: 3, marks: { none: 3, rage: 0, dead: 0 }, targets: { control: 0, plain: 3 } },
-      { page: "member", device: "phone", zone: "decision", cell: 47, events: 6, marks: { none: 5, rage: 1, dead: 0 }, targets: { control: 6, plain: 0 } },
-      { page: "member", device: "phone", zone: "decision", cell: 48, events: 2, marks: { none: 0, rage: 0, dead: 2 }, targets: { control: 0, plain: 2 } },
+      { page: "league", tool: "", device: "phone", zone: "nav", cell: 3, events: 1, marks: { none: 1, rage: 0, dead: 0 }, targets: { control: 1, plain: 0 } },
+      { page: "member", tool: "week", device: "desktop", zone: "page", cell: 0, events: 3, marks: { none: 3, rage: 0, dead: 0 }, targets: { control: 0, plain: 3 } },
+      { page: "member", tool: "week", device: "phone", zone: "decision", cell: 47, events: 6, marks: { none: 5, rage: 1, dead: 0 }, targets: { control: 6, plain: 0 } },
+      { page: "member", tool: "week", device: "phone", zone: "decision", cell: 48, events: 2, marks: { none: 0, rage: 0, dead: 2 }, targets: { control: 0, plain: 2 } },
     ]);
   });
 
-  it("counts rage and dead clicks by page and zone, most first", () => {
+  it("counts rage and dead clicks by page, tool and zone, most first", () => {
     assert.deepEqual(report.frustration, [
-      { page: "member", zone: "decision", clicks: 8, rage: 1, dead: 2 },
-      { page: "league", zone: "nav", clicks: 1, rage: 0, dead: 0 },
-      { page: "member", zone: "page", clicks: 3, rage: 0, dead: 0 },
+      { page: "member", tool: "week", zone: "decision", clicks: 8, rage: 1, dead: 2 },
+      { page: "league", tool: "", zone: "nav", clicks: 1, rage: 0, dead: 0 },
+      { page: "member", tool: "week", zone: "page", clicks: 3, rage: 0, dead: 0 },
     ]);
+  });
+
+  it("keeps the tools of one page apart, in the clicks and in the frustration", () => {
+    // Every tool of a member's page is page `member`; on 23 Nov 2026 the week tool's clicks
+    // were drawn over the chips tool because the rows did not say which tool they came from.
+    const { behaviour: tools } = summarize([
+      behaviour(A, "click", ["decision", "control", "none"], 47, { events: 4 }),
+      behaviour(B, "click", ["decision", "control", "rage"], 47, { tool: "chips" }),
+      behaviour(B, "click", ["decision", "plain", "none"], 47, { events: 2, tool: "chips" }),
+      behaviour(C, "click", ["decision", "control", "dead"], 47, { tool: "what-if" }),
+    ]);
+    assert.deepEqual(
+      tools.clicks.map(({ page, tool, zone, cell, events }) => [page, tool, zone, cell, events]),
+      [
+        ["member", "chips", "decision", 47, 3],
+        ["member", "week", "decision", 47, 4],
+        ["member", "what-if", "decision", 47, 1],
+      ],
+    );
+    assert.deepEqual(tools.frustration, [
+      { page: "member", tool: "chips", zone: "decision", clicks: 3, rage: 1, dead: 0 },
+      { page: "member", tool: "what-if", zone: "decision", clicks: 1, rage: 0, dead: 1 },
+      { page: "member", tool: "week", zone: "decision", clicks: 4, rage: 0, dead: 0 },
+    ]);
+    assert.equal(tools.events, 8);
   });
 
   it("spreads page views over every depth and every dwell, by page and device", () => {
@@ -338,8 +371,8 @@ describe("the printed report", () => {
     const output = render(summarize([...ROWS, ...BEHAVIOUR_ROWS]), { from: "2026-11-01", to: "2026-11-30", truncated: false }).join("\n");
     const headings = [
       "Behaviour: 33 events in 3 visits",
-      "Clicks by page, device and zone",
-      "Rage and dead clicks",
+      "Clicks by page, tool, device and zone",
+      "Rage and dead clicks by page, tool and zone",
       "Scroll depth",
       "Time on page",
       "Speed by metric",
@@ -349,7 +382,8 @@ describe("the printed report", () => {
     ];
     for (const heading of headings) assert.ok(output.includes(heading), heading);
     assert.ok(output.indexOf("Device classes") < output.indexOf("Behaviour:"));
-    assert.match(output, /decision\s+8 clicks\s+1 rage\s+2 dead/);
+    assert.match(output, /member\s+week\s+decision\s+8 clicks\s+1 rage\s+2 dead/);
+    assert.match(output, /league\s+\(no tool\)\s+phone\s+nav\s+1 clicks/);
     assert.match(output, /lcp\s+member\s+phone\s+8 readings\s+p75 2000\s+good 75%/);
     assert.match(output, /busiest: r2c7 6, r2c8 2/);
     for (const session of [A, B, C]) assert.equal(output.includes(session), false);
