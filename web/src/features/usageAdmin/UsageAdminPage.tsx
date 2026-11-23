@@ -329,9 +329,10 @@ function ReportSections({
       <Card title={copy.clicks} aside={place}>
         <Table
           label={copy.clicks}
-          head={[copy.zone, copy.clickCount, copy.rage, copy.dead]}
+          head={[copy.zone, copy.tool, copy.clickCount, copy.rage, copy.dead]}
           rows={clicksByZone(report, page, device).map((zone) => [
             zone.zone,
+            zone.tool === null ? copy.unknownTool : zone.tool || copy.noTool,
             count(zone.clicks),
             count(zone.rage),
             count(zone.dead),

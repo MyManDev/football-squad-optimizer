@@ -99,7 +99,12 @@ export function OwnKeyForm({
 
   if (held)
     return (
-      <div className={styles.ownKey} role="group" aria-labelledby={`${id}-title`}>
+      <div
+        className={styles.ownKey}
+        role="group"
+        aria-labelledby={`${id}-title`}
+        data-zone="llmopt-model"
+      >
         <h2 id={`${id}-title`}>{words.title}</h2>
         <p className={styles.ownKeyHeld} role="status">
           <span>{words.providers[held.provider]}</span>
@@ -112,7 +117,12 @@ export function OwnKeyForm({
     );
 
   return (
-    <div className={styles.ownKey} role="group" aria-labelledby={`${id}-title`}>
+    <div
+      className={styles.ownKey}
+      role="group"
+      aria-labelledby={`${id}-title`}
+      data-zone="llmopt-model"
+    >
       <h2 id={`${id}-title`}>{words.title}</h2>
       <p className={styles.ownKeyNeeded}>{words.needed}</p>
       <label htmlFor={`${id}-provider`}>{words.provider}</label>

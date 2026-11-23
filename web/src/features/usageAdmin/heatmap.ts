@@ -1,9 +1,14 @@
 /**
- * The heatmap mode's arithmetic (ADR 0016): which of a report's clicks a page, device and mark
- * select, where each cell of a zone's 20 by 20 grid lies over the zone's box in the document,
- * and the cell's colour. The box is the element's current one, so the drawing follows the
- * layout the person is looking at. Also the mode's two reads, kept for the page's life.
+ * The heatmap mode's arithmetic (ADR 0016): which of a report's clicks a place (page and tool),
+ * device and mark select, where each cell of a zone's 20 by 20 grid lies over the zone's box in
+ * the document, and the cell's colour. The box is the element's current one, so the drawing
+ * follows the layout the person is looking at. Also the mode's two reads, kept for the page's
+ * life.
+ *
+ * Clicks in no zone (`page`) are counted, never drawn: their cell is of a grid over the whole
+ * document, whose size differs between tools and window heights, so it lands on nothing.
  */
+import type { UsagePlace } from "../../data/usage";
 import {
   rangeEnding,
   readUsageAdminMe,
@@ -27,14 +32,23 @@ export interface Box {
   height: number;
 }
 
-/** A zone's counts by cell, for one page, device and mark. */
+/** A zone's counts by cell, for one place, device and mark. */
 export type ZoneCounts = Map<string, Map<number, number>>;
 
-/** What one page, device and mark select: counts by zone and cell, the busiest cell, the sum. */
+/** The zone of a click that had no `data-zone` around it. */
+export const NO_ZONE = "page";
+
+/**
+ * What one place, device and mark select: counts by zone and cell, the busiest cell and the
+ * sum, over the zones that are drawn; the clicks in no zone, counted apart; and whether any
+ * row came without a tool (an older Worker's), so other tools' clicks may be among them.
+ */
 export interface CellSelection {
   zones: ZoneCounts;
   max: number;
   total: number;
+  outside: number;
+  untooled: boolean;
 }
 
 /** The count a mark reads from one cell's entry. */
@@ -42,20 +56,34 @@ function countOf(cell: UsageClickCell, mark: HeatMark): number {
   return mark === "all" ? cell.events : cell.marks[mark];
 }
 
-/** The report's clicks for one page, device and mark, by zone and cell; zero cells left out. */
+/**
+ * The report's clicks for one place, device and mark, by zone and cell; zero cells left out.
+ * A row is the place's when its page and its tool are the place's: every tool of a member's
+ * page is page `member`, so the page alone would draw one tool's clicks over another. A row
+ * with no tool (from a Worker before 2026-11-23) is kept on its page alone, as before, since
+ * which tool it came from is not known; `untooled` says so.
+ */
 export function selectCells(
   clicks: readonly UsageClickCell[],
-  page: string,
+  place: UsagePlace,
   device: string,
   mark: HeatMark,
 ): CellSelection {
   const zones: ZoneCounts = new Map();
   let max = 0;
   let total = 0;
+  let outside = 0;
+  let untooled = false;
   for (const cell of clicks) {
-    if (cell.page !== page || cell.device !== device) continue;
+    if (cell.page !== place.page || cell.device !== device) continue;
+    if (cell.tool !== null && cell.tool !== place.tool) continue;
     const count = countOf(cell, mark);
     if (count <= 0) continue;
+    if (cell.tool === null) untooled = true;
+    if (cell.zone === NO_ZONE) {
+      outside += count;
+      continue;
+    }
     const cells = zones.get(cell.zone) ?? new Map<number, number>();
     const sum = (cells.get(cell.cell) ?? 0) + count;
     cells.set(cell.cell, sum);
@@ -63,7 +91,7 @@ export function selectCells(
     max = Math.max(max, sum);
     total += count;
   }
-  return { zones, max, total };
+  return { zones, max, total, outside, untooled };
 }
 
 /** A box in the viewport moved to the document: the scroll offsets added. */
@@ -138,23 +166,18 @@ function drawn(element: Element): boolean {
 }
 
 /**
- * Every cell to draw, over the boxes the zones have now: the `page` grid over the whole
- * document first, then each drawn `[data-zone]` element's grid over its own box. The layer is
- * hidden while the document is measured, so its own size never counts in the document's.
+ * Every cell to draw, over the boxes the zones have now: each drawn `[data-zone]` element's
+ * grid over its own box. A word no element carries (a zone of another layout, or a retired
+ * word) draws nothing, and neither do clicks in no zone. The layer is hidden while the
+ * document is measured, so its own size never counts in a box.
  */
 export function measureCells(selection: CellSelection, layer: HTMLElement | null): HeatCell[] {
   if (layer !== null) layer.hidden = true;
   try {
     const cells: HeatCell[] = [];
-    const root = document.documentElement;
-    const page = selection.zones.get("page");
-    if (page !== undefined) {
-      const box = { left: 0, top: 0, width: root.scrollWidth, height: root.scrollHeight };
-      cells.push(...zoneCells("page", box, page, selection.max));
-    }
     for (const element of document.querySelectorAll("[data-zone]")) {
       const zone = element.getAttribute("data-zone") ?? "";
-      const counts = zone === "page" ? undefined : selection.zones.get(zone);
+      const counts = zone === NO_ZONE ? undefined : selection.zones.get(zone);
       if (counts === undefined || !drawn(element)) continue;
       const box = documentBox(element.getBoundingClientRect(), window.scrollX, window.scrollY);
       cells.push(...zoneCells(zone, box, counts, selection.max));

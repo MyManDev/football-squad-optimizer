@@ -46,6 +46,9 @@ need the aggregated counts in a browser, for a few named people and nobody else.
    `data-zone` element's 20 by 20 cells over its current box, for the page the address names, a
    chosen device class and mark, and redraws on scroll, resize and layout changes. Every other
    visitor sends no extra request and loads none of its code.
+   Amended on 2026-11-23: the mode draws only the clicks whose page and tool both match the
+   address, since every member tool shares the page `member`, and never draws zone `page`,
+   whose whole-document grid moves with the page's length; it counts those clicks instead.
 7. **Admins are not counted.** A browser with `squadopt.admin = 1` sends no usage event of either
    version, so the people reading the record do not move it.
 

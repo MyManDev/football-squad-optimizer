@@ -10,9 +10,9 @@ import { HeatmapMode } from "./HeatmapMode";
 
 const MEMBER = "/league/352490/members/35249001";
 
-function serve(me: () => Response) {
+function serve(me: () => Response, report: () => unknown = usageReportFixture) {
   const fetch = vi.fn(async (url: string) =>
-    url.endsWith("/report/me") ? me() : Response.json(usageReportFixture()),
+    url.endsWith("/report/me") ? me() : Response.json(report()),
   );
   vi.stubGlobal("fetch", fetch);
   return fetch;
@@ -111,10 +111,13 @@ describe("the drawing", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Heatmap" }));
     const panel = screen.getByRole("region", { name: "Clicks on this page" });
-    expect(panel).toHaveTextContent("Page: member");
+    expect(panel).toHaveTextContent("Page: member, tool: week");
     // This browser reads as a phone, so the phone's clicks come first.
     expect(screen.getByRole("button", { name: "Phone" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByText("75 clicks drawn")).toBeVisible();
+    // The click in no zone is counted here, never drawn.
+    expect(screen.getByText("Outside zones: 3 clicks")).toBeVisible();
+    expect(screen.queryByText(/does not name the tool/)).toBeNull();
 
     const layer = document.querySelector<HTMLElement>("[data-heatmap] [aria-hidden='true']")!;
     await waitFor(() => expect(layer.children).toHaveLength(3));
@@ -130,6 +133,7 @@ describe("the drawing", () => {
 
     await user.click(screen.getByRole("button", { name: "Rage" }));
     expect(await screen.findByText("6 clicks drawn")).toBeVisible();
+    expect(screen.queryByText(/Outside zones/)).toBeNull();
     await waitFor(() => expect(layer.children).toHaveLength(1));
 
     await user.click(screen.getByRole("button", { name: "28 days" }));
@@ -141,6 +145,37 @@ describe("the drawing", () => {
       .map(([url]) => url)
       .filter((url) => url.startsWith("/api/v1/usage/report?"));
     expect(new Set(ranges).size).toBe(2);
+  });
+
+  it("draws only the clicks of the tool the address names", async () => {
+    serve(yes);
+    zone("decision", { left: 0, top: 0, width: 200, height: 400 });
+    zone("pitch", { left: 0, top: 400, width: 100, height: 100 });
+    mount(`${MEMBER}/chips`);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Heatmap" }));
+    expect(screen.getByRole("region")).toHaveTextContent("Page: member, tool: chips");
+    expect(await screen.findByText("7 clicks drawn")).toBeVisible();
+    const layer = document.querySelector<HTMLElement>("[data-heatmap] [aria-hidden='true']")!;
+    await waitFor(() => expect(layer.children).toHaveLength(1));
+    expect(screen.queryByText(/Outside zones/)).toBeNull();
+  });
+
+  it("draws an older report's rows, with no tool, on their page alone, and says so", async () => {
+    const older = () => {
+      const report = usageReportFixture() as unknown as {
+        behaviour: { clicks: Record<string, unknown>[] };
+      };
+      for (const cell of report.behaviour.clicks) delete cell.tool;
+      return report;
+    };
+    serve(yes, older);
+    zone("decision", { left: 0, top: 0, width: 200, height: 400 });
+    mount(`${MEMBER}/chips`);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Heatmap" }));
+    expect(await screen.findByText("82 clicks drawn")).toBeVisible();
+    expect(screen.getByText(/does not name the tool/)).toBeVisible();
   });
 
   it("closes and leaves nothing drawn", async () => {
