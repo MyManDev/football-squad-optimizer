@@ -48,7 +48,7 @@ export function FixtureMatrix({
 }) {
   const { messages } = useLanguage();
   return (
-    <table className={styles.matrix}>
+    <table className={styles.matrix} data-zone="fixtures-matrix">
       <caption className="visually-hidden">{copy.generalView}</caption>
       <thead>
         <tr>

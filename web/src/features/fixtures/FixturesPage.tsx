@@ -48,8 +48,8 @@ export function FixturesPage() {
   const view = searchParams.get("view") === "team" ? "team" : "general";
 
   return (
-    <div className={styles.page} data-zone="fixtures">
-      <header className={styles.header}>
+    <div className={styles.page}>
+      <header className={styles.header} data-zone="fixtures-header">
         <div>
           <div className={styles.kicker}>{data.season}</div>
           <h1 className={styles.pageTitle}>{copy.pageTitle}</h1>
@@ -61,6 +61,7 @@ export function FixturesPage() {
           <FixtureChoice
             legend={copy.viewLegend}
             name="fixture-view"
+            zone="fixtures-view"
             value={view}
             onChange={(next) => choose("view", next === "team" ? next : null)}
             options={[

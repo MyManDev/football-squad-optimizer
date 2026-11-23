@@ -150,12 +150,21 @@ describe("a version 2 event", () => {
   it("names exactly the kinds and words ADR 0015 lists", () => {
     const sorted = (set) => [...set].sort();
     assert.deepEqual(sorted(KINDS), ["arrival", "click", "error", "scroll", "vital"]);
-    assert.equal(ZONES.size, 44);
+    assert.equal(ZONES.size, 76);
     for (const zone of ["nav", "decision", "pitch", "member-picker", "llmopt", "contribute", "page"]) assert.ok(ZONES.has(zone));
     // Added on 2026-11-23 for smaller boxes; the words they replaced stay readable above.
     for (const zone of [
       "nav-brand", "nav-member", "nav-links", "nav-settings", "phone-bar",
       "llmopt-model", "llmopt-instructions", "llmopt-rule-list", "llmopt-rules", "llmopt-plan", "llmopt-compute", "llmopt-results",
+    ]) assert.ok(ZONES.has(zone), zone);
+    // Added on 2026-11-23 for the parts of the pages that were one zone each.
+    for (const zone of [
+      "history-header", "history-report", "history-picker", "history-table", "history-week",
+      "vs-header", "vs-weeks", "vs-score", "vs-sides", "vs-why", "vs-squad",
+      "live-header", "live-score", "live-refresh", "live-rival", "live-differentials", "live-recap", "live-players",
+      "reminder-header", "reminder-switch", "reminder-steps",
+      "fixtures-header", "fixtures-view", "fixtures-clubs", "fixtures-team", "fixtures-matrix",
+      "contribute-header", "contribute-team", "contribute-position", "contribute-player", "contribute-form", "contribute-comments",
     ]) assert.ok(ZONES.has(zone), zone);
     assert.deepEqual(sorted(TARGETS), ["control", "plain"]);
     assert.deepEqual(sorted(MARKS), ["dead", "none", "rage"]);

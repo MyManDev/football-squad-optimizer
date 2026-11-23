@@ -62,8 +62,8 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
   const ordered = [...weeks].sort((a, b) => b.gameweek - a.gameweek);
   const week = ordered.find((item) => item.gameweek === selected);
   return (
-    <div className={styles.page} data-zone="history">
-      <header>
+    <div className={styles.page}>
+      <header data-zone="history-header">
         <Link to={memberAddress(leagueId, entryId)} className={styles.back}>
           {copy.back}
         </Link>
@@ -76,7 +76,7 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
         </EmptyState>
       ) : (
         <>
-          <label className={styles.selector}>
+          <label className={styles.selector} data-zone="history-picker">
             {copy.week}
             <select
               value={week?.gameweek ?? "overview"}
@@ -125,7 +125,7 @@ function HistoryOverview({
   const fold = useOpenRows();
   const details = messages.leagueMembers.storyDetail;
   return (
-    <Card title={copy.overview}>
+    <Card title={copy.overview} zone="history-table">
       <div className={styles.overviewScroll} tabIndex={0} role="region" aria-label={copy.overview}>
         <table className={styles.overviewTable}>
           <thead>
@@ -243,7 +243,7 @@ function WeekResult({ week }: { week: WeekReview }) {
     suggested?.chip === "3xc" ? copy.triple : suggested?.chip ? copy[suggested.chip] : copy.noChip;
   return (
     <>
-      <Card title={copy.gameweek(week.gameweek)}>
+      <Card title={copy.gameweek(week.gameweek)} zone="history-week">
         {week.advice_source === "requested_server" && (
           <span className={styles.rowStatus}>{copy.requested}</span>
         )}

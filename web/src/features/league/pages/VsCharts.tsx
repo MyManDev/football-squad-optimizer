@@ -148,7 +148,13 @@ export function WeekStrip({
 }) {
   const max = Math.max(1, ...weeks.map((week) => Math.abs(week.difference)));
   return (
-    <div className={styles.strip} role="group" aria-label={label} data-testid="vs-week-strip">
+    <div
+      className={styles.strip}
+      role="group"
+      aria-label={label}
+      data-testid="vs-week-strip"
+      data-zone="vs-weeks"
+    >
       {[...weeks]
         .sort((a, b) => a.gameweek - b.gameweek)
         .map((week) => {

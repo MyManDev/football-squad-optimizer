@@ -109,7 +109,7 @@ export function LiveHeader({
   const playing = lit !== null && lit.entryId === entryId && lit.playing;
   const breath = playing ? lit.breath : null;
   return (
-    <header className={styles.header}>
+    <header className={styles.header} data-zone="live-header">
       <h1 className={styles.title}>
         {copy.title}
         {playing ? (
@@ -283,7 +283,12 @@ function ScoreCardPart({
       ? { from: plan.netFrom, key: `${plan.token}:total`, ready: gate === "open" }
       : null;
   return (
-    <section className={styles.score} aria-label={copy.livePoints} data-live-head>
+    <section
+      className={styles.score}
+      aria-label={copy.livePoints}
+      data-live-head
+      data-zone="live-score"
+    >
       <dl className={styles.scoreGrid}>
         <div className={styles.total}>
           <dt>{copy.livePoints}</dt>
@@ -346,7 +351,7 @@ function FreshnessPart({
   const { locale, messages } = useLanguage();
   const copy = messages.live;
   return (
-    <div className={styles.fresh}>
+    <div className={styles.fresh} data-zone="live-refresh">
       <p className={styles.bonus}>{board.final ? copy.bonusAdded : copy.bonusPending}</p>
       <div className={styles.freshEnd}>
         <p className={styles.updated}>
@@ -543,7 +548,7 @@ function GroupsPart({ board, ref }: { board: LiveBoard; ref?: Ref<HTMLDivElement
   const copy = messages.live;
   const id = useId();
   return (
-    <div ref={ref} className={styles.groups}>
+    <div ref={ref} className={styles.groups} data-zone="live-players">
       {LIVE_GROUPS.map((group: LiveGroup) => {
         const rows = board.groups[group];
         if (rows.length === 0) return null;
@@ -574,7 +579,7 @@ function RecapPart({ items, ref }: { items: readonly RecapItem[]; ref?: Ref<HTML
   const copy = messages.live;
   const id = useId();
   return (
-    <section ref={ref} className={styles.recap} aria-labelledby={id}>
+    <section ref={ref} className={styles.recap} aria-labelledby={id} data-zone="live-recap">
       <h2 className={styles.sectionTitle} id={id}>
         {copy.sinceLastLook}
       </h2>
@@ -1197,7 +1202,12 @@ function RivalBlockPart({
     [],
   );
   return (
-    <section className={styles.rival} aria-labelledby={`${id}-label`} data-live-rival>
+    <section
+      className={styles.rival}
+      aria-labelledby={`${id}-label`}
+      data-live-rival
+      data-zone="live-rival"
+    >
       <div className={styles.rivalHead}>
         <label className={styles.rivalLabel} id={`${id}-label`} htmlFor={`${id}-select`}>
           {label}
@@ -1349,6 +1359,7 @@ function DifferentialsPart({
         if (event.currentTarget.open !== open) onToggle(event.currentTarget.open);
       }}
       data-live-differentials
+      data-zone="live-differentials"
     >
       <summary className={styles.summary}>
         <DisclosureIcon className={styles.disclosure} />

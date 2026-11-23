@@ -79,6 +79,16 @@ sit on its controls: `nav` was a box as tall as the window and `llmopt` the whol
 phone bar shared `topbar` with the member page's own top bar. No element carries `nav` or
 `llmopt` any more; both stay in the list so older events are still taken and read.
 
+*Amended 2026-11-23:* the six pages that were still one zone each are split the same way, into
+zones named after their page: `history-header`, `history-report`, `history-picker`,
+`history-table`, `history-week`; `vs-header`, `vs-weeks`, `vs-score`, `vs-sides`, `vs-why`,
+`vs-squad`; `live-header`, `live-score`, `live-refresh`, `live-rival`, `live-differentials`,
+`live-recap`, `live-players`; `reminder-header`, `reminder-switch`, `reminder-steps`;
+`fixtures-header`, `fixtures-view`, `fixtures-clubs`, `fixtures-team`, `fixtures-matrix`;
+`contribute-header`, `contribute-team`, `contribute-position`, `contribute-player`,
+`contribute-form`, `contribute-comments`. `history`, `vs`, `live`, `reminder`, `fixtures` and
+`contribute` stay in the list for older events, and no element carries them.
+
 ### The dataset's columns
 
 `blob1` to `blob6` keep version 1's meaning (`page`, `tool`, `step`, `lang`, `device`,
