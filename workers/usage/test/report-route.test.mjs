@@ -7,7 +7,7 @@ import { before, describe, it } from "node:test";
 
 import { KEYS_TTL_MS } from "../src/access.js";
 import { MARKER_HEADER, MARKER_VALUE } from "../src/rules.js";
-import { ADMIN_CONTRACT, buildReport, reportQuery } from "../src/report.js";
+import { ADMIN_CONTRACT, ROW_LIMIT, buildReport, reportQuery } from "../src/report.js";
 import { createWorker, routeFor } from "../src/worker.js";
 import { SITE } from "./support.mjs";
 
@@ -148,7 +148,8 @@ describe("a signed-in admin", () => {
   });
 
   it("is told when the row limit cut the range off", async () => {
-    const { send } = harness({ sql: () => Response.json({ data: ROWS, rows_before_limit_at_least: 500_000 }) });
+    const full = Array.from({ length: ROW_LIMIT }, (_, index) => ROWS[index % ROWS.length]);
+    const { send } = harness({ sql: () => Response.json({ data: full, rows_before_limit_at_least: 500_000 }) });
     const response = await send(range(TODAY, TODAY), { token: await sign(goodClaims(), { key: primary }) });
     assert.equal((await response.json()).truncated, true);
   });

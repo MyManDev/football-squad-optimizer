@@ -49,6 +49,7 @@ export function usageReportFixture(): UsageReport {
       clicks: [
         {
           page: "member",
+          tool: "week",
           device: "phone",
           zone: "decision",
           cell: 0,
@@ -58,6 +59,7 @@ export function usageReportFixture(): UsageReport {
         },
         {
           page: "member",
+          tool: "week",
           device: "phone",
           zone: "decision",
           cell: 21,
@@ -67,6 +69,7 @@ export function usageReportFixture(): UsageReport {
         },
         {
           page: "member",
+          tool: "week",
           device: "phone",
           zone: "pitch",
           cell: 399,
@@ -74,8 +77,20 @@ export function usageReportFixture(): UsageReport {
           marks: { none: 20, rage: 0, dead: 5 },
           targets: { control: 0, plain: 25 },
         },
+        // Another tool of the same page, in the same zone and cell: drawn on that tool only.
         {
           page: "member",
+          tool: "chips",
+          device: "phone",
+          zone: "decision",
+          cell: 0,
+          events: 7,
+          marks: { none: 7, rage: 0, dead: 0 },
+          targets: { control: 7, plain: 0 },
+        },
+        {
+          page: "member",
+          tool: "week",
           device: "desktop",
           zone: "squad",
           cell: 5,
@@ -85,6 +100,7 @@ export function usageReportFixture(): UsageReport {
         },
         {
           page: "league",
+          tool: "",
           device: "phone",
           zone: "member-table",
           cell: 3,
@@ -92,12 +108,25 @@ export function usageReportFixture(): UsageReport {
           marks: { none: 12, rage: 0, dead: 0 },
           targets: { control: 12, plain: 0 },
         },
+        // A click in no zone: counted, never drawn.
+        {
+          page: "member",
+          tool: "week",
+          device: "phone",
+          zone: "page",
+          cell: 0,
+          events: 3,
+          marks: { none: 3, rage: 0, dead: 0 },
+          targets: { control: 0, plain: 3 },
+        },
       ],
       frustration: [
-        { page: "member", zone: "decision", clicks: 50, rage: 6, dead: 4 },
-        { page: "member", zone: "pitch", clicks: 25, rage: 0, dead: 5 },
-        { page: "member", zone: "squad", clicks: 9, rage: 0, dead: 0 },
-        { page: "league", zone: "member-table", clicks: 12, rage: 0, dead: 0 },
+        { page: "member", tool: "week", zone: "decision", clicks: 50, rage: 6, dead: 4 },
+        { page: "member", tool: "week", zone: "pitch", clicks: 25, rage: 0, dead: 5 },
+        { page: "league", tool: "", zone: "member-table", clicks: 12, rage: 0, dead: 0 },
+        { page: "member", tool: "chips", zone: "decision", clicks: 7, rage: 0, dead: 0 },
+        { page: "member", tool: "week", zone: "page", clicks: 3, rage: 0, dead: 0 },
+        { page: "member", tool: "week", zone: "squad", clicks: 9, rage: 0, dead: 0 },
       ],
       scroll: [
         {
