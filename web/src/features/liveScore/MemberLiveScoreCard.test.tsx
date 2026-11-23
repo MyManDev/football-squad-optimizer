@@ -39,6 +39,18 @@ describe.each(["tr", "en"] as const)("member live score in %s", (language) => {
     expect(container.textContent).not.toMatch(AS_A_CHANCE);
     expect(container.textContent).not.toMatch(AS_A_CAVEAT);
   });
+  it("states the matches over as its page counts them, while the bonus still waits", () => {
+    const score = result("transfer-hit", true);
+    if (score.refused) throw new Error(score.reason);
+    show(score, language, { matchesOver: 1 });
+    // FPL has finished none, so the bonus waits; the match is over all the same.
+    expect(score.fixtures_finished).toBe(0);
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+    expect(screen.queryByText("0 / 1")).toBeNull();
+    expect(
+      screen.getByText(language === "tr" ? "Bonus bekleniyor" : "Bonus Pending"),
+    ).toBeInTheDocument();
+  });
   it("shows settled substitutions and the effective captain by name", () => {
     const score = result("goalkeeper-swap");
     if (score.refused) throw new Error(score.reason);

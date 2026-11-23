@@ -179,7 +179,10 @@ describe.each(["tr", "en"] as const)("the member's live week in %s", (language) 
     expect(
       await screen.findByText(language === "tr" ? "Bonus bekleniyor" : "Bonus Pending"),
     ).toBeInTheDocument();
-    expect(container).toHaveTextContent(`${score.fixtures_finished} / ${score.fixtures_total}`);
+    // Every match of the example is past its window, so all are over; FPL has checked the
+    // bonus of one, which is why the bonus still waits.
+    expect(score.fixtures_finished).toBe(1);
+    expect(container).toHaveTextContent(`${score.fixtures_total} / ${score.fixtures_total}`);
     expect(container.querySelector("time")).toHaveAttribute("datetime", score.source_time);
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(String(WEEK));
     expect(container.textContent).not.toMatch(AS_A_CHANCE);
