@@ -1822,6 +1822,7 @@ def test_package_switches_preserve_ordinary_worker_bytes_unless_the_master_and_p
     for master, three_week, search, gate, paths in (
         (False, False, False, False, False),
         (False, True, True, True, True),
+        (True, False, False, False, False),
         (True, False, True, True, True),
         (True, True, False, False, False),
         (True, True, False, False, True),

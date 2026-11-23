@@ -1,6 +1,7 @@
 """The server selects the workflow without changing shared answers or losing earlier jobs."""
 
 from dataclasses import replace
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +12,7 @@ from tests.unit.test_llmopt_plan_context import request as catalog_request
 from tests.unit.test_llmopt_preference_bundle import _started
 
 from squadopt.api.app import create_app
+from squadopt.platform import advice_worker
 from squadopt.platform.backend_runtime import BackendConfig, BackendConfigError, build_backend
 
 
@@ -183,7 +185,10 @@ def test_window_permission_selects_the_original_prompt_and_checks_normalized_rep
     assert client.post(prompt, json=catalog).status_code == (200 if master and three_week else 422)
 
 
-def test_package_run_can_read_its_own_three_week_job_after_window_rollback(tmp_path, monkeypatch):
+@pytest.mark.parametrize("all_off", [False, True], ids=["three_week_closed", "all_controls_closed"])
+def test_package_run_can_read_its_own_three_week_job_after_window_rollback(
+    tmp_path, monkeypatch, all_off
+):
     old = world._deployment(tmp_path, monkeypatch, last_gameweek=5)["backend"]
     opened = build_backend(
         replace(
@@ -194,7 +199,16 @@ def test_package_run_can_read_its_own_three_week_job_after_window_rollback(tmp_p
             package_gate=True,
         )
     )
-    closed = build_backend(replace(opened.config, llmopt_vnext_three_week=False))
+    closed = build_backend(
+        replace(
+            opened.config,
+            llmopt_vnext=not all_off,
+            llmopt_vnext_three_week=False,
+            transfer_packages=not all_off,
+            package_gate=not all_off,
+            three_week_paths=False,
+        )
+    )
     on = TestClient(app_for_capture(opened, world.world_module.GW2_CAPTURED_AT))
     off = TestClient(app_for_capture(closed, world.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/advice"
@@ -205,7 +219,16 @@ def test_package_run_can_read_its_own_three_week_job_after_window_rollback(tmp_p
     job_id = posted.json()["job_id"]
     observed = off.post(route, json={**body, "run": run})
     assert observed.status_code == 202 and observed.json()["job_id"] == job_id
-    assert world._work(closed) == 1
+    admitted = closed.queue.load(job_id)
+    spec = closed.job_specs.get(admitted.cache_key)
+    pinned = closed.contexts.capture(spec.context)
+    assert pinned.transfer_packages and pinned.package_gate
+    with patch.object(
+        advice_worker, "advise_menu_entry", wraps=advice_worker.advise_menu_entry
+    ) as solve:
+        assert world._work(closed) == 1
+    request = solve.call_args.args[0]
+    assert request.transfer_packages and request.package_gate
     assert off.get(f"/api/v1/advice-jobs/{job_id}").json()["status"] == "completed"
     answered = off.post(route, json={**body, "run": run})
     assert answered.status_code == 200 and "plan_data_id" not in answered.json()["payload"]
@@ -217,4 +240,6 @@ def test_package_run_can_read_its_own_three_week_job_after_window_rollback(tmp_p
     assert ordinary.status_code == 202
     legacy = closed.queue.load(ordinary.json()["job_id"])
     assert legacy.contract_version == "backend_jobs_v1"
-    assert legacy.cache_key != closed.queue.load(job_id).cache_key
+    assert legacy.cache_key != admitted.cache_key
+    fresh = closed.contexts.capture(closed.job_specs.get(legacy.cache_key).context)
+    assert not fresh.transfer_packages and not fresh.package_gate

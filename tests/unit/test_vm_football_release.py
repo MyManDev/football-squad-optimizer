@@ -4,6 +4,7 @@ Nothing here reaches the VM, Docker or the network. The round trip packs a small
 week from a temporary Git repository and unpacks it into a temporary releases directory.
 """
 
+import argparse
 import hashlib
 import json
 import subprocess
@@ -32,6 +33,89 @@ def test_render_env_replaces_named_keys_and_keeps_everything_else() -> None:
 def test_render_env_leaves_a_commented_key_alone() -> None:
     rendered = release.render_env(["# SQUADOPT_SITE_PATH=/x"], {"SQUADOPT_SITE_PATH": "/y"})
     assert rendered.splitlines() == ["# SQUADOPT_SITE_PATH=/x", "SQUADOPT_SITE_PATH=/y"]
+
+
+def test_rollback_keeps_current_switches_and_defaults_missing_entries(tmp_path, monkeypatch):
+    controls = [
+        "SQUADOPT_BACKEND_" + name
+        for name in (
+            "LLMOPT_VNEXT",
+            "LLMOPT_VNEXT_THREE_WEEK",
+            "THREE_WEEK_PATHS",
+            "TRANSFER_PACKAGES",
+            "PACKAGE_GATE",
+        )
+    ]
+    saved = tmp_path / "rollback"
+    saved.mkdir()
+    (saved / "env").write_text("IMAGE=old\n" + "".join(f"{name}=1\n" for name in controls))
+    (saved / "compose.artifacts.yaml").write_text("services: {}")
+    (saved / "repo_commit").write_text("previous")
+    live = tmp_path / ".env"
+    live.write_text(f"IMAGE=new\nexport {controls[0]}='0' # closed\n{controls[2]}=1\n")
+    monkeypatch.setattr(release, "LIVE_ENV", live)
+    monkeypatch.setattr(release, "LIVE_OVERRIDE", tmp_path / "compose.yaml")
+    monkeypatch.setattr(release, "run", lambda *args: "")
+    monkeypatch.setattr(release, "_restart_live", lambda: None)
+    release._restore(tmp_path)
+    assert live.read_text().splitlines() == ["IMAGE=old", f"{controls[0]}=0", f"{controls[2]}=1"]
+
+
+def test_activation_and_automatic_recovery_reread_current_controls(tmp_path, monkeypatch):
+    master = "SQUADOPT_BACKEND_LLMOPT_VNEXT"
+    paths = "SQUADOPT_BACKEND_THREE_WEEK_PATHS"
+    live = tmp_path / ".env"
+    live.write_text(f"IMAGE=old\n{master}=1\n{paths}=1\n")
+    override = tmp_path / "compose.yaml"
+    override.write_text("old")
+    package = {"name": "new", "tag_commit": "new", "football": False, "capture": "frozen"}
+    release.write_json_new(tmp_path / "image.json", {"image": "new"})
+    release.write_json_new(
+        tmp_path / "candidate/one/receipt.json", {"passed": True, "image_id": "id"}
+    )
+    monkeypatch.setattr(release, "LIVE_ENV", live)
+    monkeypatch.setattr(release, "LIVE_OVERRIDE", override)
+    monkeypatch.setattr(release, "_release", lambda name: (tmp_path, package))
+    monkeypatch.setattr(release, "_verify", lambda *args: None)
+    monkeypatch.setattr(release, "_image_for", lambda *args: "id")
+
+    def candidate_configuration(*args):
+        prepared = release.render_env(release._env_lines(live), {"IMAGE": "new"})
+        live.write_text(live.read_text().replace(f"{master}=1", f"{master}=0"))
+        return prepared, "new"
+
+    monkeypatch.setattr(release, "_release_configuration", candidate_configuration)
+    monkeypatch.setattr(release, "_restart_live", lambda: None)
+    monkeypatch.setattr(release, "_wait_ready", lambda *args: {})
+
+    def git(*args):
+        return "previous" if args[-1] == "HEAD" else ""
+
+    def reject(*args):
+        assert live.read_text().splitlines() == ["IMAGE=new", f"{master}=0", f"{paths}=1"]
+        live.write_text(live.read_text().replace(f"{paths}=1", f"{paths}=0"))
+        raise release.ReleaseError("fixture failed readiness")
+
+    monkeypatch.setattr(release, "run", git)
+    monkeypatch.setattr(release, "_check_serving", reject)
+    args = argparse.Namespace(
+        release="new", no_jobs=True, expect_models=None, expect_managers_word=None
+    )
+    original = live.read_text()
+    for invalid in ("1#unexpected", f"0\n{master}=1"):
+        invalid_env = original.replace(f"{master}=1", f"{master}={invalid}")
+        live.write_text(invalid_env)
+        with pytest.raises(release.ReleaseError, match=master):
+            release.command_activate(args)
+        assert live.read_text() == invalid_env and not (tmp_path / "rollback").exists()
+    live.write_text(original)
+    with pytest.raises(release.ReleaseError, match="Activation failed"):
+        release.command_activate(args)
+    assert live.read_text().splitlines() == ["IMAGE=old", f"{master}=0", f"{paths}=0"]
+    assert (
+        "fixture failed readiness"
+        in json.loads((tmp_path / "activation.json").read_text())["error"]
+    )
 
 
 def test_override_reads_a_news_capture_inside_the_snapshot_root() -> None:

@@ -47,6 +47,14 @@ and completed results readable in all four combinations of the two release
 settings. A previously admitted job may finish during rollback. Additional
 advanced work for a closed window requires a new grant.
 
+During rollback, keep a previously admitted job attached to its original
+calculation key and immutable package settings. It can finish and its
+existing consumers can read it. Fresh requests use the current settings.
+A saved grouped draft in a closed window keeps its rules and offers a
+way to clear the group terms. A release activation or rollback preserves
+the five planning switches from the current environment, including the
+default zero for a switch absent from an older environment file.
+
 Changing the setting back takes effect for new confirmations. Existing
 results and job status remain readable in both modes. During rollback a
 pending new-mode session can view completed work without scheduling new

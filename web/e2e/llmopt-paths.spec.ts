@@ -63,7 +63,7 @@ for (const [master, threeWeek, packages, paths] of [
         answer(route, {
           contract_version: "league_capabilities_v1",
           ...(release ? { llmopt_vnext: true } : {}),
-          ...(threeWeekGrant ? { llmopt_vnext_three_week: true } : {}),
+          ...(release && threeWeekGrant ? { llmopt_vnext_three_week: true } : {}),
           league_id: LEAGUE,
           capture_snapshot_id: squad.source_snapshot_id,
           season: squad.season,
@@ -154,8 +154,9 @@ for (const [master, threeWeek, packages, paths] of [
       expect(posts).toHaveLength(3);
       await expect(page.locator("[data-path-group]")).toHaveCount(enabled ? 2 : 0);
       if (enabled) {
-        // Exercise both independent rollback controls against a saved bound run.
-        if (packages) release = false;
+        // Both rollback controls are exercised with and without package search.
+        const closeMaster = language === "en";
+        if (closeMaster) release = false;
         else threeWeekGrant = false;
         advertised = true;
         await page.reload();
@@ -181,7 +182,7 @@ for (const [master, threeWeek, packages, paths] of [
         await expect.poll(() => reads).toBe(7);
         await expect(page.getByRole("article")).toHaveCount(1);
         await expect(page.locator("[data-path-group]")).toHaveCount(1);
-        if (packages) release = false;
+        if (closeMaster) release = false;
         else threeWeekGrant = false;
         advertised = true;
         await page.reload();
