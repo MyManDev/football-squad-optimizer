@@ -53,6 +53,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path, PurePath, PurePosixPath
 from typing import Any
@@ -826,11 +827,31 @@ _PLANNING_CONTROL = re.compile(
     r"^\s*(?:export\s+)?(SQUADOPT_BACKEND_(?:LLMOPT_VNEXT(?:_THREE_WEEK)?|"
     r"THREE_WEEK_PATHS|TRANSFER_PACKAGES|PACKAGE_GATE))(?=\s|=|:|$)"
 )
+_QUOTED_ENV_VALUE = re.compile(r"""^\s*(?:export\s+)?[^\s#=:]+\s*[=:]\s*(["'])""")
+
+
+def _env_records(lines: list[str]) -> Iterator[str]:
+    """Keep each quoted assignment together without evaluating its contents."""
+    source = iter(lines)
+    for line in source:
+        opening = _QUOTED_ENV_VALUE.match(line)
+        if opening is None:
+            yield line
+            continue
+        record = [line]
+        value = line[opening.end() :]
+        while not any(token[0] == opening[1] for token in re.finditer(r"""\\.|["']""", value)):
+            continuation = next(source, None)
+            if continuation is None:
+                raise ReleaseError("Close the quoted environment value before switching releases")
+            record.append(continuation)
+            value = continuation
+        yield "\n".join(record)
 
 
 def _planning_controls(lines: list[str]) -> dict[str, str]:
     controls: dict[str, str] = {}
-    for line in lines:
+    for line in _env_records(lines):
         match = _PLANNING_CONTROL.match(line)
         if match is None:
             continue
@@ -851,20 +872,21 @@ def _write_release_env(release_text: str) -> None:
     remaining = _planning_controls(_env_lines(LIVE_ENV))
     # Omitting a switch in the live file keeps its default even when the saved file enabled it.
     lines = []
-    for line in release_text.splitlines():
+    for line in _env_records(release_text.splitlines()):
         saved = _PLANNING_CONTROL.match(line)
         if saved is None:
             lines.append(line)
         elif saved[1] in remaining:
             lines.append(f"{saved[1]}={remaining.pop(saved[1])}")
-    _atomic_text(LIVE_ENV, render_env(lines, remaining), 0o600)
+    lines.extend(f"{name}={literal}" for name, literal in remaining.items())
+    _atomic_text(LIVE_ENV, "\n".join(lines) + "\n", 0o600)
 
 
 def render_env(lines: list[str], values: dict[str, str]) -> str:
     """Replace the named keys and keep every other line as it was, in order."""
     seen: set[str] = set()
     rendered = []
-    for line in lines:
+    for line in _env_records(lines):
         key = (
             line.split("=", 1)[0].strip()
             if "=" in line and not line.lstrip().startswith("#")

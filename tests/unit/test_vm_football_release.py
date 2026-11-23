@@ -35,6 +35,44 @@ def test_render_env_leaves_a_commented_key_alone() -> None:
     assert rendered.splitlines() == ["# SQUADOPT_SITE_PATH=/x", "SQUADOPT_SITE_PATH=/y"]
 
 
+@pytest.mark.parametrize("quote", ["'", '"'])
+def test_release_changes_only_top_level_assignments_in_a_multiline_env(
+    tmp_path, monkeypatch, quote
+):
+    master = "SQUADOPT_BACKEND_LLMOPT_VNEXT"
+    paths = "SQUADOPT_BACKEND_THREE_WEEK_PATHS"
+
+    def notes(label):
+        return (
+            f"export NOTES = {quote}{label}\n"
+            f"  an escaped quote \\{quote} within a value\n"
+            f"{master}=1\n{paths}=1\nSQUADOPT_SITE_PATH=/inside\n\n"
+            f"end{quote} # keep this comment\n"
+        )
+
+    live = tmp_path / ".env"
+    live.write_text(notes("current") + f"export {master}: '0' # closed\n")
+    monkeypatch.setattr(release, "LIVE_ENV", live)
+    backup = notes("backup") + f'{master}="1"\n{paths}=1\nSQUADOPT_SITE_PATH=/old\n'
+    prepared = release.render_env(backup.splitlines(), {"SQUADOPT_SITE_PATH": "/new"})
+    release._write_release_env(prepared)
+    assert live.read_text() == notes("backup") + f"{master}=0\nSQUADOPT_SITE_PATH=/new\n"
+
+
+@pytest.mark.parametrize("in_backup", [False, True])
+def test_unclosed_quoted_env_stops_before_replacing_the_live_file(tmp_path, monkeypatch, in_backup):
+    literal = "SQUADOPT_BACKEND_LLMOPT_VNEXT=0\n"
+    malformed = 'NOTES="private fixture text\n' + literal
+    live = tmp_path / ".env"
+    before = literal if in_backup else malformed
+    live.write_text(before)
+    monkeypatch.setattr(release, "LIVE_ENV", live)
+    with pytest.raises(release.ReleaseError, match="quoted environment value") as caught:
+        release._write_release_env(malformed if in_backup else literal)
+    assert "private fixture text" not in str(caught.value)
+    assert live.read_text() == before
+
+
 def test_rollback_keeps_current_switches_and_defaults_missing_entries(tmp_path, monkeypatch):
     controls = [
         "SQUADOPT_BACKEND_" + name
