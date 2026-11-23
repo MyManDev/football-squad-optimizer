@@ -263,10 +263,13 @@ def _run_advice_worker_once(
         # for recovery and the caller backs off.
         raise
     except AdviceComputeRefused as refusal:
+        cancelled = refusal.code == "RUN_CANCELLED" and job.contract_version == "backend_jobs_v2"
         failed = job.transition(
-            "failed",
+            "cancelled" if cancelled else "failed",
             at_utc=terminal_at_utc(),
-            error=JobError(
+            error=None
+            if cancelled
+            else JobError(
                 code=refusal.code,
                 message=sanitize_error_message(str(refusal)),
                 infeasibility=refusal.infeasibility,

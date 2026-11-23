@@ -517,6 +517,18 @@ class FileJobQueue:
             self.store(completed)
             return completed
 
+    def cancel_pending(self, job_id: str, *, at_utc: str) -> bool:
+        """Remove unstarted run-owned work; a running solve retains its lease."""
+        with self._lock.hold():
+            job = self.load(job_id)
+            if job is None or job.status != "queued" or job.contract_version != "backend_jobs_v2":
+                return False
+            cancelled = job.transition("cancelled", at_utc=at_utc)
+            self._write(self._path(job.job_id), cancelled)
+            self._cleanup(cancelled)
+            self._settled.add(job.job_id)
+            return True
+
     def claim(
         self, *, at_utc: str | None = None, clock: Callable[[], str] | None = None
     ) -> AdviceJob | None:

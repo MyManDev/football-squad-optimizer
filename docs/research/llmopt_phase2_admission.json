@@ -1,0 +1,414 @@
+{
+  "producer_repository_commit": "5a8466dcae0d94f5eac4537fc9b8ddd18b29e0fe",
+  "runner_sha256": "3e2fae31243ec525e063c9dd0fe8de4292495c5b94eff8781678c7f6b9168338",
+  "frozen_inputs": "docs/research/llmopt_phase1/inputs.json",
+  "scope": "local admission adapters; synthetic completions; no solver-quality or latency claim",
+  "network_requests": 0,
+  "solver_calls": 0,
+  "member_weeks": 20,
+  "runs": 40,
+  "max_jobs": 4,
+  "extra_jobs_from_replays": 0,
+  "rows": [
+    {
+      "gameweek": 8,
+      "entry_id": 313686,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 313686,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 2199732,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 2199732,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 2281624,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 2281624,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 3832237,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 3832237,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 4287206,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 4287206,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 5081114,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 5081114,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 5349883,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 5349883,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 5662073,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 5662073,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 6654210,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 6654210,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 6879786,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 8,
+      "entry_id": 6879786,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 313686,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 313686,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 2199732,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 2199732,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 2281624,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 2281624,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 3832237,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 3832237,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 4287206,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 4287206,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 5081114,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 5081114,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 5349883,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 5349883,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 5662073,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 5662073,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 6654210,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 6654210,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 6879786,
+      "window": 1,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 84.0
+    },
+    {
+      "gameweek": 9,
+      "entry_id": 6879786,
+      "window": 3,
+      "server_jobs": 4,
+      "restarted_replays": 6,
+      "extra_jobs_from_replays": 0,
+      "fifth_request": "RUN_BUDGET_EXHAUSTED",
+      "reserved_units": 488.0
+    }
+  ]
+}

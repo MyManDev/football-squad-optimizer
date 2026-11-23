@@ -38,10 +38,10 @@ from squadopt.contracts.schema_paths import contract_schema_path
 
 BACKEND_JOBS_CONTRACT_VERSION: Final = "backend_jobs_v1"
 
-JobStatus: TypeAlias = Literal["queued", "running", "completed", "failed"]
+JobStatus: TypeAlias = Literal["queued", "running", "completed", "failed", "cancelled"]
 
 _STATUSES: Final = frozenset({"queued", "running", "completed", "failed"})
-_TERMINAL: Final = frozenset({"completed", "failed"})
+_TERMINAL: Final = frozenset({"completed", "failed", "cancelled"})
 _TRANSITIONS: Final[frozenset[tuple[str, str]]] = frozenset(
     {
         ("queued", "running"),
@@ -133,11 +133,13 @@ class AdviceJob:
     contract_version: str = BACKEND_JOBS_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
-        if self.contract_version != BACKEND_JOBS_CONTRACT_VERSION:
+        if self.contract_version not in (BACKEND_JOBS_CONTRACT_VERSION, "backend_jobs_v2"):
             raise BackendJobsContractError("Unsupported jobs contract_version.")
         if not isinstance(self.job_id, str) or not _JOB_ID_PATTERN.fullmatch(self.job_id):
             raise BackendJobsContractError(f"job_id has an invalid format: {self.job_id!r}.")
-        if self.status not in _STATUSES:
+        if self.status not in _STATUSES and not (
+            self.contract_version == "backend_jobs_v2" and self.status == "cancelled"
+        ):
             raise BackendJobsContractError(f"Unknown job status {self.status!r}.")
         for label, value in (
             ("request_fingerprint", self.request_fingerprint),
@@ -203,7 +205,11 @@ class AdviceJob:
         worker's leavings, unless the cache already holds the complete answer.
         """
 
-        if (self.status, to) not in _TRANSITIONS:
+        if (self.status, to) not in _TRANSITIONS and not (
+            self.contract_version == "backend_jobs_v2"
+            and self.status in ("queued", "running")
+            and to == "cancelled"
+        ):
             raise BackendJobsContractError(
                 f"No edge {self.status!r} -> {to!r} in {BACKEND_JOBS_CONTRACT_VERSION}; "
                 "terminal states are terminal."
@@ -328,20 +334,27 @@ ALLOWED_TRANSITIONS: Final[frozenset[tuple[str, str]]] = _TRANSITIONS
 BACKEND_JOBS_SCHEMA_PATH: Final = contract_schema_path(BACKEND_JOBS_CONTRACT_VERSION)
 
 
-def backend_jobs_schema() -> dict[str, object]:
+def backend_jobs_schema(version: str = BACKEND_JOBS_CONTRACT_VERSION) -> dict[str, object]:
     """The strict JSON Schema for one ``backend_jobs_v1`` record."""
 
+    if version not in (BACKEND_JOBS_CONTRACT_VERSION, "backend_jobs_v2"):
+        raise ValueError("Unsupported jobs contract_version.")
     fingerprint = {"type": "string", "pattern": _SHA256_PATTERN.pattern}
     timestamp = {"type": "string", "format": "date-time", "pattern": "Z$"}
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "https://squadopt.dev/contracts/backend_jobs_v1.schema.json",
+        "$id": f"https://squadopt.dev/contracts/{version}.schema.json",
         "title": "SquadOpt advice job record",
         "type": "object",
         "properties": {
-            "contract_version": {"type": "string", "const": BACKEND_JOBS_CONTRACT_VERSION},
+            "contract_version": {"type": "string", "const": version},
             "job_id": {"type": "string", "pattern": _JOB_ID_PATTERN.pattern},
-            "status": {"type": "string", "enum": sorted(_STATUSES)},
+            "status": {
+                "type": "string",
+                "enum": sorted(
+                    _STATUSES | ({"cancelled"} if version == "backend_jobs_v2" else set())
+                ),
+            },
             "request_fingerprint": fingerprint,
             "cache_key": fingerprint,
             "created_at_utc": timestamp,

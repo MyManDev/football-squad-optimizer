@@ -79,6 +79,7 @@ const CALENDAR = {
 let LLMOptPage: typeof Page;
 let roster: "ok" | "fail" | "late";
 let releaseRoster: () => void;
+let releaseEnabled: boolean;
 let rosterGate: Promise<void>;
 let intent: Mock<(body: Record<string, unknown>) => Response>;
 const clients: QueryClient[] = [];
@@ -90,6 +91,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jobs.length = 0;
+  releaseEnabled = true;
   roster = "ok";
   rosterGate = new Promise<void>((resolve) => (releaseRoster = resolve));
   intent = vi.fn(
@@ -103,6 +105,20 @@ beforeEach(() => {
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url === `${ORIGIN}/api/v1/leagues/${squad.league_id}/capabilities`) {
+        return Response.json({
+          contract_version: "league_capabilities_v1",
+          league_id: squad.league_id,
+          capture_snapshot_id: squad.source_snapshot_id,
+          season: squad.season,
+          gameweek: squad.gameweek,
+          strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
+          preferences: { available: true },
+          top100: { available: false, weights: [0] },
+          managers_word: { available: false },
+          ...(releaseEnabled ? { llmopt_vnext: true } : {}),
+        });
+      }
       if (url === `${ORIGIN}/api/v1/contributions/players`) {
         if (roster === "fail") return new Response("{}", { status: 503 });
         if (roster === "late") await rosterGate;
@@ -119,6 +135,7 @@ afterEach(() => {
   for (const client of clients.splice(0)) client.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  history.replaceState(null, "");
 });
 
 /** Stands in for a held model: `intent` answers the body the page would send to be checked. */
@@ -148,11 +165,21 @@ function open(
   language: "en" | "tr" = "en",
   intentSource: IntentSource | null = model,
   calendar: typeof CALENDAR | null = CALENDAR,
+  previousRelease?: boolean,
 ) {
   // The fixtures are set, not read, so the cache keeps them while no page observes them.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
   client.setQueryData(FIXTURES_QUERY.queryKey, calendar);
+  if (previousRelease !== undefined) {
+    client.setQueryData(leagueKeys.restoredPlanCapabilities(ORIGIN, false, squad), {
+      llmoptVNext: previousRelease,
+      leagueId: squad.league_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      captureSnapshotId: squad.source_snapshot_id,
+    });
+  }
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider initialLanguage={language}>
@@ -562,7 +589,7 @@ describe("a reload keeps the saved session", () => {
         JSON.stringify({
           ...saved,
           reference: summarizeRevision(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1).payload),
-          confirmation: { wildcardNotHeld: false, sending: true },
+          confirmation: { runId: "a".repeat(32), wildcardNotHeld: false, sending: true },
         }),
       );
       jobs.length = 0;
@@ -662,18 +689,73 @@ describe("a reload keeps the saved session", () => {
     expect(await screen.findByText(outsiderRule, { exact: true })).toBeVisible();
   });
 
-  async function reloadConfirmed(confirmation: Record<string, unknown>) {
+  async function reloadConfirmed(confirmation: Record<string, unknown>, previousRelease?: boolean) {
     open();
     await ready();
     await addRule("hold_transfers");
     cleanup();
     const [key, session] = savedSession();
-    sessionStorage.setItem(key, JSON.stringify({ ...session, confirmation }));
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({ ...session, confirmation: { runId: "a".repeat(32), ...confirmation } }),
+    );
     jobs.length = 0;
-    open();
+    open("en", model, CALENDAR, previousRelease);
     await ready();
     return jobs[0]!;
   }
+
+  it.each([false, true])(
+    "restores an answered session without an identity with the flag %s",
+    async (enabled) => {
+      releaseEnabled = enabled;
+      const base = await reloadConfirmed({ runId: undefined, wildcardNotHeld: false });
+      await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+      expect(base.compute).not.toHaveBeenCalled();
+      expect(base.readCached.mock.calls[0]![0]).not.toHaveProperty("run");
+    },
+  );
+
+  it("reads the saved job and cache after rollback without posting the interrupted run", async () => {
+    releaseEnabled = false;
+    const base = await reloadConfirmed({ wildcardNotHeld: false, sending: true }, true);
+    await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+    expect(base.resume).toHaveBeenCalledTimes(1);
+    expect(base.readCached.mock.calls[0]![0].run?.run_id).toBe("a".repeat(32));
+    for (const job of jobs) expect(job.compute).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "uses the current release setting %s for the first explicit comparison",
+    async (enabled) => {
+      releaseEnabled = enabled;
+      intent.mockImplementation(() =>
+        Response.json({
+          status: "draft",
+          draft: {
+            hard: [{ kind: "no_hits" }],
+            soft: [],
+            comparison: { kind: "include_player", player_id: OUTSIDER.id },
+          },
+        }),
+      );
+      open();
+      await ready();
+      await sendMessage("Compare including Outside Signing");
+      await screen.findByText(en.understood);
+      await userEvent.click(screen.getByRole("button", { name: en.compute }));
+      await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+      const [base, first] = jobs;
+      if (enabled) {
+        expect(base!.compute.mock.calls[0]![0].run?.stage).toBe("base");
+        expect(first!.compute).not.toHaveBeenCalled();
+      } else {
+        expect(base!.compute.mock.calls[0]![0]).not.toHaveProperty("run");
+        expect(first!.compute).toHaveBeenCalledTimes(1);
+        expect(first!.compute.mock.calls[0]![0]).not.toHaveProperty("run");
+      }
+    },
+  );
 
   it("says how long a 3-week plan takes while it is computed", async () => {
     open();
@@ -686,7 +768,7 @@ describe("a reload keeps the saved session", () => {
       JSON.stringify({
         ...session,
         draft: { ...(session.draft as Record<string, unknown>), window: 3 },
-        confirmation: { wildcardNotHeld: false, sending: true },
+        confirmation: { runId: "a".repeat(32), wildcardNotHeld: false, sending: true },
       }),
     );
     jobs.length = 0;
@@ -890,7 +972,14 @@ describe("the plan with all preferences", () => {
     await addRule("save_chips");
     cleanup();
     const [key, session] = savedSession();
-    sessionStorage.setItem(key, JSON.stringify({ ...session, draft, confirmation }));
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        ...session,
+        draft,
+        confirmation: { runId: "a".repeat(32), ...confirmation },
+      }),
+    );
     jobs.length = 0;
     open();
     await ready();
@@ -906,6 +995,26 @@ describe("the plan with all preferences", () => {
     expect(jobs[3]!.compute).not.toHaveBeenCalled();
     answer(second, second.compute.mock.calls[0]![0], net[1]);
   }
+
+  it("keeps the main plan and one sentence when the shared capacity refuses follow-ups", async () => {
+    await reloadWith({ hard: [], soft }, { wildcardNotHeld: false });
+    const [base, first, second, combined] = jobs as [FakeJob, FakeJob, FakeJob, FakeJob];
+    await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
+    answer(base, base.readCached.mock.calls[0]![0], 50, []);
+    await waitFor(() => expect(second.compute).toHaveBeenCalledTimes(1));
+    act(() => {
+      for (const job of [first, second])
+        job.show({
+          phase: "failed",
+          request: job.compute.mock.calls[0]![0],
+          reason: "RUN_BUDGET_EXHAUSTED",
+        });
+    });
+    expect(await screen.findAllByText(en.unfinishedPlans)).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: en.base })).toBeVisible();
+    expect(combined.compute).not.toHaveBeenCalled();
+    expect(screen.queryByText(en.priceUnavailable)).toBeNull();
+  });
 
   it("starts once the single prices are in and applies every accepted rule and the one without a slot", async () => {
     await reloadWith({ hard: [], soft }, { wildcardNotHeld: false });
@@ -983,12 +1092,16 @@ describe("the plan with all preferences", () => {
 
   it("comes back after a reload, read when it was answered and asked again while sending", async () => {
     const saved = {
+      runId: "a".repeat(32),
       wildcardNotHeld: false,
       followups: [{ kind: "priced" }, { kind: "priced" }],
       combined: [0, 1, 2],
     };
     await reloadWith({ hard: [], soft }, saved);
     const combined = jobs[3]!;
+    expect(combined.readCached).not.toHaveBeenCalled();
+    await waitFor(() => expect(jobs[0]!.readCached).toHaveBeenCalledTimes(1));
+    answer(jobs[0]!, jobs[0]!.readCached.mock.calls[0]![0], 50, []);
     await waitFor(() => expect(combined.readCached).toHaveBeenCalledTimes(1));
     expect(combined.compute).not.toHaveBeenCalled();
     expect(combined.readCached.mock.calls[0]![0].preferences).toMatchObject({
@@ -1006,6 +1119,9 @@ describe("the plan with all preferences", () => {
     jobs.length = 0;
     open();
     await ready();
+    await waitFor(() => expect(jobs[0]!.compute).toHaveBeenCalledTimes(1));
+    expect(jobs[3]!.compute).not.toHaveBeenCalled();
+    answer(jobs[0]!, jobs[0]!.compute.mock.calls[0]![0], 50, []);
     await waitFor(() => expect(jobs[3]!.compute).toHaveBeenCalledTimes(1));
     expect(jobs[3]!.resume).toHaveBeenCalledTimes(1);
     expect(jobs[3]!.compute.mock.calls[0]![0].preferences).toMatchObject({

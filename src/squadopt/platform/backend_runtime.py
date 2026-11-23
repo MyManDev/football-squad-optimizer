@@ -62,6 +62,7 @@ from squadopt.platform.advice_read import (
     FileLeagueDirectory,
     PreferencePlayers,
 )
+from squadopt.platform.advice_runs import FileRunStore
 from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRateLimiter
 from squadopt.platform.advice_switches import (
     AdviceSwitchInputs,
@@ -225,6 +226,12 @@ class BackendConfig:
     root, that the rotation table was coded from. The manager's word needs both this and
     ``artifact_root``."""
 
+    llmopt_vnext: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.llmopt_vnext) is not bool:
+            raise BackendConfigError("The LLMOPT release control must be boolean.")
+
     @property
     def queue_root(self) -> Path:
         return self.store_root / "jobs"
@@ -287,6 +294,7 @@ class BackendConfig:
             handoff_root=values["handoff_root"],
             allowed_origins=origins,
             public_entries=public_entries == "1",
+            llmopt_vnext=_flag(source, "SQUADOPT_BACKEND_LLMOPT_VNEXT"),
             public_queue_limit=_positive_int(source, "SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT", 32),
             season=season,
             rate_limit=_positive_int(source, "SQUADOPT_BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT),
@@ -299,6 +307,13 @@ class BackendConfig:
             artifact_root=Path(artifact_root) if artifact_root else None,
             club_news_source=Path(club_news_source) if club_news_source else None,
         )
+
+
+def _flag(source: Mapping[str, str], variable: str) -> bool:
+    value = source.get(variable, "0").strip()
+    if value not in {"0", "1"}:
+        raise BackendConfigError(f"{variable} must be 0 or 1.")
+    return value == "1"
 
 
 def _positive_int(source: Mapping[str, str], variable: str, default: int) -> int:
@@ -765,6 +780,7 @@ class AdviceBackend:
     public_inputs: PublicEntryInputs | None = None
     public_reader: PublicEntryAdviceReader | None = None
     public_submit: AdviceSubmitService | None = None
+    runs: FileRunStore | None = None
 
     def queue_depth(self) -> int:
         """Open work, not history: a terminal job is not something a member waits for."""
@@ -773,7 +789,7 @@ class AdviceBackend:
 
     def jobs_by_status(self) -> dict[str, int]:
         """One current store read inside the owning API, never in the status script."""
-        counts = dict.fromkeys(("queued", "running", "completed", "failed"), 0)
+        counts = dict.fromkeys(("queued", "running", "completed", "failed", "cancelled"), 0)
         for job in self.queue.jobs():
             counts[job.status] += 1
         return counts
@@ -818,6 +834,12 @@ def build_backend(
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
     specs = FileAdviceJobSpecStore(config.spec_root)
+
+    def stored_capture(key: str) -> str | None:
+        spec = specs.get(key)
+        return spec.context.capture_snapshot_id if spec is not None else None
+
+    runs = FileRunStore(config.store_root / "runs", capture_for_key=stored_capture)
     liveness = WorkerLiveness(config.worker_root, queue)
     gate = probe if probe is not None else StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
@@ -836,6 +858,7 @@ def build_backend(
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
+        llmopt_vnext=config.llmopt_vnext,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -851,6 +874,7 @@ def build_backend(
         # The job view's place in line and worker counts come from the look /ready holds.
         job_look=liveness.look,
         job_progress=queue.progress,
+        runs=runs,
     )
     public_inputs = None
     public_reader = None
@@ -864,6 +888,7 @@ def build_backend(
             public_inputs,
             switches=contexts,
             available_windows=contexts.available_windows,
+            llmopt_vnext=config.llmopt_vnext,
         )
         public_submit = AdviceSubmitService(
             public_reader,
@@ -877,6 +902,7 @@ def build_backend(
             job_progress=queue.progress,
             prepare_inputs=public_inputs.prepare,
             max_open_jobs=config.public_queue_limit,
+            runs=runs,
         )
     return AdviceBackend(
         config=config,
@@ -893,6 +919,7 @@ def build_backend(
         public_inputs=public_inputs,
         public_reader=public_reader,
         public_submit=public_submit,
+        runs=runs,
     )
 
 

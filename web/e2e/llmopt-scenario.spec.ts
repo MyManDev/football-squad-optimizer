@@ -30,12 +30,17 @@ function answer(route: Route, json: unknown, status = 200) {
     : route.fulfill({ json, status, headers: CORS });
 }
 
-for (const kind of ["price_increase", "unavailable"] as const) {
+for (const [kind, vNext] of [
+  ["price_increase", false],
+  ["price_increase", true],
+  ["unavailable", false],
+  ["unavailable", true],
+] as const) {
   const isPrice = kind === "price_increase";
   test(
     isPrice
-      ? "a £0.1m price increase makes the original move infeasible and shows a viable reoptimization"
-      : "an unavailable captain is replaced in both scenario plans and a reload resumes the comparison",
+      ? `a £0.1m price increase makes the original move infeasible and shows a viable reoptimization (release control ${vNext})`
+      : `an unavailable captain is replaced in both scenario plans and a reload resumes the comparison (release control ${vNext})`,
     async ({ page }) => {
       test.skip(!API, "API build required");
       await installLeagueMocks(page);
@@ -118,6 +123,7 @@ for (const kind of ["price_increase", "unavailable"] as const) {
       await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
         answer(route, {
           contract_version: "league_capabilities_v1",
+          ...(vNext ? { llmopt_vnext: true } : {}),
           league_id: LEAGUE,
           capture_snapshot_id: squad.source_snapshot_id,
           season: squad.season,
@@ -166,6 +172,11 @@ for (const kind of ["price_increase", "unavailable"] as const) {
             ? "original"
             : "reoptimized";
         if (request.method() === "POST") {
+          const run = request.postDataJSON().run;
+          if (vNext) {
+            expect(run?.run_id).toMatch(/^[a-f0-9]{32}$/);
+            expect(run.stage).toBe(branch === "original" ? "followup" : "base");
+          } else expect(run).toBeUndefined();
           posts.push({ branch, window, preferences });
           if (
             (isPrice && branch === "original") ||
@@ -248,6 +259,27 @@ for (const kind of ["price_increase", "unavailable"] as const) {
       await compute.click();
       await expect.poll(() => polls).toBeGreaterThan(0);
 
+      if (!isPrice) {
+        if (vNext) {
+          expect(posts.map(({ branch }) => branch)).toEqual(["baseline", "reoptimized"]);
+        } else {
+          await expect
+            .poll(() =>
+              posts
+                .slice(1)
+                .map(({ branch }) => branch)
+                .sort(),
+            )
+            .toEqual(["original", "reoptimized"]);
+        }
+        const beforeReload = polls;
+        await page.reload();
+        await expect.poll(() => polls).toBeGreaterThan(beforeReload);
+        expect(posts).toHaveLength(vNext ? 2 : 3);
+        completed = true;
+        await expect.poll(() => posts.length).toBe(3);
+      }
+
       const scenarioPosts = posts.slice(1);
       expect(scenarioPosts.map(({ branch }) => branch).sort()).toEqual(["original", "reoptimized"]);
       const expectedScenario = isPrice ? scenario : { kind, player_id: opening.captain.player_id };
@@ -315,11 +347,6 @@ for (const kind of ["price_increase", "unavailable"] as const) {
         return;
       }
 
-      const beforeReload = polls;
-      await page.reload();
-      await expect.poll(() => polls).toBeGreaterThan(beforeReload);
-      expect(posts).toHaveLength(3);
-      completed = true;
       await expect(comparison).toContainText(
         "The original transfers are feasible in this scenario.",
       );

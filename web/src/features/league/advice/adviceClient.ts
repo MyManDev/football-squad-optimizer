@@ -28,6 +28,7 @@ import { preferencesKey, type DecisionPreferences } from "./decisionPreferences"
 import { checkedPlanInfeasibility, type PlanInfeasibility } from "./planInfeasibility";
 
 export interface AdviceRequest {
+  run?: { contract_version: "llmopt_run_v1"; run_id: string; stage: "base" | "followup" };
   /** Fetch and pin this public team's inputs only when computation is requested. */
   publicEntry?: boolean;
   preferences?: DecisionPreferences;
@@ -75,6 +76,7 @@ export interface AdviceReadOptions extends RequestOptions {
 }
 
 export interface AdviceClient {
+  cancelRun?(runId: string): Promise<void>;
   /** Read an already-computed answer; never triggers computation. */
   readAdvice(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult>;
   /** Read the published document alone, whatever the service would say. */
@@ -104,7 +106,7 @@ export interface AdviceClient {
 
 export interface AdviceJobStatus {
   jobId: string;
-  status: "queued" | "running" | "completed" | "failed";
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
   /** The service's coded reason for a failed job; never its text. */
   errorCode?: string | null;
   infeasibility?: PlanInfeasibility;
@@ -314,6 +316,19 @@ export class HttpAdviceClient implements AdviceClient {
     this.fetcher = fetcher;
   }
 
+  async cancelRun(runId: string): Promise<void> {
+    const response = await this.fetcher(
+      `${this.origin}/api/v1/llmopt/runs/${encodeURIComponent(runId)}/cancel`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+        keepalive: true,
+      },
+    );
+    if (!response.ok) throw await apiError(response);
+  }
+
   private adviceUrl(request: AdviceRequest): string {
     const rival =
       request.rivalEntryId == null ? "" : `&rival=${encodeURIComponent(request.rivalEntryId)}`;
@@ -390,6 +405,7 @@ export class HttpAdviceClient implements AdviceClient {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
         body: JSON.stringify({
+          ...(request.run ? { run: request.run } : {}),
           ...(preferencesKey(request.preferences) ? { preferences: request.preferences } : {}),
           strategy: request.strategy,
           window: request.window,
@@ -436,7 +452,7 @@ export class HttpAdviceClient implements AdviceClient {
       };
       if (
         body?.job_id !== jobId ||
-        !["queued", "running", "completed", "failed"].includes(body?.status)
+        !["queued", "running", "completed", "failed", "cancelled"].includes(body?.status)
       ) {
         throw new AdviceResponseError("Advice job response has an invalid identity or status.");
       }
@@ -503,6 +519,9 @@ export class HttpAdviceClient implements AdviceClient {
  * to answer, because the published baseline may exist where the cache is empty.
  */
 export class FallbackAdviceClient implements AdviceClient {
+  async cancelRun(runId: string): Promise<void> {
+    await this.primary.cancelRun?.(runId);
+  }
   private readonly primary: AdviceClient;
   private readonly fallback: StaticOnlyAdviceClient;
 

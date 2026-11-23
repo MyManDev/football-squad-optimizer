@@ -1,6 +1,8 @@
 """Synthetic backend apps whose API clock stays at their capture's own instant."""
 
 from datetime import datetime
+from typing import Any
+from uuid import uuid4
 
 from fastapi import FastAPI
 
@@ -11,6 +13,20 @@ from squadopt.platform.advice_observability import (
     configure_advice_logging,
 )
 from squadopt.platform.backend_runtime import AdviceBackend, backend_from_environment
+
+
+def confirmed_request(body: dict[str, Any]) -> dict[str, Any]:
+    """One explicit confirmation for the one/three-week planning HTTP contract.
+
+    Five-week advice is outside the planning page and retains its legacy transport.
+    Tests of missing run metadata deliberately use the raw body instead.
+    """
+    if body.get("window") not in (1, 3) or "run" in body:
+        return body
+    return {
+        **body,
+        "run": {"contract_version": "llmopt_run_v1", "run_id": uuid4().hex, "stage": "base"},
+    }
 
 
 def app_for_capture(backend: AdviceBackend, captured_at_utc: str) -> FastAPI:

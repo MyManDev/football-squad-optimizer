@@ -1,0 +1,4455 @@
+{
+  "contract_version": "llmopt_phase2_real_solver_budget_v1",
+  "producer_repository_commit": "a72858f10d2d95935c69ec6d170f08fb7acefffc",
+  "source_sha256": {
+    "docs/research/llmopt_phase2/measure_solver_budget.py": "ac19018447258cfb7b4c2c22537f338f437ea08f71edbbcb95afbef516f9b84b",
+    "src/squadopt/platform/advice_runs.py": "69acddf2b0259b49850f57c3319726d0c19517897e40cb100bf305e1045b160a",
+    "src/squadopt/optimization/work_budget.py": "739db997f8bc89a266785ffb10fea7fc103d27dc6679fd4cc7ea6eb53a3f5f8e",
+    "src/squadopt/optimization/cpsat.py": "943c19ea9e57ab5dfb50073dc6efca3a3a5fce2430e276ed2696f123cc381e16",
+    "src/squadopt/planning/optimizer.py": "91f9207cff6af4cd4330523affd794b3b368d0e7fd1a2a9c6c4bfa0e41554d58",
+    "src/squadopt/planning/models.py": "5964ebdc5bd3ae34641a2c5dadf2bfb040337fb794efd382a4ef504da517a56b",
+    "src/squadopt/contracts/llmopt_run.py": "a39384a69a6ccc49fcf89634531b25b08307d7c30bbc57cd4d4f4cc9bf437c0a"
+  },
+  "frozen_manifest_sha256": "fdbd303a04679d1b866f366c56b72cf0fe056b6e9f52c2ed752f0ae88d0032fc",
+  "baseline_record_sha256": "1f4fda58e1de8f9e81bca3fd5f7af305c9f45ff10a37911275571779e6614af8",
+  "solver_version": "9.15.6755",
+  "execution": "Sequential local production planner controls under real durable V2 job allocations. Admission is measured separately; no live endpoint or test overlap.",
+  "local_only": true,
+  "network_calls": 0,
+  "member_weeks": 20,
+  "windows": {
+    "1": {
+      "controls": 20,
+      "equal_numeric_objectives": 16,
+      "equal_infeasibilities": 4,
+      "equal_statuses": 20,
+      "equal_decisions": 20,
+      "maximum_charged_units": 20.001169834987554,
+      "allocation": 21.0,
+      "internal_solver_calls": 55
+    },
+    "3": {
+      "controls": 20,
+      "equal_numeric_objectives": 16,
+      "equal_infeasibilities": 4,
+      "equal_statuses": 20,
+      "equal_decisions": 20,
+      "maximum_charged_units": 120.00555450856191,
+      "allocation": 122.0,
+      "internal_solver_calls": 76
+    }
+  },
+  "all_within_allocation": true,
+  "all_frozen_results_equal": true,
+  "rows": [
+    {
+      "case": "gw8-313686",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 313686,
+      "scenario": "normal",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 1.6456877179994998,
+      "cp_units": 1.6456877179994998,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 55.488,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 1.6456877179994998,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 3.321135399979539,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 55.488,
+        "best_bound": 55.488,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 55.488,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 1.6448429429994997,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.49116409364198793
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "11e094fdb24a5ed2751fe4cd0bc07e9890b48dc3b1d47953bb3edc413d934299",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 55.488,
+            "expected_lineup_net_points": null,
+            "bank": 3,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.033249400003114715,
+          "deterministic_units": 0.0008447750000000001,
+          "objective_raw": 53935.0,
+          "best_bound_raw": 53935.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.9952522999956273,
+          "deterministic_units": 0.49116409364198793,
+          "objective_raw": 55488.0,
+          "best_bound_raw": 55488.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 2.0895538000040688,
+          "deterministic_units": 1.1536788493575119,
+          "objective_raw": 14860725254.0,
+          "best_bound_raw": 14860725254.0,
+          "threads": 1,
+          "configured_deterministic_units": 19.508835906358012,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-313686",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 313686,
+      "scenario": "normal",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 64.16289798125179,
+      "cp_units": 4.16289798125179,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 168.86900000000003,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 4.16289798125179,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 13.99206749998848,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 168.86900000000003,
+        "best_bound": 168.869,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 168.869,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 4.16035203625179,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "f97c3afc23feb2563d36c9db91ea9e695b1b355628a5697b1020b42cd78fdb2c",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 55.488,
+            "expected_lineup_net_points": null,
+            "bank": 3,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 56.645,
+            "expected_lineup_net_points": null,
+            "bank": 3,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 56.736000000000004,
+            "expected_lineup_net_points": null,
+            "bank": 2,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.09407660001306795,
+          "deterministic_units": 0.0025459449999999995,
+          "objective_raw": 161805.0,
+          "best_bound_raw": 161805.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 4.496620899997652,
+          "objective_raw": 168869.0,
+          "best_bound_raw": 168869.0,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.04076820000773296,
+          "deterministic_units": 1e-08,
+          "objective_raw": 168869.0,
+          "best_bound_raw": 168869.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1794.926877299993
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 8.120276600006036,
+          "deterministic_units": 4.16035202625179,
+          "objective_raw": 15553139272886.0,
+          "best_bound_raw": 15553139272886.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-2199732",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 2199732,
+      "scenario": "wildcard",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 3.4035083990729404,
+      "cp_units": 3.4035083990729404,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 58.52700000000001,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 3.4035083990729404,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 7.337025500019081,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 58.52700000000001,
+        "best_bound": 58.527,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 58.52700000000001,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 3.40266515007294,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1.380707012552847
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "cff397e29860be13d112c5dc957f9e8a0e14cb58c94202735d9b2bc71d24075d",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 58.52700000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": "wildcard"
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.024139500019373372,
+          "deterministic_units": 0.000843249,
+          "objective_raw": 55142.0,
+          "best_bound_raw": 55142.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 3.078620599990245,
+          "deterministic_units": 1.380707012552847,
+          "objective_raw": 58527.0,
+          "best_bound_raw": 58527.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 4.050975400023162,
+          "deterministic_units": 2.0219581375200932,
+          "objective_raw": 63903682623.0,
+          "best_bound_raw": 63903682623.0,
+          "threads": 1,
+          "configured_deterministic_units": 18.619292987447153,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-2199732",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 2199732,
+      "scenario": "wildcard",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 80.98560922119113,
+      "cp_units": 20.985609221191122,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 175.58100000000002,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 20.985609221191122,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 27.671392299991567,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 175.58100000000002,
+        "best_bound": 175.581,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 175.58100000000002,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 20.983065954191122,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "ef513dd7be8e7694bc9c5fd19627e9b25c4d86afe0da9b55c7d8ef63766e0d55",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 58.52700000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": "wildcard"
+          },
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 58.52700000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 2,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 58.52700000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 3,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.08898639999097213,
+          "deterministic_units": 0.002543267,
+          "objective_raw": 165426.0,
+          "best_bound_raw": 165426.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 3.3842125000082888,
+          "objective_raw": 175581.0,
+          "best_bound_raw": 175581.0,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.043273999996017665,
+          "deterministic_units": 1e-08,
+          "objective_raw": 175581.0,
+          "best_bound_raw": 175581.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1796.0497133999888
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 22.96190569997998,
+          "deterministic_units": 20.98306594419112,
+          "objective_raw": 194590596864473.0,
+          "best_bound_raw": 194590596864473.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-2281624",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 2281624,
+      "scenario": "freehit",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 14.665536857547108,
+      "cp_units": 14.665536857547108,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 58.214000000000006,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 14.665536857547108,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 26.252602299995488,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 58.214000000000006,
+        "best_bound": 58.214,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 58.214000000000006,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 14.664531182547108,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 2.345720087617312
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "d5de2b7aa9cfeae606e8632f90f91b18d4b70cda8e0cf6ded35b0d9930e25ec6",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 58.214000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": "freehit"
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.030338199983816594,
+          "deterministic_units": 0.001005675,
+          "objective_raw": 53253.0,
+          "best_bound_raw": 53253.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 5.675508099986473,
+          "deterministic_units": 2.345720087617312,
+          "objective_raw": 58214.0,
+          "best_bound_raw": 58214.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 20.340633400017396,
+          "deterministic_units": 12.318811094929796,
+          "objective_raw": 63906524156.0,
+          "best_bound_raw": 63906524156.0,
+          "threads": 1,
+          "configured_deterministic_units": 17.654279912382687,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-2281624",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 2281624,
+      "scenario": "freehit",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 72.25062311692189,
+      "cp_units": 12.250623116921888,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 167.869,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 12.250623116921888,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 30.41360880000866,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 167.869,
+        "best_bound": 167.869,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 167.869,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 12.247912501921888,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "8a09387b4b444b9a8465866d0a91a5735d23eb29a1cbaaf0dbf9d340022bbfb3",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 58.214000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": "freehit"
+          },
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 54.410000000000004,
+            "expected_lineup_net_points": null,
+            "bank": 8,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 55.245,
+            "expected_lineup_net_points": null,
+            "bank": 1,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.11598200001753867,
+          "deterministic_units": 0.002710615,
+          "objective_raw": 159759.0,
+          "best_bound_raw": 159759.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 6.971373899985338,
+          "objective_raw": 167869.00000000006,
+          "best_bound_raw": 167869.00000000006,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.04936229999293573,
+          "deterministic_units": 1e-08,
+          "objective_raw": 167869.0,
+          "best_bound_raw": 167869.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1792.0965391999925
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 21.551142899988918,
+          "deterministic_units": 12.247912491921888,
+          "objective_raw": 194590711518272.0,
+          "best_bound_raw": 194590711518272.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-3832237",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 3832237,
+      "scenario": "tight_bank",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 20.000611679603672,
+      "cp_units": 20.000611679603672,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 53.335,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 20.000611679603672,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 47.17362509999657,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 53.335,
+        "best_bound": 53.335,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 53.335,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 20.000040899603672,
+          "deterministic_time_budget_exhausted": true,
+          "primary_deterministic_time": 15.612296680604118
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "7b1f1cb14e2012bf19473cb5bc078dbcd7856e406e648206a698ee007bb825d3",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 53.335,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.022159999993164092,
+          "deterministic_units": 0.00057078,
+          "objective_raw": 36836.0,
+          "best_bound_raw": 36836.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 37.97359609999694,
+          "deterministic_units": 15.612296680604118,
+          "objective_raw": 53335.0,
+          "best_bound_raw": 53335.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "FEASIBLE",
+          "seconds": 8.953189599997131,
+          "deterministic_units": 4.387744218999554,
+          "objective_raw": 14856961802.0,
+          "best_bound_raw": 14840358702.0,
+          "threads": 1,
+          "configured_deterministic_units": 4.387703319395882,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-3832237",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 3832237,
+      "scenario": "tight_bank",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 93.73308989588725,
+      "cp_units": 33.73308989588725,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 161.907,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 33.73308989588725,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 53.51118359999964,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 161.907,
+        "best_bound": 161.907,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 161.907,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 33.73055526888725,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "b1685bece9aac9260ff7086d9ec84b86786124e4e3decfbcd05bcaa062e77bc1",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 53.274,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 54.154,
+            "expected_lineup_net_points": null,
+            "bank": 2,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 54.479000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 1,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.10008129998459481,
+          "deterministic_units": 0.002534627,
+          "objective_raw": 110508.0,
+          "best_bound_raw": 110508.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 12.780217299994547,
+          "objective_raw": 161907.00000000012,
+          "best_bound_raw": 161907.00000000012,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.0573271999892313,
+          "deterministic_units": 1e-08,
+          "objective_raw": 161907.0,
+          "best_bound_raw": 161907.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1786.504197400005
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 39.101620000001276,
+          "deterministic_units": 33.73055525888725,
+          "objective_raw": 15552987389228.0,
+          "best_bound_raw": 15552987389228.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-4287206",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 4287206,
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 0.0,
+      "cp_units": 0.0,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": false,
+      "both_infeasible": true,
+      "same_decision": true,
+      "frozen_objective": null,
+      "frozen_status": "INFEASIBLE",
+      "work_receipt": {
+        "calls": 2,
+        "cp_used": 0.0,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 0.1732696999970358,
+        "has_solution": false,
+        "solver_status": "INFEASIBLE",
+        "proof": "infeasible",
+        "objective": null,
+        "best_bound": null,
+        "absolute_gap_points": null,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": null,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 0.0,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.0
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 2,
+        "cp_sat_calls": 2,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "weekly_points": []
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.012553299980936572,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.015624799998477101,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-4287206",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 4287206,
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 60.0,
+      "cp_units": 0.0,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": false,
+      "both_infeasible": true,
+      "same_decision": true,
+      "frozen_objective": null,
+      "frozen_status": "INFEASIBLE",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 0.0,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 1.9673168000008445,
+        "has_solution": false,
+        "solver_status": "INFEASIBLE",
+        "proof": "infeasible",
+        "objective": null,
+        "best_bound": null,
+        "absolute_gap_points": null,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": null,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 0.0,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.0
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 2,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "weekly_points": []
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.05519420001655817,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Infeasible",
+          "seconds": 0.5063002000097185,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.05750560000888072,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 60.0,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-5081114",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 5081114,
+      "scenario": "normal",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 2.610682724372973,
+      "cp_units": 2.610682724372973,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 53.179,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 2.610682724372973,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 6.586861799994949,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 53.179,
+        "best_bound": 53.179,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 53.179,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 2.6101082823729724,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.5534150503415296
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "a9bcfade0a6fa5e998488ec4991bcc4a6390a731682dbb1955a9b52a6299b3ec",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 53.179,
+            "expected_lineup_net_points": null,
+            "bank": 1,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.03142149999621324,
+          "deterministic_units": 0.0005744420000000002,
+          "objective_raw": 50512.0,
+          "best_bound_raw": 50512.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 1.3810187999915797,
+          "deterministic_units": 0.5534150503415296,
+          "objective_raw": 53179.0,
+          "best_bound_raw": 53179.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 4.895823600003496,
+          "deterministic_units": 2.056693232031443,
+          "objective_raw": 14860984500.0,
+          "best_bound_raw": 14860984500.0,
+          "threads": 1,
+          "configured_deterministic_units": 19.44658494965847,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-5081114",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 5081114,
+      "scenario": "normal",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 70.10230801991781,
+      "cp_units": 10.102308019917816,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 162.454,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 10.102308019917816,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 25.800635099993087,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 162.454,
+        "best_bound": 162.454,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 162.454,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 10.100577313917816,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "a64de619a22334fe41f52658e203570565024ab2eb2ed0260f481e7ce37b5ed5",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 53.179,
+            "expected_lineup_net_points": null,
+            "bank": 1,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 54.37500000000001,
+            "expected_lineup_net_points": null,
+            "bank": 3,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 54.900000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 1,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.12735999998403713,
+          "deterministic_units": 0.0017307059999999998,
+          "objective_raw": 151536.0,
+          "best_bound_raw": 151536.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 5.781224400008796,
+          "objective_raw": 162454.0,
+          "best_bound_raw": 162454.0,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.050704199995379895,
+          "deterministic_units": 1e-08,
+          "objective_raw": 162454.0,
+          "best_bound_raw": 162454.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1793.4906394999998
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 17.985375399992336,
+          "deterministic_units": 10.100577303917815,
+          "objective_raw": 15553179741591.0,
+          "best_bound_raw": 15553179741591.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-5349883",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 5349883,
+      "scenario": "wildcard",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 20.00092491026512,
+      "cp_units": 20.00092491026512,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 57.443000000000005,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 20.00092491026512,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 49.659724699973594,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 57.443000000000005,
+        "best_bound": 57.443,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 57.443000000000005,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 20.00008033426512,
+          "deterministic_time_budget_exhausted": true,
+          "primary_deterministic_time": 7.1876957555011485
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "494d03bcd984724a9dcd2c3b169d88c01b401ca85ab0cf02e3112f414e1c9a78",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 57.443000000000005,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 4,
+            "chip": "wildcard"
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.03731720001087524,
+          "deterministic_units": 0.000844576,
+          "objective_raw": 49002.0,
+          "best_bound_raw": 49002.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 25.374262800003635,
+          "deterministic_units": 7.1876957555011485,
+          "objective_raw": 57443.0,
+          "best_bound_raw": 57443.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "FEASIBLE",
+          "seconds": 23.984828899992863,
+          "deterministic_units": 12.812384578763972,
+          "objective_raw": 63908105344.0,
+          "best_bound_raw": 63890158540.0,
+          "threads": 1,
+          "configured_deterministic_units": 12.81230424449885,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-5349883",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 5349883,
+      "scenario": "wildcard",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 90.02793517812941,
+      "cp_units": 30.027935178129404,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 172.329,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 30.027935178129404,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 50.80619580001803,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 172.329,
+        "best_bound": 172.329,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 172.329,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 30.025395650129404,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "8ffa66fb753d56d4c1851c2d9e801adae8190fb437692caeb421f90815919ca0",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 57.443000000000005,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 4,
+            "chip": "wildcard"
+          },
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 57.443000000000005,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 5,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 57.443000000000005,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 5,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.11813329998403788,
+          "deterministic_units": 0.0025395279999999997,
+          "objective_raw": 147006.0,
+          "best_bound_raw": 147006.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 13.474020499998005,
+          "objective_raw": 172329.0000000053,
+          "best_bound_raw": 172329.0000000053,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.0728316999739036,
+          "deterministic_units": 1e-08,
+          "objective_raw": 172329.0,
+          "best_bound_raw": 172329.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1785.5565687000053
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 35.18567099998472,
+          "deterministic_units": 30.025395640129403,
+          "objective_raw": 194590716385016.0,
+          "best_bound_raw": 194590716385016.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-5662073",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 5662073,
+      "scenario": "freehit",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 20.001169834987554,
+      "cp_units": 20.001169834987554,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 57.89200000000001,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 20.001169834987554,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 42.315898200002266,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 57.89200000000001,
+        "best_bound": 57.892,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 57.89200000000001,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 20.000164540987555,
+          "deterministic_time_budget_exhausted": true,
+          "primary_deterministic_time": 2.786225852808737
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "ab557d5d38559a2ba979bea96e9516447e6d5d37ebead470aa0b5c0bb56ba3fc",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 57.89200000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 2,
+            "chip": "freehit"
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.046392799995373935,
+          "deterministic_units": 0.001005294,
+          "objective_raw": 46524.0,
+          "best_bound_raw": 46524.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 10.338532900001155,
+          "deterministic_units": 2.786225852808737,
+          "objective_raw": 57892.0,
+          "best_bound_raw": 57892.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "FEASIBLE",
+          "seconds": 31.63835249998374,
+          "deterministic_units": 17.213938688178818,
+          "objective_raw": 63906454107.0,
+          "best_bound_raw": 63890886009.0,
+          "threads": 1,
+          "configured_deterministic_units": 17.213774147191263,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-5662073",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 5662073,
+      "scenario": "freehit",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 63.51781755924416,
+      "cp_units": 3.5178175592441607,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 166.56200000000004,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 3.5178175592441607,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 16.70552640000824,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 166.56200000000004,
+        "best_bound": 166.562,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 166.562,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 3.5151050772441605,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "06ef5777ae3c629ccd3d23dcdc090f42ffb110428b74acfcaae8ec0ef695d991",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 57.89200000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 2,
+            "chip": "freehit"
+          },
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 53.607000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 55.06300000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.12212159999762662,
+          "deterministic_units": 0.002712482,
+          "objective_raw": 139572.0,
+          "best_bound_raw": 139572.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 5.533859500021208,
+          "objective_raw": 166562.0,
+          "best_bound_raw": 166562.0,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.06399880000390112,
+          "deterministic_units": 1e-08,
+          "objective_raw": 166562.0,
+          "best_bound_raw": 166562.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1793.4105574999994
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 8.955249899998307,
+          "deterministic_units": 3.5151050672441606,
+          "objective_raw": 194590741984967.0,
+          "best_bound_raw": 194590741984967.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-6654210",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 6654210,
+      "scenario": "tight_bank",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 3.0175862828926943,
+      "cp_units": 3.0175862828926943,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 53.826,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 3.0175862828926943,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 7.658681499975501,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 53.826,
+        "best_bound": 53.826,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 53.826,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 3.016743368892694,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1.3963938520723476
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "aa14336d2902c46bb43dc8c3e15f3f9386babbbbb14c53025b515c380c218647",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 53.826,
+            "expected_lineup_net_points": null,
+            "bank": 3,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.042431000008946285,
+          "deterministic_units": 0.0008429140000000001,
+          "objective_raw": 51095.0,
+          "best_bound_raw": 51095.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 3.7920722999842837,
+          "deterministic_units": 1.3963938520723476,
+          "objective_raw": 53826.0,
+          "best_bound_raw": 53826.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 3.528848599991761,
+          "deterministic_units": 1.6203495168203468,
+          "objective_raw": 14851058690.0,
+          "best_bound_raw": 14851058690.0,
+          "threads": 1,
+          "configured_deterministic_units": 18.603606147927653,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-6654210",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 6654210,
+      "scenario": "tight_bank",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 86.09724257779389,
+      "cp_units": 26.097242577793892,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 164.072,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 26.097242577793892,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 39.99889259997872,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 164.072,
+        "best_bound": 164.072,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 164.072,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 26.094709915793892,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "fdf769a57e2651241a464653cc22acbfb2cde2a75651451327e9e7915f3f8c94",
+        "weekly_points": [
+          {
+            "gameweek": 8,
+            "raw_xi_net_points": 53.619,
+            "expected_lineup_net_points": null,
+            "bank": 10,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 55.089999999999996,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 55.36299999999999,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.1394952000118792,
+          "deterministic_units": 0.0025326619999999998,
+          "objective_raw": 153285.0,
+          "best_bound_raw": 153285.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 10.03534580001724,
+          "objective_raw": 164072.00000000003,
+          "best_bound_raw": 164072.00000000003,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.0601238000090234,
+          "deterministic_units": 1e-08,
+          "objective_raw": 164072.0,
+          "best_bound_raw": 164072.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1789.176536200015
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 27.9528699000075,
+          "deterministic_units": 26.09470990579389,
+          "objective_raw": 15552868230699.0,
+          "best_bound_raw": 15552868230699.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-6879786",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 6879786,
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 0.0,
+      "cp_units": 0.0,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": false,
+      "both_infeasible": true,
+      "same_decision": true,
+      "frozen_objective": null,
+      "frozen_status": "INFEASIBLE",
+      "work_receipt": {
+        "calls": 2,
+        "cp_used": 0.0,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 0.18895330000668764,
+        "has_solution": false,
+        "solver_status": "INFEASIBLE",
+        "proof": "infeasible",
+        "objective": null,
+        "best_bound": null,
+        "absolute_gap_points": null,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": null,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 0.0,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.0
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 2,
+        "cp_sat_calls": 2,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "weekly_points": []
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.021321400010492653,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.011830300005385652,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw8-6879786",
+      "capture": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "entry_id": 6879786,
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 60.0,
+      "cp_units": 0.0,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": false,
+      "both_infeasible": true,
+      "same_decision": true,
+      "frozen_objective": null,
+      "frozen_status": "INFEASIBLE",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 0.0,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 1.9106755999964662,
+        "has_solution": false,
+        "solver_status": "INFEASIBLE",
+        "proof": "infeasible",
+        "objective": null,
+        "best_bound": null,
+        "absolute_gap_points": null,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": null,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 0.0,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.0
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 2,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "weekly_points": []
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.05097609999938868,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Infeasible",
+          "seconds": 0.5197122999816202,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.04724059998989105,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 60.0,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-313686",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 313686,
+      "scenario": "normal",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 2.1204088273065125,
+      "cp_units": 2.1204088273065125,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 54.285,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 2.1204088273065125,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 5.030073699977947,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 54.285,
+        "best_bound": 54.285,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 54.285,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 2.1198318563065124,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.48558494544715197
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "c527baaf15cd6be7734aa1ef40cc68143bd5917c11fad5635ccf46c1b596712c",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 54.285,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.0314766000083182,
+          "deterministic_units": 0.0005769710000000001,
+          "objective_raw": 52809.0,
+          "best_bound_raw": 52809.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 1.132341999997152,
+          "deterministic_units": 0.48558494544715197,
+          "objective_raw": 54285.0,
+          "best_bound_raw": 54285.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 3.602421499992488,
+          "deterministic_units": 1.6342469108593605,
+          "objective_raw": 14905089068.0,
+          "best_bound_raw": 14905089068.0,
+          "threads": 1,
+          "configured_deterministic_units": 19.51441505455285,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-313686",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 313686,
+      "scenario": "normal",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 75.04658222027217,
+      "cp_units": 15.046582220272171,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 165.899,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 15.046582220272171,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 42.38648610000382,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 165.899,
+        "best_bound": 165.899,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 165.899,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 15.044845387272172,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "eb2ba3369f70aefefb4553c6b413afd4db2e0029ee6b8f0a6dec2ed19a4d4520",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 54.285,
+            "expected_lineup_net_points": null,
+            "bank": 12,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 55.36200000000001,
+            "expected_lineup_net_points": null,
+            "bank": 5,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 11,
+            "raw_xi_net_points": 56.25200000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.1119522999797482,
+          "deterministic_units": 0.0017368329999999997,
+          "objective_raw": 158427.0,
+          "best_bound_raw": 158427.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 13.37332119999337,
+          "objective_raw": 165899.00000000268,
+          "best_bound_raw": 165899.00000000268,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.06815929998992942,
+          "deterministic_units": 1e-08,
+          "objective_raw": 165899.0,
+          "best_bound_raw": 165899.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1785.7622459999984
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 26.92211220000172,
+          "deterministic_units": 15.044845377272171,
+          "objective_raw": 15617625430764.0,
+          "best_bound_raw": 15617625430764.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-2199732",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 2199732,
+      "scenario": "wildcard",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 1.5686747657698876,
+      "cp_units": 1.5686747657698876,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 58.778000000000006,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 1.5686747657698876,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 4.882945199991809,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 58.778000000000006,
+        "best_bound": 58.778,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 58.778000000000006,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 1.5678305227698877,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.7388878047251917
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "fd2e4c8a74f8a00e18116f6db4599cf8186e6fee384a2ab6bf7e1312c38f4e9a",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 58.778000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 2,
+            "chip": "wildcard"
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.04905159998452291,
+          "deterministic_units": 0.0008442430000000002,
+          "objective_raw": 53826.0,
+          "best_bound_raw": 53826.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 2.2768052000028547,
+          "deterministic_units": 0.7388878047251917,
+          "objective_raw": 58778.0,
+          "best_bound_raw": 58778.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 2.2217310999985784,
+          "deterministic_units": 0.828942718044696,
+          "objective_raw": 64170107499.0,
+          "best_bound_raw": 64170107499.0,
+          "threads": 1,
+          "configured_deterministic_units": 19.26111219527481,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-2199732",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 2199732,
+      "scenario": "wildcard",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 120.00555450856191,
+      "cp_units": 60.00555450856191,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 176.334,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 60.00555450856191,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 78.1241374000092,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 176.334,
+        "best_bound": 176.334,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 176.334,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 60.00300729956191,
+          "deterministic_time_budget_exhausted": true,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "e078da7d8e725e0a5565162b21c1cce69c07e46c8ce8e4f251371a8a0458b6e0",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 58.778000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 2,
+            "chip": "wildcard"
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 58.778000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 3,
+            "chip": null
+          },
+          {
+            "gameweek": 11,
+            "raw_xi_net_points": 58.778000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 4,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.14532579999649897,
+          "deterministic_units": 0.002547209,
+          "objective_raw": 161478.0,
+          "best_bound_raw": 161478.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 4.833437299996149,
+          "objective_raw": 176334.0,
+          "best_bound_raw": 176334.0,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.05126199999358505,
+          "deterministic_units": 1e-08,
+          "objective_raw": 176334.0,
+          "best_bound_raw": 176334.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1794.3136745000083
+        },
+        {
+          "backend": "cp-sat",
+          "status": "FEASIBLE",
+          "seconds": 71.36676619999344,
+          "deterministic_units": 60.00300728956191,
+          "objective_raw": 195460792209524.0,
+          "best_bound_raw": 195460566481181.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-2281624",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 2281624,
+      "scenario": "freehit",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 2.0017351781574884,
+      "cp_units": 2.0017351781574884,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 58.643000000000015,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 2.0017351781574884,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 6.542194300011033,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 58.643000000000015,
+        "best_bound": 58.643,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 58.643000000000015,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 2.0007294121574883,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1.0103641018781826
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "7143b5cd0274f6544ef019f22ac3243dfdd1c13653b2fcfb100c9a11d8b3ac3c",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 58.643000000000015,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 2,
+            "chip": "freehit"
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.04017089999979362,
+          "deterministic_units": 0.001005766,
+          "objective_raw": 50983.0,
+          "best_bound_raw": 50983.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 3.4321865999954753,
+          "deterministic_units": 1.0103641018781826,
+          "objective_raw": 58643.0,
+          "best_bound_raw": 58643.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 2.7182945999957155,
+          "deterministic_units": 0.9903653102793059,
+          "objective_raw": 64168834720.0,
+          "best_bound_raw": 64168834720.0,
+          "threads": 1,
+          "configured_deterministic_units": 18.98963589812182,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-2281624",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 2281624,
+      "scenario": "freehit",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 63.29144455599294,
+      "cp_units": 3.2914445559929395,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 167.73600000000002,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 3.2914445559929395,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 19.074452599976212,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 167.73600000000002,
+        "best_bound": 167.736,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 167.73600000000002,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 3.2887332679929395,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "d37d6da00ac03630c95f7fe283962bec0ca4da8106992718b308abef4a2ecc4f",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 58.643000000000015,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 2,
+            "chip": "freehit"
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 53.797,
+            "expected_lineup_net_points": null,
+            "bank": 1,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 11,
+            "raw_xi_net_points": 55.29600000000001,
+            "expected_lineup_net_points": null,
+            "bank": 9,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.12825429998338223,
+          "deterministic_units": 0.0027112879999999996,
+          "objective_raw": 152949.0,
+          "best_bound_raw": 152949.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 8.365004299994325,
+          "objective_raw": 167736.00000000023,
+          "best_bound_raw": 167736.00000000023,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.05777350001153536,
+          "deterministic_units": 1e-08,
+          "objective_raw": 167736.0,
+          "best_bound_raw": 167736.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1790.5864793999936
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 8.43514650000725,
+          "deterministic_units": 3.2887332579929396,
+          "objective_raw": 195460823625935.0,
+          "best_bound_raw": 195460823625935.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-3832237",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 3832237,
+      "scenario": "tight_bank",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 20.0011525651973,
+      "cp_units": 20.0011525651973,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 52.31,
+      "frozen_status": "FEASIBLE",
+      "work_receipt": {
+        "calls": 2,
+        "cp_used": 20.0011525651973,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 55.24305359998834,
+        "has_solution": true,
+        "solver_status": "FEASIBLE",
+        "proof": "not_proven",
+        "objective": 52.31,
+        "best_bound": 58.561,
+        "absolute_gap_points": 6.250999999999998,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 52.31,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 20.0005814291973,
+          "deterministic_time_budget_exhausted": true,
+          "primary_deterministic_time": 20.0005814291973
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 2,
+        "cp_sat_calls": 2,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "0112665f96ace4996796f4cc90982fbd0f694db58e2e11999069b1a58e336998",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 52.31,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.03984769998351112,
+          "deterministic_units": 0.000571136,
+          "objective_raw": 36291.0,
+          "best_bound_raw": 36291.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "FEASIBLE",
+          "seconds": 54.95584430001327,
+          "deterministic_units": 20.0005814291973,
+          "objective_raw": 52310.0,
+          "best_bound_raw": 58561.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-3832237",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 3832237,
+      "scenario": "tight_bank",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 108.05614708793888,
+      "cp_units": 48.05614708793889,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 161.675,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 48.05614708793889,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 73.61145659998874,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 161.675,
+        "best_bound": 161.675,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 161.675,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 48.05360969293889,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "9b3d878f8785825702978ca036f9f3e3d6966268bebd61ca059d7ea553c1db24",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 52.900000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 54.265,
+            "expected_lineup_net_points": null,
+            "bank": 1,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 11,
+            "raw_xi_net_points": 54.510000000000005,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.1305772000050638,
+          "deterministic_units": 0.002537395,
+          "objective_raw": 108873.0,
+          "best_bound_raw": 108873.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 6.640120500000194,
+          "objective_raw": 161675.0,
+          "best_bound_raw": 161675.0,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.061159900011261925,
+          "deterministic_units": 1e-08,
+          "objective_raw": 161675.0,
+          "best_bound_raw": 161675.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1792.5583047999826
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 64.97750730000553,
+          "deterministic_units": 48.05360968293889,
+          "objective_raw": 15617496249261.0,
+          "best_bound_raw": 15617496249261.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-4287206",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 4287206,
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 0.0,
+      "cp_units": 0.0,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": false,
+      "both_infeasible": true,
+      "same_decision": true,
+      "frozen_objective": null,
+      "frozen_status": "INFEASIBLE",
+      "work_receipt": {
+        "calls": 2,
+        "cp_used": 0.0,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 0.21246910002082586,
+        "has_solution": false,
+        "solver_status": "INFEASIBLE",
+        "proof": "infeasible",
+        "objective": null,
+        "best_bound": null,
+        "absolute_gap_points": null,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": null,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 0.0,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.0
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 2,
+        "cp_sat_calls": 2,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "weekly_points": []
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.012629599979845807,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.013841800013324246,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-4287206",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 4287206,
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 60.0,
+      "cp_units": 0.0,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": false,
+      "both_infeasible": true,
+      "same_decision": true,
+      "frozen_objective": null,
+      "frozen_status": "INFEASIBLE",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 0.0,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 1.4017679000098724,
+        "has_solution": false,
+        "solver_status": "INFEASIBLE",
+        "proof": "infeasible",
+        "objective": null,
+        "best_bound": null,
+        "absolute_gap_points": null,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": null,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 0.0,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.0
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 2,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "weekly_points": []
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.04003050000756048,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Infeasible",
+          "seconds": 0.4345185999991372,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.050979799998458475,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 60.0,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-5081114",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 5081114,
+      "scenario": "normal",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 2.453153562884873,
+      "cp_units": 2.453153562884873,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 52.676,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 2.453153562884873,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 5.6524826000095345,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 52.676,
+        "best_bound": 52.676,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 52.676,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 2.452308943884873,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.9125323974968045
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "6f97cbc1dbf1ecd9f2dd05ec0bf992ab001393f85efa5048391c70805389d3f1",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 52.676,
+            "expected_lineup_net_points": null,
+            "bank": 7,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.03338330000406131,
+          "deterministic_units": 0.000844619,
+          "objective_raw": 50790.0,
+          "best_bound_raw": 50790.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 2.047005200001877,
+          "deterministic_units": 0.9125323974968045,
+          "objective_raw": 52676.0,
+          "best_bound_raw": 52676.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 3.354804199974751,
+          "deterministic_units": 1.5397765463880684,
+          "objective_raw": 14904186319.0,
+          "best_bound_raw": 14904186319.0,
+          "threads": 1,
+          "configured_deterministic_units": 19.087467602503196,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-5081114",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 5081114,
+      "scenario": "normal",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 64.25468500303896,
+      "cp_units": 4.254685003038962,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 162.246,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 4.254685003038962,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 21.307543800008716,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 162.246,
+        "best_bound": 162.246,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 162.246,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 4.252143021038962,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "2b86940ecab473f0fd9468e32bb4eb9fc1205506fe9a2e82232cb1b2300b0755",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 52.418000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 35,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 54.32000000000001,
+            "expected_lineup_net_points": null,
+            "bank": 9,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 11,
+            "raw_xi_net_points": 55.507999999999996,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.10233409999636933,
+          "deterministic_units": 0.002541982,
+          "objective_raw": 152370.0,
+          "best_bound_raw": 152370.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 8.29184229997918,
+          "objective_raw": 162246.0,
+          "best_bound_raw": 162246.0,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.0714659999939613,
+          "deterministic_units": 1e-08,
+          "objective_raw": 162246.0,
+          "best_bound_raw": 162246.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1790.916253000003
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 11.238016799994512,
+          "deterministic_units": 4.252143011038962,
+          "objective_raw": 15617632288622.0,
+          "best_bound_raw": 15617632288622.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-5349883",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 5349883,
+      "scenario": "wildcard",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 5.067201594752914,
+      "cp_units": 5.067201594752914,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 57.80800000000001,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 5.067201594752914,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 16.755062100011855,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 57.80800000000001,
+        "best_bound": 57.808,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 57.80800000000001,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 5.0663536557529145,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 2.9299145093862626
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "931b43b67f5a46ec71cad828cc11550f5aebb0a5c8f2e10bc45e53ac82d54097",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 57.80800000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 5,
+            "chip": "wildcard"
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.045334800001000986,
+          "deterministic_units": 0.000847939,
+          "objective_raw": 46535.0,
+          "best_bound_raw": 46535.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 11.10904009998194,
+          "deterministic_units": 2.9299145093862626,
+          "objective_raw": 57808.0,
+          "best_bound_raw": 57808.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 5.249933199986117,
+          "deterministic_units": 2.136439146366652,
+          "objective_raw": 64165337109.0,
+          "best_bound_raw": 64165337109.0,
+          "threads": 1,
+          "configured_deterministic_units": 17.07008549061374,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-5349883",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 5349883,
+      "scenario": "wildcard",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 81.90305302794982,
+      "cp_units": 21.90305302794982,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 173.42400000000004,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 21.90305302794982,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 40.54086609999649,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 173.42400000000004,
+        "best_bound": 173.424,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 173.42400000000004,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 21.90050204594982,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "0c80ee8e70c70904be90cfefc83dce17bb81e40088b867f03b04e709b67fd32f",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 57.80800000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 5,
+            "chip": "wildcard"
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 57.80800000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 5,
+            "chip": null
+          },
+          {
+            "gameweek": 11,
+            "raw_xi_net_points": 57.80800000000001,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 5,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.12655819999054074,
+          "deterministic_units": 0.002550982,
+          "objective_raw": 139605.0,
+          "best_bound_raw": 139605.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 5.447155300003942,
+          "objective_raw": 173424.0,
+          "best_bound_raw": 173424.0,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.07502070002374239,
+          "deterministic_units": 1e-08,
+          "objective_raw": 173424.0,
+          "best_bound_raw": 173424.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1793.6278889000241
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 32.89231710002059,
+          "deterministic_units": 21.90050203594982,
+          "objective_raw": 195460663301354.0,
+          "best_bound_raw": 195460663301354.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-5662073",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 5662073,
+      "scenario": "freehit",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 2.7600320971960297,
+      "cp_units": 2.7600320971960297,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 58.285,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 2.7600320971960297,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 9.211915499996394,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 58.285,
+        "best_bound": 58.285,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 58.285,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 2.75902528119603,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.7952996189335675
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "191c220584a67a518d96add0b8f98f543be7c5305d331987aa9549d60b04cd89",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 58.285,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": "freehit"
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.04211639999994077,
+          "deterministic_units": 0.001006816,
+          "objective_raw": 45854.0,
+          "best_bound_raw": 45854.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 2.6600388000078965,
+          "deterministic_units": 0.7952996189335675,
+          "objective_raw": 58285.0,
+          "best_bound_raw": 58285.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 6.1231171999825165,
+          "deterministic_units": 1.9637256622624624,
+          "objective_raw": 64173504972.0,
+          "best_bound_raw": 64173504972.0,
+          "threads": 1,
+          "configured_deterministic_units": 19.20470038106643,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-5662073",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 5662073,
+      "scenario": "freehit",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 75.72150955733755,
+      "cp_units": 15.721509557337548,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 159.686,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 15.721509557337548,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 49.550250100000994,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 159.686,
+        "best_bound": 159.686,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 159.686,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 15.718797339337549,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "4ae4448c0f56919d626fd5d7e72e236de691efe895387f24fb766a7e4066f8b9",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 58.285,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": "freehit"
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 46.290000000000006,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 8.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 11,
+            "raw_xi_net_points": 55.111000000000004,
+            "expected_lineup_net_points": null,
+            "bank": 2,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.13623020000522956,
+          "deterministic_units": 0.0027122179999999997,
+          "objective_raw": 137562.0,
+          "best_bound_raw": 137562.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 20.640007300011348,
+          "objective_raw": 159686.00000000035,
+          "best_bound_raw": 159686.00000000035,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.07346580000012182,
+          "deterministic_units": 1e-08,
+          "objective_raw": 159686.0,
+          "best_bound_raw": 159686.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1778.3599816999922
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 26.6964346000168,
+          "deterministic_units": 15.718797329337548,
+          "objective_raw": 195460953346937.0,
+          "best_bound_raw": 195460953346937.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-6654210",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 6654210,
+      "scenario": "tight_bank",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 2.9038175840420712,
+      "cp_units": 2.9038175840420712,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 52.0,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 2.9038175840420712,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 9.132808199996362,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 52.0,
+        "best_bound": 52.0,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 52.0,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 2.9029733960420714,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.9123057663995617
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 3,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "e26ac90acf3311227c8a36dbe5a0ca3bb5e6f24c3b3dc72b47ae80851aebae04",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 52.0,
+            "expected_lineup_net_points": null,
+            "bank": 8,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.0373840999964159,
+          "deterministic_units": 0.0008441880000000002,
+          "objective_raw": 49313.0,
+          "best_bound_raw": 49313.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 2.932648699992569,
+          "deterministic_units": 0.9123057663995617,
+          "objective_raw": 52000.0,
+          "best_bound_raw": 52000.0,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 5.886769300006563,
+          "deterministic_units": 1.9906676296425097,
+          "objective_raw": 14900749497.0,
+          "best_bound_raw": 14900749497.0,
+          "threads": 1,
+          "configured_deterministic_units": 19.087694233600438,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-6654210",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 6654210,
+      "scenario": "tight_bank",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 72.10115921436315,
+      "cp_units": 12.101159214363149,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": true,
+      "both_infeasible": false,
+      "same_decision": true,
+      "frozen_objective": 159.909,
+      "frozen_status": "OPTIMAL",
+      "work_receipt": {
+        "calls": 4,
+        "cp_used": 12.101159214363149,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 32.40965809999034,
+        "has_solution": true,
+        "solver_status": "OPTIMAL",
+        "proof": "optimal",
+        "objective": 159.909,
+        "best_bound": 159.909,
+        "absolute_gap_points": 0.0,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": 159.909,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 12.098622755363149,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 1e-08
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 4,
+        "cp_sat_calls": 3,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "b7313afcadaafb8ddce1b1e17ed2689ac418c3b08fbaa49e63476e3a6d3f68c5",
+        "weekly_points": [
+          {
+            "gameweek": 9,
+            "raw_xi_net_points": 51.869,
+            "expected_lineup_net_points": null,
+            "bank": 13,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 10,
+            "raw_xi_net_points": 53.44199999999999,
+            "expected_lineup_net_points": null,
+            "bank": 1,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          },
+          {
+            "gameweek": 11,
+            "raw_xi_net_points": 54.598,
+            "expected_lineup_net_points": null,
+            "bank": 0,
+            "hit": 0.0,
+            "next_free_transfers": 1,
+            "chip": null
+          }
+        ]
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.11622339999303222,
+          "deterministic_units": 0.002536459,
+          "objective_raw": 147939.0,
+          "best_bound_raw": 147939.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Optimal",
+          "seconds": 10.161689000000479,
+          "objective_raw": 159909.00000000003,
+          "best_bound_raw": 159909.00000000003,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 0.08269000001018867,
+          "deterministic_units": 1e-08,
+          "objective_raw": 159909.0,
+          "best_bound_raw": 159909.0,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 1788.8440139000013
+        },
+        {
+          "backend": "cp-sat",
+          "status": "OPTIMAL",
+          "seconds": 20.06650339998305,
+          "deterministic_units": 12.098622745363148,
+          "objective_raw": 15617503382378.0,
+          "best_bound_raw": 15617503382378.0,
+          "threads": 1,
+          "configured_deterministic_units": 59.99999999,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-6879786",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 6879786,
+      "scenario": "conflicting_instructions",
+      "window": 1,
+      "allocation": 21.0,
+      "charged_units": 0.0,
+      "cp_units": 0.0,
+      "native_units": 0.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": false,
+      "both_infeasible": true,
+      "same_decision": true,
+      "frozen_objective": null,
+      "frozen_status": "INFEASIBLE",
+      "work_receipt": {
+        "calls": 2,
+        "cp_used": 0.0,
+        "native_reserved": 0.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 0.19194709998555481,
+        "has_solution": false,
+        "solver_status": "INFEASIBLE",
+        "proof": "infeasible",
+        "objective": null,
+        "best_bound": null,
+        "absolute_gap_points": null,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": null,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 10.0,
+          "wall_time_limit_seconds": 300.0,
+          "solver_deterministic_time_limit": 20.0,
+          "deterministic_budget_source": "planner_default",
+          "deterministic_time_used": 0.0,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.0
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 2,
+        "cp_sat_calls": 2,
+        "native_calls": 0,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "weekly_points": []
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.015275900019332767,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.019990500004496425,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 20.0,
+          "configured_wall_seconds": 300.0
+        }
+      ]
+    },
+    {
+      "case": "gw9-6879786",
+      "capture": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "entry_id": 6879786,
+      "scenario": "conflicting_instructions",
+      "window": 3,
+      "allocation": 122.0,
+      "charged_units": 60.0,
+      "cp_units": 0.0,
+      "native_units": 60.0,
+      "within_allocation": true,
+      "same_status": true,
+      "same_numeric_objective": false,
+      "both_infeasible": true,
+      "same_decision": true,
+      "frozen_objective": null,
+      "frozen_status": "INFEASIBLE",
+      "work_receipt": {
+        "calls": 3,
+        "cp_used": 0.0,
+        "native_reserved": 60.0
+      },
+      "admitted_local_jobs": 1,
+      "result": {
+        "seconds": 1.7652070000185631,
+        "has_solution": false,
+        "solver_status": "INFEASIBLE",
+        "proof": "infeasible",
+        "objective": null,
+        "best_bound": null,
+        "absolute_gap_points": null,
+        "bound_scope": "planner_model",
+        "raw_xi_net_points": null,
+        "expected_lineup_net_points": null,
+        "selection_utility": null,
+        "solver_limits": {
+          "solver_time_limit_seconds": 1800.0,
+          "wall_time_limit_seconds": 1800.0,
+          "solver_deterministic_time_limit": 60.0,
+          "deterministic_budget_source": "caller",
+          "deterministic_time_used": 0.0,
+          "deterministic_time_budget_exhausted": false,
+          "primary_deterministic_time": 0.0
+        },
+        "wall_clock_stopped": false,
+        "solver_calls": 3,
+        "cp_sat_calls": 2,
+        "native_calls": 1,
+        "reported_thread_counts": [
+          1
+        ],
+        "unknown_thread_calls": 0,
+        "error": null,
+        "accounting_failures": null,
+        "decision_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "weekly_points": []
+      },
+      "solver_calls": [
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.049926500010769814,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 1.0,
+          "configured_wall_seconds": 30.0
+        },
+        {
+          "backend": "highs-native",
+          "status": "Infeasible",
+          "seconds": 0.4823933000152465,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "wall_cap_seconds": 1800.0
+        },
+        {
+          "backend": "cp-sat",
+          "status": "INFEASIBLE",
+          "seconds": 0.04927570000290871,
+          "deterministic_units": 0.0,
+          "objective_raw": null,
+          "best_bound_raw": null,
+          "threads": 1,
+          "configured_deterministic_units": 60.0,
+          "configured_wall_seconds": 1800.0
+        }
+      ]
+    }
+  ]
+}
