@@ -98,6 +98,8 @@ class AdviceCaptureContext:
     horizon_builder: HorizonBuilder
     switches: AdviceSwitchInputs = field(default_factory=AdviceSwitchInputs)
     chip_forecast_source: ForecastSource | None = None
+    transfer_packages: bool = False
+    package_gate: bool = False
 
     @property
     def top100_counts(self) -> Top100Counts | None:

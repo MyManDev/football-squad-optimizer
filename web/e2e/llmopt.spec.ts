@@ -10,6 +10,7 @@ import { MESSAGES } from "../src/i18n/messages";
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 import { holdModel, routeChat } from "./llmoptChat";
+import { reloadQueuedJob, startQueuedJob } from "./queuedAdviceJob";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -1047,6 +1048,7 @@ test("a waiting run survives reload and an edit closes it without a follow-up", 
     });
   });
   await page.route(`${API}/api/v1/advice-jobs/waiting-main`, (route) => {
+    if (route.request().method() === "OPTIONS") return answer(route, null);
     polls += 1;
     return answer(route, {
       job_id: "waiting-main",
@@ -1059,15 +1061,21 @@ test("a waiting run survives reload and an edit closes it without a follow-up", 
     cancelled.push(id);
     return answer(route, { contract_version: "llmopt_run_v1", run_id: id, closed: true });
   });
+  await page.clock.install();
   await page.goto(PAGE);
   await holdModel(page);
   await page.getByRole("textbox", { name: "Plan instructions" }).fill("No hits.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
-  await page.getByRole("button", { name: "Compute plans" }).click();
+  await startQueuedJob(
+    page,
+    "waiting-main",
+    page.getByRole("button", { name: "Compute plans" }),
+    "en",
+  );
   await expect.poll(() => posts.length).toBe(1);
   await expect.poll(() => polls).toBeGreaterThan(0);
   const identifier = posts[0]!.run.run_id;
-  await page.reload();
+  await reloadQueuedJob(page, "waiting-main");
   await expect.poll(() => polls).toBeGreaterThan(1);
   expect(posts).toHaveLength(1);
   await expect(page.getByRole("button", { name: "Remove · No transfer hits" })).toBeEnabled();

@@ -856,3 +856,58 @@ def test_chip_refusal_with_artifact_root_never_projects(deployment: dict[str, An
     assert response.json()["error"]["code"] == "CHIP_HISTORY_UNKNOWN"
     assert backend.contexts._context is None
     assert not backend.queue.jobs()
+
+
+def test_packages_disabled_identity_and_separate_gate_are_server_owned(tmp_path):
+    config = BackendConfig(
+        tmp_path / "store", tmp_path / "site", tmp_path / "snapshot", tmp_path / "handoff"
+    )
+    assert config.transfer_packages is False and config.package_gate is False
+    assert not config.three_week_paths and not config.enabled_three_week_paths
+    assert configuration_fingerprint() == configuration_fingerprint(
+        transfer_packages=False, package_gate=False
+    )
+    pairs = configuration_fingerprint(transfer_packages=True)
+    assert pairs != configuration_fingerprint()
+    assert pairs != configuration_fingerprint(transfer_packages=True, package_gate=True)
+    with pytest.raises(BackendConfigError, match="requires packages"):
+        replace(config, package_gate=True)
+    with pytest.raises(BackendConfigError, match="boolean"):
+        replace(config, transfer_packages=1)
+    with pytest.raises(BackendConfigError, match="boolean"):
+        replace(config, three_week_paths=1)
+    env = {
+        "SQUADOPT_BACKEND_" + key: "local"
+        for key in ("STORE_ROOT", "SITE_DATA_ROOT", "SNAPSHOT_ROOT", "HANDOFF_ROOT")
+    }
+    enabled = BackendConfig.from_environment({**env, "SQUADOPT_BACKEND_TRANSFER_PACKAGES": "1"})
+    assert enabled.transfer_packages and not enabled.package_gate
+    assert not enabled.enabled_packages and not enabled.enabled_package_gate
+    assert not enabled.three_week_paths
+    for master in ("0", "1"):
+        for packages, gate in (("0", "0"), ("1", "0"), ("1", "1")):
+            for paths in ("0", "1"):
+                config = BackendConfig.from_environment(
+                    {
+                        **env,
+                        "SQUADOPT_BACKEND_LLMOPT_VNEXT": master,
+                        "SQUADOPT_BACKEND_TRANSFER_PACKAGES": packages,
+                        "SQUADOPT_BACKEND_PACKAGE_GATE": gate,
+                        "SQUADOPT_BACKEND_THREE_WEEK_PATHS": paths,
+                    }
+                )
+                assert config.enabled_packages is (master == packages == "1")
+                assert config.enabled_package_gate is (master == packages == gate == "1")
+                assert config.enabled_three_week_paths is (master == paths == "1")
+        with pytest.raises(BackendConfigError, match="requires packages"):
+            BackendConfig.from_environment(
+                {
+                    **env,
+                    "SQUADOPT_BACKEND_LLMOPT_VNEXT": master,
+                    "SQUADOPT_BACKEND_PACKAGE_GATE": "1",
+                }
+            )
+    with pytest.raises(BackendConfigError, match="0 or 1"):
+        BackendConfig.from_environment({**env, "SQUADOPT_BACKEND_TRANSFER_PACKAGES": "yes"})
+    with pytest.raises(BackendConfigError, match="0 or 1"):
+        BackendConfig.from_environment({**env, "SQUADOPT_BACKEND_THREE_WEEK_PATHS": "yes"})

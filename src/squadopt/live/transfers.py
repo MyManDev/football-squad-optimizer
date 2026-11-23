@@ -1195,6 +1195,8 @@ def plan_transfer_horizon(
     chip_strategy: bool = False,
     chip_tail_forecast: ChipTailForecast | None = None,
     preferences: DecisionPreferences | None = None,
+    transfer_packages: bool = False,
+    package_gate: bool = False,
     priority_program: PriorityProgram | None = None,
     priority_reference: PriorityReference | None = None,
 ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
@@ -1385,6 +1387,10 @@ def plan_transfer_horizon(
         if frozen_caps:
             # A prior legal decision may predate our narrower default search policy.
             planning_policy = replace(planning_policy, transfer_caps_by_gameweek=frozen_caps)
+    if transfer_packages and len(projection_horizon.target_gameweeks) == 3:
+        planning_policy = replace(
+            planning_policy, transfer_packages=True, package_gate=package_gate
+        )
     if net_points_priority:
         planning_policy = planning_policy.for_net_points()
     if len(projection_horizon.target_gameweeks) > 1:

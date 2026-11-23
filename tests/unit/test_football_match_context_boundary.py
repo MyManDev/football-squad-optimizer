@@ -286,6 +286,8 @@ def test_match_context_artifact_survives_real_worker_and_document_schema(
         switches=switch_identity(switches, model="football"),
     )
     capture = SimpleNamespace(
+        transfer_packages=False,
+        package_gate=False,
         switches=switches,
         inputs=inputs,
         provider=SimpleNamespace(holds=lambda entry, week: True),

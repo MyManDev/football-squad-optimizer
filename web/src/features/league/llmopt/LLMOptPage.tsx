@@ -1,3 +1,4 @@
+import { PlanPathGroups } from "./PlanPathGroups";
 import { useComputedPlans } from "./useComputedPlans";
 import { currentPlanCommand, planCatalogue, planContent, type PlanHistory } from "./planHistory";
 import { readPlanAvailability } from "./planAvailability";
@@ -725,6 +726,7 @@ function Workspace({
     (!!currentCapabilities &&
       (currentCapabilities.llmoptVNext === true) === !!run?.inputs.request.run &&
       (!run?.inputs.request.deviceRun || currentCapabilities.devicePreferenceBundles === true) &&
+      (!run?.inputs.paths3w || currentCapabilities.threeWeekPaths === true) &&
       (!run?.inputs.bundleMode ||
         (run.inputs.request.deviceRun
           ? currentCapabilities.devicePreferenceBundles === true
@@ -975,6 +977,9 @@ function Workspace({
         reference,
         compareOnly: !!runId && reference?.compareOnly === true,
         bundleMode: grouped && draft.soft.length > 0 && !draft.scenario,
+        ...(runId && capabilities.threeWeekPaths === true && plans.window === 3
+          ? { paths3w: true as const }
+          : {}),
       });
       const execution = preferenceExecution(next);
       const requests = [
@@ -1021,6 +1026,7 @@ function Workspace({
         confirmation: {
           ...(runId ? { runId } : {}),
           wildcardNotHeld,
+          ...(next.inputs.paths3w ? { paths3w: true as const } : {}),
           sending: true as const,
           compareOnly: next.inputs.compareOnly === true,
           deviceRun: next.baseRequest?.deviceRun ?? false,
@@ -1177,9 +1183,11 @@ function Workspace({
         : samePlan(baseState, combinedState)
           ? 0
           : Math.max(0, baseNet - combinedNet);
+  const showPaths = vNext && run?.inputs.paths3w === true;
   const { results, same } = run
     ? planResults({
         run,
+        showPaths,
         base: baseState,
         alternatives,
         priceReview,
@@ -1612,7 +1620,12 @@ function Workspace({
           aria-busy={isWorking(baseState.phase)}
         >
           <h2>{copy.results}</h2>
-          <div className={styles.planGrid}>
+          <PlanPathGroups
+            enabled={showPaths}
+            runId={run.inputs.request.run?.run_id}
+            className={styles.planGrid}
+            label={copy.openingDecision}
+          >
             {(run.baseRequest || run.baseConflict) && !capacityRefused(baseState) && (
               <PlanResult
                 title={copy[run.baseTitle]}
@@ -1679,7 +1692,7 @@ function Workspace({
                 />
               </PlanResult>
             )}
-          </div>
+          </PlanPathGroups>
           {incompleteRun && problem !== "combinedExhausted" && (
             <p role="status">{copy.unfinishedPlans}</p>
           )}

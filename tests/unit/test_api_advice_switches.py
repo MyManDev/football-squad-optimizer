@@ -526,3 +526,29 @@ def test_a_reader_wired_as_before_offers_no_switch(tmp_path: Path) -> None:
 def test_the_committed_capabilities_schema_matches_its_generator() -> None:
     committed = json.loads(LEAGUE_CAPABILITIES_SCHEMA_PATH.read_text(encoding="utf-8"))
     assert committed == league_capabilities_schema()
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("packages", [False, True])
+@pytest.mark.parametrize("paths", [False, True])
+def test_package_and_path_capabilities_are_independent_under_the_release(
+    tmp_path, enabled, packages, paths
+):
+    _publish_members(tmp_path / "site")
+    reader = AdviceReadStore(
+        FileLeagueDirectory(tmp_path / "site"),
+        FileAdviceCache(tmp_path / "cache"),
+        _Context(),
+        {"saf-puan": False},
+        transfer_packages=packages,
+        three_week_paths=paths,
+        llmopt_vnext=enabled,
+    )
+    document = reader.league_capabilities(LEAGUE_ID)
+    for field, active in (("transfer_packages", packages), ("three_week_paths", paths)):
+        if enabled and active:
+            assert document[field] is True
+        else:
+            assert field not in document
+    committed = json.loads(LEAGUE_CAPABILITIES_SCHEMA_PATH.read_text(encoding="utf-8"))
+    jsonschema.validate(document, committed)

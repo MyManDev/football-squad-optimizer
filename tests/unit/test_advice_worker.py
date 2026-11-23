@@ -1807,6 +1807,86 @@ def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str,
     )
 
 
+def test_package_switches_preserve_ordinary_worker_bytes_unless_the_master_and_packages_are_on(
+    tmp_path, monkeypatch
+):
+    original = _deployment(tmp_path, monkeypatch, last_gameweek=5, public_entries=True)["backend"]
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    capability_routes = (
+        f"/api/v1/leagues/{LEAGUE_ID}/capabilities",
+        f"/api/v1/public/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/capabilities",
+    )
+    question = {"strategy": COMPUTED_MODE, "window": 3}
+    ordinary_key, ordinary_spec, ordinary_answer = None, None, None
+    active_keys = {}
+    for master, search, gate, paths in (
+        (False, False, False, False),
+        (False, True, True, True),
+        (True, False, False, False),
+        (True, False, False, True),
+        (True, True, False, False),
+        (True, True, False, True),
+        (True, True, True, False),
+        (True, True, True, True),
+    ):
+        store = tmp_path / f"store-{int(master)}{int(search)}{int(gate)}{int(paths)}"
+        store.mkdir()
+        config = replace(
+            original.config,
+            store_root=store,
+            llmopt_vnext=master,
+            transfer_packages=search,
+            package_gate=gate,
+            three_week_paths=paths,
+        )
+        backend = build_backend(config)
+        client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+        enabled = master and search
+        for capability_route in capability_routes:
+            response = client.get(capability_route)
+            assert response.status_code == 200, response.text
+            assert ("transfer_packages" in response.json()) is enabled
+            assert ("three_week_paths" in response.json()) is (master and paths)
+            assert ("plan_data_id" in response.json()) is master
+        queued = client.post(route, json=question)
+        assert queued.status_code == 202, queued.text
+        job = backend.queue.load(queued.json()["job_id"])
+        assert job.contract_version == "backend_jobs_v1"
+        spec = backend.job_specs.get(job.cache_key)
+        capture = backend.contexts.capture(spec.context)
+        assert capture.transfer_packages is enabled
+        assert capture.package_gate is (enabled and gate)
+        if enabled:
+            assert job.cache_key != ordinary_key
+            if gate in active_keys:
+                assert job.cache_key == active_keys[gate]
+            else:
+                assert job.cache_key not in active_keys.values()
+                active_keys[gate] = job.cache_key
+            continue
+        assert _work(backend) == 1
+        read = client.get(route, params=question)
+        assert read.status_code == 200 and len(read.json()["payload"]["plan_weeks"]) == 3
+        assert client.post(route, json=question).content == read.content
+        assert len(backend.queue.jobs()) == 1
+        canonical = FileAdviceCache(config.cache_root).get(job.cache_key)
+        assert canonical is not None
+        if master:
+            versioned = read.json()
+            assert versioned["payload"].pop("plan_data_id") == advice_context_identity(spec.context)
+            assert versioned == json.loads(canonical)
+        else:
+            assert read.content == canonical
+        if ordinary_key is None:
+            ordinary_key, ordinary_spec, ordinary_answer = job.cache_key, spec, canonical
+        else:
+            assert (job.cache_key, spec, canonical) == (
+                ordinary_key,
+                ordinary_spec,
+                ordinary_answer,
+            )
+
+
 @pytest.mark.parametrize("producer_enabled", [False, True])
 def test_provenance_follows_the_worker_and_current_grant_across_restarts(
     tmp_path, monkeypatch, producer_enabled
