@@ -725,8 +725,13 @@ function Workspace({
     currentCapabilities?.llmoptVNext === true &&
     (currentCapabilities.preferenceBundles === true ||
       (plans.window === 1 && currentCapabilities.devicePreferenceBundles === true));
+  // Older confirmations can retry their identity-free requests after a failed capability read.
+  const restoreReadFailed =
+    restoreCapabilities.isFetchedAfterMount &&
+    (restoreCapabilities.isError || restoreCapabilities.data === null);
   const canContinue =
-    (run !== restoredRun && !run?.inputs.request.run) ||
+    (!run?.inputs.request.run &&
+      (run !== restoredRun || (restoreReadFailed && !run?.inputs.bundleMode))) ||
     (!!currentCapabilities &&
       (currentCapabilities.llmoptVNext === true) === !!run?.inputs.request.run &&
       (!run?.inputs.request.deviceRun || currentCapabilities.devicePreferenceBundles === true) &&

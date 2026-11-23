@@ -80,6 +80,7 @@ let LLMOptPage: typeof Page;
 let roster: "ok" | "fail" | "late";
 let releaseRoster: () => void;
 let releaseEnabled: boolean;
+let capabilitiesUnavailable: boolean;
 let bundlesOffered: boolean;
 let repairsOffered: boolean;
 let rosterGate: Promise<void>;
@@ -94,6 +95,7 @@ beforeAll(async () => {
 beforeEach(() => {
   jobs.length = 0;
   releaseEnabled = true;
+  capabilitiesUnavailable = false;
   bundlesOffered = false;
   repairsOffered = false;
   roster = "ok";
@@ -110,6 +112,7 @@ beforeEach(() => {
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === `${ORIGIN}/api/v1/leagues/${squad.league_id}/capabilities`) {
+        if (capabilitiesUnavailable) return new Response(null, { status: 503 });
         return Response.json({
           contract_version: "league_capabilities_v1",
           league_id: squad.league_id,
@@ -780,6 +783,18 @@ describe("a reload keeps the saved session", () => {
     for (const job of jobs) expect(job.compute).not.toHaveBeenCalled();
   });
 
+  it("retries an interrupted legacy request without a run identity after the capabilities read fails", async () => {
+    capabilitiesUnavailable = true;
+    const base = await reloadConfirmed(
+      { runId: undefined, wildcardNotHeld: false, sending: true },
+      true,
+    );
+    await waitFor(() => expect(base.compute).toHaveBeenCalledTimes(1));
+    expect(base.resume).toHaveBeenCalledTimes(1);
+    expect(base.compute.mock.calls[0]![0]).not.toHaveProperty("run");
+    expect(base.readCached).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])(
     "uses the current release setting %s for the first explicit comparison",
     async (enabled) => {
@@ -1081,21 +1096,25 @@ describe("the plan with all preferences", () => {
     },
   );
 
-  it("a restored priority run reads its saved preference result after rollback without admitting another stage", async () => {
-    releaseEnabled = false;
-    bundlesOffered = true;
-    await reloadWith(
-      { hard: [], soft, max_total_cost_tenths: 15 },
-      { wildcardNotHeld: false, bundleMode: true, sending: true },
-    );
-    await waitFor(() => expect(jobs[0]!.readCached).toHaveBeenCalledTimes(1));
-    answer(jobs[0]!, jobs[0]!.readCached.mock.calls[0]![0], 50, []);
-    await waitFor(() => expect(jobs[1]!.readCached).toHaveBeenCalledTimes(1));
-    expect(
-      jobs[1]!.readCached.mock.calls[0]![0].preferenceBundle?.program?.preferences,
-    ).toHaveLength(3);
-    expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
-  });
+  it.each(["rollback", "a failed capabilities read"])(
+    "a restored priority run reads its saved preference result after %s without admitting another stage",
+    async (reason) => {
+      releaseEnabled = reason !== "rollback";
+      capabilitiesUnavailable = reason !== "rollback";
+      bundlesOffered = true;
+      await reloadWith(
+        { hard: [], soft, max_total_cost_tenths: 15 },
+        { wildcardNotHeld: false, bundleMode: true, sending: true },
+      );
+      await waitFor(() => expect(jobs[0]!.readCached).toHaveBeenCalledTimes(1));
+      answer(jobs[0]!, jobs[0]!.readCached.mock.calls[0]![0], 50, []);
+      await waitFor(() => expect(jobs[1]!.readCached).toHaveBeenCalledTimes(1));
+      expect(
+        jobs[1]!.readCached.mock.calls[0]![0].preferenceBundle?.program?.preferences,
+      ).toHaveLength(3);
+      expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
+    },
+  );
 
   async function singlePrices(net: [number, number]) {
     const [base, first, second] = jobs as [FakeJob, FakeJob, FakeJob];
