@@ -44,9 +44,9 @@ export function memberLineup(
  * the deadline, so a chip the member played at it still stands as available there; the live
  * read names the chip, and the record shown after the deadline says it was played that week.
  */
-function chipsWithPlayedWeek(
-  squad: EntrySquad,
-  lineup: PlayedLineup,
+export function chipsWithPlayedWeek(
+  squad: Pick<EntrySquad, "chips_used" | "chips">,
+  lineup: Pick<PlayedLineup, "active_chip" | "gameweek">,
 ): Pick<EntrySquad, "chips_used" | "chips"> {
   const chip = lineup.active_chip;
   const week = lineup.gameweek;
