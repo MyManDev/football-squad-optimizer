@@ -126,6 +126,17 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
     expect(bug).not.toHaveTextContent(copy.freeTransfersLabel);
   });
 
+  it("leaves the bank out of the bug once the week's deadline has passed", () => {
+    claimIn(leader.entry_id);
+    show(
+      { viewerSquad: mockEntrySquadEnvelopes[leader.entry_id!]!, deadlinePassed: true },
+      language,
+    );
+    expect(scoreBug()).toHaveTextContent(copy.rankLabel);
+    expect(scoreBug()).not.toHaveTextContent(copy.bankLabel);
+    expect(scoreBug()).not.toHaveTextContent(copy.freeTransfersLabel);
+  });
+
   it("adds the viewer's chips, bank and chaser once their squad document is read", () => {
     claimIn(leader.entry_id);
     const squad = mockEntrySquadEnvelopes[leader.entry_id!]!;
