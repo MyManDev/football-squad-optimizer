@@ -6,24 +6,34 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from squadopt.contracts.repair_origin import RepairOrigin, repair_origin_schema
+
 
 @dataclass(frozen=True, slots=True)
 class RunReference:
     run_id: str
-    stage: Literal["base", "followup"]
+    stage: Literal["base", "followup", "repair"]
+    repair_origin: RepairOrigin | None = None
 
     @classmethod
     def parse(cls, value: object) -> RunReference:
-        if not isinstance(value, dict) or set(value) != {"contract_version", "run_id", "stage"}:
+        if not isinstance(value, dict) or set(value) - {"repair_origin"} != {
+            "contract_version",
+            "run_id",
+            "stage",
+        }:
             raise ValueError("Invalid planning run reference.")
         if value["contract_version"] != "llmopt_run_v1":
             raise ValueError("Unsupported planning run reference.")
         identifier, stage = value["run_id"], value["stage"]
         if not isinstance(identifier, str) or re.fullmatch(r"[0-9a-f]{32}", identifier) is None:
             raise ValueError("run_id must contain 32 lowercase hexadecimal digits.")
-        if stage not in ("base", "followup"):
+        if stage not in ("base", "followup", "repair"):
             raise ValueError("Unknown planning run stage.")
-        return cls(identifier, stage)
+        origin = RepairOrigin.parse(value["repair_origin"]) if "repair_origin" in value else None
+        if origin is not None and stage == "followup":
+            raise ValueError("Original repair rules apply only to candidates and selection.")
+        return cls(identifier, stage, origin)
 
 
 def run_capacity(window: int) -> float:
@@ -43,8 +53,11 @@ def run_reference_schema() -> dict[str, object]:
         "properties": {
             "contract_version": {"type": "string", "const": "llmopt_run_v1"},
             "run_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
-            "stage": {"type": "string", "enum": ["base", "followup"]},
+            "stage": {"type": "string", "enum": ["base", "followup", "repair"]},
+            "repair_origin": repair_origin_schema(),
         },
+        "if": {"required": ["repair_origin"]},
+        "then": {"properties": {"stage": {"enum": ["base", "repair"]}}},
         "required": ["contract_version", "run_id", "stage"],
         "additionalProperties": False,
     }
@@ -74,6 +87,12 @@ def run_ledger_schema() -> dict[str, object]:
             "base": key,
             "closed": {"type": "boolean"},
             "base_cached": {"type": "boolean"},
+            "repair_candidates": {
+                "type": "array",
+                "items": key,
+                "maxItems": 2,
+                "uniqueItems": True,
+            },
             "requests": {
                 "type": "object",
                 "maxProperties": 4,
@@ -94,6 +113,7 @@ def run_ledger_schema() -> dict[str, object]:
             "receipt": {
                 "type": ["object", "null"],
                 "properties": {
+                    "answer_sha256": key,
                     "attempt": {"type": "integer", "minimum": 1},
                     "finished": {"type": "boolean"},
                     "calls": {"type": "integer", "minimum": 0},

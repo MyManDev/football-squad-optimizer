@@ -2,13 +2,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { readReply } from "../../../testSupport/intentReply";
 import { EMPTY_DRAFT, MAX_MESSAGE_LENGTH, MAX_QUESTION_LENGTH } from "./intent";
+import { restoreRun } from "./planRun";
 import {
   checkedPlanSession,
   createPlanSessionMemory,
   createPlanSessionStore,
   readPlanSession,
+  type PlanSession,
   writePlanSession,
 } from "./planSession";
+import { ruleRepairChoices, type RuleRepairContext } from "./ruleRepairChoices";
 
 const OWNED = [
   { id: 1, name: "Held One", team: "Arsenal" },
@@ -114,6 +117,77 @@ describe("createPlanSessionStore", () => {
     expect(store.confirmation).toBeUndefined();
     expect(readPlanSession(context)).not.toHaveProperty("confirmation");
   });
+
+  it("retains a pending repair only with its original run and data identifiers", () => {
+    const runId = "a".repeat(32);
+    const dataId = "b".repeat(64);
+    const repairSearch = { dataId, failedBase: true, failureCode: "CHIP_NOT_HELD" };
+    const confirmation = { runId, wildcardNotHeld: false, repairSearch };
+    const read = (saved: unknown) =>
+      checkedPlanSession({ draft, confirmation: saved }, ROSTER, GAMEWEEK);
+    expect(read(confirmation)?.confirmation).toMatchObject(confirmation);
+    for (const broken of [
+      { ...confirmation, runId: [runId] },
+      { ...confirmation, repairSearch: { ...repairSearch, dataId: [dataId] } },
+      { ...confirmation, repairSearch: null },
+    ]) {
+      expect(read(broken)?.draft).toEqual(draft);
+      expect(read(broken)?.confirmation).toBeUndefined();
+    }
+  });
+
+  it.each(["bank", "chip"] as const)(
+    "restores the server-diagnosed %s repair without restarting its failed base",
+    (family) => {
+      const runId = "a".repeat(32);
+      const dataId = "b".repeat(64);
+      const bank = family === "bank";
+      const session: PlanSession = {
+        draft: bank
+          ? { hard: [], soft: [], window: 3, min_bank: { tenths: 25, week: 2 } }
+          : { hard: [{ kind: "wildcard", week: 2 }], soft: [], window: 3 },
+        confirmation: {
+          runId,
+          wildcardNotHeld: false,
+          repairSearch: bank
+            ? {
+                dataId,
+                failedBase: true,
+                failureCode: "PLAN_NOT_FOUND",
+                diagnosis: {
+                  repairs: [{ kind: "lower_bank_floor", tenths: 13 }],
+                  bank: { required: 25, reachable: 13, exact: true, week: 2 },
+                },
+              }
+            : { dataId, failedBase: true, failureCode: "CHIP_NOT_HELD" },
+        },
+      };
+      const inputs: RuleRepairContext = {
+        gameweek: GAMEWEEK,
+        window: 3,
+        held: new Set(OWNED.map((player) => player.id)),
+        players: ROSTER,
+        language: "en",
+        frozen: [],
+        heldChips: null,
+      };
+      expect(ruleRepairChoices(session.draft, inputs)?.status).not.toBe("conflict");
+      expect(writePlanSession(context, session)).toBe(true);
+      const restored = checkedPlanSession(readPlanSession(context), ROSTER, GAMEWEEK);
+      expect(restored?.confirmation).toMatchObject(session.confirmation!);
+      const request = vi.fn();
+      expect(restoreRun(restored, inputs.held, request)).toBeNull();
+      expect(request).not.toHaveBeenCalled();
+      const search = restored!.confirmation!.repairSearch!;
+      const result = ruleRepairChoices(restored!.draft, { ...inputs, ...search });
+      expect(result?.status).toBe("conflict");
+      expect(result?.choices.map((choice) => choice.draft)).toEqual([
+        bank
+          ? { ...session.draft, min_bank: { tenths: 13, week: 2 } }
+          : { ...session.draft, hard: [] },
+      ]);
+    },
+  );
 
   it("tells its listeners after each save until they leave", () => {
     const store = createPlanSessionStore(context);

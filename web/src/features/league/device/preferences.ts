@@ -4,6 +4,8 @@ import { rebuilds } from "./strategies/chips";
 import type { DeviceChip, DevicePlanDocument, DevicePlanEntry } from "./types";
 import { row, term, type LpRow } from "./lp/problem";
 
+export class MissingDevicePreferenceInput extends Error {}
+
 export function oneWeekPreferences(value?: DecisionPreferences): DecisionPreferences | undefined {
   if (!value) return undefined;
   const p = checkedPreferences(value);
@@ -34,7 +36,8 @@ export function hardPreferenceRows(
   const impossible = () => add([], "=", 1);
   const member = (id: number) => {
     const i = index.get(id);
-    if (i === undefined) throw new Error("A preference names an unknown player.");
+    if (i === undefined)
+      throw new MissingDevicePreferenceInput("A preference names an unknown player.");
     return `s${i}`;
   };
   const arrivals = document.players.flatMap((player, i) =>
@@ -61,7 +64,7 @@ export function hardPreferenceRows(
     }
     for (const count of rules.club_counts ?? []) {
       if (!document.players.some((player) => player.team === count.club))
-        throw new Error("A preference names an unknown club.");
+        throw new MissingDevicePreferenceInput("A preference names an unknown club.");
       add(
         document.players.flatMap((player, i) =>
           player.team === count.club && (count.scope !== "transfers_in" || !held.has(player.id))

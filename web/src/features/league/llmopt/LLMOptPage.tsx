@@ -1,6 +1,14 @@
 import { PlanPathGroups } from "./PlanPathGroups";
 import { useComputedPlans } from "./useComputedPlans";
-import { currentPlanCommand, planCatalogue, planContent, type PlanHistory } from "./planHistory";
+import {
+  addHistory,
+  currentPlanCommand,
+  planCatalogue,
+  planContent,
+  retainedPlan,
+  selectHistory,
+  type PlanHistory,
+} from "./planHistory";
 import { readPlanAvailability } from "./planAvailability";
 import { commandDraft } from "./planCommand";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
@@ -15,6 +23,7 @@ import {
 } from "react";
 import { Link, useParams } from "react-router";
 
+import { withRequestDeadline } from "../../../data/request";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { PageLoading } from "../../../design/components/PageLoading";
 import { useLanguage } from "../../../i18n/context";
@@ -36,6 +45,9 @@ import { combinedCandidates, prepareCombined } from "./combinedPlan";
 import { CombinedRules } from "./CombinedRules";
 import { LLMOPT_COPY, ruleLabel } from "./copy";
 import { InfeasibilityResult } from "./InfeasibilityResult";
+import { VerifiedRuleRepairs } from "./VerifiedRuleRepairs";
+import { ruleRepairChoices, type RepairChoice } from "./ruleRepairChoices";
+import type { RepairRun } from "./repairComputation";
 import {
   EMPTY_DRAFT,
   checkedDraft,
@@ -696,17 +708,6 @@ function Workspace({
     delete answered.sending;
     session.save({ draft, reference, clarification, confirmation: answered });
   }, [settled, session, draft, reference, clarification]);
-  const diagnosis = (state: ComputePhase) =>
-    state.phase === "failed" && state.infeasibility ? (
-      <InfeasibilityResult
-        diagnosis={state.infeasibility}
-        request={state.request}
-        draft={draft}
-        players={players}
-        disabled={editingLocked}
-        change={applyRepair}
-      />
-    ) : undefined;
   const baseState = states.base;
   const restoreMode = capabilitiesForPage(restoreCapabilities.data, {
     leagueId: squad.league_id,
@@ -731,6 +732,124 @@ function Workspace({
         (run.inputs.request.deviceRun
           ? currentCapabilities.devicePreferenceBundles === true
           : currentCapabilities.preferenceBundles === true)));
+  const repairsEnabled = vNext && currentCapabilities?.verifiedRepairs === true;
+  const oldSearch = savedRun?.repairSearch;
+  const failure =
+    baseState.phase === "failed" || baseState.phase === "unavailable" ? baseState : null;
+  const failureCode = failure?.reason ?? oldSearch?.failureCode;
+  const failureDetails = failure?.phase === "failed" ? failure.infeasibility : oldSearch?.diagnosis;
+  const diagnosedRequest =
+    failure?.request ??
+    run?.baseRequest ??
+    (oldSearch?.diagnosis && savedRun
+      ? restoreRun(
+          { draft, reference, confirmation: { ...savedRun, repairSearch: undefined } },
+          held,
+          (window) => requestFor(squad, forwarded, window),
+        )?.baseRequest
+      : undefined);
+  const heldChipsForRepair = currentCapabilities?.chipsByEntry?.[String(squad.entry.entry_id)];
+  const repairAnalysis =
+    currentCapabilities && (repairsEnabled || oldSearch) && !draft.scenario
+      ? ruleRepairChoices(draft, {
+          ...conflictContext,
+          language,
+          heldChips: heldChipsForRepair ?? (oldSearch && savedRun.wildcardNotHeld ? [] : null),
+          freeTransfers: squad.free_transfers_known ? squad.free_transfers : null,
+          heldClubs: new Map(
+            [...squad.starting_xi, ...squad.bench].map((player) => [player.player_id, player.team]),
+          ),
+          bankTenths: squad.bank_tenths,
+          request: diagnosedRequest ?? undefined,
+          failureCode,
+          diagnosis: failureDetails,
+        })
+      : null;
+  const analysis = repairsEnabled ? repairAnalysis : null;
+  const savedConflict =
+    oldSearch && currentCapabilities && !repairsEnabled
+      ? repairAnalysis?.status === "conflict"
+        ? repairAnalysis.sentence
+        : copy.repairs.conflict
+      : null;
+  const retryRunId =
+    failure && analysis && analysis.status !== "conflict" ? failure.request.run?.run_id : undefined;
+  const mainBlocked = !!analysis && !retryRunId;
+  async function repairData() {
+    if (!deadlineOpen(deadline)) throw new Error("RUN_CONTEXT_CHANGED");
+    const [fresh, grant] = await Promise.all([
+      tree.entrySquad(squad.entry.entry_id),
+      currentGrant(),
+    ]);
+    if (
+      !mounted.current ||
+      !grant?.verifiedRepairs ||
+      squadBasis(fresh.payload) !== squadBasis(squad) ||
+      !deadlineOpen(deadline)
+    )
+      throw new Error("RUN_CONTEXT_CHANGED");
+    const dataId = plans.window === 1 ? await client.readDeviceDataId?.() : grant.planDataId;
+    if (!dataId || !/^[0-9a-f]{64}$/.test(dataId)) throw new Error("INPUTS_UNAVAILABLE");
+    return dataId;
+  }
+  async function beginRepair(signal: AbortSignal): Promise<RepairRun> {
+    const dataId = await repairData();
+    if (signal.aborted || !deadlineOpen(deadline)) throw new Error("RUN_CANCELLED");
+    const confirmation = session.confirmation;
+    if (confirmation?.repairSearch && confirmation.repairSearch.dataId !== dataId)
+      throw new Error("RUN_CONTEXT_CHANGED");
+    const runId = confirmation?.runId ?? crypto.randomUUID().replaceAll("-", "");
+    const failedBase =
+      confirmation?.repairSearch?.failedBase ??
+      !!(
+        confirmation?.runId &&
+        run &&
+        failure?.phase === "failed" &&
+        ((failure.reason === "PLAN_NOT_FOUND" && failure.infeasibility) ||
+          (failure.reason === "CHIP_NOT_HELD" && failure.terminalJobId))
+      );
+    const next = {
+      draft,
+      reference,
+      history: session.history,
+      confirmation: {
+        ...confirmation,
+        runId,
+        wildcardNotHeld:
+          confirmation?.wildcardNotHeld ?? heldChipsForRepair?.includes("wildcard") === false,
+        repairSearch: {
+          dataId,
+          failedBase,
+          diagnosis: failureDetails,
+          ...(failureCode === "PLAN_NOT_FOUND" || failureCode === "CHIP_NOT_HELD"
+            ? { failureCode: failureCode as "PLAN_NOT_FOUND" | "CHIP_NOT_HELD" }
+            : {}),
+        },
+      },
+    };
+    if (!writePlanSession(context, next)) throw new Error("RUN_STORE_UNAVAILABLE");
+    session.save(next);
+    return { runId, dataId, failedBase, sourceDraft: draft };
+  }
+  function acceptRepair(choice: RepairChoice, plan: EntryAdvice, id: string) {
+    change(choice.draft, reference);
+    const history = selectHistory(
+      addHistory(session.history, [{ id, plan: retainedPlan(plan) }]),
+      id,
+    );
+    session.save({ draft: choice.draft, reference, history });
+  }
+  const diagnosis = (state: ComputePhase) =>
+    state.phase === "failed" && state.infeasibility && !repairsEnabled ? (
+      <InfeasibilityResult
+        diagnosis={state.infeasibility}
+        request={state.request}
+        draft={draft}
+        players={players}
+        disabled={editingLocked}
+        change={applyRepair}
+      />
+    ) : undefined;
   useEffect(() => {
     if (!run || run !== restoredRun || (!!ORIGIN && !restoreCapabilities.isFetchedAfterMount))
       return;
@@ -895,7 +1014,8 @@ function Workspace({
       !ORIGIN ||
       !squad.source_snapshot_id ||
       !deadlineOpen(deadline) ||
-      !canCalculate
+      !canCalculate ||
+      mainBlocked
     )
       return;
     confirming.current = true;
@@ -910,7 +1030,7 @@ function Workspace({
           .then((read) => (read.isError ? null : read.data)),
       ]);
       if (!mounted.current) return;
-      if (!capabilities) {
+      if (!capabilities || (retryRunId && !capabilities.verifiedRepairs)) {
         setFeedback(copy.serviceUnavailable);
         return;
       }
@@ -960,6 +1080,24 @@ function Workspace({
       ) {
         setFeedback(copy.totalUnavailable);
         return;
+      }
+      if (retryRunId) {
+        if (!client.cancelRun || session.confirmation?.runId !== retryRunId) {
+          setFeedback(copy.serviceUnavailable);
+          return;
+        }
+        try {
+          await withRequestDeadline(async () => client.cancelRun?.(retryRunId));
+        } catch {
+          if (mounted.current) setFeedback(copy.serviceUnavailable);
+          return;
+        }
+        if (
+          !mounted.current ||
+          session.confirmation?.runId !== retryRunId ||
+          !deadlineOpen(deadline)
+        )
+          return;
       }
       const runId = capabilities.llmoptVNext ? crypto.randomUUID().replaceAll("-", "") : undefined;
       const request = requestFor(squad, forwarded, plans.window, local);
@@ -1470,10 +1608,36 @@ function Workspace({
             {copy.scenarioReferenceRequired}
           </p>
         )}
-        {hardConflict && (
+        {savedConflict && (
+          <p data-saved-conflict role="status" className={styles.notice}>
+            {savedConflict}
+          </p>
+        )}
+        {hardConflict && !analysis && !savedConflict && (
           <p role="alert" className={styles.notice}>
             {hardConflict}
           </p>
+        )}
+        {analysis && (
+          <VerifiedRuleRepairs
+            key={JSON.stringify([draft, reference, squad.source_snapshot_id, language])}
+            analysis={analysis}
+            client={client}
+            squad={squad}
+            window={plans.window}
+            forwarded={forwarded}
+            reference={reference}
+            disabled={
+              editingLocked || computing || closed || basisChanged || !deadlineOpen(deadline)
+            }
+            begin={beginRepair}
+            current={async (owner) =>
+              session.confirmation?.runId === owner.runId &&
+              (await repairData()) === owner.dataId &&
+              session.confirmation?.runId === owner.runId
+            }
+            apply={acceptRepair}
+          />
         )}
         {closed && (
           <p role="status" className={styles.notice}>
@@ -1498,6 +1662,7 @@ function Workspace({
             closed ||
             deadline === null ||
             !canCalculate ||
+            mainBlocked ||
             basisChanged
           }
           onClick={() => void compute()}
@@ -1626,7 +1791,7 @@ function Workspace({
             className={styles.planGrid}
             label={copy.openingDecision}
           >
-            {(run.baseRequest || run.baseConflict) && !capacityRefused(baseState) && (
+            {(run.baseRequest || run.baseConflict) && !capacityRefused(baseState) && !analysis && (
               <PlanResult
                 title={copy[run.baseTitle]}
                 state={baseState}
@@ -1693,7 +1858,7 @@ function Workspace({
               </PlanResult>
             )}
           </PlanPathGroups>
-          {incompleteRun && problem !== "combinedExhausted" && (
+          {incompleteRun && !analysis && problem !== "combinedExhausted" && (
             <p role="status">{copy.unfinishedPlans}</p>
           )}
           {same && (

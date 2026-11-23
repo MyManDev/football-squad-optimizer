@@ -3,7 +3,7 @@
 ADR [0018](../architecture/decisions/0018-llmopt-run-budget.md) defines admission and work
 capacity. The optional `run` member of an advice POST has the exact shape in
 [`llmopt_run_v1.schema.json`](llmopt_run_v1.schema.json). It carries a random 32-hex run ID
-and `base` or `followup`; it never carries a provider key, forecast, or model output.
+and a stage of `base`, `followup` or `repair`.
 The server binds the ID to its own resolved context, league, member and window. It does
 not include the reference in the advice key or immutable computation spec.
 
@@ -38,6 +38,7 @@ The browser treats cancellation as terminal and displays no server diagnostic te
 Capacity and state refusals use HTTP 409 with stable codes:
 `RUN_BASE_REQUIRED`, `RUN_BASE_CHANGED`, `RUN_CONTEXT_CHANGED`, `RUN_CANCELLED`,
 `RUN_BUDGET_EXHAUSTED`, `RUN_REQUEST_INCOMPLETE`, and `RUN_STORE_UNAVAILABLE`.
+An unrecognized repair or selection returns `RUN_REPAIR_INVALID`.
 The page retains completed plans and uses one simple sentence for unfinished work.
 
 The durable ledger reserves 21 units per one-week job, 122 per three-week job, at most four
@@ -49,3 +50,32 @@ The internal [ledger v2](llmopt_run_ledger_v2.schema.json) adds capture identity
 anonymous-consumer ownership. Old-capture runs with no open jobs are removed together
 with unreferenced allocations. V1 migration preserves existing work receipts and recovers
 capture identity from immutable specs where available. It never resets a live budget.
+
+## Verified repairs
+
+League and public-entry capabilities can advertise `verified_repairs: true` when
+the master planning setting is on. An existing job may finish and cache its answer
+after rollback. The disabled setting refuses new candidate and selection work.
+Three-week candidates use a regular advice POST with the original run ID and
+`stage: "repair"`. Following a proved incompatible base, each candidate changes
+one rule of the original immutable request. A known missing chip right permits
+removing the chip requirement. Missing chip history and unfinished searches
+cannot start these repairs. For conflicts detected before submission, the
+first well-formed edited request supplies the base. Every candidate and selection
+then carries the same optional `run.repair_origin`, containing preference
+fragments and forced Wildcard weeks from the member's original draft. Fragments
+can retain incompatible rules that cannot share a normal job request. Their
+canonical scoped rules bind the original to the run, including on a cache hit.
+The Wildcard weeks list names explicit rules. A frozen week preserves its own
+chip separately. Only active fields are sent, and the ordinary 4096-byte POST
+limit applies to the entire candidate or pinned selection. An oversized
+candidate cannot start work and an oversized selection is never offered.
+The other candidate can still be checked and selected if its request fits.
+The first posted edit counts as a candidate whether it succeeds or fails.
+
+The ledger records up to two candidate answer keys and reserves capacity for
+one selection. Cache hits retain the originating request and spend no units.
+Verification sends the edited preferences and all three weeks of transfers,
+chip, starting eleven and captain from the cached witness. Every candidate
+and selection uses the existing run capacity and capture. The client checks
+the resulting decisions and net points before displaying a selected plan.

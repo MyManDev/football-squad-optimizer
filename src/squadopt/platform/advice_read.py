@@ -51,6 +51,7 @@ from squadopt.platform.advice_documents import (
     validate_league_capabilities,
     validate_league_state,
 )
+from squadopt.platform.advice_plan_cache import PlanAdviceCache
 from squadopt.platform.advice_switches import (
     MANAGERS_WORD_SWITCH,
     MODEL_SWITCH,
@@ -467,6 +468,7 @@ class AdviceReadStore:
         transfer_packages: bool = False,
         three_week_paths: bool = False,
         preference_bundles: bool = False,
+        verified_repairs: bool = False,
         llmopt_vnext: bool = False,
     ) -> None:
         self._directory = directory
@@ -490,6 +492,7 @@ class AdviceReadStore:
         self._transfer_packages = transfer_packages
         self._three_week_paths = three_week_paths
         self._preference_bundles = preference_bundles
+        self._verified_repairs = verified_repairs
         self.llmopt_vnext = llmopt_vnext
 
     def current_capture_snapshot_id(self) -> str | None:
@@ -709,6 +712,8 @@ class AdviceReadStore:
             document["plan_data_id"] = advice_context_identity(context)
         if self.llmopt_vnext and self._preference_bundles:
             document["preference_bundles"] = {"version": BUNDLE_VERSION}
+        if self.llmopt_vnext and self._verified_repairs:
+            document["verified_repairs"] = True
         if inputs.football is not None:
             document["models"] = list(PREDICTION_MODELS)
             document["decision_information"] = inputs.decision_information(
@@ -1062,10 +1067,14 @@ class AdviceReadStore:
             raise UnknownStrategyError(f"Strategy {strategy!r} is not computed here.")
         return self._strategies[strategy]
 
-    def cached(self, key: str) -> bytes | None:
+    def cached(self, key: str, *, repair_witness: bool = False) -> bytes | None:
         """GET and POST share the same validation of exact cached bytes."""
 
-        cached = self._cache.get(key)
+        cached = (
+            self._cache.repair_witness(key)
+            if repair_witness and isinstance(self._cache, PlanAdviceCache)
+            else self._cache.get(key)
+        )
         if cached is not None:
             validate_advice_document(cached)
         return cached

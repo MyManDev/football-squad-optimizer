@@ -30,6 +30,7 @@ its header.
 | [0020](0020-llmopt-device-alternatives.md) | One-week device equivalence and Pareto transfer decisions | 2026-11-19 | Proposed | None |
 | [0021](0021-llmopt-plan-context.md) | Content identities and bounded conversations about computed plans | 2026-11-19 | Proposed | None |
 | [0022](0022-llmopt-transfer-packages.md) | Bounded transfer packages and three-week paths | 2026-11-19 | Accepted (owner, 2026-11-19) | None |
+| [0023](0023-llmopt-verified-rule-repairs.md) | Offer a rule edit only after computing a feasible plan | 2026-11-20 | Proposed | None |
 | [0024](0024-llmopt-release-control.md) | Select the planning workflow with one server setting | 2026-11-20 | Proposed | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the

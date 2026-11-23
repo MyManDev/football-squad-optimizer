@@ -75,11 +75,24 @@ export function solveRequest(
   onChip?: (done: number, total: number) => void,
 ): DevicePlanAnswer {
   if (preferenceBundle) {
-    if (alternatives || strategy || top100Weight || chipGains.length)
+    if (
+      alternatives ||
+      strategy ||
+      top100Weight ||
+      chipGains.length ||
+      (priorityMain && (!preferenceBundle.program || priorityReference || chip !== null))
+    )
       throw new DevicePlanRefused("unsupported preference execution combination", "plan");
     return solvePreferenceBundle(
       solver,
-      { document, entry, preferences, chip, bundle: preferenceBundle, priorityReference },
+      {
+        document,
+        entry,
+        preferences,
+        chip,
+        bundle: preferenceBundle,
+        priorityMain: priorityMain ? "main" : priorityReference,
+      },
       (rules, choice) =>
         solveRequest(solver, { document, entry, preferences: rules, chip: choice }, now),
       now,

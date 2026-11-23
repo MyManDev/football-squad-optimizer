@@ -899,6 +899,7 @@ def build_backend(
         transfer_packages=config.enabled_packages,
         three_week_paths=config.enabled_three_week_paths,
         preference_bundles=True,
+        verified_repairs=config.llmopt_vnext,
         llmopt_vnext=config.llmopt_vnext,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
@@ -932,6 +933,7 @@ def build_backend(
             transfer_packages=config.enabled_packages,
             three_week_paths=config.enabled_three_week_paths,
             preference_bundles=True,
+            verified_repairs=config.llmopt_vnext,
             llmopt_vnext=config.llmopt_vnext,
         )
         public_submit = AdviceSubmitService(

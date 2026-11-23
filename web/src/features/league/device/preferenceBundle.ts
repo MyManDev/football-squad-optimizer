@@ -13,7 +13,7 @@ import {
 import { oneWeekPreferences } from "./preferences";
 import { solvePriorityPreferences } from "./priority";
 import type { DevicePriorityReference } from "./priorityWitness";
-import { DevicePlanRefused, solvePlan } from "./solve/week";
+import { DevicePlanRefused, DeviceWeekInfeasible, solvePlan } from "./solve/week";
 import type { LpSolver } from "./lp/problem";
 import type {
   DeviceChip,
@@ -48,7 +48,7 @@ export function solvePreferenceBundle(
     preferences?: DecisionPreferences;
     chip: DeviceChip | null;
     bundle: PreferenceBundle;
-    priorityReference?: DevicePriorityReference;
+    priorityMain?: DevicePriorityReference | "main";
   },
   plain: (preferences: DecisionPreferences, chip: DeviceChip | null) => DevicePlanAnswer,
   now: () => number,
@@ -56,10 +56,10 @@ export function solvePreferenceBundle(
   const started = now();
   const hard = checkedPreferences(input.preferences);
   const bundle = oneWeekBundle(input.bundle, hard);
-  if (bundle.program && !input.priorityReference)
+  if (bundle.program && !input.priorityMain)
     throw new DevicePlanRefused("missing confirmed main", "plan");
   const baseline =
-    bundle.program && input.priorityReference
+    bundle.program && input.priorityMain
       ? solvePlan(
           solver,
           input.document,
@@ -67,7 +67,7 @@ export function solvePreferenceBundle(
           now,
           input.chip,
           { preferences: hard },
-          input.priorityReference,
+          input.priorityMain,
         )
       : plain(hard, input.chip);
   const net = (answer: DevicePlanAnswer) => answer.expected_own_points - answer.transfer_hit_points;
@@ -100,7 +100,7 @@ export function solvePreferenceBundle(
       };
     } catch (error) {
       if (!(error instanceof DevicePlanRefused)) throw error;
-      if (error.status === "Infeasible")
+      if (error instanceof DeviceWeekInfeasible)
         return { status: "failed", answer: null, error_code: "PLAN_NOT_FOUND" };
       if (error.status !== "Time limit reached") throw error;
       exhausted = true;

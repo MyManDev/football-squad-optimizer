@@ -49,7 +49,7 @@ from squadopt.live import Projection, RecommendationInputs, SeasonRules, plan_tr
 from squadopt.live.rules import CHIP_NAMES
 from squadopt.optimization import (
     OptimizationConfig,
-    SolverExecutionError,
+    SolverWallTimeLimit,
     wall_clock_stopped_the_search,
 )
 from squadopt.planning import PlanningWeekResult
@@ -364,7 +364,7 @@ def advise_with_chip(
         linearization_level=solved.linearization_level,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
-        raise SolverExecutionError(
+        raise SolverWallTimeLimit(
             f"The {chip!r} plan for entry {picks.entry_id} was stopped by the "
             f"{WINDOW_WALL_CEILING_SECONDS}s wall-clock safety cap, not by its deterministic "
             "budget, so it is not the plan a second build would find and may not be published."

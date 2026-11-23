@@ -1260,7 +1260,8 @@ def diagnose_infeasible_preferences(
         candidate: DecisionPreferences, bank: cp_model.IntVar | None = None
     ) -> tuple[cp_model.CpSolver, SolverStatus] | None:
         nonlocal remaining_probes
-        if remaining_probes == 0:
+        budget = current_work_budget()
+        if remaining_probes == 0 or (budget is not None and budget.remaining <= 0):
             return None
         model = replace(base, model=base.model.clone())
         _apply_decision_preferences(model, state, optimization, transfer, candidate)

@@ -47,6 +47,7 @@ export interface StrategyCapability {
 }
 
 export interface AdviceCapabilities {
+  verifiedRepairs?: true;
   transferPackages?: true;
   threeWeekPaths?: true;
   planDataId?: string;
@@ -108,6 +109,8 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
     throw new AdviceCapabilitiesError("Invalid plan data identity.");
   if (value.transfer_packages !== undefined && typeof value.transfer_packages !== "boolean")
     throw new AdviceCapabilitiesError("Invalid transfer package capability.");
+  if (value.verified_repairs !== undefined && typeof value.verified_repairs !== "boolean")
+    throw new AdviceCapabilitiesError("Invalid verified repair capability.");
   if (value.three_week_paths !== undefined && typeof value.three_week_paths !== "boolean")
     throw new AdviceCapabilitiesError("Invalid three-week path capability.");
   const strategies: Record<string, StrategyCapability> = {};
@@ -186,6 +189,9 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   )
     throw new AdviceCapabilitiesError("Invalid decision information.");
   return {
+    ...(value.llmopt_vnext === true && value.verified_repairs === true
+      ? { verifiedRepairs: true as const }
+      : {}),
     ...(value.llmopt_vnext === true ? { llmoptVNext: true as const } : {}),
     ...(value.decision_information === undefined
       ? {}

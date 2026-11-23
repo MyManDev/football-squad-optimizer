@@ -12,6 +12,7 @@ import {
 } from "../src/features/league/advice/decisionPreferences";
 import { installLeagueMocks } from "./leagueMocks";
 import { EXAMPLE_CLAIM, pickMember } from "./identity";
+import { dismissOpening } from "./dismissOpening";
 import { MESSAGES } from "../src/i18n/messages";
 import { LLMOPT_COPY } from "../src/features/league/llmopt/copy";
 import { holdModel, routeChat } from "./llmoptChat";
@@ -434,6 +435,9 @@ for (const unavailable of ["blocked", "full"] as const) {
       return answer(route, result);
     });
     await page.goto(`/league/${LEAGUE}/members/${ENTRY}/llmopt`);
+    const picker = page.locator("[data-member-picker]");
+    await expect(picker).toBeVisible();
+    await dismissOpening(page);
     await pickMember(page, EXAMPLE_CLAIM, "en");
     await page
       .getByRole("combobox", { name: LLMOPT_COPY.en.window, exact: true })
@@ -449,6 +453,8 @@ for (const unavailable of ["blocked", "full"] as const) {
     const started = [...runIds];
     await page.reload();
     // A tab without storage asks for the member again. The run lives in the history entry.
+    await expect(picker).toBeVisible();
+    await dismissOpening(page);
     await pickMember(page, EXAMPLE_CLAIM, "en");
     await expect(first).toBeVisible();
     expect(runIds).toEqual(started);

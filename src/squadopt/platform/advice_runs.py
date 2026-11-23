@@ -6,6 +6,7 @@ grant another attempt. Run metadata never changes the immutable answer or spec k
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -118,6 +119,7 @@ class RunTransaction:
     def __init__(self, store: FileRunStore, state: dict[str, Any]) -> None:
         self.store = store
         self.state = state
+        self.repair_candidate: str | None = None
 
     def bind(
         self,
@@ -156,15 +158,52 @@ class RunTransaction:
             self.store._save(self.state)
         if ref.stage == "base" and run["base"] != key:
             raise RunAdmissionError("RUN_BASE_CHANGED", "Confirm a new planning run.")
+        if ref.stage == "repair" and window != 3:
+            raise RunAdmissionError("RUN_REPAIR_INVALID", "Server repairs require three weeks.")
         if ref.stage != "base" and not run["base_cached"]:
             identifier = run["requests"].get(run["base"])
             base = queue.load(identifier) if identifier is not None else None
-            if base is None or base.status != "completed":
+            proved_failure = (
+                ref.stage == "repair"
+                and base is not None
+                and base.status == "failed"
+                and base.error is not None
+                and (
+                    base.error.code == "CHIP_NOT_HELD"
+                    or (
+                        base.error.code == "PLAN_NOT_FOUND" and base.error.infeasibility is not None
+                    )
+                )
+            )
+            if not proved_failure and (base is None or base.status != "completed"):
                 raise RunAdmissionError("RUN_BASE_REQUIRED", "Compute the main plan first.")
 
     def previous(self, ref: RunReference, key: str) -> str | None:
         value = self.state["runs"][ref.run_id]["requests"].get(key)
         return str(value) if value is not None else None
+
+    def completed_answer(
+        self, ref: RunReference, key: str, document: bytes, queue: JobQueue
+    ) -> bool:
+        identifier = self.previous(ref, key)
+        if identifier is None:
+            return False
+        allocation = self.state["jobs"][identifier]
+        receipt = allocation["receipt"]
+        if (
+            allocation["limit"] != job_capacity(3)
+            or not isinstance(receipt, dict)
+            or "answer_sha256" not in receipt
+        ):
+            return False
+        job = queue.load(identifier)
+        return (
+            job is not None
+            and job.status == "completed"
+            and job.contract_version == "backend_jobs_v2"
+            and job.cache_key == key
+            and receipt["answer_sha256"] == hashlib.sha256(document).hexdigest()
+        )
 
     def release_failed_bundles(self, run_id: str, queue: JobQueue) -> None:
         owners: set[str] = set()
@@ -203,11 +242,17 @@ class RunTransaction:
                 raise RunAdmissionError("RUN_REQUEST_CHANGED", "The original request is retained.")
             return
         units = job_capacity(run["window"]) * (3 if preference_bundle else 1)
+        # A candidate needs room for its own solve and the selected-plan replay.
+        if self.repair_candidate == key and (
+            len(run["requests"]) >= 3 or run["reserved"] + 2 * units > run_capacity(run["window"])
+        ):
+            raise RunAdmissionError("RUN_BUDGET_EXHAUSTED", "The completed plans are available.")
         if len(set(run["requests"].values())) >= 4 or run["reserved"] + units > run_capacity(
             run["window"]
         ):
             raise RunAdmissionError("RUN_BUDGET_EXHAUSTED", "The completed plans are available.")
         run["requests"][key] = job_id
+        self._remember_candidate(run)
         job = self.state["jobs"].setdefault(
             job_id, {"limit": units, "runs": [], "receipt": None, "legacy_consumer": False}
         )
@@ -219,9 +264,19 @@ class RunTransaction:
         self.store._save(self.state)
 
     def cached(self, ref: RunReference) -> None:
+        run = self.state["runs"][ref.run_id]
+        changed = self._remember_candidate(run)
         if ref.stage == "base":
-            self.state["runs"][ref.run_id]["base_cached"] = True
+            run["base_cached"] = True
+        if ref.stage == "base" or changed:
             self.store._save(self.state)
+
+    def _remember_candidate(self, run: dict[str, Any]) -> bool:
+        key = self.repair_candidate
+        if key is None or key in run.get("repair_candidates", []):
+            return False
+        run.setdefault("repair_candidates", []).append(key)
+        return True
 
     def legacy_consumer(self, job_id: str) -> None:
         """An anonymous join owns the answer independently of every identified run."""
@@ -364,7 +419,7 @@ class FileRunStore:
         for identifier, run in state["runs"].items():
             if re.fullmatch(r"[0-9a-f]{32}", identifier) is None or not isinstance(run, dict):
                 raise ValueError("Invalid planning run identity.")
-            if set(run) != {
+            if set(run) - {"repair_candidates"} != {
                 "binding",
                 "capture",
                 "window",
@@ -375,6 +430,17 @@ class FileRunStore:
                 "reserved",
             }:
                 raise ValueError("Invalid planning run fields.")
+            candidates = run.get("repair_candidates", [])
+            if (
+                not isinstance(candidates, list)
+                or len(candidates) > 2
+                or any(
+                    not isinstance(key, str) or not re.fullmatch(r"[0-9a-f]{64}", key)
+                    for key in candidates
+                )
+                or len(set(candidates)) != len(candidates)
+            ):
+                raise ValueError("Invalid planning repair candidates.")
             if (
                 (run["capture"] is not None and not isinstance(run["capture"], str))
                 or type(run["window"]) is not int
@@ -528,7 +594,9 @@ class FileRunStore:
             self._save(tx.state)
             return WorkBudget(float(job["limit"]))
 
-    def finish(self, job_id: str, budget: WorkBudget) -> None:
+    def finish(
+        self, job_id: str, budget: WorkBudget, *, rollback_answer: bytes | None = None
+    ) -> None:
         with self.transaction() as tx:
             job = tx.state["jobs"][job_id]
             if isinstance(budget.journal, BundleWorkJournal):
@@ -542,4 +610,6 @@ class FileRunStore:
                     "native_reserved": budget.native_reserved,
                     "calls": budget.calls,
                 }
+                if rollback_answer is not None and job["limit"] == job_capacity(3):
+                    job["receipt"]["answer_sha256"] = hashlib.sha256(rollback_answer).hexdigest()
             self._save(tx.state)

@@ -222,6 +222,10 @@
     "transfer_packages": {
       "description": "Whether transfer-package search is enabled.",
       "type": "boolean"
+    },
+    "verified_repairs": {
+      "const": true,
+      "type": "boolean"
     }
   },
   "required": [

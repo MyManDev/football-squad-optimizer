@@ -151,6 +151,30 @@ const en = {
     `Remove the ${player} transfer rule in GW ${week}`,
   applyRepair: "Apply suggested rules",
   repairApplied: "Suggested rules selected. Review them and calculate again.",
+  repairs: {
+    conflict: "These rules cannot all be met together.",
+    missing: "Try calculating again when the missing plan data is available.",
+    budget: "This run has used its allowance, so review the rules and start a new calculation.",
+    wait: "The calculation timed out, so try again.",
+    unconfirmed: "Check the changes again, or edit your rules to calculate a different plan.",
+    tooLarge: "Remove a rule or unlock a week to check these changes.",
+    check: "Check changes",
+    netPoints: "net points",
+    changeRule: (before: string, after: string) => `Change “${before}” to “${after}”`,
+    removeRule: (name: string) => `Remove “${name}”`,
+    bank: (amount: string, week: number) =>
+      `These rules cannot leave ${amount} in the bank after GW ${week}.`,
+    frozen: (week: number) =>
+      `The locked decision for GW ${week} conflicts with the current rules.`,
+    unlock: (week: number) => `Unlock GW ${week}`,
+    wildcard: (week: number) =>
+      `This squad cannot play its Wildcard in GW ${week} with these rules.`,
+    noHits: (week: number) =>
+      `The required transfers in GW ${week} incur a hit your rules do not allow.`,
+    hitLimit: (week: number, limit: number) =>
+      `The required transfers in GW ${week} exceed the ${limit}-point hit limit.`,
+    club: (name: string) => `“${name}” conflicts with the other squad requirements.`,
+  },
   wildcardUnavailable: "This team cannot play its Wildcard this gameweek.",
   results: "Plans",
   base: "Base plan",
@@ -384,6 +408,31 @@ const tr: typeof en = {
     `GW ${week} için ${player} transfer kuralını kaldır`,
   applyRepair: "Önerilen kuralları uygula",
   repairApplied: "Önerilen kurallar seçildi. Kontrol edip yeniden hesapla.",
+  repairs: {
+    conflict: "Bu kuralların tümü aynı anda uygulanamıyor.",
+    missing: "Eksik plan verileri hazır olduğunda yeniden hesapla.",
+    budget:
+      "Bu çalışmanın hesaplama hakkı doldu, kuralları gözden geçirip yeni bir hesaplama başlat.",
+    wait: "Hesaplama süresi doldu, yeniden dene.",
+    unconfirmed:
+      "Değişiklikleri yeniden denetle veya başka bir plan hesaplamak için kuralları düzenle.",
+    tooLarge: "Bu değişiklikleri denetlemek için bir kuralı kaldır veya bir haftanın kilidini aç.",
+    check: "Değişiklikleri denetle",
+    netPoints: "net puan",
+    changeRule: (before: string, after: string) =>
+      `“${before}” kuralını “${after}” olarak değiştir`,
+    removeRule: (name: string) => `“${name}” kuralını kaldır`,
+    bank: (amount: string, week: number) =>
+      `Bu kurallarla GW ${week} sonunda kasada ${amount} kalamıyor.`,
+    frozen: (week: number) => `GW ${week} için kilitlenen karar mevcut kurallarla uyuşmuyor.`,
+    unlock: (week: number) => `GW ${week} kilidini kaldır`,
+    wildcard: (week: number) => `Bu kadro GW ${week} için bu kurallarla Wildcard kullanamıyor.`,
+    noHits: (week: number) =>
+      `GW ${week} için gereken transferler puan cezası getiriyor ve kuralların buna izin vermiyor.`,
+    hitLimit: (week: number, limit: number) =>
+      `GW ${week} için gereken transferler ${limit} puanlık ceza sınırını aşıyor.`,
+    club: (name: string) => `“${name}” kuralı diğer kadro şartlarıyla uyuşmuyor.`,
+  },
   wildcardUnavailable: "Bu takım bu hafta Wildcard kullanamıyor.",
   results: "Planlar",
   base: "Temel plan",

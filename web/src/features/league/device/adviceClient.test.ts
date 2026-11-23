@@ -9,7 +9,11 @@ import { publicEntryCapabilities } from "../advice/adviceCapabilities";
 import type { PreferenceBundle } from "../advice/preferenceBundle";
 import type { AdviceClient, AdviceRequest } from "../advice/adviceClient";
 import { deviceAdviceClient } from "./adviceClient";
+import { DEVICE_ENVELOPE_PREFIX } from "./envelopeCache";
 import { deviceWorkReceipt } from "./workBudget";
+import { shownPriorityReference } from "./priorityWitness";
+import { planIdentity } from "../llmopt/planHistory";
+import { expectedNet } from "../llmopt/planComparison";
 import { replyTo } from "./replies";
 import { solvePlan } from "./solve/week";
 import type { DeviceSolver } from "./useDevicePlan";
@@ -61,8 +65,12 @@ const request: AdviceRequest = {
   run: { contract_version: "llmopt_run_v1", run_id: "d".repeat(32), stage: "base" },
   preferences: checkedPreferences({ keep_players: [entry.held[0]], net_points_priority: true }),
 };
-const enabledCaps = { ...publicEntryCapabilities(squad), llmoptVNext: true as const };
-function setup() {
+const enabledCaps = {
+  ...publicEntryCapabilities(squad),
+  llmoptVNext: true as const,
+  verifiedRepairs: true as const,
+};
+function setup(deviceSolver: LpSolver = solver) {
   const remote = {
     readAdvice: vi.fn().mockResolvedValue({ kind: "not-computed" }),
     readPublished: vi.fn().mockResolvedValue({ kind: "not-computed" }),
@@ -80,7 +88,7 @@ function setup() {
       postMessage: (input) => {
         posts(input);
         queueMicrotask(() =>
-          replyTo(solver, input, (data) => worker.onmessage?.({ data } as MessageEvent)),
+          replyTo(deviceSolver, input, (data) => worker.onmessage?.({ data } as MessageEvent)),
         );
       },
     };
@@ -96,6 +104,306 @@ function setup() {
 }
 
 describe("one-week advice transport with a real solver", () => {
+  it.each(["candidate", "selection"] as const)(
+    "recovers an aborted %s without a concurrent duplicate or a refund",
+    async (stage) => {
+      const { client, remote, load, posts, create } = setup();
+      const dataId = await client.readDeviceDataId!();
+      const candidate: AdviceRequest = {
+        ...request,
+        run: { ...request.run!, stage: "repair" },
+        deviceRepair: { dataId },
+      };
+      const verify = stage === "selection";
+      if (verify) expect((await client.requestAdvice(candidate)).kind).toBe("advice");
+      const attempt = { ...candidate, deviceRepair: { dataId, verify } };
+      const runId = request.run!.run_id;
+      let started!: () => void;
+      const posted = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const terminated = vi.fn();
+      const waiting = deviceAdviceClient(remote, squad, load, () => ({
+        onmessage: null,
+        terminate: terminated,
+        postMessage: started,
+      }));
+      const controller = new AbortController();
+      const first = waiting.requestAdvice(attempt, { signal: controller.signal });
+      await posted;
+      const reserved = deviceWorkReceipt(runId)!;
+      expect(reserved.units).toBe(verify ? 8 : 4);
+      // The concurrent client reaches the same address while the first worker is still alive.
+      let observed!: () => void;
+      const lookup = new Promise<void>((resolve) => {
+        observed = resolve;
+      });
+      const original = Storage.prototype.getItem;
+      const reads = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
+        this: Storage,
+        key,
+      ) {
+        if (key.startsWith(DEVICE_ENVELOPE_PREFIX)) observed();
+        return original.call(this, key);
+      });
+      const other = deviceAdviceClient(remote, squad, load, create);
+      const joined = Promise.allSettled([first, other.requestAdvice(attempt)]);
+      await lookup;
+      reads.mockRestore();
+      controller.abort();
+      const interrupted = {
+        status: "rejected",
+        reason: expect.objectContaining({ name: "AbortError" }),
+      };
+      expect(await joined).toMatchObject([interrupted, interrupted]);
+      expect(terminated).toHaveBeenCalledOnce();
+      expect(deviceWorkReceipt(runId)).toEqual(reserved);
+      expect(Object.keys(sessionStorage).some((key) => key.endsWith(":failure"))).toBe(false);
+      expect(posts).toHaveBeenCalledTimes(verify ? 1 : 0);
+      const resumed = deviceAdviceClient(remote, squad, load, create);
+      remote.readCapabilities.mockResolvedValue({ ...enabledCaps, verifiedRepairs: undefined });
+      expect(await resumed.requestAdvice(attempt)).toMatchObject({
+        reason: "LLMOPT_VNEXT_DISABLED",
+      });
+      expect(deviceWorkReceipt(runId)).toEqual(reserved);
+      remote.readCapabilities.mockResolvedValue(enabledCaps);
+      const recovered = await resumed.requestAdvice(attempt);
+      expect(recovered.kind).toBe("advice");
+      expect(await resumed.requestAdvice(attempt)).toEqual(recovered);
+      expect(deviceWorkReceipt(runId)).toEqual({ ...reserved, units: reserved.units + 4 });
+      expect(posts).toHaveBeenCalledTimes(verify ? 2 : 1);
+      expect(remote.requestAdvice).not.toHaveBeenCalled();
+    },
+  );
+
+  it("restores the exact storage left by a page that disappeared during selected replay", async () => {
+    const { client, remote, load, create, posts } = setup();
+    const dataId = await client.readDeviceDataId!();
+    const candidate: AdviceRequest = {
+      ...request,
+      run: { ...request.run!, stage: "repair" },
+      deviceRepair: { dataId },
+    };
+    const witness = await client.requestAdvice(candidate);
+    if (witness.kind !== "advice") throw new Error("Missing candidate witness");
+    const select = { ...candidate, deviceRepair: { dataId, verify: true } };
+    let snapshot: [string, string][] = [];
+    const original = deviceAdviceClient(remote, squad, load, () => {
+      snapshot = Object.keys(sessionStorage).map((key) => [key, sessionStorage.getItem(key)!]);
+      return create();
+    });
+    expect((await original.requestAdvice(select)).kind).toBe("advice");
+    sessionStorage.clear();
+    for (const [key, value] of snapshot) sessionStorage.setItem(key, value);
+    const runId = request.run!.run_id;
+    const abandoned = deviceWorkReceipt(runId)!;
+    expect(abandoned.units).toBe(8);
+    expect(abandoned.repairSelection).toBe(abandoned.repairCandidates![0]);
+    expect(Object.keys(sessionStorage).some((key) => key.endsWith(":selection"))).toBe(false);
+    const restored = deviceAdviceClient(remote, squad, load, create);
+    const replay = await restored.requestAdvice(select);
+    if (replay.kind !== "advice") throw new Error("Missing recovered selection");
+    expect(await planIdentity(replay.envelope.payload)).toBe(
+      await planIdentity(witness.envelope.payload),
+    );
+    expect(expectedNet(replay.envelope.payload)).toBe(expectedNet(witness.envelope.payload));
+    expect(await restored.requestAdvice(select)).toEqual(replay);
+    expect(deviceWorkReceipt(runId)).toEqual({ ...abandoned, units: 12 });
+    expect(posts).toHaveBeenCalledTimes(3);
+  });
+
+  it("computes a repair and freshly verifies the selected content once across reload", async () => {
+    const { client, remote, posts, load, create } = setup();
+    const dataId = await client.readDeviceDataId!();
+    const failed = await client.requestAdvice({
+      ...request,
+      preferences: checkedPreferences({
+        net_points_priority: true,
+        min_bank: { tenths: 10000 },
+      }),
+    });
+    expect(failed).toEqual({
+      kind: "unavailable",
+      reason: "PLAN_NOT_FOUND",
+      infeasibility: { repairs: [] },
+    });
+    const candidate: AdviceRequest = {
+      ...request,
+      run: { ...request.run!, stage: "repair" },
+      deviceAlternatives: true,
+      deviceRepair: { dataId },
+    };
+    const witness = await client.requestAdvice(candidate);
+    if (witness.kind !== "advice") throw new Error("A feasible witness was required.");
+    expect(posts).toHaveBeenCalledTimes(2);
+    const selected = { ...candidate, deviceRepair: { dataId, verify: true } };
+    const [a, b] = await Promise.all([
+      client.requestAdvice(selected),
+      client.requestAdvice(selected),
+    ]);
+    expect(a).toEqual(b);
+    if (a.kind !== "advice") throw new Error("The selected repair was not verified.");
+    expect(await planIdentity(a.envelope.payload)).toBe(
+      await planIdentity(witness.envelope.payload),
+    );
+    expect(expectedNet(a.envelope.payload)).toBe(expectedNet(witness.envelope.payload));
+    expect(posts).toHaveBeenCalledTimes(3);
+    remote.readCapabilities.mockResolvedValue(publicEntryCapabilities(squad));
+    const restored = deviceAdviceClient(remote, squad, load, create);
+    expect(await restored.requestAdvice(selected)).toEqual(a);
+    expect(await restored.requestAdvice(candidate)).toEqual(witness);
+    expect(posts).toHaveBeenCalledTimes(3);
+    expect(deviceWorkReceipt(request.run!.run_id)?.units).toBe(12);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["no master", { ...enabledCaps, llmoptVNext: undefined }],
+    ["no repair support", { ...enabledCaps, verifiedRepairs: undefined }],
+    ["another capture", { ...enabledCaps, captureSnapshotId: "old" }],
+  ])("does not claim a repair candidate without matching permission: %s", async (_label, caps) => {
+    const { client, remote, posts } = setup();
+    const dataId = await client.readDeviceDataId!();
+    remote.readCapabilities.mockResolvedValue(caps);
+    const result = await client.requestAdvice({
+      ...request,
+      run: { ...request.run!, stage: "repair" },
+      deviceRepair: { dataId },
+    });
+    expect(result).toEqual({ kind: "unavailable", reason: "LLMOPT_VNEXT_DISABLED" });
+    expect(deviceWorkReceipt(request.run!.run_id)).toBeUndefined();
+    expect(posts).not.toHaveBeenCalled();
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it("replays a total repair from the edited private main after reload", async () => {
+    const { client, create, load, remote, posts } = setup();
+    const dataId = await client.readDeviceDataId!();
+    const candidate: AdviceRequest = {
+      ...request,
+      run: { ...request.run!, stage: "repair" },
+      deviceRepair: { dataId },
+      preferenceBundle: {
+        contract_version: "llmopt_preference_bundle_v1",
+        slots: [],
+        prices: [],
+        choices: [],
+        program: {
+          max_total_cost_tenths: 100,
+          preferences: [
+            { priority: 1, rules: checkedPreferences({ avoid_players: [entry.held[1]] }) },
+          ],
+        },
+      },
+    };
+    const witness = await client.requestAdvice(candidate);
+    if (witness.kind !== "advice") throw new Error("Missing edited primary plan");
+    const parent = shownPriorityReference(witness.envelope.payload);
+    expect(parent).toBeDefined();
+    expect(posts.mock.calls[0]![0].priorityMain).toBe(true);
+    expect(posts.mock.calls[0]![0].priorityReference).toBeUndefined();
+    const keys = Object.keys(sessionStorage);
+    expect(keys.some((key) => key.startsWith("llmopt-device-v1:"))).toBe(false);
+    const privateKey = keys.find((key) => key.endsWith(":candidate"))!;
+    expect(privateKey).toMatch(/^llmopt-device-repair-v1:/);
+    const original = sessionStorage.getItem(privateKey)!;
+    const wrong = JSON.parse(original);
+    wrong.payload.device_input_fingerprint = "0".repeat(64);
+    sessionStorage.setItem(privateKey, JSON.stringify(wrong));
+    const replay = { ...candidate, deviceRepair: { dataId, verify: true } };
+    const restored = deviceAdviceClient(remote, squad, load, create);
+    expect(await restored.requestAdvice(replay)).toMatchObject({ reason: "RUN_BASE_REQUIRED" });
+    expect(deviceWorkReceipt(request.run!.run_id)?.repairSelection).toBeUndefined();
+    sessionStorage.setItem(privateKey, original);
+    const result = await restored.requestAdvice(replay);
+    if (result.kind !== "advice") throw new Error("Missing rechecked selection");
+    expect(posts.mock.calls[1]![0].priorityReference).toEqual(parent);
+    expect(posts.mock.calls[1]![0].priorityMain).toBeUndefined();
+    expect(await planIdentity(result.envelope.payload)).toBe(
+      await planIdentity(witness.envelope.payload),
+    );
+    expect(await restored.requestAdvice(replay)).toEqual(result);
+    expect(await restored.requestAdvice(candidate)).toEqual(witness);
+    expect(deviceWorkReceipt(request.run!.run_id)?.units).toBe(8);
+    expect(posts).toHaveBeenCalledTimes(2);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it("rechecks repair support before verifying a selected witness or binding an ordinary cache hit", async () => {
+    const { client, remote, posts } = setup();
+    const dataId = await client.readDeviceDataId!();
+    const ordinary = await client.requestAdvice(request);
+    expect(ordinary.kind).toBe("advice");
+    const candidate: AdviceRequest = {
+      ...request,
+      run: { ...request.run!, stage: "repair" },
+      deviceRepair: { dataId },
+    };
+    const afterMain = deviceWorkReceipt(request.run!.run_id);
+    remote.readCapabilities.mockResolvedValue({ ...enabledCaps, verifiedRepairs: undefined });
+    const disabled = { kind: "unavailable", reason: "LLMOPT_VNEXT_DISABLED" };
+    expect(await client.requestAdvice(candidate)).toEqual(disabled);
+    expect(deviceWorkReceipt(request.run!.run_id)).toEqual(afterMain);
+    remote.readCapabilities.mockResolvedValue(enabledCaps);
+    const witness = await client.requestAdvice(candidate);
+    expect(witness).toEqual(ordinary);
+    const afterWitness = deviceWorkReceipt(request.run!.run_id);
+    expect(afterWitness?.repairCandidates).toHaveLength(1);
+    expect(afterWitness?.units).toBe(afterMain?.units);
+    remote.readCapabilities.mockResolvedValue({ ...enabledCaps, verifiedRepairs: undefined });
+    expect(
+      await client.requestAdvice({ ...candidate, deviceRepair: { dataId, verify: true } }),
+    ).toEqual(disabled);
+    expect(deviceWorkReceipt(request.run!.run_id)).toEqual(afterWitness);
+    expect(await client.requestAdvice(candidate)).toEqual(witness);
+    expect(posts).toHaveBeenCalledTimes(1);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+  });
+  it("pins failed and stale repair attempts to the device and reserves only once", async () => {
+    const { client, remote, posts, create, load } = setup();
+    const dataId = await client.readDeviceDataId!();
+    const missing = {
+      ...request,
+      deviceRepair: { dataId },
+      preferences: checkedPreferences({ include_players: [999999] }),
+    };
+    const unknown = { kind: "unavailable", reason: "DEVICE_INPUTS_UNAVAILABLE" };
+    expect(await client.requestAdvice(missing)).toEqual(unknown);
+    const restored = deviceAdviceClient(remote, squad, load, create);
+    expect(await restored.requestAdvice(missing)).toEqual(unknown);
+    expect(
+      await restored.requestAdvice({ ...missing, deviceRepair: { dataId, verify: true } }),
+    ).toMatchObject({ reason: "RUN_BASE_REQUIRED" });
+    expect(
+      await restored.requestAdvice({ ...missing, deviceRepair: { dataId: "0".repeat(64) } }),
+    ).toMatchObject({ reason: "RUN_CONTEXT_CHANGED" });
+    expect(await restored.requestAdvice({ ...missing, deviceRun: false })).toEqual(unknown);
+    expect(await restored.readAdvice({ ...missing, deviceRun: false })).toEqual({
+      kind: "not-computed",
+    });
+    expect(await restored.readPublished(missing)).toEqual({ kind: "not-computed" });
+    expect(posts).toHaveBeenCalledTimes(1);
+    expect(deviceWorkReceipt(request.run!.run_id)?.units).toBe(4);
+    expect(remote.requestAdvice).not.toHaveBeenCalled();
+    expect(remote.readAdvice).not.toHaveBeenCalled();
+    expect(remote.readPublished).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["Time limit reached", "RUN_BUDGET_EXHAUSTED"],
+    ["Iteration limit reached", "RUN_BUDGET_EXHAUSTED"],
+    ["Infeasible", "DEVICE_PLAN_FAILED"],
+  ])("retains a stopped or failed tie-break as %s", async (status, reason) => {
+    let calls = 0;
+    const { client } = setup({
+      solve(problem, options) {
+        if (++calls === 1) return solver.solve(problem, options);
+        return { Status: status, ObjectiveValue: 0, Columns: {} };
+      },
+    });
+    const result = await client.requestAdvice(request);
+    expect(calls).toBe(2);
+    expect(result).toEqual({
+      kind: "unavailable",
+      reason,
+    });
+  });
   it("keeps legacy individual pricing inside one device preference execution", async () => {
     const { client, remote, posts } = setup();
     const selection = { preferences: { avoid_players: [entry.held[1]] }, chip: null };

@@ -11,7 +11,7 @@ interface ConflictContext {
   copy: LLMOptCopy;
 }
 
-function frozenConflict(rule: Constraint, frozen: FrozenPlanWeek) {
+export function frozenConflict(rule: Constraint, frozen: FrozenPlanWeek) {
   switch (rule.kind) {
     case "buy_player":
       return !frozen.transfers_in.includes(rule.player_id);

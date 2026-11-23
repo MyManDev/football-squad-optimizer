@@ -65,6 +65,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
         transfer_packages: bool = False,
         three_week_paths: bool = False,
         preference_bundles: bool = False,
+        verified_repairs: bool = False,
         llmopt_vnext: bool = False,
     ) -> None:
         menu = menu_capabilities()
@@ -79,6 +80,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
             transfer_packages=transfer_packages,
             three_week_paths=three_week_paths,
             preference_bundles=preference_bundles,
+            verified_repairs=verified_repairs,
             llmopt_vnext=llmopt_vnext,
         )
         self._contexts = context
