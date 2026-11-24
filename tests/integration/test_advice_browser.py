@@ -247,6 +247,7 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         allowed_origins=(web_origin,),
         artifact_root=tmp_path / "artifacts",
         llmopt_vnext=workflow == "vnext-on",
+        llmopt_vnext_three_week=workflow == "vnext-on",
     )
     config.store_root.mkdir()
     entry_id = deployment_fixture.ENTRY_ID
@@ -354,6 +355,7 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         SQUADOPT_BACKEND_ALLOWED_ORIGINS=web_origin,
         SQUADOPT_BACKEND_ARTIFACT_ROOT=str(config.artifact_root),
         SQUADOPT_BACKEND_LLMOPT_VNEXT="1" if config.llmopt_vnext else "0",
+        SQUADOPT_BACKEND_LLMOPT_VNEXT_THREE_WEEK="1" if config.llmopt_vnext_three_week else "0",
         SQUADOPT_BROWSER_CONTEXT=json.dumps(
             {
                 "apiOrigin": api_origin,

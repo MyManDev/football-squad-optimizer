@@ -67,6 +67,8 @@ class PublicEntryAdviceReader(AdviceReadStore):
         preference_bundles: bool = False,
         verified_repairs: bool = False,
         llmopt_vnext: bool = False,
+        llmopt_vnext_three_week: bool = False,
+        window_context: Callable[[AdviceRequestContext, int], AdviceRequestContext] | None = None,
     ) -> None:
         menu = menu_capabilities()
         super().__init__(
@@ -82,6 +84,8 @@ class PublicEntryAdviceReader(AdviceReadStore):
             preference_bundles=preference_bundles,
             verified_repairs=verified_repairs,
             llmopt_vnext=llmopt_vnext,
+            llmopt_vnext_three_week=llmopt_vnext_three_week,
+            window_context=window_context,
         )
         self._contexts = context
         self._public_inputs = inputs
@@ -98,7 +102,10 @@ class PublicEntryAdviceReader(AdviceReadStore):
         if fingerprint is None:
             raise AdviceInputsNotPreparedError(context)
         identity = self._contexts.identity()
-        if identity is None or identity.context != context:
+        if identity is None or context not in (
+            identity.context,
+            self.request_context(identity.context, 3),
+        ):
             raise AdviceBackendNotReadyError("The capture context is no longer current.")
         provider = self._public_inputs.provider(
             context, entry_id, fingerprint, identity.snapshot.payloads
@@ -275,6 +282,7 @@ class PublicEntryAdviceReader(AdviceReadStore):
                 preferences=preferences,
             ),
         }
+        context = self.request_context(context, window)
         key = advice_cache_key(
             advice_contract_version=context.advice_contract_version,
             capture_snapshot_id=context.capture_snapshot_id,

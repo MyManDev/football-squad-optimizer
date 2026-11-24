@@ -52,6 +52,7 @@ export interface AdviceCapabilities {
   threeWeekPaths?: true;
   planDataId?: string;
   llmoptVNext?: true;
+  llmoptVNextThreeWeek?: true;
   decisionInformation?: DecisionInformation;
   leagueId: number;
   captureSnapshotId: string;
@@ -72,6 +73,17 @@ export interface AdviceCapabilities {
 }
 
 export class AdviceCapabilitiesError extends LeagueDataError {}
+
+/** A current master grant opens one week; three weeks needs its own grant as well. */
+export function llmoptEnabledForWindow(
+  capabilities: AdviceCapabilities | null | undefined,
+  window: number,
+) {
+  return (
+    capabilities?.llmoptVNext === true &&
+    (window === 1 || (window === 3 && capabilities.llmoptVNextThreeWeek === true))
+  );
+}
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -193,6 +205,9 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       ? { verifiedRepairs: true as const }
       : {}),
     ...(value.llmopt_vnext === true ? { llmoptVNext: true as const } : {}),
+    ...(value.llmopt_vnext === true && value.llmopt_vnext_three_week === true
+      ? { llmoptVNextThreeWeek: true as const }
+      : {}),
     ...(value.decision_information === undefined
       ? {}
       : { decisionInformation: value.decision_information as DecisionInformation }),
@@ -206,7 +221,9 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
     ...(value.llmopt_vnext === true && value.transfer_packages === true
       ? { transferPackages: true }
       : {}),
-    ...(value.llmopt_vnext === true && value.three_week_paths === true
+    ...(value.llmopt_vnext === true &&
+    value.llmopt_vnext_three_week === true &&
+    value.three_week_paths === true
       ? { threeWeekPaths: true }
       : {}),
     leagueId,

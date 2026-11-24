@@ -55,7 +55,11 @@ capture identity from immutable specs where available. It never resets a live bu
 ## Workflow selection
 
 The backend advertises `llmopt_vnext: true` on current league and public-entry
-capabilities only when `SQUADOPT_BACKEND_LLMOPT_VNEXT=1`. The default is 0.
+capabilities only when `SQUADOPT_BACKEND_LLMOPT_VNEXT=1`. This grants one week.
+Three-week admission also requires `SQUADOPT_BACKEND_LLMOPT_VNEXT_THREE_WEEK=1`.
+The server advertises `llmopt_vnext_three_week: true` only when both controls
+are enabled. Both default to 0. The current capture still determines which
+windows can be computed.
 For a fresh three-preference draft, the default workflow can open four ordinary
 jobs for the main plan, two individual prices and the combined plan. A saved
 confirmation retains its transport when reopened. Rolling back the setting
@@ -66,10 +70,13 @@ Job polling reads queue state independently of the capture. Cancellation remains
 available during rollback. A new run-owned computation returns HTTP 409
 with `LLMOPT_VNEXT_DISABLED`. Identity-free legacy requests continue to use
 their ordinary cache address and admission. A run already admitted can finish
-on the worker and publish its answer. The master setting does not enter the
-answer key or change a persisted computation specification. With the setting
+on the worker and publish its answer. If a run used optional transfer packages
+before rollback, the same request in that run can still read its recorded job
+or answer. New identity-free requests at the closed window use the ordinary
+calculation. Both release controls are absent from the answer key and the
+persisted computation specification. With the setting
 off, ordinary API responses and cache entries retain the develop payload.
-With the setting on, a result can expose `plan_data_id` when its producing
+When its window is enabled, a result can expose `plan_data_id` when its producing
 data is known. Older answers without that identifier remain readable.
 
 Run `python -m docs.research.llmopt_phase8.check_develop` to exercise the
@@ -80,7 +87,8 @@ from the checkout under test.
 ## Verified repairs
 
 League and public-entry capabilities can advertise `verified_repairs: true` when
-the master planning setting is on. An existing job may finish and cache its answer
+the master planning setting is on. A three-week repair requires the additional
+three-week grant. An existing job may finish and cache its answer
 after rollback. The disabled setting refuses new candidate and selection work.
 Three-week candidates use a regular advice POST with the original run ID and
 `stage: "repair"`. Following a proved incompatible base, each candidate changes

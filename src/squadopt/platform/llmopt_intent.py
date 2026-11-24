@@ -23,6 +23,7 @@ from squadopt.contracts.llmopt_plans import (
     plan_players_current,
     provider_plan_context,
 )
+from squadopt.contracts.llmopt_run import workflow_enabled
 from squadopt.contracts.preferences import PlanScenario
 from squadopt.data.claim_identity import normalise_claim_name
 
@@ -203,6 +204,8 @@ that calculation. With priorities but no total allowance, ask how many points in
 the manager would give up. With a total allowance and optional Wildcard, ask which to
 remove; that combination is unsupported. Do not invent a total allowance. A 1.5-point
 allowance for all preferences is max_total_cost_tenths 15, not three separate allowances.
+When a manager moves a one-week draft to three weeks, including by naming week 2 or 3,
+return the updated draft with its reviewed priorities and total, even if no total was set.
 
 When choosing a displayed plan, freezing its transfer/week, or replacing one of its
 players, use only plan_context identifiers. Without that catalogue ask for clarification;
@@ -235,6 +238,9 @@ class IntentRequest:
     reference_weeks: tuple[int, ...] = ()
     reference_captains: tuple[tuple[int, int], ...] = ()
     plan_context: dict[str, Any] | None = None
+
+    def workflow_enabled(self, *, master: bool, three_week: bool) -> bool:
+        return workflow_enabled(self.draft.get("window", 1), master=master, three_week=three_week)
 
 
 def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -568,7 +574,9 @@ def _reference_captains(
     )
 
 
-def parse_intent_request(value: object, *, llmopt_vnext: bool = True) -> IntentRequest:
+def parse_intent_request(
+    value: object, *, llmopt_vnext: bool = True, llmopt_vnext_three_week: bool = True
+) -> IntentRequest:
     required = {"message", "locale", "draft", "players"}
     if (
         not isinstance(value, dict)
@@ -598,6 +606,11 @@ def parse_intent_request(value: object, *, llmopt_vnext: bool = True) -> IntentR
             _text(previous["question"], _MAX_QUESTION),
         )
     weeks = _reference_weeks(value.get("reference_weeks", []))
+    draft = (
+        _draft(value["draft"], ids, clubs) if llmopt_vnext and not llmopt_vnext_three_week else None
+    )
+    if draft is not None:
+        llmopt_vnext = workflow_enabled(draft.get("window", 1), master=True, three_week=False)
     plan_context = None
     if "plan_context" in value:
         try:
@@ -606,10 +619,16 @@ def parse_intent_request(value: object, *, llmopt_vnext: bool = True) -> IntentR
             )
         except ValueError as error:
             raise IntentValidationError(str(error)) from None
+        if (
+            llmopt_vnext
+            and not llmopt_vnext_three_week
+            and any(len(plan["weeks"]) == 3 for plan in plan_context["plans"])
+        ):
+            raise IntentValidationError("This planning workflow is closed.")
     return IntentRequest(
         _text(value["message"], INTENT_MAX_MESSAGE),
         locale,
-        _draft(value["draft"], ids, clubs),
+        draft if draft is not None else _draft(value["draft"], ids, clubs),
         roster,
         clarification,
         clubs,
@@ -694,6 +713,39 @@ def _claims_computed_value(question: str) -> bool:
     return False
 
 
+def _preference_subject(rule: Mapping[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in rule.items() if k not in ("week", "priority", "max_cost_tenths")}
+
+
+def _carry_reviewed_settings(draft: dict[str, Any], previous: Mapping[str, Any]) -> None:
+    """Keep reviewed settings until the member clears them in the closed window."""
+    total = "max_total_cost_tenths"
+    if total in draft and draft[total] != previous.get(total):
+        raise IntentValidationError("This planning workflow is closed.")
+    if total in previous:
+        draft[total] = previous[total]
+    remaining = list(previous["soft"])
+    # Match explicit priorities first so a blank field cannot consume another rule's priority.
+    for rule in sorted(draft["soft"], key=lambda rule: "priority" not in rule):
+        subject = _preference_subject(rule)
+        matches = (
+            old
+            for old in remaining
+            if _preference_subject(old) == subject
+            and ("priority" not in rule or rule["priority"] == old.get("priority"))
+        )
+        old = min(matches, key=lambda old: old.get("week") != rule.get("week"), default=None)
+        if old is None:
+            if "priority" in rule:
+                raise IntentValidationError("This planning workflow is closed.")
+            continue
+        remaining.remove(old)
+        for field in ("priority", "max_cost_tenths"):
+            if field in old:
+                rule.setdefault(field, old[field])
+    draft["soft"].extend(remaining)
+
+
 def _validate_result(
     value: object,
     candidates: tuple[dict[str, Any], ...],
@@ -704,6 +756,7 @@ def _validate_result(
     reference_weeks: tuple[int, ...] = (),
     locale: str = "en",
     plan_context: dict[str, Any] | None = None,
+    three_week_priorities: bool = True,
 ) -> dict[str, Any]:
     if (
         not isinstance(value, dict)
@@ -751,7 +804,14 @@ def _validate_result(
         previous_window=previous_window,
         previous_draft=previous_draft,
     )
-    if any("priority" in rule for rule in draft["soft"]) and "max_total_cost_tenths" not in draft:
+    if not three_week_priorities and draft.get("window") == 3:
+        if previous_window != 3 and previous_draft is not None and _priority_draft(previous_draft):
+            _carry_reviewed_settings(draft, previous_draft)
+            # Carried preferences count toward the rule limit and cannot duplicate a hard rule.
+            draft = _draft(draft, player_ids, clubs)
+        elif _priority_draft(draft):
+            raise IntentValidationError("This planning workflow is closed.")
+    elif any("priority" in rule for rule in draft["soft"]) and "max_total_cost_tenths" not in draft:
         return {
             "status": "clarification",
             "message": (
@@ -867,7 +927,11 @@ def _shortlist(request: IntentRequest) -> tuple[dict[str, Any], ...]:
 
 
 def _validated(
-    request: IntentRequest, candidates: tuple[dict[str, Any], ...], proposal: object
+    request: IntentRequest,
+    candidates: tuple[dict[str, Any], ...],
+    proposal: object,
+    *,
+    three_week_priorities: bool,
 ) -> dict[str, Any]:
     """The model's proposal checked against the shortlist it was offered and the request."""
     return _validate_result(
@@ -879,6 +943,7 @@ def _validated(
         reference_weeks=request.reference_weeks,
         locale=request.locale,
         plan_context=request.plan_context,
+        three_week_priorities=three_week_priorities,
     )
 
 
@@ -888,6 +953,7 @@ def check_reply(
     *,
     server_data_id: str | Callable[[], str | None] | None = None,
     llmopt_vnext: bool = True,
+    llmopt_vnext_three_week: bool = True,
 ) -> dict[str, Any]:
     """Validate a reply the member's own model gave to the call ``prompt_for`` wrote.
 
@@ -910,7 +976,9 @@ def check_reply(
         )
     ):
         raise IntentValidationError("This planning workflow is closed.")
-    result = _validated(request, _shortlist(request), reply)
+    result = _validated(
+        request, _shortlist(request), reply, three_week_priorities=llmopt_vnext_three_week
+    )
     if result["status"] == "plan" and request.plan_context is not None:
         selected = request.plan_context["plans"][PLAN_LABELS.index(result["plan_label"])]
         if not plan_players_current(selected, {p["id"] for p in request.players}):
@@ -923,12 +991,14 @@ def check_reply(
 
 
 def parse_check_request(
-    value: object, *, llmopt_vnext: bool = True
+    value: object, *, llmopt_vnext: bool = True, llmopt_vnext_three_week: bool = True
 ) -> tuple[IntentRequest, object]:
     """The intent request and the model's reply from a check body."""
     if not isinstance(value, dict) or value.keys() != {"request", "reply"}:
         raise IntentValidationError("Invalid check request.")
-    return parse_intent_request(value["request"], llmopt_vnext=llmopt_vnext), value["reply"]
+    return parse_intent_request(
+        value["request"], llmopt_vnext=llmopt_vnext, llmopt_vnext_three_week=llmopt_vnext_three_week
+    ), value["reply"]
 
 
 def _schema_object(properties: dict[str, Any]) -> dict[str, Any]:

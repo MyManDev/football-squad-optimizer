@@ -77,9 +77,9 @@ def test_run_refuses_invalid_and_unbounded_originals(raw):
 def test_real_precomputed_club_conflict_keeps_original_after_first_edit_fails(
     tmp_path, monkeypatch
 ):
-    backend = world._deployment(tmp_path, monkeypatch, last_gameweek=5, llmopt_vnext=True)[
-        "backend"
-    ]
+    backend = world._deployment(
+        tmp_path, monkeypatch, last_gameweek=5, llmopt_vnext=True, llmopt_vnext_three_week=True
+    )["backend"]
     client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{world.LEAGUE_ID}/entries/{world.ENTRY_ID}/advice"
     held = {"hold_transfers": True, "save_chips": True}
@@ -227,6 +227,7 @@ def test_repair_fails_closed_for_missing_unproved_and_exhausted_bases(tmp_path, 
     client, _, queue = _world(
         tmp_path,
         llmopt_vnext=True,
+        llmopt_vnext_three_week=True,
         runs=FileRunStore(tmp_path / "runs"),
         specs=FileAdviceJobSpecStore(tmp_path / "specs"),
     )
@@ -241,9 +242,9 @@ def test_repair_fails_closed_for_missing_unproved_and_exhausted_bases(tmp_path, 
 
 
 def test_real_worker_conflict_candidates_and_selected_replay_stay_in_one_run(tmp_path, monkeypatch):
-    backend = world._deployment(tmp_path, monkeypatch, last_gameweek=5, llmopt_vnext=True)[
-        "backend"
-    ]
+    backend = world._deployment(
+        tmp_path, monkeypatch, last_gameweek=5, llmopt_vnext=True, llmopt_vnext_three_week=True
+    )["backend"]
     client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
     closed = build_backend(replace(backend.config, llmopt_vnext=False))
     off = TestClient(app_for_capture(closed, world.world_module.GW2_CAPTURED_AT))
@@ -410,7 +411,11 @@ def test_only_typed_wall_time_exhaustion_is_a_run_budget_outcome(
     body = {"strategy": "saf-puan", "window": 3, "preferences": {"no_hits": True}}
     for with_run, code in [(True, expected), (False, "ADVICE_FAILED")]:
         backend = world._deployment(
-            tmp_path / str(with_run), monkeypatch, last_gameweek=5, llmopt_vnext=with_run
+            tmp_path / str(with_run),
+            monkeypatch,
+            last_gameweek=5,
+            llmopt_vnext=with_run,
+            llmopt_vnext_three_week=with_run,
         )["backend"]
         client = TestClient(app_for_capture(backend, world.world_module.GW2_CAPTURED_AT))
         result = client.post(route, json={**body, **({"run": _run_ref()} if with_run else {})})

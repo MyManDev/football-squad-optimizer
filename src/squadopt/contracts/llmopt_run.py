@@ -36,6 +36,11 @@ class RunReference:
         return cls(identifier, stage, origin)
 
 
+def workflow_enabled(window: int, *, master: bool, three_week: bool) -> bool:
+    """The server grants one week directly and three weeks through both controls."""
+    return master and (window == 1 or (window == 3 and three_week))
+
+
 def run_capacity(window: int) -> float:
     """The four-job capacity measured and explained in ADR 0018."""
     if window not in (1, 3):

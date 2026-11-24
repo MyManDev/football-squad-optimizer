@@ -631,6 +631,7 @@ def league_capabilities_schema() -> dict[str, Any]:
                 "description": "Whether three-week path comparisons are enabled.",
             },
             "llmopt_vnext": {"type": "boolean"},
+            "llmopt_vnext_three_week": {"type": "boolean", "const": True},
             "preferences": {
                 "type": "object",
                 "properties": {"available": {"type": "boolean"}},

@@ -21,7 +21,12 @@ from squadopt.platform.advice_worker import build_advice_compute
 def test_observed_worker_preserves_member_choices(tmp_path, monkeypatch, window, weight):
     artifacts = tmp_path / "artifacts"
     world = _deployment(
-        tmp_path, monkeypatch, llmopt_vnext=True, last_gameweek=6, artifact_root=artifacts
+        tmp_path,
+        monkeypatch,
+        llmopt_vnext=True,
+        llmopt_vnext_three_week=True,
+        last_gameweek=6,
+        artifact_root=artifacts,
     )
     backend = world["backend"]
     identity = backend.contexts.identity()

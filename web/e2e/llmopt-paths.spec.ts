@@ -23,16 +23,17 @@ const answer = (route: Route, json: unknown) =>
     ? route.fulfill({ status: 204, headers: CORS })
     : route.fulfill({ json, headers: CORS });
 
-for (const [master, packages, paths] of [
-  [false, false, false],
-  [false, true, true],
-  [true, false, false],
-  [true, true, false],
-  [true, false, true],
-  [true, true, true],
+for (const [master, threeWeek, packages, paths] of [
+  [false, false, false, false],
+  [false, true, true, true],
+  [true, false, true, true],
+  [true, true, false, false],
+  [true, true, true, false],
+  [true, true, false, true],
+  [true, true, true, true],
 ] as const)
   for (const language of ["en", "tr"] as const) {
-    test(`three-week paths stay bounded across reload (release ${master}, packages ${packages}, paths ${paths}, ${language})`, async ({
+    test(`three-week paths stay bounded across reload (release ${master}, three weeks ${threeWeek}, packages ${packages}, paths ${paths}, ${language})`, async ({
       page,
     }) => {
       test.skip(!API, "API build required");
@@ -44,8 +45,9 @@ for (const [master, packages, paths] of [
       const runIds: string[] = [];
       let reads = 0;
       let release: boolean = master;
+      let threeWeekGrant: boolean = threeWeek;
       let advertised: boolean = paths;
-      const enabled = master && paths;
+      const enabled = master && threeWeek && paths;
       await page.route("**/data/fixtures.json", (route) => route.fulfill({ json: openCalendar() }));
       await page.route(`${API}/api/v1/contributions/players`, (route) =>
         answer(route, {
@@ -61,6 +63,7 @@ for (const [master, packages, paths] of [
         answer(route, {
           contract_version: "league_capabilities_v1",
           ...(release ? { llmopt_vnext: true } : {}),
+          ...(release && threeWeekGrant ? { llmopt_vnext_three_week: true } : {}),
           league_id: LEAGUE,
           capture_snapshot_id: squad.source_snapshot_id,
           season: squad.season,
@@ -140,7 +143,7 @@ for (const [master, packages, paths] of [
       );
       expect(posts.every((p) => p.no_hits)).toBe(true);
       expect(new Set(runIds).size).toBe(1);
-      if (master) expect(runIds[0]).toMatch(/^[0-9a-f]{32}$/);
+      if (master && threeWeek) expect(runIds[0]).toMatch(/^[0-9a-f]{32}$/);
       else expect(runIds).toEqual(["missing", "missing", "missing"]);
       await expect(page.locator("[data-path-group]")).toHaveCount(enabled ? 2 : 0);
       // Completed results keep the confirmed path mode while the master release is enabled.
@@ -151,7 +154,10 @@ for (const [master, packages, paths] of [
       expect(posts).toHaveLength(3);
       await expect(page.locator("[data-path-group]")).toHaveCount(enabled ? 2 : 0);
       if (enabled) {
-        release = false;
+        // Both rollback controls are exercised with and without package search.
+        const closeMaster = language === "en";
+        if (closeMaster) release = false;
+        else threeWeekGrant = false;
         advertised = true;
         await page.reload();
         await expect(page.getByRole("article")).toHaveCount(2);
@@ -160,6 +166,7 @@ for (const [master, packages, paths] of [
         expect(posts).toHaveLength(3);
         // A reload after confirmation but before the main answer must not open a path on rollback.
         release = true;
+        threeWeekGrant = true;
         advertised = false;
         await page.evaluate(() => {
           const [key, raw] = Object.entries(sessionStorage).find(([k]) =>
@@ -175,7 +182,8 @@ for (const [master, packages, paths] of [
         await expect.poll(() => reads).toBe(7);
         await expect(page.getByRole("article")).toHaveCount(1);
         await expect(page.locator("[data-path-group]")).toHaveCount(1);
-        release = false;
+        if (closeMaster) release = false;
+        else threeWeekGrant = false;
         advertised = true;
         await page.reload();
         await expect.poll(() => reads).toBe(8);

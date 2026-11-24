@@ -1,5 +1,10 @@
 # Measurements Index
 
+- LLMOPT one-week release. Cold and warm mixed-mode results on twenty frozen member-weeks,
+  compared slot by slot with H2, and time to the main plan in a local browser under both settings.
+  [Window comparison and rendering times](research/llmopt_week_first.md),
+  [per-member measurements](research/llmopt_week_first.json)
+
 - 2026-11-21. On twenty frozen member-weeks, all 640 cold and warm release-workload
   answers matched the prior record. Enabling the release setting changed cold server
   jobs from 80 to zero at one week and from 80 to 40 at three weeks. Both three-week
