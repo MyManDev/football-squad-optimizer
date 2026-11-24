@@ -152,8 +152,8 @@ export function ContributePage() {
     setConsent(false);
   }
   return (
-    <section className={styles.page} data-zone="contribute">
-      <header>
+    <section className={styles.page}>
+      <header data-zone="contribute-header">
         <h1>{tr ? "Katkıda bulun" : "Contribute"}</h1>
         <p>
           {tr
@@ -174,7 +174,7 @@ export function ContributePage() {
         </div>
       ) : (
         <>
-          <label>
+          <label data-zone="contribute-team">
             {tr ? "Takım" : "Team"}
             <select
               value={teamId}
@@ -193,7 +193,7 @@ export function ContributePage() {
               ))}
             </select>
           </label>
-          <label>
+          <label data-zone="contribute-position">
             {tr ? "Pozisyon" : "Position"}
             <select
               value={position}
@@ -215,7 +215,7 @@ export function ContributePage() {
               ))}
             </select>
           </label>
-          <label>
+          <label data-zone="contribute-player">
             {tr ? "Oyuncu" : "Player"}
             <select
               value={playerId}
@@ -232,7 +232,7 @@ export function ContributePage() {
           </label>
           {playerId && (
             <>
-              <form onSubmit={send} className={styles.form}>
+              <form onSubmit={send} className={styles.form} data-zone="contribute-form">
                 <fieldset disabled={submit.isPending}>
                   <legend>{tr ? "Gözlemini paylaş" : "Share your observation"}</legend>
                   <label>
@@ -318,7 +318,10 @@ export function ContributePage() {
                       : "Submission could not be confirmed. Your text is preserved; you can retry."}
                 </p>
               )}
-              <section aria-label={tr ? "Onaylı yorumlar" : "Approved comments"}>
+              <section
+                aria-label={tr ? "Onaylı yorumlar" : "Approved comments"}
+                data-zone="contribute-comments"
+              >
                 <h2>{tr ? "Onaylı yorumlar" : "Approved comments"}</h2>
                 <button onClick={() => void feed.refetch()} disabled={feed.isFetching}>
                   {tr ? "Yorumları yenile" : "Refresh comments"}
