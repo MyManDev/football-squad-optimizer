@@ -1,11 +1,11 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-11-21T03:02:14.125516Z",
+  "generated_at_utc": "2026-11-24T16:45:59.904620Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 6654210,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261121T030214Z-3d3cac1a09b8",
+    "as_of_snapshot_id": "fpl-live-20261124T164559Z-383558969ae1",
     "weeks": [
       {
         "gameweek": 10,
@@ -16,8 +16,8 @@
         "advice_captured_at_utc": "2026-11-04T02:00:46.600538Z",
         "advice_generated_at_utc": "2026-11-05T06:41:18Z",
         "advice_sha256": "b8703a3d11939d42cdb2de146b213b18905d00ea3077440ba4d11e2f6f1a5572",
-        "outcome_snapshot_id": "fpl-live-20261121T030214Z-3d3cac1a09b8",
-        "outcome_captured_at_utc": "2026-11-21T03:02:14.125516Z",
+        "outcome_snapshot_id": "fpl-live-20261124T164559Z-383558969ae1",
+        "outcome_captured_at_utc": "2026-11-24T16:45:59.904620Z",
         "expected_own_points": 56.88156970938806,
         "suggested": {
           "gross_points": 69.0,
