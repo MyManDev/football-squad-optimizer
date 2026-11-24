@@ -734,7 +734,13 @@ function Workspace({
       (!run?.inputs.bundleMode ||
         (run.inputs.request.deviceRun
           ? currentCapabilities.devicePreferenceBundles === true
-          : currentCapabilities.preferenceBundles === true)));
+          : currentCapabilities.preferenceBundles === true))) ||
+    // Older confirmations can retry their identity-free requests after a failed capability read.
+    (run === restoredRun &&
+      !run?.inputs.request.run &&
+      !run?.inputs.bundleMode &&
+      restoreCapabilities.isFetchedAfterMount &&
+      (restoreCapabilities.isError || restoreCapabilities.data === null));
   const repairsEnabled = vNext && currentCapabilities?.verifiedRepairs === true;
   const oldSearch = savedRun?.repairSearch;
   const failure =

@@ -206,6 +206,15 @@ function open(
   );
 }
 
+function failCapabilitiesRead() {
+  const originalFetch = globalThis.fetch;
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input) === `${ORIGIN}/api/v1/leagues/${squad.league_id}/capabilities`
+      ? Promise.resolve(new Response(null, { status: 503 }))
+      : originalFetch(input, init),
+  );
+}
+
 async function ready() {
   return screen.findByRole("heading", { level: 1, name: en.title });
 }
@@ -860,6 +869,18 @@ describe("a reload keeps the saved session", () => {
     await waitFor(() => expect(savedSession()[1]).not.toHaveProperty("confirmation.sending"));
   });
 
+  it("retries an interrupted legacy request without a run identity after the capabilities read fails", async () => {
+    failCapabilitiesRead();
+    const base = await reloadConfirmed(
+      { runId: undefined, wildcardNotHeld: false, sending: true },
+      true,
+    );
+    await waitFor(() => expect(base.compute).toHaveBeenCalledTimes(1));
+    expect(base.resume).toHaveBeenCalledTimes(1);
+    expect(base.compute.mock.calls[0]![0]).not.toHaveProperty("run");
+    expect(base.readCached).not.toHaveBeenCalled();
+  });
+
   it("reads, without sending again, a run whose requests were all answered", async () => {
     const base = await reloadConfirmed({ wildcardNotHeld: false });
     await waitFor(() => expect(base.readCached).toHaveBeenCalledTimes(1));
@@ -1305,6 +1326,22 @@ describe("the plan with all preferences", () => {
     expect(leftOut).toHaveLength(1);
     expect(leftOut[0]).toHaveTextContent(en.rules.hold_transfers);
     expect(screen.getByText(en.priceLeftOut, { exact: true })).toBeVisible();
+  });
+
+  it("a restored priority run reads its saved preference result after a failed capabilities read without admitting another stage", async () => {
+    failCapabilitiesRead();
+    bundlesOffered = true;
+    await reloadWith(
+      { hard: [], soft, max_total_cost_tenths: 15 },
+      { wildcardNotHeld: false, bundleMode: true, sending: true },
+    );
+    await waitFor(() => expect(jobs[0]!.readCached).toHaveBeenCalledTimes(1));
+    answer(jobs[0]!, jobs[0]!.readCached.mock.calls[0]![0], 50, []);
+    await waitFor(() => expect(jobs[1]!.readCached).toHaveBeenCalledTimes(1));
+    expect(
+      jobs[1]!.readCached.mock.calls[0]![0].preferenceBundle?.program?.preferences,
+    ).toHaveLength(3);
+    expect(jobs.every((job) => !job.compute.mock.calls.length)).toBe(true);
   });
 
   it("comes back after a reload, read when it was answered and asked again while sending", async () => {
