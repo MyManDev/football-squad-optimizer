@@ -91,7 +91,6 @@ NAMED_IN_THE_INDEX_WITHOUT_A_LINK: frozenset[str] = frozenset(
         "docs/live_projection_audit_prereg.md",
         "docs/measurement_instrument.md",
         "docs/member_plan_determinism.md",
-        "docs/member_policy_hit_cost_grid.md",
         "docs/member_window_proofs.md",
         "docs/mode_plan_selection.md",
         "docs/mode_price_list.md",
@@ -154,9 +153,6 @@ NAMED_IN_THE_INDEX_WITHOUT_A_LINK: frozenset[str] = frozenset(
         "docs/template_rival_strength_2023-24.md",
         "docs/terminal_value_study.md",
         "docs/time_aware_recalibration.md",
-        "docs/transfer_discipline.md",
-        "docs/transfer_discipline_blind_rolling.md",
-        "docs/transfer_discipline_value_rolling.md",
         "docs/weekly_scorecard.md",
         "docs/window_solver_highs_prereg.md",
         "docs/windowed_rank.md",
@@ -229,8 +225,6 @@ NOT_NAMED_IN_THE_INDEX: frozenset[str] = frozenset(
         "docs/terminal_value_prereg.md",
         "docs/top100_effect_prereg.md",
         "docs/top100_effect_reader.md",
-        "docs/transfer_discipline_note.md",
-        "docs/transfer_discipline_rolling.md",
         "docs/transfer_scenario_selection_method.md",
         "docs/weekly_suggestion_eval.md",
     }
@@ -238,7 +232,7 @@ NOT_NAMED_IN_THE_INDEX: frozenset[str] = frozenset(
 
 #: The size of each list. Lower it when a document leaves its list; raising it is the growth
 #: the lists refuse, so a new unreachable document cannot join one by being added to it.
-LIST_SIZES = {"NAMED_IN_THE_INDEX_WITHOUT_A_LINK": 114, "NOT_NAMED_IN_THE_INDEX": 66}
+LIST_SIZES = {"NAMED_IN_THE_INDEX_WITHOUT_A_LINK": 110, "NOT_NAMED_IN_THE_INDEX": 64}
 
 
 def _documents(listed: list[str]) -> list[str]:
