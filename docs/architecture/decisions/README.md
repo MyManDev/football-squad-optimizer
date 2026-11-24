@@ -32,6 +32,7 @@ its header.
 | [0022](0022-llmopt-transfer-packages.md) | Bounded transfer packages and three-week paths | 2026-11-19 | Accepted (owner, 2026-11-19) | None |
 | [0023](0023-llmopt-verified-rule-repairs.md) | Offer a rule edit only after computing a feasible plan | 2026-11-20 | Proposed | None |
 | [0024](0024-llmopt-release-control.md) | Select the planning workflow with one server setting | 2026-11-20 | Proposed | None |
+| [0025](0025-expected-window-phase-work.md) | Admit expected-window search against measured remaining work | 2026-11-20 | Proposed | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.

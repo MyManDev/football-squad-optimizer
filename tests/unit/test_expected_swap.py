@@ -6,9 +6,10 @@ import pandas as pd
 import pytest
 
 from squadopt.contracts.preferences import DecisionPreferences
-from squadopt.optimization import OptimizationConfig, SolverStatus
+from squadopt.optimization import OptimizationConfig, SolverExecutionError, SolverStatus
 from squadopt.planning.expected_swap import propose_expected_swap
-from squadopt.planning.expected_window import optimize_expected_window
+from squadopt.planning.expected_window import extend_expected_packages, optimize_expected_window
+from squadopt.planning.guarded import optimize_guarded_window
 from squadopt.planning.lineup_utility import expected_week_utility, rescore_expected_week
 from squadopt.planning.models import (
     ChipAvailability,
@@ -113,6 +114,198 @@ def call(problem, *, template=None, retained=None, **kwargs):
 
 def no_solve(*args, **kwargs):
     pytest.fail("A documented no-op must not start another CP solve.")
+
+
+@pytest.mark.parametrize(
+    "actual",
+    [
+        pytest.param(24.058744962167573, id="gw8-3832237"),
+        pytest.param(24.223909707394814, id="gw9-3832237"),
+    ],
+)
+def test_five_free_transfers_return_a_protected_plan_without_another_solve(monkeypatch, actual):
+    horizon, initial, settings, transfer, _ = world()
+    initial = replace(initial, free_transfers=5)
+    settings = replace(settings, solver_deterministic_time_limit=60)
+    transfer = replace(transfer, banked_transfer_value_points=0)
+    protected = []
+
+    def completed_route(horizon, initial, settings, transfer, **kwargs):
+        assert not protected, "a stopped first phase must not start a second guarded solve"
+        assert settings.solver_deterministic_time_limit == 24
+        plan = optimize_guarded_window(horizon, initial, settings, transfer, **kwargs)
+        assert plan.has_solution
+        assert plan.diagnostics["incumbent_hint"]["claimed_objective_used"] is False
+        assert plan.diagnostics["incumbent_protection"]["version"] == "certified_fallback_v1"
+        protected.append(plan)
+        work = plan.diagnostics["sequential_incumbent"]
+        final_work = actual - work["seed_work"]
+        return replace(
+            plan,
+            diagnostics={
+                **plan.diagnostics,
+                "deterministic_time_used": final_work,
+                "sequential_incumbent": {
+                    **work,
+                    "actual_total": actual,
+                    "final_work_including_hold": final_work,
+                },
+            },
+        )
+
+    monkeypatch.setattr(
+        "squadopt.planning.expected_window.optimize_guarded_window", completed_route
+    )
+    monkeypatch.setattr("squadopt.planning.expected_window.propose_expected_swap", no_solve)
+    result = optimize_expected_window(horizon, initial, settings, transfer)
+    assert result.solver_status is SolverStatus.FEASIBLE
+    assert len(protected) == 1
+    assert tuple(w.gameweek for w in result.weeks) == horizon.gameweeks
+    assert result.weeks[0].free_transfers_before == 5
+    for seen, saved in zip(result.weeks, protected[0].weeks, strict=True):
+        assert set(seen.selected_squad.player_id) == set(saved.selected_squad.player_id)
+        assert set(seen.transfers_in.player_id) == set(saved.transfers_in.player_id)
+        assert set(seen.transfers_out.player_id) == set(saved.transfers_out.player_id)
+        assert seen.bank_after_tenths == saved.bank_after_tenths
+        assert seen.transfer_hit_points == saved.transfer_hit_points
+        assert seen.free_transfers_for_next_gameweek == saved.free_transfers_for_next_gameweek
+    review = result.diagnostics["expected_lineup_window"]
+    assert review["configured_total"] == 60
+    assert review["actual_total"] == actual
+    assert review["ledger"][0]["cap"] == 24
+    assert review["ledger"][0]["actual"] == actual
+    assert review["optional_swap"]["status"] == "skipped"
+    assert result.diagnostics.get("best_objective_bound") is None
+
+    # Reopening the package gate cannot spend more work after a protected stop.
+    for gate in (False, True):
+        extended = extend_expected_packages(
+            horizon,
+            initial,
+            settings,
+            replace(transfer, transfer_packages=True, package_gate=gate),
+            result,
+            elapsed_seconds=0,
+        )
+        assert extended.weeks is result.weeks
+        assert extended.diagnostics["expected_lineup_window"] == review
+        assert (
+            extended.diagnostics["transfer_packages_v1"]["reason"]
+            == "original_phase_work_exhausted"
+        )
+
+
+@pytest.fixture(scope="module")
+def protected_phase():
+    horizon, initial, settings, transfer, _ = world()
+    initial = replace(initial, free_transfers=5)
+    settings = replace(settings, solver_deterministic_time_limit=60)
+    transfer = replace(transfer, banked_transfer_value_points=0)
+    plan = optimize_guarded_window(
+        horizon, initial, replace(settings, solver_deterministic_time_limit=24), transfer
+    )
+    assert plan.has_solution and plan.diagnostics["incumbent_protection"]
+    return horizon, initial, settings, transfer, plan
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "unprotected",
+        "partial",
+        "wrong_horizon",
+        "negative",
+        "nan",
+        "infinite",
+        "inconsistent",
+        "wall",
+    ],
+)
+def test_invalid_or_unverified_original_phase_cannot_be_retained(
+    monkeypatch, protected_phase, defect
+):
+    horizon, initial, settings, transfer, plan = protected_phase
+    work = plan.diagnostics["sequential_incumbent"]
+    actual = {"negative": -1.0, "nan": float("nan"), "infinite": float("inf")}.get(defect, 24.22)
+    final_work = actual - work["seed_work"]
+    diagnostics = {
+        **plan.diagnostics,
+        "deterministic_time_used": final_work,
+        "sequential_incumbent": {
+            **work,
+            "final_work_including_hold": final_work,
+            "actual_total": actual + (1 if defect == "inconsistent" else 0),
+        },
+    }
+    if defect == "unprotected":
+        del diagnostics["incumbent_protection"]
+        del diagnostics["incumbent_hint"]
+    elif defect == "partial":
+        plan = replace(plan, weeks=plan.weeks[:1])
+    elif defect == "wrong_horizon":
+        plan = replace(plan, horizon_fingerprint="f" * 64)
+    elif defect == "wall":
+        plan = replace(plan, solver_status=SolverStatus.FEASIBLE)
+        diagnostics["deterministic_time_budget_exhausted"] = False
+    calls = []
+
+    def first_phase(*args, **kwargs):
+        assert not calls, "a refused original phase must not start another solve"
+        calls.append(True)
+        return replace(plan, diagnostics=diagnostics)
+
+    monkeypatch.setattr("squadopt.planning.expected_window.optimize_guarded_window", first_phase)
+    monkeypatch.setattr("squadopt.planning.expected_window.propose_expected_swap", no_solve)
+    if defect == "wall":
+        with pytest.raises(SolverExecutionError, match="wall-clock"):
+            optimize_expected_window(horizon, initial, settings, transfer)
+    else:
+        with pytest.raises(ValueError, match="accounting"):
+            optimize_expected_window(horizon, initial, settings, transfer)
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("overshoot,retained", [(0.000084823, True), (0.02, False)])
+def test_original_proposal_applies_shared_stop_to_its_protected_receipt(
+    monkeypatch, protected_phase, overshoot, retained
+):
+    from squadopt.optimization.work_budget import WorkBudget, work_budget
+
+    horizon, initial, settings, transfer, plan = protected_phase
+    work = plan.diagnostics["sequential_incumbent"]
+    shared = WorkBudget(122)
+    shared.reserve_native(70 * 30)
+    shared.record_cp(shared.cp_limit(122 - 70 - 24.22 + overshoot))
+
+    def finish_original(*args, **kwargs):
+        assert shared.cp_limit(24) == 24
+        shared.record_cp(24.22)
+        return replace(
+            plan,
+            diagnostics={
+                **plan.diagnostics,
+                "sequential_incumbent": {
+                    **work,
+                    "actual_total": 24.22,
+                    "final_work_including_hold": 24.22 - work["seed_work"],
+                },
+            },
+        )
+
+    monkeypatch.setattr(
+        "squadopt.planning.expected_window.optimize_guarded_window", finish_original
+    )
+    with work_budget(shared):
+        if retained:
+            result = optimize_expected_window(horizon, initial, settings, transfer)
+            review = result.diagnostics["expected_lineup_window"]
+            assert review["actual_total"] == 24.22
+            assert review["shared_used"] == shared.cp_used + shared.native_reserved
+            assert review["shared_limit"] == 122
+        else:
+            with pytest.raises(ValueError, match="accounting"):
+                optimize_expected_window(horizon, initial, settings, transfer)
+    assert shared.remaining == 0 and shared.calls == 3
 
 
 @pytest.mark.parametrize("window", [3, 5])
