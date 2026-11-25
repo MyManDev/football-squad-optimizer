@@ -81,6 +81,9 @@ ENQUEUE_MUTATION: Final = (
 #: `gh pr checks` exits 8 while a check is pending, and reports none before CI has started.
 CHECKS_PENDING: Final = 8
 NO_CHECKS: Final = re.compile(r"no (required )?checks reported", re.IGNORECASE)
+#: A row of `gh pr checks` for a check that failed or was cancelled. A non-zero exit that lists
+#: none is GitHub failing to answer, not a check that failed.
+FAILED_CHECK: Final = re.compile(r"\s(fail|cancel)(\s|$)")
 RUN_ID: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,95}")
 RUN_KIND: Final = re.compile(r"-gw[0-9]{2}-(tuesday|friday)-")
 #: The line `weekly_publish` prints once it has opened the site pull request.
@@ -421,12 +424,18 @@ def run_captured(arguments: Sequence[str], cwd: Path, log: Path) -> Completed:
 def wait_checks(
     number: str, run: Callable[[Sequence[str]], Completed], minutes: int, pause: Pause
 ) -> int:
-    """`gh pr checks --required`'s exit code once no check is pending; 8 if one still is."""
+    """`gh pr checks --required`'s exit code once no check is pending; 8 if one still is.
+
+    A non-zero exit counts only with a failed check listed. Without one, GitHub did not answer
+    (an HTTP 503 refused #1497's release on 24 Nov 2026 while every check was still running,
+    and all of them passed), so the checks are read again a minute later, as a pending one is.
+    """
 
     for _ in range(minutes):
         checks = run(["gh", "pr", "checks", number, "--required"])
         reported = not any(NO_CHECKS.search(line) for line in checks.lines)
-        if checks.code != CHECKS_PENDING and reported:
+        failed = any(FAILED_CHECK.search(line) for line in checks.lines)
+        if reported and (checks.code == 0 or (checks.code != CHECKS_PENDING and failed)):
             return checks.code
         pause(60)
     return CHECKS_PENDING

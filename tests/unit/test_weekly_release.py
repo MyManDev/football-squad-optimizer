@@ -68,6 +68,8 @@ class _Host:
             lines = ("PR_node",)
         elif list(arguments[4:6]) == ["--json", "state"]:
             lines = (self.states.pop(0) if len(self.states) > 1 else self.states[0],)
+        elif self.failing and list(arguments[1:3]) == ["pr", "checks"] and self.failing in line:
+            lines = ("web (node 22)\tfail\t15m0s\thttps://github.com/run",)
         return chain.Completed(1 if self.failing and self.failing in line else 0, lines)
 
 
@@ -516,3 +518,27 @@ def test_the_host_hook_refuses_a_run_with_only_the_gameweeks_handoff_alias(tmp_p
         "backend was not moved"
     ]
     assert not spool.exists()
+
+
+def test_github_failing_to_answer_is_read_again_and_never_taken_for_a_failed_check() -> None:
+    """On 24 Nov 2026 one HTTP 503 between two pending reads refused #1497's release, and every
+    check then passed."""
+
+    row = "{}\t{}\t0\thttps://github.com/MyManDev/football-squad-optimizer/actions/runs/1"
+    answers = [
+        chain.Completed(8, (row.format("web (node 22)", "pending"),)),
+        chain.Completed(1, ("HTTP 503: 503 Service Unavailable (https://api.github.com/graphql)",)),
+        chain.Completed(2, ("fatal error: unexpected signal during runtime execution",)),
+        chain.Completed(0, (row.format("web (node 22)", "pass"),)),
+    ]
+    pauses: list[float] = []
+    assert chain.wait_checks("1497", lambda arguments: answers.pop(0), 10, pauses.append) == 0
+    assert (answers, pauses) == ([], [60, 60, 60])
+    # A failed or cancelled check is still a failure, read once.
+    for state in ("fail", "cancel"):
+        failed = chain.Completed(1, (row.format("gates", "pass"), row.format("web", state)))
+        code = chain.wait_checks("1497", lambda arguments, read=failed: read, 10, pauses.append)
+        assert code == 1
+    # GitHub silent for the whole wait leaves the checks unread, as pending ones are.
+    silent = chain.Completed(1, ("HTTP 503: 503 Service Unavailable",))
+    assert chain.wait_checks("1497", lambda arguments: silent, 2, pauses.append) == 8
