@@ -15,6 +15,7 @@ import {
   type PitchPointsKind,
 } from "../components/MemberPitch";
 import { PlayerDetails } from "../components/PlayerDetails";
+import { weekOpponents } from "../components/plateFacts";
 import { PointsUnit } from "../components/PointsUnit";
 import { modelChangeOf, popChanged, releasePop } from "../advice/modelSwitch";
 import type { EntryAdvice, EntrySquad, EntrySquadPlayer } from "../types";
@@ -53,7 +54,7 @@ export function MemberSquad({
   fixtures?: FixturesPayload | null;
   pointsKind?: PitchPointsKind;
 }) {
-  const { locale, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
   const [view, setView] = useState<"pitch" | "list">("pitch");
@@ -109,6 +110,10 @@ export function MemberSquad({
     );
   }
   const hasList = planned && list != null;
+  // Each plate's third line: the week's opponent from the basis's own calendar.
+  const opponentOf = weekOpponents(fixtures, basis, codes, language);
+  const eleven = onPitch.eleven.map((player) => ({ ...player, opponent: opponentOf(player.team) }));
+  const bench = onPitch.bench.map((player) => ({ ...player, opponent: opponentOf(player.team) }));
   const own = planned && finite(plan?.expected_own_points) ? plan.expected_own_points : null;
   const newsPlayers = new Map(
     [...onPitch.eleven, ...onPitch.bench].map((player) => [player.playerId, player.name]),
@@ -153,7 +158,7 @@ export function MemberSquad({
       <div ref={field} className={styles.pitchView} hidden={hasList && view !== "pitch"}>
         <MemberPitch
           pointsKind={pointsKind}
-          players={onPitch.eleven}
+          players={eleven}
           codes={codes}
           modelChange={modelChange}
           news={news}
@@ -161,7 +166,7 @@ export function MemberSquad({
         />
         <MemberBench
           pointsKind={pointsKind}
-          players={onPitch.bench}
+          players={bench}
           codes={codes}
           modelChange={modelChange}
           news={news}

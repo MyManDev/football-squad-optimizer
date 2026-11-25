@@ -8,22 +8,25 @@
 
 .enter {
   margin-block: var(--space-3) var(--space-2);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  transform-origin: 50% 0;
   animation: last-week-in var(--motion-data) var(--motion-ease);
 }
 
+/* The board turns down into place from its top edge, as a broadcast graphic does. */
 @keyframes last-week-in {
   from {
     opacity: 0;
-    transform: translateY(var(--space-2));
+    transform: perspective(900px) rotateX(-75deg);
   }
 }
 
 /* The gameweek in broadcast capitals, as the top bar writes the advised one. */
 .week {
   color: var(--color-text);
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-size: var(--step-0);
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;

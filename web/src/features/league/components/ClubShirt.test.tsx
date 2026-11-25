@@ -184,9 +184,8 @@ describe("the initials", () => {
     const large = shirt();
     expect(large.getAttribute("viewBox")).toBe("0 0 32 28");
     expect(rule(".large")).toBe("width: 32px; height: 28px;");
-    // --step--2 is the page's 12 px floor.
-    expect(rule(".initials")).toContain("font-size: var(--step--2);");
-    expect(uncommented("../../../design/tokens.css")).toContain("--step--2: 0.75rem;");
+    // 12 px on the shirt's own grid, under the page's 13 px text floor: a mark, not text.
+    expect(rule(".initials")).toContain("font-size: 0.75rem;");
   });
 
   it("are left off a name with no letters", () => {

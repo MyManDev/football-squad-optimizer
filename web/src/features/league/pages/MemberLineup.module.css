@@ -156,8 +156,8 @@
   border-radius: var(--radius-s);
   background: var(--color-mark);
   color: var(--color-mark-text);
-  font-family: var(--font-display);
-  font-weight: 800;
+  font-family: var(--font-poster);
+  font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }

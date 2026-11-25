@@ -103,6 +103,44 @@ export function LeagueMembersPage() {
  * manager, and the total. The week's net and the gap to the leader fold out under the row
  * from a chevron at its end, so no column shrinks its figures to fit the screen.
  */
+/**
+ * The first three on a podium over the table, as a broadcast shows a final standing: second,
+ * first and third from the left, each with the team, the manager (a link to their page) and
+ * the total. The table under it still lists every member, the three included.
+ */
+function Podium({
+  rows,
+  count,
+}: {
+  rows: readonly HumanEntryView[];
+  count: (value: number) => string;
+}) {
+  const { language, messages } = useLanguage();
+  const leagueId = useLeagueId();
+  const copy = messages.leagueMembers;
+  const top = [1, 2, 3].map((rank) => rows.find((member) => member.rank === rank) ?? null);
+  if (top.some((member) => member === null)) return null;
+  const order = [top[1]!, top[0]!, top[2]!];
+  return (
+    <ol className={styles.podium} aria-label={language === "tr" ? "İlk üç" : "Top three"}>
+      {order.map((member) => (
+        <li key={member.entry_id} className={styles.step} data-place={member.rank}>
+          <span className={styles.place} aria-hidden="true">
+            {member.rank}
+          </span>
+          <span className={styles.podiumTeam}>{member.team_name ?? copy.unknownTeam}</span>
+          <Link className={styles.podiumManager} to={memberAddress(leagueId, member.entry_id!)}>
+            {member.manager_name ?? copy.unknownMember}
+          </Link>
+          <span className={`${styles.podiumTotal} num`}>
+            {member.total_points === null ? "-" : count(member.total_points)}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function LeagueMembersView({
   envelope,
   viewerSquad = null,
@@ -177,6 +215,8 @@ export function LeagueMembersView({
           <h1 className={styles.title} id="league-table-title">
             {view.league_name}
           </h1>
+
+          <Podium rows={rows} count={count} />
 
           <table id="league-member-list" className={styles.table} data-zone="member-table">
             <caption className="visually-hidden">{copy.caption(view.league_name)}</caption>
