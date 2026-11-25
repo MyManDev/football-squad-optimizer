@@ -15,13 +15,13 @@
    always with --color-mark-text on it. A fill that is dark in both palettes, such as a
    pressed control or the active nav item, is --color-board with --color-board-text, never
    the text colour, which turns light at night. The one shadow is
-   the drawer and sheet shadow. Radii are 4 px on controls, chips and tags, 6 px on
+   the drawer and sheet shadow. Radii are 8 px on controls, chips and tags, 12 px on
    boards and panels, soft enough to read as broadcast graphics; there are no pills.
 
    Type (Yayın Masası, 25 Nov 2026): Bebas Neue for posters (--font-poster: page titles,
    the boards and their tags, always upper case), Space Grotesk for text and for section
    headings at 700 (--font-display), IBM Plex Mono for codes and figures. Body is 16 px and
-   nothing is set under 13 px (--step--2). Weight synthesis is off, so the single-weight
+   nothing is set under 12 px (--step--2). Weight synthesis is off, so the single-weight
    poster face is never smeared into a false bold.
 
    Contrast, WCAG formula: ink (--color-text) 16:1 on the page, ink2 (--color-text-muted)
@@ -58,7 +58,7 @@
   --font-body: "Space Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Consolas, "SFMono-Regular", Menlo, monospace;
 
-  --step--2: 0.8125rem;
+  --step--2: 0.75rem;
   --step--1: 0.875rem;
   --step-0: 1rem;
   --step-1: 1.25rem;
