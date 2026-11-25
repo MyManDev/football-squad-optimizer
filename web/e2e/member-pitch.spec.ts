@@ -13,11 +13,11 @@ const copy = MESSAGES.tr;
 
 /** The faces the page is drawn in, as src/design/fonts.css declares them. */
 const FACES = [
-  "Barlow Semi Condensed 700",
-  "Barlow Semi Condensed 800",
-  "IBM Plex Sans 400",
-  "IBM Plex Sans 500",
-  "IBM Plex Sans 600",
+  "Bebas Neue 400",
+  "Space Grotesk 400",
+  "Space Grotesk 500",
+  "Space Grotesk 600",
+  "Space Grotesk 700",
   "IBM Plex Mono 500",
   "IBM Plex Mono 600",
 ];

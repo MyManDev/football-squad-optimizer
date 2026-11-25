@@ -7,6 +7,7 @@ import { forgetRetiredTheme } from "./design/retiredTheme";
 import "./design/fonts.css";
 import "./design/tokens.css";
 import "./design/transitions.css";
+import "./design/board.css";
 
 forgetRetiredTheme();
 applyStoredColourScheme();

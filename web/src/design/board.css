@@ -1,0 +1,38 @@
+/* Boards (Yayın Masası, 25 Nov 2026): the panels that carry the week's news are drawn as a
+   broadcast's score graphics, dark in both palettes with a strip of the mark along the top.
+   Inside a board the page's own colour tokens are remapped to the board's, so every
+   component placed in one keeps reading without a rule of its own. A board is a class on
+   the panel (`board`), never a component: the panel keeps its layout and only its surface
+   and inks change. The selector carries :root so a panel's own module rule for its surface,
+   at any width, gives way to the board. */
+
+:root .board {
+  --color-bg: var(--color-board);
+  --color-surface: var(--board-surface);
+  --color-surface-2: var(--board-surface-2);
+  --color-line: var(--board-line);
+  --color-text: var(--board-text);
+  --color-text-muted: var(--board-muted);
+  --color-text-faint: var(--board-faint);
+  --color-accent: var(--color-mark);
+  --color-primary: var(--color-mark);
+  --color-primary-text: var(--color-mark-text);
+  --color-good: var(--board-good);
+  --color-bad: var(--board-bad);
+  --color-warn: var(--board-warn);
+  --color-focus: var(--color-mark);
+
+  color-scheme: dark;
+  color: var(--color-text);
+  background: var(--color-board);
+  border: 0;
+  border-top: 6px solid var(--color-mark);
+  border-radius: var(--radius-m);
+  box-shadow: none;
+}
+
+/* A region's hairline (Card.module.css) is the board's strip when the region opens it. */
+:root .board > section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}

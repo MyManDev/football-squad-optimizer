@@ -15,11 +15,11 @@ const read = (relative: string) => readFileSync(join(WEB, relative), "utf-8");
 
 /** The faces the stylesheets ask for; each comes as latin-ext, then latin. */
 const FACES = [
-  ["Barlow Semi Condensed", 700],
-  ["Barlow Semi Condensed", 800],
-  ["IBM Plex Sans", 400],
-  ["IBM Plex Sans", 500],
-  ["IBM Plex Sans", 600],
+  ["Bebas Neue", 400],
+  ["Space Grotesk", 400],
+  ["Space Grotesk", 500],
+  ["Space Grotesk", 600],
+  ["Space Grotesk", 700],
   ["IBM Plex Mono", 500],
   ["IBM Plex Mono", 600],
 ] as const;

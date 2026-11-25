@@ -27,6 +27,7 @@ function advicePlayer(player: DevicePlanPlayer): AdvicePlayer {
     position: position(player.position),
     team: player.team,
     expected_points: player.expected_points,
+    price_tenths: player.buy_tenths,
   };
 }
 
