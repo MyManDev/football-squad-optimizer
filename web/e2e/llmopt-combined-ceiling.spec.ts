@@ -1,4 +1,5 @@
 import { expect, test, type Route } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 import type { DecisionPreferences } from "../src/features/league/advice/decisionPreferences";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../src/fixtures/league";
@@ -9,6 +10,12 @@ import { holdModel, routeChat } from "./llmoptChat";
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const { leagueId, entryId } = EXAMPLE_CLAIM;
 const PAGE = `/league/${leagueId}/members/${entryId}/llmopt`;
+const frozenRequests = JSON.parse(
+  readFileSync(
+    new URL("../../tests/fixtures/llmopt/develop_three_week_requests.json", import.meta.url),
+    "utf8",
+  ),
+).requests as { path: string; body: string; cache_key: string }[];
 const HEADERS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,OPTIONS",
@@ -37,6 +44,7 @@ for (const limit of [0, 15, undefined]) {
       name: ["First Target", "Second Target", "Third Target"][index]!,
     }));
     const posts: DecisionPreferences[] = [];
+    const wire: { path: string; body: string | null }[] = [];
     const reads: DecisionPreferences[] = [];
 
     await page.route(`${API}/api/v1/contributions/players`, (route) =>
@@ -54,6 +62,7 @@ for (const limit of [0, 15, undefined]) {
         gameweek: squad.gameweek,
         strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
         preferences: { available: true },
+        ...(limit === undefined ? { llmopt_vnext: true } : {}),
         top100: { available: false, weights: [] },
         managers_word: { available: false },
       }),
@@ -79,6 +88,9 @@ for (const limit of [0, 15, undefined]) {
     await page.route(`${API}/api/v1/leagues/${leagueId}/entries/${entryId}/advice**`, (route) => {
       const request = route.request();
       if (request.method() === "OPTIONS") return answer(route, null);
+      if (request.method() === "POST") {
+        wire.push({ path: new URL(request.url()).pathname, body: request.postData() });
+      }
       const preferences =
         request.method() === "POST"
           ? (request.postDataJSON() as { preferences: DecisionPreferences }).preferences
@@ -148,6 +160,9 @@ for (const limit of [0, 15, undefined]) {
       combined.getByText("2.4 expected points lost against the base plan"),
     ).toBeVisible();
     expect(posts).toHaveLength(4);
+    if (limit === undefined) {
+      expect(wire).toEqual(frozenRequests.map(({ path, body }) => ({ path, body })));
+    }
     const appliedIds = players
       .slice(0, limit === undefined ? 3 : 2)
       .map(({ player_id }) => player_id);

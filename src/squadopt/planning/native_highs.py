@@ -514,6 +514,7 @@ def solve_window_model(
     solve: Callable[[cp_model.CpModel, cp_model.CpSolver], int],
     *,
     weeks: int,
+    charge_rejected_certificate: bool = False,
 ) -> tuple[cp_model.CpSolver, int, dict[str, object]]:
     """Try native primary search for three/five weeks; certify or fall back.
 
@@ -563,10 +564,15 @@ def solve_window_model(
         return certificate, int(cp_model.OPTIMAL), details
     except (KeyError, TypeError, ValueError, RuntimeError, OSError) as error:
         details["fallback_reason"] = str(error) or type(error).__name__
-    # The solver's own limits are left as the caller set them. Work the certificate spent
-    # on a rejected witness is reported beside the search, never taken from its budget.
+    # An ordinary fallback has a separately reported certificate allowance.
+    # A phase with a single remaining balance must pay it before the next call.
     details["verification_work_before_fallback"] = verification_work
     _record(weeks, details)
+    if charge_rejected_certificate and verification_work:
+        remaining = max(0.0, deterministic - verification_work)
+        if remaining <= 0:
+            return solver, int(cp_model.UNKNOWN), details
+        solver.parameters.max_deterministic_time = remaining
     return solver, solve(model, solver), details
 
 

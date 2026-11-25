@@ -305,7 +305,7 @@ test("forwarded history recovers through Retry after a transient season failure"
   const failedReads = reads;
   healthy = true;
   await page.getByRole("button", { name: copy.suggestionHistory.retry, exact: true }).click();
-  await expect(page.locator("[data-zone='history']")).toBeVisible();
+  await expect(page.locator("[data-zone='history-header']")).toBeVisible();
   await expect(
     page.getByRole("heading", { level: 1, name: copy.suggestionHistory.title }),
   ).toBeVisible();

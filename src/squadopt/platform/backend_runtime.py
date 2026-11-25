@@ -47,6 +47,7 @@ from squadopt.application.advice_menu import held_member_chips, held_member_squa
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.llmopt_run import workflow_enabled
 from squadopt.data.errors import SourceRevisionError
 from squadopt.data.source_revision import require_source_revision
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -54,6 +55,7 @@ from squadopt.live import SeasonRules, read_season_rules
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, readiness_report
+from squadopt.platform.advice_plan_cache import PlanAdviceCache
 from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
@@ -62,6 +64,7 @@ from squadopt.platform.advice_read import (
     FileLeagueDirectory,
     PreferencePlayers,
 )
+from squadopt.platform.advice_runs import FileRunStore
 from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRateLimiter
 from squadopt.platform.advice_switches import (
     AdviceSwitchInputs,
@@ -139,7 +142,9 @@ def computable_strategies() -> dict[str, bool]:
     return {slug: value.requires_rival for slug, value in advice_capabilities().items()}
 
 
-def configuration_fingerprint() -> str:
+def configuration_fingerprint(
+    *, transfer_packages: bool = False, package_gate: bool = False
+) -> str:
     """SHA-256 of the settings that can change an answer.
 
     Paths are deliberately absent. Where the store is mounted is deployment placement, not
@@ -170,6 +175,11 @@ def configuration_fingerprint() -> str:
             if slug in STRATEGY_CATALOG
         },
     }
+    if transfer_packages:
+        document["transfer_packages"] = {
+            "version": "transfer_packages_v1",
+            "open_gate": package_gate,
+        }
     encoded = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -214,6 +224,8 @@ class BackendConfig:
     rate_limit: int = DEFAULT_RATE_LIMIT
     rate_window_seconds: float = DEFAULT_RATE_WINDOW_SECONDS
     max_open_jobs_per_client: int = 4
+    transfer_packages: bool = False
+    package_gate: bool = False
     public_entries: bool = False
     public_queue_limit: int = 32
     artifact_root: Path | None = None
@@ -224,6 +236,37 @@ class BackendConfig:
     """The club-news fixture file, or a club-news capture directory under the snapshot
     root, that the rotation table was coded from. The manager's word needs both this and
     ``artifact_root``."""
+
+    llmopt_vnext: bool = False
+    three_week_paths: bool = False
+    llmopt_vnext_three_week: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.llmopt_vnext) is not bool or type(self.llmopt_vnext_three_week) is not bool:
+            raise BackendConfigError("The LLMOPT release control must be boolean.")
+        if type(self.three_week_paths) is not bool:
+            raise BackendConfigError("The three-week path control must be boolean.")
+        if type(self.transfer_packages) is not bool or type(self.package_gate) is not bool:
+            raise BackendConfigError("Package controls must be boolean.")
+        if self.package_gate and not self.transfer_packages:
+            raise BackendConfigError("The package gate requires packages.")
+
+    @property
+    def enabled_packages(self) -> bool:
+        return self.llmopt_vnext and self.transfer_packages
+
+    @property
+    def enabled_package_gate(self) -> bool:
+        return self.enabled_packages and self.package_gate
+
+    @property
+    def enabled_three_week_paths(self) -> bool:
+        return self.workflow_enabled(3) and self.three_week_paths
+
+    def workflow_enabled(self, window: int) -> bool:
+        return workflow_enabled(
+            window, master=self.llmopt_vnext, three_week=self.llmopt_vnext_three_week
+        )
 
     @property
     def queue_root(self) -> Path:
@@ -287,6 +330,11 @@ class BackendConfig:
             handoff_root=values["handoff_root"],
             allowed_origins=origins,
             public_entries=public_entries == "1",
+            transfer_packages=_flag(source, "SQUADOPT_BACKEND_TRANSFER_PACKAGES"),
+            three_week_paths=_flag(source, "SQUADOPT_BACKEND_THREE_WEEK_PATHS"),
+            llmopt_vnext=_flag(source, "SQUADOPT_BACKEND_LLMOPT_VNEXT"),
+            llmopt_vnext_three_week=_flag(source, "SQUADOPT_BACKEND_LLMOPT_VNEXT_THREE_WEEK"),
+            package_gate=_flag(source, "SQUADOPT_BACKEND_PACKAGE_GATE"),
             public_queue_limit=_positive_int(source, "SQUADOPT_BACKEND_PUBLIC_QUEUE_LIMIT", 32),
             season=season,
             rate_limit=_positive_int(source, "SQUADOPT_BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT),
@@ -299,6 +347,13 @@ class BackendConfig:
             artifact_root=Path(artifact_root) if artifact_root else None,
             club_news_source=Path(club_news_source) if club_news_source else None,
         )
+
+
+def _flag(source: Mapping[str, str], variable: str) -> bool:
+    value = source.get(variable, "0").strip()
+    if value not in {"0", "1"}:
+        raise BackendConfigError(f"{variable} must be 0 or 1.")
+    return value == "1"
 
 
 def _positive_int(source: Mapping[str, str], variable: str, default: int) -> int:
@@ -357,6 +412,12 @@ class CaptureContextProvider:
         self._config = config
         self._commit = repository_commit
         self._fingerprint = fingerprint
+        self._plain = configuration_fingerprint()
+        self._package_settings = {
+            configuration_fingerprint(transfer_packages=True, package_gate=gate): (True, gate)
+            for gate in (False, True)
+        }
+        self._recognized_fingerprints = {self._plain, *self._package_settings}
         self._log = log
         self._lock = threading.Lock()
         self._identity: CaptureIdentity | None = None
@@ -421,7 +482,7 @@ class CaptureContextProvider:
         """The deadline of the exact capture and handoff resolved for this request."""
 
         identity = self._identity_for(context.capture_snapshot_id)
-        if identity is None or identity.context != context:
+        if identity is None or not self.matches(identity, context):
             raise AdviceBackendNotReadyError("The resolved capture is no longer available.")
         return identity.inputs.deadline.deadline_utc
 
@@ -430,9 +491,9 @@ class CaptureContextProvider:
 
         with self._lock:
             identity = self._identity
-        if identity is None or identity.context != context:
+        if identity is None or not self.matches(identity, context):
             identity = self._identity_for(context.capture_snapshot_id)
-        if identity is None or identity.context != context:
+        if identity is None or not self.matches(identity, context):
             raise AdviceBackendNotReadyError("The resolved capture is no longer available.")
         gameweeks = identity.inputs.published_gameweeks
         return tuple(
@@ -489,27 +550,56 @@ class CaptureContextProvider:
         identity = self.identity()
         return None if identity is None else identity.context
 
+    def window_context(self, context: AdviceRequestContext, window: int) -> AdviceRequestContext:
+        if (
+            context.configuration_fingerprint in self._package_settings
+            and not self._config.workflow_enabled(window)
+        ):
+            return replace(context, configuration_fingerprint=self._plain)
+        return context
+
+    def matches(self, identity: CaptureIdentity, context: AdviceRequestContext) -> bool:
+        """An admitted job pins its package calculation even if release permissions change."""
+        if identity.context == context:
+            return True
+        fingerprint = context.configuration_fingerprint
+        return (
+            self._fingerprint in self._recognized_fingerprints
+            and fingerprint in self._recognized_fingerprints
+            and replace(context, configuration_fingerprint=self._fingerprint) == identity.context
+        )
+
     def capture(self, context: AdviceRequestContext) -> AdviceCaptureContext | None:
         """The projected bundle for one **whole** context, or ``None`` if it is not current.
 
         The argument is the entire ``AdviceRequestContext`` rather than a capture id, and
-        the comparison is equality over all seven fields, because all seven are in the
-        cache key. Matching on the capture alone left three ways to compute an answer with
-        inputs the key does not describe: a redeployed commit, a changed configuration, and
-        a republished handoff. Answering "here is the current bundle" to a question about
-        any other context is the silent-corruption path this exists to close.
+        all seven fields enter the cache key. A recognized package fingerprint selects
+        its recorded calculation on the same capture, handoff and commit. A match on capture
+        alone could pair the key with a different deployment, configuration or handoff.
         """
 
         identity = self.identity()
-        if identity is None or identity.context != context:
+        if identity is None or not self.matches(identity, context):
             return None
         with self._lock:
             held = self._context
-            if held is None or held.context != context:
-                held = load_capture_context(identity)
+            if held is None or held.context != identity.context:
+                held = replace(
+                    load_capture_context(identity),
+                    transfer_packages=self._config.enabled_packages,
+                    package_gate=self._config.enabled_package_gate,
+                )
                 self._context = held
                 self._switch_signature = None
-            return self._with_current_switches(held)
+            refreshed = self._with_current_switches(held)
+            if refreshed.context == context:
+                return refreshed
+            packages, gate = self._package_settings.get(
+                context.configuration_fingerprint, (False, False)
+            )
+            return replace(
+                refreshed, context=context, transfer_packages=packages, package_gate=gate
+            )
 
     def _with_current_switches(self, held: AdviceCaptureContext) -> AdviceCaptureContext:
         """``held`` with the switch inputs as they are on disk now; called under the lock.
@@ -566,7 +656,7 @@ class CaptureContextProvider:
 
         if self._config.artifact_root is None:
             identity = self.identity()
-            if identity is None or identity.context != context:
+            if identity is None or not self.matches(identity, context):
                 return None
             return AdviceSwitchInputs()
         try:
@@ -585,7 +675,7 @@ class CaptureContextProvider:
     ) -> Mapping[int, tuple[str, ...] | None]:
         """Read the requested members once per identity, without projecting the capture."""
         identity = self.identity()
-        if identity is None or identity.context != context:
+        if identity is None or not self.matches(identity, context):
             raise AdviceBackendNotReadyError("The capture context is no longer current.")
         with self._lock:
             if self._chip_identity is not identity:
@@ -636,7 +726,7 @@ class CaptureContextProvider:
         squad cannot be read from the capture, which the worker would refuse as well.
         """
         identity = self.identity()
-        if identity is None or identity.context != context:
+        if identity is None or not self.matches(identity, context):
             raise AdviceBackendNotReadyError("The capture context is no longer current.")
         with self._lock:
             if self._squad_identity is not identity:
@@ -753,7 +843,7 @@ class AdviceBackend:
 
     config: BackendConfig
     queue: FileJobQueue
-    cache: FileAdviceCache
+    cache: PlanAdviceCache
     reader: AdviceReadStore
     submit: AdviceSubmitService
     contexts: CaptureContextProvider
@@ -765,6 +855,7 @@ class AdviceBackend:
     public_inputs: PublicEntryInputs | None = None
     public_reader: PublicEntryAdviceReader | None = None
     public_submit: AdviceSubmitService | None = None
+    runs: FileRunStore | None = None
 
     def queue_depth(self) -> int:
         """Open work, not history: a terminal job is not something a member waits for."""
@@ -773,7 +864,7 @@ class AdviceBackend:
 
     def jobs_by_status(self) -> dict[str, int]:
         """One current store read inside the owning API, never in the status script."""
-        counts = dict.fromkeys(("queued", "running", "completed", "failed"), 0)
+        counts = dict.fromkeys(("queued", "running", "completed", "failed", "cancelled"), 0)
         for job in self.queue.jobs():
             counts[job.status] += 1
         return counts
@@ -816,14 +907,26 @@ def build_backend(
     component_log = log if log is not None else AdviceLog("backend")
     metrics = metrics if metrics is not None else AdviceMetrics()
     queue = FileJobQueue(config.queue_root)
-    cache = FileAdviceCache(config.cache_root)
+    cache = PlanAdviceCache(
+        config.cache_root,
+        llmopt_vnext=config.llmopt_vnext,
+        llmopt_vnext_three_week=config.llmopt_vnext_three_week,
+    )
     specs = FileAdviceJobSpecStore(config.spec_root)
+
+    def stored_capture(key: str) -> str | None:
+        spec = specs.get(key)
+        return spec.context.capture_snapshot_id if spec is not None else None
+
+    runs = FileRunStore(config.store_root / "runs", capture_for_key=stored_capture)
     liveness = WorkerLiveness(config.worker_root, queue)
     gate = probe if probe is not None else StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
         config,
         repository_commit=_repository_commit(),
-        fingerprint=configuration_fingerprint(),
+        fingerprint=configuration_fingerprint(
+            transfer_packages=config.enabled_packages, package_gate=config.enabled_package_gate
+        ),
         log=component_log,
     )
     reader = AdviceReadStore(
@@ -836,6 +939,13 @@ def build_backend(
         chip_availability=contexts.held_chips,
         preference_players=contexts.preference_players,
         available_windows=contexts.available_windows,
+        transfer_packages=config.enabled_packages,
+        three_week_paths=config.enabled_three_week_paths,
+        preference_bundles=True,
+        verified_repairs=config.llmopt_vnext,
+        llmopt_vnext=config.llmopt_vnext,
+        llmopt_vnext_three_week=config.llmopt_vnext_three_week,
+        window_context=contexts.window_context,
     )
     limiter = FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds)
     submit = AdviceSubmitService(
@@ -851,6 +961,7 @@ def build_backend(
         # The job view's place in line and worker counts come from the look /ready holds.
         job_look=liveness.look,
         job_progress=queue.progress,
+        runs=runs,
     )
     public_inputs = None
     public_reader = None
@@ -864,6 +975,13 @@ def build_backend(
             public_inputs,
             switches=contexts,
             available_windows=contexts.available_windows,
+            transfer_packages=config.enabled_packages,
+            three_week_paths=config.enabled_three_week_paths,
+            preference_bundles=True,
+            verified_repairs=config.llmopt_vnext,
+            llmopt_vnext=config.llmopt_vnext,
+            llmopt_vnext_three_week=config.llmopt_vnext_three_week,
+            window_context=contexts.window_context,
         )
         public_submit = AdviceSubmitService(
             public_reader,
@@ -877,6 +995,7 @@ def build_backend(
             job_progress=queue.progress,
             prepare_inputs=public_inputs.prepare,
             max_open_jobs=config.public_queue_limit,
+            runs=runs,
         )
     return AdviceBackend(
         config=config,
@@ -893,6 +1012,7 @@ def build_backend(
         public_inputs=public_inputs,
         public_reader=public_reader,
         public_submit=public_submit,
+        runs=runs,
     )
 
 

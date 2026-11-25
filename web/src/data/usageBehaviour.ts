@@ -23,6 +23,11 @@ import {
 /** The parts of the site a click is told against, as `workers/usage/src/rules.js` lists them. */
 export const USAGE_ZONES = [
   "nav",
+  "nav-brand",
+  "nav-member",
+  "nav-links",
+  "nav-settings",
+  "phone-bar",
   "topbar",
   "entry-form",
   "league-list",
@@ -47,16 +52,76 @@ export const USAGE_ZONES = [
   "coach-news",
   "new-information",
   "history",
+  "history-header",
+  "history-report",
+  "history-picker",
+  "history-table",
+  "history-week",
   "vs",
+  "vs-header",
+  "vs-weeks",
+  "vs-score",
+  "vs-sides",
+  "vs-why",
+  "vs-squad",
   "live",
+  "live-header",
+  "live-score",
+  "live-refresh",
+  "live-rival",
+  "live-differentials",
+  "live-recap",
+  "live-players",
   "llmopt",
+  "llmopt-model",
+  "llmopt-instructions",
+  "llmopt-rule-list",
+  "llmopt-rules",
+  "llmopt-plan",
+  "llmopt-compute",
+  "llmopt-results",
   "reminder",
+  "reminder-header",
+  "reminder-switch",
+  "reminder-steps",
   "fixtures",
+  "fixtures-header",
+  "fixtures-view",
+  "fixtures-clubs",
+  "fixtures-team",
+  "fixtures-matrix",
   "contribute",
+  "contribute-header",
+  "contribute-team",
+  "contribute-position",
+  "contribute-player",
+  "contribute-form",
+  "contribute-comments",
   "page",
 ] as const;
 
 export type UsageZone = (typeof USAGE_ZONES)[number];
+
+/**
+ * Words no component carries any more, kept in the list so an older tab's events are still
+ * taken and the record's rows still read. On 2026-11-23 `nav` (the whole sidebar, as tall as
+ * the window) gave way to `nav-brand`, `nav-member`, `nav-links` and `nav-settings`, and
+ * `llmopt` (the whole page) to the `llmopt-` zones, because a large box's cells did not sit
+ * on its controls. Later that day the other whole-page words (`history`, `vs`, `live`,
+ * `reminder`, `fixtures`, `contribute`) gave way the same way to zones named after their page.
+ * The heatmap mode draws a word only over an element that carries it, so these rows are
+ * counted in the admin page and never drawn over the newer, smaller boxes.
+ */
+export const RETIRED_USAGE_ZONES: readonly UsageZone[] = [
+  "nav",
+  "llmopt",
+  "history",
+  "vs",
+  "live",
+  "reminder",
+  "fixtures",
+  "contribute",
+];
 
 /** The other closed lists of version 2, as the Worker keeps them. */
 export const USAGE_KINDS = ["click", "scroll", "vital", "error", "arrival"] as const;

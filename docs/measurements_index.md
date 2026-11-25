@@ -1,5 +1,71 @@
 # Measurements Index
 
+- LLMOPT one-week release. Cold and warm mixed-mode results on twenty frozen member-weeks,
+  compared slot by slot with H2, and time to the main plan in a local browser under both settings.
+  [Window comparison and rendering times](research/llmopt_week_first.md),
+  [per-member measurements](research/llmopt_week_first.json)
+
+- 2026-11-21. On twenty frozen member-weeks, all 640 cold and warm release-workload
+  answers matched the prior record. Enabling the release setting changed cold server
+  jobs from 80 to zero at one week and from 80 to 40 at three weeks. Both three-week
+  arms used 320 solver calls. Median worker time per three-week job increased from
+  45.947 to 68.645 seconds. All 80 warm repeats opened zero jobs and zero device workers.
+  [Closing report](research/llmopt_phase8_closing.md), [per-run record](research/llmopt_phase8_load.json)
+
+- 2026-11-19: [LLMOPT bounded packages](research/llmopt_phase6_results.md),
+  [record](research/llmopt_phase6_results.json): unchanged twenty-member full pool,
+  18 computed and two inherited errors in each arm; raw eleven, expected net and
+  selection-utility gains all zero. Sixteen opened-gate proposals retain the incumbent.
+  One inherited 122.000084823-unit base overrun remains visible. Both controls default off.
+
+- 2026-11-19: [LLMOPT device priorities](research/llmopt_phase4_priority_audit.md),
+  [record](research/llmopt_phase4_priority_audit.json): the original twenty frozen
+  controls, 16/16 equal feasible objectives and priority outcomes plus four equal
+  infeasibilities. Eight transfer decisions differ at equal scores; maximum complete
+  device bundle 7.165 seconds. Sequential local calls, zero jobs and network calls. #1468.
+
+- 2026-11-19: [LLMOPT original-control scope audit](research/llmopt_phase4_scope_audit.md),
+  [record](research/llmopt_phase4_scope_audit.json): 20 frozen member-weeks, 60 local
+  comparisons. Exact original controls replay 20/20; device equality is 15/16 feasible
+  plus four infeasibilities. The unproved zero-bank 52.310 differs from the device's
+  52.978. Active server profile matches 16/16 controls plus four infeasibilities and
+  20/20 no-added-rule cases. No extra keep rule, server jobs or live measurement.
+
+- 2026-11-19: [LLMOPT device parity and scope](research/llmopt_phase4/README.md),
+  [record](research/llmopt_phase4_parity.json): twenty frozen member-weeks, forty local
+  comparisons, forty equal model and published objectives, forty identical transfer
+  decisions with a keep-first-held-player constraint; no server jobs or live measurements.
+
+- 2026-11-20. Seven one-week hard-rule families covered all 20 frozen member-weeks.
+  The server and device returned the same score and transfers in 130 feasible
+  comparisons. Both proved the other ten infeasible. All 220 device alternatives
+  satisfied the submitted rules. [Comparison](research/llmopt_phase4_rule_families.md),
+  [record](research/llmopt_phase4_rule_families.json). #1468.
+
+- 2026-11-20. LLMOPT priorities on twenty frozen member-weeks produced 80 local
+  API/worker run records at both windows and in both modes. At three weeks 10/20
+  completed all three layers, or 10/16 with a feasible main. Their preference jobs
+  charged 2,660.992 of 5,856 available units across the 16 eligible runs. No run
+  exceeded two server jobs and 192 repeats opened zero extra jobs. #1467.
+  [Measurement](research/llmopt_phase3_jobs.md), [record](research/llmopt_phase3_jobs.json)
+
+- 2026-11-19: [LLMOPT real solver budget controls](research/llmopt_phase2_solver_budget.md),
+  [record](research/llmopt_phase2_solver_budget.json): twenty frozen member-weeks at
+  both windows; 40/40 original statuses and decisions, 32 equal numeric objectives
+  and eight equal infeasibilities; maximum work 20.001169834987554/21 and
+  120.00555450856191/122 units. Sequential local production solves, no network calls.
+
+- 2026-11-20: [Wildcard and Free Hit cache parity](research/llmopt_phase2_named_chip.md),
+  [record](research/llmopt_phase2_named_chip.json). In 16 paired one- and three-week
+  controls, the run-bound and legacy workers returned the same solver status, transfer
+  decisions, objective and published net points. All 16 pairs shared the same cache
+  address and immutable request, and the cached bytes matched in every pair.
+
+- 2026-11-18: [LLMOPT shared admission](research/llmopt_phase2_admission.md),
+  [record](research/llmopt_phase2_admission.json): 20 frozen member-weeks, 40 runs,
+  maximum four server jobs, zero additional jobs from 240 reconstructed-service repeats;
+  synthetic completions, no solver-quality or latency claim.
+
 One line per committed real-data measurement artifact: what it is, what it found, and
 where it came from. Every artifact here is measurement-only in the sense that matters —
 **nothing in this index promoted a model or changed the operational control** — but one row
@@ -265,6 +331,7 @@ identified below rather than being silently pooled with v1 evidence.
 | [`football_complete_policy_acceptance`](research/football_complete_policy_acceptance.json) / [readout](research/football_information_windows.md) | Cold application acceptance of the `complete_observed_window_v2` football information windows on one reused capture (`fpl-live-20260922T214539Z-364991a4f832`, 667 players, GW6 to GW10): fourteen requests, three and five weeks at seven Top100 settings, each one planner call comparing two or three distinct current actions over both information branches. Every final selection kept the baseline, with a utility gain of 0 in all fourteen; three-week requests took 43.47 to 49.75 s and five-week requests 90.00 to 97.80 s. The first matrix passed 13 of 14 (five weeks at Top100 50 had no distinct alternative). No realized point gain measured; a restricted menu, not a global optimality certificate; local timings only. | #911 |
 | [`football_information_worlds`](research/football_information_worlds.json) / [readout](research/football_information_windows.md) | Shared football-world diagnostic on a wholly synthetic test-fixture season: the nominal plan against a fixed hold on the same 64 worlds (seed 31), sample means 123.17 against 116.49 over three weeks and 211.47 against 200.59 over five, paired win share 0.6875 in both. It compares the existing optimizer with making no transfers on synthetic draws, not a gain of the information layer; no season archive or 2025-26 holdout was read. The per-week sampler gaps against analytic expectations are kept in the record. | #909 |
 | [mean_reversion_discount](research/mean_reversion_discount.md) ([record](research/mean_reversion_discount.json); protocol [mean_reversion_discount_prereg](research/mean_reversion_discount_prereg.md); **measured, not certified**) | **A pre-registered mean-reversion discount on the later weeks of the capped three-week planner, measured and refused by its own gate.** The candidate rule `mean_reversion_discount_v1` shrinks each later horizon week's deviation from the position mean by rho per week of offset. Primary `L3_mr_0.75` minus `L3_naive`, realized points net of charged hits: -0.56 points per gameweek, 90% interval [-1.51, +0.89], 184 paired gameweeks over five season chains (2025-26 walked as declared development data, scope v2); season nets +63, -189, +18, -4, +9, so two seasons lose and all three clauses of the gate fail (floor 1.5 points per gameweek, interval excludes zero, at most one losing season). Secondary rho 0.9 -0.03 [-0.83, +0.64] and rho 0.6 -0.14 [-0.76, +0.90]. Under the member policy (planning hit cost 8, 4 charged) and the member window's cap (one transfer a week, a second only from two banked free transfers) no three-week arm pays a hit in any season, because one free transfer accrues every week and a paid second move is not allowed; the churn the discount was built to damp cannot occur under this cap, so the rule moves selection only (2022-23 loses 189 realized points at rho 0.75) and the discounted ranking picks worse on average than the undiscounted one. The capped `L3_naive` against the uncapped weekly control `L1` is -0.51 [-1.79, +0.34] per week, level within noise, which repeats the transfer-discipline reading with 2025-26 and the member policy. Rho 0.9 reproduces `L3_naive`'s 2023-24 total (1886) with 8 of 37 weekly squads different: equal totals, not an inert rule. The squad members a chain carries at a zero projection, the one population the rule treats differently from the naive rule, number 9 to 44 blank rows per chain and no archive holes, and the record counts them per chain. Proofs 702 of 920 solves at deterministic budget 8.0; one process per season on a 4-core machine. Commit e112fed, run 2026-10-17. Nothing promoted; a pass would have licensed a proposal for the live window builder, and a fail licenses this record. | - |
+| [component_hit_margin](research/component_hit_margin.md) ([record](research/component_hit_margin.json); protocol [component_hit_margin_prereg](research/component_hit_margin_prereg.md); **reading `unsupported`**, no default moved) | **The member planner's hit margin, walked for the first time on the forecast that decides the served squads, barely binds there.** `supplied_decision_week_v1` lets the lookahead-1 season chain decide on the Phase C component base's own decision-week forecast (frozen handoff `b05f10c3`, 147 decisions, four development seasons, chips off, no automatic substitution, 2025-26 not read); planning hit costs 4 to 12 were walked on it and on the form-window control beside it, 72 chains, 2616 of 2646 solves proved. **On the component base the planner pays for 24 transfers in four seasons at the game's own 4, one at 8 and none from 9 up** (the control pays for 168 at 4 and 36 at 8), so the levels differ by a handful of decisions and what follows from them. No level passes the gate against 8 (5: -0.53 a week [-1.43, +0.59]; 6: -0.86 [-1.85, +0.10]; 7 is the same chain as 8; 9 to 12 are one chain, -0.27 [-0.77, +0.14] at 12). 8 against 4 is **+1.55 a week [+0.09, +3.49]** but its season nets are +243, -33, +56 and -38: one season carries it and two are lower, so the third clause of the gate fails and the pre-registered reading is `unsupported`: nothing is shown better than 8, and 8 is not shown better than the game's charge on this forecast. **The control arm reproduces the hit cost grid's four shared seasons to the point** (8 against 4 +2.07 a week [+0.49, +3.89]; +26, +64, +122, +92) **and brackets it**: 9 to 12 are each worse than 8 (12: -2.27 [-3.65, -1.09]), so on the control 7 to 8 is an interior optimum and no longer an edge. Projected score minus realized, per decision: **+33.9 on the control at 8 and -1.1 on the component base**, which is the optimism the grid's note named and its absence on the served forecast. Standing: a margin above 4 costs almost nothing on the component base and is carried by the control's evidence only; the measurement gives no reason to move the policy's 8 | - |
 
 ## Evidence handoffs
 
@@ -373,3 +440,4 @@ the #980 forwarder is built on Cloudflare.
 | [GW8 club-news join counts](research/club_news_join_counts_gw8.md) ([record](research/club_news_join_counts_gw8.json); [protocol](research/club_news_join_counts_gw8_prereg.md)) | Offline replay at the clean export commit reproduces the published table. Five unique player joins, zero no-match or ambiguous identities; three absence/doubt statements unapplied because fixture scope is unverified. Frozen verdict `statements_lost`, routing #1006 items 3, 7, 4 and 10. No new model call or prediction claim. | #524, #1006, #1140 |
 
 - [Five-free-transfer served-path preflight](research/llmopt_window_budget_probe.md) ([record](research/llmopt_window_budget_probe.json)): one saved GW6 member with five free transfers selected the bound football input and observed-information route, returning a feasible plan; the specific Phase 1 accounting exception was not reproduced. Exact GW8/GW9 served bundles are absent locally. No planner change.
+- [Expected-window phase work at five free transfers](research/expected_window_guard.md) ([paired record](research/expected_window_guard.json)) compares both revisions on the twenty frozen member-weeks. The GW8 and GW9 cases record the original exception, the retained three-week plan and the work charged to each phase.

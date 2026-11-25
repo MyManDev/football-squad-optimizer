@@ -12,7 +12,7 @@ export interface FixtureOption<T> {
 /**
  * One of the fixture page's choices, as radios: joined segments for the two views, and a grid
  * of separate cells for the clubs. The group's name is for assistive technology; what the
- * options say is enough to see.
+ * options say is enough to see. `zone` names the group for the usage record's clicks (ADR 0015).
  */
 export function FixtureChoice<T extends string>({
   legend,
@@ -21,6 +21,7 @@ export function FixtureChoice<T extends string>({
   value,
   onChange,
   clubs = false,
+  zone,
 }: {
   legend: string;
   name: string;
@@ -28,9 +29,10 @@ export function FixtureChoice<T extends string>({
   value: T;
   onChange: (value: T) => void;
   clubs?: boolean;
+  zone?: string;
 }) {
   return (
-    <fieldset className={styles.choice}>
+    <fieldset className={styles.choice} data-zone={zone}>
       <legend className="visually-hidden">{legend}</legend>
       <div className={clubs ? styles.clubs : styles.segments}>
         {options.map((option) => (

@@ -416,6 +416,52 @@ def test_bank_diagnosis_distinguishes_a_witness_from_an_unfinished_probe(
         assert report == {"repairs": []}
 
 
+def test_exhausted_diagnostic_retains_proved_failure_without_another_probe(
+    known_optimum_players, small_config, monkeypatch
+):
+    from squadopt.optimization.work_budget import WorkBudget, work_budget
+
+    horizon, initial, _ = _case(known_optimum_players)
+    budget = WorkBudget(122, cp_used=122)
+
+    def no_call(*args):
+        pytest.fail("An exhausted repair probe started a solver.")
+
+    monkeypatch.setattr(optimizer, "_solve", no_call)
+    with work_budget(budget):
+        result = optimizer.diagnose_infeasible_preferences(
+            horizon,
+            initial,
+            small_config,
+            TransferPlanningConfig(),
+            ChipAvailability(),
+            DecisionPreferences(hold_transfers=True, min_bank=BankFloor(101, week=2)),
+        )
+    assert result == {"repairs": []}
+    assert budget.calls == 0
+
+
+def test_successful_diagnostic_consumes_the_original_job_allocation(
+    known_optimum_players, small_config
+):
+    from squadopt.optimization.work_budget import WorkBudget, work_budget
+
+    horizon, initial, _ = _case(known_optimum_players)
+    budget = WorkBudget(122, cp_used=121.5)
+    with work_budget(budget):
+        result = optimizer.diagnose_infeasible_preferences(
+            horizon,
+            initial,
+            small_config,
+            TransferPlanningConfig(),
+            ChipAvailability(),
+            DecisionPreferences(hold_transfers=True, min_bank=BankFloor(101, week=2)),
+        )
+    assert result["repairs"] == [{"kind": "lower_bank_floor", "tenths": 100}]
+    assert budget.calls == 1
+    assert 121.5 < budget.cp_used <= 122
+
+
 def test_net_points_priority_compares_the_exact_cost_of_keeping_a_player(
     known_optimum_players, small_config
 ):

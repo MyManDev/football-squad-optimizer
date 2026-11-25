@@ -165,6 +165,8 @@ def test_form_artifact_survives_worker_document_validation(publication_case, mon
     # In-memory collaborators exercise the actual compute boundary without a backend
     # or another planner solve. Only the plan result is fabricated.
     capture = SimpleNamespace(
+        transfer_packages=False,
+        package_gate=False,
         switches=switches,
         inputs=inputs,
         provider=SimpleNamespace(holds=lambda entry, week: True),

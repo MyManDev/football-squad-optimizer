@@ -17,15 +17,14 @@
  */
 
 import type { Fixture, FixturesPayload } from "../../fixtures/types";
-import { MATCH_WINDOW_MS } from "../../liveScore/liveWindow";
 import type { LiveActivity } from "../../liveScore/weekActivity";
 import type { MemberWeek, Position, WeekLive } from "../../liveScore/weekLive";
 import { forecastSource } from "../device/chipForecast/member";
 import type { DevicePlanDocument } from "../device/types";
+import { matchPhaseReader, type LivePhase } from "./matchPhase";
 import { memberLiveScore } from "./memberLiveScore";
 
-/** Where a match stands at the read's source time. */
-export type LivePhase = "upcoming" | "playing" | "finished";
+export type { LivePhase };
 /** The page's groups: the eleven by their match, then the bench. */
 export type LiveGroup = LivePhase | "bench";
 export type LiveState = "up" | "down" | "neutral";
@@ -183,49 +182,13 @@ export function liveBoard(input: LiveBoardInput): LiveBoard | null {
   const calendar = calendarIndex(fixtures);
   const players = new Map(table.players.map((player) => [player.element_id, player]));
   const elements = new Map(live.elements.map((element) => [element.element_id, element]));
-  const time = Date.parse(live.source_time);
-  const inPlay = new Set(activity?.in_play_fixtures ?? []);
   const appearances = new Map<string, { minutes: number; goals: number; assists: number }>();
   for (const row of activity?.appearances ?? []) {
     appearances.set(`${row.element_id}:${row.fixture_id}`, row);
   }
 
-  // The fixtures someone has played minutes in, where the read has detail; where it has none,
-  // the clubs someone has played for in the week.
-  const playedIn = new Set<number>();
-  for (const row of activity?.appearances ?? []) if (row.minutes > 0) playedIn.add(row.fixture_id);
-  const clubsPlayed = new Set<number>();
-  if (activity === null) {
-    for (const element of live.elements) {
-      const team = element.minutes > 0 ? players.get(element.element_id)?.team : undefined;
-      const club = team === undefined ? undefined : clubIds.get(team);
-      if (club !== undefined) clubsPlayed.add(club);
-    }
-  }
-
-  /**
-   * A fixture's phase at the read's time. A match has started once FPL lists it in play or
-   * someone has played in it (with no detail: its kickoff has passed and someone has played for
-   * one of its clubs), and past its window only a match that started is over; one that never did
-   * (put back, or moved within the day) is still to come. A pick's own minutes in it mean it has
-   * started. The window still ends a started match: FPL lists a match in play until its bonus is
-   * checked, an hour or more after the final whistle.
-   */
-  const phaseOf = (fixture: WeekLive["fixtures"][number], minutes: number | null): LivePhase => {
-    const kickoff = instant(calendar.byId.get(fixture.id)?.kickoff_utc);
-    const started =
-      (activity !== null
-        ? inPlay.has(fixture.id) || playedIn.has(fixture.id)
-        : kickoff !== null &&
-          time >= kickoff &&
-          (clubsPlayed.has(fixture.home_club) || clubsPlayed.has(fixture.away_club))) ||
-      (minutes ?? 0) > 0;
-    if (fixture.finished) return "finished";
-    if (kickoff !== null && time >= kickoff + MATCH_WINDOW_MS) {
-      return started ? "finished" : "upcoming";
-    }
-    return started ? "playing" : "upcoming";
-  };
+  // One rule for a match's phase, shared with the member's live card (`matchPhase`).
+  const phaseOf = matchPhaseReader({ live, activity, table, fixtures });
 
   const counted = new Set(score.counted);
   const armbandHolder = score.captain ?? member.captain;
@@ -332,7 +295,6 @@ export function liveBoard(input: LiveBoardInput): LiveBoard | null {
         Number(b.armband === "captain") - Number(a.armband === "captain") || a.pick - b.pick,
     );
   }
-  const over = live.fixtures.filter((fixture) => phaseOf(fixture, null) === "finished").length;
   return {
     entryId: member.entry_id,
     season: live.season,
@@ -342,7 +304,7 @@ export function liveBoard(input: LiveBoardInput): LiveBoard | null {
     net: score.net,
     gross: score.gross,
     transferCost: score.transfer_cost,
-    matchesOver: over,
+    matchesOver: result.live.matchesOver,
     matchesTotal: live.fixtures.length,
     final: score.bonus_confirmed,
     detailed: activity !== null,

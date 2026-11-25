@@ -73,6 +73,7 @@ export function TeamFixtures({
         clubs
         legend={copy.clubLegend}
         name="fixture-club"
+        zone="fixtures-clubs"
         value={club.short_name}
         onChange={onChoose}
         options={clubs.map((option) => ({
@@ -86,7 +87,7 @@ export function TeamFixtures({
           ),
         }))}
       />
-      <Card title={club.name}>
+      <Card title={club.name} zone="fixtures-team">
         {weeks.length === 0 ? (
           <p className={styles.none}>{copy.noneAhead}</p>
         ) : (

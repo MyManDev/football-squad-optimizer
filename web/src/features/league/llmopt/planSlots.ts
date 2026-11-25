@@ -9,6 +9,7 @@ import {
   type ComputePhase,
 } from "../advice/useAdviceJob";
 import type { EntryAdvice } from "../types";
+import { delayedBuyPreferences } from "./planPaths";
 import { openingAlternatives } from "./planComparison";
 import type { PlanRequest, PlanRun } from "./planRun";
 import type { ALTERNATIVE_COUNT, StartedAlternative } from "./planSession";
@@ -89,6 +90,7 @@ export interface Followup {
  * nothing is priced and a slot is free, a plan that rolls the transfer or keeps more budget.
  */
 export function followupRequests(run: PlanRun, basePlan: EntryAdvice): (Followup | null)[] {
+  if (basePlan.device_alternatives || run.inputs.request.deviceAlternatives) return [];
   const basis = run.automaticBasis;
   if (!basis) return [];
   const followups = run.slots.map((slot): Followup | null =>
@@ -99,8 +101,17 @@ export function followupRequests(run: PlanRun, basePlan: EntryAdvice): (Followup
   const { roll, bank } = openingAlternatives(basePlan, basis.preferences, basis.chip);
   const bankFloor = bank?.min_opening_bank_tenths;
   const available: Followup[] = [];
-  if (roll && !reserved.some(({ preferences }) => holdsOpeningTransfers(preferences)))
-    available.push({ request: { ...basis, preferences: roll }, alternative: { kind: "roll" } });
+  if (roll && !reserved.some(({ preferences }) => holdsOpeningTransfers(preferences))) {
+    const players =
+      basePlan.plan_weeks
+        ?.find((week) => week.gameweek === basePlan.gameweek)
+        ?.transfers_in.map((p) => p.player_id) ?? [];
+    const delayed = run.inputs.paths3w ? delayedBuyPreferences(roll, players) : null;
+    available.push({
+      request: { ...basis, preferences: delayed ?? roll },
+      alternative: delayed ? { kind: "delay", players } : { kind: "roll" },
+    });
+  }
   if (bank && bankFloor !== undefined)
     available.push({
       request: { ...basis, preferences: bank },
@@ -131,6 +142,11 @@ export function restoredSlot(
   const basis = run.automaticBasis;
   if (!basis || run.prices.length || !started || started.kind === "priced") return null;
   try {
+    if (started.kind === "delay") {
+      if (!run.inputs.paths3w) return null;
+      const preferences = delayedBuyPreferences(basis.preferences, started.players);
+      return preferences ? { ...basis, preferences } : null;
+    }
     return {
       ...basis,
       preferences: checkedPreferences({

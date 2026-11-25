@@ -7,6 +7,7 @@ request that prompt carries, and has the reply checked.
 import json
 from collections.abc import Callable
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -26,13 +27,15 @@ PROMPT = "/api/v1/llmopt/prompt"
 CHECK = "/api/v1/llmopt/check"
 
 
-def _interpret(body: dict[str, Any], model: Callable[[IntentRequest], object]) -> Any:
+def _interpret(
+    body: dict[str, Any], model: Callable[[IntentRequest], object], *, llmopt_vnext: bool = False
+) -> Any:
     """One message as the page sends it: the prompt, the model's reply to it, the check.
 
     ``model`` gets the request as the prompt carries it, its players the shortlist. A body
     the prompt refuses never reaches the model, and that refusal is the answer.
     """
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(llmopt_vnext=llmopt_vnext)) as client:
         prompt = client.post(PROMPT, json=body)
         if prompt.status_code != 200:
             return prompt
@@ -60,6 +63,105 @@ def _proposed(player_id: int = 1) -> dict[str, Any]:
         },
         "message": None,
     }
+
+
+@pytest.mark.parametrize("locale", ["tr", "en"])
+def test_priority_without_total_asks_for_one_total_allowance(locale):
+    body = {**_request(), "locale": locale}
+    reply = _proposed()
+    reply["draft"]["soft"] = [{"kind": "keep_player", "player_id": 1, "priority": 1}]
+    checked = _interpret(body, lambda _: reply, llmopt_vnext=True)
+    assert checked.status_code == 200
+    assert checked.json() == {
+        "status": "clarification",
+        "message": "Bu tercihler için toplam kaç puandan vazgeçebilirsin?"
+        if locale == "tr"
+        else "How many points in total would you give up for these preferences?",
+    }
+
+
+@pytest.mark.parametrize("locale", ["tr", "en"])
+def test_total_allowance_and_priorities_are_checked_before_computation(locale):
+    reply = _proposed()
+    reply["draft"]["soft"] = [{"kind": "keep_player", "player_id": 1, "priority": 1}]
+    reply["draft"]["max_total_cost_tenths"] = 15
+    checked = _interpret({**_request(), "locale": locale}, lambda _: reply, llmopt_vnext=True)
+    assert checked.status_code == 200
+    assert checked.json()["draft"]["max_total_cost_tenths"] == 15
+    assert checked.json()["draft"]["soft"] == reply["draft"]["soft"]
+    reply["draft"]["soft"] = [{"kind": "wildcard", "priority": 2}]
+    checked = _interpret({**_request(), "locale": locale}, lambda _: reply, llmopt_vnext=True)
+    assert checked.status_code == 200
+    assert checked.json()["status"] == "clarification"
+
+
+@pytest.mark.parametrize("section", ["draft", "hard", "soft", "comparison"])
+def test_legacy_provider_null_extension_is_ignored(section):
+    reply = _proposed()
+    if section == "draft":
+        target = reply["draft"]
+    elif section == "soft":
+        reply["draft"]["soft"] = [{"kind": "save_chips"}]
+        target = reply["draft"]["soft"][0]
+    else:
+        target = reply["draft"]["hard"][0] if section == "hard" else reply["draft"]["comparison"]
+    target["invented"] = None
+    checked = _interpret(_request(), lambda _: reply)
+    assert checked.status_code == 200
+    assert checked.json()["status"] == "draft"
+    assert "invented" not in json.dumps(checked.json())
+
+
+def test_default_prompt_returns_the_frozen_develop_schema_bytes():
+    # Captured from POST /api/v1/llmopt/prompt at develop 177000ec2cfcd0eb525f9253cd46afd75b7ac733.
+    fixture = Path(__file__).resolve().parents[1] / "fixtures" / "llmopt_develop_prompt_schema.json"
+    with TestClient(create_app()) as client:
+        prompt = client.post(PROMPT, json=_request())
+    assert prompt.status_code == 200
+    wire_schema = prompt.content.split(b',"schema":', 1)[1].split(b',"schema_name":', 1)[0]
+    assert wire_schema == fixture.read_bytes()
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_prompt_schema_and_check_accept_priority_fields_only_when_enabled(enabled):
+    body = _request()
+    priority = {
+        "hard": [],
+        "soft": [{"kind": "keep_player", "player_id": 1, "priority": 1}],
+        "max_total_cost_tenths": 5,
+    }
+    with TestClient(create_app(llmopt_vnext=enabled)) as client:
+        prompt = client.post(PROMPT, json=body)
+        assert prompt.status_code == 200
+        call = prompt.json()
+        draft = call["schema"]["properties"]["draft"]["anyOf"][0]["properties"]
+        soft = draft["soft"]["items"]["properties"]
+        assert ("priority" in soft) is enabled
+        assert ("max_total_cost_tenths" in draft) is enabled
+        assert ("max_total_cost_tenths" in call["system"]) is enabled
+        if enabled:
+            assert soft["priority"] == {
+                "anyOf": [{"type": "integer", "enum": [1, 2, 3]}, {"type": "null"}]
+            }
+            assert draft["max_total_cost_tenths"] == {
+                "anyOf": [{"type": "integer", "minimum": 0, "maximum": 1000}, {"type": "null"}]
+            }
+        for field in (
+            call["schema"]["properties"]["draft"],
+            *(draft[key] for key in ("comparison", "min_bank", "scenario")),
+        ):
+            assert set(field) == {"anyOf"}
+            obj, null = field["anyOf"]
+            assert obj["type"] == "object" and obj["additionalProperties"] is False
+            assert obj["required"] == list(obj["properties"])
+            assert null == {"type": "null"}
+        assert client.post(PROMPT, json={**body, "draft": priority}).status_code == (
+            200 if enabled else 422
+        )
+        checked = client.post(
+            CHECK, json={"request": body, "reply": {"status": "draft", "draft": priority}}
+        )
+        assert checked.status_code == (200 if enabled else 422), checked.text
 
 
 def test_prepares_comparison_and_preserves_hard_constraints() -> None:

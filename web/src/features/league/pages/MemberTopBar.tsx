@@ -45,7 +45,9 @@ export function MemberTopBar({
   const entry = view.entry;
   const deadline = deadlinePassed ?? gameweekDeadline(fixtures, view.season, view.gameweek);
   const humans = members.filter((member) => member.member_kind === "human").length;
-  const cells = scoreBugCells(entry, humans, view, locale, copy);
+  // The bank and the free transfers are what the member had for this deadline. Once it has
+  // passed they describe a decision that is over, so the bug leaves them out.
+  const cells = scoreBugCells(entry, humans, deadlinePassed !== null ? null : view, locale, copy);
   const leagueId = useLeagueId();
   return (
     <header

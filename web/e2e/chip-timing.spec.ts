@@ -12,6 +12,7 @@ import type { EntrySquad } from "../src/features/league/types";
 import { MESSAGES } from "../src/i18n/messages";
 import { PUBLIC_ROOT, shippedTrees } from "../src/testSupport/shippedTrees";
 import { atRest } from "./atRest";
+import { dismissOpening } from "./dismissOpening";
 import { claimMember, shippedClaim, type SeededClaim } from "./identity";
 
 // The chip timing card (#1003) in a real browser: the plain plan and each held chip solved
@@ -179,6 +180,7 @@ async function solve(page: Page, address: string): Promise<Run> {
   await page.goto(address);
   const button = page.getByRole("button", { name: COPY.deviceButton });
   await expect(button).toBeVisible();
+  await dismissOpening(page);
   pressed = true;
   await button.click();
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 120_000 });

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
+import { checkedPreferences } from "../advice/decisionPreferences";
 import type { ComputePhase } from "../advice/useAdviceJob";
 import type { EntryAdvice } from "../types";
-import { preferencePrice } from "./planResults";
+import { preferencePrice, visibleAutomatic } from "./planResults";
 import type { PriceTarget } from "./planRun";
 
 const envelope = mockEntryAdviceEnvelope(35249001, "saf-puan", 1);
@@ -77,4 +78,37 @@ describe("preferencePrice", () => {
     for (const outcome of ["conflict", "unavailable", "skipped"] as const)
       expect(preferencePrice(target(outcome), "Saka", done(50), [], true).status).toBe(outcome);
   });
+});
+
+it.each([20, 25])("shows a delayed buy with an inherited bank floor and %i bank", (bank) => {
+  const original = mockEntryAdviceEnvelope(35249001, "saf-puan", 3);
+  original.payload.bank_after_tenths = 20;
+  const opening = original.payload.plan_weeks![0]!;
+  opening.free_transfers_after = 1;
+  const delayed = structuredClone(original);
+  delayed.payload.bank_after_tenths = bank;
+  const [first, second] = delayed.payload.plan_weeks!;
+  Object.assign(first!, { transfers_in: [], transfers_out: [], free_transfers_after: 2 });
+  Object.assign(second!, {
+    transfers_in: opening.transfers_in,
+    transfers_out: opening.transfers_out,
+  });
+  const state: ComputePhase = {
+    phase: "done",
+    request: {
+      ...request,
+      window: 3,
+      preferences: checkedPreferences({
+        hold_opening_transfers: true,
+        min_opening_bank_tenths: 10,
+        week_rules: [
+          { week: 2, rules: { buy_players: opening.transfers_in.map((p) => p.player_id) } },
+        ],
+      }),
+    },
+    envelope: delayed,
+    source: "api-cache",
+  };
+  expect(visibleAutomatic(state, original.payload, [], true)?.kind).toBe("roll");
+  expect(visibleAutomatic(state, original.payload)?.kind).toBe(bank > 20 ? "bank" : undefined);
 });

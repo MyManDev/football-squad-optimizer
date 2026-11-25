@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import fixture from "../../../fixtures/device-plan/instances.json";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
+import { checkedPreferences } from "../advice/decisionPreferences";
 import type { DevicePlanAnswer, DevicePlanDocument, DeviceRivalFields } from "./types";
 
 const world = fixture.rivals;
@@ -61,6 +62,28 @@ const rival: DeviceRivalFields = {
   expected_gap_vs_rival: reference.expected_gap_vs_rival,
   captain_agreement: reference.captain_agreement,
 };
+
+it("uses the same coefficient precision in both views of a net-points transfer", () => {
+  const id = plain.transfers_in[0]!;
+  const changed = {
+    ...document,
+    players: document.players.map((p) =>
+      p.id === id ? { ...p, expected_points: p.expected_points + 0.0004 } : p,
+    ),
+  };
+  const plan = deviceAdviceEnvelope(
+    changed,
+    squad,
+    { ...plain, preferences: checkedPreferences({ net_points_priority: true }) },
+    new Date(),
+    352490,
+  ).payload;
+  const top = plan.moves.find((move) => move.player_in?.player_id === id)!.player_in!;
+  const weekly = plan.plan_weeks![0]!.transfers_in.find((p) => p.player_id === id)!;
+  const source = changed.players.find((p) => p.id === id)!;
+  expect(top.expected_points).toBe(source.coefficients[2] / changed.rules.expected_points_scale);
+  expect(weekly.expected_points).toBe(top.expected_points);
+});
 
 describe("the moves of a plan solved on the device", () => {
   it("carry the reason the server gives the same plan's moves", () => {

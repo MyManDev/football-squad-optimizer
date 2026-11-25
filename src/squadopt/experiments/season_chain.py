@@ -48,7 +48,9 @@ from squadopt.experiments.multi_gw_rehearsal import (
     MEAN_REVERSION_PROJECTION_RULE,
     NAIVE_PROJECTION_RULE,
     PROJECTION_RULES,
+    SUPPLIED_DECISION_WEEK_PROJECTION_RULE,
     DecisionSeason,
+    DecisionWeekProjections,
     _relative_gap,
     realize_week,
     validate_mean_reversion_factor,
@@ -227,7 +229,10 @@ class SeasonChainConfig:
     control as evaluated, with no scaling, so a double projects like a single;
     ``mean_reversion_discount_v1`` is the naive rule with each later week's deviation
     from the position mean discounted by ``mean_reversion_factor`` per week of offset
-    (`multi_gw_rehearsal.MEAN_REVERSION_PROJECTION_RULE`)."""
+    (`multi_gw_rehearsal.MEAN_REVERSION_PROJECTION_RULE`); ``supplied_decision_week_v1``
+    decides on a forecast of the decision gameweek handed to the chain beside this
+    configuration, unscaled, and needs ``lookahead`` 1
+    (`multi_gw_rehearsal.SUPPLIED_DECISION_WEEK_PROJECTION_RULE`)."""
     mean_reversion_factor: float | None = None
     """The per-week factor of ``mean_reversion_discount_v1``, in (0, 1]; required under
     that rule and refused under the other two."""
@@ -294,6 +299,11 @@ class SeasonChainConfig:
             "mean_reversion_factor",
             validate_mean_reversion_factor(self.projection_rule, self.mean_reversion_factor),
         )
+        if self.projection_rule == SUPPLIED_DECISION_WEEK_PROJECTION_RULE and self.lookahead != 1:
+            raise ExperimentConfigurationError(
+                f"{SUPPLIED_DECISION_WEEK_PROJECTION_RULE!r} forecasts the decision gameweek "
+                "only, so it needs lookahead 1."
+            )
         if self.chip_policy not in CHIP_POLICIES:
             raise ExperimentConfigurationError(f"chip_policy must be one of {CHIP_POLICIES!r}.")
         if self.chip_threshold not in CHIP_THRESHOLDS:
@@ -557,7 +567,12 @@ class SeasonChain(DecisionSeason):
         panel: pd.DataFrame,
         fixture_counts: pd.DataFrame,
         config: SeasonChainConfig | None = None,
+        *,
+        decision_projections: DecisionWeekProjections | None = None,
     ) -> None:
+        """``decision_projections`` is the season's supplied forecast, required under
+        ``supplied_decision_week_v1`` and refused under every other projection rule."""
+
         settings = SeasonChainConfig() if config is None else config
         if not isinstance(settings, SeasonChainConfig):
             raise ExperimentExecutionError("config must be a SeasonChainConfig.")
@@ -571,6 +586,7 @@ class SeasonChain(DecisionSeason):
             cross_season_config=settings.cross_season_config,
             projection_rule=settings.projection_rule,
             mean_reversion_factor=settings.mean_reversion_factor,
+            decision_projections=decision_projections,
         )
         self._settings = settings
         # Last projection row seen for each squad member, so a member without a row
@@ -652,6 +668,11 @@ class SeasonChain(DecisionSeason):
                 **(
                     {"mean_reversion_factor": settings.mean_reversion_factor}
                     if settings.projection_rule == MEAN_REVERSION_PROJECTION_RULE
+                    else {}
+                ),
+                **(
+                    {"decision_projection_model": self._decision_projections.model_version}
+                    if self._decision_projections is not None
                     else {}
                 ),
                 "form_window": settings.form_window,

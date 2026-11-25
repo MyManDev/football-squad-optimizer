@@ -1,3 +1,6 @@
+import { checkedHistory, EMPTY_HISTORY, type PlanHistory } from "./planHistory";
+import type { EntrySquad } from "../types";
+import { checkedPlanInfeasibility, type PlanInfeasibility } from "../advice/planInfeasibility";
 import {
   MAX_MESSAGE_LENGTH,
   MAX_QUESTION_LENGTH,
@@ -10,9 +13,24 @@ import { checkedPlanRevision, type PlanRevision } from "./planRevision";
 
 export const ALTERNATIVE_COUNT = 2;
 
-export type StartedAlternative = { kind: "priced" | "roll" } | { kind: "bank"; floor: number };
+export type StartedAlternative =
+  | { kind: "priced" | "roll" }
+  | { kind: "bank"; floor: number }
+  | { kind: "delay"; players: number[] };
 
 export interface PlanConfirmation {
+  repairSearch?: {
+    dataId: string;
+    failedBase: boolean;
+    diagnosis?: PlanInfeasibility;
+    failureCode?: "PLAN_NOT_FOUND" | "CHIP_NOT_HELD";
+  };
+  paths3w?: true;
+  compareOnly?: boolean;
+  deviceRun?: boolean;
+  deviceAlternatives?: boolean;
+  bundleMode?: true;
+  runId?: string;
   wildcardNotHeld: boolean;
   /** Absent until the confirmed baseline has been checked for follow-up requests. */
   followups?: (StartedAlternative | null)[];
@@ -27,6 +45,7 @@ export interface PlanConfirmation {
 }
 
 export interface PlanSession {
+  history?: PlanHistory;
   draft: PlanDraft;
   clarification?: Clarification;
   confirmation?: PlanConfirmation;
@@ -44,7 +63,14 @@ export interface PlanSessionContext {
 export function readPlanSession(context: PlanSessionContext): unknown {
   if (context.deadline === null) return null;
   try {
-    const raw = sessionStorage.getItem(context.key);
+    const fallback = history.state?.llmoptSession ?? history.state?.usr?.llmoptSession;
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem(context.key);
+    } catch {
+      /* History retains the same safe session when session storage is blocked. */
+    }
+    if (fallback?.key === context.key && typeof fallback.raw === "string") raw = fallback.raw;
     if (!raw) return null;
     const saved = JSON.parse(raw);
     if (saved?.deadline !== context.deadline) return null;
@@ -61,14 +87,36 @@ export function readPlanSession(context: PlanSessionContext): unknown {
   }
 }
 
-function writePlanSession(context: PlanSessionContext | null, session: PlanSession) {
-  if (!context || context.deadline === null) return;
+export function writePlanSession(
+  context: PlanSessionContext | null,
+  session: PlanSession,
+): boolean {
+  if (!context || context.deadline === null) return false;
   const { key, basis, season, gameweek, deadline } = context;
+  const raw = JSON.stringify({ basis, season, gameweek, deadline, ...session });
+  let retained = false;
   try {
-    sessionStorage.setItem(key, JSON.stringify({ basis, season, gameweek, deadline, ...session }));
+    sessionStorage.setItem(key, raw);
+    retained = sessionStorage.getItem(key) === raw;
   } catch {
-    // The planner remains usable without storage.
+    /* Try history below. */
   }
+  try {
+    const prior = history.state?.llmoptSession ?? history.state?.usr?.llmoptSession;
+    const useFallback = !retained && !!session.confirmation?.runId;
+    if (!useFallback && !prior) return retained;
+    const state = { ...history.state, llmoptSession: useFallback ? { key, raw } : undefined };
+    if (state.usr?.llmoptSession) {
+      state.usr = { ...state.usr };
+      delete state.usr.llmoptSession;
+    }
+    history.replaceState(state, "");
+    retained ||=
+      history.state?.llmoptSession?.raw === raw && history.state.llmoptSession.key === key;
+  } catch {
+    /* Refuse new work if neither store can retain its identity. */
+  }
+  return retained;
 }
 
 export interface PlanSessionMemory {
@@ -112,6 +160,7 @@ export function createPlanSessionMemory(): PlanSessionMemory {
 export interface PlanSessionStore {
   /** The confirmed run as last saved; absent while the draft has not been calculated. */
   readonly confirmation: PlanConfirmation | undefined;
+  readonly history: PlanHistory;
   /** Saves the whole session. A session saved without a confirmation clears the run's. */
   save(session: PlanSession): void;
   /** Calls the listener after each save, so the page can render from the saved run. */
@@ -122,14 +171,22 @@ export function createPlanSessionStore(
   context: PlanSessionContext | null,
   confirmation?: PlanConfirmation,
   memory?: PlanSessionMemory,
+  history: PlanHistory = EMPTY_HISTORY,
 ): PlanSessionStore {
   let current = confirmation;
+  let retained = history;
   const listeners = new Set<() => void>();
   return {
+    get history() {
+      return retained;
+    },
     get confirmation() {
       return current;
     },
     save(session) {
+      retained = session.history ?? retained;
+      if (session.history !== undefined || retained.items.length)
+        session = { ...session, history: retained };
       current = session.confirmation;
       if (memory && context) memory.save(context, session);
       else writePlanSession(context, session);
@@ -162,6 +219,7 @@ export function checkedPlanSession(
   value: unknown,
   players: readonly CatalogPlayer[],
   gameweek: number,
+  squad?: EntrySquad,
 ): PlanSession | null {
   if (!value || typeof value !== "object") return null;
   const { draft, confirmation, clarification, reference } = value as Partial<PlanSession>;
@@ -169,6 +227,7 @@ export function checkedPlanSession(
     const session: PlanSession = {
       draft: checkedDraft(draft, players),
       reference: checkedPlanRevision(reference, gameweek),
+      ...(squad ? { history: checkedHistory((value as PlanSession).history, squad) } : {}),
     };
     if (
       typeof clarification?.message === "string" &&
@@ -186,14 +245,62 @@ export function checkedPlanSession(
         (Array.isArray(confirmation.followups) &&
           confirmation.followups.length <= ALTERNATIVE_COUNT))
     ) {
+      const runId =
+        typeof confirmation.runId === "string" && /^[0-9a-f]{32}$/.test(confirmation.runId)
+          ? confirmation.runId
+          : undefined;
+      const search = confirmation.repairSearch;
+      if (
+        search !== undefined &&
+        (!runId ||
+          typeof search?.dataId !== "string" ||
+          !/^[0-9a-f]{64}$/.test(search.dataId) ||
+          typeof search.failedBase !== "boolean")
+      )
+        return session;
       session.confirmation = {
+        ...(search
+          ? {
+              repairSearch: {
+                dataId: search.dataId,
+                failedBase: search.failedBase,
+                diagnosis: checkedPlanInfeasibility(search.diagnosis),
+                failureCode:
+                  search.failureCode === "PLAN_NOT_FOUND" || search.failureCode === "CHIP_NOT_HELD"
+                    ? search.failureCode
+                    : undefined,
+              },
+            }
+          : {}),
+        ...(confirmation.bundleMode === true ? { bundleMode: true as const } : {}),
+        ...(runId ? { runId } : {}),
         wildcardNotHeld: confirmation.wildcardNotHeld,
+        ...(confirmation.paths3w === true ? { paths3w: true as const } : {}),
+        ...(typeof confirmation.compareOnly === "boolean"
+          ? { compareOnly: confirmation.compareOnly }
+          : {}),
+        ...(typeof confirmation.deviceRun === "boolean"
+          ? { deviceRun: confirmation.deviceRun }
+          : {}),
+        ...(typeof confirmation.deviceAlternatives === "boolean"
+          ? { deviceAlternatives: confirmation.deviceAlternatives }
+          : {}),
         ...(session.draft.scenario && confirmation.scenarioReplayInfeasible === true
           ? { scenarioReplayInfeasible: true as const }
           : {}),
         ...(confirmation.sending === true ? { sending: true as const } : {}),
         ...checkedCombined(confirmation.combined, session.draft.soft.length),
         followups: confirmation.followups?.map((item) => {
+          if (
+            item?.kind === "delay" &&
+            confirmation.paths3w === true &&
+            Array.isArray(item.players) &&
+            item.players.length > 0 &&
+            item.players.length <= 15 &&
+            item.players.every((id) => Number.isSafeInteger(id) && id > 0) &&
+            new Set(item.players).size === item.players.length
+          )
+            return { kind: "delay", players: [...item.players].sort((a, b) => a - b) };
           if (item?.kind === "priced" || item?.kind === "roll") return { kind: item.kind };
           if (
             item?.kind === "bank" &&

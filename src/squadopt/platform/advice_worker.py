@@ -53,7 +53,7 @@ from contextlib import ExitStack
 from dataclasses import replace
 from datetime import UTC, datetime
 from types import FrameType
-from typing import Final
+from typing import Final, TypedDict
 
 from squadopt.application.advice_capabilities import (
     MEMBER_WINDOWS,
@@ -72,10 +72,18 @@ from squadopt.application.football_participation import INHERITED_ZERO_LIMIT, pa
 from squadopt.application.football_roles import role_forecast_summary
 from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.llmopt_run import workflow_enabled
+from squadopt.contracts.preference_bundle import BUNDLE_SWITCH
 from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.contracts.priority_preferences import PriorityProgram, PriorityReference
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
 from squadopt.live.transfers import HorizonNoSolutionError
-from squadopt.optimization import SolverStatus
+from squadopt.optimization import SolverStatus, SolverWallTimeLimit
+from squadopt.optimization.work_budget import (
+    WorkBudgetExhausted,
+    current_work_budget,
+    work_budget,
+)
 from squadopt.planning.native_highs import (
     NativeWindowOutcome,
     native_window_executor,
@@ -90,12 +98,16 @@ from squadopt.platform.advice_observability import (
     AdviceMetrics,
     configure_advice_logging,
 )
+from squadopt.platform.advice_preference_bundle import compute_preference_bundle
 from squadopt.platform.advice_queue import (
     DEFAULT_LEASE_SECONDS,
     AdviceComputeRefused,
     JobQueue,
+    RetryBundleWork,
     run_advice_worker_once,
 )
+from squadopt.platform.advice_read import advice_context_identity
+from squadopt.platform.advice_runs import FileRunStore, RunAdmissionError
 from squadopt.platform.advice_switches import (
     CHIP_SWITCH,
     MANAGERS_WORD_SWITCH,
@@ -273,7 +285,14 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
         managers_word=word,
         preferences=preferences,
         chip=chip if isinstance(chip, str) else None,
+        transfer_packages=capture.transfer_packages,
+        package_gate=capture.package_gate,
     )
+
+
+class _PriorityArguments(TypedDict, total=False):
+    priority_program: PriorityProgram
+    priority_reference: PriorityReference | None
 
 
 class _DocumentCount:
@@ -318,6 +337,9 @@ def build_advice_compute(
     job_log_fields: dict[str, object] | None = None,
     progress: ProgressRecorder | None = None,
     public_inputs: PublicEntryInputs | None = None,
+    runs: FileRunStore | None = None,
+    llmopt_vnext: bool = False,
+    llmopt_vnext_three_week: bool = False,
 ) -> Callable[[AdviceJob], bytes]:
     """Return the callback that turns one claimed job into the bytes it will be served as.
 
@@ -375,7 +397,22 @@ def build_advice_compute(
         payload = json.loads(held).get("payload")
         return payload if isinstance(payload, dict) else None
 
-    def compute(job: AdviceJob) -> bytes:
+    def bounded_native(model: Mapping[str, object], seconds: float) -> Mapping[str, object]:
+        budget = current_work_budget()
+        if budget is not None:
+            try:
+                budget.reserve_native(seconds)
+            except WorkBudgetExhausted as error:
+                # This public boundary already falls back to the bounded CP path.
+                raise RuntimeError(str(error)) from error
+        return execute_native_window(model, seconds)
+
+    def compute(
+        job: AdviceJob,
+        supplied_spec: AdviceJobSpec | None = None,
+        priority_program: PriorityProgram | None = None,
+        priority_reference: PriorityReference | None = None,
+    ) -> bytes:
         # One worker computes one job at a time. Share only the validated spec's
         # coordinates with the terminal logger; a later unreadable spec stays absent.
         if job_log_fields is not None:
@@ -387,7 +424,7 @@ def build_advice_compute(
                 "finish is a fault to look at, not work to repeat.",
             )
         try:
-            spec = specs.get(job.cache_key)
+            spec = supplied_spec if supplied_spec is not None else specs.get(job.cache_key)
         except AdviceJobSpecError as error:
             # A spec that is there and cannot be read is the same fact as one that is
             # not there: what to compute cannot be known. It used to be recorded as a
@@ -432,7 +469,9 @@ def build_advice_compute(
             ):
                 raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unsupported public team request.")
             identity = contexts.identity()
-            if identity is None or identity.context != spec.context:
+            if identity is None or (
+                identity.context != spec.context and not contexts.matches(identity, spec.context)
+            ):
                 raise AdviceComputeRefused(
                     "CONTEXT_UNAVAILABLE", "The capture changed before computation."
                 )
@@ -459,6 +498,17 @@ def build_advice_compute(
             )
         if capture.switches.official_injuries is not None:
             require_official_injury_source()
+        if BUNDLE_SWITCH in menu_spec.switches:
+            plain_spec = replace(
+                menu_spec,
+                switches={
+                    name: value
+                    for name, value in menu_spec.switches.items()
+                    if name != BUNDLE_SWITCH
+                },
+            )
+            request = _menu_request(plain_spec, capture)
+            return compute_preference_bundle(job, spec, request, capture, cache, specs, compute)
         request = _menu_request(menu_spec, capture)
         football = capture.switches.football if MODEL_SWITCH in spec.switches else None
         projection = football.projection if football is not None else capture.projection
@@ -488,9 +538,15 @@ def build_advice_compute(
             )
         )
         native_windows: list[NativeWindowOutcome] = []
+        priority_arguments: _PriorityArguments = {}
+        if priority_program is not None:
+            priority_arguments = {
+                "priority_program": priority_program,
+                "priority_reference": priority_reference,
+            }
         try:
             with (
-                native_window_executor(execute_native_window),
+                native_window_executor(bounded_native),
                 native_window_outcomes() as native_windows,
             ):
                 advice = advise_menu_entry(
@@ -506,7 +562,10 @@ def build_advice_compute(
                     prerequisite=prerequisite,
                     on_document=None if count is None else count.solved,
                     include_resource_state=True,
+                    **priority_arguments,
                 )
+        except WorkBudgetExhausted:
+            raise
         except ChipUnavailable as error:
             raise AdviceComputeRefused(error.code, str(error)) from error
         except ManagersWordNotSolved as error:
@@ -515,6 +574,12 @@ def build_advice_compute(
             # not be produced. The same request without the word still answers.
             raise AdviceComputeRefused("MANAGERS_WORD_NOT_SOLVED", str(error)) from error
         except HorizonNoSolutionError as error:
+            if (
+                error.wall_time_exhausted
+                and request.window == 3
+                and current_work_budget() is not None
+            ):
+                raise WorkBudgetExhausted("The window reached its wall-clock limit.") from error
             if error.status is SolverStatus.INFEASIBLE:
                 raise AdviceComputeRefused(
                     "PLAN_NOT_FOUND",
@@ -525,6 +590,12 @@ def build_advice_compute(
                 "ADVICE_FAILED", "The service could not solve this plan."
             ) from error
         except PLAN_NOT_FOUND_ERRORS as error:
+            if (
+                isinstance(error, SolverWallTimeLimit)
+                and request.window == 3
+                and current_work_budget() is not None
+            ):
+                raise WorkBudgetExhausted("The window reached its wall-clock limit.") from error
             if request.preferences.active:
                 raise AdviceComputeRefused(
                     "ADVICE_FAILED", "The service could not solve this plan."
@@ -603,6 +674,8 @@ def build_advice_compute(
             advice["official_injuries"] = capture.switches.official_injuries.public_record(
                 _injury_fact_ids(advice)
             )
+        if workflow_enabled(spec.window, master=llmopt_vnext, three_week=llmopt_vnext_three_week):
+            advice["plan_data_id"] = advice_context_identity(spec.context)
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a
@@ -620,7 +693,51 @@ def build_advice_compute(
         validate_advice_document(payload)
         return payload
 
-    return compute
+    def admitted_compute(job: AdviceJob) -> bytes:
+        budget = None
+        try:
+            # Joining an existing V1 job does not transfer its original consumer's
+            # ownership. Only run-owned V2 work receives this durable allocation.
+            # A running answer remains cacheable after its initiating run closes.
+            budget = (
+                runs.allocation(job.job_id, attempt=job.attempt)
+                if runs is not None and job.contract_version == "backend_jobs_v2"
+                else None
+            )
+            if budget is None and job.contract_version == "backend_jobs_v2":
+                raise RunAdmissionError(
+                    "RUN_STORE_UNAVAILABLE", "The admitted work is unavailable."
+                )
+            result = None
+            try:
+                with work_budget(budget):
+                    result = compute(job)
+                    return result
+            finally:
+                if budget is not None:
+                    assert runs is not None
+                    rollback_answer = result
+                    if (
+                        result is not None
+                        and llmopt_vnext
+                        and (
+                            llmopt_vnext_three_week or json.loads(result)["payload"]["window"] == 1
+                        )
+                    ):
+                        rollback_answer = None
+                    runs.finish(job.job_id, budget, rollback_answer=rollback_answer)
+        except (OSError, RuntimeError) as error:
+            if budget is not None and budget.journal is not None and job.attempt < max_attempts:
+                raise RetryBundleWork("Retry the admitted preference job.") from error
+            raise
+        except RunAdmissionError as error:
+            raise AdviceComputeRefused(error.code, str(error)) from error
+        except WorkBudgetExhausted as error:
+            raise AdviceComputeRefused(
+                "RUN_BUDGET_EXHAUSTED", "The completed plans are available."
+            ) from error
+
+    return admitted_compute
 
 
 def run_advice_worker(
@@ -783,6 +900,8 @@ def run_advice_worker(
                 pulse.stop()
         failed_rounds = 0
         if job is not None:
+            if not job.is_terminal:
+                continue
             processed += 1
             if max_jobs is not None and processed >= max_jobs:
                 return processed
@@ -1023,6 +1142,9 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 job_log_fields=job_log_fields,
                 progress=running.queue.record_progress,
                 public_inputs=running.public_inputs,
+                runs=running.runs,
+                llmopt_vnext=running.config.llmopt_vnext,
+                llmopt_vnext_three_week=running.config.llmopt_vnext_three_week,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.

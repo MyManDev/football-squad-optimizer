@@ -471,6 +471,10 @@ def test_capabilities_say_what_may_be_asked_right_now(tmp_path: Path) -> None:
     world = _world(tmp_path)
     url = f"/api/v1/leagues/{LEAGUE_ID}/capabilities"
     document = world["client"].get(url).json()
+    assert (
+        world["reader"].plan_data_id()
+        == "670ca0ec8dc7645572b6578b3a1957c8769c1fbf437b33b642ac9e3d84189269"
+    )
     assert document == {
         "contract_version": "league_capabilities_v1",
         "league_id": LEAGUE_ID,
@@ -522,3 +526,30 @@ def test_a_reader_wired_as_before_offers_no_switch(tmp_path: Path) -> None:
 def test_the_committed_capabilities_schema_matches_its_generator() -> None:
     committed = json.loads(LEAGUE_CAPABILITIES_SCHEMA_PATH.read_text(encoding="utf-8"))
     assert committed == league_capabilities_schema()
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("packages", [False, True])
+@pytest.mark.parametrize("paths", [False, True])
+def test_package_and_path_capabilities_are_independent_under_the_release(
+    tmp_path, enabled, packages, paths
+):
+    _publish_members(tmp_path / "site")
+    reader = AdviceReadStore(
+        FileLeagueDirectory(tmp_path / "site"),
+        FileAdviceCache(tmp_path / "cache"),
+        _Context(),
+        {"saf-puan": False},
+        transfer_packages=packages,
+        three_week_paths=paths,
+        llmopt_vnext=enabled,
+        llmopt_vnext_three_week=True,
+    )
+    document = reader.league_capabilities(LEAGUE_ID)
+    for field, active in (("transfer_packages", packages), ("three_week_paths", paths)):
+        if enabled and active:
+            assert document[field] is True
+        else:
+            assert field not in document
+    committed = json.loads(LEAGUE_CAPABILITIES_SCHEMA_PATH.read_text(encoding="utf-8"))
+    jsonschema.validate(document, committed)

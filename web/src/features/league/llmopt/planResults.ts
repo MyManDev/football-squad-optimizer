@@ -8,6 +8,7 @@ import {
   meaningfulOpeningAlternative,
   sameOpeningDecision,
   samePlan,
+  transferPathKey,
 } from "./planComparison";
 import type { ExplicitTitle, PlanRun, PriceTarget } from "./planRun";
 import { isWorking } from "./planSlots";
@@ -65,19 +66,21 @@ export function visibleAutomatic(
   state: ComputePhase,
   reference?: EntryAdvice,
   previous: readonly EntryAdvice[] = [],
+  paths3w = false,
 ) {
   if (state.phase !== "done" || !reference) return null;
   const plan = state.envelope.payload;
   const preferences = state.request.preferences;
-  const kind =
-    preferences?.min_opening_bank_tenths !== undefined
-      ? "bank"
-      : preferences?.hold_opening_transfers
-        ? "roll"
-        : null;
+  // A delayed-buy path inherits the member's opening bank floor.
+  const bankGoal =
+    preferences?.min_opening_bank_tenths !== undefined &&
+    !(paths3w && preferences.hold_opening_transfers);
+  const kind = bankGoal ? "bank" : preferences?.hold_opening_transfers ? "roll" : null;
   return kind &&
     meaningfulOpeningAlternative(reference, plan, kind) &&
-    !previous.some((shown) => sameOpeningDecision(shown, plan))
+    !previous.some((shown) =>
+      paths3w ? transferPathKey(shown) === transferPathKey(plan) : sameOpeningDecision(shown, plan),
+    )
     ? { kind, state, plan }
     : null;
 }
@@ -103,6 +106,7 @@ export interface ShownResult {
  */
 export function planResults({
   run,
+  showPaths,
   base,
   alternatives,
   priceReview,
@@ -110,6 +114,7 @@ export function planResults({
   explain,
 }: {
   run: PlanRun;
+  showPaths: boolean;
   base: ComputePhase;
   alternatives: readonly ComputePhase[];
   priceReview: readonly PriceReview[];
@@ -120,6 +125,15 @@ export function planResults({
   let same = false;
   if (run.scenario) return { results, same };
   const baseAnswer = base.phase === "done" ? base.envelope.payload : undefined;
+  if (base.phase === "done" && baseAnswer?.device_alternatives && run.prices.length === 0) {
+    return {
+      same: false,
+      results: baseAnswer.device_alternatives.slice(0, 2).map((payload, i) => ({
+        title: `${copy.alternative} ${i + 2}`,
+        state: { ...base, envelope: { ...base.envelope, payload } },
+      })),
+    };
+  }
   alternatives.forEach((state, index) => {
     const slot = run.slots[index];
     if (slot?.kind === "explicit") {
@@ -160,7 +174,7 @@ export function planResults({
       const previous = results.flatMap(({ state }) =>
         state.phase === "done" ? [state.envelope.payload] : [],
       );
-      const automatic = visibleAutomatic(state, baseAnswer, previous);
+      const automatic = visibleAutomatic(state, baseAnswer, previous, showPaths);
       if (automatic)
         results.push({ title: automatic.kind === "roll" ? copy.rollPlan : copy.bankPlan, state });
     }

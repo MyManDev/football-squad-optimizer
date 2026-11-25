@@ -10,7 +10,8 @@
 
 import type { LpSolver } from "./lp/problem";
 import { solveRequest, type DevicePlanRequest } from "./requests";
-import { DevicePlanRefused } from "./solve/week";
+import { DevicePlanRefused, DeviceWeekInfeasible } from "./solve/week";
+import { MissingDevicePreferenceInput } from "./preferences";
 import type { DeviceChip, DevicePlanAnswer } from "./types";
 
 export type DevicePlanReply =
@@ -27,8 +28,8 @@ export type DevicePlanReply =
       /** The whole run's solving time: the plain plan and every chip. */
       seconds: number;
     }
-  | { id: number; kind: "refused"; status: string; stage: string }
-  | { id: number; kind: "failed" };
+  | { id: number; kind: "refused"; status: string; stage: string; primaryInfeasible?: true }
+  | { id: number; kind: "failed"; inputsUnavailable?: true };
 
 export function replyTo(
   solver: LpSolver,
@@ -38,9 +39,9 @@ export function replyTo(
 ): void {
   const { id } = request;
   const started = now();
-  let planned = false;
+  let planned: DevicePlanAnswer | undefined;
   const onPlan = (answer: DevicePlanAnswer) => {
-    planned = true;
+    planned = answer;
     post({ id, kind: "plan", answer });
   };
   let reply: DevicePlanReply;
@@ -48,15 +49,30 @@ export function replyTo(
     const answer = solveRequest(solver, request, now, onPlan, (done, total) =>
       post({ id, kind: "chip", done, total }),
     );
-    reply = planned
-      ? { id, kind: "gains", gains: answer.chip_gains ?? {}, seconds: answer.seconds }
-      : { id, kind: "answer", answer };
+    reply =
+      planned && !request.alternatives
+        ? { id, kind: "gains", gains: answer.chip_gains ?? {}, seconds: answer.seconds }
+        : { id, kind: "answer", answer };
   } catch (error) {
-    reply = planned
-      ? { id, kind: "gains", gains: null, seconds: (now() - started) / 1000 }
-      : error instanceof DevicePlanRefused
-        ? { id, kind: "refused", status: error.status, stage: error.stage }
-        : { id, kind: "failed" };
+    if (planned) {
+      reply = request.alternatives
+        ? { id, kind: "answer", answer: planned }
+        : { id, kind: "gains", gains: null, seconds: (now() - started) / 1000 };
+    } else if (error instanceof DevicePlanRefused) {
+      reply = {
+        id,
+        kind: "refused",
+        status: error.status,
+        stage: error.stage,
+        ...(error instanceof DeviceWeekInfeasible ? { primaryInfeasible: true } : {}),
+      };
+    } else {
+      reply = {
+        id,
+        kind: "failed",
+        ...(error instanceof MissingDevicePreferenceInput ? { inputsUnavailable: true } : {}),
+      };
+    }
   }
   post(reply);
 }

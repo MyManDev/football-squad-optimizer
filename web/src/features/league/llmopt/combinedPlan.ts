@@ -64,7 +64,10 @@ export function prepareCombined(run: PlanRun, candidates: readonly number[]): Co
     const plan = branch.alternative ?? branch.base;
     if (!plan || (wildcardNotHeld && plan.chip === "wildcard")) return null;
     try {
-      return pricedRequest(request, plan);
+      return pricedRequest(
+        request.run ? { ...request, run: { ...request.run, stage: "followup" } } : request,
+        plan,
+      );
     } catch {
       return null;
     }

@@ -587,6 +587,41 @@ def test_a_horizon_with_no_solution_raises_a_type_that_carries_how_it_ended(
     assert refusal.value.relative_optimality_gap == 0.12
 
 
+@pytest.mark.parametrize(
+    ("diagnostics", "exhausted"),
+    [
+        (
+            {
+                "solve_time_seconds": 2.1,
+                "wall_time_limit_seconds": 2,
+                "deterministic_time_budget_exhausted": False,
+            },
+            True,
+        ),
+        (
+            {
+                "solve_time_seconds": 0.1,
+                "wall_time_limit_seconds": 2,
+                "deterministic_time_budget_exhausted": False,
+            },
+            False,
+        ),
+        ({}, False),
+    ],
+)
+def test_unknown_window_requires_observed_wall_exhaustion_to_report_the_deadline(
+    tmp_path, monkeypatch, diagnostics, exhausted
+):
+    inputs, horizon, held, rules = _inputs(tmp_path, (2,))
+    proven, _ = plan_transfer_horizon(inputs, horizon, held, rules)
+    empty = _no_solution(proven, SolverStatus.UNKNOWN, diagnostics)
+    monkeypatch.setattr(live_transfers, "optimize_transfer_plan", lambda *_a, **_k: empty)
+    with pytest.raises(HorizonNoSolutionError) as refusal:
+        plan_transfer_horizon(inputs, horizon, held, rules)
+    assert refusal.value.wall_time_exhausted is exhausted
+    assert refusal.value.infeasibility is None
+
+
 def test_every_caller_that_handled_a_planning_failure_still_handles_this_one(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

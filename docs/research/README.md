@@ -32,7 +32,18 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 
 | Topic | Entry point |
 | --- | --- |
+| LLMOPT release acceptance and local cold and warm work | [Twenty-member comparison and closing report](llmopt_phase8_closing.md) |
+| LLMOPT one-week opening | [Mixed-mode parity and visible main-plan timing](llmopt_week_first.md) |
+| LLMOPT manual provider acceptance | [Owner checklist for seven hosted providers and Local](llmopt_provider_acceptance.md) |
+| LLMOPT one-week operating procedure | [Opening and rollback](llmopt_one_week_opening.md), [observable counts](llmopt_one_week_observation.md) |
+| LLMOPT bounded packages and three-week paths | [Phase 6 full-pool comparison](llmopt_phase6_results.md) |
+| LLMOPT one-week device parity and alternatives | [Phase 4 probe and scope](llmopt_phase4/README.md) |
+| LLMOPT one-week device priority execution | [Twenty-control comparison](llmopt_phase4_priority_audit.md) |
+| LLMOPT one-week hard rules | [Seven rule families across twenty member-weeks](llmopt_phase4_rule_families.md) |
+| LLMOPT priorities and one preference job | [Frozen twenty-member API/worker replay](llmopt_phase3_jobs.md) and [implementation](llmopt_phase3_status.md) |
+| LLMOPT shared run admission | [Local admission replay](llmopt_phase2/README.md) |
 | Five-free-transfer accounting preflight | [Saved served-path probe and unresolved capture gap](llmopt_window_budget_probe.md) |
+| Five-free-transfer expected windows | [Paired results for the twenty frozen member-weeks](expected_window_guard.md) |
 | Fixture football candidate and observed planning | [Implementation and evidence contract](football_candidate_development.md) |
 | Private set-piece duties candidate | [Source, learned allocation, synthetic checks and real-use gates](football_set_piece_duties.md) |
 | Private tactical matchup candidate | [Source, model, synthetic checks and real-use gates](football_tactical_matchup_development.md) |
@@ -74,6 +85,7 @@ reaches, and a backticked name is not a link.
 | [Published fixture difficulty, live](published_difficulty_live_prereg.md) | Runner described in [the live runner](published_difficulty_live_runner.md); no record yet |
 | [Available attacking shares](football_available_shares_prereg.md) | No record names it yet |
 | [Mean-reversion discount for later plan weeks](mean_reversion_discount_prereg.md) | Recorded in [mean-reversion discount](mean_reversion_discount.md): measured, not certified |
+| [The member planner's hit margin on the component forecast](component_hit_margin_prereg.md) | Recorded in [hit margin on the component forecast](component_hit_margin.md): unsupported, no default moved |
 | [HiGHS on the current window model](window_solver_highs_current_prereg.md) | Recorded in [HiGHS on the current window model at GW7](window_solver_highs_current.md): a switch is supported on the server, device verdict carried from #1083 |
 | [Team-match block resampler for component scenarios](team_match_block_sampler_prereg.md) | Recorded in [the calibration reading](team_match_block_sampler.md) and [the fidelity diagnostic](team_match_block_sampler_fidelity.md) |
 | [Rank-conditional shrinkage of expected points](rank_conditional_shrinkage_prereg.md) | Recorded in [rank-conditional shrinkage](rank_conditional_shrinkage.md): measured, not certified |

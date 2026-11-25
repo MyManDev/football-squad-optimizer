@@ -7,12 +7,14 @@ No forecast is transformed and no initial transaction state is rebased.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
 from math import isfinite
 from numbers import Real
 from time import perf_counter
 from typing import Any, cast
+
+import pandas as pd
 
 from squadopt.contracts.players import POSITIONS
 from squadopt.contracts.preferences import DecisionPreferences
@@ -30,6 +32,22 @@ from squadopt.planning.models import (
 from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.scenarios.expected_lineup import expected_lineup_score
 
+PackageChoice = tuple[float, object, object, tuple[object, ...]]
+PackagePicker = Callable[
+    [
+        pd.DataFrame,
+        InitialSquadState,
+        OptimizationConfig,
+        TransferPlanningConfig,
+        DecisionPreferences,
+        Mapping[object, object],
+        Sequence[frozenset[object]],
+        dict[str, Any],
+    ],
+    PackageChoice | None,
+]
+WORK_TOLERANCE = 0.01
+
 
 def checked_work(value: object, cap: float) -> float:
     """Bad accounting is an error, never permission for fresh solver work."""
@@ -39,7 +57,7 @@ def checked_work(value: object, cap: float) -> float:
         or not isfinite(float(value))
         or not isfinite(cap)
         or cap < 0
-        or not 0 <= float(value) <= cap + 0.01
+        or not 0 <= float(value) <= cap + WORK_TOLERANCE
     ):
         raise ValueError("Invalid deterministic-work accounting for expected windows.")
     return float(value)
@@ -59,6 +77,9 @@ def propose_expected_swap(
     preferences: DecisionPreferences | None = None,
     not_starting: Iterable[object] = (),
     not_captain: Iterable[object] = (),
+    package_picker: PackagePicker | None = None,
+    max_lineup_evaluations: int = 128,
+    deterministic_reserve: float = 0.0,
 ) -> tuple[TransferPlanResult | None, dict[str, Any]]:
     """At most one template score, then one cold fixed-first-squad CP solve.
 
@@ -89,6 +110,14 @@ def propose_expected_swap(
         record.update(reason=reason, wall_seconds=perf_counter() - started)
         return None, record
 
+    if (
+        isinstance(deterministic_reserve, bool)
+        or not isfinite(deterministic_reserve)
+        or deterministic_reserve < 0
+        or type(max_lineup_evaluations) is not int
+        or not 1 <= max_lineup_evaluations <= 128
+    ):
+        raise ValueError("Invalid optional-phase allocation.")
     checked_work(deterministic_slack, deterministic_slack)
     if not isfinite(wall_slack):
         raise ValueError("Expected-window wall slack must be finite.")
@@ -96,7 +125,7 @@ def propose_expected_swap(
         return skip("unsupported_horizon")
     if tuple(not_starting) or tuple(not_captain):
         return skip("first_week_role_exclusions_not_supported")
-    if deterministic_slack <= 1e-9 or wall_slack <= 0:
+    if deterministic_slack <= deterministic_reserve + 1e-9 or wall_slack <= 0:
         return skip("no_remaining_budget")
     if optimization.squad_size != 15 or optimization.starting_size != 11:
         return skip("unsupported_squad_shape")
@@ -198,54 +227,66 @@ def propose_expected_swap(
     avoid = set(week_rules.avoid_players)
     hit = transfer.transfer_hit_cost_points if initial.free_transfers == 0 else 0.0
     best: tuple[float, object, object, tuple[object, ...]] | None = None
-    for outgoing in sorted(held, key=_stable_id_key):
-        for incoming in outsiders:
-            record["cheap_pair_checks"] += 1
-            if first.at[outgoing, "position"] != first.at[incoming, "position"]:
-                continue
-            ids = held - {outgoing} | {incoming}
-            if (
-                ids in retained_squads
-                or not required <= ids
-                or not bought <= {incoming}
-                or ids & avoid
-            ):
-                continue
-            bank_after = (
-                initial.bank_tenths
-                + int(cast(int, first.at[outgoing, "sell_price_tenths"]))
-                - int(cast(int, first.at[incoming, "buy_price_tenths"]))
-            )
-            if bank_after < (preferences.min_opening_bank_tenths or 0):
-                continue
-            club_totals = Counter(map(str, first.loc[list(ids), "team_id"]))
-            if max(club_totals.values()) > optimization.max_players_per_team:
-                continue
-            if week_rules.club_counts:
-                incoming_club = str(first.at[incoming, "team_id"])
-                if any(
-                    (
-                        int(incoming_club == rule.club)
-                        if rule.scope == "transfers_in"
-                        else club_totals[rule.club]
-                    )
-                    != rule.count
-                    for rule in week_rules.club_counts
+    if package_picker is not None:
+        best = package_picker(
+            first,
+            initial,
+            optimization,
+            transfer,
+            preferences,
+            multipliers,
+            retained_squads,
+            record,
+        )
+    else:
+        for outgoing in sorted(held, key=_stable_id_key):
+            for incoming in outsiders:
+                record["cheap_pair_checks"] += 1
+                if first.at[outgoing, "position"] != first.at[incoming, "position"]:
+                    continue
+                ids = held - {outgoing} | {incoming}
+                if (
+                    ids in retained_squads
+                    or not required <= ids
+                    or not bought <= {incoming}
+                    or ids & avoid
                 ):
                     continue
-            proxy = (
-                float(multipliers[outgoing])
-                * (
-                    float(cast(float, first.at[incoming, "expected_points"]))
-                    - float(cast(float, first.at[outgoing, "expected_points"]))
+                bank_after = (
+                    initial.bank_tenths
+                    + int(cast(int, first.at[outgoing, "sell_price_tenths"]))
+                    - int(cast(int, first.at[incoming, "buy_price_tenths"]))
                 )
-                - hit
-            )
-            if proxy <= 0:
-                continue
-            record["eligible_positive_pairs"] += 1
-            if best is None or proxy > best[0]:
-                best = (proxy, outgoing, incoming, tuple(sorted(ids, key=_stable_id_key)))
+                if bank_after < (preferences.min_opening_bank_tenths or 0):
+                    continue
+                club_totals = Counter(map(str, first.loc[list(ids), "team_id"]))
+                if max(club_totals.values()) > optimization.max_players_per_team:
+                    continue
+                if week_rules.club_counts:
+                    incoming_club = str(first.at[incoming, "team_id"])
+                    if any(
+                        (
+                            int(incoming_club == rule.club)
+                            if rule.scope == "transfers_in"
+                            else club_totals[rule.club]
+                        )
+                        != rule.count
+                        for rule in week_rules.club_counts
+                    ):
+                        continue
+                proxy = (
+                    float(multipliers[outgoing])
+                    * (
+                        float(cast(float, first.at[incoming, "expected_points"]))
+                        - float(cast(float, first.at[outgoing, "expected_points"]))
+                    )
+                    - hit
+                )
+                if proxy <= 0:
+                    continue
+                record["eligible_positive_pairs"] += 1
+                if best is None or proxy > best[0]:
+                    best = (proxy, outgoing, incoming, tuple(sorted(ids, key=_stable_id_key)))
     if best is None:
         return skip("no_distinct_legal_positive_pair")
     remaining_wall = wall_slack - (perf_counter() - started)
@@ -255,9 +296,14 @@ def propose_expected_swap(
     # solve, two half-ceilings fit the remaining CP wall allowance.
     settings = replace(
         optimization,
-        solver_deterministic_time_limit=deterministic_slack,
+        solver_deterministic_time_limit=deterministic_slack - deterministic_reserve,
         solver_time_limit_seconds=remaining_wall / 2,
     )
+    if deterministic_reserve:
+        record.update(
+            stop_work_reserve=deterministic_reserve,
+            solver_deterministic_limit=deterministic_slack - deterministic_reserve,
+        )
     record.update(
         cap=deterministic_slack,
         solver_calls=1,
@@ -280,6 +326,7 @@ def propose_expected_swap(
         protect_hold=False,
         incumbent_plan=None,
         protect_incumbent=False,
+        phase_remaining=deterministic_slack,
     )
     record.update(
         status=candidate.solver_status.name,
@@ -296,7 +343,11 @@ def propose_expected_swap(
     if candidate.weeks[0].chip in {"wildcard", "freehit"}:
         return skip("optional_first_week_rebuild")
     result = improve_plan_lineups(
-        candidate, settings, transfer, preferences=preferences, max_evaluations=128
+        candidate,
+        settings,
+        transfer,
+        preferences=preferences,
+        max_evaluations=max_lineup_evaluations,
     )
     record.update(
         reason="retained",

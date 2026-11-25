@@ -1,14 +1,16 @@
-import { expect, test, type Route } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 import {
   mockEntryAdviceEnvelope,
   mockEntrySquadEnvelopes,
   mockLeagueMembersEnvelope,
 } from "../src/fixtures/league";
+import { planIdentity, retainedPlan } from "../src/features/league/llmopt/planHistory";
 import { MESSAGES } from "../src/i18n/messages";
 import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 import { holdModel, routeChat } from "./llmoptChat";
+import { reloadQueuedJob, startQueuedJob } from "./queuedAdviceJob";
 
 const API = process.env.VITE_ADVICE_API_ORIGIN?.replace(/\/$/, "");
 const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
@@ -816,9 +818,15 @@ test("preferred players are priced individually and only shown within their exac
   );
 });
 
-test("accepted preferred players are combined into one plan after their single prices", async ({
-  page,
-}) => {
+for (const vNext of [false, true]) {
+  test(`accepted preferred players are combined after their single prices (release control ${vNext})`, async ({
+    page,
+  }) => {
+    await checkCombinedPrices(page, vNext);
+  });
+}
+
+async function checkCombinedPrices(page: Page, vNext: boolean) {
   test.skip(!API, "API build required");
   await installLeagueMocks(page);
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
@@ -836,7 +844,8 @@ test("accepted preferred players are combined into one plan after their single p
     [String(players[1]!.player_id)]: 43.8,
     [players.map(({ player_id }) => player_id).join(",")]: 42.6,
   };
-  const posts: { preferences: Record<string, unknown> }[] = [];
+  const posts: { preferences: Record<string, unknown>; run: { run_id: string; stage: string } }[] =
+    [];
   await page.route(`${API}/api/v1/contributions/players`, (route) =>
     answer(route, {
       season: squad.season,
@@ -845,6 +854,7 @@ test("accepted preferred players are combined into one plan after their single p
   );
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
     answer(route, {
+      ...(vNext ? { llmopt_vnext: true, llmopt_vnext_three_week: true } : {}),
       contract_version: "league_capabilities_v1",
       league_id: LEAGUE,
       capture_snapshot_id: squad.source_snapshot_id,
@@ -871,9 +881,16 @@ test("accepted preferred players are combined into one plan after their single p
     }),
   );
   await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
-    if (route.request().method() !== "POST") return answer(route, null);
-    const body = route.request().postDataJSON() as (typeof posts)[number];
-    posts.push(body);
+    if (route.request().method() === "OPTIONS") return answer(route, null);
+    const posted = route.request().method() === "POST";
+    const body = posted
+      ? (route.request().postDataJSON() as (typeof posts)[number])
+      : {
+          preferences: JSON.parse(
+            new URL(route.request().url()).searchParams.get("preferences") ?? "{}",
+          ),
+        };
+    if (posted) posts.push(body as (typeof posts)[number]);
     const wanted = (body.preferences.include_players as number[] | undefined) ?? [];
     const signing = players.find((p) => p.player_id === wanted[0]);
     const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
@@ -909,6 +926,30 @@ test("accepted preferred players are combined into one plan after their single p
     .getByRole("textbox", { name: "Plan instructions" })
     .fill("No hits. The first two are worth up to 1.5 points each. Also prefer the third player.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
+  let archived: string | undefined;
+  if (!vNext) {
+    await expect(page.getByText("Instructions updated.", { exact: true })).toBeVisible();
+    const plan = retainedPlan(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1).payload);
+    archived = await planIdentity(plan);
+    await page.evaluate(
+      ({ id, plan }) => {
+        const [key, raw] = Object.entries(sessionStorage).find(([k]) =>
+          k.startsWith("squadopt.llmopt:"),
+        )!;
+        sessionStorage.setItem(
+          key,
+          JSON.stringify({
+            ...JSON.parse(raw),
+            history: { items: [{ id, plan }], navigation: [id], cursor: 0, explicit: true },
+          }),
+        );
+      },
+      { id: archived, plan },
+    );
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Selected plan", exact: true })).toBeVisible();
+    await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+  }
   await page.getByRole("button", { name: "Compute plans" }).click();
 
   const combined = page.getByRole("article").filter({
@@ -921,6 +962,11 @@ test("accepted preferred players are combined into one plan after their single p
   await expect(
     page.getByText("Applied in the plan with all preferences.", { exact: true }),
   ).toBeVisible();
+  if (!vNext) {
+    await expect(page.getByRole("heading", { name: "Selected plan", exact: true })).toHaveCount(0);
+    await expect(page.locator("article[data-plan-ready]")).toHaveCount(4);
+    await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+  }
   expect(posts).toHaveLength(4);
   expect(posts[3]?.preferences).toMatchObject({
     no_hits: true,
@@ -928,4 +974,231 @@ test("accepted preferred players are combined into one plan after their single p
     include_players: players.map(({ player_id }) => player_id),
   });
   for (const post of posts) expect(JSON.stringify(post)).not.toContain("max_cost_tenths");
+  const runId = posts[0]!.run?.run_id;
+  if (vNext) {
+    expect(runId).toMatch(/^[a-f0-9]{32}$/);
+    expect(new Set(posts.map(({ run }) => run.run_id)).size).toBe(1);
+    expect(posts.map(({ run }) => run.stage)).toEqual(["base", "followup", "followup", "followup"]);
+  } else {
+    for (const post of posts) expect(post).not.toHaveProperty("run");
+  }
+  await page.reload();
+  await expect(combined.getByText("2.4 expected points lost against the base plan")).toBeVisible();
+  if (!vNext) {
+    await expect(page.getByRole("heading", { name: "Selected plan", exact: true })).toHaveCount(0);
+    await expect(page.locator("article[data-plan-ready]")).toHaveCount(4);
+    await expect(page.locator("article[data-plan-id]")).toHaveCount(0);
+  }
+  expect(posts).toHaveLength(4);
+  const retained = await page.evaluate(
+    () => Object.entries(sessionStorage).find(([key]) => key.startsWith("squadopt.llmopt:"))?.[1],
+  );
+  expect(JSON.parse(retained!).confirmation.runId).toBe(runId);
+  if (!vNext) expect(JSON.parse(retained!).history.navigation).toEqual([archived]);
+}
+
+test("a waiting run survives reload and an edit closes it without a follow-up", async ({
+  page,
+}) => {
+  test.skip(!API, "API build required");
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+  const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+  const posts: { window: number; run?: { run_id: string; stage: string } }[] = [];
+  const cancelled: string[] = [];
+  let polls = 0;
+  await page.route(`${API}/api/v1/contributions/players`, (route) =>
+    answer(route, {
+      season: squad.season,
+      players: squad.starting_xi.map((player) => ({
+        id: player.player_id,
+        name: player.name,
+        team: player.team,
+      })),
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+    answer(route, {
+      llmopt_vnext: true,
+      contract_version: "league_capabilities_v1",
+      league_id: LEAGUE,
+      capture_snapshot_id: squad.source_snapshot_id,
+      season: squad.season,
+      gameweek: squad.gameweek,
+      strategies: { "saf-puan": { windows: [1, 3], requires_rival: false } },
+      preferences: { available: true },
+      top100: { available: false, weights: [] },
+      managers_word: { available: false },
+    }),
+  );
+  await routeChat(page, API, (route) =>
+    answer(route, {
+      status: "draft",
+      draft: {
+        window: route.request().postDataJSON()?.message.includes("three weeks") ? 3 : 1,
+        hard: [{ kind: "no_hits" }],
+        soft: [],
+      },
+    }),
+  );
+  await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+    if (route.request().method() === "OPTIONS") return answer(route, null);
+    if (route.request().method() !== "POST") return route.fulfill({ status: 404, headers: CORS });
+    posts.push(route.request().postDataJSON());
+    if (posts.at(-1)!.window === 3)
+      return route.fulfill({
+        status: 503,
+        headers: CORS,
+        json: { error: { code: "MODEL_INPUTS_UNAVAILABLE" } },
+      });
+    return route.fulfill({
+      status: 202,
+      headers: CORS,
+      json: { job_id: "waiting-main", status: "queued" },
+    });
+  });
+  await page.route(`${API}/api/v1/advice-jobs/waiting-main`, (route) => {
+    if (route.request().method() === "OPTIONS") return answer(route, null);
+    polls += 1;
+    return answer(route, {
+      job_id: "waiting-main",
+      status: cancelled.length ? "cancelled" : "queued",
+    });
+  });
+  await page.route(`${API}/api/v1/llmopt/runs/*/cancel`, (route) => {
+    if (route.request().method() === "OPTIONS") return answer(route, null);
+    const id = new URL(route.request().url()).pathname.split("/").at(-2)!;
+    cancelled.push(id);
+    return answer(route, { contract_version: "llmopt_run_v1", run_id: id, closed: true });
+  });
+  await page.clock.install();
+  await page.goto(PAGE);
+  await holdModel(page);
+  await page.getByRole("textbox", { name: "Plan instructions" }).fill("No hits.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await startQueuedJob(
+    page,
+    "waiting-main",
+    page.getByRole("button", { name: "Compute plans" }),
+    "en",
+  );
+  await expect.poll(() => posts.length).toBe(1);
+  await expect.poll(() => polls).toBeGreaterThan(0);
+  const identifier = posts[0]!.run!.run_id;
+  await reloadQueuedJob(page, "waiting-main");
+  await expect.poll(() => polls).toBeGreaterThan(1);
+  expect(posts).toHaveLength(1);
+  await expect(page.getByRole("button", { name: "Remove · No transfer hits" })).toBeEnabled();
+  await page.getByRole("button", { name: "Remove · No transfer hits" }).click();
+  await expect.poll(() => cancelled).toEqual([identifier]);
+  await expect(page.getByRole("region", { name: "Plans" })).toHaveCount(0);
+  expect(posts).toHaveLength(1);
+  // The same tab still has a one-week grant. Its next, three-week calculation uses
+  // the legacy request and never attempts a repair or a follow-up from the old run.
+  await holdModel(page);
+  await page.getByRole("textbox", { name: "Plan instructions" }).fill("No hits over three weeks.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByRole("button", { name: "Compute plans" }).click();
+  await expect.poll(() => posts.length).toBe(2);
+  expect(posts[1]).toMatchObject({ window: 3 });
+  expect(posts[1]).not.toHaveProperty("run");
+  expect(posts[1]).not.toHaveProperty("preference_bundle");
+  expect(cancelled).toEqual([identifier]);
+  await expect(page.locator("[data-rule-repairs]")).toHaveCount(0);
 });
+
+for (const locale of ["tr", "en"] as const) {
+  test(`capacity keeps the completed plan with one sentence in ${locale}`, async ({ page }) => {
+    test.skip(!API, "API build required");
+    await installLeagueMocks(page);
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.addInitScript(
+      (language) => localStorage.setItem("squadopt.language", language),
+      locale,
+    );
+    const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
+    const players = squad.starting_xi.slice(0, 2).map((player) => ({
+      id: player.player_id,
+      name: player.name,
+      team: player.team,
+    }));
+    const posts: { preferences: Record<string, unknown> }[] = [];
+    await page.route(`${API}/api/v1/contributions/players`, (route) =>
+      answer(route, { season: squad.season, players }),
+    );
+    await page.route(`${API}/api/v1/leagues/${LEAGUE}/capabilities`, (route) =>
+      answer(route, {
+        contract_version: "league_capabilities_v1",
+        league_id: LEAGUE,
+        capture_snapshot_id: squad.source_snapshot_id,
+        season: squad.season,
+        gameweek: squad.gameweek,
+        strategies: { "saf-puan": { windows: [1], requires_rival: false } },
+        preferences: { available: true },
+        top100: { available: false, weights: [] },
+        managers_word: { available: false },
+      }),
+    );
+    await routeChat(page, API, (route) =>
+      answer(route, {
+        status: "draft",
+        draft: {
+          hard: [],
+          soft: [
+            ...players.map(({ id }) => ({ kind: "keep_player", player_id: id })),
+            { kind: "no_hits" },
+          ],
+        },
+      }),
+    );
+    await page.route(`${API}/api/v1/leagues/${LEAGUE}/entries/${ENTRY}/advice**`, (route) => {
+      if (route.request().method() === "OPTIONS") return answer(route, null);
+      if (route.request().method() !== "POST") return route.fulfill({ status: 404, headers: CORS });
+      const body = route.request().postDataJSON() as (typeof posts)[number];
+      posts.push(body);
+      if (posts.length > 1)
+        return route.fulfill({
+          status: 409,
+          headers: CORS,
+          json: { error: { code: "RUN_BUDGET_EXHAUSTED" } },
+        });
+      const envelope = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+      return answer(route, {
+        ...envelope,
+        payload: {
+          ...envelope.payload,
+          preferences: body.preferences,
+          preferences_scope: "all_selected_weeks",
+        },
+      });
+    });
+    await page.goto(PAGE);
+    await holdModel(page);
+    await page
+      .getByRole("textbox", { name: locale === "tr" ? "Plan talimatların" : "Plan instructions" })
+      .fill("Keep both players if possible.");
+    await page
+      .getByRole("button", { name: locale === "tr" ? "Gönder" : "Send", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: locale === "tr" ? "Planları hesapla" : "Compute plans" })
+      .click();
+    await expect.poll(() => posts.length).toBe(3);
+    await expect(page.locator("article[data-plan-ready]")).toHaveCount(1);
+    await expect(
+      page.getByText(
+        locale === "tr" ? "Bazı planlar hesaplanamadı." : "Some plans could not be calculated.",
+        { exact: true },
+      ),
+    ).toHaveCount(1);
+    await expect(
+      page.locator("article").filter({
+        hasText: locale === "tr" ? "Tüm tercihlerle plan" : "Plan with all preferences",
+      }),
+    ).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    expect(posts).toHaveLength(3);
+  });
+}

@@ -5,7 +5,7 @@
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   mockEntryAdviceEnvelope,
@@ -20,13 +20,21 @@ import { COMPUTE_COPY } from "../advice/computeCopy";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { withLeague } from "../../../testSupport/league";
+import { testWeek } from "../../../testSupport/liveWeek";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const ENTRY = 35249001;
 const DEADLINE = "2026-09-18T17:30:00Z";
 const INDEX = mockEntryAdviceIndex(ENTRY).payload;
 const SQUAD = mockEntrySquadEnvelopes[ENTRY]!;
+
+/** What a closed week's heading reads while none of its matches is played. */
+const CLOSED_NAME = (language: "tr" | "en") =>
+  MESSAGES[language].leagueMembers.weekLabel(SQUAD.payload.gameweek);
 
 /** A service that computes both models, so the comparison is offered while the week is open. */
 const CAPABILITIES: AdviceCapabilities = {
@@ -248,7 +256,7 @@ describe("the plan under LIVE WEEK", () => {
       cleanup();
 
       renderView(DEADLINE, language);
-      await screen.findByRole("heading", { name: copy.liveWeek });
+      await screen.findByRole("heading", { name: CLOSED_NAME(language) });
       expect(screen.getByRole("heading", { name: copy.memberSquad })).toBeInTheDocument();
       expect(screen.queryByText(copy.squadAfterTitle)).toBeNull();
       expect(details()).toEqual([]);
@@ -261,7 +269,7 @@ describe("the plan under LIVE WEEK", () => {
     (language) => {
       const copy = MESSAGES[language].leagueMembers;
       renderView(DEADLINE, language, "", { adviceLoading: true });
-      expect(screen.getByRole("heading", { name: copy.liveWeek })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: CLOSED_NAME(language) })).toBeInTheDocument();
       expect(screen.queryByText(copy.loadingAdvice)).toBeNull();
       cleanup();
       // The open week says so while its plan is read.
@@ -296,14 +304,43 @@ describe("a closed week on a device menu", () => {
 });
 
 describe("the closed week's heading", () => {
-  it.each(["tr", "en"] as const)("is LIVE WEEK, with no plan summary under it (%s)", (language) => {
-    const copy = MESSAGES[language].leagueMembers;
-    renderView(DEADLINE, language, "", { advice: null, adviceIssue: "not-listed" });
-    const heading = screen.getByRole("heading", { name: copy.liveWeek });
-    expect(heading).toHaveAttribute("data-live");
-    expect(screen.queryByRole("heading", { name: copy.decisionTitle })).toBeNull();
-    expect(screen.queryByTestId("member-selection-summary")).toBeNull();
-  });
+  it.each(["tr", "en"] as const)(
+    "names the week, with no live mark and no plan summary, while no match is played (%s)",
+    (language) => {
+      const copy = MESSAGES[language].leagueMembers;
+      renderView(DEADLINE, language, "", { advice: null, adviceIssue: "not-listed" });
+      const heading = screen.getByRole("heading", { name: CLOSED_NAME(language) });
+      expect(heading).not.toHaveAttribute("data-live");
+      expect(screen.queryByRole("heading", { name: copy.liveWeek })).toBeNull();
+      expect(screen.queryByRole("heading", { name: copy.decisionTitle })).toBeNull();
+      expect(screen.queryByTestId("member-selection-summary")).toBeNull();
+    },
+  );
+
+  it.each(["tr", "en"] as const)(
+    "is LIVE WEEK with its light while one of the week's matches is played (%s)",
+    (language) => {
+      const copy = MESSAGES[language].leagueMembers;
+      // Half an hour into the calendar's first match of the day.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-21T13:00:00Z"));
+      renderView("2026-11-21T11:00:00Z", language, "", {
+        advice: null,
+        adviceIssue: "not-listed",
+        fixtures: testWeek().fixtures,
+        liveDependencies: {
+          forwarder: {
+            entryBundle: async () => ({ ok: false, reason: "not_found" }),
+            liveWeek: async () => ({ ok: false, reason: "not_found" }),
+            liveActivity: async () => ({ ok: false, reason: "not_found" }),
+          },
+        },
+      });
+      const heading = screen.getByRole("heading", { name: copy.liveWeek });
+      expect(heading).toHaveAttribute("data-live");
+      expect(screen.queryByRole("heading", { name: CLOSED_NAME(language) })).toBeNull();
+    },
+  );
 
   it.each(["tr", "en"] as const)("carries no live mark while the week is open (%s)", (language) => {
     const copy = MESSAGES[language].leagueMembers;

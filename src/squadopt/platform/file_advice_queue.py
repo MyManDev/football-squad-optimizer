@@ -507,6 +507,18 @@ class FileJobQueue:
             self._cleanup(job)
             self._settled.add(job.job_id)
 
+    def _requeue(self, job: AdviceJob, at_utc: str) -> AdviceJob:
+        requeued = job.transition("queued", at_utc=at_utc)
+        self._write(self._path(job.job_id), requeued)
+        self._claim_marker(job.job_id).unlink(missing_ok=True)
+        self._progress_record(job.job_id).unlink(missing_ok=True)
+        return requeued
+
+    def requeue(self, job: AdviceJob, *, at_utc: str) -> AdviceJob:
+        with self._lock.hold():
+            self._owned(job)
+            return self._requeue(job, at_utc)
+
     def complete(
         self, job: AdviceJob, *, cache: AdviceCacheRepository, payload: bytes, at_utc: str
     ) -> AdviceJob:
@@ -516,6 +528,18 @@ class FileJobQueue:
             cache.put(job.cache_key, payload)
             self.store(completed)
             return completed
+
+    def cancel_pending(self, job_id: str, *, at_utc: str) -> bool:
+        """Remove unstarted run-owned work; a running solve retains its lease."""
+        with self._lock.hold():
+            job = self.load(job_id)
+            if job is None or job.status != "queued" or job.contract_version != "backend_jobs_v2":
+                return False
+            cancelled = job.transition("cancelled", at_utc=at_utc)
+            self._write(self._path(job.job_id), cancelled)
+            self._cleanup(cancelled)
+            self._settled.add(job.job_id)
+            return True
 
     def claim(
         self, *, at_utc: str | None = None, clock: Callable[[], str] | None = None
@@ -625,12 +649,7 @@ class FileJobQueue:
                     age = float("inf")
                 if age < lease_seconds:
                     continue
-                requeued = job.transition("queued", at_utc=stamp())
-                self._write(self._path(job.job_id), requeued)
-                marker.unlink(missing_ok=True)
-                # The next attempt counts from zero; this one's count is history.
-                self._progress_record(job.job_id).unlink(missing_ok=True)
-                recovered.append(requeued)
+                recovered.append(self._requeue(job, stamp()))
         return tuple(recovered)
 
     def archive(

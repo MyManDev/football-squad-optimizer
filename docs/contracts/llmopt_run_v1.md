@@ -1,0 +1,115 @@
+# One confirmed planning run
+
+ADR [0018](../architecture/decisions/0018-llmopt-run-budget.md) defines admission and work
+capacity. The optional `run` member of an advice POST has the exact shape in
+[`llmopt_run_v1.schema.json`](llmopt_run_v1.schema.json). It carries a random 32-hex run ID
+and a stage of `base`, `followup` or `repair`.
+The server binds the ID to its own resolved context, league, member and window. It does
+not include the reference in the advice key or immutable computation spec.
+
+When the server enables run admission, the page saves the identity before submitting
+and reuses it after reload. Requests
+without a run reference, including member-panel preferences, keep their legacy V1
+admission outside the run budget. An identified repeated request returns its original job,
+including terminal failure. It never purchases another attempt in that run. Crash recovery
+does not reset a started job's work allocation.
+
+`POST /api/v1/llmopt/runs/{run_id}/cancel` closes a run, idempotently. The response is
+`{contract_version: "llmopt_run_v1", run_id: string, closed: true}`. An unregistered ID
+gets a tombstone for at most five minutes; at most 1,024 such IDs are retained. Cancellation
+uses the existing IP rate limiter and returns 429 when it is exhausted. An unshared queued
+job is cancelled. A running solve retains its lease, publishes its valid shared cache answer
+and completes, even if its initiating run closes. The closed run cannot start follow-ups.
+A new run can read that answer without another job. An anonymous join to a V2 job is a
+durable consumer too, so cancellation cannot revoke its queued or running work.
+
+A pre-existing V1 job keeps its original consumer and execution policy when a run joins
+it. Joining starts no additional server work; abandoning the join cannot cancel or fence
+that original work. The run conservatively reserves capacity for the join, while the new
+execution budget applies to newly admitted V2 jobs.
+
+Run-owned jobs use [`backend_jobs_v2.schema.json`](backend_jobs_v2.schema.json). V2 adds
+terminal `cancelled`. Run cancellation uses `queued -> cancelled`; it never uses the
+schema's running cancellation edge to discard a completed shared computation.
+Cancellation carries neither result nor error. V1 records and transitions are unchanged.
+The public view is [`advice_job_view_v2`](advice_job_view_v2.schema.json) for these jobs: the fields of
+[`advice_job_view_v1`](advice_job_view_v1.md), with the additional status `cancelled`.
+The browser treats cancellation as terminal and displays no server diagnostic text.
+
+Capacity and state refusals use HTTP 409 with stable codes:
+`RUN_BASE_REQUIRED`, `RUN_BASE_CHANGED`, `RUN_CONTEXT_CHANGED`, `RUN_CANCELLED`,
+`RUN_BUDGET_EXHAUSTED`, `RUN_REQUEST_INCOMPLETE`, and `RUN_STORE_UNAVAILABLE`.
+An unrecognized repair or selection returns `RUN_REPAIR_INVALID`.
+The page retains completed plans and uses one simple sentence for unfinished work.
+
+The durable ledger reserves 21 units per one-week job, 122 per three-week job, at most four
+jobs. Its record distinguishes reserved capacity from actual deterministic work and native
+wall reservations. Engine stop granularity is recorded honestly; an exhausted allocation
+cannot start another nested solve. Running processes are never forcibly terminated.
+
+The internal [ledger v2](llmopt_run_ledger_v2.schema.json) adds capture identity and
+anonymous-consumer ownership. Old-capture runs with no open jobs are removed together
+with unreferenced allocations. V1 migration preserves existing work receipts and recovers
+capture identity from immutable specs where available. It never resets a live budget.
+
+## Workflow selection
+
+The backend advertises `llmopt_vnext: true` on current league and public-entry
+capabilities only when `SQUADOPT_BACKEND_LLMOPT_VNEXT=1`. This grants one week.
+Three-week admission also requires `SQUADOPT_BACKEND_LLMOPT_VNEXT_THREE_WEEK=1`.
+The server advertises `llmopt_vnext_three_week: true` only when both controls
+are enabled. Both default to 0. The current capture still determines which
+windows can be computed.
+For a fresh three-preference draft, the default workflow can open four ordinary
+jobs for the main plan, two individual prices and the combined plan. A saved
+confirmation retains its transport when reopened. Rolling back the setting
+allows reads of existing results and prevents new run-owned computations.
+During rollback advice reads and existing run requests use the current capture
+to resolve their cache address. Without that capture, advice reads return HTTP 503.
+Job polling reads queue state independently of the capture. Cancellation remains
+available during rollback. A new run-owned computation returns HTTP 409
+with `LLMOPT_VNEXT_DISABLED`. Identity-free legacy requests continue to use
+their ordinary cache address and admission. A run already admitted can finish
+on the worker and publish its answer. If a run used optional transfer packages
+before rollback, the same request in that run can still read its recorded job
+or answer. New identity-free requests at the closed window use the ordinary
+calculation. Both release controls are absent from the answer key and the
+persisted computation specification. With the setting
+off, ordinary API responses and cache entries retain the develop payload.
+When its window is enabled, a result can expose `plan_data_id` when its producing
+data is known. Older answers without that identifier remain readable.
+
+Run `python -m docs.research.llmopt_phase8.check_develop` to exercise the
+default workflow against the original develop worker and intent tests. The
+runner keeps their original shared fixtures and imports the implementation
+from the checkout under test.
+
+## Verified repairs
+
+League and public-entry capabilities can advertise `verified_repairs: true` when
+the master planning setting is on. A three-week repair requires the additional
+three-week grant. An existing job may finish and cache its answer
+after rollback. The disabled setting refuses new candidate and selection work.
+Three-week candidates use a regular advice POST with the original run ID and
+`stage: "repair"`. Following a proved incompatible base, each candidate changes
+one rule of the original immutable request. A known missing chip right permits
+removing the chip requirement. Missing chip history and unfinished searches
+cannot start these repairs. For conflicts detected before submission, the
+first well-formed edited request supplies the base. Every candidate and selection
+then carries the same optional `run.repair_origin`, containing preference
+fragments and forced Wildcard weeks from the member's original draft. Fragments
+can retain incompatible rules that cannot share a normal job request. Their
+canonical scoped rules bind the original to the run, including on a cache hit.
+The Wildcard weeks list names explicit rules. A frozen week preserves its own
+chip separately. Only active fields are sent, and the ordinary 4096-byte POST
+limit applies to the entire candidate or pinned selection. An oversized
+candidate cannot start work and an oversized selection is never offered.
+The other candidate can still be checked and selected if its request fits.
+The first posted edit counts as a candidate whether it succeeds or fails.
+
+The ledger records up to two candidate answer keys and reserves capacity for
+one selection. Cache hits retain the originating request and spend no units.
+Verification sends the edited preferences and all three weeks of transfers,
+chip, starting eleven and captain from the cached witness. Every candidate
+and selection uses the existing run capacity and capture. The client checks
+the resulting decisions and net points before displaying a selected plan.

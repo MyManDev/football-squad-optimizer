@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from jsonschema import Draft202012Validator
 
 from squadopt.api.app import ADVICE_BODY_MAX_BYTES, create_app
 from squadopt.contracts.plan_infeasibility import PlanInfeasibility
@@ -29,6 +30,7 @@ from squadopt.platform.advice_read import (
     FileLeagueDirectory,
     PreferencePlayers,
 )
+from squadopt.platform.advice_runs import FileRunStore
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     FixedWindowRateLimiter,
@@ -50,6 +52,263 @@ CONTEXT = AdviceRequestContext(
 )
 ADVICE_URL = f"/api/v1/leagues/{LEAGUE_ID}/entries/313686/advice"
 BODY = {"strategy": "saf-puan", "window": 1}
+
+
+def _run_ref(identifier="a" * 32, stage="base"):
+    return {"contract_version": "llmopt_run_v1", "run_id": identifier, "stage": stage}
+
+
+def test_run_owned_public_job_views_conform_in_every_lifecycle_state(tmp_path):
+    schema = json.loads(
+        Path("docs/contracts/advice_job_view_v2.schema.json").read_text(encoding="utf-8")
+    )
+    validator = Draft202012Validator(schema)
+    client, cache, queue = _world(tmp_path, runs=FileRunStore(tmp_path / "runs"))
+
+    def check(identifier, status):
+        response = client.get(f"/api/v1/advice-jobs/{identifier}")
+        assert response.status_code == 200
+        view = response.json()
+        validator.validate(view)
+        assert view["status"] == status
+        assert "idempotency_key" not in view and "message" not in view
+
+    first = client.post(ADVICE_URL, json={**BODY, "run": _run_ref()}).json()["job_id"]
+    check(first, "queued")
+    job = queue.claim(at_utc="2026-08-27T12:01:00Z")
+    check(first, "running")
+    queue.store(
+        job.transition(
+            "failed",
+            at_utc="2026-08-27T12:01:00Z",
+            error=JobError("ADVICE_FAILED", "Internal detail."),
+        )
+    )
+    check(first, "failed")
+    second = client.post(ADVICE_URL, json={**BODY, "run": _run_ref("b" * 32)}).json()["job_id"]
+    run_advice_worker_once(
+        queue, cache, lambda _: _valid_advice_document(), at_utc="2026-08-27T12:01:00Z"
+    )
+    check(second, "completed")
+    third = client.post(
+        ADVICE_URL, json={**BODY, "preferences": {"no_hits": True}, "run": _run_ref("c" * 32)}
+    ).json()["job_id"]
+    assert client.post(f"/api/v1/llmopt/runs/{'c' * 32}/cancel", json={}).status_code == 200
+    check(third, "cancelled")
+
+
+@pytest.mark.parametrize("window", [1, 3])
+def test_new_preference_work_without_identity_keeps_legacy_admission(tmp_path, window):
+    client, cache, queue = _world(tmp_path, runs=FileRunStore(tmp_path / "runs"))
+    body = {**BODY, "window": window, "preferences": {"no_hits": True}}
+    missing = client.post(ADVICE_URL, json=body)
+    assert missing.status_code == 202, missing.text
+    assert queue.jobs()[0].contract_version == "backend_jobs_v1"
+    assert not (tmp_path / "runs/ledger.json").exists()
+    document = json.loads(_valid_advice_document())
+    document["payload"].update(
+        window=window,
+        preferences={"keep_players": [], "avoid_players": [], "no_hits": True},
+        preferences_scope="all_selected_weeks",
+    )
+    run_advice_worker_once(
+        queue, cache, lambda _: json.dumps(document).encode(), at_utc="2026-08-27T12:01:00Z"
+    )
+    assert client.post(ADVICE_URL, json=body).status_code == 200
+    assert len(queue.jobs()) == 1
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_release_control_preserves_legacy_admission_and_scopes_new_runs(tmp_path, enabled):
+    store = FileRunStore(tmp_path / "runs")
+    client, _, queue = _world(tmp_path, llmopt_vnext=enabled, runs=store)
+    capabilities = client.get(ADVICE_URL.split("/entries/")[0] + "/capabilities").json()
+    assert capabilities.get("llmopt_vnext", False) is enabled
+    if not enabled:
+        assert "llmopt_vnext" not in capabilities
+    legacy = client.post(ADVICE_URL, json={**BODY, "preferences": {"no_hits": True}})
+    assert legacy.status_code == 202, legacy.text
+    assert queue.load(legacy.json()["job_id"]).contract_version == "backend_jobs_v1"
+    bound = client.post(ADVICE_URL, json={**BODY, "run": _run_ref()})
+    if enabled:
+        assert bound.status_code == 202, bound.text
+        assert queue.load(bound.json()["job_id"]).contract_version == "backend_jobs_v2"
+    else:
+        assert bound.status_code == 409, bound.text
+        assert bound.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
+        assert len(queue.jobs()) == 1
+        assert not store.path.exists()
+
+
+def test_rollback_reads_admitted_and_completed_work_without_a_new_followup(tmp_path):
+    store = FileRunStore(tmp_path / "runs")
+    on, cache, queue = _world(tmp_path, runs=store, llmopt_vnext=True)
+    body = {**BODY, "run": _run_ref()}
+    first = on.post(ADVICE_URL, json=body)
+    assert first.status_code == 202, first.text
+    off, _, _ = _world(tmp_path, runs=store, llmopt_vnext=False)
+    assert off.post(ADVICE_URL, json=body).json()["job_id"] == first.json()["job_id"]
+    run_advice_worker_once(
+        queue, cache, lambda _: _valid_advice_document(), at_utc="2026-08-27T12:01:00Z"
+    )
+    answer = off.post(ADVICE_URL, json=body)
+    assert answer.status_code == 200, answer.text
+    assert off.post(ADVICE_URL, json={**BODY, "run": _run_ref("b" * 32)}).content == answer.content
+    refused = off.post(
+        ADVICE_URL,
+        json={**body, "run": _run_ref(stage="followup"), "preferences": {"no_hits": True}},
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
+    assert len(queue.jobs()) == 1
+    other = off.post(ADVICE_URL, json={**BODY, "preferences": {"no_hits": True}})
+    assert other.status_code == 202
+    unadmitted = off.post(
+        ADVICE_URL,
+        json={**body, "run": _run_ref(stage="followup"), "preferences": {"no_hits": True}},
+    )
+    assert unadmitted.json()["error"]["code"] == "LLMOPT_VNEXT_DISABLED"
+    with store.transaction() as tx:
+        assert len(tx.state["runs"]["a" * 32]["requests"]) == 1
+
+
+def test_five_week_advice_cannot_claim_the_one_three_week_run_budget(tmp_path):
+    client, _, queue = _world(tmp_path, runs=FileRunStore(tmp_path / "runs"))
+    refused = client.post(ADVICE_URL, json={**BODY, "window": 5, "run": _run_ref()})
+    assert refused.status_code == 422
+    assert queue.jobs() == ()
+
+
+@pytest.mark.parametrize("window,capacity", [(1, 84), (3, 488)])
+def test_llmopt_run_has_four_lifetime_jobs_across_terminal_retries_and_restart(
+    tmp_path, window, capacity
+):
+    root = tmp_path / "runs"
+    client, cache, queue = _world(
+        tmp_path, runs=FileRunStore(root), preference_players=_players, llmopt_vnext_three_week=True
+    )
+    base = {**BODY, "window": window, "run": _run_ref()}
+    first = client.post(ADVICE_URL, json=base)
+    assert first.status_code == 202, first.text
+    assert (
+        client.post(
+            ADVICE_URL,
+            json={
+                **base,
+                "run": _run_ref(stage="followup"),
+                "preferences": {"avoid_players": [100]},
+            },
+        ).json()["error"]["code"]
+        == "RUN_BASE_REQUIRED"
+    )
+    document = json.loads(_valid_advice_document())
+    document["payload"]["window"] = window
+    run_advice_worker_once(
+        queue, cache, lambda _: json.dumps(document).encode(), at_utc="2026-08-27T12:01:00Z"
+    )
+    for index in range(3):
+        request = {
+            **base,
+            "run": _run_ref(stage="followup"),
+            "preferences": {"avoid_players": [100 + index]},
+        }
+        accepted = client.post(ADVICE_URL, json=request)
+        assert accepted.status_code == 202, accepted.text
+        claimed = queue.claim(at_utc="2026-08-27T12:01:00Z")
+        queue.store(
+            claimed.transition(
+                "failed", at_utc="2026-08-27T12:01:00Z", error=JobError("ADVICE_FAILED", "Stopped.")
+            )
+        )
+        restarted, _, _ = _world(
+            tmp_path,
+            runs=FileRunStore(root),
+            preference_players=_players,
+            llmopt_vnext_three_week=True,
+        )
+        repeated = restarted.post(ADVICE_URL, json=request)
+        assert repeated.json()["job_id"] == accepted.json()["job_id"]
+    refused = client.post(
+        ADVICE_URL,
+        json={**base, "run": _run_ref(stage="followup"), "preferences": {"avoid_players": [200]}},
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == "RUN_BUDGET_EXHAUSTED"
+    assert len(queue.jobs()) == 4
+    state = json.loads((root / "ledger.json").read_text())
+    assert state["runs"]["a" * 32]["reserved"] == capacity
+    assert client.post(ADVICE_URL, json=base).status_code == 200
+
+
+def test_llmopt_concurrent_reconstructed_services_cannot_admit_a_fifth_job(tmp_path):
+    root = tmp_path / "runs"
+    client, cache, queue = _world(
+        tmp_path, runs=FileRunStore(root), preference_players=_players, max_open_jobs_per_client=100
+    )
+    base = {**BODY, "run": _run_ref()}
+    assert client.post(ADVICE_URL, json=base).status_code == 202
+    run_advice_worker_once(
+        queue, cache, lambda _: _valid_advice_document(), at_utc="2026-08-27T12:01:00Z"
+    )
+    clients = [
+        _world(
+            tmp_path,
+            runs=FileRunStore(root),
+            preference_players=_players,
+            max_open_jobs_per_client=100,
+        )[0]
+        for _ in range(8)
+    ]
+
+    def ask(index):
+        return (
+            clients[index % len(clients)]
+            .post(
+                ADVICE_URL,
+                json={
+                    **BODY,
+                    "run": _run_ref(stage="followup"),
+                    "preferences": {"avoid_players": [100 + index]},
+                },
+            )
+            .status_code
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        statuses = list(pool.map(ask, range(16)))
+    assert statuses.count(202) == 3
+    assert statuses.count(409) == 13
+    assert len(queue.jobs()) == 4
+
+
+def test_llmopt_edit_closes_admission_without_discarding_running_accounting(tmp_path):
+    runs = FileRunStore(tmp_path / "runs")
+    client, _, queue = _world(tmp_path, runs=runs)
+    request = {**BODY, "run": _run_ref()}
+    posted = client.post(ADVICE_URL, json=request)
+    identifier = posted.json()["job_id"]
+    claimed = queue.claim(at_utc="2026-08-27T12:01:00Z")
+    budget = runs.allocation(identifier)
+    assert budget.limit == 21
+    closed = client.post(f"/api/v1/llmopt/runs/{'a' * 32}/cancel", json={})
+    assert closed.status_code == 200
+    assert queue.load(identifier).status == "running"
+    runs.finish(identifier, budget)
+    assert client.post(ADVICE_URL, json=request).status_code == 409
+    assert claimed.job_id == identifier
+
+
+def test_llmopt_shared_queued_job_survives_until_its_last_consumer_leaves(tmp_path):
+    runs = FileRunStore(tmp_path / "runs")
+    client, _, queue = _world(tmp_path, runs=runs)
+    first = client.post(ADVICE_URL, json={**BODY, "run": _run_ref()})
+    joined = client.post(ADVICE_URL, json={**BODY, "run": _run_ref("b" * 32)})
+    assert first.json()["job_id"] == joined.json()["job_id"]
+    assert client.post(f"/api/v1/llmopt/runs/{'a' * 32}/cancel", json={}).status_code == 200
+    assert queue.jobs()[0].status == "queued"
+    assert client.post(f"/api/v1/llmopt/runs/{'b' * 32}/cancel", json={}).status_code == 200
+    assert queue.jobs()[0].status == "cancelled"
+    assert queue.claim(at_utc="2026-08-27T12:01:00Z") is None
 
 
 def _valid_advice_document() -> bytes:
@@ -101,6 +360,8 @@ def _world(
     allowed_origins: tuple[str, ...] = (),
     metrics: AdviceMetrics | None = None,
     submit_services: list[AdviceSubmitService] | None = None,
+    llmopt_vnext: bool = True,
+    llmopt_vnext_three_week: bool = False,
     utc_now: Callable[[], datetime] = lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
     preference_players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None]
     | None = None,
@@ -115,6 +376,8 @@ def _world(
         _Context(),
         {"saf-puan": False, "fark-yarat": True},
         preference_players=preference_players,
+        llmopt_vnext=llmopt_vnext,
+        llmopt_vnext_three_week=llmopt_vnext_three_week,
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
     if submit_services is not None:
@@ -215,6 +478,19 @@ def test_late_cache_hit_is_served_without_checking_deadline(
     assert response.status_code == 200
     assert response.content == _valid_advice_document()
     assert not queue.jobs()
+
+
+def test_saved_answer_without_plan_provenance_remains_readable_after_changing_modes(tmp_path):
+    client, cache, queue = _world(tmp_path, llmopt_vnext=False)
+    held = _valid_advice_document()
+    assert "plan_data_id" not in json.loads(held)["payload"]
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    run_advice_worker_once(queue, cache, lambda _job: held, at_utc="2026-08-27T12:01:00Z")
+    for enabled in (True, False):
+        restarted, _, queue = _world(tmp_path, llmopt_vnext=enabled)
+        assert restarted.get(ADVICE_URL, params=BODY).content == held
+        assert restarted.post(ADVICE_URL, json=BODY).content == held
+        assert len(queue.jobs()) == 1
 
 
 def test_the_whole_story_get_404_post_202_worker_poll_second_post_200(

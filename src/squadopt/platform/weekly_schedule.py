@@ -237,8 +237,9 @@ def decide(
 ) -> Decision:
     """Pure: the action of this tick, from the deadlines, the clock and the runs started.
 
-    `settled` holds the gameweeks the bootstrap says are finished and checked; only a fixture
-    gap reads it.
+    `settled` holds the gameweeks the bootstrap says are finished and checked. A fixture gap
+    reads it for the settled view, and a morning run inside the window waits for the gameweek
+    before to be in it: until then a capture is mid-gameweek and the handoff refuses it.
     """
 
     if lead_hours < run_hours:
@@ -305,6 +306,16 @@ def decide(
         )
     if morning in markers:
         return chosen("none", "today's morning run has already started")
+    previous = gameweek - 1
+    listed = {week for week, _ in events}
+    if previous in listed and previous not in settled:
+        # GW12 of 2026-27 closed six days after GW11, inside the window while GW11 was still
+        # being played; each morning run then stopped at the handoff and raised an alarm.
+        return chosen(
+            "none",
+            f"gameweek {previous} is not finished and checked yet; morning runs for gameweek "
+            f"{gameweek} wait for it",
+        )
     if final_start - now < run:
         return chosen(
             "none",

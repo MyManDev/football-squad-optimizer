@@ -1,17 +1,29 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-11-21T03:07:06Z",
+  "generated_at_utc": "2026-11-25T02:06:49Z",
   "payload": {
     "actions": [
       {
         "gameweek": 11,
         "handoff_path": null,
         "kind": "wait",
-        "reason": "gameweek 11 deadline in 7.9 h; capture opens 3 h before it",
+        "reason": "gameweek 11 deadline 2026-11-21T11:00:00Z closed with no decision recorded (missed); nothing can be decided for it now",
+        "reason_code": "deadline_missed",
+        "reason_params": {
+          "deadline_utc": "2026-11-21T11:00:00Z",
+          "gameweek": 11
+        },
+        "snapshot_id": null
+      },
+      {
+        "gameweek": 12,
+        "handoff_path": null,
+        "kind": "wait",
+        "reason": "gameweek 12 deadline in 64.4 h; capture opens 3 h before it",
         "reason_code": "before_window",
         "reason_params": {
-          "gameweek": 11,
-          "hours_left": 7.9,
+          "gameweek": 12,
+          "hours_left": 64.4,
           "window_hours": 3.0
         },
         "snapshot_id": null
@@ -22,12 +34,12 @@
       4,
       5
     ],
-    "hours_to_deadline": 7.88,
+    "hours_to_deadline": 64.39,
     "is_idle": true,
-    "latest_capture": "fpl-live-20261121T030214Z-3d3cac1a09b8",
-    "next_deadline_utc": "2026-11-21T11:00:00Z",
-    "next_gameweek": 11,
-    "now_utc": "2026-11-21T03:07:06Z",
+    "latest_capture": "fpl-live-20261125T020109Z-1e2a008701a9",
+    "next_deadline_utc": "2026-11-27T18:30:00Z",
+    "next_gameweek": 12,
+    "now_utc": "2026-11-25T02:06:49Z",
     "recent_events": [
       {
         "fields": {
@@ -35,8 +47,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:07:06.647+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:06:49.344+00:00"
       },
       {
         "fields": {
@@ -44,69 +56,67 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:07:06.646+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:06:49.343+00:00"
       },
       {
         "fields": {
-          "capture": "fpl-live-20261121T030214Z-3d3cac1a09b8",
-          "leagues": [
-            352490
-          ],
-          "reason": "no rendered member has a complete server baseline"
-        },
-        "level": "INFO",
-        "message": "tick.week.advice_record.skipped",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:07:01.662+00:00"
-      },
-      {
-        "fields": {
-          "elapsed_seconds": 120.05128,
+          "elapsed_seconds": 125.603941,
           "league_id": 352490,
           "menu": "device",
           "stage": "publication"
         },
         "level": "INFO",
         "message": "tick.week.league.substage",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:06:42.293+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:06:23.063+00:00"
       },
       {
         "fields": {
-          "elapsed_seconds": 15.542298,
+          "elapsed_seconds": 12.636706,
           "league_id": 352490,
           "menu": "device",
           "stage": "members"
         },
         "level": "INFO",
         "message": "tick.week.league.substage",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:04:57.784+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:04:30.096+00:00"
       },
       {
         "fields": {
-          "elapsed_seconds": 9.639816,
+          "elapsed_seconds": 8.848887,
           "league_id": 352490,
           "menu": "device",
           "stage": "projection"
         },
         "level": "INFO",
         "message": "tick.week.league.substage",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:04:51.881+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:04:26.308+00:00"
       },
       {
         "fields": {
-          "elapsed_seconds": 1.286281,
+          "elapsed_seconds": 0.785278,
           "league_id": 352490,
           "menu": "device",
           "stage": "prepared"
         },
         "level": "INFO",
         "message": "tick.week.league.substage",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:04:43.528+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:04:18.245+00:00"
+      },
+      {
+        "fields": {
+          "elapsed_seconds": 53.547938,
+          "entries": 15,
+          "refused": {}
+        },
+        "level": "INFO",
+        "message": "tick.week.baselines.prepared",
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:04:17.442+00:00"
       },
       {
         "fields": {
@@ -114,8 +124,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:04:37.255+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:03:17.597+00:00"
       },
       {
         "fields": {
@@ -123,8 +133,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:04:37.091+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:03:17.230+00:00"
       },
       {
         "fields": {
@@ -132,26 +142,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:54.494+00:00"
-      },
-      {
-        "fields": {
-          "stage": "rotation"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:54.494+00:00"
-      },
-      {
-        "fields": {
-          "stage": "rotation"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:50.503+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:01:46.909+00:00"
       },
       {
         "fields": {
@@ -159,8 +151,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:50.503+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:01:46.909+00:00"
       },
       {
         "fields": {
@@ -168,8 +160,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:23.359+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:01:18.358+00:00"
       },
       {
         "fields": {
@@ -177,8 +169,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:23.358+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:01:18.358+00:00"
       },
       {
         "fields": {
@@ -186,8 +178,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:04.797+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:01:04.702+00:00"
       },
       {
         "fields": {
@@ -195,8 +187,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:04.796+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:01:04.702+00:00"
       },
       {
         "fields": {
@@ -204,8 +196,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:04.392+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:01:04.335+00:00"
       },
       {
         "fields": {
@@ -213,8 +205,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:02:04.392+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:01:04.335+00:00"
       },
       {
         "fields": {
@@ -222,8 +214,26 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw11-friday-20261121T0300Z",
-        "ts": "2026-11-21T03:01:57.359+00:00"
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:00:52.766+00:00"
+      },
+      {
+        "fields": {
+          "stage": "top100_cohort"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.done",
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:00:52.766+00:00"
+      },
+      {
+        "fields": {
+          "stage": "top100_cohort"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.start",
+        "run_id": "2026-27-gw12-tuesday-20261125T0200Z",
+        "ts": "2026-11-25T02:00:51.015+00:00"
       }
     ],
     "season": "2026-27",

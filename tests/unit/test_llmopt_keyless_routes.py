@@ -49,6 +49,80 @@ def _draft(player_id: int = 1, **extra: Any) -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize("dated", [False, True])
+@pytest.mark.parametrize("priority,total", [(True, None), (False, 0), (True, 15)])
+@pytest.mark.parametrize("echo", ["preserved", "nulls", "empty"])
+def test_chat_moves_reviewed_settings_to_a_closed_window_for_editing(dated, priority, total, echo):
+    preference = {"kind": "keep_player", "player_id": 1, "max_cost_tenths": 5}
+    if priority:
+        preference["priority"] = 1
+    reviewed = {"hard": [], "soft": [preference], "window": 1}
+    if total is not None:
+        reviewed["max_total_cost_tenths"] = total
+    body = {
+        **_request(),
+        "draft": reviewed,
+        "message": "Keep Salah in week 2" if dated else "Plan three weeks",
+    }
+    expected = {**reviewed, "window": 3}
+    proposal = {} if dated else {"window": 3}
+    if echo == "empty":
+        proposal.update(soft=[], max_total_cost_tenths=None)
+        if dated:
+            expected["hard"] = proposal["hard"] = [{"kind": "no_hits", "week": 2}]
+    else:
+        rule = {**preference, **({"week": 2} if dated else {})}
+        expected["soft"] = [rule]
+        if echo == "nulls":
+            proposal.update(
+                soft=[{**rule, "priority": None, "max_cost_tenths": None}],
+                max_total_cost_tenths=None,
+            )
+        else:
+            proposal["soft"] = [rule]
+    with TestClient(create_app(llmopt_vnext=True, llmopt_vnext_three_week=False)) as client:
+        assert client.post(PROMPT, json=body).status_code == 200
+        checked = client.post(
+            CHECK, json={"request": body, "reply": {"status": "draft", "draft": proposal}}
+        )
+        assert checked.status_code == 200, checked.text
+        assert checked.json() == {"status": "draft", "draft": expected}
+        assert client.post(PROMPT, json={**body, "draft": expected}).status_code == 422
+
+
+@pytest.mark.parametrize("priority,total", [(2, 15), (1, 20)])
+def test_chat_cannot_add_grouped_settings_while_moving_to_a_closed_window(priority, total):
+    preference = {"kind": "keep_player", "player_id": 1}
+    reviewed = {"hard": [], "soft": [{**preference, "priority": 1}], "max_total_cost_tenths": 15}
+    proposal = {
+        "window": 3,
+        "soft": [{**preference, "priority": priority}],
+        "max_total_cost_tenths": total,
+    }
+    with TestClient(create_app(llmopt_vnext=True, llmopt_vnext_three_week=False)) as client:
+        checked = client.post(
+            CHECK,
+            json={
+                "request": {**_request(), "draft": reviewed},
+                "reply": {"status": "draft", "draft": proposal},
+            },
+        )
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "REPLY_REFUSED"
+
+
+def test_chat_cannot_copy_a_reviewed_priority_onto_a_second_week():
+    reviewed = {"kind": "keep_player", "player_id": 1, "priority": 1}
+    body = {**_request(), "draft": {"soft": [reviewed], "hard": []}}
+    proposed = {"soft": [reviewed, {**reviewed, "week": 2}], "max_total_cost_tenths": None}
+    with TestClient(create_app(llmopt_vnext=True)) as client:
+        checked = client.post(
+            CHECK, json={"request": body, "reply": {"status": "draft", "draft": proposed}}
+        )
+    assert checked.status_code == 422
+    assert checked.json()["error"]["code"] == "REPLY_REFUSED"
+
+
 @pytest.mark.parametrize(
     ("name", "message", "locale"),
     [

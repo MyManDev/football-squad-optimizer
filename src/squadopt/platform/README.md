@@ -7,7 +7,7 @@ with `squadopt.api`, that may import web frameworks, network clients, model SDKs
 (the contract "Frameworks, network and databases stay in api and platform"). No package below
 it in the layer order imports it, and it imports no laboratory module.
 
-Its 67 Python files serve several deployment units: 51 implementation modules and 4
+Its 68 Python files serve several deployment units: 52 implementation modules and 4
 aliases at old paths in the flat folder, the package file, and the seven subpackages of ADR
 0011, of which `storage/` holds the four shared durable-state modules and the six others their
 package file only.
@@ -70,6 +70,7 @@ What the API process serves, and the composition root that wires the backend's p
 | `backend_runtime.py` | The composition root: the one place the backend's parts are wired to each other, for the API and the worker. |
 | `advice_read.py` | The read side of on-demand advice: league state and pure cache lookups. |
 | `advice_submit.py` | The write side: one request becomes a job record, with rate and open-job limits. |
+| `advice_runs.py` | Durable four-job admission, pre-reserved solver capacity, restart fencing and cancellation for one confirmed planning run (ADR 0018). |
 | `llmopt_intent.py` | Writes the call a member's own model is asked for an LLMOPT message and validates that model's reply into an editable constraint draft. It calls no model. |
 | `public_entry_inputs.py` | Pins one requested team's public FPL inputs separately from the weekly capture. |
 | `public_entry_advice.py` | Read-only cache addressing for public teams, computed through the shared queue. |
@@ -87,12 +88,14 @@ The file job queue, the worker loop and what keeps them observable and recoverab
 | Module | What it does |
 | --- | --- |
 | `advice_worker.py` | The worker process: what one job means, and the loop that keeps claiming jobs. |
+| `advice_preference_bundle.py` | Sequential preference components inside one admitted worker job, sharing its reserved capacity and cached main reference. |
 | `advice_queue.py` | Worker orchestration and compatibility imports for the advice queue. |
 | `file_advice_queue.py` | The recoverable file queue, with fenced, short metadata transactions. |
 | `queue_contracts.py` | Adapter-neutral queue operations and attempt ownership errors. |
 | `jobs_contract.py` | The job lifecycle contract, `backend_jobs_v1`. |
-| `advice_job_spec.py` | What a queued job is for, stored beside the queue rather than inside it. |
+| `advice_job_spec.py` | The immutable request for a queued job and the checks that bind a repair or selected plan to its originating request and capture. |
 | `advice_cache.py` | The immutable-key answer cache behind a protocol, and the cache key. |
+| `advice_plan_cache.py` | Stores plan provenance separately from the immutable answer and exposes it when the planning release is enabled. |
 | `_damaged_entry.py` | Moves aside bytes at a create-once address that do not parse, rather than answering from them. |
 | `worker_heartbeat.py` | Each worker reports that it is alive, and readiness asks whether any worker is. |
 | `worker_metrics.py` | A worker-owned Prometheus listener; no counters are shared with the API process. |
@@ -109,6 +112,7 @@ captured bytes, not a live endpoint.
 | `fpl_capture.py` | One immutable FPL deadline capture. |
 | `cohort_capture.py` | Captures the official overall elite cohort before a gameweek deadline. |
 | `elite_capture.py` | Captures a frozen elite cohort's previous-gameweek picks before the deadline. |
+| `elite_season_capture.py` | Keeps the season history, transfers and scored-week picks of every manager a stored elite cohort names; adds only what the store lacks. |
 | `official_injury_capture.py` | A bounded capture of the official league injury widget, without a model call. |
 | `benchmark_capture.py` | Private weekly Benchmark V2 receipts, kept apart from published decisions. |
 | `capture_measurement.py` | Offline availability calibration and a paired late-capture audit; changes no projection. |

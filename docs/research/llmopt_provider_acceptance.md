@@ -1,0 +1,39 @@
+# LLMOPT provider acceptance checklist
+
+**Owner check.** Run this check on the live site during the owner's temporary one-week opening. Use the English page with **1 week** selected and current player data. Prepare two selectable plans in the rule editor before using chat. Send exactly two messages per provider, first to select a plan and then to add a rule. Missing setup, credentials or model access leaves the row **not run**.
+
+## Prepare two selectable decisions
+
+The recorded example is league **352490**, entry **5349883**, GW8 of 2026–27, capture `fpl-live-20261023T111647Z-a2cd55fde426`. Use the frozen publication and its open-deadline clock when replaying it. In a clean draft, use **Apply as → Preferred**, **Rule → Keep player** and **Add rule** twice, first for **Gianluigi Donnarumma**, then for **Riccardo Calafiori**. Add **Preferred → No transfer hits**. Leave all point limits and priorities empty. Choose **Compute plans**. The frozen member has four free transfers. These two decisions were visible on both the cold calculation and the warm reload. [Frozen squad and player names](llmopt_phase1/gw8.json) · [Recorded browser decisions](https://github.com/MyManDev/football-squad-optimizer/blob/4cf24ae4f984643295bd3ce835ce01152f6ca151/docs/research/llmopt_week_first.json) · [Exact draft used by the browser](https://github.com/MyManDev/football-squad-optimizer/blob/4cf24ae4f984643295bd3ce835ce01152f6ca151/docs/research/llmopt_week_first/browser.py)
+
+| Card to identify | Decision in the frozen example |
+| --- | --- |
+| First, **Base plan** (`P1`) | Sells Donnarumma and brings in David Raya Martín. Julio Enciso stays. |
+| Second, the priced Donnarumma preference (`P2`) | Keeps Donnarumma, sells Enciso and brings in Morgan Rogers. **Plan with all preferences** also makes this decision. |
+
+The base and priced Donnarumma plans scored 54.648 and 54.553 expected net points before display rounding. The Calafiori-only plan repeats the base decision. The page omits that duplicate priced card and orders catalogue labels by displayed plan order, beginning with the base. Record each card's displayed points and transfer decision from the page. [Scored one-week stages](llmopt_phase8_load.json) · [Visible pricing results](../../web/src/features/league/llmopt/planResults.ts) · [Catalogue order](../../web/src/features/league/llmopt/planHistory.ts)
+
+**For a current squad**, start the same check in a separate tab using only the editor. Add **Preferred → No transfer hits**, calculate, and note a player the base plan sells. Start a fresh draft, add **Preferred → Keep player** for that outgoing player, add **Preferred → No transfer hits**, and calculate again. If the base rolls its transfers, try **Preferred → Include player** for an affordable player outside the base squad instead. Use an eligible member for whom the first card makes the original decision and the second card visibly keeps or acquires the target. Click **Use this plan** on each in turn and check its selected state. If both decisions cannot be shown, mark setup **not run**. This preflight takes no chat messages.
+
+## Run each provider row
+
+1. For each provider, start on the checked member with the complete preflight draft, including **Preferred → No transfer hits**, and **no bank floor**. Click **Compute plans** and confirm both current decisions. Under **Your model**, choose the provider and enter an eligible model ID. Enter your existing key only in **API key** and choose **Save**. The saved form shows the provider and model. For **Local**, use your existing OpenAI-compatible HTTP endpoint on `localhost` or `127.0.0.1` with an explicit port and its API base path. The key is optional if that server accepts anonymous calls.
+2. **First message.** Select the opposite card using **Use this plan**, then send the selection message in the provider's row once. Expect the selected state to move to the indicated card with its recorded transfers and displayed points. Selection requires no calculation. A wrong card, invented label, changed score or request to recalculate on the same capture fails the selection check.
+3. **Second message, identical for every provider.** With both plans still available, send “Require at least £0.1m in the bank at the end of the plan. Keep the one-week window and all my existing preferences.” Expect **Instructions updated.** and **Keep at least £0.1m after the final week** under **Revision rules**. Check that **1 week**, the player preferences and **No transfer hits** remain in the draft. The page waits for the member to choose **Compute plans**. End the check there. A changed selection in place of the new rule, a wrong bank amount, a missing preference or an automatic calculation fails this message. [Bank-floor instruction and units](../../src/squadopt/platform/llmopt_intent.py) · [English draft labels](../../web/src/features/league/llmopt/copy.ts)
+
+Score the two messages separately. If selection fails, use the card button to select the intended plan and continue with the second message while the catalogue is available. If a failed answer edited the draft, restore the preflight with the editor and **Compute plans** first. If the two current decisions cannot be restored, mark the second message **not run**.
+
+| Provider | First message to send | Expected selection | First message failure example | Second message failure example |
+| --- | --- | --- | --- | --- |
+| OpenAI | Use the second plan. | Second, `P2` | “The chat did not accept this request.” if the structured request is refused. | The new bank floor is absent or the provider refuses the model. |
+| Anthropic | Use the first plan. | Base, `P1` | Missing or invalid tool input gives an unreadable-answer message. | “Your provider account has no credit or quota left.” |
+| Google Gemini | Use the second plan. | Second, `P2` | “The provider refused this API key.” or the original card stays selected. | A model refusal or a missing bank rule. |
+| OpenRouter | Use the first plan. | Base, `P1` | A model or request refusal when the route cannot honor the structured output. | The page selects a plan again instead of adding the bank floor. |
+| Mistral | Use the second plan. | Second, `P2` | The page rejects the selection or keeps the original card. | A request refusal or the draft loses an existing preference. |
+| Groq | Use the first plan. | Base, `P1` | “Your provider's request limit has been reached. Wait a little and try again.” | “The model stopped before it finished its answer. Try another model.” |
+| DeepSeek | Use the second plan. | Second, `P2` | The page rejects an invalid command or unknown label. | An unreadable-answer message if JSON-object mode returns an invalid draft. |
+| Local | Use the first plan. | Base, `P1` | “The provider could not be reached.” or the endpoint refuses the selection schema. | The completion is unreadable or the wrong amount appears in the draft. |
+
+Choose **Delete** to clear the held credential before changing providers and after the final row. For the next provider, remove the bank floor under **Revision rules** and restore the same two cards with **Compute plans**. Record only the provider, model ID, pass/fail/not run for each message, and a short description of any visible error. Keep keys, request headers, request or response bodies and logs out of the record.
+
+For each message the browser obtains the schema from `/api/v1/llmopt/prompt`, calls the chosen provider once, then submits the reply to `/api/v1/llmopt/check`. The two app routes are keyless. For selection the provider returns the displayed plan's short label. The page checks the resolved identity against the current catalogue before selecting the card. [Provider adapters](../../web/src/features/league/llmopt/providers.ts) · [Chat request flow](../../web/src/features/league/llmopt/intentSource.ts) · [Plan-label contract](../contracts/llmopt_plans_v1.md)
