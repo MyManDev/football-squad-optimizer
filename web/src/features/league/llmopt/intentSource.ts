@@ -1,7 +1,9 @@
+import type { PlanContext, PlanCommand } from "./planHistory";
 import { withRequestDeadline } from "../../../data/request";
 import type { Language } from "../../../i18n/messages";
 import type { PlanWeekNumber } from "../advice/decisionPreferences";
 import {
+  IntentError,
   intentAnswer,
   intentBody,
   intentError,
@@ -19,13 +21,18 @@ export interface IntentRequest {
   draft: PlanDraft;
   players: CatalogPlayer[];
   clarification?: Clarification;
+  planContext?: PlanContext;
+  /** True only when the current capture confirms the catalogue feature has closed. */
+  confirmCatalogueRollback?: () => Promise<boolean>;
   referenceWeeks?: readonly PlanWeekNumber[];
   referenceCaptains?: readonly { week: PlanWeekNumber; player_id: number }[];
 }
 
 /** A checked answer: a new draft, or one question back to the member. */
 export type IntentResult =
-  { status: "draft"; draft: PlanDraft } | { status: "clarification"; message: string };
+  | { status: "draft"; draft: PlanDraft }
+  | { status: "clarification"; message: string }
+  | { status: "plan"; command: PlanCommand };
 
 /**
  * Where the page's chat is read: the member's own model, or a stand-in in a test. The site
@@ -70,17 +77,46 @@ export function ownKeyIntentSource(origin: string, keyed: KeyedCall = withOwnKey
             request.clarification,
             request.referenceWeeks,
             request.referenceCaptains,
+            request.planContext,
           );
-          const call = checkedProviderCall(
-            await postKeyless(`${origin}/api/v1/llmopt/prompt`, body, signal),
-          );
+          const prompt = () => postKeyless(`${origin}/api/v1/llmopt/prompt`, body, signal);
+          let prepared;
+          try {
+            prepared = await prompt();
+          } catch (error) {
+            if (
+              !body.plan_context ||
+              !(
+                error instanceof IntentError &&
+                error.status === 422 &&
+                error.code === "VALIDATION_FAILED"
+              ) ||
+              signal.aborted ||
+              !(await request.confirmCatalogueRollback?.().catch(() => false))
+            )
+              throw error;
+            signal.throwIfAborted();
+            if (body.reference_captains) {
+              const roster = new Set(body.players.map(({ id }) => id));
+              const archived = body.plan_context.plans.flatMap(({ weeks }) => weeks);
+              body.reference_captains = body.reference_captains.filter(
+                ({ week, player_id }) =>
+                  roster.has(player_id) ||
+                  !archived.some((row) => row.week === week && row.captain === player_id),
+              );
+              if (!body.reference_captains.length) delete body.reference_captains;
+            }
+            delete body.plan_context;
+            prepared = await prompt();
+          }
+          const call = checkedProviderCall(prepared);
           const reply = await keyed((credential) => callProvider(credential, call, signal));
           const answer = await postKeyless(
             `${origin}/api/v1/llmopt/check`,
             { request: body, reply },
             signal,
           );
-          return intentAnswer(answer, request.players);
+          return intentAnswer(answer, request.players, body.plan_context);
         },
         { signal, timeoutMs: 120_000 },
       ),

@@ -25,6 +25,14 @@ its header.
 | [0015](0015-behaviour-measurement.md) | Clicks, scroll, speed, errors and arrivals in the usage record, still with no personal data | 2026-11-16 | Accepted (owner, 2026-11-16) | None |
 | [0016](0016-usage-admin-views.md) | The usage record read inside the site, behind Cloudflare Access | 2026-11-16 | Accepted (owner, 2026-11-16) | None |
 | [0017](0017-llmopt-own-key.md) | LLMOPT with the member's own model key, which the site never receives | 2026-11-17 | Accepted (owner, 2026-11-17) | None |
+| [0018](0018-llmopt-run-budget.md) | One durable job and work budget per LLMOPT run | 2026-11-18 | Proposed | None |
+| [0019](0019-llmopt-priority-budget.md) | Priority layers within one preference job | 2026-11-19 | Proposed | None |
+| [0020](0020-llmopt-device-alternatives.md) | One-week device equivalence and Pareto transfer decisions | 2026-11-19 | Proposed | None |
+| [0021](0021-llmopt-plan-context.md) | Content identities and bounded conversations about computed plans | 2026-11-19 | Proposed | None |
+| [0022](0022-llmopt-transfer-packages.md) | Bounded transfer packages and three-week paths | 2026-11-19 | Accepted (owner, 2026-11-19) | None |
+| [0023](0023-llmopt-verified-rule-repairs.md) | Offer a rule edit only after computing a feasible plan | 2026-11-20 | Proposed | None |
+| [0024](0024-llmopt-release-control.md) | Select the planning workflow with one server setting | 2026-11-20 | Proposed | None |
+| [0025](0025-expected-window-phase-work.md) | Admit expected-window search against measured remaining work | 2026-11-20 | Proposed | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.

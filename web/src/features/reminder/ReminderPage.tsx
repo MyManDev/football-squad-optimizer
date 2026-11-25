@@ -47,12 +47,16 @@ export function ReminderPageView({
           ? copy.statusDenied
           : copy.statusOff;
   return (
-    <div className={styles.page} data-zone="reminder">
-      <header>
+    <div className={styles.page}>
+      <header data-zone="reminder-header">
         <Link to={memberAddress(target.leagueId, target.entryId)}>{copy.back}</Link>
         <h1>{copy.title}</h1>
       </header>
-      <section className={styles.control} aria-labelledby="reminder-switch-title">
+      <section
+        className={styles.control}
+        aria-labelledby="reminder-switch-title"
+        data-zone="reminder-switch"
+      >
         <h2 id="reminder-switch-title" className="visually-hidden">
           {copy.label}
         </h2>
@@ -61,7 +65,7 @@ export function ReminderPageView({
           {status}
         </p>
       </section>
-      <ol className={styles.steps}>
+      <ol className={styles.steps} data-zone="reminder-steps">
         <li className={styles.step}>
           <PermissionPicture allow={copy.allowWord} />
           <div>

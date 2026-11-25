@@ -26,6 +26,7 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "league_id",  # address: whose rivals it was solved against
         "mode",  # address: the strategy slug the document answers for
         "window",  # address: how many weeks the plan spans (1, 3, 5)
+        "plan_data_id",  # conversation: immutable current advice context, ADR 0021
         "source_snapshot_id",  # provenance: the capture the advice was computed from
         "information_review",  # conditional actions and source playing chance; no rank odds
         "role_forecast",  # explicitly requested experimental start/cameo/minute estimates
@@ -36,6 +37,8 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "decision_information",  # provenance: bound inputs, for explicit recalculation
         "preferences",  # inputs: canonical user constraints applied by the producer
         "preferences_scope",  # inputs: these constraints bind every selected week
+        "priority_preferences",  # producer result: checked count layers, cost and reference status
+        "preference_bundle_result",  # worker result: bounded components and selected plan
         "bank_after_tenths",  # resources: remaining bank after the computed first week
         "free_transfers_after",  # resources: transfers carried into the following week
         "selection_top100_weight",  # inputs: selection weight, not a measured points cost

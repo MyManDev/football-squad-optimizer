@@ -53,6 +53,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path, PurePath, PurePosixPath
 from typing import Any
@@ -822,11 +823,70 @@ def _env_lines(path: Path) -> list[str]:
     return path.read_text(encoding="utf-8").splitlines()
 
 
+_PLANNING_CONTROL = re.compile(
+    r"^\s*(?:export\s+)?(SQUADOPT_BACKEND_(?:LLMOPT_VNEXT(?:_THREE_WEEK)?|"
+    r"THREE_WEEK_PATHS|TRANSFER_PACKAGES|PACKAGE_GATE))(?=\s|=|:|$)"
+)
+_QUOTED_ENV_VALUE = re.compile(r"""^\s*(?:export\s+)?[^\s#=:]+\s*[=:]\s*(["'])""")
+
+
+def _env_records(lines: list[str]) -> Iterator[str]:
+    """Keep each quoted assignment together without evaluating its contents."""
+    source = iter(lines)
+    for line in source:
+        opening = _QUOTED_ENV_VALUE.match(line)
+        if opening is None:
+            yield line
+            continue
+        record = [line]
+        value = line[opening.end() :]
+        while not any(token[0] == opening[1] for token in re.finditer(r"""\\.|["']""", value)):
+            continuation = next(source, None)
+            if continuation is None:
+                raise ReleaseError("Close the quoted environment value before switching releases")
+            record.append(continuation)
+            value = continuation
+        yield "\n".join(record)
+
+
+def _planning_controls(lines: list[str]) -> dict[str, str]:
+    controls: dict[str, str] = {}
+    for line in _env_records(lines):
+        match = _PLANNING_CONTROL.match(line)
+        if match is None:
+            continue
+        name = match[1]
+        value = re.fullmatch(
+            r"""\s*[=:]\s*(?:([01])|'([01])'|"([01])")(?:\s+#.*|\s*)""", line[match.end() :]
+        )
+        if value is None:
+            raise ReleaseError(f"Set {name} to a literal 0 or 1 before switching releases")
+        literal = next(part for part in value.groups() if part is not None)
+        require(controls.get(name, literal) == literal, f"Conflicting entries for {name}")
+        controls[name] = literal
+    return controls
+
+
+def _write_release_env(release_text: str) -> None:
+    """Write the release configuration with the live planning switches at switch time."""
+    remaining = _planning_controls(_env_lines(LIVE_ENV))
+    # Omitting a switch in the live file keeps its default even when the saved file enabled it.
+    lines = []
+    for line in _env_records(release_text.splitlines()):
+        saved = _PLANNING_CONTROL.match(line)
+        if saved is None:
+            lines.append(line)
+        elif saved[1] in remaining:
+            lines.append(f"{saved[1]}={remaining.pop(saved[1])}")
+    lines.extend(f"{name}={literal}" for name, literal in remaining.items())
+    _atomic_text(LIVE_ENV, "\n".join(lines) + "\n", 0o600)
+
+
 def render_env(lines: list[str], values: dict[str, str]) -> str:
     """Replace the named keys and keep every other line as it was, in order."""
     seen: set[str] = set()
     rendered = []
-    for line in lines:
+    for line in _env_records(lines):
         key = (
             line.split("=", 1)[0].strip()
             if "=" in line and not line.lstrip().startswith("#")
@@ -1151,6 +1211,7 @@ def command_activate(args: argparse.Namespace) -> None:
     )
     rollback = release / "rollback"
     require(not rollback.exists(), "This release was activated before; use a new release")
+    _planning_controls(_env_lines(LIVE_ENV))
     rollback.mkdir()
     shutil.copy2(LIVE_ENV, rollback / "env")
     shutil.copy2(LIVE_OVERRIDE, rollback / "compose.artifacts.yaml")
@@ -1168,9 +1229,11 @@ def command_activate(args: argparse.Namespace) -> None:
         "previous_commit": previous_commit,
         "expected": expected,
     }
+    switch_started = False
     try:
+        _write_release_env(env_text)
+        switch_started = True
         run("git", "-C", str(REPO), "checkout", "-q", "--detach", package["tag_commit"])
-        _atomic_text(LIVE_ENV, env_text, 0o600)
         _atomic_text(LIVE_OVERRIDE, override_text, 0o664)
         _restart_live()
         record["serving"] = {}
@@ -1178,9 +1241,12 @@ def command_activate(args: argparse.Namespace) -> None:
         record["stage"] = "active"
     except Exception as error:  # any failure after the switch restores the kept release
         record["error"] = f"{type(error).__name__}: {error}"
-        record["stage"] = "rolled_back"
-        _restore(release)
-        record["after_rollback_ready"] = _wait_ready(8000, 600)
+        record["stage"] = "not_activated"
+        if switch_started:
+            record["stage"] = "rollback_incomplete"
+            _restore(release)
+            record["stage"] = "rolled_back"
+            record["after_rollback_ready"] = _wait_ready(8000, 600)
     finally:
         record["completed_at"] = now()
         write_json_new(release / "activation.json", record)
@@ -1191,6 +1257,7 @@ def command_activate(args: argparse.Namespace) -> None:
             indent=2,
         )
     )
+    require(record["stage"] != "not_activated", "Activation stopped before switching configuration")
     require(record["stage"] == "active", "Activation failed and the previous release is back")
 
 
@@ -1203,7 +1270,7 @@ def _atomic_text(path: Path, text: str, mode: int) -> None:
 
 def _restore(release: Path) -> None:
     rollback = release / "rollback"
-    _atomic_text(LIVE_ENV, (rollback / "env").read_text(encoding="utf-8"), 0o600)
+    _write_release_env((rollback / "env").read_text(encoding="utf-8"))
     _atomic_text(
         LIVE_OVERRIDE, (rollback / "compose.artifacts.yaml").read_text(encoding="utf-8"), 0o664
     )

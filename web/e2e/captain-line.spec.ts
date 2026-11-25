@@ -8,6 +8,7 @@ import {
   DEVICE_SOLVE_CEILING_SECONDS,
 } from "../src/features/league/device/solve/ceiling";
 import { PUBLIC_ROOT, shippedTrees } from "../src/testSupport/shippedTrees";
+import { dismissOpening } from "./dismissOpening";
 import { claimMember, shippedClaim } from "./identity";
 
 /**
@@ -113,7 +114,10 @@ for (const language of ["tr", "en"] as const) {
         await page.setViewportSize({ width: WIDTHS[0], height: 800 });
         await page.goto(`/league/${LEAGUE_ID}/members/${entry}?mode=${strategy}&window=${window}`);
         if (device) {
-          await page.locator("[data-device-compute]").click();
+          const compute = page.locator("[data-device-compute]");
+          await expect(compute).toBeVisible();
+          await dismissOpening(page);
+          await compute.click();
           await expect(page.locator('[data-device-state="done"]')).toBeVisible({ timeout: 60_000 });
           await expect(page.locator("[data-device-progress]")).toHaveCount(0, {
             timeout: COVER_GONE_MS,

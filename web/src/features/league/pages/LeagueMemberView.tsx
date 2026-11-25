@@ -230,6 +230,13 @@ function LeagueMemberContent({
     [liveDependencies, queryClient],
   );
   const liveMatch = useLiveWindow(fixtures, matchFilter);
+  const matchOn = closed && liveMatch.open;
+  // A closed week's heading: the live mark while a match is on, the week's own name otherwise.
+  const closedHeading = !closed
+    ? undefined
+    : matchOn
+      ? copy.liveWeek
+      : copy.weekLabel(view.gameweek);
   const liveWeek = useMemberLiveScore(
     view,
     fixtures,
@@ -525,7 +532,7 @@ function LeagueMemberContent({
           />
         ) : null,
     },
-    chips: { title: copy.chipsAndTransfers, body: <MemberResourceCards squad={view} /> },
+    chips: { title: copy.chipsAndTransfers, body: <MemberResourceCards squad={displayedSquad} /> },
     card: {
       title: copy.cardTitle,
       body:
@@ -578,7 +585,7 @@ function LeagueMemberContent({
           {/* A phone's one column is long: the strip keeps its two parts a tap away, pinned
             under the phone bar once the decision has been read past. Wider layouts pin the
             top bar instead and show more of the page at once. */}
-          {layout === "phone" ? <MemberSections closed={closed} /> : null}
+          {layout === "phone" ? <MemberSections closedName={closedHeading} /> : null}
 
           {deadlinePassed !== null ? (
             <p className={styles.deadlineNotice} role="status" data-testid="deadline-passed">
@@ -613,15 +620,17 @@ function LeagueMemberContent({
               <div className={styles.headingRow}>
                 <div className={styles.headingText}>
                   {/* Once the deadline has passed the page is the week being played, not a
-                    plan: the heading says so as a green mark with a pulsing light, and the
-                    settings' summary goes with the plan. */}
+                    plan, and the settings' summary goes with the plan. The heading is the
+                    green mark with its pulsing light only while one of the member's matches
+                    is played, as LIVE's own light is; between matches, before the first and
+                    after the last it names the week. */}
                   <h2
                     className={styles.decisionTitle}
                     id="entry-advice-title"
-                    data-live={closed || undefined}
+                    data-live={matchOn || undefined}
                   >
-                    {closed ? <span className={styles.liveLight} aria-hidden="true" /> : null}
-                    {closed ? copy.liveWeek : copy.decisionTitle}
+                    {matchOn ? <span className={styles.liveLight} aria-hidden="true" /> : null}
+                    {closedHeading ?? copy.decisionTitle}
                   </h2>
                   {closed ? null : (
                     <p className={styles.selectionSummary} data-testid="member-selection-summary">

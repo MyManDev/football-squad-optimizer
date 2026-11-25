@@ -1,0 +1,27 @@
+{
+  "source_commit": "e1fcd7d895386dd04f09763f87d40f4cc06d58e4",
+  "browser_case": "a third preference without a limit is combined",
+  "server_context": "tests.unit.test_api_advice_post.CONTEXT",
+  "requests": [
+    {
+      "path": "/api/v1/leagues/352490/entries/35249001/advice",
+      "body": "{\"preferences\":{\"keep_players\":[],\"avoid_players\":[],\"no_hits\":true,\"save_chips\":true,\"net_points_priority\":true},\"strategy\":\"saf-puan\",\"window\":3,\"rival_entry_id\":null}",
+      "cache_key": "fd1a782ef2927bbeb773066d1ead72da1d00a8273a66c9768f5eac146b5ee70e"
+    },
+    {
+      "path": "/api/v1/leagues/352490/entries/35249001/advice",
+      "body": "{\"preferences\":{\"keep_players\":[],\"avoid_players\":[],\"no_hits\":true,\"save_chips\":true,\"include_players\":[9081401],\"net_points_priority\":true},\"strategy\":\"saf-puan\",\"window\":3,\"rival_entry_id\":null}",
+      "cache_key": "aae1172200125dd3ddabe463301ad92f85a9af8e93964d09020c3cc80b288b88"
+    },
+    {
+      "path": "/api/v1/leagues/352490/entries/35249001/advice",
+      "body": "{\"preferences\":{\"keep_players\":[],\"avoid_players\":[],\"no_hits\":true,\"save_chips\":true,\"include_players\":[9081402],\"net_points_priority\":true},\"strategy\":\"saf-puan\",\"window\":3,\"rival_entry_id\":null}",
+      "cache_key": "6c9608d2bd7792a6b476a0c41dd4b4c3db81870396c87bdd2fc7623da7bee263"
+    },
+    {
+      "path": "/api/v1/leagues/352490/entries/35249001/advice",
+      "body": "{\"preferences\":{\"keep_players\":[],\"avoid_players\":[],\"no_hits\":true,\"save_chips\":true,\"include_players\":[9081401,9081402,9081403],\"net_points_priority\":true},\"strategy\":\"saf-puan\",\"window\":3,\"rival_entry_id\":null}",
+      "cache_key": "3125bfe9a3db5271e311ca9bdbe26ba855476816a1f96de0468707b73ec9642d"
+    }
+  ]
+}

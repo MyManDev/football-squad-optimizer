@@ -76,8 +76,8 @@ export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) 
   const signed = (value: number | null) =>
     value === null ? "—" : signedPoints(value, Number.isInteger(value) ? 0 : 1, locale);
   return (
-    <div className={styles.page} data-zone="vs">
-      <header>
+    <div className={styles.page}>
+      <header data-zone="vs-header">
         <Link to={memberAddress(leagueId, entryId)} className={styles.back}>
           {messages.suggestionHistory.back}
         </Link>
@@ -141,7 +141,7 @@ function WeekAnalysis({
       data-testid="vs-week"
     >
       <h2 id={`vs-week-${week.gameweek}`}>{history.gameweek(week.gameweek)}</h2>
-      <figure className={styles.figure}>
+      <figure className={styles.figure} data-zone="vs-score">
         <NetBars
           suggested={suggested.net_points}
           actual={actual.net_points}
@@ -163,7 +163,7 @@ function WeekAnalysis({
         </figcaption>
       </figure>
 
-      <div className={styles.sides}>
+      <div className={styles.sides} data-zone="vs-sides">
         <Card title={copy.said}>
           <dl className={styles.facts}>
             <dt>{copy.transfers}</dt>
@@ -245,7 +245,7 @@ function WeekAnalysis({
       </div>
 
       {parts !== null ? (
-        <Card title={copy.why}>
+        <Card title={copy.why} zone="vs-why">
           <DifferenceBars
             parts={parts}
             labels={{
@@ -287,7 +287,7 @@ function WeekAnalysis({
       ) : null}
 
       {week.players.length > 0 ? (
-        <Card title={copy.squad}>
+        <Card title={copy.squad} zone="vs-squad">
           <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={copy.squad}>
             <table className={styles.squad}>
               <thead>

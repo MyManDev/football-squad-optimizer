@@ -55,6 +55,7 @@ export function MemberLiveScoreCard({
   onRefresh,
   refreshing = false,
   activity = null,
+  matchesOver,
 }: {
   /** Whose score it is: each member's figure counts from its own last value. */
   entryId?: number;
@@ -69,6 +70,12 @@ export function MemberLiveScoreCard({
   onRefresh?: () => void;
   refreshing?: boolean;
   activity?: PlayerActivity[] | null;
+  /**
+   * The week's matches that are over at the read's time, by the LIVE page's rule. FPL's
+   * `finished` (the score's `fixtures_finished`) waits for the bonus check, so without this
+   * the count would stay at zero through a whole match day.
+   */
+  matchesOver?: number;
 }) {
   const { language, locale } = useLanguage();
   const copy = COPY[language];
@@ -131,7 +138,7 @@ export function MemberLiveScoreCard({
           <Stat label={copy.hit} value={integer(score.transfer_cost)} />
           <Stat
             label={copy.matches}
-            value={`${integer(score.fixtures_finished)} / ${integer(score.fixtures_total)}`}
+            value={`${integer(matchesOver ?? score.fixtures_finished)} / ${integer(score.fixtures_total)}`}
           />
         </StatRow>
         <p className={styles.bonus}>{score.bonus_confirmed ? copy.bonusDone : copy.bonusPending}</p>

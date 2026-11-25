@@ -11,7 +11,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { StrictMode, type ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   mockDefaultRival,
@@ -61,6 +61,12 @@ import { WIDE_QUERY } from "./useWide";
 const ON: LivePhase = { on: true, nextGameweek: null, nextKickoff: null, changesIn: null };
 const phase = vi.hoisted(() => ({ current: null as LivePhase | null }));
 vi.mock("./useLivePhase", () => ({ useLivePhase: () => phase.current ?? ON }));
+
+beforeEach(() => {
+  // Static boards open after the last fixture. Follow and live-light cases set their own match time.
+  vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+  vi.setSystemTime(Date.parse("2026-11-21T21:00:00Z"));
+});
 
 afterEach(() => {
   phase.current = null;
@@ -451,7 +457,6 @@ describe("the LIVE page's reads", () => {
   });
 
   it("reads nothing more by itself between weeks", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-23T10:00:00Z"));
     const forwarder = fakeForwarder([answered(live("2026-11-21T19:30:00Z"))]);
     renderLive({ forwarder });
@@ -463,7 +468,6 @@ describe("the LIVE page's reads", () => {
   });
 
   it("follows the live week once a minute while one of the member's matches is played", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
     const forwarder = fakeForwarder([
       answered(live("2026-11-21T15:29:00Z")),
@@ -489,7 +493,6 @@ describe("the LIVE page's reads", () => {
 
   it("puts the heading's light out at the bound that ends the member's match, though FPL has not finished it", async () => {
     // The 15:00 match, two hours and sixteen minutes on: FPL still has it unfinished.
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T17:16:00Z"));
     const forwarder = fakeForwarder([answered(live("2026-11-21T17:16:00Z"))]);
     renderLive({ forwarder });
@@ -510,7 +513,6 @@ describe("the LIVE page's reads", () => {
   it("reads nothing more by itself while only other clubs play", async () => {
     // The member's three matches are over; clubs 7 and 8, none of the member's, kicked off
     // half an hour ago.
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T20:00:00Z"));
     const fixtures = [
       ...testFixtures().map((fixture) => ({ ...fixture, finished: true })),
@@ -534,7 +536,6 @@ describe("the LIVE page's reads", () => {
   });
 
   it("holds what changed through a quiet followed read, until the visitor looks again", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
     const forwarder = fakeForwarder([
       answered(live("2026-11-21T15:29:00Z")),
@@ -566,7 +567,6 @@ describe("the LIVE page's reads", () => {
 
 describe("the GOL board on LIVE", () => {
   it("rises for the member's goal, and Canlı puan takes its points when they land", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
     const forwarder = fakeForwarder([
       answered(live("2026-11-21T15:29:00Z")),
@@ -601,7 +601,6 @@ describe("the GOL board on LIVE", () => {
   });
 
   it("keeps the rival's points and the duel as the read before left them while the board waits", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
     const forwarder = fakeForwarder([
       answered(live("2026-11-21T15:29:00Z")),
@@ -626,7 +625,6 @@ describe("the GOL board on LIVE", () => {
   });
 
   it("keeps the whole duel on the read before between the landings of a read's two goals", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
     const forwarder = fakeForwarder([
       answered(live("2026-11-21T15:29:00Z")),
@@ -656,7 +654,6 @@ describe("the GOL board on LIVE", () => {
   });
 
   it("keeps a rival picked while the board plays out of sight until the board has played", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
     const forwarder = fakeForwarder([
       answered(live("2026-11-21T15:29:00Z")),
@@ -685,7 +682,6 @@ describe("the GOL board on LIVE", () => {
   });
 
   it("keeps the duel's room while the first rival's bundle answers under the board", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
     const forwarder = fakeForwarder([
       answered(live("2026-11-21T15:29:00Z")),
@@ -722,7 +718,6 @@ describe("the GOL board on LIVE", () => {
   });
 
   it("runs the board's points into Canlı puan, which pops as they land", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
     // jsdom has no Web Animations: each one here finishes at once, and the totals it moves
     // are noted.
@@ -767,7 +762,6 @@ describe("the GOL board on LIVE", () => {
   });
 
   it("follows nothing while ?replay=1 plays, though a match is on", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T15:30:00Z"));
     const forwarder = fakeForwarder([answered(live("2026-11-21T15:29:00Z", 9, 1))]);
     renderLive({
@@ -1620,7 +1614,6 @@ describe("LIVE's motion", () => {
   });
 
   it("keeps what changed until the read made on coming back lands", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T13:05:00Z"));
     const started = recordMotion();
     const forwarder = fakeForwarder([beat("kickoff"), beat("goal"), beat("card")]);
@@ -1777,7 +1770,6 @@ describe("LIVE's motion", () => {
   it("breathes for a return's read whose own matches open the follow window a render later", async () => {
     // 101 kicked off at 12:30, so its 135 minutes end at 14:45; the read, a minute old, still
     // has it played, and its own matches give it the longer bound one render after its board.
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T14:45:30Z"));
     seen("kickoff");
     recordMotion();
@@ -1795,7 +1787,6 @@ describe("LIVE's motion", () => {
   });
 
   it("breathes the heading's light for a newer read while a match is played, never for the first", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.parse("2026-11-21T13:05:00Z"));
     recordMotion();
     const forwarder = fakeForwarder([beat("kickoff"), beat("goal")]);

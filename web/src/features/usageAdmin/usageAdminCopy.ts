@@ -51,6 +51,7 @@ export interface UsageAdminCopy {
   pages: string;
   name: string;
   noTool: string;
+  unknownTool: string;
   sources: string;
   returns: string;
   sourceNames: Record<"direct" | "internal" | "other", string>;
@@ -82,6 +83,7 @@ export interface UsageAdminCopy {
 
   clicks: string;
   zone: string;
+  tool: string;
   clickCount: string;
   rage: string;
   dead: string;
@@ -92,7 +94,9 @@ export interface UsageAdminCopy {
   markNames: Record<"all" | "rage" | "dead", string>;
   heatRange: string;
   heatTotal: (count: string) => string;
-  heatPage: (page: string) => string;
+  heatPage: (page: string, tool: string) => string;
+  heatOutside: (count: string) => string;
+  heatUntooled: string;
   heatLoading: string;
   heatFailed: string;
   heatEmpty: string;
@@ -148,6 +152,7 @@ const en: UsageAdminCopy = {
   pages: "Pages",
   name: "Name",
   noTool: "(no tool)",
+  unknownTool: "(not recorded)",
   sources: "Sources",
   returns: "Returns",
   sourceNames: { direct: "Direct", internal: "From the site", other: "Other" },
@@ -194,6 +199,7 @@ const en: UsageAdminCopy = {
 
   clicks: "Clicks by zone",
   zone: "Zone",
+  tool: "Tool",
   clickCount: "Clicks",
   rage: "Rage",
   dead: "Dead",
@@ -204,7 +210,9 @@ const en: UsageAdminCopy = {
   markNames: { all: "All", rage: "Rage", dead: "Dead" },
   heatRange: "Range",
   heatTotal: (count) => `${count} clicks drawn`,
-  heatPage: (page) => `Page: ${page}`,
+  heatPage: (page, tool) => (tool === "" ? `Page: ${page}` : `Page: ${page}, tool: ${tool}`),
+  heatOutside: (count) => `Outside zones: ${count} clicks`,
+  heatUntooled: "This report does not name the tool, so every tool of this page is drawn.",
   heatLoading: "Reading the record",
   heatFailed: "The record could not be read.",
   heatEmpty: "No clicks for this choice.",
@@ -261,6 +269,7 @@ const tr: UsageAdminCopy = {
   pages: "Sayfalar",
   name: "Ad",
   noTool: "(araç yok)",
+  unknownTool: "(kayıtlı değil)",
   sources: "Kaynaklar",
   returns: "Geri dönüşler",
   sourceNames: { direct: "Doğrudan", internal: "Site içinden", other: "Diğer" },
@@ -307,6 +316,7 @@ const tr: UsageAdminCopy = {
 
   clicks: "Bölgelere göre tıklamalar",
   zone: "Bölge",
+  tool: "Araç",
   clickCount: "Tıklama",
   rage: "Öfkeli",
   dead: "Boş",
@@ -317,7 +327,9 @@ const tr: UsageAdminCopy = {
   markNames: { all: "Tümü", rage: "Öfkeli", dead: "Boş" },
   heatRange: "Aralık",
   heatTotal: (count) => `${count} tıklama çizildi`,
-  heatPage: (page) => `Sayfa: ${page}`,
+  heatPage: (page, tool) => (tool === "" ? `Sayfa: ${page}` : `Sayfa: ${page}, araç: ${tool}`),
+  heatOutside: (count) => `Bölgesiz: ${count} tıklama`,
+  heatUntooled: "Bu rapor aracı belirtmiyor; bu sayfanın bütün araçları çiziliyor.",
   heatLoading: "Kayıt okunuyor",
   heatFailed: "Kayıt okunamadı.",
   heatEmpty: "Bu seçim için tıklama yok.",

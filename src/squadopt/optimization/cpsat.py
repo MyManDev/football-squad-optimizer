@@ -18,6 +18,7 @@ from ortools.sat.python import cp_model
 
 from squadopt.optimization.config import OptimizationConfig
 from squadopt.optimization.models import SolverExecutionError, SolverStatus
+from squadopt.optimization.work_budget import current_work_budget
 
 CP_SAT_SAFE_INTEGER_MAX = (1 << 62) - 1
 MIN_TIEBREAK_TIME_SECONDS = 0.001
@@ -105,7 +106,18 @@ def solve(model: cp_model.CpModel, solver: cp_model.CpSolver) -> int:
     validation_message = model.validate()
     if validation_message:
         raise SolverExecutionError(f"CP-SAT rejected the generated model: {validation_message}")
+    budget = current_work_budget()
+    if budget is not None:
+        solver.parameters.max_deterministic_time = budget.cp_limit(
+            solver.parameters.max_deterministic_time
+        )
     try:
-        return int(solver.solve(model))
+        status = int(solver.solve(model))
+        used = deterministic_time_used(solver, status) if budget is not None else 0.0
     except Exception as error:
+        if budget is not None:
+            budget.abandon_cp()
         raise SolverExecutionError("CP-SAT failed while solving the squad model.") from error
+    if budget is not None:
+        budget.record_cp(used)
+    return status

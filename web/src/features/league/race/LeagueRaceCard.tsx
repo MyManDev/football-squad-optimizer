@@ -205,7 +205,7 @@ export function LeagueRaceCard({
       {/* The first settled week has no week before it for a place to change from. */}
       {week === 0 ? null : (
         <div className={styles.week}>
-          <h3 className={styles.weekTitle}>{copy.raceMoved}</h3>
+          <h3 className={styles.weekTitle}>{copy.raceMoved(race.gameweeks[week]!)}</h3>
           {moves.length === 0 ? (
             <p className={styles.quiet}>{copy.raceNoMoves}</p>
           ) : (

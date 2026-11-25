@@ -50,6 +50,7 @@ export function MemberLiveWeekView({
       onRefresh={refresh}
       refreshing={refreshing}
       activity={shown.activity}
+      matchesOver={shown.matchesOver}
     />
   );
 }

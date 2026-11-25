@@ -1,10 +1,12 @@
 import type { FrozenPlanWeek, PlanWeekNumber } from "../advice/decisionPreferences";
 import type { AdviceChip, AdvicePlayer, EntryAdvice } from "../types";
-import { expectedNet, plannedWeeks } from "./planComparison";
+import { expectedNet, plannedWeeks, weekNet } from "./planComparison";
 
 type TransferPlayer = Pick<AdvicePlayer, "player_id" | "name">;
 
 interface RevisionWeek {
+  net?: number;
+  hits?: number;
   incoming: TransferPlayer[];
   outgoing: TransferPlayer[];
   chip: AdviceChip | null;
@@ -14,6 +16,7 @@ interface RevisionWeek {
 }
 
 export interface PlanRevision {
+  compareOnly?: true;
   gameweek: number;
   window: 1 | 3;
   net: number | null;
@@ -35,6 +38,8 @@ function transferPlayer({ player_id, name }: TransferPlayer): TransferPlayer {
 export function summarizeRevision(plan: EntryAdvice): PlanRevision | undefined {
   if (plan.window !== 1 && plan.window !== 3) return undefined;
   const weeks = plannedWeeks(plan)?.map((week, index): RevisionWeek => ({
+    net: weekNet(week),
+    hits: week.transfer_hit_points,
     incoming: week.transfers_in.map(transferPlayer),
     outgoing: week.transfers_out.map(transferPlayer),
     chip: week.chip,
@@ -49,6 +54,8 @@ export function summarizeRevision(plan: EntryAdvice): PlanRevision | undefined {
         : undefined,
   })) ?? [
     {
+      net: expectedNet(plan) ?? undefined,
+      hits: plan.transfer_hit_points,
       incoming: plan.moves.flatMap(({ player_in }) =>
         player_in ? [transferPlayer(player_in)] : [],
       ),
@@ -89,8 +96,11 @@ function playerList(value: unknown): value is TransferPlayer[] {
 
 function checkedWeek(value: unknown): RevisionWeek | null {
   if (!value || typeof value !== "object") return null;
-  const { incoming, outgoing, chip, bank, freeTransfers, lineup } = value as Partial<RevisionWeek>;
+  const { incoming, outgoing, chip, bank, freeTransfers, lineup, net, hits } =
+    value as Partial<RevisionWeek>;
   if (
+    (net !== undefined && (typeof net !== "number" || !Number.isFinite(net))) ||
+    (hits !== undefined && (typeof hits !== "number" || !Number.isFinite(hits) || hits < 0)) ||
     !playerList(incoming) ||
     !playerList(outgoing) ||
     incoming.length !== outgoing.length ||
@@ -118,6 +128,8 @@ function checkedWeek(value: unknown): RevisionWeek | null {
   )
     return null;
   return {
+    net,
+    hits,
     incoming: incoming.map(transferPlayer),
     outgoing: outgoing.map(transferPlayer),
     chip,
@@ -132,8 +144,9 @@ export function checkedPlanRevision(
   expectedGameweek: number,
 ): PlanRevision | undefined {
   if (!value || typeof value !== "object") return undefined;
-  const { gameweek, window, weeks, net } = value as Partial<PlanRevision>;
+  const { gameweek, window, weeks, net, compareOnly } = value as Partial<PlanRevision>;
   if (
+    (compareOnly !== undefined && compareOnly !== true) ||
     gameweek !== expectedGameweek ||
     (window !== 1 && window !== 3) ||
     (net !== null && (typeof net !== "number" || !Number.isFinite(net))) ||
@@ -143,7 +156,7 @@ export function checkedPlanRevision(
     return undefined;
   const checked = weeks.map(checkedWeek);
   if (!checked.every((week) => week !== null)) return undefined;
-  return { gameweek, window, net, weeks: checked };
+  return { gameweek, window, net, weeks: checked, ...(compareOnly ? { compareOnly } : {}) };
 }
 
 export function referenceWeeks(reference?: PlanRevision): PlanWeekNumber[] | undefined {

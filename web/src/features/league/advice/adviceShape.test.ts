@@ -102,3 +102,61 @@ it("refuses malformed preference metadata instead of accepting an unverified pla
   expect(isAdvicePayload({ ...payload, preferences_scope: "first_week" })).toBe(false);
   expect(isAdvicePayload({ ...payload, selection_top100_weight: 99 })).toBe(false);
 });
+
+it("validates priority receipts and ordinary advice inside a preference result", () => {
+  const payload = mockEntryAdviceEnvelope(101, "saf-puan", 3).payload;
+  const priority = {
+    contract_version: "llmopt_priority_result_v1",
+    satisfied: [],
+    left_out: [],
+    total_cost: -0.5,
+    completed_priorities: [1, 2, 3],
+    reference_proved: false,
+    budget_exhausted: false,
+  };
+  expect(isAdvicePayload({ ...payload, priority_preferences: priority })).toBe(true);
+  for (const invalid of [
+    { ...priority, total_cost: NaN },
+    { ...priority, completed_priorities: [1, 1] },
+    { ...priority, satisfied: [9] },
+    { ...priority, secret: true },
+  ]) {
+    expect(isAdvicePayload({ ...payload, priority_preferences: invalid })).toBe(false);
+  }
+  const selection = { preferences: { no_hits: true }, chip: null };
+  const request = {
+    contract_version: "llmopt_preference_bundle_v1",
+    slots: [selection],
+    prices: [{ outcome: 0, ceiling: 15 }],
+    choices: [
+      { accepted: 0, applied: [], selection: null },
+      { accepted: 1, applied: [0], selection },
+    ],
+    program: null,
+  };
+  const component = { status: "done", payload, error_code: null };
+  const result = {
+    contract_version: "llmopt_preference_result_v1",
+    request,
+    components: [component],
+    selected: component,
+    applied: [0],
+    accepted: 1,
+    budget_exhausted: false,
+  };
+  expect(isAdvicePayload({ ...payload, preference_bundle_result: result })).toBe(true);
+  for (const invalid of [
+    { ...result, components: [{ ...component, payload: { ...payload, window: 99 } }] },
+    {
+      ...result,
+      components: [{ ...component, payload: { ...payload, preference_bundle_result: result } }],
+    },
+    {
+      ...result,
+      request: { ...request, slots: [{ ...selection, preferences: { unknown: null } }] },
+    },
+    { ...result, applied: [] },
+    { ...result, accepted: 2 },
+  ])
+    expect(isAdvicePayload({ ...payload, preference_bundle_result: invalid })).toBe(false);
+});

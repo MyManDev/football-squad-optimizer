@@ -124,6 +124,32 @@ def test_native_failure_preserves_cp_sat_fallback():
     assert details["fallback_reason"] == "native unavailable"
 
 
+def test_optional_swap_debits_rejected_certificate_before_fallback(monkeypatch):
+    from tests.unit.test_expected_swap import call, world
+
+    import squadopt.planning.optimizer as optimizer
+
+    # A native proposal is really produced and checked. Report that fixed CP
+    # certificate as unfinished to exercise the fallback with measured work.
+    original = optimizer._solve
+    grants = []
+    used = []
+
+    def reject_certificate(model, solver):
+        grants.append(solver.parameters.max_deterministic_time)
+        status = original(model, solver)
+        used.append(solver.response_proto.deterministic_time)
+        return cp_model.FEASIBLE if len(grants) == 1 else status
+
+    monkeypatch.setattr(optimizer, "_solve", reject_certificate)
+    with native_window_executor(execute_native_window):
+        _, receipt = call(world())
+    assert receipt["solver_calls"] == 1 and 0 < used[0] <= grants[0]
+    assert grants[1] == receipt["cap"] - used[0]
+    assert grants[2] == pytest.approx(receipt["cap"] - sum(used[:2]), abs=1e-14)
+    assert receipt["actual"] == pytest.approx(sum(used), abs=1e-14)
+
+
 def test_original_cp_model_catches_a_bad_exporter(monkeypatch):
     original = native_highs.export_milp
 

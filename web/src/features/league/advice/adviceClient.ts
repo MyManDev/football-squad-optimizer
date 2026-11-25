@@ -25,12 +25,40 @@ import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
 import type { ChipSelection } from "./chipChoice";
 
 import { preferencesKey, type DecisionPreferences } from "./decisionPreferences";
+import { bundleKey, type PreferenceBundle } from "./preferenceBundle";
 import { checkedPlanInfeasibility, type PlanInfeasibility } from "./planInfeasibility";
 
+/** Original rules may conflict. Each fragment contains only its active fields. */
+export type RepairRuleFragment = Partial<Omit<DecisionPreferences, "week_rules">> & {
+  week_rules?: {
+    week: 1 | 2 | 3;
+    rules: Partial<NonNullable<DecisionPreferences["week_rules"]>[number]["rules"]>;
+  }[];
+};
+
 export interface AdviceRequest {
+  /** Local plan menu; never serialized to the advice service. */
+  deviceAlternatives?: boolean;
+  /** A run with an unsupported rule remains entirely on the service. */
+  deviceRun?: boolean;
+  /** Browser-only repair witness or selection, pinned to the verified device inputs. */
+  deviceRepair?: { dataId: string; verify?: boolean };
+  /** Private device main for a confirmed total-allowance run. */
+  priorityMain?: true;
+  shownDeviceMain?: {
+    fingerprint: string;
+    decisions: import("../device/priorityWitness").DevicePriorityReference;
+  } | null;
+  run?: {
+    contract_version: "llmopt_run_v1";
+    run_id: string;
+    stage: "base" | "followup" | "repair";
+    repair_origin?: { preferences: RepairRuleFragment[]; wildcard_weeks: number[] };
+  };
   /** Fetch and pin this public team's inputs only when computation is requested. */
   publicEntry?: boolean;
   preferences?: DecisionPreferences;
+  preferenceBundle?: PreferenceBundle;
   leagueId: number;
   entryId: number;
   strategy: AdviceStrategy;
@@ -62,11 +90,13 @@ export type AdviceRequestResult =
   /** `status` is the job's word when the answer says it: a press can join a running job. */
   | { kind: "job"; jobId: string; status?: "queued" | "running" }
   /** `reason` is a service code when a configured service refused or could not be reached. */
-  | { kind: "unavailable"; reason?: string | null };
+  | { kind: "unavailable"; reason?: string | null; infeasibility?: PlanInfeasibility };
 
 /** One click's identity: sent as `Idempotency-Key`, the same for every retry of that click. */
 export interface AdviceRequestOptions extends RequestOptions {
   idempotencyKey?: string;
+  /** A completed device plan available while optional alternatives continue. */
+  onPlan?: (result: Extract<AdviceReadResult, { kind: "advice" }>) => void;
 }
 
 export interface AdviceReadOptions extends RequestOptions {
@@ -75,6 +105,12 @@ export interface AdviceReadOptions extends RequestOptions {
 }
 
 export interface AdviceClient {
+  readDeviceDataId?(): Promise<string>;
+  /** Bind a new local run without spending work before its location is confirmed. */
+  prepareDeviceRun?(request: AdviceRequest): Promise<boolean>;
+  /** Local computation waits for its worker ceiling; network transports keep their own deadline. */
+  localRequestAllowanceMs?(request: AdviceRequest): number | undefined;
+  cancelRun?(runId: string): Promise<void>;
   /** Read an already-computed answer; never triggers computation. */
   readAdvice(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult>;
   /** Read the published document alone, whatever the service would say. */
@@ -104,7 +140,7 @@ export interface AdviceClient {
 
 export interface AdviceJobStatus {
   jobId: string;
-  status: "queued" | "running" | "completed" | "failed";
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
   /** The service's coded reason for a failed job; never its text. */
   errorCode?: string | null;
   infeasibility?: PlanInfeasibility;
@@ -299,6 +335,21 @@ async function adviceJson(response: Response): Promise<unknown> {
   }
 }
 
+export function adviceRequestBody(request: AdviceRequest): string {
+  return JSON.stringify({
+    ...(request.run ? { run: request.run } : {}),
+    ...(request.preferenceBundle ? { preference_bundle: request.preferenceBundle } : {}),
+    ...(preferencesKey(request.preferences) ? { preferences: request.preferences } : {}),
+    strategy: request.strategy,
+    window: request.window,
+    rival_entry_id: request.rivalEntryId ?? null,
+    ...(request.model === "football" ? { model: "football" } : {}),
+    ...(request.top100Weight ? { top100_weight: request.top100Weight } : {}),
+    ...(request.managersWord === true ? { managers_word: true } : {}),
+    ...(request.chip == null ? {} : { chip: request.chip }),
+  });
+}
+
 /** Talks to the advice backend; understands 200 (hit), 202 (job), and 404 (not computed). */
 export class HttpAdviceClient implements AdviceClient {
   private readonly origin: string;
@@ -312,6 +363,19 @@ export class HttpAdviceClient implements AdviceClient {
   constructor(origin: string, fetcher: FetchLike = (input, init) => fetch(input, init)) {
     this.origin = origin.replace(/\/$/, "");
     this.fetcher = fetcher;
+  }
+
+  async cancelRun(runId: string): Promise<void> {
+    const response = await this.fetcher(
+      `${this.origin}/api/v1/llmopt/runs/${encodeURIComponent(runId)}/cancel`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+        keepalive: true,
+      },
+    );
+    if (!response.ok) throw await apiError(response);
   }
 
   private adviceUrl(request: AdviceRequest): string {
@@ -329,6 +393,9 @@ export class HttpAdviceClient implements AdviceClient {
       chip +
       (preferencesKey(request.preferences)
         ? `&preferences=${encodeURIComponent(preferencesKey(request.preferences))}`
+        : "") +
+      (request.preferenceBundle
+        ? `&preference_bundle=${encodeURIComponent(bundleKey(request.preferenceBundle))}`
         : "") +
       (request.model === "football" ? "&model=football" : "")
     );
@@ -389,16 +456,7 @@ export class HttpAdviceClient implements AdviceClient {
         signal,
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
-        body: JSON.stringify({
-          ...(preferencesKey(request.preferences) ? { preferences: request.preferences } : {}),
-          strategy: request.strategy,
-          window: request.window,
-          rival_entry_id: request.rivalEntryId ?? null,
-          ...(request.model === "football" ? { model: "football" } : {}),
-          ...(request.top100Weight ? { top100_weight: request.top100Weight } : {}),
-          ...(request.managersWord === true ? { managers_word: true } : {}),
-          ...(request.chip == null ? {} : { chip: request.chip }),
-        }),
+        body: adviceRequestBody(request),
       });
       if (response.status === 202) {
         const body = (await adviceJson(response)) as { job_id: string; status?: unknown };
@@ -436,7 +494,7 @@ export class HttpAdviceClient implements AdviceClient {
       };
       if (
         body?.job_id !== jobId ||
-        !["queued", "running", "completed", "failed"].includes(body?.status)
+        !["queued", "running", "completed", "failed", "cancelled"].includes(body?.status)
       ) {
         throw new AdviceResponseError("Advice job response has an invalid identity or status.");
       }
@@ -503,6 +561,9 @@ export class HttpAdviceClient implements AdviceClient {
  * to answer, because the published baseline may exist where the cache is empty.
  */
 export class FallbackAdviceClient implements AdviceClient {
+  async cancelRun(runId: string): Promise<void> {
+    await this.primary.cancelRun?.(runId);
+  }
   private readonly primary: AdviceClient;
   private readonly fallback: StaticOnlyAdviceClient;
 

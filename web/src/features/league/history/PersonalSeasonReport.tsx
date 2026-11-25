@@ -38,7 +38,7 @@ export function PersonalSeasonReport({ history }: { history: SuggestionHistory }
   if (!weeks.length) return null;
   const copy = COPY[language];
   return (
-    <details className={styles.report}>
+    <details className={styles.report} data-zone="history-report">
       <summary>{copy.title}</summary>
       <div className={styles.weeks}>
         {weeks.map((week) => {

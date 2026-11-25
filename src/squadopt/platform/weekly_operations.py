@@ -938,22 +938,40 @@ class WeeklyOperations:
         gameweek: int | None = None
         baselines = None
         baseline_seconds = 0.0
-        # Device menus are a promise not to compute a member's plan until requested.
-        # Recording cannot turn them back into a weekly solve batch. A full menu can
-        # still share its existing control with a device league containing that entry.
-        full_leagues = tuple(
-            league
-            for league in self.request.league_ids
-            if league not in self.request.device_league_ids
+        # A device menu promises that no menu of plans is computed until a member asks, and
+        # that stands. What a recording run adds is one plain one-week control per member,
+        # solved once before any league renders, so the weekly history holds what the
+        # member's page showed. Without it a league published as a device menu wrote no
+        # record at all: from the final run of gameweek 10 of 2026-27 the history and the
+        # comparison against the system had no system side (the owner's decision of
+        # 2026-11-23).
+        device_only = all(
+            league in self.request.device_league_ids for league in self.request.league_ids
         )
-        if record and full_leagues:
+        if record and self.request.league_ids:
             baseline_started = time.perf_counter()
-            baselines = prepare_tracked_baselines(
-                tuple(self._league_request(league, False) for league in full_leagues),
-                read_capture=self._capture_for_publication,
-            )
+            try:
+                baselines = prepare_tracked_baselines(
+                    tuple(
+                        self._league_request(league, False) for league in self.request.league_ids
+                    ),
+                    read_capture=self._capture_for_publication,
+                )
+            except Exception as error:
+                # A full menu needs these controls to render, so its run stops here as it
+                # always has. A run of device menus alone publishes without them: the
+                # record is worth less than the week's pages, and the skip is said below.
+                if not device_only:
+                    raise
+                baselines = None
+                if getattr(self, "log", None) is not None:
+                    self.log.event(
+                        "tick.week.baselines.failed",
+                        error=type(error).__name__,
+                        detail=str(error)[:400],
+                    )
             baseline_seconds = round(time.perf_counter() - baseline_started, 6)
-            if getattr(self, "log", None) is not None:
+            if baselines is not None and getattr(self, "log", None) is not None:
                 self.log.event(
                     "tick.week.baselines.prepared",
                     entries=len(baselines.records),

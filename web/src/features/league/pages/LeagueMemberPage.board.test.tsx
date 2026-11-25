@@ -259,6 +259,12 @@ describe("the top bar", () => {
     show("tr", { fixtures: CALENDAR, deadlinePassed: "2026-10-10T10:00:00Z" });
     expect(screen.getByText(MESSAGES.tr.leagueMembers.deadlinePassedLabel)).toBeInTheDocument();
     expect(screen.getByTestId("deadline-passed")).toBeVisible();
+    // The bank and the free transfers were this deadline's; the bug leaves them out with it.
+    const copy = MESSAGES.tr.leagueMembers;
+    const bug = screen.getByText(copy.rankLabel).closest("dl")!;
+    expect(within(bug).getByText(copy.pointsLabel)).toBeInTheDocument();
+    expect(within(bug).queryByText(copy.bankLabel)).toBeNull();
+    expect(within(bug).queryByText(copy.freeTransfersLabel)).toBeNull();
   });
 });
 

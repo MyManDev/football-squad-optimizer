@@ -2,6 +2,7 @@ import { join } from "node:path";
 
 import AxeBuilder from "@axe-core/playwright";
 import { atRest } from "./atRest";
+import { axeViolations } from "./axeViolations";
 import { expect, test as base, type Locator, type Page } from "@playwright/test";
 
 import { shippedClaim } from "./identity";
@@ -49,8 +50,7 @@ async function waitForPage(page: import("@playwright/test").Page) {
 /** The ids of axe's critical and serious findings on the page as it stands. */
 async function blockingViolations(page: import("@playwright/test").Page) {
   await atRest(page);
-  const results = await new AxeBuilder({ page }).analyze();
-  return results.violations
+  return (await axeViolations(page))
     .filter((violation) => BLOCKING_IMPACTS.has(violation.impact ?? ""))
     .map((violation) => violation.id);
 }
@@ -58,8 +58,7 @@ async function blockingViolations(page: import("@playwright/test").Page) {
 /** axe's critical and serious findings with the first nodes of each, so a failure says where. */
 async function blockingSummary(page: import("@playwright/test").Page) {
   await atRest(page);
-  const results = await new AxeBuilder({ page }).analyze();
-  return results.violations
+  return (await axeViolations(page))
     .filter((violation) => BLOCKING_IMPACTS.has(violation.impact ?? ""))
     .map((violation) => ({
       id: violation.id,
@@ -404,10 +403,31 @@ for (const { path, unpublished } of STATE_PAGES) {
     await page.goto(path);
     const state = page.getByRole("main").getByRole("status");
     await expect(state.getByRole("heading", { level: 1 })).toBeVisible();
-    const results = await new AxeBuilder({ page }).withRules(["page-has-heading-one"]).analyze();
-    expect(results.violations.map((violation) => violation.id)).toEqual([]);
+    const violations = await axeViolations(page, ["page-has-heading-one"]);
+    expect(violations.map((violation) => violation.id)).toEqual([]);
   });
 }
+
+base("reports every unnamed button on the page and in a child frame", async ({ page }) => {
+  const rules = ["button-name"];
+  const markup = '<main><button id="first"></button><button id="second"></button></main>';
+  await page.setContent(markup);
+  async function check(nodeCount: number) {
+    const expected = (await new AxeBuilder({ page }).withRules(rules).analyze()).violations;
+    const found = await axeViolations(page, rules);
+    expect(found).toEqual(expected);
+    expect(found.map((violation) => violation.id)).toEqual(rules);
+    expect(found[0]!.nodes).toHaveLength(nodeCount);
+  }
+  await check(2);
+
+  await page.route("http://frame.test/issue", (route) =>
+    route.fulfill({ contentType: "text/html", body: '<button id="framed"></button>' }),
+  );
+  await page.setContent(markup + '<iframe title="Example" src="http://frame.test/issue"></iframe>');
+  await expect(page.frameLocator("iframe").locator("#framed")).toBeVisible();
+  await check(3);
+});
 
 base("language controls satisfy label-in-name and remain keyboard operable", async ({ page }) => {
   await page.goto("/");

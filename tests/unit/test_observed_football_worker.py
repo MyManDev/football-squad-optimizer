@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
-from tests.fixtures.backend_app import app_for_capture
+from tests.fixtures.backend_app import app_for_capture, confirmed_request
 from tests.unit.test_advice_worker import ENTRY_ID, LEAGUE_ID, _deployment, world_module
 from tests.unit.test_api_advice_switches import COUNTS
 from tests.unit.test_live_football_model import _forecast
@@ -20,7 +20,14 @@ from squadopt.platform.advice_worker import build_advice_compute
 @pytest.mark.parametrize("window,weight", [(3, 0), (5, 20)])
 def test_observed_worker_preserves_member_choices(tmp_path, monkeypatch, window, weight):
     artifacts = tmp_path / "artifacts"
-    world = _deployment(tmp_path, monkeypatch, last_gameweek=6, artifact_root=artifacts)
+    world = _deployment(
+        tmp_path,
+        monkeypatch,
+        llmopt_vnext=True,
+        llmopt_vnext_three_week=True,
+        last_gameweek=6,
+        artifact_root=artifacts,
+    )
     backend = world["backend"]
     identity = backend.contexts.identity()
     availability = identity.inputs.availability.copy()
@@ -56,12 +63,14 @@ def test_observed_worker_preserves_member_choices(tmp_path, monkeypatch, window,
         "top100_weight": weight,
         "preferences": preferences,
     }
-    accepted = client.post(route, json=body)
+    accepted = client.post(route, json=confirmed_request(body))
     assert accepted.status_code == 202, accepted.text
     job = run_advice_worker_once(
         backend.queue,
         backend.cache,
-        build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache),
+        build_advice_compute(
+            backend.contexts, backend.job_specs, runs=backend.runs, cache=backend.cache
+        ),
         at_utc="2026-09-01T10:01:00Z",
     )
     assert job.status == "completed", job.error

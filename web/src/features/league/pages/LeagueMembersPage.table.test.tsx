@@ -126,6 +126,52 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
     expect(bug).not.toHaveTextContent(copy.freeTransfersLabel);
   });
 
+  it("states a chip played at the passed deadline as used, from the viewer's played week", () => {
+    claimIn(leader.entry_id);
+    const squad = mockEntrySquadEnvelopes[leader.entry_id!]!;
+    const week = squad.payload.gameweek;
+    const resources = MESSAGES[language].memberResources;
+    const card = () =>
+      screen.getByRole("heading", { name: resources.chipsTitle }).closest("section")!;
+    // As published, before the deadline: the wildcard is there to play.
+    show({ viewerSquad: squad }, language);
+    expect(card()).toHaveTextContent(copy.chipLine.available);
+    const before = card().textContent;
+    cleanup();
+    show(
+      {
+        viewerSquad: squad,
+        deadlinePassed: true,
+        viewerPlayedWeek: { active_chip: "wildcard", gameweek: week },
+      },
+      language,
+    );
+    expect(card().textContent).not.toBe(before);
+    expect(card()).toHaveTextContent(copy.chipLine.used(week));
+    // A week with no chip leaves the card as published.
+    cleanup();
+    show(
+      {
+        viewerSquad: squad,
+        deadlinePassed: true,
+        viewerPlayedWeek: { active_chip: null, gameweek: week },
+      },
+      language,
+    );
+    expect(card().textContent).toBe(before);
+  });
+
+  it("leaves the bank out of the bug once the week's deadline has passed", () => {
+    claimIn(leader.entry_id);
+    show(
+      { viewerSquad: mockEntrySquadEnvelopes[leader.entry_id!]!, deadlinePassed: true },
+      language,
+    );
+    expect(scoreBug()).toHaveTextContent(copy.rankLabel);
+    expect(scoreBug()).not.toHaveTextContent(copy.bankLabel);
+    expect(scoreBug()).not.toHaveTextContent(copy.freeTransfersLabel);
+  });
+
   it("adds the viewer's chips, bank and chaser once their squad document is read", () => {
     claimIn(leader.entry_id);
     const squad = mockEntrySquadEnvelopes[leader.entry_id!]!;

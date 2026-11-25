@@ -3,6 +3,7 @@ import { LeagueDataError } from "../dataErrors";
 import type { AdvicePlayer, EntryAdvice, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "./adviceClient";
 import { isAdvicePayload } from "./adviceShape";
+import { checkedBundleResult, expandSelection } from "./preferenceBundle";
 
 export class AdviceResponseError extends LeagueDataError {}
 
@@ -161,6 +162,47 @@ export function checkedAdvice(
       (chosenChip !== requestedChip || (payload.chip ?? null) !== selectedChip))
   ) {
     throw new AdviceContextError("Advice does not match the selected switches.");
+  }
+  if (payload.device_alternatives !== undefined) {
+    const alternatives = payload.device_alternatives;
+    if (!Array.isArray(alternatives) || alternatives.length > 2)
+      throw new AdviceResponseError("Invalid device plan menu.");
+    for (const alternative of alternatives) {
+      if (!record(alternative) || alternative.device_alternatives !== undefined)
+        throw new AdviceResponseError("Nested device menus are not accepted.");
+      checkedAdvice({ ...value, payload: alternative }, request);
+    }
+    const identities = [payload, ...alternatives].map((plan) => {
+      const p = plan as unknown as EntryAdvice;
+      const ids = [...(p.starting_xi ?? []), ...(p.bench ?? [])].map((player) => player.player_id);
+      if (ids.length !== 15 || new Set(ids).size !== 15)
+        throw new AdviceResponseError("A device plan must name one complete squad.");
+      return JSON.stringify([p.chip ?? null, ids.sort((a, b) => a - b)]);
+    });
+    if (new Set(identities).size !== identities.length)
+      throw new AdviceResponseError("A transfer decision appears more than once.");
+  }
+  if (request.preferenceBundle) {
+    try {
+      const child = { ...request };
+      delete child.preferenceBundle;
+      payload.preference_bundle_result = checkedBundleResult(
+        payload.preference_bundle_result,
+        request.preferenceBundle,
+        request.chip === "auto" ? null : (request.chip ?? null),
+        (computed, selection) =>
+          checkedAdvice(
+            { ...value, payload: computed },
+            {
+              ...child,
+              preferences: expandSelection(request.preferences, selection),
+              chip: selection.chip,
+            },
+          ).payload,
+      );
+    } catch {
+      throw new AdviceContextError("Advice does not match its preference execution.");
+    }
   }
   return value as unknown as LeagueViewEnvelope<EntryAdvice>;
 }

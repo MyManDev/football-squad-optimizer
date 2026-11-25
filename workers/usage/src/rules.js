@@ -95,9 +95,20 @@ export const KINDS = new Set(["click", "scroll", "vital", "error", "arrival"]);
 /**
  * The part of a page a click landed in, from the nearest `data-zone` around it; `page` when
  * there is none, so a component without a zone still counts.
+ *
+ * A word is never taken out: `nav` (the whole sidebar, as tall as the window) and `llmopt` (the
+ * whole LLMOPT page) are no longer placed on any element since 2026-11-23, when smaller zones
+ * replaced them, but an older tab still sends them and the record keeps their rows. The same
+ * holds since 2026-11-23 for the whole-page words `history`, `vs`, `live`, `reminder`, `fixtures`
+ * and `contribute`, each split into the parts of its page.
  */
 export const ZONES = new Set([
   "nav",
+  "nav-brand",
+  "nav-member",
+  "nav-links",
+  "nav-settings",
+  "phone-bar",
   "topbar",
   "entry-form",
   "league-list",
@@ -122,12 +133,51 @@ export const ZONES = new Set([
   "coach-news",
   "new-information",
   "history",
+  "history-header",
+  "history-report",
+  "history-picker",
+  "history-table",
+  "history-week",
   "vs",
+  "vs-header",
+  "vs-weeks",
+  "vs-score",
+  "vs-sides",
+  "vs-why",
+  "vs-squad",
   "live",
+  "live-header",
+  "live-score",
+  "live-refresh",
+  "live-rival",
+  "live-differentials",
+  "live-recap",
+  "live-players",
   "llmopt",
+  "llmopt-model",
+  "llmopt-instructions",
+  "llmopt-rule-list",
+  "llmopt-rules",
+  "llmopt-plan",
+  "llmopt-compute",
+  "llmopt-results",
   "reminder",
+  "reminder-header",
+  "reminder-switch",
+  "reminder-steps",
   "fixtures",
+  "fixtures-header",
+  "fixtures-view",
+  "fixtures-clubs",
+  "fixtures-team",
+  "fixtures-matrix",
   "contribute",
+  "contribute-header",
+  "contribute-team",
+  "contribute-position",
+  "contribute-player",
+  "contribute-form",
+  "contribute-comments",
   "page",
 ]);
 

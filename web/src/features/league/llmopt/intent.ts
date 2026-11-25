@@ -1,3 +1,4 @@
+import { planIdForLabel, type PlanContext, type PlanCommand } from "./planHistory";
 import { discardBody, withRequestDeadline } from "../../../data/request";
 import type { Language } from "../../../i18n/messages";
 import {
@@ -40,12 +41,13 @@ export type Constraint = (
     ))
   | { kind: "buy_player"; player_id: number; week: PlanWeekNumber }
   | { kind: "hit_budget"; points: number; week?: never }
-) & { max_cost_tenths?: number };
+) & { max_cost_tenths?: number; priority?: 1 | 2 | 3 };
 type Comparison = Constraint & { both?: boolean };
 
 export interface PlanDraft {
   hard: Constraint[];
   soft: Constraint[];
+  max_total_cost_tenths?: number;
   comparison?: Comparison;
   window?: PlanWindow;
   keep_weeks?: PlanWeekNumber[];
@@ -113,7 +115,7 @@ function parseConstraint(
       (key) =>
         !["kind", "player_id", "club", "count", "scope", "week", "points"].includes(key) &&
         !(strength === "comparison" && key === "both") &&
-        !(strength === "soft" && key === "max_cost_tenths"),
+        !(strength === "soft" && (key === "max_cost_tenths" || key === "priority")),
     )
   )
     throw new Error("Invalid constraint");
@@ -122,7 +124,13 @@ function parseConstraint(
   const { club, count, scope, week, points, max_cost_tenths: maxCost } = value;
   if (maxCost !== undefined && !isPreferenceCost(maxCost))
     throw new Error("Invalid preference cost limit");
-  const price = maxCost === undefined ? {} : { max_cost_tenths: maxCost };
+  const priority = value.priority;
+  if (priority !== undefined && priority !== 1 && priority !== 2 && priority !== 3)
+    throw new Error("Invalid priority");
+  const price: Pick<Constraint, "max_cost_tenths" | "priority"> = {
+    ...(maxCost === undefined ? {} : { max_cost_tenths: maxCost }),
+    ...(priority === undefined ? {} : { priority }),
+  };
   if (week !== undefined && !isPlanWeek(week)) throw new Error("Invalid rule week");
   const timing = week === undefined ? {} : { week };
   if (kind === "hit_budget") {
@@ -186,6 +194,10 @@ export function checkedDraft(value: unknown, players: readonly CatalogPlayer[]):
     soft: value.soft.map((item) => parseConstraint(item, playerIds, clubs, "soft")),
     ...(value.window !== undefined ? { window: value.window } : {}),
   };
+  if (value.max_total_cost_tenths !== undefined) {
+    if (!isPreferenceCost(value.max_total_cost_tenths)) throw new Error("Invalid total concession");
+    draft.max_total_cost_tenths = value.max_total_cost_tenths;
+  }
   if (value.keep_weeks !== undefined) {
     if (
       !Array.isArray(value.keep_weeks) ||
@@ -227,7 +239,7 @@ function playerIds(rules: readonly Constraint[], kind: PlayerKind) {
   return [...new Set(rules.flatMap((rule) => (rule.kind === kind ? [rule.player_id] : [])))];
 }
 
-function ruleFields(rules: readonly Constraint[]) {
+export function ruleFields(rules: readonly Constraint[]) {
   const buy = playerIds(rules, "buy_player");
   return {
     keep_players: playerIds(rules, "keep_player"),
@@ -513,6 +525,7 @@ export function intentBody(
   clarification?: Clarification,
   referenceWeeks?: readonly PlanWeekNumber[],
   referenceCaptains?: readonly { week: PlanWeekNumber; player_id: number }[],
+  planContext?: PlanContext,
 ) {
   return {
     message,
@@ -525,11 +538,16 @@ export function intentBody(
     ...(clarification ? { clarification } : {}),
     ...(referenceWeeks?.length ? { reference_weeks: referenceWeeks } : {}),
     ...(referenceCaptains?.length ? { reference_captains: referenceCaptains } : {}),
+    ...(planContext ? { plan_context: planContext } : {}),
   };
 }
 
 /** A checked answer from the site's intent routes: a draft, or one question back. */
-export function intentAnswer(value: unknown, players: readonly CatalogPlayer[]) {
+export function intentAnswer(
+  value: unknown,
+  players: readonly CatalogPlayer[],
+  context?: PlanContext,
+) {
   if (!record(value)) throw new Error("Invalid response");
   // The question is saved with the session and sent back on the next message, so it must
   // fit the limit both the restore check and the service hold it to.
@@ -540,6 +558,35 @@ export function intentAnswer(value: unknown, players: readonly CatalogPlayer[]) 
     value.message.trim().length <= MAX_QUESTION_LENGTH
   )
     return { status: "clarification" as const, message: value.message.trim() };
+  if (value.status === "plan") {
+    const c = value.command;
+    if (
+      !context ||
+      !record(c) ||
+      Object.keys(c).some(
+        (k) => !["plan_id", "action", "week", "player_id", "replacement_id"].includes(k),
+      ) ||
+      typeof c.plan_id !== "string" ||
+      !/^[0-9a-f]{64}$/.test(c.plan_id) ||
+      !["select", "freeze_transfer", "freeze_week", "substitute"].includes(String(c.action))
+    )
+      throw new IntentError(422, "REPLY_REFUSED");
+    // A tab talking to an earlier check route can still receive just the full identity.
+    const id =
+      value.plan_label === undefined
+        ? context.plans.find((p) => p.plan_id === c.plan_id && p.data_id === context.data_id)
+            ?.plan_id
+        : planIdForLabel(context, value.plan_label);
+    if (!id || id !== c.plan_id) throw new IntentError(422, "REPLY_REFUSED");
+    if (c.week !== undefined && !isPlanWeek(c.week)) throw new IntentError(422, "REPLY_REFUSED");
+    for (const key of ["player_id", "replacement_id"])
+      if (
+        c[key] !== undefined &&
+        (!Number.isSafeInteger(c[key]) || !players.some((p) => p.id === c[key]))
+      )
+        throw new IntentError(422, "REPLY_REFUSED");
+    return { status: "plan" as const, command: { ...(c as unknown as PlanCommand), plan_id: id } };
+  }
   if (value.status !== "draft") throw new Error("Invalid response");
   return {
     status: "draft" as const,

@@ -3,6 +3,8 @@
  * and the answer the solve returns. Shapes mirror `squadopt.application.device_plan`.
  */
 
+import type { DecisionPreferences } from "../advice/decisionPreferences";
+
 export const DEVICE_PLAN_CONTRACT_VERSION = "league_device_plan_v1";
 /**
  * The capture's own table (#981 step 1): the same document once per capture, under
@@ -153,8 +155,33 @@ export interface DevicePlanEntry {
   top100_weights?: number[];
 }
 
+export interface DevicePreferenceComponent {
+  status: "done" | "failed" | "exhausted" | "unavailable";
+  answer: DevicePlanAnswer | null;
+  error_code: string | null;
+}
+
+export interface DevicePreferenceResult {
+  contract_version: "llmopt_device_preference_v1";
+  request: import("../advice/preferenceBundle").PreferenceBundle;
+  components: DevicePreferenceComponent[];
+  selected: DevicePreferenceComponent | null;
+  applied: number[];
+  accepted: number;
+  budget_exhausted: boolean;
+}
+
 /** What the device's solve proved, in player ids. */
 export interface DevicePlanAnswer {
+  expected_points_cost?: number;
+  preference_bundle?: DevicePreferenceResult;
+  priority_preferences?: import("../advice/preferenceBundle").PriorityResult;
+  restricted?: boolean;
+  alternatives?: DevicePlanAnswer[];
+  preferences?: DecisionPreferences;
+  free_transfers_before?: number;
+  bank_after_tenths?: number;
+  free_transfers_after?: number;
   /** The objective on the integer scale, and the same divided by the scale. */
   objective_scaled: number;
   objective: number;

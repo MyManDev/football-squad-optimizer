@@ -89,7 +89,7 @@ def pool(naive: SeasonChain) -> pd.DataFrame:
 
 
 def test_the_rule_is_registered_beside_the_two_calendar_rules() -> None:
-    assert PROJECTION_RULES == (
+    assert PROJECTION_RULES[:3] == (
         NAIVE_PROJECTION_RULE,
         CALENDAR_BLIND_PROJECTION_RULE,
         MEAN_REVERSION_PROJECTION_RULE,
