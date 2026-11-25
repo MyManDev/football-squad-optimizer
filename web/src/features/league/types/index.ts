@@ -186,6 +186,8 @@ export interface AdvicePlayer {
   team: string;
   /** Present on lineup players: the projection's expected points for the gameweek. */
   expected_points?: number;
+  /** The player's buying price in tenths, where the plan's inputs state it. */
+  price_tenths?: number;
 }
 
 /** The chips the producer's planner models; the payload names the one it plays, if any. */

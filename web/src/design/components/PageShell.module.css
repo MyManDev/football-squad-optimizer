@@ -84,9 +84,9 @@
 }
 
 .phoneWordmark {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 400;
   line-height: 24px;
   text-transform: uppercase;
   white-space: nowrap;
@@ -283,9 +283,9 @@
 }
 
 .wordmark {
-  font-family: var(--font-display);
+  font-family: var(--font-poster);
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 400;
   line-height: 20px;
   letter-spacing: 0.01em;
   text-transform: uppercase;

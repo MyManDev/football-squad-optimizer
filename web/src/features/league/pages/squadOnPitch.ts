@@ -27,6 +27,15 @@ export function heldBench(bench: readonly EntrySquadPlayer[]): EntrySquadPlayer[
  * the member holds is drawn, with the captain and any vice-captain the game records.
  */
 export function squadOnPitch(plan: EntryAdvice | null, squad: EntrySquad): SquadOnPitch {
+  // Each held player's price as the squad document states it; a plan's player carries
+  // their own where the plan's inputs state it.
+  const held = new Map(
+    [...squad.starting_xi, ...squad.bench]
+      .filter((player) => finite(player.price_tenths))
+      .map((player) => [player.player_id, player.price_tenths]),
+  );
+  const price = (player: { player_id: number; price_tenths?: number }) =>
+    finite(player.price_tenths) ? player.price_tenths : (held.get(player.player_id) ?? null);
   const planned = plan?.starting_xi;
   if (plan && planned && planned.length > 0) {
     const incoming = new Set(
@@ -43,6 +52,7 @@ export function squadOnPitch(plan: EntryAdvice | null, squad: EntrySquad): Squad
         position: player.position,
         team: player.team,
         expectedPoints: finite(player.expected_points) ? player.expected_points : null,
+        priceTenths: price(player),
         captain: player.player_id === plan.captain?.player_id,
         vice: player.player_id === plan.vice_captain?.player_id,
         isNew: incoming.has(player.player_id),
@@ -54,6 +64,7 @@ export function squadOnPitch(plan: EntryAdvice | null, squad: EntrySquad): Squad
         position: player.position,
         team: player.team,
         expectedPoints: finite(player.expected_points) ? player.expected_points : null,
+        priceTenths: price(player),
         order: index + 1,
       })),
     };
@@ -68,6 +79,7 @@ export function squadOnPitch(plan: EntryAdvice | null, squad: EntrySquad): Squad
         position: player.position,
         team: player.team,
         expectedPoints: finite(player.expected_points) ? player.expected_points : null,
+        priceTenths: price(player),
         eventPoints: finite(player.event_points) ? player.event_points : null,
         captain: player.is_captain,
         vice: player.is_vice_captain === true,
@@ -80,6 +92,7 @@ export function squadOnPitch(plan: EntryAdvice | null, squad: EntrySquad): Squad
         position: player.position,
         team: player.team,
         expectedPoints: finite(player.expected_points) ? player.expected_points : null,
+        priceTenths: price(player),
         eventPoints: finite(player.event_points) ? player.event_points : null,
         order: player.bench_order,
       })),
