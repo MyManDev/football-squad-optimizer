@@ -15,12 +15,14 @@
    always with --color-mark-text on it. A fill that is dark in both palettes, such as a
    pressed control or the active nav item, is --color-board with --color-board-text, never
    the text colour, which turns light at night. The one shadow is
-   the drawer and sheet shadow. Radii are 4 px on controls, chips and tags, 6 px on
-   boards and panels; there are no pills.
+   the drawer and sheet shadow. Radii are 8 px on controls, chips and tags, 12 px on
+   boards and panels, soft enough to read as broadcast graphics; there are no pills.
 
-   Type: Barlow Semi Condensed for headings, IBM Plex Sans for text, IBM Plex Mono for
-   codes and figures. Body is 14 px and nothing is set under 12 px (--step--2). Plex Sans
-   is loaded at 400, 500 and 600 and Plex Mono at 500 and 600, so text never asks for 700.
+   Type (Yayın Masası, 25 Nov 2026): Bebas Neue for posters (--font-poster: page titles,
+   the boards and their tags, always upper case), Space Grotesk for text and for section
+   headings at 700 (--font-display), IBM Plex Mono for codes and figures. Body is 16 px and
+   nothing is set under 12 px (--step--2). Weight synthesis is off, so the single-weight
+   poster face is never smeared into a false bold.
 
    Contrast, WCAG formula: ink (--color-text) 16:1 on the page, ink2 (--color-text-muted)
    8.8:1, ink3 (--color-text-faint) 6:1 on the page, 5.8:1 on panels and 5.5:1 on the
@@ -51,17 +53,18 @@
 :root {
   color-scheme: light;
 
-  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
-  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-poster: "Bebas Neue", "Oswald", "Arial Narrow", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-body: "Space Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Consolas, "SFMono-Regular", Menlo, monospace;
 
   --step--2: 0.75rem;
-  --step--1: 0.8125rem;
-  --step-0: 0.875rem;
-  --step-1: 1.125rem;
-  --step-2: 1.375rem;
-  --step-3: 1.75rem;
-  --step-4: 2.25rem;
+  --step--1: 0.875rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.5rem;
+  --step-3: 2rem;
+  --step-4: 2.5rem;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -71,8 +74,8 @@
   --space-6: 32px;
   --space-7: 48px;
 
-  --radius-s: 4px;
-  --radius-m: 6px;
+  --radius-s: 8px;
+  --radius-m: 12px;
 
   --measure: 62ch;
 
@@ -116,6 +119,23 @@
   --color-mark-text: #10261a;
   --color-seg2: #a8db45;
   --color-keeper: #f06ba8;
+
+  /* The league's podium: medal fills, with ink on each in both palettes. */
+  --color-gold: #f2c230;
+  --color-silver: #c9ccd1;
+  --color-bronze: #d89a5b;
+  --color-podium-text: #10261a;
+
+  /* Inside a board (board.css): the panel's own surfaces and inks, dark in both palettes. */
+  --board-surface: #183524;
+  --board-surface-2: #1f402c;
+  --board-line: #335a42;
+  --board-text: #ffffff;
+  --board-muted: #cfe0d4;
+  --board-faint: #adc6b5;
+  --board-good: #7be3a4;
+  --board-bad: #ff9a90;
+  --board-warn: #f2c230;
 
   --color-scrim: rgba(16, 38, 26, 0.45);
   --shadow-drawer: 0 12px 32px rgba(16, 38, 26, 0.28);
@@ -178,6 +198,21 @@
     --color-seg2: #c79a1e;
     --color-keeper: #f06ba8;
 
+    --color-gold: #f2c230;
+    --color-silver: #c9ccd1;
+    --color-bronze: #d89a5b;
+    --color-podium-text: #10261a;
+
+    --board-surface: #121a2a;
+    --board-surface-2: #18223a;
+    --board-line: #2a3550;
+    --board-text: #ffffff;
+    --board-muted: #c3cddc;
+    --board-faint: #a3afc4;
+    --board-good: #4cc38a;
+    --board-bad: #ff7a6e;
+    --board-warn: #e9b04f;
+
     --color-scrim: rgba(0, 0, 0, 0.6);
     --shadow-drawer: 0 12px 32px rgba(0, 0, 0, 0.55);
   }
@@ -224,6 +259,21 @@
   --color-seg2: #c79a1e;
   --color-keeper: #f06ba8;
 
+  --color-gold: #f2c230;
+  --color-silver: #c9ccd1;
+  --color-bronze: #d89a5b;
+  --color-podium-text: #10261a;
+
+  --board-surface: #121a2a;
+  --board-surface-2: #18223a;
+  --board-line: #2a3550;
+  --board-text: #ffffff;
+  --board-muted: #c3cddc;
+  --board-faint: #a3afc4;
+  --board-good: #4cc38a;
+  --board-bad: #ff7a6e;
+  --board-warn: #e9b04f;
+
   --color-scrim: rgba(0, 0, 0, 0.6);
   --shadow-drawer: 0 12px 32px rgba(0, 0, 0, 0.55);
 }
@@ -247,7 +297,8 @@ body {
   color: var(--color-text);
   font-family: var(--font-body);
   font-size: var(--step-0);
-  line-height: 1.43;
+  line-height: 1.5;
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -260,7 +311,15 @@ h4 {
   line-height: 1.2;
 }
 
-/* Emphasis in running text is Plex Sans 600, the heaviest weight the page loads for it. */
+/* A page's own title is a poster. */
+h1 {
+  font-family: var(--font-poster);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+/* Emphasis in running text is Space Grotesk 600. */
 strong,
 th {
   font-weight: 600;

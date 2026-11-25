@@ -616,7 +616,7 @@ function LeagueMemberContent({
           ) : null}
 
           <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
-            <div className={styles.decision} data-mark="decision" data-zone="decision">
+            <div className={`${styles.decision} board`} data-mark="decision" data-zone="decision">
               <div className={styles.headingRow}>
                 <div className={styles.headingText}>
                   {/* Once the deadline has passed the page is the week being played, not a

@@ -61,7 +61,7 @@ export function LastWeekCard({
   ].filter((cell) => cell !== null);
 
   return (
-    <div className={styles.enter} data-last-week={result.gameweek} data-zone="last-week">
+    <div className={`${styles.enter} board`} data-last-week={result.gameweek} data-zone="last-week">
       <Card
         title={result.previous ? copy.lastWeekTitle : copy.latestWeekTitle}
         aside={

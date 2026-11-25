@@ -9,6 +9,7 @@ import { ClubShirt } from "./ClubShirt";
 import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
 import { playerPoints, type PitchPointsKind } from "./playerPoints";
+import { priceText } from "./plateFacts";
 export type { PitchPointsKind } from "./playerPoints";
 
 /**
@@ -29,23 +30,54 @@ export interface PitchPlayer {
   vice: boolean;
   /** Arrives with this plan's transfers. */
   isNew: boolean;
+  /** The buying price in tenths, where a document states it. */
+  priceTenths?: number | null;
+  /** This week's opponent as the plate prints it (plateFacts.ts), or null where unknown. */
+  opponent?: string | null;
 }
 
 const LINES = ["GK", "DEF", "MID", "FWD"] as const;
 
+/** A plate's height across: the name, the club and figure, then the week's facts. */
+const PLATE_ACROSS = 58;
+
 /** Vertical distance between plate centres in a line of `count`, horizontal layout. */
 function lineStep(count: number): number {
-  return count <= 3 ? 68 : count === 4 ? 56 : 50;
+  return count <= 3 ? 84 : count === 4 ? 70 : 64;
 }
 
 /** A line of `count` plates from the first top edge to the last bottom edge. */
 function lineSpan(count: number): number {
-  return count <= 1 ? 40 : (count - 1) * lineStep(count) + 40;
+  return count <= 1 ? PLATE_ACROSS : (count - 1) * lineStep(count) + PLATE_ACROSS;
 }
 
-/** The horizontal pitch's height: 256 px as drawn for up to four in a line, taller for five. */
+/** The horizontal pitch's height: 320 px for up to four in a line, taller for five. */
 function horizontalHeight(counts: readonly number[]): number {
-  return Math.max(256, lineSpan(Math.max(1, ...counts)) + 48);
+  return Math.max(320, lineSpan(Math.max(1, ...counts)) + 48);
+}
+
+/** The plate's third line: this week's opponent and the price, where either is known. */
+function Facts({
+  opponent,
+  priceTenths,
+  className,
+}: {
+  opponent?: string | null;
+  priceTenths?: number | null;
+  className: string;
+}) {
+  const { locale } = useLanguage();
+  const price =
+    typeof priceTenths === "number" && Number.isFinite(priceTenths)
+      ? priceText(priceTenths, locale)
+      : null;
+  if (!opponent && !price) return null;
+  return (
+    <span className={className} data-plate-facts="">
+      {opponent ? <span>{opponent}</span> : null}
+      {price ? <span>{price}</span> : null}
+    </span>
+  );
 }
 
 /** A plate's parts that depend on the plan shown before it (#1131). */
@@ -131,6 +163,7 @@ function Plate({
           {news ? <CoachNewsMark news={news} name={player.name} /> : null}
         </span>
       ) : null}
+      <Facts opponent={player.opponent} priceTenths={player.priceTenths} className={styles.facts} />
       {player.isNew ? <span className={styles.new}>{messages.leagueMembers.boardNew}</span> : null}
       {player.captain ? (
         <span className={styles.mark} role="img" aria-label={messages.squad.captainLabel}>
@@ -283,6 +316,8 @@ export interface BenchPlayer {
   eventPoints?: number | null;
   /** The published order, or null where none is published (shown as a hyphen, last). */
   order: number | null;
+  priceTenths?: number | null;
+  opponent?: string | null;
 }
 
 /**
@@ -353,6 +388,11 @@ export function MemberBench({
                     </span>
                   ) : null}
                 </span>
+                <Facts
+                  opponent={player.opponent}
+                  priceTenths={player.priceTenths}
+                  className={styles.benchFacts}
+                />
                 {news?.has(player.playerId) || (points !== null && Number.isFinite(points)) ? (
                   <span
                     className={styles.benchXp}

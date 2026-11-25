@@ -1,5 +1,7 @@
-/* Page snapshots share one gentle crossfade (#1319). Keep travel small and text at its
-   actual size; the two pictures and their group finish together. */
+/* Page snapshots turn like a broadcast board (Yayın Masası, 25 Nov 2026): the old page fades
+   while the new one swings down into place from its top edge, a few degrees only, so text
+   is at its actual size before it can be read. The two pictures and their group finish
+   together. */
 
 ::view-transition-group(root) {
   animation-duration: var(--motion-page);
@@ -12,6 +14,7 @@
 
 ::view-transition-new(root) {
   animation: page-rise var(--motion-page) var(--motion-route-ease) both;
+  transform-origin: 50% 0;
 }
 
 @keyframes page-leave {
@@ -23,7 +26,7 @@
 @keyframes page-rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: perspective(1400px) rotateX(-10deg);
   }
 }
 

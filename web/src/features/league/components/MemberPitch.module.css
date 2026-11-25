@@ -185,6 +185,7 @@
 
 .token {
   --vw: min(124px, calc((100cqw - 16px - (var(--n) - 1) * 6px) / var(--n)));
+  container: plate / inline-size;
   position: absolute;
   width: var(--vw);
   left: calc(50% + (var(--i) - (var(--n) - 1) / 2) * (var(--vw) + 6px));
@@ -216,8 +217,9 @@
   grid-template-areas:
     "name"
     "code"
+    "facts"
     "xp";
-  height: 52px;
+  height: 68px;
   padding: 3px 4px;
   border-radius: var(--radius-s);
   background: var(--color-chip);
@@ -283,6 +285,39 @@
   grid-area: xp;
   font-family: var(--font-mono);
   font-weight: 600;
+  white-space: nowrap;
+}
+
+/* This week's opponent and the price, side by side under the club. */
+.facts {
+  grid-area: facts;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-chip-muted);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* The bench's opponent and price: a line of their own under the club. */
+/* A plate too narrow for both keeps the opponent; the price stays in the player's details. */
+@container plate (max-width: 112px) {
+  .facts > :last-child:not(:first-child) {
+    display: none;
+  }
+}
+
+.benchFacts {
+  grid-row: 2;
+  grid-column: 3 / -1;
+  display: flex;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
   white-space: nowrap;
 }
 
@@ -545,15 +580,17 @@
     grid-template-columns: auto auto minmax(0, 1fr) auto;
     grid-template-areas:
       "name name name name"
-      "code new . xp";
+      "code new . xp"
+      "facts facts facts facts";
     column-gap: 4px;
-    height: 40px;
+    height: 58px;
     padding: 4px 8px;
     text-align: left;
   }
 
   .name,
-  .code {
+  .code,
+  .facts {
     justify-content: flex-start;
   }
 
@@ -684,6 +721,8 @@
 }
 
 .benchXp {
+  grid-row: 1;
+  grid-column: 4;
   font-family: var(--font-mono);
   font-size: var(--step--1);
   font-weight: 600;
@@ -722,7 +761,8 @@
     grid-template-columns: 12px minmax(0, 1fr) auto;
     grid-template-areas:
       "order name xp"
-      ". meta meta";
+      ". meta meta"
+      ". facts facts";
     align-items: baseline;
     padding: 4px 0 0;
   }
@@ -739,6 +779,10 @@
 
   .benchMeta {
     grid-area: meta;
+  }
+
+  .benchFacts {
+    grid-area: facts;
   }
 
   .benchXp {
