@@ -24,7 +24,8 @@ the server uses, not a description of them.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from decimal import Decimal
 from typing import Any, Final
 
 from squadopt.application.strategies.catalog import STRATEGY_CATALOG
@@ -43,12 +44,18 @@ from squadopt.live.transfers import (
     member_planning_policy,
 )
 from squadopt.optimization import OptimizationConfig
-from squadopt.optimization.coefficients import objective_coefficients, scale_expected_points
+from squadopt.optimization.coefficients import (
+    objective_coefficients,
+    round_half_up,
+    scale_expected_points,
+)
+from squadopt.planning import ProjectionHorizon
 from squadopt.prediction.elite_evidence import ELITE_COHORT_SIZE
 
 DEVICE_PLAN_CONTRACT_VERSION: Final = "league_device_plan_v1"
 #: The per-capture table: one document per capture, no league in it.
 DEVICE_PLAN_TABLE_CONTRACT_VERSION: Final = "league_device_plan_v2"
+DEVICE_PLAN_HORIZON_CONTRACT_VERSION: Final = "league_device_horizon_v1"
 DEVICE_PLAN_DOCUMENT: Final = DEVICE_PLAN_FILE
 
 
@@ -60,6 +67,7 @@ def device_plan_table(
     league_id: int,
     optimization: OptimizationConfig | None = None,
     top100: Top100Counts | None = None,
+    horizon: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """The capture's table and rules, as the member path's solver receives them.
 
@@ -84,6 +92,7 @@ def device_plan_table(
         "contract_version": DEVICE_PLAN_CONTRACT_VERSION,
         "league_id": int(league_id),
         **body,
+        **({"horizon": dict(horizon)} if horizon is not None else {}),
     }
 
 
@@ -95,6 +104,7 @@ def device_plan_capture_table(
     bootstrap: bytes,
     optimization: OptimizationConfig | None = None,
     top100: Top100Counts | None = None,
+    horizon: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """The capture's table once for every league of the run (contract v2).
 
@@ -154,6 +164,97 @@ def device_plan_capture_table(
         **{key: value for key, value in body.items() if key not in ("rules", "players")},
         "rules": body_rules,
         "players": players,
+        **({"horizon": dict(horizon)} if horizon is not None else {}),
+    }
+
+
+def device_plan_horizon(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    builder: Callable[[tuple[int, ...]], ProjectionHorizon] | None,
+    *,
+    optimization: OptimizationConfig | None = None,
+) -> dict[str, object] | None:
+    """An additive, versioned horizon beside the unchanged one-week document.
+
+    Reuse the server's captured-calendar builder, never extrapolate from the device's
+    one-week points. A capture without a valid future calendar retains its one-week
+    inputs. The longest complete supported window carries all shorter windows too.
+    """
+
+    if builder is None:
+        return None
+    first = int(inputs.deadline.gameweek)
+    windows = [
+        length
+        for length in (3, 5)
+        if set(range(first, first + length)).issubset(inputs.published_gameweeks)
+    ]
+    if not windows:
+        return None
+    try:
+        horizon = builder(tuple(range(first, first + windows[-1])))
+    except DataSourceError:
+        # A missing/invalid future calendar must not take away the published H1 plan.
+        return None
+    horizon.assert_fingerprint()
+    if horizon.season != inputs.season or horizon.source_snapshot_id != inputs.snapshot_id:
+        raise DataSourceError("The device horizon belongs to another season or capture.")
+    settings = OptimizationConfig() if optimization is None else optimization
+    policy = member_planning_policy(rules)
+    initial = sort_players_by_id(projection.table)
+    weeks: list[dict[str, object]] = []
+    for offset, gameweek in enumerate(horizon.target_gameweeks):
+        table = sort_players_by_id(horizon.table.loc[horizon.table.gameweek.eq(gameweek)])
+        if table.player_id.tolist() != initial.player_id.tolist():
+            raise DataSourceError("The device horizon has a different player universe.")
+        for field in ("name", "team_id", "position", "price_tenths"):
+            if table[field].tolist() != initial[field].tolist():
+                raise DataSourceError(f"The device horizon changes captured {field}.")
+        if offset == 0 and table.expected_points.tolist() != initial.expected_points.tolist():
+            raise DataSourceError("The device horizon changes the one-week points.")
+        coefficients = objective_coefficients(table.expected_points.tolist(), settings)
+        weeks.append(
+            {
+                "gameweek": gameweek,
+                "discount_weight": round_half_up(
+                    Decimal(str(policy.horizon_discount_factor)) ** offset
+                    * policy.objective_weight_scale
+                ),
+                "players": [
+                    {
+                        "id": int(str(row.player_id)),
+                        "buy_tenths": int(str(row.price_tenths)),
+                        "expected_points": float(str(row.expected_points)),
+                        "coefficients": list(coefficients[index]),
+                        **(
+                            {"appearance_probability": float(str(row.appearance_probability))}
+                            if hasattr(row, "appearance_probability")
+                            else {}
+                        ),
+                    }
+                    for index, row in enumerate(table.itertuples(index=False))
+                ],
+            }
+        )
+    return {
+        "contract_version": DEVICE_PLAN_HORIZON_CONTRACT_VERSION,
+        "windows": windows,
+        "projection_horizon_fingerprint": horizon.horizon_fingerprint,
+        "post_processing_contract_version": horizon.post_processing_contract_version,
+        "rules": {
+            "max_transfers_per_gameweek": 1,
+            "free_transfer_accrual": policy.free_transfer_accrual,
+            "bench_weight": settings.bench_weight,
+            "objective_weight_scale": policy.objective_weight_scale,
+            "horizon_discount_factor": policy.horizon_discount_factor,
+            "banked_transfer_value_scaled": scale_expected_points(
+                policy.banked_transfer_value_points, settings.expected_points_scale
+            ),
+            "acquisition_sell_on_fee": float(rules.transfers.sell_on_fee),
+        },
+        "weeks": weeks,
     }
 
 

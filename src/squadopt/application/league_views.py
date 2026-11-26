@@ -1325,6 +1325,7 @@ def build_league_views(
     controls: Mapping[int, MemberControl] | None = None,
     device_only: bool = False,
     short_names: Mapping[int, GameName] | None = None,
+    device_horizon: Mapping[str, object] | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -2248,7 +2249,14 @@ def build_league_views(
     # order with the server's integer coefficients, and the rules as numbers.
     _write(
         DEVICE_PLAN_DOCUMENT,
-        device_plan_table(inputs, projection, rules, league_id=league_id, top100=top100_counts),
+        device_plan_table(
+            inputs,
+            projection,
+            rules,
+            league_id=league_id,
+            top100=top100_counts,
+            horizon=device_horizon,
+        ),
     )
 
     # Whatever this run did not produce is not this week's advice, and the tree it wrote
