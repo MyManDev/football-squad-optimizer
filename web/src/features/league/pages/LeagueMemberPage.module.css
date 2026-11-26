@@ -753,6 +753,30 @@
   color: var(--color-board-text);
 }
 
+/* The decision's own Compute, where nothing published answers the selection yet: it takes
+   the apply button's look, under the decision's heading. */
+.decisionCompute {
+  display: flex;
+  align-items: center;
+}
+
+.decisionComputeButton {
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.decisionComputeButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.decisionComputeButton:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 /* With a pointer beside the sidebar the button needs no thumb's height, and the heading row
    keeps its two lines. */
 @media (min-width: 1180px) {
