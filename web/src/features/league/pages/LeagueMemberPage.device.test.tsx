@@ -54,6 +54,14 @@ const WORD_INDEX: EntryAdviceIndex = {
     rule_version: "managers_word_rule_v1",
   },
 };
+/** A device menu, as the tree publishes every member now: nothing computed, nothing listed. */
+const DEVICE_INDEX: EntryAdviceIndex = {
+  ...INDEX,
+  windows: { "saf-puan": [], "ortak-koru": [], "fark-yarat": [] },
+  computed: [],
+  unavailable: [],
+  menu: "device",
+};
 const copy = MESSAGES.tr.leagueMembers;
 const PLAN_SHOWN = copy.squadAfterTitle;
 const document = fixture.document as unknown as DevicePlanDocument;
@@ -311,6 +319,67 @@ describe("the device solve on the member page", () => {
     await waitFor(() => expect(deviceDone(container)).not.toBeNull());
     expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.done));
     for (const name of TRANSFERS_IN) expect(container).toHaveTextContent(name);
+  });
+
+  it("offers its press in the decision itself, which stands empty no longer", async () => {
+    const { container } = renderView(
+      squadWith(entryBlock),
+      "mode=saf-puan&window=1",
+      false,
+      DEVICE_INDEX,
+    );
+    const decision = screen.getByRole("region", { name: copy.decisionTitle });
+    const press = () => decision.querySelector<HTMLButtonElement>("[data-decision-compute] button");
+    expect(press()).toHaveTextContent(copy.decisionCompute);
+    await act(async () => press()!.click());
+    await waitFor(() => expect(deviceDone(container)).not.toBeNull());
+    expect(screen.getByText(PLAN_SHOWN)).toBeVisible();
+    for (const name of TRANSFERS_IN) expect(container).toHaveTextContent(name);
+    expect(press()).toBeNull();
+  });
+
+  it("does not offer the decision's press where the device has nothing to solve", () => {
+    const { container } = renderView(
+      squadWith(null),
+      "mode=saf-puan&window=1",
+      false,
+      DEVICE_INDEX,
+    );
+    expect(container.querySelector("[data-decision-compute]")).toBeNull();
+  });
+
+  it("says what a tool needs before the plan is computed, and links the decision", () => {
+    for (const tool of ["what-if", "card"] as const) {
+      render(
+        <LanguageProvider initialLanguage="tr">
+          <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}/${tool}`]}>
+            {withLeague(
+              <LeagueMemberView
+                squad={squadWith(entryBlock)}
+                advice={null}
+                adviceIssue="not-listed"
+                members={MEMBERS}
+                index={DEVICE_INDEX}
+                client={new ServiceClient()}
+                tool={tool}
+                deviceDependencies={{
+                  loadDocument: deviceDocument,
+                  createSolver: () => new CannedSolver(),
+                  now: () => new Date("2026-10-03T01:02:03Z"),
+                }}
+              />,
+            )}
+          </MemoryRouter>
+        </LanguageProvider>,
+      );
+      expect(screen.getByText(copy.toolNeedsPlan)).toBeVisible();
+      expect(screen.queryByText(copy.toolEmpty)).toBeNull();
+      expect(screen.getByRole("link", { name: copy.decisionTitle })).toHaveAttribute(
+        "href",
+        `/league/352490/members/${ENTRY}`,
+      );
+      cleanup();
+    }
   });
 
   it("says a device plan that holds the fifteen makes no transfer, without calling it published", async () => {
