@@ -19,6 +19,7 @@ export default defineConfig({
   reporter: "list",
   use: {
     baseURL,
+    serviceWorkers: "block",
     storageState: rememberedLeague(new URL(baseURL).origin),
     // Every attempt, not "on-first-retry": that traces only the retry, which is the attempt
     // that passes, and the one worth reading is the first.

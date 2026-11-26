@@ -1,4 +1,6 @@
-import { expect, test, type Response } from "@playwright/test";
+import { createServer } from "node:http";
+
+import { expect, test, type Page, type Request, type Response } from "@playwright/test";
 import type {
   EntryAdvice,
   EntryAdviceIndex,
@@ -25,7 +27,95 @@ function logJourney(line: string) {
   journey.push(`${String(Date.now() - journeyStart).padStart(6)}ms ${line}`);
 }
 
+interface WriteFence {
+  writes: string[];
+  analytics: Map<string, number>;
+  beacons: number;
+}
+
+interface ConsoleError {
+  text: string;
+  url: string;
+}
+
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+let liveMetrics: { fence: WriteFence; visits: number } | null = null;
+
+function safeAddress(raw: string): string {
+  const url = new URL(raw);
+  return `${url.origin}${url.pathname
+    .replace(/\/(entries|entry|members|advice)\/\d+/g, "/$1/<member>")
+    .replace(/\/history\/(requested\/)?\d+/g, "/history/$1<member>")}`;
+}
+
+async function installWriteFence(page: Page, origin: string): Promise<WriteFence> {
+  const state: WriteFence = { writes: [], analytics: new Map(), beacons: 0 };
+  await page.route("**/*", (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.origin === origin && url.pathname === "/api/v1/usage/events") {
+      state.beacons += 1;
+      return route.fulfill({ status: 204 });
+    }
+    if (url.origin === origin && url.pathname === "/cdn-cgi/rum" && request.method() === "POST") {
+      state.analytics.set(request.url(), (state.analytics.get(request.url()) ?? 0) + 1);
+      return route.abort("blockedbyclient");
+    }
+    if (!READ_METHODS.has(request.method())) {
+      state.writes.push(`${request.method()} ${safeAddress(request.url())}`);
+      return route.abort("blockedbyclient");
+    }
+    return route.continue();
+  });
+  return state;
+}
+
+function isBlockedAnalytics(request: Request, origin: string, fence: WriteFence): boolean {
+  const url = new URL(request.url());
+  return (
+    url.origin === origin &&
+    url.pathname === "/cdn-cgi/rum" &&
+    request.method() === "POST" &&
+    fence.analytics.has(request.url()) &&
+    request.failure()?.errorText.startsWith("net::ERR_BLOCKED_BY_CLIENT") === true
+  );
+}
+
+function withoutBlockedAnalyticsConsole(
+  errors: ConsoleError[],
+  origin: string,
+  fence: WriteFence,
+): ConsoleError[] {
+  // At most one native error per blocked POST. A GET or any other error at the same
+  // address cannot be hidden by a URL-wide exception.
+  const remaining = new Map(fence.analytics);
+  return errors.filter(({ text, url: raw }) => {
+    if (!/^Failed to load resource:.*net::ERR_BLOCKED_BY_CLIENT(?:[.\s]|$)/.test(text)) return true;
+    const count = remaining.get(raw) ?? 0;
+    if (count === 0) return true;
+    const url = new URL(raw);
+    if (url.origin !== origin || url.pathname !== "/cdn-cgi/rum") return true;
+    remaining.set(raw, count - 1);
+    return false;
+  });
+}
+
 test.afterEach(async ({ page }, testInfo) => {
+  if (liveMetrics) {
+    const summary = {
+      profile: testInfo.project.name,
+      visits: liveMetrics.visits,
+      local_beacons: liveMetrics.fence.beacons,
+      blocked_analytics: [...liveMetrics.fence.analytics.values()].reduce((sum, n) => sum + n, 0),
+      blocked_service_writes: liveMetrics.fence.writes.length,
+      elapsed_ms: Date.now() - journeyStart,
+    };
+    console.log(`LIVE_SMOKE_SUMMARY ${JSON.stringify(summary)}`);
+    await testInfo.attach("safety-summary.json", {
+      body: JSON.stringify(summary),
+      contentType: "application/json",
+    });
+  }
   const log = journey.join("\n");
   await testInfo.attach("journey.txt", { body: log, contentType: "text/plain" });
   if (testInfo.status === testInfo.expectedStatus) return;
@@ -37,18 +127,116 @@ test.afterEach(async ({ page }, testInfo) => {
   );
 });
 
+test("smoke write fence blocks analytics and all other writes on every origin", async ({
+  page,
+}) => {
+  journey = [];
+  journeyStart = Date.now();
+  liveMetrics = null;
+  let receivedWrites = 0;
+  const servers = [0, 1].map(() =>
+    createServer((request, response) => {
+      if (!READ_METHODS.has(request.method ?? "")) receivedWrites += 1;
+      response.setHeader("Access-Control-Allow-Origin", "*");
+      response.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS, POST, PUT");
+      response.end("<!doctype html><title>Local smoke fence</title>");
+    }),
+  );
+  await Promise.all(
+    servers.map((server) => new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))),
+  );
+  try {
+    const origins = servers.map((server) => {
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("No local fence listener");
+      return `http://127.0.0.1:${address.port}`;
+    });
+    const origin = origins[0]!;
+    const fence = await installWriteFence(page, origin);
+    const failures: { method: string; analytics: boolean; url: string; error: string }[] = [];
+    page.on("requestfailed", (request) =>
+      failures.push({
+        method: request.method(),
+        analytics: isBlockedAnalytics(request, origin, fence),
+        url: request.url(),
+        error: request.failure()?.errorText ?? "",
+      }),
+    );
+    await page.route(`${origin}/cdn-cgi/rum`, (route) =>
+      route.request().method() === "GET" ? route.abort("blockedbyclient") : route.fallback(),
+    );
+    await page.goto(origin);
+    const result = await page.evaluate(async (otherOrigin) => {
+      const read = await fetch("/read");
+      const usage = await fetch("/api/v1/usage/events", { method: "POST", body: "{}" });
+      navigator.sendBeacon("/api/v1/usage/events", "{}");
+      const solve = await fetch("/api/v1/solve", { method: "POST" }).catch(() => null);
+      const outside = await fetch("/outside-api", { method: "POST" }).catch(() => null);
+      const foreign = await fetch(`${otherOrigin}/outside-api`, { method: "PUT" }).catch(
+        () => null,
+      );
+      await fetch("/cdn-cgi/rum", { method: "POST", body: "{}" }).catch(() => null);
+      await fetch("/cdn-cgi/rum").catch(() => null);
+      return { read: read.status, usage: usage.status, solve, outside, foreign };
+    }, origins[1]!);
+    const targetFailures = () =>
+      failures.filter((failure) => new URL(failure.url).pathname !== "/api/v1/usage/events");
+    await expect.poll(() => targetFailures().length).toBe(5);
+    await expect.poll(() => fence.beacons).toBe(2);
+    await page.close();
+    expect(result).toEqual({ read: 200, usage: 204, solve: null, outside: null, foreign: null });
+    expect(fence.writes).toHaveLength(3);
+    expect(failures.filter((failure) => failure.analytics)).toHaveLength(1);
+    expect(
+      failures.filter(
+        (failure) =>
+          failure.method === "GET" && failure.url.endsWith("/cdn-cgi/rum") && !failure.analytics,
+      ),
+    ).toHaveLength(1);
+    expect(receivedWrites).toBe(0);
+    // Chromium can cancel a sendBeacon after its locally fulfilled 204. It must
+    // still have been answered in the browser and must not reach either server.
+    expect(
+      failures
+        .filter((failure) => new URL(failure.url).pathname === "/api/v1/usage/events")
+        .every((failure) => failure.method === "POST" && failure.error === "net::ERR_ABORTED"),
+    ).toBe(true);
+    const rumError = {
+      text: "Failed to load resource: net::ERR_BLOCKED_BY_CLIENT",
+      url: `${origin}/cdn-cgi/rum`,
+    };
+    expect(withoutBlockedAnalyticsConsole([rumError, rumError], origin, fence)).toHaveLength(1);
+    const otherError = {
+      ...rumError,
+      text: "Failed to load resource: the server responded with a status of 500",
+    };
+    expect(withoutBlockedAnalyticsConsole([otherError], origin, fence)).toEqual([otherError]);
+  } finally {
+    if (!page.isClosed()) await page.close();
+    await Promise.all(
+      servers.map(
+        (server) =>
+          new Promise<void>((resolve, reject) =>
+            server.close((error) => (error ? reject(error) : resolve())),
+          ),
+      ),
+    );
+  }
+});
+
 test("published league and member journey works without submitting a solve", async ({
   page,
 }, testInfo) => {
   journey = [];
   journeyStart = Date.now();
+  liveMetrics = null;
   if (testInfo.retry > 0)
     console.log(
       `LIVE SMOKE RETRY ${testInfo.retry} (${testInfo.project.name}): the attempt before this one failed, see its journey above`,
     );
   const origin = new URL(process.env.LIVE_BASE_URL!).origin;
   const errors: string[] = [];
-  const consoleErrors: { text: string; url: string }[] = [];
+  const consoleErrors: ConsoleError[] = [];
   const optionalDocuments = new Set(OPTIONAL_DOCUMENTS);
   const absentDocuments = new Set<string>();
   // The FPL forwarder's own 404s and 503s, marked as its answers: a page reads each as no
@@ -57,7 +245,13 @@ test("published league and member journey works without submitting a solve", asy
   const cacheMissUrls = new Set<string>();
   const adviceMisses: Response[] = [];
   const failures: string[] = [];
-  const writes: string[] = [];
+  const fence = await installWriteFence(page, origin);
+  const writes = fence.writes;
+  liveMetrics = { fence, visits: 0 };
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame() && new URL(frame.url()).origin === origin)
+      liveMetrics!.visits += 1;
+  });
   const staticPlanReads: string[] = [];
   let capabilitiesUrl: string | undefined;
   page.on("request", (request) => {
@@ -74,6 +268,10 @@ test("published league and member journey works without submitting a solve", asy
       consoleErrors.push({ text: message.text(), url: message.location().url });
   });
   page.on("requestfailed", (request) => {
+    if (isBlockedAnalytics(request, origin, fence)) {
+      logJourney(`BLOCKED ANALYTICS POST ${safeAddress(request.url())}`);
+      return;
+    }
     logJourney(`FAILED ${request.failure()?.errorText} ${request.method()} ${request.url()}`);
     const url = new URL(request.url());
     // Leaving a member cancels its polling, its device-input prefetch and, when the edge is
@@ -118,23 +316,6 @@ test("published league and member journey works without submitting a solve", asy
         console.log(`forwarder refusal ${response.status()}: ${response.url()}`);
       } else failures.push(`${response.status()} ${response.url()}`);
     }
-  });
-  // Even an accidental UI submission cannot create a job during this release check.
-  await page.route("**/*", (route) => {
-    const request = route.request();
-    // The usage record's beacon is the one write a visit makes on purpose (ADR 0014). The
-    // check answers it here, so a release check is not counted as a visit and the page sees
-    // the record's own empty answer rather than a blocked request.
-    if (new URL(request.url()).pathname === "/api/v1/usage/events")
-      return route.fulfill({ status: 204 });
-    if (
-      new URL(request.url()).pathname.startsWith("/api/v1/") &&
-      !["GET", "HEAD", "OPTIONS"].includes(request.method())
-    ) {
-      writes.push(`${request.method()} ${request.url()}`);
-      return route.abort("blockedbyclient");
-    }
-    return route.continue();
   });
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
   // The league's tree: the directory's first line, or the one tree of a site from before it.
@@ -312,7 +493,7 @@ test("published league and member journey works without submitting a solve", asy
       page.getByText(MESSAGES.en.suggestionHistory.emptyBody, { exact: true }),
     ).toBeVisible();
   }
-  expect(writes, "no mutating API request is allowed").toEqual([]);
+  expect(writes, "no mutating request is allowed on any origin or path").toEqual([]);
   if (deviceMenu)
     expect(staticPlanReads, "a device menu must not read old published plans").toEqual([]);
   // The model comparison also performs a cache-only GET. Admit only this member's
@@ -335,7 +516,7 @@ test("published league and member journey works without submitting a solve", asy
     "the site's own requests must succeed apart from a validated cache miss",
   ).toEqual([]);
   expect(
-    consoleErrors.filter(
+    withoutBlockedAnalyticsConsole(consoleErrors, origin, fence).filter(
       ({ text, url }) =>
         !(
           ((absentDocuments.has(url) || cacheMissUrls.has(url)) &&
@@ -343,7 +524,7 @@ test("published league and member journey works without submitting a solve", asy
           (forwarderRefusals.has(url) && /Failed to load resource:.*\b(?:404|503)\b/.test(text))
         ),
     ),
-    "no console error apart from the reported optional document, validated cache miss or forwarder refusal",
+    "no console error apart from blocked analytics, optional absence, validated cache miss or forwarder refusal",
   ).toEqual([]);
   expect(errors, "no browser or console error").toEqual([]);
 });

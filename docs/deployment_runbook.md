@@ -593,7 +593,8 @@ desktop and 360px phone, in Turkish and English. Run only the tour for a rehears
 receipts. Optional `LIVE_SMOKE_COMPUTE=1` checks the public backend with a browser GET,
 reporting a matching cached answer or `NOT_COMPUTED` (never submits a solve).
 
-The tour fulfills usage beacons with 204 inside the browser. All other writes are blocked.
+Both browser suites fulfill usage beacons with 204 inside the browser and block writes on
+every origin and path. Service workers are blocked so they cannot bypass the request fence.
 The injected Cloudflare `POST /cdn-cgi/rum` is counted separately as blocked analytics; its
 transport is omitted from page-health checks because exercising it would write a record.
 It is never forwarded. Any other attempted write fails the check. LLMOPT stops at its empty
@@ -602,8 +603,9 @@ journeys without traces, screenshots, DOM snapshots or comparison identities. Th
 standalone entry, what-if and card regressions repaired in the live publication are ordinary
 checks in all four profiles. Their former symptoms are never filtered from page health.
 
-The existing smoke includes the local beacon response from #1505. The tour answers its usage
-requests independently with the same 204 behavior.
+Both suites test their write fences with loopback servers before visiting the live site;
+these local checks do not count as live visits. Record each suite's summaries, including
+live visits, local beacon answers, blocked analytics and attempted service writes.
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
