@@ -141,6 +141,49 @@ const PAGES = [
   { name: "contribute", address: () => "/contribute" },
 ];
 
+function watchServiceTransport(
+  page: Page,
+  origin: string,
+  publication: Pick<Publication, "leagueId" | "entryId">,
+  name: string,
+  issues: Issue[],
+  allowedAbsence: Set<string>,
+) {
+  const serviceOrigins = new Set([origin]);
+  const capabilityPaths = new Set([
+    `/api/v1/leagues/${publication.leagueId}/capabilities`,
+    ...(name === "entry"
+      ? [`/api/v1/public/leagues/0/entries/${publication.entryId}/capabilities`]
+      : []),
+  ]);
+  const rememberService = (raw: string) => {
+    const url = new URL(raw);
+    if (capabilityPaths.has(url.pathname)) serviceOrigins.add(url.origin);
+  };
+  // Learn the backend before an answer: a refused capabilities connection has no response.
+  page.on("request", (request) => {
+    if (request.method() === "GET") rememberService(request.url());
+  });
+  page.on("requestfailed", (request) => {
+    const url = new URL(request.url());
+    if (
+      url.origin === origin &&
+      url.pathname === "/cdn-cgi/rum" &&
+      request.method() === "POST" &&
+      request.failure()?.errorText.startsWith("net::ERR_BLOCKED_BY_CLIENT")
+    ) {
+      allowedAbsence.add(request.url());
+      return;
+    }
+    if (serviceOrigins.has(url.origin))
+      issues.push({
+        check: "request",
+        reason: `${request.failure()?.errorText} ${safeAddress(request.url())}`,
+      });
+  });
+  return { serviceOrigins, rememberService };
+}
+
 async function visit(
   page: Page,
   publication: Publication,
@@ -158,16 +201,18 @@ async function visit(
   const pending: Promise<void>[] = [];
   const allowedAbsence = new Set<string>();
   const consoleErrors: { url: string; resource: boolean }[] = [];
-  const serviceOrigins = new Set([origin]);
+  const { serviceOrigins, rememberService } = watchServiceTransport(
+    page,
+    origin,
+    publication,
+    name,
+    issues,
+    allowedAbsence,
+  );
   const record = (line: string) => journey.push(`${Date.now() - started}ms ${line}`);
   const checkResponse = async (response: Response) => {
     const url = new URL(response.url());
-    if (
-      url.pathname === `/api/v1/leagues/${publication.leagueId}/capabilities` ||
-      (name === "entry" &&
-        url.pathname === `/api/v1/public/leagues/0/entries/${publication.entryId}/capabilities`)
-    )
-      serviceOrigins.add(url.origin);
+    if (response.request().method() === "GET") rememberService(response.url());
     if (!serviceOrigins.has(url.origin)) return;
     record(`${response.status()} ${response.request().method()} ${safeAddress(response.url())}`);
     if (response.status() < 400) return;
@@ -210,23 +255,6 @@ async function visit(
       consoleErrors.push({
         url: message.location().url,
         resource: /^Failed to load resource:/.test(message.text()),
-      });
-  });
-  page.on("requestfailed", (request) => {
-    const url = new URL(request.url());
-    if (
-      url.origin === origin &&
-      url.pathname === "/cdn-cgi/rum" &&
-      request.method() === "POST" &&
-      request.failure()?.errorText.startsWith("net::ERR_BLOCKED_BY_CLIENT")
-    ) {
-      allowedAbsence.add(request.url());
-      return;
-    }
-    if (new URL(request.url()).origin === origin)
-      issues.push({
-        check: "request",
-        reason: `${request.failure()?.errorText} ${safeAddress(request.url())}`,
       });
   });
   await fenceWrites(page, origin, writes, beacons, telemetry);
@@ -306,6 +334,7 @@ async function visit(
   );
   console.log(journey.filter((line) => /FAIL |SUMMARY /.test(line)).join("\n"));
   // Detach before context disposal cancels its remaining reads.
+  page.removeAllListeners("request");
   page.removeAllListeners("requestfailed");
   page.removeAllListeners("response");
   page.removeAllListeners("console");
@@ -347,6 +376,94 @@ test("read-only fence answers beacons and blocks every other write", async ({ pa
     );
   }
 });
+
+for (const name of ["decision", "entry"] as const) {
+  test(`${name}: separate API transport failures are recorded before any response`, async ({
+    page,
+  }) => {
+    let siteWrites = 0;
+    const apiReads: string[] = [];
+    const site = createServer((request, response) => {
+      if (!READ_METHODS.has(request.method ?? "")) siteWrites += 1;
+      response.setHeader("Content-Type", "text/html");
+      response.end("<!doctype html><title>Transport check</title><main>Local page</main>");
+    });
+    const api = createServer((request, response) => {
+      apiReads.push(request.method ?? "unknown");
+      response.end("{}");
+    });
+    await Promise.all([
+      new Promise<void>((resolve) => site.listen(0, "127.0.0.1", resolve)),
+      new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve)),
+    ]);
+    try {
+      const siteAddress = site.address();
+      const apiAddress = api.address();
+      if (
+        !siteAddress ||
+        typeof siteAddress === "string" ||
+        !apiAddress ||
+        typeof apiAddress === "string"
+      )
+        throw new Error("No local transport listeners");
+      const origin = `http://127.0.0.1:${siteAddress.port}`;
+      const apiOrigin = `http://127.0.0.1:${apiAddress.port}`;
+      const issues: Issue[] = [];
+      const writes: string[] = [];
+      const beacons: string[] = [];
+      const telemetry: string[] = [];
+      const allowedAbsence = new Set<string>();
+      const { serviceOrigins } = watchServiceTransport(
+        page,
+        origin,
+        { leagueId: 1, entryId: 2 },
+        name,
+        issues,
+        allowedAbsence,
+      );
+      await fenceWrites(page, origin, writes, beacons, telemetry);
+      await page.route(`${apiOrigin}/**`, (route) => route.abort("connectionfailed"));
+      await page.route(`${origin}/cdn-cgi/rum`, (route) =>
+        route.request().method() === "GET" ? route.abort("connectionfailed") : route.fallback(),
+      );
+      await page.goto(origin);
+      const prefix = name === "entry" ? "/api/v1/public/leagues/0/entries/2" : "/api/v1/leagues/1";
+      await page.evaluate(
+        async ({ apiOrigin, prefix, name }) => {
+          await fetch(`${apiOrigin}${prefix}/capabilities`).catch(() => null);
+          const advice = name === "entry" ? `${prefix}/advice` : `${prefix}/entries/2/advice`;
+          await fetch(`${apiOrigin}${advice}`).catch(() => null);
+          await fetch("/cdn-cgi/rum", { method: "POST", body: "{}" }).catch(() => null);
+          await fetch("/cdn-cgi/rum").catch(() => null);
+        },
+        { apiOrigin, prefix, name },
+      );
+      await expect.poll(() => issues.length).toBe(3);
+      await page.close();
+      expect(serviceOrigins.has(apiOrigin)).toBe(true);
+      expect(issues.every((issue) => issue.check === "request")).toBe(true);
+      expect(issues.filter((issue) => issue.reason.includes(apiOrigin))).toHaveLength(2);
+      expect(issues.filter((issue) => issue.reason.includes(`${origin}/cdn-cgi/rum`))).toHaveLength(
+        1,
+      );
+      expect(allowedAbsence.has(`${origin}/cdn-cgi/rum`)).toBe(true);
+      expect(telemetry).toEqual(["POST /cdn-cgi/rum"]);
+      expect(writes).toEqual([]);
+      expect(siteWrites).toBe(0);
+      expect(apiReads, "both API reads failed before any response").toEqual([]);
+    } finally {
+      if (!page.isClosed()) await page.close();
+      await Promise.all(
+        [site, api].map(
+          (server) =>
+            new Promise<void>((resolve, reject) =>
+              server.close((error) => (error ? reject(error) : resolve())),
+            ),
+        ),
+      );
+    }
+  });
+}
 
 for (const target of PAGES) {
   test(`${target.name}: published page has content without service writes`, async ({
