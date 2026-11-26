@@ -1,4 +1,9 @@
-import { memberHistoryAddress, type MemberTool } from "../../../lib/leagueAddresses";
+import {
+  entryAddress,
+  memberAddress,
+  memberHistoryAddress,
+  type MemberTool,
+} from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { QueryClientContext } from "@tanstack/react-query";
@@ -75,6 +80,30 @@ export function LeagueMemberView(props: LeagueMemberViewProps) {
   ].join(":");
   // A new published squad invalidates both an old result and its in-flight request.
   return <LeagueMemberContent key={contextKey} {...props} />;
+}
+
+/** The decision's own Compute, where nothing published answers the selection yet. */
+function DecisionCompute({
+  label,
+  busy,
+  onPress,
+}: {
+  label: string;
+  busy: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <div className={styles.decisionCompute} data-decision-compute>
+      <button
+        type="button"
+        className={`${styles.applyLink} ${styles.decisionComputeButton}`}
+        disabled={busy}
+        onClick={onPress}
+      >
+        {label}
+      </button>
+    </div>
+  );
 }
 
 type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
@@ -283,11 +312,21 @@ function LeagueMemberContent({
   // The same holds for a selection the member's device solves, until a run ends without a
   // plan: the card then says what is published again. Both hold only while the week is
   // open; a closed week has no panel, so the card says what is published.
+  const deviceComputes = device.available && !deviceEndedWithoutPlan(device.state);
   const computeOnly =
     selection.status === "not-listed" &&
     !closed &&
-    ((computeAvailable && selection.computable !== undefined) ||
-      (device.available && !deviceEndedWithoutPlan(device.state)));
+    ((computeAvailable && selection.computable !== undefined) || deviceComputes);
+  // Where the decision's own press sends the selection: the member's device when it solves
+  // it, as the settings' device button does, otherwise the service.
+  const computeHere: "device" | "service" = deviceComputes ? "device" : "service";
+  // A tool that starts from the plan, opened before the plan is computed, points back to the
+  // decision instead of saying the week has nothing for it.
+  const toolNeedsPlan = computeOnly && !rejectedContext && !shown;
+  const decisionAddress =
+    leagueId > 0
+      ? memberAddress(leagueId, entryId, searchParams.size > 0 ? `?${searchParams}` : "")
+      : entryAddress(entryId);
   // The what-if mode starts from the plan on screen when it is a solved week without a chip.
   const advised = advisedFifteen(shown?.envelope.payload);
   // The duel (#1133): the other human members, and the one `?duel=` names among them.
@@ -485,7 +524,10 @@ function LeagueMemberContent({
 
   // The member's tools, each its own page that the sidebar links (lib/leagueAddresses.ts);
   // a tool this member's week has nothing for is null and its page says so.
-  const tools: Record<MemberTool, { title: string; body: ReactNode | null }> = {
+  const tools: Record<
+    MemberTool,
+    { title: string; body: ReactNode | null; startsFromPlan?: boolean }
+  > = {
     "current-squad": {
       title: copy.memberSquad,
       body:
@@ -499,6 +541,7 @@ function LeagueMemberContent({
     },
     "what-if": {
       title: copy.whatIfTitle,
+      startsFromPlan: true,
       body:
         advised !== null && isDevicePlanEntry(view.device_plan) ? (
           <WhatIfPanel
@@ -535,6 +578,7 @@ function LeagueMemberContent({
     chips: { title: copy.chipsAndTransfers, body: <MemberResourceCards squad={displayedSquad} /> },
     card: {
       title: copy.cardTitle,
+      startsFromPlan: true,
       body:
         !adviceLoading && shown ? <SquadCard view={shown.envelope.payload} squad={view} /> : null,
     },
@@ -562,7 +606,14 @@ function LeagueMemberContent({
               <h2 className={styles.decisionTitle} id="member-tool-title">
                 {page.title}
               </h2>
-              {page.body ?? <EmptyState title={copy.toolEmpty} />}
+              {page.body ??
+                (page.startsFromPlan && toolNeedsPlan ? (
+                  <EmptyState title={copy.toolNeedsPlan}>
+                    <Link to={decisionAddress}>{copy.decisionTitle}</Link>
+                  </EmptyState>
+                ) : (
+                  <EmptyState title={copy.toolEmpty} />
+                ))}
             </section>
           </div>
         </div>
@@ -661,7 +712,25 @@ function LeagueMemberContent({
                 closed ? null : (
                   <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />
                 )
-              ) : computeOnly && !rejectedContext ? null : closed ? null : (
+              ) : computeOnly && !rejectedContext ? (
+                // Nothing published answers this selection, and the member's device or the
+                // service computes it: the decision offers that press itself, rather than
+                // standing empty above the settings that hold the button.
+                <DecisionCompute
+                  label={copy.decisionCompute}
+                  busy={
+                    device.state.phase === "loading" ||
+                    device.state.phase === "solving" ||
+                    job.state.phase === "requesting" ||
+                    job.state.phase === "waiting"
+                  }
+                  onPress={() => {
+                    if (!canStart()) return;
+                    if (computeHere === "device") device.run();
+                    else job.compute(request);
+                  }}
+                />
+              ) : closed ? null : (
                 // Under LIVE WEEK no plan is drawn, so no card says one is missing or points at one.
                 <MissingAdviceCard
                   issue={
