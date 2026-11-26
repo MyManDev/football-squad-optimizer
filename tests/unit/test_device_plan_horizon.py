@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
+from ortools.sat.python import cp_model
 from scripts.check_league_tree import main as check_tree
 from tests.unit.test_device_plan_fixture import _same
 from tests.unit.test_league_views import DISCRETIONARY_SQUAD, _Provider
@@ -32,6 +33,7 @@ from squadopt.live import HeldSquad, read_inputs, read_season_rules
 from squadopt.live.recommendation import InSeasonProjection, project, write_projection_handoff
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.optimization.coefficients import objective_coefficients
+from squadopt.planning import optimizer as server_model
 
 FIXTURE = Path(__file__).resolve().parents[2] / "web/src/fixtures/device-plan/horizons.json"
 SEASON = "2026-27"
@@ -126,18 +128,53 @@ def build_horizon_fixture(root: Path) -> dict[str, Any]:
             )
             # Synthetic initial state replaces only the ledger read. The complete
             # application command builds, solves, verifies and serializes the result.
-            with patch(
-                "squadopt.application.horizon_plans.held_squad_from_ledger", return_value=held
+            built = []
+            original_build = server_model._build_model
+
+            def capture_model(*args, _original=original_build, _built=built, **kwargs):
+                artifacts = _original(*args, **kwargs)
+                _built.append(artifacts)
+                return artifacts
+
+            with (
+                patch(
+                    "squadopt.application.horizon_plans.held_squad_from_ledger", return_value=held
+                ),
+                patch.object(server_model, "_build_model", side_effect=capture_model),
             ):
                 result = plan_horizon(request)
             assert result.solver_status is SolverStatus.OPTIMAL
+            primary = round(
+                result.plan.diagnostics["scaled_model_objective_value"]
+                * result.plan.diagnostics["objective_weight_scale"]
+                * OptimizationConfig().expected_points_scale
+            )
+            artifacts = built[-1]
+            alternative = artifacts.model.clone()
+            alternative.add(artifacts.primary_objective == primary)
+            differences = []
+            for index, week in enumerate(result.plan.weeks):
+                players = artifacts.players_by_week[index].player_id.tolist()
+                for family, chosen in (
+                    (artifacts.transfer_in_vars[index], set(week.transfers_in.player_id)),
+                    (artifacts.transfer_out_vars[index], set(week.transfers_out.player_id)),
+                ):
+                    differences.extend(
+                        1 - variable if player in chosen else variable
+                        for player, variable in zip(players, family, strict=True)
+                    )
+            alternative.add(sum(differences) >= 1)
+            alternative.maximize(artifacts.primary_objective)
+            uniqueness = cp_model.CpSolver()
+            uniqueness.parameters.num_search_workers = 1
+            uniqueness.parameters.max_time_in_seconds = 30
+            uniqueness.parameters.max_deterministic_time = 10
+            uniqueness_status = uniqueness.solve(alternative)
+            assert uniqueness_status in (cp_model.INFEASIBLE, cp_model.OPTIMAL, cp_model.FEASIBLE)
             references[str(window)] = {
                 "objective": result.plan.objective_value,
-                "objective_scaled": round(
-                    result.plan.diagnostics["scaled_model_objective_value"]
-                    * result.plan.diagnostics["objective_weight_scale"]
-                    * OptimizationConfig().expected_points_scale
-                ),
+                "objective_scaled": primary,
+                "unique_moves": uniqueness_status == cp_model.INFEASIBLE,
                 "tiebreak_completed": result.plan.diagnostics["tiebreak_completed"],
                 "weeks": [
                     {

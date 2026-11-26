@@ -1085,6 +1085,7 @@
         "3": {
           "objective": 496.136,
           "objective_scaled": 496136000,
+          "unique_moves": true,
           "tiebreak_completed": true,
           "weeks": [
             {
@@ -1140,6 +1141,7 @@
         "5": {
           "objective": 826.562,
           "objective_scaled": 826562000,
+          "unique_moves": true,
           "tiebreak_completed": true,
           "weeks": [
             {
@@ -1256,6 +1258,7 @@
         "3": {
           "objective": 504.136,
           "objective_scaled": 504136000,
+          "unique_moves": true,
           "tiebreak_completed": true,
           "weeks": [
             {
@@ -1311,6 +1314,7 @@
         "5": {
           "objective": 834.562,
           "objective_scaled": 834562000,
+          "unique_moves": true,
           "tiebreak_completed": true,
           "weeks": [
             {
@@ -1427,6 +1431,7 @@
         "3": {
           "objective": 504.136,
           "objective_scaled": 504136000,
+          "unique_moves": true,
           "tiebreak_completed": true,
           "weeks": [
             {
@@ -1482,6 +1487,7 @@
         "5": {
           "objective": 834.562,
           "objective_scaled": 834562000,
+          "unique_moves": true,
           "tiebreak_completed": true,
           "weeks": [
             {
