@@ -3,20 +3,67 @@
 # and watch the run to completion. Every step verifies before the next, and refuses loudly.
 set -u
 ROOT=$(git rev-parse --show-toplevel) || exit 1
+S=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 1
 cd "$ROOT" || exit 1
+log(){ echo "$(date -u +%H:%M:%S) $*"; }
+
+# The operator can check every local prerequisite before the release mutates anything.
+# This mode never installs packages, fetches a repository or contacts a service.
+preflight() {
+  [ -z "${CI:-}" ] || { log "live browser checks are operator-only, not CI"; return 1; }
+  if [ -x "$ROOT/.venv/Scripts/python.exe" ]; then PY="$ROOT/.venv/Scripts/python.exe"
+  elif [ -x "$ROOT/.venv/bin/python" ]; then PY="$ROOT/.venv/bin/python"
+  else PY=$(command -v python || command -v python3) || { log "python not found"; return 1; }
+  fi
+  "$PY" -c '' || { log "python could not start"; return 1; }
+  command -v node >/dev/null || { log "node not found"; return 1; }
+  CLI="$ROOT/web/node_modules/@playwright/test/cli.js"
+  [ -f "$CLI" ] || { log "install the locked web dependencies before releasing"; return 1; }
+  node "$CLI" --version >/dev/null || { log "browser test runner could not start"; return 1; }
+  node -e 'const { chromium } = require(process.argv[1]); (async () => { const browser = await chromium.launch({ timeout: 10000 }); await browser.close(); })().catch(() => { console.error("Chromium could not start; install its browser before releasing"); process.exit(1); });' "$ROOT/web/node_modules/playwright" || return 1
+}
+
+verify_live_after_deploy() {
+  preflight || return 1
+  set -- "$ACCEPTED_STAMP"
+  if [ -n "$SETTLED" ]; then set -- "$@" --settled "$SETTLED"; fi
+  if [ -n "$DATA_ROOT" ]; then
+    [ -d "$DATA_ROOT" ] || { log "expected data root does not exist"; return 1; }
+    set -- "$@" --expected-data-root "$DATA_ROOT"
+  fi
+  log "checking the live publication"
+  "$PY" "$S/verify_live.py" "$@" || {
+    log "live verification failed; retrying once after 60 seconds"
+    sleep 60
+    "$PY" "$S/verify_live.py" "$@" || { log "live verification found failures"; return 1; }
+  }
+  cd "$ROOT/web" || return 1
+  log "running read-only live smoke and four-profile page tour"
+  BROWSER_STARTED=$(date +%s)
+  LIVE_BASE_URL=https://squadopt.mymandev.com node "$CLI" test --config playwright.live.config.ts || {
+    log "live browser checks failed; the release is not verified"
+    return 1
+  }
+  log "live browser checks passed in $(( $(date +%s) - BROWSER_STARTED )) seconds"
+}
+
+if [ "${1:-}" = --preflight ]; then
+  [ "$#" -eq 1 ] || { echo 'usage: deploy.sh --preflight' >&2; exit 2; }
+  preflight || exit 1
+  exit 0
+fi
+
 GH=$(command -v gh || printf '%s' 'C:/Program Files/GitHub CLI/gh.exe')
 [ -x "$GH" ] || command -v "$GH" >/dev/null || { echo 'gh not found' >&2; exit 1; }
 REPO="MyManDev/football-squad-optimizer"
 case "$#" in 2|3|4) ;; *) echo 'usage: deploy.sh <site-tag> <accepted-generated-at-ISO> [settled-gameweek] [expected-data-root]' >&2; exit 2;; esac
 TAG="$1"; ACCEPTED_STAMP="$2"; SETTLED="${3:-}"; DATA_ROOT="${4:-}"
-S=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 1
-log(){ echo "$(date -u +%H:%M:%S) $*"; }
 case "$SETTLED" in *[!0-9]*) log "settled gameweek must be a number"; exit 2;; esac
 if [ "${TAG#*-settled}" != "$TAG" ] && [ -z "$SETTLED" ]; then
   log "a settled tag requires its gameweek"; exit 2
 fi
 if [ -n "$DATA_ROOT" ] && [ ! -d "$DATA_ROOT" ]; then log "expected data root does not exist"; exit 2; fi
-sh "$S/verify_release.sh" --preflight || { log "live verification preflight failed"; exit 1; }
+preflight || { log "live verification preflight failed"; exit 1; }
 
 git fetch -q origin || { log "fetch failed"; exit 1; }
 MAIN=$(git rev-parse origin/main)
@@ -100,7 +147,7 @@ if [ "$RC" -eq 0 ] && ! "$GH" run view "$DRUN" --json jobs --jq '.jobs[].name' 2
 fi
 [ "$RC" -eq 0 ] || exit "$RC"
 sleep 45
-sh "$S/verify_release.sh" "$ACCEPTED_STAMP" "$SETTLED" "$DATA_ROOT" || {
+verify_live_after_deploy || {
   log "post-deployment verification failed"; exit 1
 }
 log "LIVE: publication, smoke and page tour passed"

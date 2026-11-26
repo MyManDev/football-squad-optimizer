@@ -1104,6 +1104,18 @@ def test_deploy_requires_the_accepted_publication_stamp(tmp_path: Path) -> None:
     assert "workflow run" not in log
 
 
+def test_deploy_preflight_only_checks_local_prerequisites(tmp_path: Path) -> None:
+    result, log = _run_deploy_recipe(tmp_path, arguments=["--preflight"])
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "node -e " in log
+    assert "cli.js --version" in log
+    assert "fetch -q origin" not in log
+    assert "verify_live.py" not in log
+    assert "cli.js test " not in log
+    assert "tag -a" not in log
+    assert "workflow run" not in log
+
+
 @pytest.mark.parametrize("parents", ["", "parent1", "parent1 parent2 parent3"])
 def test_deploy_refuses_main_without_exactly_two_parents(tmp_path: Path, parents: str) -> None:
     result, log = _run_deploy_recipe(tmp_path, extra_env={"MAIN_PARENTS": parents})
@@ -1135,8 +1147,10 @@ def test_deploy_propagates_post_deployment_verification_failure(
     assert "run watch 200 --exit-status" in log
     assert "verify_live.py" in log
     if failure == "VERIFY_EXIT":
+        assert log.count("/verify_live.py ") == 2
         assert "cli.js test " not in log
     else:
+        assert log.count("/verify_live.py ") == 1
         assert "cli.js test --config playwright.live.config.ts" in log
 
 

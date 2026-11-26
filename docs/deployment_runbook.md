@@ -280,7 +280,7 @@ pull request reviewed, with no gate anywhere catching it. Recover with the secon
 sh scripts/release/deploy.sh <tag> <accepted-generated-at-ISO> [settled-gameweek] [expected-data-root]
 ```
 
-`deploy.sh` waits 45 seconds after the successful workflow, then runs `verify_release.sh`.
+`deploy.sh` waits 45 seconds after the successful workflow, then runs its read-only gate.
 That gate requires `verify_live.py` to print `ALL GOOD` (retrying once after a minute),
 then runs the live browser smoke and full page tour. A browser failure fails the release
 step. `ship.sh` passes the accepted stamp, settled week and release worktree's data root
@@ -312,8 +312,13 @@ and can be repeated. Once that run has finished, run the same read-only gate:
 
 ```
 gh workflow run deploy-pages.yml --ref develop -f release_tag=<tag>
-sh scripts/release/verify_release.sh <accepted-generated-at-ISO> [settled-gameweek] [expected-data-root]
+python scripts/release/verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>] [--expected-data-root <path>]
+cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts
 ```
+
+After re-dispatch, run the HTTP check only once the deployment finishes; if it fails while
+the edge updates, retry it once after a minute. Run the browser command only after HTTP
+verification passes. These read-only checks do not deploy again.
 
 Each dispatch that reaches the upload spends one of the day's ten Cloudflare deployments,
 whatever happens after it, so a run that uploads and then fails its smoke check has still spent
@@ -576,10 +581,12 @@ deployment job is running or queued and inspect the Cloudflare daily count.
 
 ## Post-deployment smoke
 
-`deploy.sh` now runs `verify_release.sh` after deployment: the HTTP/content verifier first,
+`deploy.sh` runs its verification gate after deployment: the HTTP/content verifier first,
 then `cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts`.
 Install the locked web dependencies and Chromium before starting a release; release commands
-never install them. The live configuration refuses CI and has a five-minute total budget.
+never install them. `sh scripts/release/deploy.sh --preflight` checks these local prerequisites
+without fetching or deploying; `ship.sh` calls that mode before waiting for the site PR.
+The live configuration refuses CI and has a five-minute total budget.
 The existing smoke retains its desktop/phone profiles. The tour visits 15 pages on 1280px
 desktop and 360px phone, in Turkish and English. Run only the tour for a rehearsal by adding
 `live-tour.spec.ts` to the browser command. Record its elapsed time and summary in the release

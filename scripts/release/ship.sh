@@ -45,7 +45,7 @@ EOF
 fi
 GH=$(command -v gh || printf '%s' 'C:/Program Files/GitHub CLI/gh.exe')
 [ -x "$GH" ] || command -v "$GH" >/dev/null || { echo 'gh not found' >&2; exit 1; }
-sh "$S/verify_release.sh" --preflight || { log "live verification preflight failed"; exit 1; }
+sh "$S/deploy.sh" --preflight || { log "live verification preflight failed"; exit 1; }
 i=0; st=""
 while [ $i -lt 120 ]; do
   st=$("$GH" pr view "$SITE_PR" --json state --jq .state 2>/dev/null || echo "")
