@@ -598,7 +598,7 @@ every origin and path. Service workers are blocked so they cannot bypass the req
 The injected Cloudflare `POST /cdn-cgi/rum` is counted separately as blocked analytics; its
 transport is omitted from page-health checks because exercising it would write a record.
 It is never forwarded. Any other attempted write fails the check. LLMOPT stops at its empty
-key step, and the contribution form is only visited. The tour records redacted request
+key step, and the contribution form is only visited. Both suites record redacted request
 journeys without traces, screenshots, DOM snapshots or comparison identities. The decision,
 standalone entry, what-if and card regressions repaired in the live publication are ordinary
 checks in all four profiles. Their former symptoms are never filtered from page health.

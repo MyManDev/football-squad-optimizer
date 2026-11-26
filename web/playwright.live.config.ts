@@ -12,18 +12,17 @@ export default defineConfig({
   timeout: 60_000,
   globalTimeout: 300_000,
   workers: 1,
-  // A second attempt inside the same run, so the first one's trace is still on disk: the
-  // rerun an operator typed by hand emptied test-results and took the failure with it. An
-  // attempt that fails prints its journey and says so, and the summary counts it as flaky.
+  // Retain each redacted journey in the same run and mark a successful retry as flaky.
   retries: 1,
   reporter: "list",
   use: {
     baseURL,
     serviceWorkers: "block",
     storageState: rememberedLeague(new URL(baseURL).origin),
-    // Every attempt, not "on-first-retry": that traces only the retry, which is the attempt
-    // that passes, and the one worth reading is the first.
-    trace: "on",
+    // Live response bodies and DOM captures can retain private comparison identities.
+    trace: "off",
+    screenshot: "off",
+    video: "off",
   },
   projects: [
     {
