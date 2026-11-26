@@ -392,7 +392,7 @@ was written.
 
 | Artifact | Finding | PR |
 | --- | --- | --- |
-| `crowd_signal_data_audit` ([report](crowd_signal_data_audit.md), [record](crowd_signal_data_audit.json)) | **Stopped before pre-registration: 0 of 147 development folds have verified pre-deadline crowd capture provenance, below the required 60.** The four named seasons, 2021-22 through 2024-25, contain ownership and transfer fields on 109,282 rows, but no capture or deadline timestamp and no captaincy share. The 2024-25 `modified` field is boolean on all 27,605 rows. No forecast or squad outcome was computed; no model gate was evaluated and no live path changed. | - |
+| `crowd_signal_data_audit` ([report](crowd_signal_data_audit.md), [record](crowd_signal_data_audit.json)) | **Stopped before pre-registration: 0 of 147 development folds have verified pre-deadline crowd capture provenance, below the required 60.** The four named seasons, 2021-22 through 2024-25, contain ownership and transfer fields on 109,282 rows, but no capture or deadline timestamp and no captaincy share. The 2024-25 `modified` field is boolean on all 27,605 rows. No forecast or squad outcome was computed; no model gate was evaluated and no live path changed. | #1508 |
 
 ## Data source reach
 
