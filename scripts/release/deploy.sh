@@ -7,8 +7,16 @@ cd "$ROOT" || exit 1
 GH=$(command -v gh || printf '%s' 'C:/Program Files/GitHub CLI/gh.exe')
 [ -x "$GH" ] || command -v "$GH" >/dev/null || { echo 'gh not found' >&2; exit 1; }
 REPO="MyManDev/football-squad-optimizer"
-TAG="${1:?usage: deploy.sh <site-tag>}"
+case "$#" in 2|3|4) ;; *) echo 'usage: deploy.sh <site-tag> <accepted-generated-at-ISO> [settled-gameweek] [expected-data-root]' >&2; exit 2;; esac
+TAG="$1"; ACCEPTED_STAMP="$2"; SETTLED="${3:-}"; DATA_ROOT="${4:-}"
+S=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 1
 log(){ echo "$(date -u +%H:%M:%S) $*"; }
+case "$SETTLED" in *[!0-9]*) log "settled gameweek must be a number"; exit 2;; esac
+if [ "${TAG#*-settled}" != "$TAG" ] && [ -z "$SETTLED" ]; then
+  log "a settled tag requires its gameweek"; exit 2
+fi
+if [ -n "$DATA_ROOT" ] && [ ! -d "$DATA_ROOT" ]; then log "expected data root does not exist"; exit 2; fi
+sh "$S/verify_release.sh" --preflight || { log "live verification preflight failed"; exit 1; }
 
 git fetch -q origin || { log "fetch failed"; exit 1; }
 MAIN=$(git rev-parse origin/main)
@@ -90,4 +98,9 @@ log "deploy run $DRUN finished: $CONC"
 if [ "$RC" -eq 0 ] && ! "$GH" run view "$DRUN" --json jobs --jq '.jobs[].name' 2>/dev/null | grep -qxF "production $TAG"; then
   log "deploy run $DRUN has no job 'production $TAG'; it is not this release's run"; exit 1
 fi
-exit $RC
+[ "$RC" -eq 0 ] || exit "$RC"
+sleep 45
+sh "$S/verify_release.sh" "$ACCEPTED_STAMP" "$SETTLED" "$DATA_ROOT" || {
+  log "post-deployment verification failed"; exit 1
+}
+log "LIVE: publication, smoke and page tour passed"
