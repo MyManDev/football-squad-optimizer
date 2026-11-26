@@ -29,7 +29,7 @@ from squadopt.application.advice_record import (
 )
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import forecast_source
-from squadopt.application.device_plan import device_plan_capture_table
+from squadopt.application.device_plan import device_plan_capture_table, device_plan_horizon
 from squadopt.application.entries import EntryError, EntryRegistration, EntryRegistry
 from squadopt.application.league_tree_identity import record_tree_identity
 from squadopt.application.league_views import (
@@ -851,6 +851,12 @@ def publish_prepared_league(
     # which keeps its own copy for pages from before the per-capture table.
     # Every page names a player as the game does, and the device table beside them too.
     short_names = game_names(snapshot.payloads[BOOTSTRAP_PAYLOAD], inputs.players)
+    device_horizon_builder = member_horizon_builder(
+        snapshot, season=season, panel=panel, in_season=in_season
+    )
+    device_horizon = device_plan_horizon(
+        inputs, projection, read_season_rules(snapshot, season=season), device_horizon_builder
+    )
     table_payload = with_game_short_names(
         device_plan_capture_table(
             inputs,
@@ -858,6 +864,7 @@ def publish_prepared_league(
             read_season_rules(snapshot, season=season),
             bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
             top100=top100_counts,
+            horizon=device_horizon,
         ),
         short_names,
     )
@@ -900,6 +907,7 @@ def publish_prepared_league(
         controls=baselines.controls if baselines is not None else None,
         device_only=request.menu == "device",
         short_names=short_names,
+        device_horizon=device_horizon,
     )
     if on_stage is not None:
         on_stage("members")
