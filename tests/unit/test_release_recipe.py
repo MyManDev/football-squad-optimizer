@@ -72,12 +72,13 @@ def test_ship_dry_run_only_reads_repository_location(tmp_path: Path, tag: str) -
     assert {p.name for p in tmp_path.iterdir()} == {"commands", "calls"}
     if result.returncode == 0:
         lines = result.stdout.splitlines()
-        assert len(lines) == 15
+        assert len(lines) == 16
         for required in (
             "two parents",
             "unexpired site artifact",
             "deploy-pages.yml",
             "live smoke checks",
+            "full page tour",
             "60 minutes",
             "45 minutes",
             "40 minutes",
@@ -833,6 +834,7 @@ def test_a_movement_that_is_not_text_is_printed_not_raised(
 
 
 _DEPLOY_TAG = "site-2026-27-gw06-fix1"
+_DEPLOY_STAMP = "2026-09-18T17:00:00Z"
 
 #: git answers as a release-ready main would; ls-remote lists $REMOTE_TAGS.
 _DEPLOY_GIT = """case "$*" in
@@ -840,7 +842,7 @@ _DEPLOY_GIT = """case "$*" in
   "fetch -q origin") :;;
   "rev-parse origin/main") echo mainsha;;
   "rev-parse origin/develop") echo devsha;;
-  "rev-list --parents -n1 origin/main") echo "mainsha parent1 parent2";;
+  "rev-list --parents -n1 origin/main") echo "mainsha ${MAIN_PARENTS-parent1 parent2}";;
   "rev-parse origin/main^{tree}"|"rev-parse origin/develop^{tree}") echo treesha;;
   "ls-remote --tags origin")
     for tag in $REMOTE_TAGS; do printf 'sha\\trefs/tags/%s\\n' "$tag"; done;;
@@ -883,20 +885,58 @@ esac
 """
 
 
-@pytest.mark.parametrize(
-    "scenario", ["own-run", "existing-tag", "unregistered", "other-tag", "failed"]
-)
-def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str) -> None:
-    """The newest dispatch run was taken as this one, so a run GitHub had not registered yet
-    left the script watching the previous release's finished run and reporting its result."""
+def _run_deploy_recipe(
+    tmp_path: Path,
+    *,
+    scenario: str = "own-run",
+    gh_script: str = _DEPLOY_GH,
+    arguments: list[str] | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> tuple[subprocess.CompletedProcess[str], str]:
+    """Run the real recipe against disposable commands, including its local preflight.
 
+    Every operation that could contact a service or change a repository is a stand-in.
+    The verifier's command, browser launch and browser tests are stand-ins too; no real
+    deployment, verification request or browser process runs through this harness.
+    """
     if not Path(SHELL).is_file():
         pytest.skip("A POSIX shell is required")
     commands = tmp_path / "commands"
     commands.mkdir()
     calls = tmp_path / "calls"
-    stubs = {"git": _DEPLOY_GIT, "gh": _DEPLOY_GH, "sleep": ":\n"}
-    for name, body in stubs.items():
+    cli = tmp_path / "web/node_modules/@playwright/test/cli.js"
+    cli.parent.mkdir(parents=True)
+    cli.write_text("local runner stand-in\n", encoding="utf-8")
+    expected_data = tmp_path / "accepted data"
+    expected_data.mkdir()
+    python = """case "${1:-}" in
+  -c) exit 0;;
+  */verify_live.py)
+    [ "${2:-}" = "$ACCEPTED_STAMP" ] || exit 98
+    exit "${VERIFY_EXIT:-0}";;
+  *) exit 99;;
+esac
+"""
+    node = """case "${1:-}" in
+  -e) exit "${PREFLIGHT_EXIT:-0}";;
+  */cli.js)
+    case "${2:-}" in
+      --version) exit 0;;
+      test)
+        [ "${LIVE_BASE_URL:-}" = https://squadopt.mymandev.com ] || exit 98
+        exit "${BROWSER_EXIT:-0}";;
+    esac;;
+esac
+exit 99
+"""
+    for name, body in {
+        "git": _DEPLOY_GIT,
+        "gh": gh_script,
+        "sleep": ":\n",
+        "python": python,
+        "python3": python,
+        "node": node,
+    }.items():
         target = commands / name
         target.write_text(
             '#!/bin/sh\nprintf "%s\\n" "$0 $*" >> "$CALLS"\n' + body,
@@ -904,7 +944,6 @@ def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str
             newline="\n",
         )
         target.chmod(0o755)
-    # A tag the release tag is a prefix of must not read as the release tag itself.
     remote = [f"{_DEPLOY_TAG}0", "site-2026-27-gw06-decision"]
     if scenario == "existing-tag":
         remote.append(_DEPLOY_TAG)
@@ -915,11 +954,13 @@ def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str
             'PATH="$(cd "$COMMANDS" && pwd):$PATH"; export PATH; exec /bin/sh "$@"',
             "deploy-test",
             str(ROOT / "scripts/release/deploy.sh"),
-            _DEPLOY_TAG,
+            *(arguments if arguments is not None else [_DEPLOY_TAG, _DEPLOY_STAMP]),
         ],
         cwd=tmp_path,
         env={
             **os.environ,
+            # This is a hermetic operator simulation; the production CI refusal stays on.
+            "CI": "",
             "COMMANDS": commands.as_posix(),
             "CALLS": calls.as_posix(),
             "DISPATCHED": (tmp_path / "dispatched").as_posix(),
@@ -927,13 +968,31 @@ def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str
             "REMOTE_TAGS": " ".join(remote),
             "SCENARIO": scenario,
             "TAG": _DEPLOY_TAG,
+            "ACCEPTED_STAMP": _DEPLOY_STAMP,
+            "MAIN_PARENTS": "parent1 parent2",
+            "PREFLIGHT_EXIT": "0",
+            "VERIFY_EXIT": "0",
+            "BROWSER_EXIT": "0",
+            "POLLS": (tmp_path / "polls").as_posix(),
+            "RERUN": (tmp_path / "rerun").as_posix(),
+            **(extra_env or {}),
         },
         capture_output=True,
         text=True,
         check=False,
         timeout=30,
     )
-    log = calls.read_text()
+    return result, calls.read_text()
+
+
+@pytest.mark.parametrize(
+    "scenario", ["own-run", "existing-tag", "unregistered", "other-tag", "failed"]
+)
+def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str) -> None:
+    """The newest dispatch run was taken as this one, so a run GitHub had not registered yet
+    left the script watching the previous release's finished run and reporting its result."""
+
+    result, log = _run_deploy_recipe(tmp_path, scenario=scenario)
     assert "run watch 100" not in log
     assert "run view 100" not in log
     if scenario == "own-run":
@@ -994,47 +1053,7 @@ def test_a_failed_main_ci_is_rerun_once_before_the_deploy_refuses(
     """A flaky check on main stopped the scheduled releases of 14 and 15 Nov 2026 after their
     release PRs had merged. The failed jobs now run once more; a second failure refuses."""
 
-    if not Path(SHELL).is_file():
-        pytest.skip("A POSIX shell is required")
-    commands = tmp_path / "commands"
-    commands.mkdir()
-    calls = tmp_path / "calls"
-    stubs = {"git": _DEPLOY_GIT, "gh": _RERUN_GH, "sleep": ":\n"}
-    for name, body in stubs.items():
-        target = commands / name
-        target.write_text(
-            '#!/bin/sh\nprintf "%s\\n" "$0 $*" >> "$CALLS"\n' + body,
-            encoding="utf-8",
-            newline="\n",
-        )
-        target.chmod(0o755)
-    result = subprocess.run(
-        [
-            SHELL,
-            "-c",
-            'PATH="$(cd "$COMMANDS" && pwd):$PATH"; export PATH; exec /bin/sh "$@"',
-            "deploy-test",
-            str(ROOT / "scripts/release/deploy.sh"),
-            _DEPLOY_TAG,
-        ],
-        cwd=tmp_path,
-        env={
-            **os.environ,
-            "COMMANDS": commands.as_posix(),
-            "CALLS": calls.as_posix(),
-            "DISPATCHED": (tmp_path / "dispatched").as_posix(),
-            "POLLS": (tmp_path / "polls").as_posix(),
-            "RERUN": (tmp_path / "rerun").as_posix(),
-            "REMOTE_TAGS": "site-2026-27-gw06-decision",
-            "SCENARIO": scenario,
-            "TAG": _DEPLOY_TAG,
-        },
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=30,
-    )
-    log = calls.read_text()
+    result, log = _run_deploy_recipe(tmp_path, scenario=scenario, gh_script=_RERUN_GH)
     assert log.count("run rerun 11 --failed") == 1
     assert (
         "main CI run 11 attempt 1 ended failure; re-running its failed jobs once" in result.stdout
@@ -1052,6 +1071,73 @@ def test_a_failed_main_ci_is_rerun_once_before_the_deploy_refuses(
         assert result.returncode == 1
         assert "main CI run 11 could not be re-run; refusing to deploy" in result.stdout
         assert "tag -a" not in log
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize("data_root", [False, True])
+def test_deploy_forwards_publication_verification_arguments(
+    tmp_path: Path, settled: bool, data_root: bool
+) -> None:
+    arguments = [_DEPLOY_TAG, _DEPLOY_STAMP]
+    if settled or data_root:
+        arguments.append("6" if settled else "")
+    if data_root:
+        arguments.append((tmp_path / "accepted data").as_posix())
+    result, log = _run_deploy_recipe(tmp_path, arguments=arguments)
+    assert result.returncode == 0, result.stdout + result.stderr
+    verification = next(line for line in log.splitlines() if "verify_live.py" in line)
+    assert _DEPLOY_STAMP in verification
+    assert ("--settled 6" in verification) is settled
+    assert ("--expected-data-root" in verification) is data_root
+    if data_root:
+        assert (tmp_path / "accepted data").as_posix() in verification
+    assert log.index("node -e ") < log.index("fetch -q origin")
+    assert log.index("verify_live.py") < log.index("cli.js test --config playwright.live.config.ts")
+
+
+def test_deploy_requires_the_accepted_publication_stamp(tmp_path: Path) -> None:
+    result, log = _run_deploy_recipe(tmp_path, arguments=[_DEPLOY_TAG])
+    assert result.returncode == 2
+    assert "accepted-generated-at-ISO" in result.stderr
+    assert "fetch -q origin" not in log
+    assert "tag -a" not in log
+    assert "workflow run" not in log
+
+
+@pytest.mark.parametrize("parents", ["", "parent1", "parent1 parent2 parent3"])
+def test_deploy_refuses_main_without_exactly_two_parents(tmp_path: Path, parents: str) -> None:
+    result, log = _run_deploy_recipe(tmp_path, extra_env={"MAIN_PARENTS": parents})
+    assert result.returncode == 1
+    assert f"main tip mainsha has {len(parents.split())} parent(s)" in result.stdout
+    assert "not a release merge; refusing" in result.stdout
+    assert "run list --workflow ci.yml" not in log
+    assert "tag -a" not in log
+    assert "workflow run" not in log
+
+
+@pytest.mark.parametrize("failure", ["PREFLIGHT_EXIT", "CI"])
+def test_deploy_preflight_failure_refuses_before_fetch(tmp_path: Path, failure: str) -> None:
+    result, log = _run_deploy_recipe(tmp_path, extra_env={failure: "1"})
+    assert result.returncode == 1
+    assert "live verification preflight failed" in result.stdout
+    assert "fetch -q origin" not in log
+    assert "tag -a" not in log
+    assert "workflow run" not in log
+
+
+@pytest.mark.parametrize("failure", ["VERIFY_EXIT", "BROWSER_EXIT"])
+def test_deploy_propagates_post_deployment_verification_failure(
+    tmp_path: Path, failure: str
+) -> None:
+    result, log = _run_deploy_recipe(tmp_path, extra_env={failure: "7"})
+    assert result.returncode == 1
+    assert "post-deployment verification failed" in result.stdout
+    assert "run watch 200 --exit-status" in log
+    assert "verify_live.py" in log
+    if failure == "VERIFY_EXIT":
+        assert "cli.js test " not in log
+    else:
+        assert "cli.js test --config playwright.live.config.ts" in log
 
 
 @pytest.mark.parametrize(

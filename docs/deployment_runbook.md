@@ -285,7 +285,19 @@ That gate requires `verify_live.py` to print `ALL GOOD` (retrying once after a m
 then runs the live browser smoke and full page tour. A browser failure fails the release
 step. `ship.sh` passes the accepted stamp, settled week and release worktree's data root
 to this same gate. If passing a data root without a settled week, pass an empty third
-argument: `deploy.sh <tag> <stamp> '' <expected-data-root>`. `deploy.sh` watches the
+argument: `deploy.sh <tag> <stamp> '' <expected-data-root>`. The weekly caller still passes
+the same five required `ship.sh` arguments (site PR, tag, release branch, accepted stamp,
+summary), with the settled gameweek as its optional sixth argument. Its recovery message
+points to this runbook.
+
+To repeat only the HTTP/content verification after recovery, without another deployment:
+
+```sh
+python scripts/release/verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>] [--expected-data-root <path>]
+```
+
+The recovery `deploy.sh` command above already runs this verifier and the browser gate.
+`deploy.sh` watches the
 earliest dispatch run created since a minute before its own dispatch (the minute is slack for
 clock skew), so an older release's finished run is not picked while this machine's clock is
 within a minute of GitHub's. It refuses a successful run whose production job does not name
@@ -579,12 +591,12 @@ The injected Cloudflare `POST /cdn-cgi/rum` is counted separately as blocked ana
 transport is omitted from page-health checks because exercising it would write a record.
 It is never forwarded. Any other attempted write fails the check. LLMOPT stops at its empty
 key step, and the contribution form is only visited. The tour records redacted request
-journeys without traces, screenshots, DOM snapshots or comparison identities. Existing live
-faults have named expected-failure tests scoped to the observed profiles; an unexpected pass
-requires removing the repaired fault, and unrelated failures still fail the normal page test.
+journeys without traces, screenshots, DOM snapshots or comparison identities. The decision,
+standalone entry, what-if and card regressions repaired in the live publication are ordinary
+checks in all four profiles. Their former symptoms are never filtered from page health.
 
-The combined release browser gate depends on the beacon correction in #1505 for the existing
-smoke. The tour applies the same local-204 behavior independently; it does not change that smoke.
+The existing smoke includes the local beacon response from #1505. The tour answers its usage
+requests independently with the same 204 behavior.
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 

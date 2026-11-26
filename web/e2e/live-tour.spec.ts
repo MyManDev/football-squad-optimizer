@@ -37,37 +37,6 @@ interface Issue {
   reason: string;
 }
 
-interface Fault extends Issue {
-  page: string;
-  name: string;
-  profiles: string[];
-}
-
-// Each observed fault has its own failing check below. The normal page check still
-// rejects every other fault, and a repaired fault becomes an unexpected pass.
-const TOUR_PROFILES = [
-  "live-tour-desktop-tr",
-  "live-tour-phone-tr",
-  "live-tour-desktop-en",
-  "live-tour-phone-en",
-];
-const KNOWN_FAULTS: Fault[] = [
-  ...["decision", "entry"].map((page) => ({
-    page,
-    name: `empty-device-decision-${page}`,
-    check: "decision" as const,
-    reason: "decision panel has neither a plan nor a compute button",
-    profiles: TOUR_PROFILES,
-  })),
-  ...["what-if", "card"].map((page) => ({
-    page,
-    name: `empty-device-tool-${page}`,
-    check: "empty-tool" as const,
-    reason: "open week renders the empty-tool message",
-    profiles: TOUR_PROFILES,
-  })),
-];
-
 const test = base.extend<object, { publication: Publication }>({
   publication: [
     async ({ playwright }, provide) => {
@@ -291,10 +260,12 @@ async function visit(
       issues.push({ check: "empty-tool", reason: "open week renders the empty-tool message" });
     if ((name === "decision" || name === "entry") && publication.weekOpen) {
       const panel = page.locator('[data-mark="decision"]');
-      const planOrCompute = panel.locator(
-        `#${STORY_ANCHORS.captain}, [data-device-compute], [data-compute]`,
-      );
-      if ((await panel.count()) === 0 || !(await planOrCompute.first().isVisible()))
+      const planOrCompute = panel
+        .locator(
+          `#${STORY_ANCHORS.captain}, [data-decision-compute] button, [data-device-compute], [data-compute]`,
+        )
+        .filter({ visible: true });
+      if ((await panel.count()) === 0 || (await planOrCompute.count()) === 0)
         issues.push({
           check: "decision",
           reason: "decision panel has neither a plan nor a compute button",
@@ -397,25 +368,20 @@ for (const target of PAGES) {
       contentType: "text/plain",
     });
     expect(result.writes, "no mutating request may leave the browser").toEqual([]);
-    const unexpected = result.issues.filter(
-      (issue) =>
-        !KNOWN_FAULTS.some(
-          (fault) =>
-            fault.page === target.name &&
-            fault.profiles.includes(testInfo.project.name) &&
-            fault.check === issue.check &&
-            fault.reason === issue.reason,
-        ),
-    );
-    expect(unexpected, `${target.name}: page health`).toEqual([]);
+    expect(result.issues, `${target.name}: page health`).toEqual([]);
   });
 }
 
-for (const fault of KNOWN_FAULTS) {
-  test(`known live fault: ${fault.name}`, async ({ page, publication }, testInfo) => {
-    test.skip(!fault.profiles.includes(testInfo.project.name), "Fault belongs to another profile.");
+// The four pages repaired in the live publication also retain ordinary open-week
+// regression checks. Their symptoms are never filtered from the general page checks.
+for (const target of PAGES.filter(({ name }) =>
+  ["decision", "entry", "what-if", "card"].includes(name),
+)) {
+  test(`${target.name}: repaired open-week content is available`, async ({
+    page,
+    publication,
+  }, testInfo) => {
     test.skip(!publication.weekOpen, "An empty open-week plan is not a closed-week fault.");
-    const target = PAGES.find((candidate) => candidate.name === fault.page)!;
     const result = await visit(
       page,
       publication,
@@ -424,15 +390,11 @@ for (const fault of KNOWN_FAULTS) {
       target.address(publication),
     );
     await page.close();
+    await testInfo.attach("journey.txt", {
+      body: result.journey.join("\n"),
+      contentType: "text/plain",
+    });
     expect(result.writes, "no mutating request may leave the browser").toEqual([]);
-    expect(
-      result.issues.filter((issue) => issue.check !== fault.check || issue.reason !== fault.reason),
-      "unrelated failures remain unexpected",
-    ).toEqual([]);
-    test.fail(true, fault.name);
-    expect(
-      result.issues.filter((issue) => issue.check === fault.check && issue.reason === fault.reason),
-      fault.name,
-    ).toEqual([]);
+    expect(result.issues, `${target.name}: repaired open-week content`).toEqual([]);
   });
 }
