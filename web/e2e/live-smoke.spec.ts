@@ -122,6 +122,11 @@ test("published league and member journey works without submitting a solve", asy
   // Even an accidental UI submission cannot create a job during this release check.
   await page.route("**/*", (route) => {
     const request = route.request();
+    // The usage record's beacon is the one write a visit makes on purpose (ADR 0014). The
+    // check answers it here, so a release check is not counted as a visit and the page sees
+    // the record's own empty answer rather than a blocked request.
+    if (new URL(request.url()).pathname === "/api/v1/usage/events")
+      return route.fulfill({ status: 204 });
     if (
       new URL(request.url()).pathname.startsWith("/api/v1/") &&
       !["GET", "HEAD", "OPTIONS"].includes(request.method())
