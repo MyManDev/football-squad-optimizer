@@ -83,3 +83,22 @@ three budgets. It does not pass the gate and its interval holds zero. It keeps a
 Across the primary cell the levels fall into two groups: 0.5, 1 and 1.2 are at or above 0
 (+2.60, +0.78, +0.74), and 1.5 and above are at or below it (-0.11 to -1.14), as the planner
 starts holding three to five transfers a week on average and spends them late.
+
+## The owner's chosen value, 1.12
+
+Added 27 Nov 2026 after every number above was read: the owner chose 1.12 for the policy. It
+is walked once more on the primary cell at budget 8 (four chains,
+`artifacts/component_banked_transfer_value/level_1p12/`) and read with the record's bootstrap.
+A level named after the record was read; it is a description, not a gate reading.
+
+| 1.12 against | Mean a week | 90% interval | 2021-22 | 2022-23 | 2023-24 | 2024-25 |
+|---|---|---|---|---|---|---|
+| 0 (policy) | +0.12 | [-1.78, +2.12] | -164 | +65 | +2 | +115 |
+| 0.5 | -2.48 | [-4.02, -0.83] | -164 | -87 | -87 | -26 |
+| 1 | -0.65 | [-2.18, +0.26] | -22 | +10 | -50 | -34 |
+| 1.2 | -0.62 | [-1.43, +0.41] | -80 | -11 | 0 | 0 |
+
+1.12 cannot be told from 0, 1 or 1.2, and it is below 0.5 in every season with the interval
+under zero. It holds 1.5 to 2.2 free transfers on average and pays no hit. The 2021-22 season
+moves by 80 points between 1.12 and 1.2, a level change of 0.08, which is the path sensitivity
+the section above could not create with the solver budget.

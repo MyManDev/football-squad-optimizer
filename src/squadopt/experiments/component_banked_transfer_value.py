@@ -72,12 +72,12 @@ def _check_cell(forecast: str, rules: str) -> None:
 
 
 def level_tag(level: float) -> str:
-    """A level as a label fragment: 0, 0p5, 1p5, 6."""
+    """A level as a label fragment: 0, 0p5, 1p12, 6."""
 
     value = float(level)
-    if value < 0 or abs(value * 10 - round(value * 10)) > 1e-9:
+    if value < 0 or abs(value * 100 - round(value * 100)) > 1e-9:
         raise ExperimentConfigurationError(
-            "A banked value level is a non-negative tenth of a point."
+            "A banked value level is a non-negative hundredth of a point."
         )
     return f"{value:g}".replace(".", "p")
 

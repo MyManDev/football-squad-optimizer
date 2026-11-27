@@ -75,10 +75,10 @@ def _flat(overrides: dict[float, tuple[float, float, tuple[float, ...]]]) -> lis
 
 
 def test_level_tags_and_labels_are_stable():
-    assert [level_tag(v) for v in (0.0, 0.5, 1.2, 6.0)] == ["0", "0p5", "1p2", "6"]
+    assert [level_tag(v) for v in (0.0, 0.5, 1.12, 1.2, 6.0)] == ["0", "0p5", "1p12", "1p2", "6"]
     assert arm_label(COMPONENT, RULES_2026_27, 1.5) == "component_rules_2026_27_bank1p5"
     with pytest.raises(ExperimentConfigurationError):
-        level_tag(0.25)
+        level_tag(0.125)
     with pytest.raises(ExperimentConfigurationError):
         arm_label(CONTROL, RULES_2026_27, 1.0)
 
