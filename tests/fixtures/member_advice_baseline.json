@@ -222,12 +222,12 @@
         "team": "Club 1"
       },
       {
-        "expected_points": 1.13,
-        "name": "Player 1014",
-        "player_id": 1014,
+        "expected_points": 1.11,
+        "name": "Player 1012",
+        "player_id": 1012,
         "position": "MID",
-        "short_name": "1014",
-        "team": "Club 3"
+        "short_name": "1012",
+        "team": "Club 1"
       },
       {
         "expected_points": 1.05,
@@ -260,9 +260,9 @@
     "control_solver_status": "OPTIMAL",
     "data_quality": "partial",
     "entry_id": 101,
-    "expected_gain_vs_hold": 0.040000000000000924,
-    "expected_gap_vs_rival": 0.5600000000000005,
-    "expected_own_points": 13.790000000000001,
+    "expected_gain_vs_hold": 0.0,
+    "expected_gap_vs_rival": 0.5199999999999996,
+    "expected_own_points": 13.75,
     "expected_points_cost": 0.0,
     "expected_points_cost_ceiling": 0.0,
     "gameweek": 2,
@@ -272,30 +272,10 @@
       "purchase_prices"
     ],
     "mode": "ortak-koru",
-    "moves": [
-      {
-        "expected_points_delta": 0.040000000000000924,
-        "move_id": "gw02-1",
-        "player_in": {
-          "name": "Player 1018",
-          "player_id": 1018,
-          "position": "MID",
-          "short_name": "1018",
-          "team": "Club 1"
-        },
-        "player_out": {
-          "name": "Player 1012",
-          "player_id": 1012,
-          "position": "MID",
-          "short_name": "1012",
-          "team": "Club 1"
-        },
-        "reason_code": "mode_tradeoff"
-      }
-    ],
+    "moves": [],
     "optimality_gap": 0.0,
     "overlap_applied": 9,
-    "overlap_count": 10,
+    "overlap_count": 11,
     "overlap_target": 9,
     "plan_kind": "within_free_transfers",
     "rival_entry_id": 202,
@@ -345,14 +325,6 @@
         "team": "Club 2"
       },
       {
-        "expected_points": 1.17,
-        "name": "Player 1018",
-        "player_id": 1018,
-        "position": "MID",
-        "short_name": "1018",
-        "team": "Club 1"
-      },
-      {
         "expected_points": 1.16,
         "name": "Player 1017",
         "player_id": 1017,
@@ -367,6 +339,14 @@
         "position": "MID",
         "short_name": "1015",
         "team": "Club 4"
+      },
+      {
+        "expected_points": 1.13,
+        "name": "Player 1014",
+        "player_id": 1014,
+        "position": "MID",
+        "short_name": "1014",
+        "team": "Club 3"
       },
       {
         "expected_points": 1.23,
@@ -420,12 +400,12 @@
         "team": "Club 1"
       },
       {
-        "expected_points": 1.13,
-        "name": "Player 1014",
-        "player_id": 1014,
+        "expected_points": 1.11,
+        "name": "Player 1012",
+        "player_id": 1012,
         "position": "MID",
-        "short_name": "1014",
-        "team": "Club 3"
+        "short_name": "1012",
+        "team": "Club 1"
       },
       {
         "expected_points": 1.05,
@@ -455,8 +435,8 @@
     "chip": null,
     "data_quality": "partial",
     "entry_id": 101,
-    "expected_gain_vs_hold": 0.040000000000000924,
-    "expected_own_points": 13.790000000000001,
+    "expected_gain_vs_hold": 0.0,
+    "expected_own_points": 13.75,
     "expected_points_cost": 0.0,
     "gameweek": 2,
     "league_id": 352490,
@@ -465,27 +445,7 @@
       "purchase_prices"
     ],
     "mode": "saf-puan",
-    "moves": [
-      {
-        "expected_points_delta": 0.040000000000000924,
-        "move_id": "gw02-1",
-        "player_in": {
-          "name": "Player 1018",
-          "player_id": 1018,
-          "position": "MID",
-          "short_name": "1018",
-          "team": "Club 1"
-        },
-        "player_out": {
-          "name": "Player 1012",
-          "player_id": 1012,
-          "position": "MID",
-          "short_name": "1012",
-          "team": "Club 1"
-        },
-        "reason_code": "points_gain"
-      }
-    ],
+    "moves": [],
     "optimality_gap": 0.0,
     "rival_label": null,
     "season": "2026-27",
@@ -533,14 +493,6 @@
         "team": "Club 2"
       },
       {
-        "expected_points": 1.17,
-        "name": "Player 1018",
-        "player_id": 1018,
-        "position": "MID",
-        "short_name": "1018",
-        "team": "Club 1"
-      },
-      {
         "expected_points": 1.16,
         "name": "Player 1017",
         "player_id": 1017,
@@ -555,6 +507,14 @@
         "position": "MID",
         "short_name": "1015",
         "team": "Club 4"
+      },
+      {
+        "expected_points": 1.13,
+        "name": "Player 1014",
+        "player_id": 1014,
+        "position": "MID",
+        "short_name": "1014",
+        "team": "Club 3"
       },
       {
         "expected_points": 1.23,

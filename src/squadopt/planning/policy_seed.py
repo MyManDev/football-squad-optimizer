@@ -155,8 +155,7 @@ def forecast_policy_seed(
     ]
     discount = transfer.horizon_discount_factor ** (len(weeks) - 1)
     terminal_transfers = (
-        transfer.banked_transfer_value_points
-        * weeks[-1].free_transfers_for_next_gameweek
+        sum(transfer.carried_transfer_values[: weeks[-1].free_transfers_for_next_gameweek])
         * discount
     )
     terminal_chips = discount * sum(

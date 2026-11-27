@@ -505,6 +505,10 @@ class TransferPlanningConfig:
     """Terminal value of each free transfer banked past the horizon's last gameweek,
     in points. Zero means an unused free transfer at the end is worth nothing to the
     plan — the myopic default, which spends a free transfer on any positive gain."""
+    banked_transfer_values: tuple[float, ...] = ()
+    """Terminal value of the ``k``-th free transfer banked past the horizon, ``k = 1..``,
+    in points: a declining schedule in place of the one constant above, which must then be
+    zero. Entries past the tuple's end are worth nothing; empty means the constant."""
     chip_holding_value_points: Mapping[str, float] = field(default_factory=dict)
     """Terminal value, in points, of each named chip left unplayed past the horizon:
     the option value a finite horizon cannot otherwise see, so a chip is played only
@@ -565,6 +569,19 @@ class TransferPlanningConfig:
             "banked_transfer_value_points",
             _finite(self.banked_transfer_value_points, "banked_transfer_value_points", minimum=0.0),
         )
+        schedule = tuple(
+            _finite(value, f"banked_transfer_values[{index}]", minimum=0.0)
+            for index, value in enumerate(self.banked_transfer_values)
+        )
+        if len(schedule) > self.max_free_transfers:
+            raise TransferPlanningConfigurationError(
+                "banked_transfer_values cannot price more free transfers than the cap."
+            )
+        if any(schedule) and self.banked_transfer_value_points != 0:
+            raise TransferPlanningConfigurationError(
+                "A banked free transfer is valued by the constant or the schedule, not both."
+            )
+        object.__setattr__(self, "banked_transfer_values", schedule)
         holding: dict[str, float] = {}
         for name, value in dict(self.chip_holding_value_points).items():
             if name not in CHIP_NAMES:
@@ -630,8 +647,24 @@ class TransferPlanningConfig:
             horizon_discount_factor=1.0,
             objective_weight_scale=1,
             banked_transfer_value_points=0.0,
+            banked_transfer_values=(),
             chip_holding_value_points={},
         )
+
+    @property
+    def carried_transfer_values(self) -> tuple[float, ...]:
+        """The value of the ``k``-th free transfer carried past the horizon, ``k = 1..cap``."""
+
+        if any(self.banked_transfer_values):
+            padding = self.max_free_transfers - len(self.banked_transfer_values)
+            return (*self.banked_transfer_values, *(0.0,) * padding)
+        return (self.banked_transfer_value_points,) * self.max_free_transfers
+
+    @property
+    def values_carried_transfers(self) -> bool:
+        """Whether a free transfer carried past the horizon is worth anything to the plan."""
+
+        return self.banked_transfer_value_points != 0 or any(self.banked_transfer_values)
 
     @property
     def configuration_fingerprint(self) -> str:
@@ -653,6 +686,12 @@ class TransferPlanningConfig:
                 for name, value in sorted(self.chip_holding_value_points.items())
             },
         }
+        if any(self.banked_transfer_values):
+            # Only a schedule enters the digest, so every configuration without one keeps
+            # the fingerprint it had before the schedule existed.
+            payload["banked_transfer_values"] = [
+                float(value).hex() for value in self.banked_transfer_values
+            ]
         # Existing supplied-path callers keep their recorded fingerprints.
         if self.acquisition_sell_on_fee is not None:
             payload["acquisition_sell_on_fee"] = float(self.acquisition_sell_on_fee).hex()

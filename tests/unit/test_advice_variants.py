@@ -352,9 +352,15 @@ def test_a_one_week_rival_strategy_under_a_setting_that_favours_nobody_is_the_st
         TOP100_LIMIT.format(weight=30),
     ]
     for key in set(reference) - {"stated_limits", "optimality_gap"}:
+        # A flat mapping of numbers (the alternative plan's price) is compared the same way:
+        # the two paths may sum a zero price to a rounding residue.
         assert (
             payload[key] == pytest.approx(reference[key])
             if isinstance(reference[key], float)
+            or (
+                isinstance(reference[key], dict)
+                and all(not isinstance(v, (dict, list)) for v in reference[key].values())
+            )
             else payload[key] == reference[key]
         ), key
     assert payload["optimality_gap"] is None

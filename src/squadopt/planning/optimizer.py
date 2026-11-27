@@ -212,6 +212,7 @@ def _validate_integer_bounds(
     banked_value_scaled: int,
     chips: ChipAvailability,
     chip_tail: ChipTailTable | None = None,
+    banked_schedule_scaled: Sequence[int] = (),
 ) -> int:
     objective_bound = 0
     bank_bound = initial_state.bank_tenths
@@ -231,6 +232,7 @@ def _validate_integer_bounds(
         objective_bound += (
             discount_weight * abs(banked_value_scaled) * transfer_config.max_free_transfers
         )
+        objective_bound += discount_weight * sum(abs(value) for value in banked_schedule_scaled)
         largest_sell_prices = sorted(
             (
                 int(value)
@@ -336,6 +338,10 @@ def _build_model(
         transfer_config.banked_transfer_value_points,
         optimization_config.expected_points_scale,
     )
+    banked_schedule_scaled = [
+        scale_expected_points(value, optimization_config.expected_points_scale)
+        for value in transfer_config.banked_transfer_values
+    ]
     bank_bound = _validate_integer_bounds(
         players_by_week,
         initial_state,
@@ -346,6 +352,7 @@ def _build_model(
         banked_value_scaled,
         chips,
         chip_tail,
+        banked_schedule_scaled,
     )
 
     squad_vars: list[list[cp_model.IntVar]] = []
@@ -628,6 +635,26 @@ def _build_model(
         # giving up by spending one now on a small gain, which a finite horizon cannot
         # otherwise see.
         objective_terms.append(discount_weights[-1] * banked_value_scaled * free_next_vars[-1])
+    if any(banked_schedule_scaled):
+        # A declining schedule: ``carried[k]`` is one exactly when the horizon's last week
+        # carries at least ``k + 1`` free transfers, so the term is the schedule's prefix
+        # sum at the carried count whatever its shape.
+        carried = [
+            model.new_bool_var(f"carried_free_transfer_{index + 1}")
+            for index in range(len(banked_schedule_scaled))
+        ]
+        for wider, narrower in pairwise(carried):
+            model.add(wider >= narrower)
+        model.add(cp_model.LinearExpr.sum(carried) <= free_next_vars[-1])
+        model.add(
+            cp_model.LinearExpr.sum(carried)
+            >= free_next_vars[-1] - (transfer_config.max_free_transfers - len(carried))
+        )
+        objective_terms.extend(
+            discount_weights[-1] * value * flag
+            for value, flag in zip(banked_schedule_scaled, carried, strict=True)
+            if value != 0
+        )
     for name in sorted(chips.available):
         for period in chips.windows_for(name):
             holding_value = (
@@ -967,11 +994,9 @@ def _extract_plan(
                     f"Chip {name!r} was played more than once in its window."
                 )
     diagnostics["chips_played"] = dict(chips_played)
-    terminal_value = (
-        transfer_config.banked_transfer_value_points
-        * weeks[-1].free_transfers_for_next_gameweek
-        * transfer_config.horizon_discount_factor ** (len(weeks) - 1)
-    )
+    terminal_value = sum(
+        transfer_config.carried_transfer_values[: weeks[-1].free_transfers_for_next_gameweek]
+    ) * transfer_config.horizon_discount_factor ** (len(weeks) - 1)
     diagnostics["terminal_banked_transfer_value"] = terminal_value
     total_objective += terminal_value
     last_discount = transfer_config.horizon_discount_factor ** (len(weeks) - 1)

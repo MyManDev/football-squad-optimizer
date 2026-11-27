@@ -220,6 +220,11 @@ def horizon_plan_document(
             "transfer_hit_cost_points": transfer_config.transfer_hit_cost_points,
             "hit_points_charged": transfer_config.hit_points_charged,
             "banked_transfer_value_points": transfer_config.banked_transfer_value_points,
+            **(
+                {"banked_transfer_values": list(transfer_config.banked_transfer_values)}
+                if transfer_config.banked_transfer_values
+                else {}
+            ),
         },
         "solver_status": plan.solver_status.name,
         "decision_role": decision_role,

@@ -58,7 +58,7 @@ def optimize_chip_strategy(
         raise ValueError("Net points comparisons cannot use automatic chips.")
     if expected_lineups and "appearance_probability" not in horizon.table:
         raise ValueError("Expected chip scoring requires appearance probabilities.")
-    if transfer.chip_holding_value_points or transfer.banked_transfer_value_points:
+    if transfer.chip_holding_value_points or transfer.values_carried_transfers:
         raise ValueError("Chip strategy requires explicit dated tail values, not fixed reserves.")
     if any(
         p.holding_value_points is not None for n in chips.available for p in chips.windows_for(n)
