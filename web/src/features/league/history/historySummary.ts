@@ -1,29 +1,36 @@
-import { availableWeek, resultWeeks } from "../../../lib/weekState";
+import { availableWeek, weekState } from "../../../lib/weekState";
 import type { WeekReview } from "./historyData";
 
 /** `available` is the history contract's recorded finished-and-checked result. */
-export function settledHistoryWeeks(weeks: readonly WeekReview[]): number[] {
-  return resultWeeks(
-    weeks.map((week) => ({
+function historyWeekState(weeks: readonly WeekReview[]) {
+  return weekState({
+    treeGameweek: null,
+    events: weeks.map((week) => ({
       gameweek: week.gameweek,
       finished: week.status === "available",
       data_checked: week.status === "available",
       deadline_utc: week.deadline_utc,
     })),
-    "checked",
-  );
+    fixtures: null,
+    now: Number.POSITIVE_INFINITY,
+  });
+}
+
+export function settledHistoryWeeks(weeks: readonly WeekReview[]): number[] {
+  return historyWeekState(weeks).checkedWeeks;
 }
 
 /** Aggregate already scored weeks; both sides use exactly the same comparable weeks. */
 export function summarizeHistory(weeks: readonly WeekReview[]) {
-  const checked = settledHistoryWeeks(weeks);
+  const state = historyWeekState(weeks);
+  const checked = state.checkedWeeks;
   const available = weeks
     .filter(
       (week) => week.suggested !== null && week.actual !== null && week.net_difference !== null,
     )
     .map((week) => week.gameweek);
   const current = checked.filter((gameweek) => available.includes(gameweek)).at(-1) ?? null;
-  const throughGameweek = availableWeek(checked.at(-1) ?? null, current, available);
+  const throughGameweek = availableWeek(state.weeks.history, current, available);
   let suggested = 0;
   let actual = 0;
   let difference = 0;
