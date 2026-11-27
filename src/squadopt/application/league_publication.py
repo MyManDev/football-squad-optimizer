@@ -892,12 +892,7 @@ def publish_prepared_league(
         mode_paths=mode_paths,
         rival_menu=request.rival_menu,
         mapper=mapper,
-        horizon_builder=member_horizon_builder(
-            snapshot,
-            season=season,
-            panel=panel,
-            in_season=in_season,
-        ),
+        horizon_builder=device_horizon_builder,
         advice_record_root=request.record_root if request.menu == "full" else None,
         now=request.now,
         manager_words=manager_words,
