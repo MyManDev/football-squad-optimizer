@@ -55,3 +55,31 @@ plausible value. It is walked as one more arm of the primary cell at budgets 6,
 against 0 at the same budget with the record's gate, and against the path noise floor above.
 It is a level named after the record was read, so a pass is reported as such and is not a
 pre-registered reading.
+
+## Results
+
+Record: [`component_banked_transfer_value_path_diagnostic.json`](component_banked_transfer_value_path_diagnostic.json),
+written by `scripts/diagnose_component_banked_transfer_value.py --read`. The budget chains ran
+at commit `3a97b3bc8`; the owner's level ran at `5c822e38e` from a working copy of the
+script's `--walk-owner-level`, which repeats it.
+
+**The budget is not a perturbation on this chain.** The policy's 0 walks the same four
+seasons to the point at budgets 6, 8 and 10 (net change 0, 0, 0, 0 both ways), because almost
+every decision is proved optimal and a proved optimum does not move with the budget. 0.5
+against 0 is the same at all three budgets: +2.60 a week [+1.21, +4.07], seasons +0, +152,
++89, +141. Levels 1 to 6 move by at most 0.3 a week across budgets.
+
+By the rule declared above, the neutral change moved season nets by less than a third of 0.5's
+gains and 0.5 passed at both other budgets, so the record's `move` stands. Read plainly, this
+diagnostic shows the solver is stable; it did not create the early path split it was meant to
+create, so it does not measure path noise. The one path comparison the record holds is still
+the 2022-23 season under the two bank caps: the same 0.5 is +152 under cap 5 and -48 under cap
+2, from chains that differ only in weeks where five transfers could be held.
+
+**The owner's 1.2:** +0.74 a week [-1.11, +2.40], seasons -84, +76, +2, +115, the same at all
+three budgets. It does not pass the gate and its interval holds zero. It keeps a free transfer
+7 to 13 times a season (0.5 keeps one 1 to 4 times) and pays no hit in any season.
+
+Across the primary cell the levels fall into two groups: 0.5, 1 and 1.2 are at or above 0
+(+2.60, +0.78, +0.74), and 1.5 and above are at or below it (-0.11 to -1.14), as the planner
+starts holding three to five transfers a week on average and spends them late.
