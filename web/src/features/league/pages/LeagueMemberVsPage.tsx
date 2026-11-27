@@ -9,6 +9,7 @@ import { points, signedPoints } from "../../../lib/format";
 import { memberAddress } from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../dataErrors";
 import type { SuggestionHistory, WeekReview } from "../history/historyData";
+import { summarizeHistory } from "../history/historySummary";
 import { useSuggestionHistory } from "../queries";
 import { useLeague, useLeagueId } from "../useLeague";
 import styles from "./LeagueMemberVsPage.module.css";
@@ -53,24 +54,21 @@ export function LeagueMemberVsPage() {
   return <LeagueMemberVsView key={entryId} history={query.data} />;
 }
 
-/** A week both sides scored: the only kind the comparison can draw. */
-function comparable(week: WeekReview): boolean {
-  return (
-    week.status === "available" &&
-    week.suggested !== null &&
-    week.actual !== null &&
-    week.net_difference !== null
-  );
-}
-
 export function LeagueMemberVsView({ history }: { history: SuggestionHistory }) {
   const { messages, locale } = useLanguage();
   const leagueId = useLeagueId();
   const copy = messages.vsSquadopt;
   const { entry_id: entryId, weeks } = history.payload;
-  const compared = weeks.filter(comparable).sort((a, b) => b.gameweek - a.gameweek);
+  const summary = summarizeHistory(weeks);
+  const compared = summary.rows
+    .filter((row) => row.comparable)
+    .map(({ week }) => week)
+    .reverse();
   const [chosen, setChosen] = useState<number | null>(null);
-  const week = compared.find((item) => item.gameweek === chosen) ?? compared[0] ?? null;
+  const week =
+    compared.find((item) => item.gameweek === chosen) ??
+    compared.find((item) => item.gameweek === summary.throughGameweek) ??
+    null;
   const fmt = (value: number | null | undefined) =>
     value == null ? "—" : points(value, Number.isInteger(value) ? 0 : 1, locale);
   const signed = (value: number | null) =>

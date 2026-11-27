@@ -14,7 +14,7 @@ import { useOpenRows } from "../components/useOpenRows";
 import { LeagueDataMissing } from "../dataErrors";
 import type { SuggestionHistory, WeekReview } from "../history/historyData";
 import styles from "./LeagueMemberHistoryPage.module.css";
-import { summarizeHistory } from "../history/historySummary";
+import { settledHistoryWeeks, summarizeHistory } from "../history/historySummary";
 import { PersonalSeasonReport } from "../history/PersonalSeasonReport";
 import { useSuggestionHistory } from "../queries";
 
@@ -61,6 +61,7 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
   const [selected, setSelected] = useState<number | null>(null);
   const ordered = [...weeks].sort((a, b) => b.gameweek - a.gameweek);
   const week = ordered.find((item) => item.gameweek === selected);
+  const checked = settledHistoryWeeks(weeks);
   return (
     <div className={styles.page}>
       <header data-zone="history-header">
@@ -93,7 +94,7 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
             </select>
           </label>
           {week ? (
-            <WeekResult week={week} />
+            <WeekResult week={week} settled={checked.includes(week.gameweek)} />
           ) : (
             <HistoryOverview weeks={weeks} onSelect={setSelected} />
           )}
@@ -146,10 +147,10 @@ function HistoryOverview({
             </tr>
           </thead>
           <tbody>
-            {summary.rows.map(({ week, cumulative }) => {
+            {summary.rows.map(({ week, scored, cumulative }) => {
               const open = phone && fold.isOpen(week.gameweek);
               const detailsId = `history-week-${week.gameweek}-details`;
-              const difference = signed(week.status === "available" ? week.net_difference : null);
+              const difference = signed(scored ? week.net_difference : null);
               return (
                 <Fragment key={week.gameweek}>
                   <tr>
@@ -169,10 +170,8 @@ function HistoryOverview({
                         <span className={styles.rowStatus}>{copy.requested}</span>
                       )}
                     </th>
-                    <td>
-                      {format(week.status === "available" ? week.suggested?.net_points : null)}
-                    </td>
-                    <td>{format(week.status === "available" ? week.actual?.net_points : null)}</td>
+                    <td>{format(scored ? week.suggested?.net_points : null)}</td>
+                    <td>{format(scored ? week.actual?.net_points : null)}</td>
                     {phone ? (
                       <td className={styles.detailsCell}>
                         <RowDetailsToggle
@@ -233,7 +232,7 @@ function HistoryOverview({
   );
 }
 
-function WeekResult({ week }: { week: WeekReview }) {
+function WeekResult({ week, settled }: { week: WeekReview; settled: boolean }) {
   const { messages, locale } = useLanguage();
   const copy = messages.suggestionHistory;
   const format = (value: number | null | undefined) =>
@@ -247,7 +246,7 @@ function WeekResult({ week }: { week: WeekReview }) {
         {week.advice_source === "requested_server" && (
           <span className={styles.rowStatus}>{copy.requested}</span>
         )}
-        {week.status !== "available" || !suggested ? (
+        {!settled || !suggested ? (
           <EmptyState title={week.status === "unsettled" ? copy.unsettled : copy.unavailable} />
         ) : (
           <>
@@ -307,7 +306,7 @@ function WeekResult({ week }: { week: WeekReview }) {
         )}
       </Card>
       <SuggestedMove week={week} />
-      {week.status === "available" && (
+      {settled && (
         <Card title={copy.players}>
           <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={copy.players}>
             <table className={styles.players}>

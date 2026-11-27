@@ -115,6 +115,38 @@ describe.each(["tr", "en"] as const)("VS SQUADOPT in %s", (language) => {
   const copy = MESSAGES[language].vsSquadopt;
   const weekWord = MESSAGES[language].suggestionHistory.gameweek;
 
+  it("keeps C until its new comparison row arrives and preserves an explicit older week", async () => {
+    const document = history();
+    const old = document.payload.weeks.find((week) => week.gameweek === 5)!;
+    const next = { ...structuredClone(old), gameweek: 6 };
+    const tree = (value: SuggestionHistory) => (
+      <LanguageProvider initialLanguage={language}>
+        <MemoryRouter initialEntries={["/league/352490/members/101/vs"]}>
+          {withLeague(<LeagueMemberVsView history={value} />)}
+        </MemoryRouter>
+      </LanguageProvider>
+    );
+    const shown = render(tree(document));
+    expect(screen.getByRole("heading", { level: 2, name: weekWord(5) })).toBeVisible();
+    const update = (six: WeekReview, later: WeekReview[] = []) =>
+      shown.rerender(
+        tree({
+          ...document,
+          payload: { ...document.payload, weeks: [document.payload.weeks[0]!, old, six, ...later] },
+        }),
+      );
+    update({ ...next, actual: null, actual_reason: "not_available", net_difference: null });
+    expect(screen.getByRole("heading", { level: 2, name: weekWord(5) })).toBeVisible();
+    expect(screen.getByTestId("vs-headline")).toHaveTextContent(copy.wouldHave("40", "35"));
+    update(next);
+    expect(screen.getByRole("heading", { level: 2, name: weekWord(6) })).toBeVisible();
+    await userEvent.click(within(screen.getByTestId("vs-week-strip")).getAllByRole("button")[0]!);
+    expect(screen.getByRole("heading", { level: 2, name: weekWord(4) })).toBeVisible();
+    update(next, [{ ...structuredClone(next), gameweek: 7 }]);
+    expect(screen.getByRole("heading", { level: 2, name: weekWord(4) })).toBeVisible();
+    expect(within(screen.getByTestId("vs-week-strip")).getAllByRole("button")).toHaveLength(4);
+  });
+
   it("opens on the latest settled week, says what the plan would have scored, and offers the other weeks", async () => {
     open(language, history());
     expect(screen.getByRole("heading", { level: 1, name: copy.title })).toBeInTheDocument();

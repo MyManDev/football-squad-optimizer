@@ -2,6 +2,7 @@ import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import type { SuggestionHistory } from "./historyData";
+import { settledHistoryWeeks } from "./historySummary";
 import styles from "./PersonalSeasonReport.module.css";
 
 const COPY = {
@@ -32,8 +33,9 @@ export function PersonalSeasonReport({ history }: { history: SuggestionHistory }
   const { language, locale } = useLanguage();
   const { member } = useLeagueIdentity(history.payload.league_id);
   if (member?.entryId !== history.payload.entry_id) return null;
+  const checked = settledHistoryWeeks(history.payload.weeks);
   const weeks = history.payload.weeks
-    .filter((week) => week.status === "available" && week.actual && week.suggested)
+    .filter((week) => checked.includes(week.gameweek) && week.actual && week.suggested)
     .sort((left, right) => right.gameweek - left.gameweek);
   if (!weeks.length) return null;
   const copy = COPY[language];
