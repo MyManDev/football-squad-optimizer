@@ -12,6 +12,7 @@ import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../src/fixtu
 import type { FixturesPayload } from "../src/features/fixtures/types";
 import type { DevicePlanDocument } from "../src/features/league/device/types";
 import type { FplEntryBundle } from "../src/features/league/forwarder/documents";
+import type { Scoreboard } from "../src/features/league/types";
 import type { WeekActivity } from "../src/features/liveScore/weekActivity";
 import type { MemberWeek } from "../src/features/liveScore/weekLive";
 import { installLeagueMocks } from "./leagueMocks";
@@ -56,6 +57,41 @@ export async function closedWeek(
   await installLeagueMocks(page);
   const { league_id, league_name } = mockLeagueMembersEnvelope.payload;
   const { season, gameweek } = LISTED;
+  const scenarioCalendar =
+    calendar ?? exampleCalendar({ season, gameweek, deadline: "2020-01-01T00:00:00Z" });
+  // These scenarios have unfinished weeks. Published historical flags belong to a
+  // different clock and must not close a synthetic match window.
+  const scoreboard: Scoreboard = {
+    season: scenarioCalendar.season,
+    league_id,
+    source_snapshot_id: LISTED.source_snapshot_id,
+    captured_at_utc: scenarioCalendar.captured_at_utc,
+    cohort_snapshot_id: null,
+    cohort_picks_snapshot_id: null,
+    gameweeks: scenarioCalendar.gameweeks.map((week) => ({
+      gameweek: week.gameweek,
+      deadline_utc: week.deadline_utc,
+      finished: false,
+      data_checked: false,
+      average_entry_score: null,
+      highest_score: null,
+      ours: null,
+      top100: null,
+      members: [],
+      members_mean_net: null,
+      members_counted: 0,
+    })),
+    cumulative: {
+      through_gameweek: null,
+      gameweeks: [],
+      members_mean_total_points: null,
+      members_counted: 0,
+      average_entry_score: null,
+    },
+  };
+  await page.route("**/data/league/scoreboard.json", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(envelope(scoreboard)) }),
+  );
   const bytes = `${JSON.stringify(
     envelope(table ?? exampleTable({ season, gameweek, capture: LISTED.source_snapshot_id! })),
   )}\n`;
@@ -85,10 +121,7 @@ export async function closedWeek(
   await page.route(/\/data\/device\//, (route) =>
     route.fulfill({ contentType: "application/json", body: bytes }),
   );
-  await serveCalendar(
-    page,
-    calendar ?? exampleCalendar({ season, gameweek, deadline: "2020-01-01T00:00:00Z" }),
-  );
+  await serveCalendar(page, scenarioCalendar);
 }
 
 export async function serveCalendar(page: Page, calendar: FixturesPayload) {
