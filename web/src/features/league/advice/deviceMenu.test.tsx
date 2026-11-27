@@ -32,6 +32,7 @@ const SQUAD: EntrySquad = {
     free_transfers: 1,
     sell_tenths: {},
     top100_weights: [20],
+    horizon: { windows: [3, 5] },
   },
   chips: {
     known: true,

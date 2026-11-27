@@ -396,6 +396,7 @@ def device_plan_entry(
     rules: SeasonRules,
     *,
     top100: Top100Counts | None = None,
+    horizon: Mapping[str, object] | None = None,
 ) -> dict[str, object] | None:
     """One member's side of the problem, or ``None`` where the live path would not plan.
 
@@ -412,10 +413,16 @@ def device_plan_entry(
         return None
     sell: Mapping[int, int] = prepared.sell_prices_tenths
     weights = [weight for weight in TOP100_WEIGHTS if weight != 0]
+    windows = None if horizon is None else horizon.get("windows")
     return {
         # The weights the shared document carries this week, so a page can offer them
         # before it reads the document; none where the week has no counts.
         **({} if top100 is None else {"top100_weights": weights}),
+        **(
+            {"horizon": {"windows": [window for window in (3, 5) if window in windows]}}
+            if isinstance(windows, (list, tuple))
+            else {}
+        ),
         "held": [int(player) for player in held.squad_player_ids],
         "bank_tenths": int(prepared.bank_tenths),
         "free_transfers": int(prepared.free_transfers),

@@ -160,6 +160,8 @@ export interface DevicePlanEntry {
   sell_tenths: Record<string, number>;
   /** The Top 100 weights the shared document carries; absent where the week has none. */
   top100_weights?: number[];
+  /** The longer windows present in this capture's separately published horizon. */
+  horizon?: { windows: number[] };
 }
 
 export interface DevicePreferenceComponent {
@@ -348,6 +350,15 @@ export function isDevicePlanEntry(value: unknown): value is DevicePlanEntry {
     finite(value.free_transfers) &&
     numberMap(value.sell_tenths) &&
     (value.top100_weights === undefined ||
-      (Array.isArray(value.top100_weights) && value.top100_weights.every(finite)))
+      (Array.isArray(value.top100_weights) && value.top100_weights.every(finite))) &&
+    (value.horizon === undefined ||
+      (record(value.horizon) &&
+        Array.isArray(value.horizon.windows) &&
+        value.horizon.windows.every(finite)))
   );
+}
+
+/** Canonical supported windows, present only when the publisher carried their inputs. */
+export function deviceHorizonWindows(entry: DevicePlanEntry): Array<3 | 5> {
+  return ([3, 5] as const).filter((window) => entry.horizon?.windows.includes(window));
 }

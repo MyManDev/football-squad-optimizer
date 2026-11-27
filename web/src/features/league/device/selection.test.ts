@@ -69,7 +69,17 @@ describe("what the device solves", () => {
 
   it.each([3, 5] as const)("offers H%i only for unmodified plain points", (window) => {
     const ask = { ...plain, window };
-    expect(deviceSelection(ask, squad)).toEqual({ kind: "horizon", window });
+    const published = {
+      ...squad,
+      device_plan: {
+        held: [],
+        bank_tenths: 0,
+        free_transfers: 1,
+        sell_tenths: {},
+        horizon: { windows: [3, 5] },
+      },
+    };
+    expect(deviceSelection(ask, published)).toEqual({ kind: "horizon", window });
     for (const extra of [
       { chip: "3xc" as const },
       { top100Weight: 20 },
@@ -87,7 +97,7 @@ describe("what the device solves", () => {
         deviceRun: true,
       },
     ])
-      expect(deviceSelection({ ...ask, ...extra }, squad)).toBeNull();
+      expect(deviceSelection({ ...ask, ...extra }, published)).toBeNull();
   });
 
   it("takes a named weight for the pure-points plan or a named rival at one week", () => {

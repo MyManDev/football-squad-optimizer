@@ -12,6 +12,7 @@ import type { EntrySquad } from "../types";
 import { oneWeekPreferences } from "./preferences";
 import { oneWeekBundle } from "./preferenceBundle";
 import {
+  deviceHorizonWindows,
   hasCompleteStartingXi,
   isDeviceChip,
   isDevicePlanEntry,
@@ -71,6 +72,8 @@ export function deviceSelection(
   }
   if (request.window !== 1) {
     return (request.window === 3 || request.window === 5) &&
+      isDevicePlanEntry(squad.device_plan) &&
+      deviceHorizonWindows(squad.device_plan).includes(request.window) &&
       request.strategy === "saf-puan" &&
       (request.chip ?? null) === null &&
       (request.top100Weight ?? 0) === 0 &&

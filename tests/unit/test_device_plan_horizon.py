@@ -238,7 +238,7 @@ def build_horizon_fixture(root: Path) -> dict[str, Any]:
         members.append(
             {
                 "entry_id": entry_id,
-                "entry": device_plan_entry(inputs, projection, held, rules),
+                "entry": device_plan_entry(inputs, projection, held, rules, horizon=horizon),
                 "reference": references,
             }
         )
@@ -431,9 +431,40 @@ def test_horizon_inputs_change_only_the_device_document_in_the_built_tree(tmp_pa
         path.relative_to(after) for path in after.rglob("*") if path.is_file()
     }
     for path in before.rglob("*"):
-        if path.is_file() and path.name != "device-plan.json":
-            assert path.read_bytes() == (after / path.relative_to(before)).read_bytes(), path.name
+        if not path.is_file() or path.name == "device-plan.json":
+            continue
+        relative = path.relative_to(before)
+        updated = after / relative
+        if relative.parts[0] == "entries":
+            entry = json.loads(updated.read_text(encoding="utf-8"))
+            assert entry["payload"]["device_plan"].pop("horizon") == {"windows": [3, 5]}
+            assert path.read_bytes() == json.dumps(entry, indent=2).encode(), path.name
+        else:
+            assert path.read_bytes() == updated.read_bytes(), path.name
     assert check_tree([str(after.parent)]) == 0
+
+
+@pytest.mark.parametrize("windows", [None, [3], [3, 5]])
+def test_member_device_metadata_changes_no_existing_one_week_field(
+    tmp_path: Path, windows: list[int] | None
+) -> None:
+    world = horizon_world(tmp_path)
+    inputs, projection, rules = (world[key] for key in ("inputs", "projection", "rules"))
+    held = held_member(world, 1)
+    before = device_plan_entry(inputs, projection, held, rules)
+    after = device_plan_entry(
+        inputs,
+        projection,
+        held,
+        rules,
+        horizon=None if windows is None else {"windows": windows},
+    )
+    assert after is not None
+    if windows is None:
+        assert "horizon" not in after
+    else:
+        assert after.pop("horizon") == {"windows": windows}
+    assert json.dumps(before).encode() == json.dumps(after).encode()
 
 
 def test_recorded_horizon_answers_are_the_server_application_answers(tmp_path: Path) -> None:
