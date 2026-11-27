@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-26T02:05:14Z",
+  "generated_at_utc": "2026-11-27T02:04:38Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -225,7 +225,7 @@
         "short_name": "Thiago",
         "position": "FWD",
         "team": "Brentford",
-        "price_tenths": 78,
+        "price_tenths": 77,
         "expected_points": 0.0,
         "event_points": null,
         "is_captain": false,
@@ -307,9 +307,9 @@
     "squad_basis": "captured",
     "active_chip": null,
     "purchase_prices_known": true,
-    "squad_sell_value_tenths": 968,
-    "spendable_budget_tenths": 973,
-    "source_snapshot_id": "fpl-live-20261126T020109Z-c7422fcc66df",
+    "squad_sell_value_tenths": 967,
+    "spendable_budget_tenths": 972,
+    "source_snapshot_id": "fpl-live-20261127T020105Z-e101f783762d",
     "squadopt_comparison": null,
     "data_quality": "complete",
     "missing_fields": [],
@@ -356,7 +356,7 @@
         "204936": 54,
         "437730": 81,
         "84450": 53,
-        "502500": 78
+        "502500": 77
       }
     }
   }
