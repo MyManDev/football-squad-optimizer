@@ -1,12 +1,12 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-26T02:05:14Z",
+  "generated_at_utc": "2026-11-27T02:04:38Z",
   "source_kind": "live",
   "payload": {
     "contract_version": "league_device_plan_v2",
     "season": "2026-27",
     "gameweek": 12,
-    "source_snapshot_id": "fpl-live-20261126T020109Z-c7422fcc66df",
+    "source_snapshot_id": "fpl-live-20261127T020105Z-e101f783762d",
     "policy_id": "member_planning_policy_v2",
     "rules": {
       "squad_size": 15,
@@ -55,9 +55,9 @@
           50
         ],
         "cohort_size": 100,
-        "cohort_snapshot_id": "fpl-top100-20261126T020054Z-21891e211a9a",
-        "picks_snapshot_id": "fpl-elite-picks-20261126T020101Z-238b52c40910",
-        "table_sha256": "82cee494d88c4e20cbcb7cb0d6e86e4a8a1ad7cee73ee55289bf658084277183",
+        "cohort_snapshot_id": "fpl-top100-20261127T020050Z-43d9e94e38c0",
+        "picks_snapshot_id": "fpl-elite-picks-20261127T020057Z-d4cd5e8e66cd",
+        "table_sha256": "913aeec691ea7b9bc94d74e3a8d5713c4b3ce236920deca8bf09f6e245e802e2",
         "picks_gameweek": 11
       },
       "transfers_cap": 20,
@@ -4180,20 +4180,20 @@
         "position": "FWD",
         "buy_tenths": 54,
         "start_tenths": 55,
-        "expected_points": 1.955828010401009,
+        "expected_points": 0.0,
         "coefficients": [
-          196,
-          1760,
-          1956
+          0,
+          0,
+          0
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 1956,
-          "10": 1956,
-          "20": 1956,
-          "30": 1956,
-          "40": 1956,
-          "50": 1956
+          "5": 0,
+          "10": 0,
+          "20": 0,
+          "30": 0,
+          "40": 0,
+          "50": 0
         }
       },
       {
@@ -5203,22 +5203,22 @@
         "short_name": "Haaland",
         "team": "Man City",
         "position": "FWD",
-        "buy_tenths": 158,
+        "buy_tenths": 157,
         "start_tenths": 155,
-        "expected_points": 7.614574002643938,
+        "expected_points": 7.57195748500116,
         "coefficients": [
-          762,
-          6853,
-          7615
+          757,
+          6815,
+          7572
         ],
         "top100_count": 99,
         "top100_scaled": {
-          "5": 7991,
-          "10": 8368,
-          "20": 9122,
-          "30": 9876,
-          "40": 10630,
-          "50": 11384
+          "5": 7947,
+          "10": 8322,
+          "20": 9071,
+          "30": 9821,
+          "40": 10570,
+          "50": 11320
         }
       },
       {
@@ -6205,20 +6205,20 @@
         "position": "DEF",
         "buy_tenths": 42,
         "start_tenths": 45,
-        "expected_points": 0.7810910434272251,
+        "expected_points": 1.0414547245696335,
         "coefficients": [
-          78,
-          703,
-          781
+          104,
+          937,
+          1041
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 781,
-          "10": 781,
-          "20": 781,
-          "30": 781,
-          "40": 781,
-          "50": 781
+          "5": 1041,
+          "10": 1041,
+          "20": 1041,
+          "30": 1041,
+          "40": 1041,
+          "50": 1041
         }
       },
       {
@@ -7353,22 +7353,22 @@
         "short_name": "Okafor",
         "team": "Leeds",
         "position": "MID",
-        "buy_tenths": 57,
+        "buy_tenths": 58,
         "start_tenths": 60,
-        "expected_points": 2.3765673217075167,
+        "expected_points": 2.418800365155906,
         "coefficients": [
-          238,
-          2139,
-          2377
+          242,
+          2177,
+          2419
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 2377,
-          "10": 2377,
-          "20": 2377,
-          "30": 2377,
-          "40": 2377,
-          "50": 2377
+          "5": 2419,
+          "10": 2419,
+          "20": 2419,
+          "30": 2419,
+          "40": 2419,
+          "50": 2419
         }
       },
       {
@@ -7803,7 +7803,7 @@
         "short_name": "Brobbey",
         "team": "Sunderland",
         "position": "FWD",
-        "buy_tenths": 57,
+        "buy_tenths": 56,
         "start_tenths": 60,
         "expected_points": 0.0,
         "coefficients": [
@@ -9328,22 +9328,22 @@
         "short_name": "De Cuyper",
         "team": "Brighton",
         "position": "DEF",
-        "buy_tenths": 55,
+        "buy_tenths": 56,
         "start_tenths": 45,
-        "expected_points": 3.35396149040452,
+        "expected_points": 3.3968085477250813,
         "coefficients": [
-          335,
-          3019,
-          3354
+          340,
+          3057,
+          3397
         ],
         "top100_count": 70,
         "top100_scaled": {
-          "5": 3471,
-          "10": 3589,
-          "20": 3824,
-          "30": 4058,
-          "40": 4293,
-          "50": 4528
+          "5": 3516,
+          "10": 3635,
+          "20": 3872,
+          "30": 4110,
+          "40": 4348,
+          "50": 4586
         }
       },
       {
@@ -10303,22 +10303,22 @@
         "short_name": "Kinsk\u00fd",
         "team": "Spurs",
         "position": "GK",
-        "buy_tenths": 44,
+        "buy_tenths": 45,
         "start_tenths": 45,
-        "expected_points": 2.7864214227810264,
+        "expected_points": 2.8286233338750137,
         "coefficients": [
-          279,
-          2507,
-          2786
+          283,
+          2546,
+          2829
         ],
         "top100_count": 18,
         "top100_scaled": {
-          "5": 2811,
-          "10": 2837,
-          "20": 2887,
-          "30": 2937,
-          "40": 2987,
-          "50": 3037
+          "5": 2854,
+          "10": 2880,
+          "20": 2930,
+          "30": 2981,
+          "40": 3032,
+          "50": 3083
         }
       },
       {
@@ -10430,20 +10430,20 @@
         "position": "MID",
         "buy_tenths": 53,
         "start_tenths": 55,
-        "expected_points": 1.807198077567378,
+        "expected_points": 2.409597436756504,
         "coefficients": [
-          181,
-          1626,
-          1807
+          241,
+          2169,
+          2410
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 1807,
-          "10": 1807,
-          "20": 1807,
-          "30": 1807,
-          "40": 1807,
-          "50": 1807
+          "5": 2410,
+          "10": 2410,
+          "20": 2410,
+          "30": 2410,
+          "40": 2410,
+          "50": 2410
         }
       },
       {
@@ -10503,22 +10503,22 @@
         "short_name": "Hume",
         "team": "Sunderland",
         "position": "DEF",
-        "buy_tenths": 42,
+        "buy_tenths": 41,
         "start_tenths": 45,
-        "expected_points": 2.7506550484157026,
+        "expected_points": 2.70838997554276,
         "coefficients": [
-          275,
-          2476,
-          2751
+          271,
+          2437,
+          2708
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 2751,
-          "10": 2751,
-          "20": 2751,
-          "30": 2751,
-          "40": 2751,
-          "50": 2751
+          "5": 2708,
+          "10": 2708,
+          "20": 2708,
+          "30": 2708,
+          "40": 2708,
+          "50": 2708
         }
       },
       {
@@ -11103,22 +11103,22 @@
         "short_name": "Wirtz",
         "team": "Liverpool",
         "position": "MID",
-        "buy_tenths": 74,
+        "buy_tenths": 75,
         "start_tenths": 75,
-        "expected_points": 4.515005018166981,
+        "expected_points": 4.557695094447827,
         "coefficients": [
-          452,
-          4063,
-          4515
+          456,
+          4102,
+          4558
         ],
         "top100_count": 7,
         "top100_scaled": {
-          "5": 4531,
-          "10": 4547,
-          "20": 4578,
-          "30": 4610,
-          "40": 4641,
-          "50": 4673
+          "5": 4574,
+          "10": 4590,
+          "20": 4622,
+          "30": 4653,
+          "40": 4685,
+          "50": 4717
         }
       },
       {
@@ -11753,7 +11753,7 @@
         "short_name": "Thiago",
         "team": "Brentford",
         "position": "FWD",
-        "buy_tenths": 78,
+        "buy_tenths": 77,
         "start_tenths": 80,
         "expected_points": 0.0,
         "coefficients": [
@@ -12528,22 +12528,22 @@
         "short_name": "Muharemovi\u0107",
         "team": "Leeds",
         "position": "DEF",
-        "buy_tenths": 51,
+        "buy_tenths": 52,
         "start_tenths": 50,
-        "expected_points": 3.443427145321124,
+        "expected_points": 3.4864766785404933,
         "coefficients": [
-          344,
-          3099,
-          3443
+          349,
+          3137,
+          3486
         ],
         "top100_count": 3,
         "top100_scaled": {
-          "5": 3449,
-          "10": 3454,
-          "20": 3464,
-          "30": 3474,
-          "40": 3485,
-          "50": 3495
+          "5": 3492,
+          "10": 3497,
+          "20": 3507,
+          "30": 3518,
+          "40": 3528,
+          "50": 3539
         }
       },
       {
@@ -13755,20 +13755,20 @@
         "position": "MID",
         "buy_tenths": 65,
         "start_tenths": 65,
-        "expected_points": 2.2828496465735504,
+        "expected_points": 1.7121372349301627,
         "coefficients": [
-          228,
-          2055,
-          2283
+          171,
+          1541,
+          1712
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 2283,
-          "10": 2283,
-          "20": 2283,
-          "30": 2283,
-          "40": 2283,
-          "50": 2283
+          "5": 1712,
+          "10": 1712,
+          "20": 1712,
+          "30": 1712,
+          "40": 1712,
+          "50": 1712
         }
       },
       {
@@ -14005,20 +14005,20 @@
         "position": "MID",
         "buy_tenths": 73,
         "start_tenths": 75,
-        "expected_points": 2.4162947773107892,
+        "expected_points": 1.812221082983092,
         "coefficients": [
-          242,
-          2174,
-          2416
+          181,
+          1631,
+          1812
         ],
         "top100_count": 1,
         "top100_scaled": {
-          "5": 2418,
-          "10": 2419,
-          "20": 2421,
-          "30": 2424,
-          "40": 2426,
-          "50": 2428
+          "5": 1813,
+          "10": 1814,
+          "20": 1816,
+          "30": 1818,
+          "40": 1819,
+          "50": 1821
         }
       },
       {
@@ -14553,22 +14553,22 @@
         "short_name": "George Hemmings",
         "team": "Aston Villa",
         "position": "MID",
-        "buy_tenths": 44,
+        "buy_tenths": 43,
         "start_tenths": 45,
-        "expected_points": 0.2804600541451817,
+        "expected_points": 0.26845254145719366,
         "coefficients": [
-          28,
-          252,
-          280
+          27,
+          241,
+          268
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 280,
-          "10": 280,
-          "20": 280,
-          "30": 280,
-          "40": 280,
-          "50": 280
+          "5": 268,
+          "10": 268,
+          "20": 268,
+          "30": 268,
+          "40": 268,
+          "50": 268
         }
       },
       {
@@ -16330,20 +16330,20 @@
         "position": "DEF",
         "buy_tenths": 45,
         "start_tenths": 45,
-        "expected_points": 0.12395570134850117,
+        "expected_points": 0.09296677601137587,
         "coefficients": [
-          12,
-          112,
-          124
+          9,
+          84,
+          93
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 124,
-          "10": 124,
-          "20": 124,
-          "30": 124,
-          "40": 124,
-          "50": 124
+          "5": 93,
+          "10": 93,
+          "20": 93,
+          "30": 93,
+          "40": 93,
+          "50": 93
         }
       },
       {
