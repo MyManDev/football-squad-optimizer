@@ -33,6 +33,7 @@ its header.
 | [0023](0023-llmopt-verified-rule-repairs.md) | Offer a rule edit only after computing a feasible plan | 2026-11-20 | Proposed | None |
 | [0024](0024-llmopt-release-control.md) | Select the planning workflow with one server setting | 2026-11-20 | Proposed | None |
 | [0025](0025-expected-window-phase-work.md) | Admit expected-window search against measured remaining work | 2026-11-20 | Proposed | None |
+| [0026](0026-one-week-state-rule.md) | One week-state rule for every web consumer | 2026-11-26 | Proposed | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.
