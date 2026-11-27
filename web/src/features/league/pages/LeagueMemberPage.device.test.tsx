@@ -252,6 +252,9 @@ describe("the device solve on the member page", () => {
     cleanup();
     renderView(squadWith(entryBlock), "mode=saf-puan&window=3");
     expect(deviceButton()).toBeNull();
+    cleanup();
+    renderView(squadWith(entryBlock), "mode=saf-puan&window=3&model=football");
+    expect(deviceButton()).toBeNull();
   });
 
   it("is not offered while the manager's word is on, which only the service solves", () => {

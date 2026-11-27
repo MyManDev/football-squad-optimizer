@@ -18,6 +18,8 @@ import type { LpSolver } from "../lp/problem";
  * far slower than any measured one, or on a solve that has stopped making progress.
  */
 export const DEVICE_SOLVE_CEILING_SECONDS = 120;
+/** H3/H5 must prove the complete window inside one minute on the measured fixtures. */
+export const DEVICE_HORIZON_SOLVE_CEILING_SECONDS = 60;
 export const DEVICE_ALTERNATIVE_SECONDS = 15;
 
 /** How long the page waits for the solver to load before the ceiling starts. */

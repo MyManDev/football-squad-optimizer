@@ -3,7 +3,8 @@
  * needs: the plain pure-points plan over one week; the same with a chip the member still
  * holds; a rival strategy over one week against a named rival; either plan at a
  * Top 100 weight the member block names. Nothing switched on beyond that (the club's word,
- * the football model, preferences, a longer window) is the service's.
+ * the football model, preferences) is the service's. Plain points alone also admits
+ * three and five weeks, from the separately versioned captured horizon.
  */
 
 import type { AdviceRequest } from "../advice/adviceClient";
@@ -11,6 +12,7 @@ import type { EntrySquad } from "../types";
 import { oneWeekPreferences } from "./preferences";
 import { oneWeekBundle } from "./preferenceBundle";
 import {
+  deviceHorizonWindows,
   hasCompleteStartingXi,
   isDeviceChip,
   isDevicePlanEntry,
@@ -22,6 +24,7 @@ import {
 
 export type DeviceSelection =
   | { kind: "plain" }
+  | { kind: "horizon"; window: 3 | 5 }
   | { kind: "chip"; chip: DeviceChip }
   | { kind: "rival"; strategy: RivalStrategy; rivalEntryId: number; weight?: number }
   | { kind: "top100"; weight: number };
@@ -62,11 +65,23 @@ export function deviceSelection(
   if (
     // Ordinary member links have no confirmed run. Their preferences are served remotely.
     ((request.preferences || request.preferenceBundle) && (!request.run || !allowRunPreferences)) ||
-    request.window !== 1 ||
     (request.managersWord ?? false) ||
     (request.model ?? "current") !== "current"
   ) {
     return null;
+  }
+  if (request.window !== 1) {
+    return (request.window === 3 || request.window === 5) &&
+      isDevicePlanEntry(squad.device_plan) &&
+      deviceHorizonWindows(squad.device_plan).includes(request.window) &&
+      request.strategy === "saf-puan" &&
+      (request.chip ?? null) === null &&
+      (request.top100Weight ?? 0) === 0 &&
+      (request.rivalEntryId ?? null) === null &&
+      !request.preferences &&
+      !request.preferenceBundle
+      ? { kind: "horizon", window: request.window }
+      : null;
   }
   const chip = deviceChip(request, squad);
   if (chip === undefined) return null;

@@ -1239,6 +1239,8 @@ def _device_plan_block(
     rules: SeasonRules,
     prices: Mapping[int, int],
     top100: Top100Counts | None = None,
+    *,
+    horizon: Mapping[str, object] | None = None,
 ) -> dict[str, object] | None:
     """One member's device-plan inputs, or ``None`` where the live path would not plan.
 
@@ -1251,7 +1253,7 @@ def _device_plan_block(
         held = held_squad_from_picks(picks, current_prices=prices)
     except (EntryError, DataError):
         return None
-    return device_plan_entry(inputs, projection, held, rules, top100=top100)
+    return device_plan_entry(inputs, projection, held, rules, top100=top100, horizon=horizon)
 
 
 def _suggested_strategy(
@@ -1325,6 +1327,7 @@ def build_league_views(
     controls: Mapping[int, MemberControl] | None = None,
     device_only: bool = False,
     short_names: Mapping[int, GameName] | None = None,
+    device_horizon: Mapping[str, object] | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -1607,7 +1610,15 @@ def build_league_views(
         picks_or_error = fetched[entry_id]
         if device_only:
             block = (
-                _device_plan_block(picks_or_error, inputs, projection, rules, prices, top100_counts)
+                _device_plan_block(
+                    picks_or_error,
+                    inputs,
+                    projection,
+                    rules,
+                    prices,
+                    top100_counts,
+                    horizon=device_horizon,
+                )
                 if isinstance(picks_or_error, EntryPicks)
                 else None
             )
@@ -1711,7 +1722,7 @@ def build_league_views(
         # exactly as the published plan was held to them. Absent where the live path
         # would refuse to plan, so the device never solves a problem the server did not.
         squad_payload["device_plan"] = _device_plan_block(
-            picks, inputs, projection, rules, prices, top100_counts
+            picks, inputs, projection, rules, prices, top100_counts, horizon=device_horizon
         )
         squad_path.write_text(
             json.dumps(_envelope(_labelled(squad_payload), generated_at_utc=generated), indent=2),
@@ -2248,7 +2259,14 @@ def build_league_views(
     # order with the server's integer coefficients, and the rules as numbers.
     _write(
         DEVICE_PLAN_DOCUMENT,
-        device_plan_table(inputs, projection, rules, league_id=league_id, top100=top100_counts),
+        device_plan_table(
+            inputs,
+            projection,
+            rules,
+            league_id=league_id,
+            top100=top100_counts,
+            horizon=device_horizon,
+        ),
     )
 
     # Whatever this run did not produce is not this week's advice, and the tree it wrote
