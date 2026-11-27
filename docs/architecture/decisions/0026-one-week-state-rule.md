@@ -1,6 +1,6 @@
 # ADR 0026: One week-state rule for every web consumer
 
-- **Status:** Proposed, awaiting the owner's explicit answer before implementation.
+- **Status:** Accepted by the owner on 2026-11-26; clarification A accepted on 2026-11-27. Implementation follows in separate draft PRs.
 - **Date:** 2026-11-26.
 - **Decider:** The owner.
 - **Related:** [Member page boundaries](../member_page_boundaries.md), [ADR 0012](0012-fpl-forwarder.md).
@@ -93,8 +93,8 @@ their existing empty or absent presentation. No cross-week value is relabelled.
 | Fixtures page, default week | N | N | N | Q | Q | Q | Keep the last match visible while its window remains, then show the next listed week. |
 | Member fixture rail, first column | P while open | N if P closed, otherwise P | N if P closed, otherwise P | Q if P closed, otherwise P | Q if P closed, otherwise P | Q if P closed, otherwise P | An open plan keeps its own horizon; a closed plan's rail follows the same calendar transition as fixtures. |
 | Member current/live score card | Latest elapsed week, when held | N, awaiting first match | N | N, retain held score | N | N | The actual score belongs to the played week until its replacement is read, independent of P. |
-| LIVE page | Wait for first kickoff of N | Wait for first kickoff of N | Follow N | Wait for first kickoff of Q | Wait for first kickoff of Q | Wait for first kickoff of Q | LIVE remains for following matches; result checking does not extend its time window. |
-| Phone LIVE pill | Off | Off | N only during a member match window | Off | Off | Off | Preserve the member-club filter and existing bounded request policy. |
+| LIVE page | Wait for first kickoff of N | Wait for first kickoff of N | Follow N until the last known kickoff plus 180 minutes; then wait for Q | Wait for first kickoff of Q | Wait for first kickoff of Q | Wait for first kickoff of Q | LIVE remains for following matches; an undated match does not extend its time window. |
+| Phone LIVE pill | Off | Off | N only during a member match window and before the last known kickoff plus 180 minutes | Off | Off | Off | Preserve the member-club filter and existing bounded request policy. |
 | League scoreboard rows | F | F | F | F | N, if its row exists | N, if its row exists | A finished result can be shown before checking, as it is today. |
 | Latest-result card | F | F | F | F | N, if its member net exists | N, if its member net exists | Select the latest finished week even while P is still N. |
 | League cumulative totals and race | C | C | C | C | C | N, if checked rows exist | Standings history uses checked results, not a clock-derived result. |
@@ -129,15 +129,26 @@ match-level policies, outside the choice of week.
    while still being followed.
 3. Use one phase policy with separate, named week targets: proposed above.
 
-The owner is asked to approve or amend option 3, including these visible changes:
+The owner accepted option 3, including these visible changes:
 fixtures retain N past the last kickoff until phase 4, and a closed member rail
 advances to Q at that same boundary. LIVE also ends immediately if authoritative
 completion selects phase 4, 5 or 6 before its current 180-minute limit; its held
 result remains on the member card. Otherwise its existing upper limit remains.
 The latest-result, closed bank and free-transfer rules above are existing
 behavior, not additional removals. No other currently visible value is removed.
-This draft is the review stop. No module or consumer implementation starts
-without the owner's explicit answer.
+The owner's [approval](https://github.com/MyManDev/football-squad-optimizer/pull/1507#issuecomment-7200292388)
+also requires separate tests for F versus C between completion and checking, and
+for keeping a consumer's current week when its new target has no data row.
+
+On 2026-11-27 the owner explicitly selected clarification A: an assigned,
+unfinished fixture with no kickoff can retain calendar phase 3 and fixture week
+N, but LIVE closes at the last **known** kickoff plus 180 minutes and waits for
+Q. The phone pill is off after that limit. The transition must be scheduled even
+though the calendar phase remains 3; tests pin the exact limit and one second
+on each side. Completion flags and the next elapsed deadline still take
+precedence as specified above. This resolves the phase-3 LIVE exception without
+extending the existing upper limit. The decision PR remains a draft for the
+owner's reviewer to merge together with the module PR.
 
 ## Delivery and acceptance after approval
 
