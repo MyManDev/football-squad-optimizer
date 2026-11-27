@@ -87,6 +87,7 @@ reaches, and a backticked name is not a link.
 | [Mean-reversion discount for later plan weeks](mean_reversion_discount_prereg.md) | Recorded in [mean-reversion discount](mean_reversion_discount.md): measured, not certified |
 | [The member planner's hit margin on the component forecast](component_hit_margin_prereg.md) | Recorded in [hit margin on the component forecast](component_hit_margin.md): unsupported, no default moved |
 | [The value of a held free transfer on the component forecast](component_banked_transfer_value_prereg.md) | Recorded in [held free transfer value](component_banked_transfer_value.md): `move` at 0.5, no default moved; [path diagnostic](component_banked_transfer_value_path_diagnostic.md) |
+| [A held free transfer's value computed each week](component_computed_banked_value_prereg.md) | Recorded in [computed banked value](component_computed_banked_value.md) |
 | [HiGHS on the current window model](window_solver_highs_current_prereg.md) | Recorded in [HiGHS on the current window model at GW7](window_solver_highs_current.md): a switch is supported on the server, device verdict carried from #1083 |
 | [Team-match block resampler for component scenarios](team_match_block_sampler_prereg.md) | Recorded in [the calibration reading](team_match_block_sampler.md) and [the fidelity diagnostic](team_match_block_sampler_fidelity.md) |
 | [Rank-conditional shrinkage of expected points](rank_conditional_shrinkage_prereg.md) | Recorded in [rank-conditional shrinkage](rank_conditional_shrinkage.md): measured, not certified |
