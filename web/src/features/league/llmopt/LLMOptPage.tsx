@@ -29,6 +29,7 @@ import { PageLoading } from "../../../design/components/PageLoading";
 import { useLanguage } from "../../../i18n/context";
 import { money } from "../../../lib/format";
 import { entryAddress, memberAddress } from "../../../lib/leagueAddresses";
+import { openPlanWeek, weekState } from "../../../lib/weekState";
 import { useFixtures } from "../../fixtures/data";
 import { capabilitiesForPage, llmoptEnabledForWindow } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
@@ -132,8 +133,16 @@ function squadBasis(squad: EntrySquad) {
   ]);
 }
 
-function deadlineOpen(deadline: string | null) {
-  return deadline !== null && Date.now() < Date.parse(deadline);
+function deadlinePolicy(gameweek: number, deadline: string | null, now: number) {
+  const time = deadline === null ? NaN : Date.parse(deadline);
+  if (!Number.isSafeInteger(time) || !Number.isSafeInteger(now))
+    return { open: false, closed: false };
+  const open = openPlanWeek([{ gameweek, deadline: BigInt(time) }], BigInt(now)) === gameweek;
+  return { open, closed: !open };
+}
+
+function deadlineOpen(deadline: string | null, gameweek: number, now = Date.now()) {
+  return deadlinePolicy(gameweek, deadline, now).open;
 }
 
 interface ChatLine {
@@ -215,6 +224,7 @@ function PageHeader({ squad }: { squad: EntrySquad }) {
   const { language } = useLanguage();
   const copy = LLMOPT_COPY[language];
   const team = squad.entry.team_name ?? squad.entry.manager_name;
+  const state = weekState({ treeGameweek: squad.gameweek, events: [], fixtures: null, now: 0 });
   const teamPath =
     squad.league_id === 0
       ? entryAddress(squad.entry.entry_id)
@@ -225,7 +235,7 @@ function PageHeader({ squad }: { squad: EntrySquad }) {
       <h1>{copy.title}</h1>
       <p>
         {team ? `${team} · ` : ""}
-        {copy.week} {squad.gameweek}
+        {copy.week} {state.weeks.plan}
       </p>
     </header>
   );
@@ -290,7 +300,7 @@ function Workspace({
   const copy = LLMOPT_COPY[language];
   const { tree, forwarded } = useLeague();
   const now = useDeadlineClock(deadline);
-  const closed = deadline !== null && now >= Date.parse(deadline);
+  const closed = deadlinePolicy(squad.gameweek, deadline, now).closed;
   const owned = [...squad.starting_xi, ...squad.bench];
   const held = new Set(owned.map(({ player_id }) => player_id));
   const players = (roster.data ?? ownedPlayers(squad)).map((p) => ({
@@ -814,7 +824,7 @@ function Workspace({
     failure && analysis && analysis.status !== "conflict" ? failure.request.run?.run_id : undefined;
   const mainBlocked = !!analysis && !retryRunId;
   async function repairData() {
-    if (!deadlineOpen(deadline)) throw new Error("RUN_CONTEXT_CHANGED");
+    if (!deadlineOpen(deadline, squad.gameweek)) throw new Error("RUN_CONTEXT_CHANGED");
     const [fresh, grant] = await Promise.all([
       tree.entrySquad(squad.entry.entry_id),
       currentGrant(),
@@ -823,7 +833,7 @@ function Workspace({
       !mounted.current ||
       !grant?.verifiedRepairs ||
       squadBasis(fresh.payload) !== squadBasis(squad) ||
-      !deadlineOpen(deadline)
+      !deadlineOpen(deadline, squad.gameweek)
     )
       throw new Error("RUN_CONTEXT_CHANGED");
     const dataId = plans.window === 1 ? await client.readDeviceDataId?.() : grant.planDataId;
@@ -832,7 +842,7 @@ function Workspace({
   }
   async function beginRepair(signal: AbortSignal): Promise<RepairRun> {
     const dataId = await repairData();
-    if (signal.aborted || !deadlineOpen(deadline)) throw new Error("RUN_CANCELLED");
+    if (signal.aborted || !deadlineOpen(deadline, squad.gameweek)) throw new Error("RUN_CANCELLED");
     const confirmation = session.confirmation;
     if (confirmation?.repairSearch && confirmation.repairSearch.dataId !== dataId)
       throw new Error("RUN_CONTEXT_CHANGED");
@@ -896,7 +906,9 @@ function Workspace({
     // Such a slot asks again while the deadline is open: the service answers a computed request
     // from its cache and joins a request still running to its open job.
     const askAgain =
-      canContinue && restored?.confirmation?.sending === true && deadlineOpen(deadline);
+      canContinue &&
+      restored?.confirmation?.sending === true &&
+      deadlineOpen(deadline, squad.gameweek);
     const restore = (request: PlanRequest, job: JobControls) => {
       if (job.resume?.(request)) return;
       if (askAgain) job.compute(request);
@@ -926,6 +938,7 @@ function Workspace({
     restored,
     savedReplayProof,
     deadline,
+    squad.gameweek,
     controls,
     restoreCapabilities.isFetchedAfterMount,
     canContinue,
@@ -944,7 +957,8 @@ function Workspace({
     const restoring = run === restoredRun;
     const restore = (request: PlanRequest, slot: JobControls) => {
       if (slot.resume?.(request)) return;
-      if (canContinue && confirmed?.sending && deadlineOpen(deadline)) slot.compute(request);
+      if (canContinue && confirmed?.sending && deadlineOpen(deadline, squad.gameweek))
+        slot.compute(request);
       else slot.readCached?.(request);
     };
     ALTERNATIVE_SLOTS.forEach((name, index) => {
@@ -966,6 +980,7 @@ function Workspace({
     session,
     savedReplayProof,
     deadline,
+    squad.gameweek,
     controls,
     incompleteRun,
     execution,
@@ -984,7 +999,7 @@ function Workspace({
       return;
     if (run === restoredRun) {
       if (controls.first.resume?.(execution)) return;
-      if (canContinue && session.confirmation?.sending && deadlineOpen(deadline))
+      if (canContinue && session.confirmation?.sending && deadlineOpen(deadline, squad.gameweek))
         controls.first.compute(execution);
       else controls.first.readCached?.(execution);
     } else if (canContinue) controls.first.compute(execution);
@@ -998,6 +1013,7 @@ function Workspace({
     controls,
     session,
     deadline,
+    squad.gameweek,
     canContinue,
   ]);
 
@@ -1014,7 +1030,7 @@ function Workspace({
       confirmed.followups !== undefined
     )
       return;
-    if (!deadlineOpen(deadline)) return;
+    if (!deadlineOpen(deadline, squad.gameweek)) return;
     const followups = followupRequests(run, baseState.envelope.payload);
     session.save({
       draft,
@@ -1034,6 +1050,7 @@ function Workspace({
     baseState,
     run,
     deadline,
+    squad.gameweek,
     controls,
     session,
     draft,
@@ -1051,7 +1068,7 @@ function Workspace({
       clarification !== undefined ||
       !ORIGIN ||
       !squad.source_snapshot_id ||
-      !deadlineOpen(deadline) ||
+      !deadlineOpen(deadline, squad.gameweek) ||
       !canCalculate ||
       mainBlocked
     )
@@ -1086,7 +1103,7 @@ function Workspace({
           gameweek: squad.gameweek,
           snapshotId: squad.source_snapshot_id,
         }) ||
-        !deadlineOpen(deadline)
+        !deadlineOpen(deadline, squad.gameweek)
       ) {
         setBasisChanged(true);
         setRun(null);
@@ -1122,7 +1139,7 @@ function Workspace({
         if (
           !currentConfirmation() ||
           session.confirmation?.runId !== retryRunId ||
-          !deadlineOpen(deadline)
+          !deadlineOpen(deadline, squad.gameweek)
         )
           return;
       }
@@ -1137,7 +1154,7 @@ function Workspace({
         runId,
         client.prepareDeviceRun,
       );
-      if (!currentConfirmation() || !deadlineOpen(deadline)) return;
+      if (!currentConfirmation() || !deadlineOpen(deadline, squad.gameweek)) return;
       if (!next) {
         setFeedback(copy.serviceUnavailable);
         return;
@@ -1234,7 +1251,7 @@ function Workspace({
       !confirmed ||
       confirmed.followups === undefined ||
       confirmed.combined !== undefined ||
-      !deadlineOpen(deadline)
+      !deadlineOpen(deadline, squad.gameweek)
     )
       return;
     const plan = combinedChoice
@@ -1256,6 +1273,7 @@ function Workspace({
     singlesIn,
     combinedChoice,
     deadline,
+    squad.gameweek,
     controls,
     session,
     draft,
@@ -1666,7 +1684,11 @@ function Workspace({
             forwarded={forwarded}
             reference={reference}
             disabled={
-              editingLocked || computing || closed || basisChanged || !deadlineOpen(deadline)
+              editingLocked ||
+              computing ||
+              closed ||
+              basisChanged ||
+              !deadlineOpen(deadline, squad.gameweek, now)
             }
             begin={beginRepair}
             current={async (owner) =>

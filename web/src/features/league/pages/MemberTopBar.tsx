@@ -8,6 +8,7 @@ import { gameweekDeadline, minutesLeft } from "../advice/deadline";
 import type { EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
 import { useLeagueId } from "../useLeague";
 import { scoreBugCells, type ScoreCell } from "./scoreBug";
+import { memberWeekPolicy } from "./memberWeekPolicy";
 import styles from "./LeagueMemberPage.module.css";
 
 /**
@@ -43,11 +44,20 @@ export function MemberTopBar({
   const copy = messages.leagueMembers;
   const view = squad.payload;
   const entry = view.entry;
-  const deadline = deadlinePassed ?? gameweekDeadline(fixtures, view.season, view.gameweek);
+  // Without a supplied clock this is a presentation of the caller's closed/open state.
+  const state = memberWeekPolicy(view, now === undefined ? null : fixtures, null, now ?? 0);
+  const deadline =
+    deadlinePassed ?? state.planDeadline ?? gameweekDeadline(fixtures, view.season, view.gameweek);
   const humans = members.filter((member) => member.member_kind === "human").length;
   // The bank and the free transfers are what the member had for this deadline. Once it has
   // passed they describe a decision that is over, so the bug leaves them out.
-  const cells = scoreBugCells(entry, humans, deadlinePassed !== null ? null : view, locale, copy);
+  const cells = scoreBugCells(
+    entry,
+    humans,
+    deadlinePassed !== null || state.weeks.resources === null ? null : view,
+    locale,
+    copy,
+  );
   const leagueId = useLeagueId();
   return (
     <header
@@ -57,7 +67,7 @@ export function MemberTopBar({
     >
       <h1 className={styles.teamName}>{entry.team_name ?? copy.unknownTeam}</h1>
       <TopWeek
-        gameweek={view.gameweek}
+        gameweek={state.weeks.topBar ?? view.gameweek}
         deadline={deadline}
         passed={deadlinePassed !== null}
         now={now}

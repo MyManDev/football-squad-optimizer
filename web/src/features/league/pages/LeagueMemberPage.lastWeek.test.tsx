@@ -158,6 +158,19 @@ const suggestion = (container: HTMLElement) =>
   card(container)!.querySelector<HTMLElement>('[data-line="suggested"]');
 
 describe("the latest finished week's card", () => {
+  it("keeps its current card until the new finished week has this member's data row", () => {
+    const current = week(SCORED);
+    const newer = week(SCORED + 1, { data_checked: false, members: [] });
+    const first = show("en", { scoreboard: scoreboard([current, newer]) });
+    expect(card(first.container)).toHaveTextContent(`GW${SCORED}`);
+    expect(card(first.container)).toHaveTextContent("74");
+    cleanup();
+    const landed = show("en", {
+      scoreboard: scoreboard([current, week(SCORED + 1, { data_checked: false })]),
+    });
+    expect(card(landed.container)).toHaveTextContent(`GW${SCORED + 1}`);
+  });
+
   it.each([
     [
       "tr",

@@ -551,6 +551,69 @@ describe("a reload keeps the saved session", () => {
     },
   );
 
+  it("keeps P and the recorded deadline when the calendar disappears, closing at the exact millisecond", async () => {
+    const end = Date.parse(DEADLINE);
+    vi.useFakeTimers();
+    vi.setSystemTime(end - 1_000);
+    try {
+      open();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const header = () =>
+        screen.getByRole("heading", { level: 1, name: en.title }).closest("header")!;
+      expect(header()).toHaveTextContent(`${en.week} ${squad.gameweek}`);
+      expect(screen.queryByText(en.deadline, { exact: true })).toBeNull();
+      await act(async () => {
+        clients.at(-1)!.setQueryData(FIXTURES_QUERY.queryKey, null);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(999);
+      });
+      expect(header()).toHaveTextContent(`${en.week} ${squad.gameweek}`);
+      expect(screen.queryByText(en.deadline, { exact: true })).toBeNull();
+      expect(screen.getByRole("button", { name: en.compute })).toBeEnabled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(screen.getByText(en.deadline, { exact: true })).toBeVisible();
+      expect(screen.getByRole("button", { name: en.compute })).toBeDisabled();
+      expect(header()).toHaveTextContent(`${en.week} ${squad.gameweek}`);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(screen.getByText(en.deadline, { exact: true })).toBeVisible();
+      expect(header()).toHaveTextContent(`${en.week} ${squad.gameweek}`);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["missing", "invalid"] as const)(
+    "keeps an %s deadline editable but not runnable",
+    async (kind) => {
+      const calendar =
+        kind === "missing"
+          ? null
+          : {
+              ...CALENDAR,
+              gameweeks: [{ ...CALENDAR.gameweeks[0]!, deadline_utc: "invalid-timestamp" }],
+            };
+      open("en", model, calendar);
+      await ready();
+      await addRule("include_player", OUTSIDER.name);
+      expect(screen.getByText(outsiderRule, { exact: true })).toBeVisible();
+      expect(screen.queryByText(en.deadline, { exact: true })).toBeNull();
+      expect(screen.getByRole("button", { name: en.compute })).toBeDisabled();
+      expect(
+        screen.getByRole("heading", { level: 1, name: en.title }).closest("header"),
+      ).toHaveTextContent(`${en.week} ${squad.gameweek}`);
+      expect(jobs.every((job) => job.compute.mock.calls.length === 0)).toBe(true);
+    },
+  );
+
   it("keeps rules edited before the initially missing deadline is published", async () => {
     open("en", model, null);
     await ready();
