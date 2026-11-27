@@ -534,6 +534,13 @@ def test_scale_fixture_inputs_are_the_captured_600_player_problem(tmp_path: Path
     assert expected["season"] == "2026-27"
     assert len(recorded["members"]) == 1
     assert recorded["members"][0]["entry"]["free_transfers"] == 1
+    assert (
+        _same(
+            recorded["members"][0]["entry"],
+            device_plan_entry(inputs, projection, held_member(world, 1), rules, horizon=horizon),
+        )
+        == []
+    )
 
 
 if __name__ == "__main__":
@@ -542,31 +549,6 @@ if __name__ == "__main__":
     arguments = parser.parse_args()
     destination = FIXTURE.with_name("horizons-scale.json") if arguments.scale else FIXTURE
     with TemporaryDirectory() as temporary:
-        if arguments.scale:
-            world = horizon_world(Path(temporary) / "inputs", scale=True)
-            inputs, projection, rules = (world[key] for key in ("inputs", "projection", "rules"))
-            horizon = device_plan_horizon(inputs, projection, rules, world["builder"])
-            destination.write_text(
-                json.dumps(
-                    {
-                        "reference_proof": "not_available",
-                        "document": device_plan_table(
-                            inputs, projection, rules, league_id=9, horizon=horizon
-                        ),
-                        "members": [
-                            {
-                                "entry_id": 1,
-                                "entry": device_plan_entry(
-                                    inputs, projection, held_member(world, 1), rules
-                                ),
-                            }
-                        ],
-                    },
-                    indent=2,
-                )
-                + "\n",
-                encoding="utf-8",
-            )
         destination.write_text(
             json.dumps(
                 build_horizon_fixture(Path(temporary) / "reference", scale=arguments.scale),
