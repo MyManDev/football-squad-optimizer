@@ -730,7 +730,7 @@ for (const window of [3, 5] as const) {
 }
 
 test.describe("horizon benchmark", () => {
-  test.describe.configure({ mode: "serial" });
+  test.describe.configure({ mode: "default" });
   test.skip(process.env.SQUADOPT_DEVICE_BENCHMARK !== "1", "Explicit timing run only");
   test.afterAll(({ browser }) => {
     if (horizonSamples.length === 0) return;
@@ -747,6 +747,7 @@ test.describe("horizon benchmark", () => {
     console.log(
       JSON.stringify({
         kind: "device-horizon-chromium-measurement",
+        aggregation_scope: "worker_session",
         browser_version: browser.version(),
         measured_at: new Date().toISOString(),
         ceiling_seconds: 60,
@@ -791,15 +792,23 @@ test.describe("horizon benchmark", () => {
   for (const { pool, fixture } of horizonPools) {
     fixture.members.forEach((member, memberIndex) => {
       for (const window of [3, 5] as const) {
-        for (let repeat = 0; repeat < 3; repeat += 1) {
-          test(`${pool}, member ${member.entry_id}, H${window}, repeat ${repeat + 1}`, async ({
-            page,
-          }) => {
-            test.setTimeout(90_000);
+        test(`${pool}, member ${member.entry_id}, H${window}`, async ({ page }) => {
+          test.setTimeout(240_000);
+          for (let repeat = 0; repeat < 3; repeat += 1) {
             const started = performance.now();
             try {
               const seconds = await runHorizon(page, fixture, memberIndex, window);
               horizonSamples.push({ pool, member: member.entry_id, window, seconds });
+              console.log(
+                JSON.stringify({
+                  kind: "device-horizon-chromium-sample",
+                  pool,
+                  member: member.entry_id,
+                  window,
+                  repeat: repeat + 1,
+                  seconds,
+                }),
+              );
               expect(seconds).toBeLessThan(60);
             } catch (error) {
               const ending = await page
@@ -830,8 +839,8 @@ test.describe("horizon benchmark", () => {
               );
               throw error;
             }
-          });
-        }
+          }
+        });
       }
     });
   }
