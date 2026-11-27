@@ -19,7 +19,7 @@ fi
 REPO=$(git rev-parse --show-toplevel) || exit 1
 S=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 1
 WT="$REPO/.codex-tmp/worktrees/$(echo "$BR" | tr '/' '-')"
-log(){ echo "$(date +%H:%M:%S) $*"; }
+log(){ echo "$(date -u +%H:%M:%S) $*"; }
 cd "$REPO" || exit 1
 echo "$TAG" | grep -Eq '^site-[0-9]{4}-[0-9]{2}-gw[0-9]{2}-(decision|settled|fix[0-9]+)$' || { log "tag $TAG does not match the deploy rule"; exit 1; }
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -39,7 +39,7 @@ Wait up to 40 minutes for successful main push CI at that exact SHA and one unex
 Refuse an existing tag; create annotated $TAG on main and push it.
 Dispatch deploy-pages.yml from develop with release_tag=$TAG; watch its result.
 Run the live smoke checks and content checks matching accepted stamp $ACCEPTED_STAMP${SETTLED:+, settling gameweek $SETTLED}; retry once.
-Run the read-only browser smoke and full page tour on desktop and 360px phone, in Turkish and English; refuse a failure.
+Run the read-only browser smoke and full page tour when provisioned, or log one skip; HTTP/content checks remain required.
 EOF
   exit 0
 fi

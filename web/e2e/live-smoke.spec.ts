@@ -38,8 +38,38 @@ interface ConsoleError {
   url: string;
 }
 
+interface BackendDiagnostics {
+  reads: Set<string>;
+  failures: string[];
+}
+
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 let liveMetrics: { fence: WriteFence; visits: number } | null = null;
+
+function isBackendRead(request: Request): boolean {
+  return (
+    READ_METHODS.has(request.method()) && new URL(request.url()).pathname.startsWith("/api/v1/")
+  );
+}
+
+function watchBackendReads(page: Page): BackendDiagnostics {
+  const state: BackendDiagnostics = { reads: new Set(), failures: [] };
+  page.on("request", (request) => {
+    if (isBackendRead(request)) state.reads.add(request.url());
+  });
+  page.on("requestfailed", (request) => {
+    if (isBackendRead(request)) state.failures.push(`transport ${safeAddress(request.url())}`);
+  });
+  page.on("response", (response) => {
+    if (isBackendRead(response.request()) && response.status() >= 400)
+      state.failures.push(`HTTP ${response.status()} ${safeAddress(response.url())}`);
+  });
+  return state;
+}
+
+function isBackendResourceError(error: ConsoleError, backend: BackendDiagnostics): boolean {
+  return backend.reads.has(error.url) && /^Failed to load resource:/.test(error.text);
+}
 
 function safeAddress(raw: string): string {
   const url = new URL(raw);
@@ -147,6 +177,8 @@ test("smoke write fence blocks analytics and all other writes on every origin", 
       if (!READ_METHODS.has(request.method ?? "")) receivedWrites += 1;
       response.setHeader("Access-Control-Allow-Origin", "*");
       response.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS, POST, PUT");
+      if (request.url === "/api/v1/new-backend-route") response.statusCode = 404;
+      if (request.url === "/api/v1/unavailable") response.statusCode = 503;
       response.end("<!doctype html><title>Local smoke fence</title>");
     }),
   );
@@ -161,6 +193,7 @@ test("smoke write fence blocks analytics and all other writes on every origin", 
     });
     const origin = origins[0]!;
     const fence = await installWriteFence(page, origin);
+    const backend = watchBackendReads(page);
     const failures: { method: string; analytics: boolean; url: string; error: string }[] = [];
     page.on("requestfailed", (request) =>
       failures.push({
@@ -177,6 +210,11 @@ test("smoke write fence blocks analytics and all other writes on every origin", 
     const result = await page.evaluate(async (otherOrigin) => {
       const read = await fetch("/read");
       const usage = await fetch("/api/v1/usage/events", { method: "POST", body: "{}" });
+      const backendStatuses = await Promise.all(
+        ["/api/v1/new-backend-route", "/api/v1/unavailable"].map(
+          async (url) => (await fetch(url)).status,
+        ),
+      );
       navigator.sendBeacon("/api/v1/usage/events", "{}");
       const solve = await fetch("/api/v1/solve", { method: "POST" }).catch(() => null);
       const outside = await fetch("/outside-api", { method: "POST" }).catch(() => null);
@@ -185,7 +223,7 @@ test("smoke write fence blocks analytics and all other writes on every origin", 
       );
       await fetch("/cdn-cgi/rum", { method: "POST", body: "{}" }).catch(() => null);
       await fetch("/cdn-cgi/rum").catch(() => null);
-      return { read: read.status, usage: usage.status, solve, outside, foreign };
+      return { read: read.status, usage: usage.status, backendStatuses, solve, outside, foreign };
     }, origins[1]!);
     const targetFailures = () =>
       failures.filter((failure) => new URL(failure.url).pathname !== "/api/v1/usage/events");
@@ -202,7 +240,23 @@ test("smoke write fence blocks analytics and all other writes on every origin", 
     expect(syntheticFailure?.message).toBe(
       `Live smoke failed at ${origin}/entry/<member> during synthetic guard phase`,
     );
-    expect(result).toEqual({ read: 200, usage: 204, solve: null, outside: null, foreign: null });
+    expect(result).toEqual({
+      read: 200,
+      usage: 204,
+      backendStatuses: [404, 503],
+      solve: null,
+      outside: null,
+      foreign: null,
+    });
+    expect(backend.failures).toHaveLength(2);
+    const backendError = {
+      text: "Failed to load resource: the server responded with a status of 503",
+      url: `${origin}/api/v1/unavailable`,
+    };
+    expect(isBackendResourceError(backendError, backend)).toBe(true);
+    expect(
+      isBackendResourceError({ ...backendError, url: `${origin}/assets/missing.js` }, backend),
+    ).toBe(false);
     expect(fence.writes).toHaveLength(3);
     expect(failures.filter((failure) => failure.analytics)).toHaveLength(1);
     expect(
@@ -264,6 +318,7 @@ test("published league and member journey works without submitting a solve", asy
   const adviceMisses: Response[] = [];
   const failures: string[] = [];
   const fence = await installWriteFence(page, origin);
+  const backend = watchBackendReads(page);
   const writes = fence.writes;
   liveMetrics = { fence, visits: 0 };
   page.on("framenavigated", (frame) => {
@@ -288,6 +343,10 @@ test("published league and member journey works without submitting a solve", asy
         consoleErrors.push({ text: message.text(), url: message.location().url });
     });
     page.on("requestfailed", (request) => {
+      if (isBackendRead(request)) {
+        logJourney(`BACKEND transport ${safeAddress(request.url())} (not gated)`);
+        return;
+      }
       if (isBlockedAnalytics(request, origin, fence)) {
         logJourney(`BLOCKED ANALYTICS POST ${safeAddress(request.url())}`);
         return;
@@ -319,6 +378,9 @@ test("published league and member journey works without submitting a solve", asy
       logJourney(
         `${response.status()} ${response.request().method()} ${safeAddress(response.url())}`,
       );
+      // The release moves the backend only after this site gate. Its old routes
+      // and transient failures must not decide whether the new site is published.
+      if (isBackendRead(response.request()) && process.env.LIVE_SMOKE_COMPUTE !== "1") return;
       if (
         response.status() === 404 &&
         response.request().method() === "GET" &&
@@ -467,7 +529,7 @@ test("published league and member journey works without submitting a solve", asy
       else await expect(page.locator(selector)).toBeEnabled();
     // The Top 100 menu is offered by the compute service; with the PC backend down the page
     // has nothing to offer it from, so it is checked only when the service answered.
-    if (capabilitiesUrl && !closed)
+    if (process.env.LIVE_SMOKE_COMPUTE === "1" && capabilitiesUrl && !closed)
       await expect(page.locator('input[name="top100"][value="0"]')).toBeEnabled();
 
     if (process.env.LIVE_SMOKE_COMPUTE === "1") {
@@ -546,7 +608,7 @@ test("published league and member journey works without submitting a solve", asy
     // The model comparison also performs a cache-only GET. Admit only this member's
     // exact baseline settings and a typed NOT_COMPUTED response from the discovered API.
     stage = "typed cache-miss validation";
-    for (const response of adviceMisses) {
+    for (const response of process.env.LIVE_SMOKE_COMPUTE === "1" ? adviceMisses : []) {
       expect(capabilitiesUrl, "cache reads must use the discovered backend").toBeTruthy();
       const url = new URL(response.url());
       expect(url.origin).toBe(new URL(capabilitiesUrl!).origin);
@@ -575,6 +637,8 @@ test("published league and member journey works without submitting a solve", asy
             !(
               ((absentDocuments.has(url) || cacheMissUrls.has(url)) &&
                 /Failed to load resource:.*404/.test(text)) ||
+              (process.env.LIVE_SMOKE_COMPUTE !== "1" &&
+                isBackendResourceError({ text, url }, backend)) ||
               (forwarderRefusals.has(url) && /Failed to load resource:.*\b(?:404|503)\b/.test(text))
             ),
         )
@@ -583,6 +647,7 @@ test("published league and member journey works without submitting a solve", asy
     ).toEqual([]);
     stage = "runtime health checks";
     expect(errors, "no browser or console error").toEqual([]);
+    logJourney(`BACKEND SUMMARY ${backend.failures.length} diagnostics (not gated)`);
   } catch {
     // Assertion messages can contain live DOM or response data. Keep only the
     // address and stage, close first, and let the failure still fail the test.

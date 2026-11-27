@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 
-import { expect, test as base, type Page, type Response } from "@playwright/test";
+import { expect, test as base, type Page, type Request, type Response } from "@playwright/test";
 
 import { isForwarderRefusal, MARKER_HEADER } from "../src/features/league/forwarder/client";
 import { STORY_ANCHORS } from "../src/features/league/pages/storyPlan";
@@ -83,7 +83,13 @@ const test = base.extend<object, { publication: Publication }>({
 });
 
 test.skip(!baseURL || Boolean(process.env.CI), "Manual live release check only.");
-test.describe.configure({ retries: 0 });
+test.describe.configure({ retries: 1 });
+
+function isBackendRead(request: Request): boolean {
+  return (
+    READ_METHODS.has(request.method()) && new URL(request.url()).pathname.startsWith("/api/v1/")
+  );
+}
 
 function safeAddress(raw: string): string {
   const url = new URL(raw);
@@ -148,6 +154,7 @@ function watchServiceTransport(
   name: string,
   issues: Issue[],
   allowedAbsence: Set<string>,
+  diagnostics: string[] = [],
 ) {
   const serviceOrigins = new Set([origin]);
   const capabilityPaths = new Set([
@@ -166,6 +173,11 @@ function watchServiceTransport(
   });
   page.on("requestfailed", (request) => {
     const url = new URL(request.url());
+    if (isBackendRead(request)) {
+      diagnostics.push(`transport ${safeAddress(request.url())}`);
+      allowedAbsence.add(request.url());
+      return;
+    }
     if (
       url.origin === origin &&
       url.pathname === "/cdn-cgi/rum" &&
@@ -181,6 +193,12 @@ function watchServiceTransport(
         reason: `${request.failure()?.errorText} ${safeAddress(request.url())}`,
       });
   });
+  page.on("response", (response) => {
+    if (isBackendRead(response.request()) && response.status() >= 400) {
+      diagnostics.push(`HTTP ${response.status()} ${safeAddress(response.url())}`);
+      allowedAbsence.add(response.url());
+    }
+  });
   return { serviceOrigins, rememberService };
 }
 
@@ -192,7 +210,8 @@ async function visit(
   address: string,
 ) {
   const started = Date.now();
-  const origin = new URL(baseURL!).origin;
+  const origin = new URL(address, baseURL).origin;
+  const logPrefix = origin === new URL(baseURL!).origin ? "" : "LOCAL_PROBE ";
   const issues: Issue[] = [];
   const writes: string[] = [];
   const beacons: string[] = [];
@@ -200,6 +219,7 @@ async function visit(
   const journey: string[] = [];
   const pending: Promise<void>[] = [];
   const allowedAbsence = new Set<string>();
+  const diagnostics: string[] = [];
   const consoleErrors: { url: string; resource: boolean }[] = [];
   const { serviceOrigins, rememberService } = watchServiceTransport(
     page,
@@ -208,10 +228,14 @@ async function visit(
     name,
     issues,
     allowedAbsence,
+    diagnostics,
   );
   const record = (line: string) => journey.push(`${Date.now() - started}ms ${line}`);
   const checkResponse = async (response: Response) => {
     const url = new URL(response.url());
+    // The site is already published while the backend still serves the old tag.
+    // Backend transport, statuses and payloads are diagnostics, never a release gate.
+    if (isBackendRead(response.request())) return;
     if (response.request().method() === "GET") rememberService(response.url());
     if (!serviceOrigins.has(url.origin)) return;
     record(`${response.status()} ${response.request().method()} ${safeAddress(response.url())}`);
@@ -222,21 +246,6 @@ async function visit(
       (response.status() === 404 &&
         url.pathname ===
           `/data/leagues/${publication.leagueId}/history/requested/${publication.entryId}.json`)
-    ) {
-      allowedAbsence.add(response.url());
-      return;
-    }
-    if (
-      response.status() === 404 &&
-      response.request().method() === "GET" &&
-      (url.pathname ===
-        `/api/v1/leagues/${publication.leagueId}/entries/${publication.entryId}/advice` ||
-        (name === "entry" &&
-          url.pathname === `/api/v1/public/leagues/0/entries/${publication.entryId}/advice`)) &&
-      url.searchParams.get("strategy") === "saf-puan" &&
-      url.searchParams.get("window") === "1" &&
-      [null, "current", "football"].includes(url.searchParams.get("model")) &&
-      (await response.json().catch(() => null))?.error?.code === "NOT_COMPUTED"
     ) {
       allowedAbsence.add(response.url());
       return;
@@ -328,9 +337,9 @@ async function visit(
       });
   const viewport = page.viewportSize();
   const label = `${name} ${new URL(address, baseURL).href} ${language} ${viewport?.width}x${viewport?.height}`;
-  for (const issue of issues) record(`FAIL ${label}: ${issue.check}: ${issue.reason}`);
+  for (const issue of issues) record(`${logPrefix}FAIL ${label}: ${issue.check}: ${issue.reason}`);
   record(
-    `SUMMARY ${label}: ${Date.now() - started}ms, ${beacons.length} local beacons, ${telemetry.length} blocked analytics writes (transport omitted), ${writes.length} blocked service writes, ${issues.length} issues`,
+    `${logPrefix}SUMMARY ${label}: ${Date.now() - started}ms, ${beacons.length} local beacons, ${telemetry.length} blocked analytics writes (transport omitted), ${writes.length} blocked service writes, ${issues.length} issues, ${diagnostics.length} backend diagnostics (not gated)`,
   );
   console.log(journey.filter((line) => /FAIL |SUMMARY /.test(line)).join("\n"));
   // Detach before context disposal cancels its remaining reads.
@@ -339,8 +348,90 @@ async function visit(
   page.removeAllListeners("response");
   page.removeAllListeners("console");
   page.removeAllListeners("pageerror");
-  return { issues, writes, journey };
+  return { issues, writes, journey, diagnostics };
 }
+
+function assertVisitHealthy(result: { writes: string[]; issues: Issue[] }, reason: string) {
+  expect(result.writes, "no mutating request may leave the browser").toEqual([]);
+  expect(result.issues, reason).toEqual([]);
+}
+
+test("site assets, runtime failures and forbidden writes stay gated while backend errors do not", async ({
+  page,
+}) => {
+  let receivedWrites = 0;
+  const server = createServer((request, response) => {
+    if (!READ_METHODS.has(request.method ?? "")) receivedWrites += 1;
+    if (request.url === "/assets/broken.js") {
+      response.writeHead(503, { "Content-Type": "text/javascript" });
+      response.end("");
+    } else if (request.url?.startsWith("/api/v1/")) {
+      response.writeHead(request.url.endsWith("new-route") ? 404 : 503, {
+        "Content-Type": "application/json",
+      });
+      response.end("{}");
+    } else {
+      response.writeHead(200, { "Content-Type": "text/html" });
+      response.end(`<!doctype html><main>Local static content</main>
+        <script src="/assets/broken.js"></script><script>
+        fetch('/api/v1/new-route'); fetch('/api/v1/unavailable');
+        fetch('/outside-api', {method:'POST'}).catch(() => {});
+        setTimeout(() => { throw new Error('synthetic runtime failure'); }, 0);
+        </script>`);
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw new Error("No local negative-check listener");
+    const result = await visit(
+      page,
+      {
+        leagueId: 1,
+        entryId: 2,
+        leagueName: "Local",
+        managerName: "Local",
+        teamName: "Local",
+        weekOpen: false,
+      },
+      "en",
+      "local-negative",
+      `http://127.0.0.1:${address.port}`,
+    );
+    await page.close();
+    expect(result.diagnostics).toHaveLength(2);
+    expect(result.issues.some((issue) => issue.reason.includes("/api/v1/"))).toBe(false);
+    expect(
+      result.issues.some(
+        (issue) =>
+          issue.check === "request" &&
+          issue.reason.includes("HTTP 503") &&
+          issue.reason.includes("/assets/broken.js"),
+      ),
+    ).toBe(true);
+    expect(
+      result.issues.some(
+        (issue) => issue.check === "browser" && issue.reason === "page error: Error",
+      ),
+    ).toBe(true);
+    expect(result.writes).toHaveLength(1);
+    expect(() =>
+      assertVisitHealthy({ writes: result.writes, issues: [] }, "local write gate"),
+    ).toThrow();
+    for (const reason of ["HTTP 503", "page error: Error"]) {
+      const issues = result.issues.filter((issue) => issue.reason.includes(reason));
+      expect(issues.length).toBeGreaterThan(0);
+      expect(() => assertVisitHealthy({ writes: [], issues }, "local site-health gate")).toThrow();
+    }
+    expect(receivedWrites).toBe(0);
+  } finally {
+    if (!page.isClosed()) await page.close();
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+});
 
 test("read-only fence answers beacons and blocks every other write", async ({ page }) => {
   const received: string[] = [];
@@ -378,7 +469,7 @@ test("read-only fence answers beacons and blocks every other write", async ({ pa
 });
 
 for (const name of ["decision", "entry"] as const) {
-  test(`${name}: separate API transport failures are recorded before any response`, async ({
+  test(`${name}: backend transport and old routes are diagnostic while site failures stay gated`, async ({
     page,
   }) => {
     let siteWrites = 0;
@@ -390,6 +481,8 @@ for (const name of ["decision", "entry"] as const) {
     });
     const api = createServer((request, response) => {
       apiReads.push(request.method ?? "unknown");
+      response.setHeader("Access-Control-Allow-Origin", "*");
+      response.statusCode = request.url === "/api/v1/new-route" ? 404 : 503;
       response.end("{}");
     });
     await Promise.all([
@@ -413,6 +506,7 @@ for (const name of ["decision", "entry"] as const) {
       const beacons: string[] = [];
       const telemetry: string[] = [];
       const allowedAbsence = new Set<string>();
+      const diagnostics: string[] = [];
       const { serviceOrigins } = watchServiceTransport(
         page,
         origin,
@@ -420,9 +514,16 @@ for (const name of ["decision", "entry"] as const) {
         name,
         issues,
         allowedAbsence,
+        diagnostics,
       );
       await fenceWrites(page, origin, writes, beacons, telemetry);
-      await page.route(`${apiOrigin}/**`, (route) => route.abort("connectionfailed"));
+      await page.route(`${apiOrigin}/**`, (route) =>
+        ["/api/v1/new-route", "/api/v1/unavailable"].includes(
+          new URL(route.request().url()).pathname,
+        )
+          ? route.continue()
+          : route.abort("connectionfailed"),
+      );
       await page.route(`${origin}/cdn-cgi/rum`, (route) =>
         route.request().method() === "GET" ? route.abort("connectionfailed") : route.fallback(),
       );
@@ -433,16 +534,22 @@ for (const name of ["decision", "entry"] as const) {
           await fetch(`${apiOrigin}${prefix}/capabilities`).catch(() => null);
           const advice = name === "entry" ? `${prefix}/advice` : `${prefix}/entries/2/advice`;
           await fetch(`${apiOrigin}${advice}`).catch(() => null);
+          await fetch(`${apiOrigin}/api/v1/new-route`);
+          await fetch(`${apiOrigin}/api/v1/unavailable`);
           await fetch("/cdn-cgi/rum", { method: "POST", body: "{}" }).catch(() => null);
           await fetch("/cdn-cgi/rum").catch(() => null);
         },
         { apiOrigin, prefix, name },
       );
-      await expect.poll(() => issues.length).toBe(3);
+      await expect.poll(() => diagnostics.length).toBe(4);
+      await expect.poll(() => issues.length).toBe(1);
       await page.close();
       expect(serviceOrigins.has(apiOrigin)).toBe(true);
       expect(issues.every((issue) => issue.check === "request")).toBe(true);
-      expect(issues.filter((issue) => issue.reason.includes(apiOrigin))).toHaveLength(2);
+      expect(issues.filter((issue) => issue.reason.includes(apiOrigin))).toHaveLength(0);
+      expect(diagnostics.filter((line) => line.startsWith("transport "))).toHaveLength(2);
+      expect(diagnostics.some((line) => line.startsWith("HTTP 503 "))).toBe(true);
+      expect(diagnostics.some((line) => line.startsWith("HTTP 404 "))).toBe(true);
       expect(issues.filter((issue) => issue.reason.includes(`${origin}/cdn-cgi/rum`))).toHaveLength(
         1,
       );
@@ -450,7 +557,10 @@ for (const name of ["decision", "entry"] as const) {
       expect(telemetry).toEqual(["POST /cdn-cgi/rum"]);
       expect(writes).toEqual([]);
       expect(siteWrites).toBe(0);
-      expect(apiReads, "both API reads failed before any response").toEqual([]);
+      expect(apiReads, "only the two status probes reach the local API listener").toEqual([
+        "GET",
+        "GET",
+      ]);
     } finally {
       if (!page.isClosed()) await page.close();
       await Promise.all(
@@ -484,8 +594,7 @@ for (const target of PAGES) {
       body: result.journey.join("\n"),
       contentType: "text/plain",
     });
-    expect(result.writes, "no mutating request may leave the browser").toEqual([]);
-    expect(result.issues, `${target.name}: page health`).toEqual([]);
+    assertVisitHealthy(result, `${target.name}: page health`);
   });
 }
 
@@ -511,7 +620,6 @@ for (const target of PAGES.filter(({ name }) =>
       body: result.journey.join("\n"),
       contentType: "text/plain",
     });
-    expect(result.writes, "no mutating request may leave the browser").toEqual([]);
-    expect(result.issues, `${target.name}: repaired open-week content`).toEqual([]);
+    assertVisitHealthy(result, `${target.name}: repaired open-week content`);
   });
 }

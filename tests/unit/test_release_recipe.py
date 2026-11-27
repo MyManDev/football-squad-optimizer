@@ -431,6 +431,187 @@ def test_a_directory_site_is_one_publication_of_one_capture(
         assert said in output
 
 
+def _run_ship_recipe(
+    tmp_path: Path, settled: str = "", preflight_exit: int = 0
+) -> tuple[subprocess.CompletedProcess[str], str, list[list[str]], Path]:
+    """Run ship with inert git/gh/deploy commands, never a real release."""
+    commands = tmp_path / "commands"
+    commands.mkdir()
+    calls = tmp_path / "calls"
+    branch = "release/gw06-fix1"
+    worktree = tmp_path / ".codex-tmp/worktrees" / branch.replace("/", "-")
+    (worktree / "web/public/data").mkdir(parents=True)
+    git = """case "$*" in
+  "rev-parse --show-toplevel") echo "$SHIP_ROOT";;
+  "rev-parse origin/develop") echo devsha;;
+  "rev-list --count origin/main..origin/develop") echo 3;;
+  "rev-list --parents -n1 HEAD") echo 'merge parent1 parent2';;
+  "ls-remote --tags origin"|"diff origin/develop HEAD") :;;
+  "fetch "*|"worktree "*|"branch -D "*|"merge "*|"read-tree "*|"commit "*|"push "*) :;;
+  *) exit 99;;
+esac
+"""
+    gh = """case "$*" in
+  "pr view 618 --json state --jq .state") echo MERGED;;
+  "pr create "*) echo https://github.invalid/owner/repo/pull/701;;
+  "pr view 701 --json mergeStateStatus --jq .mergeStateStatus") echo CLEAN;;
+  "pr merge 701 --merge") :;;
+  *) exit 99;;
+esac
+"""
+    deploy = """printf 'SHBEGIN\\n' >> "$CALLS"
+for argument in "$@"; do printf 'ARG:%s\\n' "$argument" >> "$CALLS"; done
+printf 'SHEND\\n' >> "$CALLS"
+[ "${2:-}" != --preflight ] || exit "$PREFLIGHT_EXIT"
+exit 0
+"""
+    for name, body in {
+        "git": git,
+        "gh": gh,
+        "sh": deploy,
+        "sleep": ":\n",
+        "date": '[ "$*" = "-u +%H:%M:%S" ] || exit 99\nprintf "01:02:03\\n"\n',
+    }.items():
+        target = commands / name
+        target.write_text(
+            '#!/bin/sh\nprintf "%s\\n" "$0 $*" >> "$CALLS"\n' + body,
+            encoding="utf-8",
+            newline="\n",
+        )
+        target.chmod(0o755)
+    arguments = ["618", _DEPLOY_TAG, branch, _DEPLOY_STAMP, "Publish the accepted tree."]
+    if settled:
+        arguments.append(settled)
+    result = subprocess.run(
+        [
+            SHELL,
+            "-c",
+            'PATH="$(cd "$COMMANDS" && pwd):$PATH"; export PATH; exec /bin/sh "$@"',
+            "ship-test",
+            str(ROOT / "scripts/release/ship.sh"),
+            *arguments,
+        ],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "COMMANDS": commands.as_posix(),
+            "CALLS": calls.as_posix(),
+            "SHIP_ROOT": tmp_path.as_posix(),
+            "PREFLIGHT_EXIT": str(preflight_exit),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=15,
+    )
+    log = calls.read_text()
+    invocations = [
+        [line.removeprefix("ARG:") for line in block.splitlines()]
+        for block in re.findall(r"SHBEGIN\n(.*?)SHEND", log, re.DOTALL)
+    ]
+    return result, log, invocations, worktree
+
+
+def test_ship_preflight_precedes_the_site_pr_wait(tmp_path: Path) -> None:
+    result, log, calls, _ = _run_ship_recipe(tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls[0][1:] == ["--preflight"]
+    assert log.index("--preflight") < log.index("gh pr view 618")
+
+
+def test_ship_stops_before_the_site_pr_wait_when_preflight_refuses(tmp_path: Path) -> None:
+    result, log, _, _ = _run_ship_recipe(tmp_path, preflight_exit=7)
+    assert result.returncode == 1
+    assert "gh pr view" not in log
+    assert "git fetch" not in log
+
+
+@pytest.mark.parametrize("settled", ["", "6"])
+def test_ship_passes_stamp_empty_or_settled_week_and_worktree_data_positionally(
+    tmp_path: Path, settled: str
+) -> None:
+    result, _, calls, worktree = _run_ship_recipe(tmp_path, settled)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert len(calls) == 2
+    assert calls[1][1:] == [
+        _DEPLOY_TAG,
+        _DEPLOY_STAMP,
+        settled,
+        (worktree / "web/public/data").as_posix(),
+    ]
+
+
+def test_ship_logs_in_utc(tmp_path: Path) -> None:
+    result, log, _, _ = _run_ship_recipe(tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+    dates = [line for line in log.splitlines() if "/date " in line]
+    assert dates and all(line.endswith("date -u +%H:%M:%S") for line in dates)
+    assert all(line.startswith("01:02:03 ") for line in result.stdout.splitlines())
+
+
+@pytest.mark.parametrize("enabled", [None, "0", "1"])
+def test_host_browser_provisioning_is_explicitly_optional_and_uses_the_service_cache(
+    tmp_path: Path, enabled: str | None
+) -> None:
+    """Source only the optional functions; every host-changing command is a recorder."""
+    bash = "C:/Program Files/Git/bin/bash.exe" if sys.platform == "win32" else shutil.which("bash")
+    if not bash or not Path(bash).is_file():
+        pytest.skip("A POSIX bash is required")
+    commands = tmp_path / "commands"
+    commands.mkdir()
+    calls = tmp_path / "calls"
+    calls.write_text("")
+    checkout = tmp_path / "checkout"
+    (checkout / "web").mkdir(parents=True)
+    for name in ("apt-get", "curl", "gpg", "chmod", "install", "npx", "dpkg", "node"):
+        target = commands / name
+        answer = {"dpkg": "printf 'amd64\\n'", "node": "printf '22\\n'"}.get(name, ":")
+        target.write_text(
+            '#!/bin/sh\nprintf "%s\\n" "$0 $*" >> "$CALLS"\n' + answer + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        target.chmod(0o755)
+    environment = {**os.environ, "COMMANDS": commands.as_posix(), "CALLS": calls.as_posix()}
+    environment.pop("SQUADOPT_LIVE_BROWSER", None)
+    if enabled is not None:
+        environment["SQUADOPT_LIVE_BROWSER"] = enabled
+    result = subprocess.run(
+        [
+            bash,
+            "-c",
+            'PATH="$(cd "$COMMANDS" && pwd):$PATH"; export PATH; source "$1"; '
+            'write_if_changed() { cat >> "$CALLS"; return 0; }; '
+            'as_user() { printf "as_user %s\\n" "$*" >> "$CALLS"; }; '
+            'browser_node "$2/keyrings" "$2/nodesource.list"; '
+            'browser_runtime "$2/checkout" "$2/service-home"',
+            "provision-test",
+            str(ROOT / "deploy/weekly-schedule/provision.sh"),
+            tmp_path.as_posix(),
+        ],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    log = calls.read_text()
+    if enabled != "1":
+        assert log == "" and result.stdout == ""
+        return
+    assert "https://deb.nodesource.com/node_22.x nodistro main" in log
+    assert "apt-get install -y -q nodejs" in log
+    assert "npm ci" in log
+    assert "npx --no-install playwright install --with-deps chromium" in log
+    assert "as_user env HOME=" in log
+    assert "PLAYWRIGHT_BROWSERS_PATH=" in log
+    assert "/service-home/.cache/ms-playwright" in log
+    assert log.index("npm ci") < log.index("playwright install --with-deps chromium")
+    assert log.index("playwright install --with-deps chromium") < log.index("chromium.launch")
+
+
 def test_a_site_with_a_directory_is_checked_tree_by_tree(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -892,6 +1073,7 @@ def _run_deploy_recipe(
     gh_script: str = _DEPLOY_GH,
     arguments: list[str] | None = None,
     extra_env: dict[str, str] | None = None,
+    browser: str = "ready",
 ) -> tuple[subprocess.CompletedProcess[str], str]:
     """Run the real recipe against disposable commands, including its local preflight.
 
@@ -906,11 +1088,12 @@ def _run_deploy_recipe(
     calls = tmp_path / "calls"
     cli = tmp_path / "web/node_modules/@playwright/test/cli.js"
     cli.parent.mkdir(parents=True)
-    cli.write_text("local runner stand-in\n", encoding="utf-8")
+    if browser != "missing-runner":
+        cli.write_text("local runner stand-in\n", encoding="utf-8")
     expected_data = tmp_path / "accepted data"
     expected_data.mkdir()
     python = """case "${1:-}" in
-  -c) exit 0;;
+  -c) exit "${PYTHON_EXIT:-0}";;
   */verify_live.py)
     [ "${2:-}" = "$ACCEPTED_STAMP" ] || exit 98
     exit "${VERIFY_EXIT:-0}";;
@@ -924,6 +1107,7 @@ esac
       --version) exit 0;;
       test)
         [ "${LIVE_BASE_URL:-}" = https://squadopt.mymandev.com ] || exit 98
+        [ -z "${LIVE_SMOKE_COMPUTE:-}" ] || exit 98
         exit "${BROWSER_EXIT:-0}";;
     esac;;
 esac
@@ -937,6 +1121,8 @@ exit 99
         "python3": python,
         "node": node,
     }.items():
+        if name == "node" and browser == "missing-node":
+            continue
         target = commands / name
         target.write_text(
             '#!/bin/sh\nprintf "%s\\n" "$0 $*" >> "$CALLS"\n' + body,
@@ -944,6 +1130,15 @@ exit 99
             newline="\n",
         )
         target.chmod(0o755)
+    if browser == "missing-node":
+        # Isolate PATH from the machine's Node. Only inert stubs and the named
+        # read-only POSIX utilities remain available, on both Windows and Linux.
+        for name in ("cat", "cut", "date", "dirname", "grep", "sed", "wc"):
+            target = commands / name
+            target.write_text(
+                f'#!/bin/sh\nexec /usr/bin/{name} "$@"\n', encoding="utf-8", newline="\n"
+            )
+            target.chmod(0o755)
     remote = [f"{_DEPLOY_TAG}0", "site-2026-27-gw06-decision"]
     if scenario == "existing-tag":
         remote.append(_DEPLOY_TAG)
@@ -951,7 +1146,9 @@ exit 99
         [
             SHELL,
             "-c",
-            'PATH="$(cd "$COMMANDS" && pwd):$PATH"; export PATH; exec /bin/sh "$@"',
+            'TOOL_PATH="$(cd "$COMMANDS" && pwd)"; '
+            'if [ "$ISOLATE_TOOL_PATH" = 1 ]; then PATH="$TOOL_PATH"; '
+            'else PATH="$TOOL_PATH:$PATH"; fi; export PATH; exec /bin/sh "$@"',
             "deploy-test",
             str(ROOT / "scripts/release/deploy.sh"),
             *(arguments if arguments is not None else [_DEPLOY_TAG, _DEPLOY_STAMP]),
@@ -970,7 +1167,8 @@ exit 99
             "TAG": _DEPLOY_TAG,
             "ACCEPTED_STAMP": _DEPLOY_STAMP,
             "MAIN_PARENTS": "parent1 parent2",
-            "PREFLIGHT_EXIT": "0",
+            "PREFLIGHT_EXIT": "1" if browser == "missing-chromium" else "0",
+            "ISOLATE_TOOL_PATH": "1" if browser == "missing-node" else "0",
             "VERIFY_EXIT": "0",
             "BROWSER_EXIT": "0",
             "POLLS": (tmp_path / "polls").as_posix(),
@@ -1127,7 +1325,7 @@ def test_deploy_refuses_main_without_exactly_two_parents(tmp_path: Path, parents
     assert "workflow run" not in log
 
 
-@pytest.mark.parametrize("failure", ["PREFLIGHT_EXIT", "CI"])
+@pytest.mark.parametrize("failure", ["PYTHON_EXIT", "CI"])
 def test_deploy_preflight_failure_refuses_before_fetch(tmp_path: Path, failure: str) -> None:
     result, log = _run_deploy_recipe(tmp_path, extra_env={failure: "1"})
     assert result.returncode == 1
@@ -1135,6 +1333,33 @@ def test_deploy_preflight_failure_refuses_before_fetch(tmp_path: Path, failure: 
     assert "fetch -q origin" not in log
     assert "tag -a" not in log
     assert "workflow run" not in log
+
+
+@pytest.mark.parametrize("browser", ["missing-node", "missing-runner", "missing-chromium"])
+def test_a_host_without_a_browser_keeps_http_as_its_gate(tmp_path: Path, browser: str) -> None:
+    result, log = _run_deploy_recipe(tmp_path, browser=browser)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.count("SKIP browser smoke and tour:") == 1
+    assert "/verify_live.py " in log
+    assert "cli.js test " not in log
+    assert "required publication verification passed" in result.stdout
+
+
+def test_a_browserless_host_still_refuses_a_failed_http_gate(tmp_path: Path) -> None:
+    result, log = _run_deploy_recipe(
+        tmp_path, browser="missing-node", extra_env={"VERIFY_EXIT": "7"}
+    )
+    assert result.returncode == 1
+    assert log.count("/verify_live.py ") == 2
+    assert "cli.js test " not in log
+    assert "SKIP browser" not in result.stdout
+
+
+def test_a_provisioned_browser_runs_without_backend_compute_diagnostics(tmp_path: Path) -> None:
+    result, log = _run_deploy_recipe(tmp_path, extra_env={"LIVE_SMOKE_COMPUTE": "1"})
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "cli.js test --config playwright.live.config.ts" in log
+    assert "SKIP browser" not in result.stdout
 
 
 @pytest.mark.parametrize("failure", ["VERIFY_EXIT", "BROWSER_EXIT"])

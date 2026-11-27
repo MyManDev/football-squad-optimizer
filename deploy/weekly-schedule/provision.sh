@@ -34,6 +34,8 @@ readonly SWAP_FILE=/swapfile
 readonly SWAP_SIZE=4G
 # The OS check reads this file; the tests point it at a fixture.
 readonly OS_RELEASE="${SQUADOPT_OS_RELEASE:-/etc/os-release}"
+# Optional release diagnostics. HTTP/content verification needs no browser.
+readonly LIVE_BROWSER="${SQUADOPT_LIVE_BROWSER:-0}"
 
 say() { printf '\n== %s\n' "$*"; }
 warn() { printf 'WARNING: %s\n' "$*" >&2; }
@@ -69,6 +71,7 @@ preflight() {
   case "$REF" in
     "" | -* | */ | *..* | *[!A-Za-z0-9._/-]*) refuse "SQUADOPT_REF must name a branch, not '$REF'" ;;
   esac
+  case "$LIVE_BROWSER" in 0 | 1) ;; *) refuse "SQUADOPT_LIVE_BROWSER must be 0 or 1" ;; esac
   [ "$(id -u)" -eq 0 ] || refuse "run as root: bash provision.sh"
 }
 
@@ -80,6 +83,27 @@ packages() {
     git curl ca-certificates gnupg time software-properties-common ufw unattended-upgrades \
     openssh-server
   timedatectl set-timezone Etc/UTC
+  browser_node
+}
+
+browser_node() {
+  [ "$LIVE_BROWSER" = 1 ] || return 0
+  say "Optional live browser: Node 22"
+  local keyring_dir="${1:-/etc/apt/keyrings}"
+  local source_list="${2:-/etc/apt/sources.list.d/nodesource.list}"
+  local node_keyring="$keyring_dir/nodesource.gpg"
+  install -d -m 0755 "$keyring_dir"
+  if [ ! -s "$node_keyring" ]; then
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key |
+      gpg --batch --yes --dearmor -o "$node_keyring"
+    chmod go+r "$node_keyring"
+  fi
+  if printf 'deb [arch=%s signed-by=%s] https://deb.nodesource.com/node_22.x nodistro main\n' \
+    "$(dpkg --print-architecture)" "$node_keyring" | write_if_changed "$source_list" 0644; then
+    apt-get update -q
+  fi
+  apt-get install -y -q nodejs
+  [ "$(node -p 'process.versions.node.split(".")[0]')" = 22 ] || refuse "live browser needs Node 22"
 }
 
 github_cli() {
@@ -183,6 +207,26 @@ venv() {
   fi
   as_user "$python" -c \
     'import squadopt.platform.weekly_operations, squadopt.platform.weekly_schedule, squadopt.platform.weekly_release'
+  browser_runtime
+}
+
+browser_runtime() {
+  [ "$LIVE_BROWSER" = 1 ] || return 0
+  local checkout="${1:-$CHECKOUT}" browser_home="${2:-$SERVICE_HOME}"
+  local browser_cache="$browser_home/.cache/ms-playwright"
+  say "Optional live browser: locked web dependencies and Chromium"
+  (
+    umask 022
+    cd "$checkout/web"
+    as_user env HOME="$browser_home" npm ci
+    install -d -m 0755 -o "$SERVICE_USER" -g "$SERVICE_USER" "$browser_cache"
+    # Root installs OS libraries; the service user must then be able to launch from
+    # the same cache its weekly release will discover under its home directory.
+    PLAYWRIGHT_BROWSERS_PATH="$browser_cache" npx --no-install playwright install --with-deps chromium
+    as_user env HOME="$browser_home" PLAYWRIGHT_BROWSERS_PATH="$browser_cache" node -e \
+      'const { chromium } = require(process.argv[1]); (async () => { const browser = await chromium.launch({ timeout: 10000 }); await browser.close(); })().catch(() => process.exit(1));' \
+      "$checkout/web/node_modules/playwright"
+  )
 }
 
 swap() {
