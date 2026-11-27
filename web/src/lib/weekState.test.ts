@@ -163,6 +163,8 @@ describe("the approved six-phase week policy", () => {
     const missing = weekState({ treeGameweek: 11, events, fixtures: null, now: deadline });
     expect(missing).toMatchObject({ phase: "unavailable", gameweek: null, planClosed: null });
     expect(missing.weeks.plan).toBe(11);
+    expect(missing.weeks.resources).toBe(11);
+    expect(missing.weeks.memberRail).toBe(11);
     expect(missing.weeks.scoreboard).toBeNull();
   });
 

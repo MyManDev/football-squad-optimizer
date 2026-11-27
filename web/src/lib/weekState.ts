@@ -215,9 +215,10 @@ export function weekState({
   const targets: WeekTargets = {
     topBar: treeGameweek,
     plan: treeGameweek,
-    resources: planClosed === false ? treeGameweek : null,
+    // Missing calendar data cannot erase published values or relabel their week.
+    resources: planClosed === true ? null : treeGameweek,
     fixtures: fixturesWeek,
-    memberRail: planClosed === false ? treeGameweek : fixturesWeek,
+    memberRail: planClosed === true ? fixturesWeek : treeGameweek,
     memberScore: elapsed?.gameweek ?? null,
     live: liveOn ? focus!.gameweek : null,
     liveWaiting: waiting?.gameweek ?? null,
