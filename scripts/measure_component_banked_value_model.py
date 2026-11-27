@@ -88,6 +88,8 @@ def all_seasons_value_table(samples: Sequence[Sequence[float]]) -> list[list[flo
         [round(x, 2) for x in marginal_values(values[last - remaining])]
         for remaining in range(ALL_SEASONS_ROWS)
     ]
+
+
 PROTOCOL_PATH = "docs/research/component_banked_value_model_prereg.md"
 FIXED_CELL = "component_rules_2026_27"
 
