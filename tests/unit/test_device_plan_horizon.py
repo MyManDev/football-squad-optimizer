@@ -32,6 +32,7 @@ from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import HeldSquad, read_inputs, read_season_rules
 from squadopt.live.recommendation import InSeasonProjection, project, write_projection_handoff
+from squadopt.live.transfers import member_planning_policy, member_window_policy
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.optimization.coefficients import objective_coefficients
 from squadopt.planning import optimizer as server_model
@@ -252,6 +253,37 @@ def test_horizon_does_not_remove_one_week_inputs_when_future_calendar_is_missing
         raise DataSourceError("missing captured calendar")
 
     assert device_plan_horizon(inputs, projection, rules, missing) is None
+
+
+@pytest.mark.parametrize("window", [3, 5])
+def test_horizon_uses_the_window_policy_and_carries_no_one_week_transfer_value(
+    tmp_path: Path, window: int
+) -> None:
+    world = horizon_world(tmp_path)
+    inputs, projection, rules = (world[key] for key in ("inputs", "projection", "rules"))
+    inputs = replace(inputs, published_gameweeks=frozenset(range(1, 2 + window)))
+    first = int(inputs.deadline.gameweek)
+    assert member_planning_policy(rules, first).values_carried_transfers
+    one_week = device_plan_table(inputs, projection, rules, league_id=9)
+    assert any(one_week["rules"]["banked_values_scaled"])
+    with patch(
+        "squadopt.application.device_plan.member_window_policy", wraps=member_window_policy
+    ) as policy:
+        horizon = device_plan_horizon(inputs, projection, rules, world["builder"])
+    policy.assert_called_once_with(rules, gameweek=first, transfer_cap=1, weeks=window)
+    assert horizon is not None
+    assert horizon["rules"]["banked_transfer_value_scaled"] == 0
+    assert horizon["rules"]["max_transfers_per_gameweek"] == 1
+
+
+def test_horizon_publishes_the_transfer_cap_returned_by_the_window_policy(tmp_path: Path) -> None:
+    world = horizon_world(tmp_path)
+    inputs, projection, rules = (world[key] for key in ("inputs", "projection", "rules"))
+    policy = member_window_policy(rules, gameweek=2, transfer_cap=2, weeks=5)
+    with patch("squadopt.application.device_plan.member_window_policy", return_value=policy):
+        horizon = device_plan_horizon(inputs, projection, rules, world["builder"])
+    assert horizon is not None
+    assert horizon["rules"]["max_transfers_per_gameweek"] == 2
 
 
 @pytest.mark.parametrize(

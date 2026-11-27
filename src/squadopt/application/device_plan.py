@@ -43,6 +43,7 @@ from squadopt.live.transfers import (
     MemberPlanningInputs,
     member_planning_inputs,
     member_planning_policy,
+    member_window_policy,
 )
 from squadopt.optimization import OptimizationConfig
 from squadopt.optimization.coefficients import (
@@ -206,7 +207,7 @@ def device_plan_horizon(
         _log_unavailable_horizon("the projection belongs to another season or capture")
         return None
     settings = OptimizationConfig() if optimization is None else optimization
-    policy = member_planning_policy(rules)
+    policy = member_window_policy(rules, gameweek=first, transfer_cap=1, weeks=windows[-1])
     initial = sort_players_by_id(projection.table)
     weeks: list[dict[str, object]] = []
     for offset, gameweek in enumerate(horizon.target_gameweeks):
@@ -251,7 +252,7 @@ def device_plan_horizon(
         "projection_horizon_fingerprint": horizon.horizon_fingerprint,
         "post_processing_contract_version": horizon.post_processing_contract_version,
         "rules": {
-            "max_transfers_per_gameweek": 1,
+            "max_transfers_per_gameweek": policy.max_transfers_per_gameweek,
             "free_transfer_accrual": policy.free_transfer_accrual,
             "bench_weight": settings.bench_weight,
             "objective_weight_scale": policy.objective_weight_scale,
