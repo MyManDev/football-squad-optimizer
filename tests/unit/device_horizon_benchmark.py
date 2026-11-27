@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import statistics
+import struct
 import subprocess
 from ctypes import wintypes
 from pathlib import Path
@@ -28,6 +29,44 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER = ROOT / "web/src/features/league/device/benchmark/controller.mjs"
 TABLE = ROOT / "web/public/data/device/fpl-live-20261127T103417Z-2907c387f11f/device-plan.json"
 CALENDAR = ROOT / "web/public/data/fixtures.json"
+
+
+def normalized_mask(value: int | list[int] | None) -> list[int] | None:
+    return [value] if isinstance(value, int) else sorted(value) if value is not None else None
+
+
+def cpu_topology() -> list[dict[str, int]]:
+    """Read the official variable-sized CPU-set records without changing CPU settings."""
+    api = ctypes.WinDLL("kernel32", use_last_error=True).GetSystemCpuSetInformation
+    api.argtypes = [
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+        wintypes.HANDLE,
+        wintypes.DWORD,
+    ]
+    api.restype = wintypes.BOOL
+    needed = wintypes.DWORD()
+    api(None, 0, ctypes.byref(needed), None, 0)
+    if needed.value == 0:
+        raise ctypes.WinError(ctypes.get_last_error())
+    buffer = ctypes.create_string_buffer(needed.value)
+    if not api(buffer, needed, ctypes.byref(needed), None, 0):
+        raise ctypes.WinError(ctypes.get_last_error())
+    offset = 0
+    rows = []
+    while offset < needed.value:
+        size, kind = struct.unpack_from("<II", buffer.raw, offset)
+        if size < 32:
+            raise ValueError("Unknown CPU-set topology record")
+        if kind == 0:
+            group = struct.unpack_from("<H", buffer.raw, offset + 12)[0]
+            logical, core, _, _, efficiency, _ = struct.unpack_from("<6B", buffer.raw, offset + 14)
+            rows.append(
+                {"group": group, "logical": logical, "core": core, "efficiency_class": efficiency}
+            )
+        offset += size
+    return rows
 
 
 def wasm_contract() -> dict[str, Any]:
@@ -197,7 +236,7 @@ class OwnedCpuJob:
             raise RuntimeError("CPU rate readback differs from the requested own-job limit")
         return {"flags": result.ControlFlags, "rate": result.CpuRate}
 
-    def verify(self, cpu: int | None = None) -> dict[str, Any]:
+    def verify(self, cpu: list[int] | None = None) -> dict[str, Any]:
         count = 0
         console_hosts = []
         compute_affinity = []
@@ -236,7 +275,7 @@ class OwnedCpuJob:
                     )
                 count += 1
                 affinity = child.cpu_affinity()
-                if cpu is not None and affinity != [cpu]:
+                if cpu is not None and affinity != cpu:
                     raise RuntimeError("Own compute process changed the frozen CPU affinity")
                 compute_affinity.append({"pid": child.pid, "affinity": affinity})
             finally:
@@ -259,6 +298,10 @@ def main() -> None:
     parser.add_argument("--calibration-log", type=Path)
     parser.add_argument("--prior-calibration-log", type=Path)
     parser.add_argument("--cpu", type=int)
+    parser.add_argument(
+        "--cpus", help="Comma-separated logical CPUs from four homogeneous physical cores"
+    )
+    parser.add_argument("--nominal-cdp", action="store_true")
     parser.add_argument("--execution-context", choices=["worker", "main"], default="worker")
     parser.add_argument("--cpu-throttling", choices=["job", "cdp"], default="job")
     parser.add_argument("--output", type=Path, required=True)
@@ -267,6 +310,29 @@ def main() -> None:
     parser.add_argument("--audit-only", action="store_true")
     parser.add_argument("--watchdog-smoke", action="store_true")
     args = parser.parse_args()
+    if args.cpu is not None and args.cpus is not None:
+        raise ValueError("Choose either a single CPU or a homogeneous CPU mask")
+    cpu_mask = (
+        sorted({int(value) for value in args.cpus.split(",")})
+        if args.cpus
+        else normalized_mask(args.cpu)
+    )
+    selected_topology = []
+    if args.cpus:
+        assert cpu_mask is not None
+        topology = cpu_topology()
+        selected_topology = [
+            row for row in topology if row["group"] == 0 and row["logical"] in cpu_mask
+        ]
+        if (
+            len(cpu_mask) != 4
+            or len({row["core"] for row in selected_topology}) != 4
+            or {row["efficiency_class"] for row in selected_topology}
+            != {max(row["efficiency_class"] for row in topology)}
+        ):
+            raise ValueError("The mask must cover four distinct highest-efficiency-class cores")
+    if args.nominal_cdp and (args.cpu_throttling != "cdp" or args.execution_context != "main"):
+        raise ValueError("Nominal CDP measurements require the explicit main-thread context")
     if args.audit_only and (args.runtime != "desktop" or args.execution_context != "worker"):
         raise ValueError("The compatibility audit uses only the unthrottled Dedicated Worker")
     prior_count = 0
@@ -276,7 +342,7 @@ def main() -> None:
         prior_rows = [json.loads(line) for line in prior_bytes.splitlines()]
         prior_protocol = next(row for row in prior_rows if row["event"] == "protocol")
         if (
-            prior_protocol["logical_cpu_affinity"] != args.cpu
+            normalized_mask(prior_protocol["logical_cpu_affinity"]) != cpu_mask
             or prior_protocol["calibration_iterations"] != 1_200_000_000
             or prior_protocol["calibration_repeats"] != 5
         ):
@@ -315,12 +381,15 @@ def main() -> None:
         cleanup = records[-1]
         if (
             any(row["event"] == "run_failed" for row in records)
-            or not 3.90
-            <= confirmation["main_ratio" if args.cpu_throttling == "cdp" else "worker_ratio"]
-            <= 4.10
+            or (
+                not args.nominal_cdp
+                and not 3.90
+                <= confirmation["main_ratio" if args.cpu_throttling == "cdp" else "worker_ratio"]
+                <= 4.10
+            )
             or cleanup
             != {"event": "cleanup", "owned_processes_remaining": 0, "node_exit": 0, "errors": []}
-            or protocol["logical_cpu_affinity"] != args.cpu
+            or normalized_mask(protocol["logical_cpu_affinity"]) != cpu_mask
             or protocol.get("cpu_throttling", "job") != args.cpu_throttling
             or protocol.get("execution_context", "worker") != args.execution_context
             or (args.runtime == "throttled" and args.rate != confirmation["rate"])
@@ -362,7 +431,9 @@ def main() -> None:
                 "fixed_cdp_candidate_count": 1 if args.cpu_throttling == "cdp" else 0,
                 "prior_candidate_count": prior_count,
                 "prior_calibration": prior_manifest,
-                "logical_cpu_affinity": args.cpu,
+                "logical_cpu_affinity": cpu_mask,
+                "selected_cpu_topology": selected_topology,
+                "nominal_cdp_protocol": args.nominal_cdp,
                 "execution_context": "node" if args.runtime == "node" else args.execution_context,
                 "cpu_throttling": args.cpu_throttling,
                 "logical_cpus": psutil.cpu_count(),
@@ -415,7 +486,7 @@ def main() -> None:
 
         def probe() -> dict[str, Any]:
             assert job is not None
-            membership_before = job.verify(args.cpu)
+            membership_before = job.verify(cpu_mask)
             send({"command": "probe", "count": 1_200_000_000, "repeats": 5})
             result = receive()
             if result["event"] != "probe":
@@ -424,7 +495,7 @@ def main() -> None:
                 {
                     **result,
                     "membership_before": membership_before,
-                    "membership_after": job.verify(args.cpu),
+                    "membership_after": job.verify(cpu_mask),
                 }
             )
             return result
@@ -450,11 +521,11 @@ def main() -> None:
             assert job is not None
             adopt_children()
             job.verify()
-            if args.cpu is not None:
+            if cpu_mask is not None:
                 for child in job.node.children(recursive=True):
                     if child.name() != "conhost.exe":
-                        child.cpu_affinity([args.cpu])
-            emit({**result, "owned_membership": job.verify(args.cpu)})
+                        child.cpu_affinity(cpu_mask)
+            emit({**result, "owned_membership": job.verify(cpu_mask)})
             send({"command": "resume"})
             return True
 
@@ -463,12 +534,13 @@ def main() -> None:
             if boot != {"event": "boot", "pid": proc.pid}:
                 raise RuntimeError("Wrong own launcher PID")
             job = OwnedCpuJob(proc)
+            emit({"event": "cpu_full_rate", **job.configure(10000)})
             owned = [job.node]
             original_affinity = job.node.cpu_affinity()
-            if args.cpu is not None:
-                if args.cpu not in original_affinity:
+            if cpu_mask is not None:
+                if not set(cpu_mask).issubset(original_affinity):
                     raise ValueError("Requested CPU is outside this own process's allowed affinity")
-                job.node.cpu_affinity([args.cpu])
+                job.node.cpu_affinity(cpu_mask)
             send({"command": "go"})
             ready = receive()
             if ready.get("event") != "ready":
@@ -476,11 +548,11 @@ def main() -> None:
             owned += job.node.children(recursive=True)
             emit({**ready, "owned_processes_verified": job.verify()})
             compute = [child for child in owned if child.name() != "conhost.exe"]
-            if args.cpu is not None:
+            if cpu_mask is not None:
                 # Chromium's GPU child can restore a wide mask at startup. All these
                 # identities are already verified descendants in this own CPU job.
                 for child in compute:
-                    child.cpu_affinity([args.cpu])
+                    child.cpu_affinity(cpu_mask)
             emit(
                 {
                     "event": "owned_identities",
@@ -496,9 +568,7 @@ def main() -> None:
                     ],
                 }
             )
-            if args.cpu is not None and any(
-                child.cpu_affinity() != [args.cpu] for child in compute
-            ):
+            if cpu_mask is not None and any(child.cpu_affinity() != cpu_mask for child in compute):
                 raise RuntimeError("Own compute child did not inherit the frozen CPU affinity")
             if args.watchdog_smoke:
                 send({"command": "watchdog-smoke"})
@@ -542,6 +612,7 @@ def main() -> None:
                         "ratios": ratios,
                         "checksum_stable": len(checksums) == 1,
                         "accepted": accepted,
+                        "nominal_protocol_accepted": args.nominal_cdp or accepted,
                     }
                 )
                 emit(
@@ -550,11 +621,11 @@ def main() -> None:
                         "rate": 4,
                         "main_ratio": confirmed["main"],
                         "worker_ratio": confirmed["dedicatedWorker"],
-                        "owned_membership": job.verify(args.cpu),
+                        "owned_membership": job.verify(cpu_mask),
                     }
                 )
                 cdp_rate(1)
-                if not accepted:
+                if len(checksums) != 1 or (not accepted and not args.nominal_cdp):
                     raise RuntimeError("The fixed CDP4 main-thread protocol failed calibration")
             elif args.runtime == "calibration":
                 baseline = probe()
@@ -603,7 +674,7 @@ def main() -> None:
                                 "event": "calibration_confirmation",
                                 "rate": rate,
                                 "worker_ratio": confirmed,
-                                "owned_membership": job.verify(args.cpu),
+                                "owned_membership": job.verify(cpu_mask),
                             }
                         )
                         confirmed_checksums = {
@@ -688,7 +759,7 @@ def main() -> None:
                     emit({"event": "cpu_restored", **job.configure(10000)})
                 except OSError as error:
                     errors.append(f"restore:{error.winerror}")
-                if args.cpu is not None:
+                if cpu_mask is not None:
                     for child in owned:
                         try:
                             if child.is_running() and child.name() != "conhost.exe":
