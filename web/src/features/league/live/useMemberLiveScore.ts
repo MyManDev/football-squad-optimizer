@@ -18,6 +18,7 @@
 
 import { QueryClientContext } from "@tanstack/react-query";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { availableWeek, weekState } from "../../../lib/weekState";
 
 import type { FixturesPayload } from "../../fixtures/types";
 import { advanceLiveMarks, type LiveMarks } from "../../liveScore/liveEvents";
@@ -350,6 +351,17 @@ export function useMemberLiveScore(
       const bundle = await forwarder.entryBundle(entryId, gameweek, { signal: read.signal });
       if (read.signal.aborted || !bundle.ok || bundle.document.current_week === null) return false;
       const member = bundle.document.current_week;
+      const policy = weekState({
+        treeGameweek: gameweek,
+        events: [],
+        fixtures: sources.current.fixtures,
+        now: Date.now(),
+      });
+      const target = policy.weeks.memberScore ?? member.gameweek;
+      const selected = availableWeek(target, held.current?.member.gameweek ?? member.gameweek, [
+        member.gameweek,
+      ]);
+      if (selected !== member.gameweek) return false;
       const [live, table] = await Promise.all([
         readLive(forwarder, member.gameweek, read.signal),
         loadTable(read.signal).then(

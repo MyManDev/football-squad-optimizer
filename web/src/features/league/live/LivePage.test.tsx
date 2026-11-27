@@ -442,6 +442,9 @@ describe("the LIVE page's reads", () => {
     const forwarder = fakeForwarder([answered(live("2026-11-21T19:30:00Z"))]);
     renderLive({ forwarder });
     const waiting = await screen.findByText(copy.live.notStarted(12));
+    expect(screen.getByRole("heading", { level: 1 }).closest("header")).toHaveTextContent(
+      copy.suggestionHistory.gameweek(12),
+    );
     expect(waiting.closest("[role=status]")).toHaveTextContent(copy.live.firstMatch);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(copy.live.title);
     expect(document.querySelectorAll("[data-live-row]")).toHaveLength(0);

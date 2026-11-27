@@ -203,6 +203,50 @@ function goalPoints(element: number, armband: number): string {
 }
 
 describe("a followed live week", () => {
+  it("keeps the shown week when the phase's member row is missing, then advances when it arrives", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const nextWeek = WEEK + 1;
+    const calendar = exampleCalendar({
+      season: SQUAD.season,
+      gameweek: nextWeek,
+      deadline: "2026-08-28T17:30:00Z",
+    });
+    let member: MemberWeek | null = MEMBER;
+    const client = {
+      entryBundle: vi.fn<ForwarderClient["entryBundle"]>(async () => ({
+        ok: true,
+        copy: "miss",
+        document: { ...exampleBundle(ENTRY, WEEK, member ?? MEMBER), current_week: member },
+      })),
+      liveWeek: vi.fn<ForwarderClient["liveWeek"]>(async (gameweek) => ({
+        ok: true,
+        copy: "miss",
+        document: forwardedLive("in_progress", gameweek),
+      })),
+    };
+    const table = loadTable();
+    function Week() {
+      const value = useMemberLiveScore(
+        SQUAD,
+        calendar,
+        { forwarder: client, loadTable: table },
+        true,
+        nextWeek,
+      );
+      return <output data-testid="retained-week">{value.shown?.gameweek ?? "none"}</output>;
+    }
+    render(<LanguageProvider initialLanguage="tr">{withLeague(<Week />)}</LanguageProvider>);
+    await screen.findByText(String(WEEK));
+    member = null;
+    await minute();
+    expect(screen.getByTestId("retained-week")).toHaveTextContent(String(WEEK));
+    member = exampleMember(ENTRY, nextWeek);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4 * FOLLOW_INTERVAL_MS);
+    });
+    expect(screen.getByTestId("retained-week")).toHaveTextContent(String(nextWeek));
+  });
+
   it("reads the live points once a minute while in view, and names the goal a read brings", async () => {
     const client = forwarder([0, 1]);
     follow(client);

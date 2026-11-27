@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from "react";
+import type { WeekEvent } from "../../../lib/weekState";
 
 import type { FixturesPayload } from "../../fixtures/types";
 import { liveWindow, type LiveWindow, type LiveWindowFilter } from "../../liveScore/liveWindow";
@@ -25,11 +26,12 @@ function filterKey(filter: LiveWindowFilter): string {
 export function useLiveWindow(
   fixtures: FixturesPayload | null,
   filter: LiveWindowFilter = {},
+  events: readonly WeekEvent[] = [],
 ): LiveWindow {
   const [now, setNow] = useState(() => Date.now());
-  const match = liveWindow(fixtures, now, filter);
+  const match = liveWindow(fixtures, now, filter, events);
   const changesIn = match.changesIn;
-  const key = filterKey(filter);
+  const key = `${filterKey(filter)}:${events.map((row) => `${row.gameweek},${row.finished},${row.data_checked}`).join("|")}`;
   // A new filter (a read named the member's clubs) is read with the clock of now, not with
   // the one the last timer left, which can be up to half an hour old.
   useEffect(() => {
@@ -40,7 +42,7 @@ export function useLiveWindow(
     if (changesIn === null) return undefined;
     const timer = setTimeout(
       () => setNow(Date.now()),
-      Math.min(Math.max(changesIn, 1_000), LONGEST_WAIT_MS),
+      Math.min(Math.max(changesIn, 1), LONGEST_WAIT_MS),
     );
     return () => clearTimeout(timer);
   }, [changesIn, now]);

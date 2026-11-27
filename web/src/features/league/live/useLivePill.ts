@@ -14,8 +14,8 @@
  * computes this and hands the shell the address: the shell itself reads no league data.
  */
 
-import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useSyncExternalStore } from "react";
 
 import { FIXTURES_QUERY } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
@@ -28,7 +28,8 @@ import {
   entryBundleQuery,
   newestDeviceTable,
 } from "../forwarded/reads";
-import { HELD_READ } from "../queries";
+import { HELD_READ, leagueKeys } from "../queries";
+import type { LeagueViewEnvelope, Scoreboard } from "../types";
 import { useLiveWindow } from "./useLiveWindow";
 import { useReadAgain } from "./useReadAgain";
 
@@ -70,7 +71,22 @@ export function useLivePill(target: LivePillTarget | null, enabled: boolean): st
   const active = enabled && target !== null;
   const fixtures = useQuery({ ...FIXTURES_QUERY, ...HELD_READ, enabled: active });
   const calendar = active ? (fixtures.data ?? null) : null;
-  const any = useLiveWindow(calendar);
+  const client = useQueryClient();
+  const leagueId = Number(target?.to.match(/^\/league\/([1-9]\d*)\//)?.[1] ?? 0);
+  // A cache subscription joins flags a page already holds, with no additional read.
+  const held = useSyncExternalStore(
+    (notify) => client.getQueryCache().subscribe(() => notify()),
+    () =>
+      client.getQueryData<LeagueViewEnvelope<Scoreboard>>(leagueKeys.scoreboard(leagueId)) ?? null,
+  );
+  const events =
+    held !== null &&
+    calendar !== null &&
+    held.payload.league_id === leagueId &&
+    held.payload.season === calendar.season
+      ? held.payload.gameweeks
+      : [];
+  const any = useLiveWindow(calendar, {}, events);
   const open = active && any.open;
   const directory = useQuery({ ...directoryQuery(), ...HELD_READ, enabled: open });
   const tableRef = open && directory.data ? newestDeviceTable(directory.data) : null;
@@ -98,7 +114,7 @@ export function useLivePill(target: LivePillTarget | null, enabled: boolean): st
     () => (open ? memberClubs(bundle.data, table.data?.payload, calendar) : null),
     [open, bundle.data, table.data, calendar],
   );
-  const mine = useLiveWindow(calendar, { clubs });
+  const mine = useLiveWindow(calendar, { clubs }, events);
   if (!open || target === null) return null;
   if (clubs !== null) return mine.open ? target.to : null;
   // While the member's clubs are being read the pill waits; where they cannot be read, every
