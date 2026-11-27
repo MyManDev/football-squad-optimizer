@@ -72,6 +72,22 @@ LOGGER = logging.getLogger(__name__)
 ARTIFACT_ROOT = REPOSITORY_ROOT / "artifacts" / "component_banked_transfer_value"
 MODEL_ROOT = ARTIFACT_ROOT / "model"
 RECORD_PATH = REPOSITORY_ROOT / "docs" / "research" / "component_banked_value_model.json"
+SEASON_GAMEWEEKS = range(1, 39)
+ALL_SEASONS_ROWS = 14
+"""Rows of the all-seasons table: decisions remaining after this one, 0..13; by thirteen the
+values have settled to the stationary row at two decimals."""
+
+
+def all_seasons_value_table(samples: Sequence[Sequence[float]]) -> list[list[float]]:
+    """The 2nd..5th carried transfer's value by decisions remaining (0..13), from every
+    development season's opportunities: what a product policy would carry."""
+
+    values = bellman_values(SEASON_GAMEWEEKS, samples, CURRENT_FREE_TRANSFER_CAP)
+    last = SEASON_GAMEWEEKS[-1]
+    return [
+        [round(x, 2) for x in marginal_values(values[last - remaining])]
+        for remaining in range(ALL_SEASONS_ROWS)
+    ]
 PROTOCOL_PATH = "docs/research/component_banked_value_model_prereg.md"
 FIXED_CELL = "component_rules_2026_27"
 
@@ -247,6 +263,7 @@ def _read(arguments: argparse.Namespace) -> int:
             sum(1 for g in samples if g[0] == 0.0) / len(samples), 3
         ),
         "value_tables": tables,
+        "all_seasons_value_table": all_seasons_value_table(samples),
         "free_transfer_use": {
             season: free_transfer_use(by_key[(season, MODEL_LABEL)], CURRENT_FREE_TRANSFER_CAP)
             for season in seasons
