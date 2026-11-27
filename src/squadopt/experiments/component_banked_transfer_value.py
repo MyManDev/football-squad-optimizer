@@ -75,8 +75,10 @@ def level_tag(level: float) -> str:
     """A level as a label fragment: 0, 0p5, 1p5, 6."""
 
     value = float(level)
-    if value < 0 or value * 2 != int(value * 2):
-        raise ExperimentConfigurationError("A banked value level is a non-negative half point.")
+    if value < 0 or abs(value * 10 - round(value * 10)) > 1e-9:
+        raise ExperimentConfigurationError(
+            "A banked value level is a non-negative tenth of a point."
+        )
     return f"{value:g}".replace(".", "p")
 
 

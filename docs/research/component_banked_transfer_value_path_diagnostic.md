@@ -46,3 +46,12 @@ How to read it, fixed now:
   is then to keep 0, and to measure a threshold only on a population of independent decisions
   (fresh squads a week), not on season chains.
 - Anything between is reported as it is.
+
+## The owner's level, 1.2
+
+Added 27 Nov 2026, before any number of this diagnostic was seen: the owner named 1.2 as a
+plausible value. It is walked as one more arm of the primary cell at budgets 6,
+8 and 10 (twelve chains, `artifacts/component_banked_transfer_value/owner_level/`) and read
+against 0 at the same budget with the record's gate, and against the path noise floor above.
+It is a level named after the record was read, so a pass is reported as such and is not a
+pre-registered reading.
