@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createInterface } from "node:readline";
+import { guardedBrowserSolve } from "./watchdog.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const web = resolve(here, "../../../../..");
@@ -35,7 +36,50 @@ if (process.argv[2] === "build") {
   const gate = await iterator.next();
   if (gate.done || JSON.parse(gate.value).command !== "go") throw new Error("No launcher gate");
   const runtime = process.argv[2];
-  let server, browserServer, browser, page, solve;
+  let server, browserServer, browser, page, solve, cdp;
+  let currentRate = 1;
+  async function openPage() {
+    page = await browser.newPage();
+    await page.goto(`http://127.0.0.1:${server.address().port}`);
+    await page.waitForFunction(() => !!window.deviceBenchmark);
+    await page.evaluate(
+      (main) => (main ? window.deviceBenchmark.readyMain() : window.deviceBenchmark.ready()),
+      runtime === "main",
+    );
+    cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: currentRate });
+    solve =
+      runtime === "main"
+        ? (request) => page.evaluate((value) => window.deviceBenchmark.solveMain(value), request)
+        : (request, audit = false) =>
+            page.evaluate(({ value, inspect }) => window.deviceBenchmark.solve(value, inspect), {
+              value: request,
+              inspect: audit,
+            });
+  }
+  async function replaceOwnContext() {
+    let closed = false;
+    await Promise.race([
+      page
+        .context()
+        .close()
+        .then(() => {
+          closed = true;
+        })
+        .catch(() => {}),
+      new Promise((done) => setTimeout(done, 5000)),
+    ]);
+    if (!closed) {
+      await browserServer.kill();
+      browserServer = await chromium.launchServer({ headless: true });
+      browser = await chromium.connect(browserServer.wsEndpoint());
+    }
+    await openPage();
+    emit({ event: "runtime_restarted", pid: browserServer.process().pid });
+    const resume = await iterator.next();
+    if (resume.done || JSON.parse(resume.value).command !== "resume")
+      throw new Error("Restart was not verified by the owning controller");
+  }
   try {
     if (runtime === "node") {
       solve = await (await import(pathToFileURL(nodeBundle).href)).nodeSolver();
@@ -62,16 +106,13 @@ if (process.argv[2] === "build") {
       await new Promise((done) => server.listen(0, "127.0.0.1", done));
       browserServer = await chromium.launchServer({ headless: true });
       browser = await chromium.connect(browserServer.wsEndpoint());
-      page = await browser.newPage();
-      await page.goto(`http://127.0.0.1:${server.address().port}`);
-      await page.waitForFunction(() => !!window.deviceBenchmark);
-      await page.evaluate(() => window.deviceBenchmark.ready());
-      solve = (request) => page.evaluate((value) => window.deviceBenchmark.solve(value), request);
+      await openPage();
       emit({
         event: "ready",
         pid: browserServer.process().pid,
         browser: browser.version(),
         node: process.version,
+        execution_context: runtime === "main" ? "chromium-main" : "dedicated-worker",
       });
     }
     for (;;) {
@@ -79,7 +120,26 @@ if (process.argv[2] === "build") {
       if (item.done) break;
       const command = JSON.parse(item.value);
       if (command.command === "finish") break;
-      if (command.command === "probe") {
+      if (command.command === "watchdog-smoke") {
+        if (!page || runtime !== "main")
+          throw new Error("Watchdog smoke needs its own main-thread tab");
+        const result = await guardedBrowserSolve(
+          () =>
+            page.evaluate(() => {
+              let value = 17;
+              for (;;) value = Math.imul(value, 1597334677) | 0;
+            }),
+          replaceOwnContext,
+          100,
+        );
+        emit({ event: "watchdog_smoke", ...result });
+      } else if (command.command === "cdp-rate") {
+        if (!cdp || runtime !== "main")
+          throw new Error("CDP rate requires explicit main-thread context");
+        await cdp.send("Emulation.setCPUThrottlingRate", { rate: command.rate });
+        currentRate = command.rate;
+        emit({ event: "cdp_rate", rate: command.rate, execution_context: "chromium-main" });
+      } else if (command.command === "probe") {
         if (!page) throw new Error("CPU calibration needs a browser");
         emit({
           event: "probe",
@@ -90,25 +150,45 @@ if (process.argv[2] === "build") {
         });
       } else if (command.command === "measure") {
         const { document, members } = command.problem;
+        const { modelFingerprint } = await import(pathToFileURL(nodeBundle).href);
+        const models = new Map();
         let id = 0;
         for (const member of members)
           for (const window of [3, 5])
             for (let repetition = 0; repetition < command.repeats; repetition += 1) {
               const request = { id: ++id, document, entry: member.entry, window };
+              const key = `${member.member}:${window}`;
+              if (!models.has(key)) models.set(key, modelFingerprint(request));
               const started = performance.now();
               let result;
               try {
-                result = await solve(request);
+                if (runtime === "node") {
+                  result = await solve(request);
+                  result.outer_elapsed_seconds = (performance.now() - started) / 1000;
+                } else
+                  result = await guardedBrowserSolve(
+                    () => solve(request, command.audit),
+                    replaceOwnContext,
+                  );
               } catch (error) {
                 result = {
                   reply: { kind: "failed", status: String(error) },
                   elapsed_seconds: (performance.now() - started) / 1000,
+                  outer_elapsed_seconds: (performance.now() - started) / 1000,
                 };
               }
               const completed = result.reply.kind === "answer";
               emit({
                 event: "sample",
                 runtime,
+                execution_context:
+                  runtime === "node"
+                    ? "node"
+                    : runtime === "main"
+                      ? "chromium-main"
+                      : "dedicated-worker",
+                purpose: command.purpose,
+                expected_model_sha256: models.get(key),
                 pool: command.pool,
                 players: document.players.length,
                 member: member.member,
@@ -122,17 +202,13 @@ if (process.argv[2] === "build") {
                   (result.reply.kind === "timeout" || /time/i.test(result.reply.status ?? "")),
               });
               // A diagnostic timeout terminates that worker. Do not silently skip later shapes.
-              if (result.reply.kind === "timeout" && page) {
-                await page.reload();
-                await page.waitForFunction(() => !!window.deviceBenchmark);
-                await page.evaluate(() => window.deviceBenchmark.ready());
-              }
             }
         emit({ event: "measured" });
       } else throw new Error("Unknown diagnostic command");
     }
   } finally {
     lines.close();
+    if (cdp) await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 }).catch(() => {});
     await browser?.close();
     await browserServer?.close();
     if (server) await new Promise((done) => server.close(done));

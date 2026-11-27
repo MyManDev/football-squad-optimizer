@@ -259,10 +259,16 @@ def main() -> None:
     parser.add_argument("--calibration-log", type=Path)
     parser.add_argument("--prior-calibration-log", type=Path)
     parser.add_argument("--cpu", type=int)
+    parser.add_argument("--execution-context", choices=["worker", "main"], default="worker")
+    parser.add_argument("--cpu-throttling", choices=["job", "cdp"], default="job")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--audit-only", action="store_true")
+    parser.add_argument("--watchdog-smoke", action="store_true")
     args = parser.parse_args()
+    if args.audit_only and (args.runtime != "desktop" or args.execution_context != "worker"):
+        raise ValueError("The compatibility audit uses only the unthrottled Dedicated Worker")
     prior_count = 0
     prior_manifest = None
     if args.prior_calibration_log:
@@ -298,7 +304,7 @@ def main() -> None:
         problem = json.loads((ROOT / "web/src/fixtures/device-plan/horizons.json").read_bytes())
         problem["members"] = [
             {**member, "member": f"synthetic-ft{member['entry']['free_transfers']}"}
-            for member in problem["members"][:1]
+            for member in problem["members"]
         ]
         provenance = {"pool": "parity-24", "diagnostic_smoke_only": True}
     if args.calibration_log:
@@ -309,10 +315,14 @@ def main() -> None:
         cleanup = records[-1]
         if (
             any(row["event"] == "run_failed" for row in records)
-            or not 3.90 <= confirmation["worker_ratio"] <= 4.10
+            or not 3.90
+            <= confirmation["main_ratio" if args.cpu_throttling == "cdp" else "worker_ratio"]
+            <= 4.10
             or cleanup
             != {"event": "cleanup", "owned_processes_remaining": 0, "node_exit": 0, "errors": []}
             or protocol["logical_cpu_affinity"] != args.cpu
+            or protocol.get("cpu_throttling", "job") != args.cpu_throttling
+            or protocol.get("execution_context", "worker") != args.execution_context
             or (args.runtime == "throttled" and args.rate != confirmation["rate"])
         ):
             raise ValueError("The fixed rate/affinity has no successful 4x calibration evidence")
@@ -321,6 +331,8 @@ def main() -> None:
             "source_head": protocol["head"],
             "rate": confirmation["rate"],
             "worker_confirmation_ratio": confirmation["worker_ratio"],
+            "main_confirmation_ratio": confirmation.get("main_ratio"),
+            "calibrated_context": protocol.get("execution_context", "worker"),
         }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8") as log:
@@ -346,10 +358,13 @@ def main() -> None:
                 "calibration_target_ratio": [3.90, 4.10],
                 "selected_rate": args.rate,
                 "initial_calibration_rate": args.initial_rate,
-                "calibration_candidate_limit": 6,
+                "calibration_candidate_limit": 1 if args.cpu_throttling == "cdp" else 6,
+                "fixed_cdp_candidate_count": 1 if args.cpu_throttling == "cdp" else 0,
                 "prior_candidate_count": prior_count,
                 "prior_calibration": prior_manifest,
                 "logical_cpu_affinity": args.cpu,
+                "execution_context": "node" if args.runtime == "node" else args.execution_context,
+                "cpu_throttling": args.cpu_throttling,
                 "logical_cpus": psutil.cpu_count(),
                 "physical_cpus": psutil.cpu_count(logical=False),
                 "solver_threading": wasm_contract(),
@@ -360,7 +375,15 @@ def main() -> None:
             return
         if args.runtime == "throttled" and (args.rate is None or not 1 <= args.rate <= 10000):
             raise ValueError("A frozen calibrated CPU rate is required before solving")
-        runtime = "node" if args.runtime == "node" else "browser"
+        if args.cpu_throttling == "cdp" and args.execution_context != "main":
+            raise ValueError("CDP CPU throttling is supported only in the explicit main context")
+        runtime = (
+            "node"
+            if args.runtime == "node"
+            else "main"
+            if args.execution_context == "main"
+            else "browser"
+        )
         proc = subprocess.Popen(
             ["node", str(CONTROLLER), runtime],
             cwd=ROOT / "web",
@@ -406,6 +429,35 @@ def main() -> None:
             )
             return result
 
+        def cdp_rate(rate: int) -> None:
+            send({"command": "cdp-rate", "rate": rate})
+            result = receive()
+            if result != {"event": "cdp_rate", "rate": rate, "execution_context": "chromium-main"}:
+                raise RuntimeError("Wrong main-thread CDP rate response")
+            emit(result)
+
+        def adopt_children() -> None:
+            nonlocal owned
+            assert job is not None
+            identities = {(child.pid, child.create_time()): child for child in owned}
+            for child in [job.node, *job.node.children(recursive=True)]:
+                identities.setdefault((child.pid, child.create_time()), child)
+            owned = list(identities.values())
+
+        def accept_restart(result: dict[str, Any]) -> bool:
+            if result["event"] != "runtime_restarted":
+                return False
+            assert job is not None
+            adopt_children()
+            job.verify()
+            if args.cpu is not None:
+                for child in job.node.children(recursive=True):
+                    if child.name() != "conhost.exe":
+                        child.cpu_affinity([args.cpu])
+            emit({**result, "owned_membership": job.verify(args.cpu)})
+            send({"command": "resume"})
+            return True
+
         try:
             boot = receive()
             if boot != {"event": "boot", "pid": proc.pid}:
@@ -448,7 +500,63 @@ def main() -> None:
                 child.cpu_affinity() != [args.cpu] for child in compute
             ):
                 raise RuntimeError("Own compute child did not inherit the frozen CPU affinity")
-            if args.runtime == "calibration":
+            if args.watchdog_smoke:
+                send({"command": "watchdog-smoke"})
+                result = receive()
+                while accept_restart(result):
+                    result = receive()
+                emit(result)
+                if result["event"] != "watchdog_smoke" or result["reply"]["kind"] != "timeout":
+                    raise RuntimeError(
+                        "The external watchdog did not close its blocked own context"
+                    )
+            elif args.runtime == "calibration" and args.cpu_throttling == "cdp":
+                baseline = probe()
+                cdp_rate(4)
+                limited = probe()
+                confirmation = probe()
+                ratios = {
+                    kind: statistics.median(r["milliseconds"] for r in limited[kind])
+                    / statistics.median(r["milliseconds"] for r in baseline[kind])
+                    for kind in ("main", "dedicatedWorker")
+                }
+                confirmed = {
+                    kind: statistics.median(r["milliseconds"] for r in confirmation[kind])
+                    / statistics.median(r["milliseconds"] for r in baseline[kind])
+                    for kind in ("main", "dedicatedWorker")
+                }
+                checksums = {
+                    r["checksum"]
+                    for rows in (baseline, limited, confirmation)
+                    for kind in ratios
+                    for r in rows[kind]
+                }
+                accepted = len(checksums) == 1 and all(
+                    3.90 <= values["main"] <= 4.10 for values in (ratios, confirmed)
+                )
+                emit(
+                    {
+                        "event": "calibration_result",
+                        "rate": 4,
+                        "mechanism": "cdp-main",
+                        "ratios": ratios,
+                        "checksum_stable": len(checksums) == 1,
+                        "accepted": accepted,
+                    }
+                )
+                emit(
+                    {
+                        "event": "calibration_confirmation",
+                        "rate": 4,
+                        "main_ratio": confirmed["main"],
+                        "worker_ratio": confirmed["dedicatedWorker"],
+                        "owned_membership": job.verify(args.cpu),
+                    }
+                )
+                cdp_rate(1)
+                if not accepted:
+                    raise RuntimeError("The fixed CDP4 main-thread protocol failed calibration")
+            elif args.runtime == "calibration":
                 baseline = probe()
                 rate = args.initial_rate or round(10000 / (4 * psutil.cpu_count()) * 1.2)
                 if not 1 <= rate <= 10000:
@@ -513,22 +621,49 @@ def main() -> None:
                     raise RuntimeError("Cannot establish the predeclared 4x worker calibration")
             else:
                 if args.runtime == "throttled":
-                    emit({"event": "cpu_rate", **job.configure(args.rate)})
+                    if args.cpu_throttling == "cdp":
+                        if args.rate != 4:
+                            raise ValueError("The predeclared CDP rate is exactly four")
+                        cdp_rate(4)
+                    else:
+                        emit({"event": "cpu_rate", **job.configure(args.rate)})
                 send(
                     {
                         "command": "measure",
                         "problem": problem,
-                        "repeats": 1 if args.smoke else 3,
+                        "repeats": 1 if args.smoke or args.audit_only else 3,
                         "pool": "parity-24" if args.smoke else "published-674",
+                        "audit": args.audit_only,
+                        "purpose": "parity-smoke"
+                        if args.smoke
+                        else "execution-context-audit"
+                        if args.audit_only
+                        else "timing",
                     }
                 )
                 while True:
                     result = receive()
+                    if accept_restart(result):
+                        continue
                     if result["event"] == "sample":
                         result["runtime"] = args.runtime
                     emit(result)
+                    if (
+                        args.audit_only
+                        and result["event"] == "sample"
+                        and result["completed"]
+                        and result.get("model_sha256") != result["expected_model_sha256"]
+                    ):
+                        raise RuntimeError(
+                            "Worker primary LP differs from the canonical Node builder"
+                        )
                     if args.smoke and result["event"] == "sample":
-                        reference = problem["members"][0]["reference"][str(result["window"])]
+                        member = next(
+                            member
+                            for member in problem["members"]
+                            if member["member"] == result["member"]
+                        )
+                        reference = member["reference"][str(result["window"])]
                         answer = result["reply"]["answer"]
                         assert abs(answer["objective"] - reference["objective"]) <= 1e-6
                         assert answer["objective_scaled"] == reference["objective_scaled"]
@@ -540,16 +675,15 @@ def main() -> None:
                                 assert week["transfers_out"] == expected["transfers_out"]
                     if result["event"] == "measured":
                         break
+                if args.cpu_throttling == "cdp" and args.runtime == "throttled":
+                    cdp_rate(1)
         except Exception as error:
             emit({"event": "run_failed", "error": type(error).__name__, "message": str(error)})
             raise
         finally:
             if job:
-                owned = (
-                    [job.node, *job.node.children(recursive=True)]
-                    if job.node.is_running()
-                    else owned
-                )
+                if job.node.is_running():
+                    adopt_children()
                 try:
                     emit({"event": "cpu_restored", **job.configure(10000)})
                 except OSError as error:
