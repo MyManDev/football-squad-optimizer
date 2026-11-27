@@ -37,6 +37,21 @@ The values fall with each transfer carried, are zero past the cap and at the sea
 decision, and are flat through most of a season: with independent weeks the long horizon
 settles to a stationary value until the last few decisions.
 
+The same model on all four seasons' 147 decisions (`all_seasons_value_table` in the
+record) is what a product policy carries, by the decisions left after this one:
+
+| Decisions left | 2nd | 3rd | 4th | 5th |
+|---|---|---|---|---|
+| 0 | 0 | 0 | 0 | 0 |
+| 1 | 2.05 | 1.53 | 1.19 | 0.88 |
+| 2 | 2.34 | 1.91 | 1.61 | 1.37 |
+| 3 | 2.53 | 2.13 | 1.86 | 1.50 |
+| 6 | 2.82 | 2.41 | 2.06 | 1.63 |
+| 13 or more | 2.90 | 2.48 | 2.11 | 1.65 |
+
+The first carried transfer is earned in every week the bank is not rebuilt, so it never
+changes a decision and carries no value in that table.
+
 ## What the model does
 
 It holds 2.5 to 3.7 free transfers on average, pays no hit and loses none at the cap. In
