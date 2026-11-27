@@ -251,6 +251,9 @@ describe("the device solve on the member page", () => {
     expect(deviceButton()).toBeNull();
     cleanup();
     renderView(squadWith(entryBlock), "mode=saf-puan&window=3");
+    expect(deviceButton()).not.toBeNull();
+    cleanup();
+    renderView(squadWith(entryBlock), "mode=saf-puan&window=3&model=football");
     expect(deviceButton()).toBeNull();
   });
 
@@ -293,7 +296,7 @@ describe("the device solve on the member page", () => {
     await waitFor(() => expect(deviceDone(container)).not.toBeNull());
     await act(async () => screen.getByText("to-3").click());
     expect(deviceDone(container)).toBeNull();
-    expect(deviceButton()).toBeNull();
+    expect(deviceButton()).not.toBeNull();
     await act(async () => screen.getByText("to-1").click());
     expect(deviceDone(container)).toBeNull();
     expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
