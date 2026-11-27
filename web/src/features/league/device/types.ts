@@ -180,6 +180,9 @@ export interface DevicePreferenceResult {
 
 /** What the device's solve proved, in player ids. */
 export interface DevicePlanAnswer {
+  /** Only a proved plain multi-week plan carries these fields. */
+  window?: 3 | 5;
+  plan_weeks?: import("./solve/horizon").DeviceHorizonWeek[];
   expected_points_cost?: number;
   preference_bundle?: DevicePreferenceResult;
   priority_preferences?: import("../advice/preferenceBundle").PriorityResult;

@@ -16,7 +16,7 @@ from tests.unit.test_league_views import DISCRETIONARY_SQUAD, _Provider
 from tests.unit.test_live_transfers import _bootstrap, _elements
 from tests.unit.test_projection_horizon_builder import _calendar
 
-from squadopt.application.advice import member_horizon_builder
+from squadopt.application.advice import member_horizon_builder, window_payload
 from squadopt.application.device_plan import (
     DEVICE_PLAN_HORIZON_CONTRACT_VERSION,
     device_plan_capture_table,
@@ -108,6 +108,24 @@ def held_member(world: dict[str, Any], free: int, bank: int = 50) -> HeldSquad:
     )
 
 
+def member_picks(world: dict[str, Any], held: HeldSquad, entry_id: int = 1) -> EntryPicks:
+    return EntryPicks(
+        entry_id=entry_id,
+        season=SEASON,
+        gameweek=1,
+        squad=tuple(held.squad_player_ids),
+        starting_xi=tuple(held.squad_player_ids[:11]),
+        captain=1001,
+        vice_captain=1002,
+        bank_tenths=held.bank_tenths,
+        free_transfers=held.free_transfers,
+        purchase_prices=held.purchase_prices,
+        purchase_prices_known=True,
+        free_transfers_known=True,
+        source_snapshot_id=world["inputs"].snapshot_id,
+    )
+
+
 def build_horizon_fixture(root: Path) -> dict[str, Any]:
     world = horizon_world(root)
     inputs, projection, rules = (world[key] for key in ("inputs", "projection", "rules"))
@@ -173,11 +191,33 @@ def build_horizon_fixture(root: Path) -> dict[str, Any]:
             uniqueness.parameters.max_deterministic_time = 10
             uniqueness_status = uniqueness.solve(alternative)
             assert uniqueness_status in (cp_model.INFEASIBLE, cp_model.OPTIMAL, cp_model.FEASIBLE)
+            published = window_payload(
+                member_picks(world, held, entry_id),
+                projection,
+                result.plan,
+                league_id=9,
+                window=window,
+            )
             references[str(window)] = {
                 "objective": result.plan.objective_value,
                 "objective_scaled": primary,
                 "unique_moves": uniqueness_status == cp_model.INFEASIBLE,
                 "tiebreak_completed": result.plan.diagnostics["tiebreak_completed"],
+                "presentation": {
+                    field: published[field]
+                    for field in (
+                        "window",
+                        "moves",
+                        "transfer_hit_points",
+                        "expected_gain_vs_hold",
+                        "expected_own_points",
+                        "captain",
+                        "vice_captain",
+                        "starting_xi",
+                        "bench",
+                        "plan_weeks",
+                    )
+                },
                 "weeks": [
                     {
                         "gameweek": week.gameweek,

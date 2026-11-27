@@ -1088,6 +1088,253 @@
           "objective_scaled": 496136000,
           "unique_moves": true,
           "tiebreak_completed": true,
+          "presentation": {
+            "window": 3,
+            "moves": [
+              {
+                "move_id": "gw02-1",
+                "player_out": {
+                  "player_id": 1004,
+                  "name": "Player 1004",
+                  "short_name": "1004",
+                  "position": "DEF",
+                  "team": "Club 1"
+                },
+                "player_in": {
+                  "player_id": 1011,
+                  "name": "Player 1011",
+                  "short_name": "1011",
+                  "position": "DEF",
+                  "team": "Club 2"
+                },
+                "expected_points_delta": 9.590000000000003,
+                "reason_code": "window_value"
+              }
+            ],
+            "transfer_hit_points": 4.0,
+            "expected_gain_vs_hold": 9.590000000000003,
+            "expected_own_points": 152.24,
+            "captain": {
+              "player_id": 1012,
+              "name": "Player 1012",
+              "short_name": "1012",
+              "position": "MID",
+              "team": "Club 1",
+              "expected_points": 17.44
+            },
+            "vice_captain": {
+              "player_id": 1024,
+              "name": "Player 1024",
+              "short_name": "1024",
+              "position": "FWD",
+              "team": "Club 5",
+              "expected_points": 16.880000000000003
+            },
+            "starting_xi": [
+              {
+                "player_id": 1002,
+                "name": "Player 1002",
+                "short_name": "1002",
+                "position": "GK",
+                "team": "Club 2",
+                "expected_points": 3.74
+              },
+              {
+                "player_id": 1011,
+                "name": "Player 1011",
+                "short_name": "1011",
+                "position": "DEF",
+                "team": "Club 2",
+                "expected_points": 16.07
+              },
+              {
+                "player_id": 1009,
+                "name": "Player 1009",
+                "short_name": "1009",
+                "position": "DEF",
+                "team": "Club 6",
+                "expected_points": 13.33
+              },
+              {
+                "player_id": 1008,
+                "name": "Player 1008",
+                "short_name": "1008",
+                "position": "DEF",
+                "team": "Club 5",
+                "expected_points": 11.96
+              },
+              {
+                "player_id": 1007,
+                "name": "Player 1007",
+                "short_name": "1007",
+                "position": "DEF",
+                "team": "Club 4",
+                "expected_points": 10.59
+              },
+              {
+                "player_id": 1006,
+                "name": "Player 1006",
+                "short_name": "1006",
+                "position": "DEF",
+                "team": "Club 3",
+                "expected_points": 9.22
+              },
+              {
+                "player_id": 1012,
+                "name": "Player 1012",
+                "short_name": "1012",
+                "position": "MID",
+                "team": "Club 1",
+                "expected_points": 17.44
+              },
+              {
+                "player_id": 1016,
+                "name": "Player 1016",
+                "short_name": "1016",
+                "position": "MID",
+                "team": "Club 5",
+                "expected_points": 5.92
+              },
+              {
+                "player_id": 1024,
+                "name": "Player 1024",
+                "short_name": "1024",
+                "position": "FWD",
+                "team": "Club 5",
+                "expected_points": 16.880000000000003
+              },
+              {
+                "player_id": 1023,
+                "name": "Player 1023",
+                "short_name": "1023",
+                "position": "FWD",
+                "team": "Club 4",
+                "expected_points": 15.51
+              },
+              {
+                "player_id": 1022,
+                "name": "Player 1022",
+                "short_name": "1022",
+                "position": "FWD",
+                "team": "Club 3",
+                "expected_points": 14.14
+              }
+            ],
+            "bench": [
+              {
+                "player_id": 1001,
+                "name": "Player 1001",
+                "short_name": "1001",
+                "position": "GK",
+                "team": "Club 1",
+                "expected_points": 2.37
+              },
+              {
+                "player_id": 1015,
+                "name": "Player 1015",
+                "short_name": "1015",
+                "position": "MID",
+                "team": "Club 4",
+                "expected_points": 4.55
+              },
+              {
+                "player_id": 1014,
+                "name": "Player 1014",
+                "short_name": "1014",
+                "position": "MID",
+                "team": "Club 3",
+                "expected_points": 3.18
+              },
+              {
+                "player_id": 1013,
+                "name": "Player 1013",
+                "short_name": "1013",
+                "position": "MID",
+                "team": "Club 2",
+                "expected_points": 1.81
+              }
+            ],
+            "plan_weeks": [
+              {
+                "gameweek": 2,
+                "transfers_in": [
+                  {
+                    "player_id": 1011,
+                    "name": "Player 1011",
+                    "short_name": "1011",
+                    "position": "DEF",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1004,
+                    "name": "Player 1004",
+                    "short_name": "1004",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfer_hit_points": 4.0,
+                "chip": null,
+                "free_transfers_before": 0,
+                "free_transfers_after": 1,
+                "expected_points": 152.24
+              },
+              {
+                "gameweek": 3,
+                "transfers_in": [
+                  {
+                    "player_id": 1010,
+                    "name": "Player 1010",
+                    "short_name": "1010",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1006,
+                    "name": "Player 1006",
+                    "short_name": "1006",
+                    "position": "DEF",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 221.63
+              },
+              {
+                "gameweek": 4,
+                "transfers_in": [
+                  {
+                    "player_id": 1019,
+                    "name": "Player 1019",
+                    "short_name": "1019",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1013,
+                    "name": "Player 1013",
+                    "short_name": "1013",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 127.51000000000002
+              }
+            ]
+          },
           "weeks": [
             {
               "gameweek": 2,
@@ -1144,6 +1391,305 @@
           "objective_scaled": 826562000,
           "unique_moves": true,
           "tiebreak_completed": true,
+          "presentation": {
+            "window": 5,
+            "moves": [
+              {
+                "move_id": "gw02-1",
+                "player_out": {
+                  "player_id": 1004,
+                  "name": "Player 1004",
+                  "short_name": "1004",
+                  "position": "DEF",
+                  "team": "Club 1"
+                },
+                "player_in": {
+                  "player_id": 1011,
+                  "name": "Player 1011",
+                  "short_name": "1011",
+                  "position": "DEF",
+                  "team": "Club 2"
+                },
+                "expected_points_delta": 9.590000000000003,
+                "reason_code": "window_value"
+              }
+            ],
+            "transfer_hit_points": 4.0,
+            "expected_gain_vs_hold": 9.590000000000003,
+            "expected_own_points": 152.24,
+            "captain": {
+              "player_id": 1012,
+              "name": "Player 1012",
+              "short_name": "1012",
+              "position": "MID",
+              "team": "Club 1",
+              "expected_points": 17.44
+            },
+            "vice_captain": {
+              "player_id": 1024,
+              "name": "Player 1024",
+              "short_name": "1024",
+              "position": "FWD",
+              "team": "Club 5",
+              "expected_points": 16.880000000000003
+            },
+            "starting_xi": [
+              {
+                "player_id": 1002,
+                "name": "Player 1002",
+                "short_name": "1002",
+                "position": "GK",
+                "team": "Club 2",
+                "expected_points": 3.74
+              },
+              {
+                "player_id": 1011,
+                "name": "Player 1011",
+                "short_name": "1011",
+                "position": "DEF",
+                "team": "Club 2",
+                "expected_points": 16.07
+              },
+              {
+                "player_id": 1009,
+                "name": "Player 1009",
+                "short_name": "1009",
+                "position": "DEF",
+                "team": "Club 6",
+                "expected_points": 13.33
+              },
+              {
+                "player_id": 1008,
+                "name": "Player 1008",
+                "short_name": "1008",
+                "position": "DEF",
+                "team": "Club 5",
+                "expected_points": 11.96
+              },
+              {
+                "player_id": 1007,
+                "name": "Player 1007",
+                "short_name": "1007",
+                "position": "DEF",
+                "team": "Club 4",
+                "expected_points": 10.59
+              },
+              {
+                "player_id": 1006,
+                "name": "Player 1006",
+                "short_name": "1006",
+                "position": "DEF",
+                "team": "Club 3",
+                "expected_points": 9.22
+              },
+              {
+                "player_id": 1012,
+                "name": "Player 1012",
+                "short_name": "1012",
+                "position": "MID",
+                "team": "Club 1",
+                "expected_points": 17.44
+              },
+              {
+                "player_id": 1016,
+                "name": "Player 1016",
+                "short_name": "1016",
+                "position": "MID",
+                "team": "Club 5",
+                "expected_points": 5.92
+              },
+              {
+                "player_id": 1024,
+                "name": "Player 1024",
+                "short_name": "1024",
+                "position": "FWD",
+                "team": "Club 5",
+                "expected_points": 16.880000000000003
+              },
+              {
+                "player_id": 1023,
+                "name": "Player 1023",
+                "short_name": "1023",
+                "position": "FWD",
+                "team": "Club 4",
+                "expected_points": 15.51
+              },
+              {
+                "player_id": 1022,
+                "name": "Player 1022",
+                "short_name": "1022",
+                "position": "FWD",
+                "team": "Club 3",
+                "expected_points": 14.14
+              }
+            ],
+            "bench": [
+              {
+                "player_id": 1001,
+                "name": "Player 1001",
+                "short_name": "1001",
+                "position": "GK",
+                "team": "Club 1",
+                "expected_points": 2.37
+              },
+              {
+                "player_id": 1015,
+                "name": "Player 1015",
+                "short_name": "1015",
+                "position": "MID",
+                "team": "Club 4",
+                "expected_points": 4.55
+              },
+              {
+                "player_id": 1014,
+                "name": "Player 1014",
+                "short_name": "1014",
+                "position": "MID",
+                "team": "Club 3",
+                "expected_points": 3.18
+              },
+              {
+                "player_id": 1013,
+                "name": "Player 1013",
+                "short_name": "1013",
+                "position": "MID",
+                "team": "Club 2",
+                "expected_points": 1.81
+              }
+            ],
+            "plan_weeks": [
+              {
+                "gameweek": 2,
+                "transfers_in": [
+                  {
+                    "player_id": 1011,
+                    "name": "Player 1011",
+                    "short_name": "1011",
+                    "position": "DEF",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1004,
+                    "name": "Player 1004",
+                    "short_name": "1004",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfer_hit_points": 4.0,
+                "chip": null,
+                "free_transfers_before": 0,
+                "free_transfers_after": 1,
+                "expected_points": 152.24
+              },
+              {
+                "gameweek": 3,
+                "transfers_in": [
+                  {
+                    "player_id": 1010,
+                    "name": "Player 1010",
+                    "short_name": "1010",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1006,
+                    "name": "Player 1006",
+                    "short_name": "1006",
+                    "position": "DEF",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 221.63
+              },
+              {
+                "gameweek": 4,
+                "transfers_in": [
+                  {
+                    "player_id": 1019,
+                    "name": "Player 1019",
+                    "short_name": "1019",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1013,
+                    "name": "Player 1013",
+                    "short_name": "1013",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 127.51000000000002
+              },
+              {
+                "gameweek": 5,
+                "transfers_in": [
+                  {
+                    "player_id": 1003,
+                    "name": "Player 1003",
+                    "short_name": "1003",
+                    "position": "GK",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1001,
+                    "name": "Player 1001",
+                    "short_name": "1001",
+                    "position": "GK",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 163.2
+              },
+              {
+                "gameweek": 6,
+                "transfers_in": [
+                  {
+                    "player_id": 1018,
+                    "name": "Player 1018",
+                    "short_name": "1018",
+                    "position": "MID",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1014,
+                    "name": "Player 1014",
+                    "short_name": "1014",
+                    "position": "MID",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 163.2
+              }
+            ]
+          },
           "weeks": [
             {
               "gameweek": 2,
@@ -1261,6 +1807,253 @@
           "objective_scaled": 504136000,
           "unique_moves": true,
           "tiebreak_completed": true,
+          "presentation": {
+            "window": 3,
+            "moves": [
+              {
+                "move_id": "gw02-1",
+                "player_out": {
+                  "player_id": 1004,
+                  "name": "Player 1004",
+                  "short_name": "1004",
+                  "position": "DEF",
+                  "team": "Club 1"
+                },
+                "player_in": {
+                  "player_id": 1011,
+                  "name": "Player 1011",
+                  "short_name": "1011",
+                  "position": "DEF",
+                  "team": "Club 2"
+                },
+                "expected_points_delta": 9.590000000000003,
+                "reason_code": "window_value"
+              }
+            ],
+            "transfer_hit_points": 0.0,
+            "expected_gain_vs_hold": 9.590000000000003,
+            "expected_own_points": 152.24,
+            "captain": {
+              "player_id": 1012,
+              "name": "Player 1012",
+              "short_name": "1012",
+              "position": "MID",
+              "team": "Club 1",
+              "expected_points": 17.44
+            },
+            "vice_captain": {
+              "player_id": 1024,
+              "name": "Player 1024",
+              "short_name": "1024",
+              "position": "FWD",
+              "team": "Club 5",
+              "expected_points": 16.880000000000003
+            },
+            "starting_xi": [
+              {
+                "player_id": 1002,
+                "name": "Player 1002",
+                "short_name": "1002",
+                "position": "GK",
+                "team": "Club 2",
+                "expected_points": 3.74
+              },
+              {
+                "player_id": 1011,
+                "name": "Player 1011",
+                "short_name": "1011",
+                "position": "DEF",
+                "team": "Club 2",
+                "expected_points": 16.07
+              },
+              {
+                "player_id": 1009,
+                "name": "Player 1009",
+                "short_name": "1009",
+                "position": "DEF",
+                "team": "Club 6",
+                "expected_points": 13.33
+              },
+              {
+                "player_id": 1008,
+                "name": "Player 1008",
+                "short_name": "1008",
+                "position": "DEF",
+                "team": "Club 5",
+                "expected_points": 11.96
+              },
+              {
+                "player_id": 1007,
+                "name": "Player 1007",
+                "short_name": "1007",
+                "position": "DEF",
+                "team": "Club 4",
+                "expected_points": 10.59
+              },
+              {
+                "player_id": 1006,
+                "name": "Player 1006",
+                "short_name": "1006",
+                "position": "DEF",
+                "team": "Club 3",
+                "expected_points": 9.22
+              },
+              {
+                "player_id": 1012,
+                "name": "Player 1012",
+                "short_name": "1012",
+                "position": "MID",
+                "team": "Club 1",
+                "expected_points": 17.44
+              },
+              {
+                "player_id": 1016,
+                "name": "Player 1016",
+                "short_name": "1016",
+                "position": "MID",
+                "team": "Club 5",
+                "expected_points": 5.92
+              },
+              {
+                "player_id": 1024,
+                "name": "Player 1024",
+                "short_name": "1024",
+                "position": "FWD",
+                "team": "Club 5",
+                "expected_points": 16.880000000000003
+              },
+              {
+                "player_id": 1023,
+                "name": "Player 1023",
+                "short_name": "1023",
+                "position": "FWD",
+                "team": "Club 4",
+                "expected_points": 15.51
+              },
+              {
+                "player_id": 1022,
+                "name": "Player 1022",
+                "short_name": "1022",
+                "position": "FWD",
+                "team": "Club 3",
+                "expected_points": 14.14
+              }
+            ],
+            "bench": [
+              {
+                "player_id": 1001,
+                "name": "Player 1001",
+                "short_name": "1001",
+                "position": "GK",
+                "team": "Club 1",
+                "expected_points": 2.37
+              },
+              {
+                "player_id": 1015,
+                "name": "Player 1015",
+                "short_name": "1015",
+                "position": "MID",
+                "team": "Club 4",
+                "expected_points": 4.55
+              },
+              {
+                "player_id": 1014,
+                "name": "Player 1014",
+                "short_name": "1014",
+                "position": "MID",
+                "team": "Club 3",
+                "expected_points": 3.18
+              },
+              {
+                "player_id": 1013,
+                "name": "Player 1013",
+                "short_name": "1013",
+                "position": "MID",
+                "team": "Club 2",
+                "expected_points": 1.81
+              }
+            ],
+            "plan_weeks": [
+              {
+                "gameweek": 2,
+                "transfers_in": [
+                  {
+                    "player_id": 1011,
+                    "name": "Player 1011",
+                    "short_name": "1011",
+                    "position": "DEF",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1004,
+                    "name": "Player 1004",
+                    "short_name": "1004",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 152.24
+              },
+              {
+                "gameweek": 3,
+                "transfers_in": [
+                  {
+                    "player_id": 1010,
+                    "name": "Player 1010",
+                    "short_name": "1010",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1006,
+                    "name": "Player 1006",
+                    "short_name": "1006",
+                    "position": "DEF",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 221.63
+              },
+              {
+                "gameweek": 4,
+                "transfers_in": [
+                  {
+                    "player_id": 1019,
+                    "name": "Player 1019",
+                    "short_name": "1019",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1013,
+                    "name": "Player 1013",
+                    "short_name": "1013",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 127.51000000000002
+              }
+            ]
+          },
           "weeks": [
             {
               "gameweek": 2,
@@ -1317,6 +2110,305 @@
           "objective_scaled": 834562000,
           "unique_moves": true,
           "tiebreak_completed": true,
+          "presentation": {
+            "window": 5,
+            "moves": [
+              {
+                "move_id": "gw02-1",
+                "player_out": {
+                  "player_id": 1004,
+                  "name": "Player 1004",
+                  "short_name": "1004",
+                  "position": "DEF",
+                  "team": "Club 1"
+                },
+                "player_in": {
+                  "player_id": 1011,
+                  "name": "Player 1011",
+                  "short_name": "1011",
+                  "position": "DEF",
+                  "team": "Club 2"
+                },
+                "expected_points_delta": 9.590000000000003,
+                "reason_code": "window_value"
+              }
+            ],
+            "transfer_hit_points": 0.0,
+            "expected_gain_vs_hold": 9.590000000000003,
+            "expected_own_points": 152.24,
+            "captain": {
+              "player_id": 1012,
+              "name": "Player 1012",
+              "short_name": "1012",
+              "position": "MID",
+              "team": "Club 1",
+              "expected_points": 17.44
+            },
+            "vice_captain": {
+              "player_id": 1024,
+              "name": "Player 1024",
+              "short_name": "1024",
+              "position": "FWD",
+              "team": "Club 5",
+              "expected_points": 16.880000000000003
+            },
+            "starting_xi": [
+              {
+                "player_id": 1002,
+                "name": "Player 1002",
+                "short_name": "1002",
+                "position": "GK",
+                "team": "Club 2",
+                "expected_points": 3.74
+              },
+              {
+                "player_id": 1011,
+                "name": "Player 1011",
+                "short_name": "1011",
+                "position": "DEF",
+                "team": "Club 2",
+                "expected_points": 16.07
+              },
+              {
+                "player_id": 1009,
+                "name": "Player 1009",
+                "short_name": "1009",
+                "position": "DEF",
+                "team": "Club 6",
+                "expected_points": 13.33
+              },
+              {
+                "player_id": 1008,
+                "name": "Player 1008",
+                "short_name": "1008",
+                "position": "DEF",
+                "team": "Club 5",
+                "expected_points": 11.96
+              },
+              {
+                "player_id": 1007,
+                "name": "Player 1007",
+                "short_name": "1007",
+                "position": "DEF",
+                "team": "Club 4",
+                "expected_points": 10.59
+              },
+              {
+                "player_id": 1006,
+                "name": "Player 1006",
+                "short_name": "1006",
+                "position": "DEF",
+                "team": "Club 3",
+                "expected_points": 9.22
+              },
+              {
+                "player_id": 1012,
+                "name": "Player 1012",
+                "short_name": "1012",
+                "position": "MID",
+                "team": "Club 1",
+                "expected_points": 17.44
+              },
+              {
+                "player_id": 1016,
+                "name": "Player 1016",
+                "short_name": "1016",
+                "position": "MID",
+                "team": "Club 5",
+                "expected_points": 5.92
+              },
+              {
+                "player_id": 1024,
+                "name": "Player 1024",
+                "short_name": "1024",
+                "position": "FWD",
+                "team": "Club 5",
+                "expected_points": 16.880000000000003
+              },
+              {
+                "player_id": 1023,
+                "name": "Player 1023",
+                "short_name": "1023",
+                "position": "FWD",
+                "team": "Club 4",
+                "expected_points": 15.51
+              },
+              {
+                "player_id": 1022,
+                "name": "Player 1022",
+                "short_name": "1022",
+                "position": "FWD",
+                "team": "Club 3",
+                "expected_points": 14.14
+              }
+            ],
+            "bench": [
+              {
+                "player_id": 1001,
+                "name": "Player 1001",
+                "short_name": "1001",
+                "position": "GK",
+                "team": "Club 1",
+                "expected_points": 2.37
+              },
+              {
+                "player_id": 1015,
+                "name": "Player 1015",
+                "short_name": "1015",
+                "position": "MID",
+                "team": "Club 4",
+                "expected_points": 4.55
+              },
+              {
+                "player_id": 1014,
+                "name": "Player 1014",
+                "short_name": "1014",
+                "position": "MID",
+                "team": "Club 3",
+                "expected_points": 3.18
+              },
+              {
+                "player_id": 1013,
+                "name": "Player 1013",
+                "short_name": "1013",
+                "position": "MID",
+                "team": "Club 2",
+                "expected_points": 1.81
+              }
+            ],
+            "plan_weeks": [
+              {
+                "gameweek": 2,
+                "transfers_in": [
+                  {
+                    "player_id": 1011,
+                    "name": "Player 1011",
+                    "short_name": "1011",
+                    "position": "DEF",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1004,
+                    "name": "Player 1004",
+                    "short_name": "1004",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 152.24
+              },
+              {
+                "gameweek": 3,
+                "transfers_in": [
+                  {
+                    "player_id": 1010,
+                    "name": "Player 1010",
+                    "short_name": "1010",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1006,
+                    "name": "Player 1006",
+                    "short_name": "1006",
+                    "position": "DEF",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 221.63
+              },
+              {
+                "gameweek": 4,
+                "transfers_in": [
+                  {
+                    "player_id": 1019,
+                    "name": "Player 1019",
+                    "short_name": "1019",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1013,
+                    "name": "Player 1013",
+                    "short_name": "1013",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 127.51000000000002
+              },
+              {
+                "gameweek": 5,
+                "transfers_in": [
+                  {
+                    "player_id": 1003,
+                    "name": "Player 1003",
+                    "short_name": "1003",
+                    "position": "GK",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1001,
+                    "name": "Player 1001",
+                    "short_name": "1001",
+                    "position": "GK",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 163.2
+              },
+              {
+                "gameweek": 6,
+                "transfers_in": [
+                  {
+                    "player_id": 1018,
+                    "name": "Player 1018",
+                    "short_name": "1018",
+                    "position": "MID",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1014,
+                    "name": "Player 1014",
+                    "short_name": "1014",
+                    "position": "MID",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 1,
+                "free_transfers_after": 1,
+                "expected_points": 163.2
+              }
+            ]
+          },
           "weeks": [
             {
               "gameweek": 2,
@@ -1434,6 +2526,253 @@
           "objective_scaled": 504136000,
           "unique_moves": true,
           "tiebreak_completed": true,
+          "presentation": {
+            "window": 3,
+            "moves": [
+              {
+                "move_id": "gw02-1",
+                "player_out": {
+                  "player_id": 1004,
+                  "name": "Player 1004",
+                  "short_name": "1004",
+                  "position": "DEF",
+                  "team": "Club 1"
+                },
+                "player_in": {
+                  "player_id": 1011,
+                  "name": "Player 1011",
+                  "short_name": "1011",
+                  "position": "DEF",
+                  "team": "Club 2"
+                },
+                "expected_points_delta": 9.590000000000003,
+                "reason_code": "window_value"
+              }
+            ],
+            "transfer_hit_points": 0.0,
+            "expected_gain_vs_hold": 9.590000000000003,
+            "expected_own_points": 152.24,
+            "captain": {
+              "player_id": 1012,
+              "name": "Player 1012",
+              "short_name": "1012",
+              "position": "MID",
+              "team": "Club 1",
+              "expected_points": 17.44
+            },
+            "vice_captain": {
+              "player_id": 1024,
+              "name": "Player 1024",
+              "short_name": "1024",
+              "position": "FWD",
+              "team": "Club 5",
+              "expected_points": 16.880000000000003
+            },
+            "starting_xi": [
+              {
+                "player_id": 1002,
+                "name": "Player 1002",
+                "short_name": "1002",
+                "position": "GK",
+                "team": "Club 2",
+                "expected_points": 3.74
+              },
+              {
+                "player_id": 1011,
+                "name": "Player 1011",
+                "short_name": "1011",
+                "position": "DEF",
+                "team": "Club 2",
+                "expected_points": 16.07
+              },
+              {
+                "player_id": 1009,
+                "name": "Player 1009",
+                "short_name": "1009",
+                "position": "DEF",
+                "team": "Club 6",
+                "expected_points": 13.33
+              },
+              {
+                "player_id": 1008,
+                "name": "Player 1008",
+                "short_name": "1008",
+                "position": "DEF",
+                "team": "Club 5",
+                "expected_points": 11.96
+              },
+              {
+                "player_id": 1007,
+                "name": "Player 1007",
+                "short_name": "1007",
+                "position": "DEF",
+                "team": "Club 4",
+                "expected_points": 10.59
+              },
+              {
+                "player_id": 1006,
+                "name": "Player 1006",
+                "short_name": "1006",
+                "position": "DEF",
+                "team": "Club 3",
+                "expected_points": 9.22
+              },
+              {
+                "player_id": 1012,
+                "name": "Player 1012",
+                "short_name": "1012",
+                "position": "MID",
+                "team": "Club 1",
+                "expected_points": 17.44
+              },
+              {
+                "player_id": 1016,
+                "name": "Player 1016",
+                "short_name": "1016",
+                "position": "MID",
+                "team": "Club 5",
+                "expected_points": 5.92
+              },
+              {
+                "player_id": 1024,
+                "name": "Player 1024",
+                "short_name": "1024",
+                "position": "FWD",
+                "team": "Club 5",
+                "expected_points": 16.880000000000003
+              },
+              {
+                "player_id": 1023,
+                "name": "Player 1023",
+                "short_name": "1023",
+                "position": "FWD",
+                "team": "Club 4",
+                "expected_points": 15.51
+              },
+              {
+                "player_id": 1022,
+                "name": "Player 1022",
+                "short_name": "1022",
+                "position": "FWD",
+                "team": "Club 3",
+                "expected_points": 14.14
+              }
+            ],
+            "bench": [
+              {
+                "player_id": 1001,
+                "name": "Player 1001",
+                "short_name": "1001",
+                "position": "GK",
+                "team": "Club 1",
+                "expected_points": 2.37
+              },
+              {
+                "player_id": 1015,
+                "name": "Player 1015",
+                "short_name": "1015",
+                "position": "MID",
+                "team": "Club 4",
+                "expected_points": 4.55
+              },
+              {
+                "player_id": 1014,
+                "name": "Player 1014",
+                "short_name": "1014",
+                "position": "MID",
+                "team": "Club 3",
+                "expected_points": 3.18
+              },
+              {
+                "player_id": 1013,
+                "name": "Player 1013",
+                "short_name": "1013",
+                "position": "MID",
+                "team": "Club 2",
+                "expected_points": 1.81
+              }
+            ],
+            "plan_weeks": [
+              {
+                "gameweek": 2,
+                "transfers_in": [
+                  {
+                    "player_id": 1011,
+                    "name": "Player 1011",
+                    "short_name": "1011",
+                    "position": "DEF",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1004,
+                    "name": "Player 1004",
+                    "short_name": "1004",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 5,
+                "free_transfers_after": 5,
+                "expected_points": 152.24
+              },
+              {
+                "gameweek": 3,
+                "transfers_in": [
+                  {
+                    "player_id": 1010,
+                    "name": "Player 1010",
+                    "short_name": "1010",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1006,
+                    "name": "Player 1006",
+                    "short_name": "1006",
+                    "position": "DEF",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 5,
+                "free_transfers_after": 5,
+                "expected_points": 221.63
+              },
+              {
+                "gameweek": 4,
+                "transfers_in": [
+                  {
+                    "player_id": 1019,
+                    "name": "Player 1019",
+                    "short_name": "1019",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1013,
+                    "name": "Player 1013",
+                    "short_name": "1013",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 5,
+                "free_transfers_after": 5,
+                "expected_points": 127.51000000000002
+              }
+            ]
+          },
           "weeks": [
             {
               "gameweek": 2,
@@ -1490,6 +2829,305 @@
           "objective_scaled": 834562000,
           "unique_moves": true,
           "tiebreak_completed": true,
+          "presentation": {
+            "window": 5,
+            "moves": [
+              {
+                "move_id": "gw02-1",
+                "player_out": {
+                  "player_id": 1004,
+                  "name": "Player 1004",
+                  "short_name": "1004",
+                  "position": "DEF",
+                  "team": "Club 1"
+                },
+                "player_in": {
+                  "player_id": 1011,
+                  "name": "Player 1011",
+                  "short_name": "1011",
+                  "position": "DEF",
+                  "team": "Club 2"
+                },
+                "expected_points_delta": 9.590000000000003,
+                "reason_code": "window_value"
+              }
+            ],
+            "transfer_hit_points": 0.0,
+            "expected_gain_vs_hold": 9.590000000000003,
+            "expected_own_points": 152.24,
+            "captain": {
+              "player_id": 1012,
+              "name": "Player 1012",
+              "short_name": "1012",
+              "position": "MID",
+              "team": "Club 1",
+              "expected_points": 17.44
+            },
+            "vice_captain": {
+              "player_id": 1024,
+              "name": "Player 1024",
+              "short_name": "1024",
+              "position": "FWD",
+              "team": "Club 5",
+              "expected_points": 16.880000000000003
+            },
+            "starting_xi": [
+              {
+                "player_id": 1002,
+                "name": "Player 1002",
+                "short_name": "1002",
+                "position": "GK",
+                "team": "Club 2",
+                "expected_points": 3.74
+              },
+              {
+                "player_id": 1011,
+                "name": "Player 1011",
+                "short_name": "1011",
+                "position": "DEF",
+                "team": "Club 2",
+                "expected_points": 16.07
+              },
+              {
+                "player_id": 1009,
+                "name": "Player 1009",
+                "short_name": "1009",
+                "position": "DEF",
+                "team": "Club 6",
+                "expected_points": 13.33
+              },
+              {
+                "player_id": 1008,
+                "name": "Player 1008",
+                "short_name": "1008",
+                "position": "DEF",
+                "team": "Club 5",
+                "expected_points": 11.96
+              },
+              {
+                "player_id": 1007,
+                "name": "Player 1007",
+                "short_name": "1007",
+                "position": "DEF",
+                "team": "Club 4",
+                "expected_points": 10.59
+              },
+              {
+                "player_id": 1006,
+                "name": "Player 1006",
+                "short_name": "1006",
+                "position": "DEF",
+                "team": "Club 3",
+                "expected_points": 9.22
+              },
+              {
+                "player_id": 1012,
+                "name": "Player 1012",
+                "short_name": "1012",
+                "position": "MID",
+                "team": "Club 1",
+                "expected_points": 17.44
+              },
+              {
+                "player_id": 1016,
+                "name": "Player 1016",
+                "short_name": "1016",
+                "position": "MID",
+                "team": "Club 5",
+                "expected_points": 5.92
+              },
+              {
+                "player_id": 1024,
+                "name": "Player 1024",
+                "short_name": "1024",
+                "position": "FWD",
+                "team": "Club 5",
+                "expected_points": 16.880000000000003
+              },
+              {
+                "player_id": 1023,
+                "name": "Player 1023",
+                "short_name": "1023",
+                "position": "FWD",
+                "team": "Club 4",
+                "expected_points": 15.51
+              },
+              {
+                "player_id": 1022,
+                "name": "Player 1022",
+                "short_name": "1022",
+                "position": "FWD",
+                "team": "Club 3",
+                "expected_points": 14.14
+              }
+            ],
+            "bench": [
+              {
+                "player_id": 1001,
+                "name": "Player 1001",
+                "short_name": "1001",
+                "position": "GK",
+                "team": "Club 1",
+                "expected_points": 2.37
+              },
+              {
+                "player_id": 1015,
+                "name": "Player 1015",
+                "short_name": "1015",
+                "position": "MID",
+                "team": "Club 4",
+                "expected_points": 4.55
+              },
+              {
+                "player_id": 1014,
+                "name": "Player 1014",
+                "short_name": "1014",
+                "position": "MID",
+                "team": "Club 3",
+                "expected_points": 3.18
+              },
+              {
+                "player_id": 1013,
+                "name": "Player 1013",
+                "short_name": "1013",
+                "position": "MID",
+                "team": "Club 2",
+                "expected_points": 1.81
+              }
+            ],
+            "plan_weeks": [
+              {
+                "gameweek": 2,
+                "transfers_in": [
+                  {
+                    "player_id": 1011,
+                    "name": "Player 1011",
+                    "short_name": "1011",
+                    "position": "DEF",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1004,
+                    "name": "Player 1004",
+                    "short_name": "1004",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 5,
+                "free_transfers_after": 5,
+                "expected_points": 152.24
+              },
+              {
+                "gameweek": 3,
+                "transfers_in": [
+                  {
+                    "player_id": 1010,
+                    "name": "Player 1010",
+                    "short_name": "1010",
+                    "position": "DEF",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1006,
+                    "name": "Player 1006",
+                    "short_name": "1006",
+                    "position": "DEF",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 5,
+                "free_transfers_after": 5,
+                "expected_points": 221.63
+              },
+              {
+                "gameweek": 4,
+                "transfers_in": [
+                  {
+                    "player_id": 1019,
+                    "name": "Player 1019",
+                    "short_name": "1019",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1013,
+                    "name": "Player 1013",
+                    "short_name": "1013",
+                    "position": "MID",
+                    "team": "Club 2"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 5,
+                "free_transfers_after": 5,
+                "expected_points": 127.51000000000002
+              },
+              {
+                "gameweek": 5,
+                "transfers_in": [
+                  {
+                    "player_id": 1003,
+                    "name": "Player 1003",
+                    "short_name": "1003",
+                    "position": "GK",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1001,
+                    "name": "Player 1001",
+                    "short_name": "1001",
+                    "position": "GK",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 5,
+                "free_transfers_after": 5,
+                "expected_points": 163.2
+              },
+              {
+                "gameweek": 6,
+                "transfers_in": [
+                  {
+                    "player_id": 1018,
+                    "name": "Player 1018",
+                    "short_name": "1018",
+                    "position": "MID",
+                    "team": "Club 1"
+                  }
+                ],
+                "transfers_out": [
+                  {
+                    "player_id": 1014,
+                    "name": "Player 1014",
+                    "short_name": "1014",
+                    "position": "MID",
+                    "team": "Club 3"
+                  }
+                ],
+                "transfer_hit_points": 0.0,
+                "chip": null,
+                "free_transfers_before": 5,
+                "free_transfers_after": 5,
+                "expected_points": 163.2
+              }
+            ]
+          },
           "weeks": [
             {
               "gameweek": 2,
