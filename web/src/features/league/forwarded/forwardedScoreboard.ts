@@ -7,6 +7,7 @@
  * system's own squad, so those rows stay null.
  */
 
+import { availableWeek, weekState } from "../../../lib/weekState";
 import type { FixturesPayload } from "../../fixtures/types";
 import type { DevicePlanDocument } from "../device/types";
 import type { FplEntrySeason, FplEvents } from "../forwarder/documents";
@@ -53,13 +54,14 @@ export function forwardedScoreboard({
   events,
   fixtures,
 }: ForwardedScoreboardInputs): LeagueViewEnvelope<Scoreboard> {
+  const calendar = fixtures?.season === table.payload.season ? fixtures : null;
   const played = new Set<number>();
   for (const season of seasons.values()) for (const week of season.weeks) played.add(week.event);
   const latest = Math.max(0, ...played);
   const gameweeks: ScoreboardGameweek[] = [];
   for (const event of events.events) {
     if (event.id > latest) continue;
-    const deadline = deadlineOf(fixtures, event.id);
+    const deadline = deadlineOf(calendar, event.id);
     if (deadline === null) continue;
     const rows: ScoreboardMember[] = [];
     for (const member of members) {
@@ -89,7 +91,26 @@ export function forwardedScoreboard({
       members_counted: rows.length,
     });
   }
-  const settled = gameweeks.filter((week) => week.finished && week.data_checked);
+  const state = weekState({
+    treeGameweek: table.payload.gameweek,
+    events: events.events.map((event) => ({
+      gameweek: event.id,
+      finished: event.finished,
+      data_checked: event.data_checked,
+    })),
+    fixtures: calendar,
+    now: Date.parse(events.source_time),
+  });
+  const checked = gameweeks.filter((week) => state.checkedWeeks.includes(week.gameweek));
+  const available = checked
+    .filter((week) => week.members.some((row) => Number.isFinite(row.total_points)))
+    .map((week) => week.gameweek);
+  const current =
+    state.checkedWeeks.filter((gameweek) => available.includes(gameweek)).at(-1) ?? null;
+  const target = availableWeek(state.weeks.leagueTotal, current, available);
+  const settled = checked
+    .filter((week) => target !== null && week.gameweek <= target)
+    .sort((a, b) => a.gameweek - b.gameweek);
   const through = settled.at(-1) ?? null;
   const totals = through?.members.map((row) => row.total_points) ?? [];
   return {

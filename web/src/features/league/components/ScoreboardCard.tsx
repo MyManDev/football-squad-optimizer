@@ -1,6 +1,8 @@
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
+import { useMinuteClock } from "../../../lib/useMinuteClock";
+import { availableWeek, calendarClock, weekState } from "../../../lib/weekState";
 import { LeagueDataMissing } from "../data";
 import { useLeagueScoreboard } from "../queries";
 import type { LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
@@ -38,8 +40,25 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
   const { locale, messages } = useLanguage();
   const copy = messages.leagueScoreboard;
   const view = envelope.payload;
-  const finished = view.gameweeks.filter((week) => week.finished);
+  const now = useMinuteClock();
+  const state = weekState({
+    treeGameweek: null,
+    events: view.gameweeks,
+    fixtures: null,
+    now: calendarClock(view, now),
+  });
+  const finished = view.gameweeks.filter(
+    (week) =>
+      state.finishedWeeks.includes(week.gameweek) &&
+      state.weeks.scoreboard !== null &&
+      week.gameweek <= state.weeks.scoreboard,
+  );
   const total = view.cumulative;
+  const through = availableWeek(
+    state.weeks.leagueTotal ?? total.through_gameweek,
+    total.through_gameweek,
+    total.through_gameweek === null ? [] : [total.through_gameweek],
+  );
   return (
     <Card title={copy.title}>
       {finished.length === 0 ? (
@@ -70,10 +89,10 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
                 <WeekRow key={week.gameweek} week={week} locale={locale} />
               ))}
             </tbody>
-            {total.through_gameweek !== null && (
+            {through !== null && (
               <tfoot>
                 <tr className={styles.total}>
-                  <th scope="row">{copy.cumulative(total.through_gameweek)}</th>
+                  <th scope="row">{copy.cumulative(through)}</th>
                   <td className={`${styles.right} num`}>
                     {total.members_mean_total_points === null
                       ? "—"

@@ -1,3 +1,4 @@
+import { availableWeek, calendarClock, weekState } from "../../../lib/weekState";
 import type { EntryView, HumanEntryView, Scoreboard } from "../types";
 
 /** One member's place after each settled gameweek, and the total it stands on. */
@@ -38,8 +39,25 @@ export function leagueRace(
       member.member_kind === "human" && member.entry_id !== null,
   );
   const known = new Set(humans.map((member) => member.entry_id));
-  const weeks = scoreboard.gameweeks
-    .filter((week) => week.finished && week.data_checked)
+  const state = weekState({
+    treeGameweek: null,
+    events: scoreboard.gameweeks,
+    fixtures: null,
+    now: calendarClock(scoreboard, Date.now()),
+  });
+  const checked = scoreboard.gameweeks.filter((week) => state.checkedWeeks.includes(week.gameweek));
+  const available = checked
+    .filter((week) =>
+      week.members.some(
+        (member) => known.has(member.entry_id) && Number.isFinite(member.total_points),
+      ),
+    )
+    .map((week) => week.gameweek);
+  const current =
+    state.checkedWeeks.filter((gameweek) => available.includes(gameweek)).at(-1) ?? null;
+  const through = availableWeek(state.weeks.race, current, available);
+  const weeks = checked
+    .filter((week) => through !== null && week.gameweek <= through)
     .sort((a, b) => a.gameweek - b.gameweek);
   if (weeks.length < 2 || humans.length === 0) return null;
 

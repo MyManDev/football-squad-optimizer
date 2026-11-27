@@ -147,6 +147,30 @@ function renderSection(language: Language = "en") {
 }
 
 describe("scoreboard card", () => {
+  it("shows finished N while the league total stays on its checked row, then retains that row if the new total is absent", () => {
+    const value = structuredClone(scoreboard);
+    value.payload.captured_at_utc = "2026-09-13T12:00:00Z";
+    value.payload.gameweeks[3]!.finished = true;
+    value.payload.gameweeks[3]!.average_entry_score = 60;
+    renderCard(value);
+    expect(screen.getByRole("rowheader", { name: "4" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("rowheader", { name: MESSAGES.en.leagueScoreboard.cumulative(3) }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("rowheader", { name: MESSAGES.en.leagueScoreboard.cumulative(4) }),
+    ).toBeNull();
+    cleanup();
+    value.payload.gameweeks[3]!.data_checked = true;
+    renderCard(value);
+    expect(
+      screen.getByRole("rowheader", { name: MESSAGES.en.leagueScoreboard.cumulative(3) }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("rowheader", { name: MESSAGES.en.leagueScoreboard.cumulative(4) }),
+    ).toBeNull();
+  });
+
   it.each(["tr", "en"] as const)("shows one row per finished gameweek in %s", (language) => {
     const copy = MESSAGES[language].leagueScoreboard;
     const { container } = renderCard(scoreboard, language);

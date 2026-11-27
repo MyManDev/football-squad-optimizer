@@ -109,6 +109,49 @@ describe("the forwarded scoreboard", () => {
     fixtures: FIXTURES,
   });
 
+  it("keeps the total on C while N is finished but unchecked", () => {
+    const events = {
+      ...EVENTS,
+      events: EVENTS.events.map((event) =>
+        event.id === 9 ? { ...event, data_checked: false } : event,
+      ),
+    };
+    const value = forwardedScoreboard({
+      leagueId: PAGE.league.id,
+      table: TABLE,
+      members,
+      seasons,
+      events,
+      fixtures: FIXTURES,
+    }).payload;
+    expect(value.gameweeks.at(-1)).toMatchObject({
+      gameweek: 9,
+      finished: true,
+      data_checked: false,
+    });
+    expect(value.cumulative.through_gameweek).toBe(8);
+  });
+
+  it("keeps the current total when checked N has no member season row", () => {
+    const held = new Map(
+      [...seasons].map(([entry, season]) => [
+        entry,
+        { ...season, weeks: season.weeks.filter((week) => week.event !== 9) },
+      ]),
+    );
+    const value = forwardedScoreboard({
+      leagueId: PAGE.league.id,
+      table: TABLE,
+      members,
+      seasons: held,
+      events: EVENTS,
+      fixtures: FIXTURES,
+    }).payload;
+    expect(value.cumulative.through_gameweek).toBe(8);
+    expect(value.gameweeks.map((week) => week.gameweek)).not.toContain(9);
+    expect(board.payload.cumulative.through_gameweek).toBe(9);
+  });
+
   it("has one week per played gameweek, with each member's gross, hit, net and total", () => {
     expect(board.payload.league_id).toBe(PAGE.league.id);
     expect(board.payload.source_snapshot_id).toBe(CAPTURE);
