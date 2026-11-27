@@ -5,6 +5,7 @@ import { recordUsage } from "../../data/usage";
 import { EmptyState } from "../../design/components/EmptyState";
 import { useLanguage } from "../../i18n/context";
 import { useMinuteClock } from "../../lib/useMinuteClock";
+import { weekState } from "../../lib/weekState";
 import { useFixtures } from "./data";
 import { DeadlineCalendar } from "./DeadlineCalendar";
 import { FixtureChoice } from "./FixtureChoice";
@@ -27,7 +28,14 @@ export function FixturesPage() {
   const copy = FIXTURES_COPY[language];
   const { data, isPending } = useFixtures();
   const [searchParams, setSearchParams] = useSearchParams();
-  const now = useMinuteClock();
+  const state = weekState({
+    treeGameweek: null,
+    events: [],
+    fixtures: data ?? null,
+    now: Date.now(),
+  });
+  const boundary = state.changesIn === null ? null : state.clock + state.changesIn;
+  const now = useMinuteClock(Date.now, boundary);
   if (isPending) return <EmptyState title={messages.common.loading} />;
   if (!data) return <EmptyState page title={copy.notPublished} />;
 

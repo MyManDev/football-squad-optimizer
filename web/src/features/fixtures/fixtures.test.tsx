@@ -369,17 +369,52 @@ describe("the fixtures page", () => {
 
   it("rolls on by itself in a tab left open", async () => {
     const clock = atClock("2026-09-18T10:00:00Z");
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"] });
     try {
       serve(published(longRun()));
       render(surface(<FixturesPage />, "en", "/fixtures"));
-      const matrix = await findMatrix();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const matrix = screen.getByRole("table", { name: FIXTURES_COPY.en.generalView });
       expect(columnsOf(matrix).slice(1)).toEqual(["GW3", "GW4", "GW5", "GW6", "GW7"]);
       clock.mockReturnValue(Date.parse("2026-09-28T10:00:00Z"));
       act(() => {
         vi.advanceTimersByTime(60_000);
       });
       expect(columnsOf(matrix).slice(1)).toEqual(["GW5", "GW6", "GW7", "GW8", "GW9"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retains N in the matrix until the exact shared last-match window boundary", async () => {
+    const clock = atClock("2026-09-20T15:59:59Z");
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"] });
+    try {
+      const view = payload();
+      view.gameweeks[2]!.fixtures = [upcoming(4, AVL, BRE, "2026-09-20T13:00:00Z")];
+      serve(published(view));
+      render(surface(<FixturesPage />, "en", "/fixtures"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const matrix = screen.getByRole("table", { name: FIXTURES_COPY.en.generalView });
+      expect(columnsOf(matrix).slice(1)).toEqual(["GW3", "GW4"]);
+      clock.mockReturnValue(Date.parse("2026-09-20T16:00:00Z"));
+      act(() => {
+        vi.advanceTimersByTime(999);
+      });
+      expect(columnsOf(matrix).slice(1)).toEqual(["GW3", "GW4"]);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(columnsOf(matrix).slice(1)).toEqual(["GW4"]);
+      clock.mockReturnValue(Date.parse("2026-09-20T16:00:01Z"));
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(columnsOf(matrix).slice(1)).toEqual(["GW4"]);
     } finally {
       vi.useRealTimers();
     }
@@ -442,7 +477,7 @@ describe("the matrix's window", () => {
   });
 
   it("narrows to the weeks left near the season's end, down to the last one", async () => {
-    atClock("2026-09-22T12:00:00Z");
+    atClock("2026-09-26T15:00:00Z");
     serve(published(payload()));
     render(surface(<FixturesPage />, "en", "/fixtures"));
     expect(columnsOf(await findMatrix())).toEqual([FIXTURES_COPY.en.clubLegend, "GW4"]);
@@ -960,12 +995,12 @@ describe("the fixture document", () => {
   const numbers = (weeks: readonly { gameweek: number }[]) => weeks.map((week) => week.gameweek);
   const instant = (iso: string) => Date.parse(iso);
 
-  it("starts at the first week with its deadline open or a match still to kick off", () => {
+  it("follows the shared fixture target through the last match and an assigned undated match", () => {
     const view = payload();
     expect(numbers(weeksAhead(view, instant("2026-09-18T10:00:00Z")))).toEqual([3, 4]);
     // A closed FPL deadline does not hide fixtures still to be played this weekend.
     expect(numbers(weeksAhead(view, instant("2026-09-19T12:00:00Z")))).toEqual([3, 4]);
-    expect(numbers(weeksAhead(view, instant("2026-09-22T12:00:00Z")))).toEqual([4]);
+    expect(numbers(weeksAhead(view, instant("2026-09-22T12:00:00Z")))).toEqual([3, 4]);
     expect(weeksAhead(view, instant("2027-01-01T00:00:00Z"))).toEqual([]);
     // No result is inferred from the clock.
     expect(view.gameweeks[2]!.fixtures[1]!.finished).toBe(false);
@@ -983,9 +1018,30 @@ describe("the fixture document", () => {
     expect(numbers(weeksAhead(view, instant("2026-10-03T10:00:00Z")))).toEqual([]);
   });
 
-  it("lets a fixture with no date hold no week open", () => {
+  it("keeps an assigned undated fixture on N until the next deadline takes precedence", () => {
     // Gameweek 3 still has ARS v BRE with no date; its deadline and its dated matches are past.
-    expect(numbers(weeksAhead(payload(), instant("2026-09-22T12:00:00Z")))).toEqual([4]);
+    expect(numbers(weeksAhead(payload(), instant("2026-09-22T12:00:00Z")))).toEqual([3, 4]);
+    expect(numbers(weeksAhead(payload(), instant("2026-09-26T10:00:00Z")))).toEqual([4]);
+  });
+
+  it.each([-1_000, 0, 1_000])(
+    "uses the shared final-match +180-minute boundary (%s ms)",
+    (offset) => {
+      const view = payload();
+      view.gameweeks[2]!.fixtures = [upcoming(4, AVL, BRE, "2026-09-20T13:00:00Z")];
+      const end = instant("2026-09-20T16:00:00Z");
+      expect(numbers(weeksAhead(view, end + offset))).toEqual(offset < 0 ? [3, 4] : [4]);
+      expect(view.gameweeks[2]!.fixtures[0]!.finished).toBe(false);
+    },
+  );
+
+  it("uses event completion from the same policy rather than a second kickoff rollover", () => {
+    const view = payload();
+    const now = instant("2026-09-20T13:30:00Z");
+    expect(numbers(weeksAhead(view, now))).toEqual([3, 4]);
+    expect(
+      numbers(weeksAhead(view, now, [{ gameweek: 3, finished: true, data_checked: false }])),
+    ).toEqual([4]);
   });
 
   it("never reads the calendar earlier than its capture", () => {

@@ -1,38 +1,32 @@
 /** What the fixtures page reads out of the published calendar: nothing here loads or draws. */
 
+import { calendarClock, weekState, type WeekEvent } from "../../lib/weekState";
 import type { Fixture, FixtureGameweek, FixtureTeam, FixturesPayload } from "./types";
+
+export { calendarClock };
 
 /** How many gameweeks the matrix shows: the upcoming one and the four after it. */
 const GENERAL_WEEKS = 5;
-
-/**
- * The clock the calendar is read by: never earlier than its capture, so a device whose clock
- * is behind does not bring a played week back.
- */
-export function calendarClock(payload: FixturesPayload, now: number): number {
-  const captured = Date.parse(payload.captured_at_utc);
-  return Number.isNaN(captured) ? now : Math.max(now, captured);
-}
 
 const stillToKickOff = (fixture: Fixture, clock: number): boolean =>
   !fixture.finished && fixture.kickoff_utc !== null && Date.parse(fixture.kickoff_utc) > clock;
 
 /**
- * The gameweeks still to come, in order: from the earliest with its deadline open or a fixture
- * still to kick off, on to the last the calendar lists. `current_gameweek` does not decide
- * this: it names the first deadline open at capture, and the week before that can still have
- * matches to play. No result is inferred from the clock, and a fixture with no date holds no
- * week open.
+ * The shared policy's fixture target and every listed week after it. The last kickoff
+ * does not remove a week while its match window remains. An assigned undated match can
+ * retain N until a flag or the next deadline resolves it; missing weeks are not invented.
  */
-export function weeksAhead(payload: FixturesPayload, now = Date.now()): FixtureGameweek[] {
-  const clock = calendarClock(payload, now);
-  const weeks = [...payload.gameweeks].sort((left, right) => left.gameweek - right.gameweek);
-  const first = weeks.findIndex(
-    (week) =>
-      Date.parse(week.deadline_utc) > clock ||
-      week.fixtures.some((fixture) => stillToKickOff(fixture, clock)),
-  );
-  return first < 0 ? [] : weeks.slice(first);
+export function weeksAhead(
+  payload: FixturesPayload,
+  now = Date.now(),
+  events: readonly WeekEvent[] = [],
+): FixtureGameweek[] {
+  const first = weekState({ treeGameweek: null, events, fixtures: payload, now }).weeks.fixtures;
+  return first === null
+    ? []
+    : payload.gameweeks
+        .filter((week) => week.gameweek >= first)
+        .sort((left, right) => left.gameweek - right.gameweek);
 }
 
 /**
