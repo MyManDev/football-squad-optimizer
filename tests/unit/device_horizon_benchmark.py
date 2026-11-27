@@ -197,9 +197,10 @@ class OwnedCpuJob:
             raise RuntimeError("CPU rate readback differs from the requested own-job limit")
         return {"flags": result.ControlFlags, "rate": result.CpuRate}
 
-    def verify(self) -> dict[str, Any]:
+    def verify(self, cpu: int | None = None) -> dict[str, Any]:
         count = 0
         console_hosts = []
+        compute_affinity = []
         for child in [self.node, *self.node.children(recursive=True)]:
             process = self.kernel.OpenProcess(0x1000, False, child.pid)
             self.checked(process)
@@ -234,9 +235,17 @@ class OwnedCpuJob:
                         f"Own child escaped the quota job: {child.pid} {child.name()}"
                     )
                 count += 1
+                affinity = child.cpu_affinity()
+                if cpu is not None and affinity != [cpu]:
+                    raise RuntimeError("Own compute process changed the frozen CPU affinity")
+                compute_affinity.append({"pid": child.pid, "affinity": affinity})
             finally:
                 self.kernel.CloseHandle(process)
-        return {"compute_processes_verified": count, "unthrottled_console_hosts": console_hosts}
+        return {
+            "compute_processes_verified": count,
+            "compute_affinity": compute_affinity,
+            "unthrottled_console_hosts": console_hosts,
+        }
 
 
 def main() -> None:
@@ -246,6 +255,7 @@ def main() -> None:
     )
     parser.add_argument("--rule-bootstrap", type=Path)
     parser.add_argument("--rate", type=int)
+    parser.add_argument("--cpu", type=int)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke", action="store_true")
@@ -285,6 +295,7 @@ def main() -> None:
                 "calibration_repeats": 5,
                 "calibration_target_ratio": [3.90, 4.10],
                 "selected_rate": args.rate,
+                "logical_cpu_affinity": args.cpu,
                 "logical_cpus": psutil.cpu_count(),
                 "physical_cpus": psutil.cpu_count(logical=False),
                 "solver_threading": wasm_contract(),
@@ -308,6 +319,7 @@ def main() -> None:
         )
         job = None
         owned: list[psutil.Process] = []
+        original_affinity = []
         errors = []
 
         def send(value: Any) -> None:
@@ -325,11 +337,19 @@ def main() -> None:
             return result
 
         def probe() -> dict[str, Any]:
+            assert job is not None
+            membership_before = job.verify(args.cpu)
             send({"command": "probe", "count": 1_200_000_000, "repeats": 5})
             result = receive()
             if result["event"] != "probe":
                 raise RuntimeError("Wrong calibration response")
-            emit(result)
+            emit(
+                {
+                    **result,
+                    "membership_before": membership_before,
+                    "membership_after": job.verify(args.cpu),
+                }
+            )
             return result
 
         try:
@@ -338,12 +358,42 @@ def main() -> None:
                 raise RuntimeError("Wrong own launcher PID")
             job = OwnedCpuJob(proc)
             owned = [job.node]
+            original_affinity = job.node.cpu_affinity()
+            if args.cpu is not None:
+                if args.cpu not in original_affinity:
+                    raise ValueError("Requested CPU is outside this own process's allowed affinity")
+                job.node.cpu_affinity([args.cpu])
             send({"command": "go"})
             ready = receive()
             if ready.get("event") != "ready":
                 raise RuntimeError("Own runtime did not load")
             owned += job.node.children(recursive=True)
             emit({**ready, "owned_processes_verified": job.verify()})
+            compute = [child for child in owned if child.name() != "conhost.exe"]
+            if args.cpu is not None:
+                # Chromium's GPU child can restore a wide mask at startup. All these
+                # identities are already verified descendants in this own CPU job.
+                for child in compute:
+                    child.cpu_affinity([args.cpu])
+            emit(
+                {
+                    "event": "owned_identities",
+                    "processes": [
+                        {
+                            "pid": child.pid,
+                            "parent_pid": child.ppid(),
+                            "created": child.create_time(),
+                            "executable": child.exe(),
+                            "affinity": child.cpu_affinity(),
+                        }
+                        for child in owned
+                    ],
+                }
+            )
+            if args.cpu is not None and any(
+                child.cpu_affinity() != [args.cpu] for child in compute
+            ):
+                raise RuntimeError("Own compute child did not inherit the frozen CPU affinity")
             if args.runtime == "calibration":
                 baseline = probe()
                 rate = round(10000 / (4 * psutil.cpu_count()) * 1.2)
@@ -389,10 +439,16 @@ def main() -> None:
                                 "event": "calibration_confirmation",
                                 "rate": rate,
                                 "worker_ratio": confirmed,
-                                "owned_membership": job.verify(),
+                                "owned_membership": job.verify(args.cpu),
                             }
                         )
-                        if not 3.90 <= confirmed <= 4.10:
+                        confirmed_checksums = {
+                            r["checksum"]
+                            for rows in (baseline, confirmation)
+                            for kind in ("main", "dedicatedWorker")
+                            for r in rows[kind]
+                        }
+                        if not 3.90 <= confirmed <= 4.10 or len(confirmed_checksums) != 1:
                             raise RuntimeError("The fixed 4x rate did not survive confirmation")
                         break
                     job.configure(10000)
@@ -439,6 +495,13 @@ def main() -> None:
                     emit({"event": "cpu_restored", **job.configure(10000)})
                 except OSError as error:
                     errors.append(f"restore:{error.winerror}")
+                if args.cpu is not None:
+                    for child in owned:
+                        try:
+                            if child.is_running() and child.name() != "conhost.exe":
+                                child.cpu_affinity(original_affinity)
+                        except psutil.NoSuchProcess:
+                            pass
             if proc.poll() is None:
                 try:
                     send({"command": "finish"})
@@ -453,6 +516,14 @@ def main() -> None:
                     proc.wait(timeout=5)
             if job:
                 job.kernel.CloseHandle(job.handle)
+            # Console and browser children can exit just after the launcher. Await their
+            # recorded process identities, never a name-wide process selection.
+            _, still_alive = psutil.wait_procs(owned, timeout=5)
+            for child in still_alive:
+                if child.is_running():
+                    child.terminate()
+            if still_alive:
+                psutil.wait_procs(still_alive, timeout=5)
             remaining = sum(child.is_running() for child in owned)
             emit(
                 {
