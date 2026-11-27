@@ -1,12 +1,12 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-27T02:04:38Z",
+  "generated_at_utc": "2026-11-27T10:37:54Z",
   "source_kind": "live",
   "payload": {
     "contract_version": "league_device_plan_v2",
     "season": "2026-27",
     "gameweek": 12,
-    "source_snapshot_id": "fpl-live-20261127T020105Z-e101f783762d",
+    "source_snapshot_id": "fpl-live-20261127T103417Z-2907c387f11f",
     "policy_id": "member_planning_policy_v2",
     "rules": {
       "squad_size": 15,
@@ -55,9 +55,9 @@
           50
         ],
         "cohort_size": 100,
-        "cohort_snapshot_id": "fpl-top100-20261127T020050Z-43d9e94e38c0",
-        "picks_snapshot_id": "fpl-elite-picks-20261127T020057Z-d4cd5e8e66cd",
-        "table_sha256": "913aeec691ea7b9bc94d74e3a8d5713c4b3ce236920deca8bf09f6e245e802e2",
+        "cohort_snapshot_id": "fpl-top100-20261127T103400Z-c73fd9e12846",
+        "picks_snapshot_id": "fpl-elite-picks-20261127T103408Z-1001fa0135a4",
+        "table_sha256": "1245a9ad9a3836d5e889e7a4f015bc3594b7467aff1a5c38c6d504f667d17f53",
         "picks_gameweek": 11
       },
       "transfers_cap": 20,
@@ -3605,20 +3605,20 @@
         "position": "DEF",
         "buy_tenths": 48,
         "start_tenths": 50,
-        "expected_points": 0.7503264958782441,
+        "expected_points": 0.562744871908683,
         "coefficients": [
-          75,
-          675,
-          750
+          56,
+          507,
+          563
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 750,
-          "10": 750,
-          "20": 750,
-          "30": 750,
-          "40": 750,
-          "50": 750
+          "5": 563,
+          "10": 563,
+          "20": 563,
+          "30": 563,
+          "40": 563,
+          "50": 563
         }
       },
       {
