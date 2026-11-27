@@ -24,6 +24,7 @@ the server uses, not a description of them.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping
 from decimal import Decimal
 from typing import Any, Final
@@ -49,7 +50,7 @@ from squadopt.optimization.coefficients import (
     round_half_up,
     scale_expected_points,
 )
-from squadopt.planning import ProjectionHorizon
+from squadopt.planning import ProjectionHorizon, TransferPlanningValidationError
 from squadopt.prediction.elite_evidence import ELITE_COHORT_SIZE
 
 DEVICE_PLAN_CONTRACT_VERSION: Final = "league_device_plan_v1"
@@ -57,6 +58,7 @@ DEVICE_PLAN_CONTRACT_VERSION: Final = "league_device_plan_v1"
 DEVICE_PLAN_TABLE_CONTRACT_VERSION: Final = "league_device_plan_v2"
 DEVICE_PLAN_HORIZON_CONTRACT_VERSION: Final = "league_device_horizon_v1"
 DEVICE_PLAN_DOCUMENT: Final = DEVICE_PLAN_FILE
+_LOG: Final = logging.getLogger(__name__)
 
 
 def device_plan_table(
@@ -195,12 +197,12 @@ def device_plan_horizon(
         return None
     try:
         horizon = builder(tuple(range(first, first + windows[-1])))
-    except DataSourceError:
+        horizon.assert_fingerprint()
+    except (DataSourceError, TransferPlanningValidationError):
         # A missing/invalid future calendar must not take away the published H1 plan.
-        return None
-    horizon.assert_fingerprint()
+        return _unavailable_horizon("the captured calendar or projection is invalid")
     if horizon.season != inputs.season or horizon.source_snapshot_id != inputs.snapshot_id:
-        raise DataSourceError("The device horizon belongs to another season or capture.")
+        return _unavailable_horizon("the projection belongs to another season or capture")
     settings = OptimizationConfig() if optimization is None else optimization
     policy = member_planning_policy(rules)
     initial = sort_players_by_id(projection.table)
@@ -208,12 +210,12 @@ def device_plan_horizon(
     for offset, gameweek in enumerate(horizon.target_gameweeks):
         table = sort_players_by_id(horizon.table.loc[horizon.table.gameweek.eq(gameweek)])
         if table.player_id.tolist() != initial.player_id.tolist():
-            raise DataSourceError("The device horizon has a different player universe.")
+            return _unavailable_horizon("the projection has a different player universe")
         for field in ("name", "team_id", "position", "price_tenths"):
             if table[field].tolist() != initial[field].tolist():
-                raise DataSourceError(f"The device horizon changes captured {field}.")
+                return _unavailable_horizon(f"the projection changes captured {field}")
         if offset == 0 and table.expected_points.tolist() != initial.expected_points.tolist():
-            raise DataSourceError("The device horizon changes the one-week points.")
+            return _unavailable_horizon("the projection changes the one-week points")
         coefficients = objective_coefficients(table.expected_points.tolist(), settings)
         weeks.append(
             {
@@ -256,6 +258,10 @@ def device_plan_horizon(
         },
         "weeks": weeks,
     }
+
+
+def _unavailable_horizon(reason: str) -> None:
+    _LOG.warning("Skipping device horizon: %s. The one-week inputs are unchanged.", reason)
 
 
 _V1_PLAYER_KEYS: Final = ("id", "name", "short_name", "team", "position", "buy_tenths")

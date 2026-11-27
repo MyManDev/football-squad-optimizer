@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
+import pytest
 from ortools.sat.python import cp_model
 from scripts.check_league_tree import main as check_tree
 from tests.unit.test_device_plan_fixture import _same
@@ -251,6 +252,69 @@ def test_horizon_does_not_remove_one_week_inputs_when_future_calendar_is_missing
         raise DataSourceError("missing captured calendar")
 
     assert device_plan_horizon(inputs, projection, rules, missing) is None
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    [
+        "season",
+        "capture",
+        "player_id",
+        "name",
+        "team_id",
+        "position",
+        "price_tenths",
+        "expected_points",
+        "fingerprint",
+    ],
+)
+def test_a_changed_horizon_logs_once_and_preserves_the_one_week_document(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, mismatch: str
+) -> None:
+    world = horizon_world(tmp_path)
+    inputs, projection, rules = (world[key] for key in ("inputs", "projection", "rules"))
+    horizon = world["builder"]((2, 3, 4, 5, 6))
+    before = json.dumps(device_plan_table(inputs, projection, rules, league_id=9)).encode()
+    if mismatch == "season":
+        horizon = replace(horizon, season="2024-25")
+    elif mismatch == "capture":
+        horizon = replace(horizon, source_snapshot_id="synthetic-other-capture")
+    elif mismatch == "fingerprint":
+        horizon.table.loc[horizon.table.index[0], "price_tenths"] += 1
+    else:
+        table = horizon.table.copy()
+        if mismatch == "player_id":
+            table["player_id"] += 10000
+        elif mismatch in ("price_tenths", "expected_points"):
+            row = table.index[(table.gameweek == 2) & (table.fixture_count > 0)][0]
+            table.loc[row, mismatch] += 1
+        elif mismatch == "position":
+            table.loc[table.index[0], "position"] = (
+                "DEF" if table.iloc[0].position == "GK" else "GK"
+            )
+        elif mismatch == "team_id":
+            team = table.iloc[0].team_id
+            table.loc[table.index[0], "team_id"] = (
+                f"{team}-changed" if isinstance(team, str) else int(team) + 10000
+            )
+        else:
+            table.loc[table.index[0], mismatch] = "synthetic-changed"
+        horizon = replace(horizon, table=table)
+
+    result = device_plan_horizon(inputs, projection, rules, lambda _weeks: horizon)
+
+    assert result is None
+    records = [
+        record for record in caplog.records if record.name == "squadopt.application.device_plan"
+    ]
+    assert len(records) == 1
+    assert records[0].getMessage().startswith("Skipping device horizon:")
+    assert (
+        json.dumps(
+            device_plan_table(inputs, projection, rules, league_id=9, horizon=result)
+        ).encode()
+        == before
+    )
 
 
 def test_horizon_inputs_change_only_the_device_document_in_the_built_tree(tmp_path: Path) -> None:
