@@ -1,0 +1,181 @@
+{
+  "bootstrap": {
+    "block_length": 4,
+    "resamples": 2000
+  },
+  "described": {
+    "2021-22": {
+      "free_transfer_use": {
+        "cap": 5,
+        "decisions": 37,
+        "free_transfers_lost_at_cap": 0,
+        "free_transfers_used": 37,
+        "mean_free_transfers_held": 1.5675675675675675,
+        "paid_transfers": 0
+      },
+      "held_where_policy_spends": 12,
+      "max_value": 8.0,
+      "mean_value": 2.674,
+      "median_value": 1.787,
+      "net_points": 1916.0,
+      "share_zero": 0.054
+    },
+    "2022-23": {
+      "free_transfer_use": {
+        "cap": 5,
+        "decisions": 36,
+        "free_transfers_lost_at_cap": 0,
+        "free_transfers_used": 36,
+        "mean_free_transfers_held": 1.5555555555555556,
+        "paid_transfers": 0
+      },
+      "held_where_policy_spends": 14,
+      "max_value": 8.0,
+      "mean_value": 2.138,
+      "median_value": 1.149,
+      "net_points": 2150.0,
+      "share_zero": 0.056
+    },
+    "2023-24": {
+      "free_transfer_use": {
+        "cap": 5,
+        "decisions": 37,
+        "free_transfers_lost_at_cap": 0,
+        "free_transfers_used": 37,
+        "mean_free_transfers_held": 1.5135135135135136,
+        "paid_transfers": 0
+      },
+      "held_where_policy_spends": 14,
+      "max_value": 8.0,
+      "mean_value": 2.019,
+      "median_value": 1.073,
+      "net_points": 1951.0,
+      "share_zero": 0.054
+    },
+    "2024-25": {
+      "free_transfer_use": {
+        "cap": 5,
+        "decisions": 37,
+        "free_transfers_lost_at_cap": 0,
+        "free_transfers_used": 37,
+        "mean_free_transfers_held": 1.5675675675675675,
+        "paid_transfers": 0
+      },
+      "held_where_policy_spends": 16,
+      "max_value": 8.0,
+      "mean_value": 1.79,
+      "median_value": 1.256,
+      "net_points": 2071.0,
+      "share_zero": 0.054
+    }
+  },
+  "measurement_only": true,
+  "primary": {
+    "baseline": "component_rules_2026_27_bank0",
+    "mean_season_net_advantage_points": -6.0,
+    "mean_weekly_advantage_points": -0.16326530612244897,
+    "paired_gameweeks": 147,
+    "positive_season_share": 0.5,
+    "positive_week_share": 0.41496598639455784,
+    "season_hit_points_delta": {
+      "2021-22": -4.0,
+      "2022-23": 0.0,
+      "2023-24": 0.0,
+      "2024-25": 0.0
+    },
+    "season_net_advantage_points": {
+      "2021-22": -176.0,
+      "2022-23": 85.0,
+      "2023-24": -30.0,
+      "2024-25": 97.0
+    },
+    "seasons": 4,
+    "variant": "component_rules_2026_27_bankcomputed",
+    "weekly_advantage_block_bootstrap_interval": [
+      -2.0139455782312927,
+      1.6193877551020406
+    ],
+    "weekly_advantage_standard_error": 1.1900306577897002
+  },
+  "protocol": "docs/research/component_computed_banked_value_prereg.md",
+  "provenance": {
+    "repository_commit": "c64f9bd7b50ff59f8ca9a09eb73910d19f286f59",
+    "working_tree_dirty": true
+  },
+  "reading": {
+    "primary": {
+      "interval": [
+        -2.0139455782312927,
+        1.6193877551020406
+      ],
+      "losing_seasons": [
+        "2021-22",
+        "2023-24"
+      ],
+      "mean": -0.16326530612244897,
+      "passed": false
+    },
+    "proposes_computed_value": false,
+    "reading": "unsupported",
+    "secondary": {
+      "component_rules_2026_27_bank0p5": "worse",
+      "component_rules_2026_27_bank1p2": "not_separable"
+    }
+  },
+  "secondary": {
+    "component_rules_2026_27_bank0p5": {
+      "baseline": "component_rules_2026_27_bank0p5",
+      "mean_season_net_advantage_points": -101.5,
+      "mean_weekly_advantage_points": -2.761904761904762,
+      "paired_gameweeks": 147,
+      "positive_season_share": 0.0,
+      "positive_week_share": 0.35374149659863946,
+      "season_hit_points_delta": {
+        "2021-22": -4.0,
+        "2022-23": -4.0,
+        "2023-24": 0.0,
+        "2024-25": 0.0
+      },
+      "season_net_advantage_points": {
+        "2021-22": -176.0,
+        "2022-23": -67.0,
+        "2023-24": -119.0,
+        "2024-25": -44.0
+      },
+      "seasons": 4,
+      "variant": "component_rules_2026_27_bankcomputed",
+      "weekly_advantage_block_bootstrap_interval": [
+        -4.489795918367347,
+        -1.1904761904761905
+      ],
+      "weekly_advantage_standard_error": 0.9871371041989607
+    },
+    "component_rules_2026_27_bank1p2": {
+      "baseline": "component_rules_2026_27_bank1p2",
+      "mean_season_net_advantage_points": -33.25,
+      "mean_weekly_advantage_points": -0.9047619047619048,
+      "paired_gameweeks": 147,
+      "positive_season_share": 0.25,
+      "positive_week_share": 0.43537414965986393,
+      "season_hit_points_delta": {
+        "2021-22": 0.0,
+        "2022-23": 0.0,
+        "2023-24": 0.0,
+        "2024-25": 0.0
+      },
+      "season_net_advantage_points": {
+        "2021-22": -92.0,
+        "2022-23": 9.0,
+        "2023-24": -32.0,
+        "2024-25": -18.0
+      },
+      "seasons": 4,
+      "variant": "component_rules_2026_27_bankcomputed",
+      "weekly_advantage_block_bootstrap_interval": [
+        -2.3540816326530614,
+        0.8302721088435372
+      ],
+      "weekly_advantage_standard_error": 1.0461308155823372
+    }
+  }
+}

@@ -1,0 +1,104 @@
+# Diagnostic: is the banked value reading inside the path noise?
+
+Declared 27 Nov 2026 after the [pre-registered record](component_banked_transfer_value.md) was
+written and read, before any number of this diagnostic was seen. It is post hoc. It does not
+change the record's reading (`move` at 0.5); it says how much weight that reading can carry.
+
+## Why
+
+The record's primary cell reads `move`: a held free transfer worth 0.5 beats 0 by +2.60 a
+week [+1.21, +4.07], season nets +0, +152, +89, +141. Two facts in the same record question
+it:
+
+- At 0.5 the planner keeps a free transfer it would have spent only 1 to 4 times a season.
+  The chains part at gameweek 3 or 4 and never meet again, so each season's difference is
+  the difference between two paths that split early, not the sum of the weeks where the
+  threshold acted.
+- The same threshold under each season's own bank cap, which differs from the primary only
+  in weeks where five transfers could be held, gives 2022-23 at -48 instead of +152.
+
+The weekly block bootstrap treats the 147 paired weeks as the data. If an early split moves a
+season by as much as the threshold does, the interval is too narrow and the reading rests on
+three path draws.
+
+## What is walked
+
+The primary cell (component base, bank cap 5 in every season), the whole grid of banked values,
+the same code and seasons, with one change that should not matter: the solver's deterministic
+budget a decision is **6** and **10** instead of 8. A budget changes which of several
+near-equal plans the solver returns, and nothing else. Eight processes, artifacts under
+`artifacts/component_banked_transfer_value/budget6/` and `budget10/`.
+
+## What is read
+
+1. **The path noise floor.** For each season, the season net of the policy's 0 at budget 6
+   and at budget 10 minus its net at budget 8: how far a neutral change moves a season.
+2. **The reading at each budget.** 0.5 against 0 at budget 6 and at budget 10, with the
+   record's gate.
+3. **Every level's gain against 0 across the three budgets**, to see whether any level keeps
+   its sign.
+
+How to read it, fixed now:
+- If the budget changes move season nets by less than a third of 0.5's season gains, and 0.5
+  passes the gate at both other budgets, the record's `move` stands as evidence.
+- If a neutral change moves season nets by as much as 0.5's gains, or 0.5 fails the gate at
+  either other budget, the record's `move` is read as path noise. The proposal to the owner
+  is then to keep 0, and to measure a threshold only on a population of independent decisions
+  (fresh squads a week), not on season chains.
+- Anything between is reported as it is.
+
+## The owner's level, 1.2
+
+Added 27 Nov 2026, before any number of this diagnostic was seen: the owner named 1.2 as a
+plausible value. It is walked as one more arm of the primary cell at budgets 6,
+8 and 10 (twelve chains, `artifacts/component_banked_transfer_value/owner_level/`) and read
+against 0 at the same budget with the record's gate, and against the path noise floor above.
+It is a level named after the record was read, so a pass is reported as such and is not a
+pre-registered reading.
+
+## Results
+
+Record: [`component_banked_transfer_value_path_diagnostic.json`](component_banked_transfer_value_path_diagnostic.json),
+written by `scripts/diagnose_component_banked_transfer_value.py --read`. The budget chains ran
+at commit `3a97b3bc8`; the owner's level ran at `5c822e38e` from a working copy of the
+script's `--walk-owner-level`, which repeats it.
+
+**The budget is not a perturbation on this chain.** The policy's 0 walks the same four
+seasons to the point at budgets 6, 8 and 10 (net change 0, 0, 0, 0 both ways), because almost
+every decision is proved optimal and a proved optimum does not move with the budget. 0.5
+against 0 is the same at all three budgets: +2.60 a week [+1.21, +4.07], seasons +0, +152,
++89, +141. Levels 1 to 6 move by at most 0.3 a week across budgets.
+
+By the rule declared above, the neutral change moved season nets by less than a third of 0.5's
+gains and 0.5 passed at both other budgets, so the record's `move` stands. Read plainly, this
+diagnostic shows the solver is stable; it did not create the early path split it was meant to
+create, so it does not measure path noise. The one path comparison the record holds is still
+the 2022-23 season under the two bank caps: the same 0.5 is +152 under cap 5 and -48 under cap
+2, from chains that differ only in weeks where five transfers could be held.
+
+**The owner's 1.2:** +0.74 a week [-1.11, +2.40], seasons -84, +76, +2, +115, the same at all
+three budgets. It does not pass the gate and its interval holds zero. It keeps a free transfer
+7 to 13 times a season (0.5 keeps one 1 to 4 times) and pays no hit in any season.
+
+Across the primary cell the levels fall into two groups: 0.5, 1 and 1.2 are at or above 0
+(+2.60, +0.78, +0.74), and 1.5 and above are at or below it (-0.11 to -1.14), as the planner
+starts holding three to five transfers a week on average and spends them late.
+
+## The owner's chosen value, 1.12
+
+Added 27 Nov 2026 after every number above was read: the owner chose 1.12 for the policy. It
+is walked once more on the primary cell at budget 8 (four chains,
+`artifacts/component_banked_transfer_value/level_1p12/`) and read with the record's bootstrap.
+A level named after the record was read; it is a description, not a gate reading.
+
+| 1.12 against | Mean a week | 90% interval | 2021-22 | 2022-23 | 2023-24 | 2024-25 |
+|---|---|---|---|---|---|---|
+| 0 (policy) | +0.12 | [-1.78, +2.12] | -164 | +65 | +2 | +115 |
+| 0.5 | -2.48 | [-4.02, -0.83] | -164 | -87 | -87 | -26 |
+| 1 | -0.65 | [-2.18, +0.26] | -22 | +10 | -50 | -34 |
+| 1.2 | -0.62 | [-1.43, +0.41] | -80 | -11 | 0 | 0 |
+
+1.12 cannot be told from 0, 1 or 1.2, and it is below 0.5 in every season with the interval
+under zero. It holds 1.5 to 2.2 free transfers on average and pays no hit. The 2021-22 season
+moves by 80 points between 1.12 and 1.2, a level change of 0.08, which is the path sensitivity
+the section above could not create with the solver budget.
