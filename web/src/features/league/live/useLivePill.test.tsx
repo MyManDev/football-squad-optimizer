@@ -95,6 +95,57 @@ describe("the member's clubs", () => {
 });
 
 describe("the LIVE pill", () => {
+  it.each(["matching", "other-season", "other-league"] as const)(
+    "joins a %s held finished event without any additional read",
+    async (identity) => {
+      const calendar = pillCalendar(3, 4, 30);
+      const fetcher = pillSite(calendar);
+      const { result, client } = pill(TARGET);
+      await waitFor(() => expect(result.current).toBe(TARGET.to));
+      const paths = [...askedPaths(fetcher)];
+      const week = calendar.gameweeks[0]!;
+      act(() =>
+        client.setQueryData(leagueKeys.scoreboard(314), {
+          contract_version: "provisional_league_ui_v1",
+          generated_at_utc: new Date().toISOString(),
+          source_kind: "live",
+          payload: {
+            season: identity === "other-season" ? "2024-25" : calendar.season,
+            league_id: identity === "other-league" ? 315 : 314,
+            source_snapshot_id: "synthetic-held-event",
+            captured_at_utc: calendar.captured_at_utc,
+            cohort_snapshot_id: null,
+            cohort_picks_snapshot_id: null,
+            gameweeks: [
+              {
+                gameweek: week.gameweek,
+                deadline_utc: week.deadline_utc,
+                finished: true,
+                data_checked: false,
+                average_entry_score: 50,
+                highest_score: 90,
+                ours: null,
+                top100: null,
+                members: [],
+                members_mean_net: null,
+                members_counted: 0,
+              },
+            ],
+            cumulative: {
+              through_gameweek: null,
+              gameweeks: [],
+              members_mean_total_points: null,
+              members_counted: 0,
+              average_entry_score: null,
+            },
+          },
+        }),
+      );
+      await waitFor(() => expect(result.current).toBe(identity === "matching" ? null : TARGET.to));
+      expect(askedPaths(fetcher)).toEqual(paths);
+    },
+  );
+
   it("opens the member's LIVE page while one of their matches is played", async () => {
     const fetcher = pillSite(pillCalendar(3, 4, 30));
     const { result } = pill(TARGET);

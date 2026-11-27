@@ -9,14 +9,14 @@
  * page follows the live points only while the window is open.
  */
 
-import { calendarClock } from "../fixtures/weeks";
+import { weekState, WEEK_MATCH_LIMIT_MS, type WeekEvent } from "../../lib/weekState";
 import type { FixturesPayload } from "../fixtures/types";
 
 /** Ninety minutes, half time, stoppages and a margin. */
 export const MATCH_WINDOW_MS = 135 * 60_000;
 
 /** The longest a match the live read names unfinished holds the window open. */
-export const MATCH_WINDOW_LIMIT_MS = 180 * 60_000;
+export const MATCH_WINDOW_LIMIT_MS = WEEK_MATCH_LIMIT_MS;
 
 /**
  * How often a followed page reads the live points: the forwarder keeps a played week this long.
@@ -41,7 +41,7 @@ export interface LiveWindow {
    * may still be played until its limit: the page reads now and then (`SLOW_FOLLOW_MS`).
    */
   slow: boolean;
-  /** Milliseconds until `open` or the week can change, or null when nothing lies ahead. */
+  /** Milliseconds until a member window or shared policy boundary, or null when none lies ahead. */
   changesIn: number | null;
 }
 
@@ -65,21 +65,13 @@ export function liveWindow(
   fixtures: FixturesPayload | null,
   now: number,
   filter: LiveWindowFilter = {},
+  events: readonly WeekEvent[] = [],
 ): LiveWindow {
   if (fixtures === null) return { gameweek: null, open: false, slow: false, changesIn: null };
-  const clock = calendarClock(fixtures, now);
-  let week: FixturesPayload["gameweeks"][number] | null = null;
-  let nextDeadline: number | null = null;
-  for (const candidate of fixtures.gameweeks) {
-    const deadline = instant(candidate.deadline_utc);
-    if (deadline === null) continue;
-    if (deadline <= clock) {
-      if (week === null || candidate.gameweek > week.gameweek) week = candidate;
-    } else if (nextDeadline === null || deadline < nextDeadline) {
-      nextDeadline = deadline;
-    }
-  }
-  const changes: number[] = nextDeadline === null ? [] : [nextDeadline - clock];
+  const state = weekState({ treeGameweek: null, events, fixtures, now });
+  const clock = state.clock;
+  const week = fixtures.gameweeks.find((row) => row.gameweek === state.weeks.memberScore);
+  const changes: number[] = state.changesIn === null ? [] : [state.changesIn];
   const { clubs, unfinished, stalled } = filter;
   let open = false;
   let slow = false;
@@ -99,9 +91,9 @@ export function liveWindow(
     }
   }
   return {
-    gameweek: week?.gameweek ?? null,
-    open,
-    slow: slow && !open,
+    gameweek: state.weeks.memberScore,
+    open: state.weeks.pill !== null && open,
+    slow: state.weeks.pill !== null && slow && !open,
     changesIn: changes.length === 0 ? null : Math.min(...changes),
   };
 }
@@ -111,7 +103,8 @@ export function liveWindow(
  * the matches, not for reading a played week). A week is on from its first kickoff until
  * `MATCH_WINDOW_LIMIT_MS` after its last, every club counted. Otherwise LIVE waits for the
  * next week to start: the live week itself when its first match is still to come, else the
- * next gameweek the calendar lists with a dated match.
+ * next listed gameweek, including a blank one. An undated assigned match can keep the
+ * calendar on N, while LIVE still stops at its last known kickoff plus 180 minutes.
  */
 export interface LivePhase {
   on: boolean;
@@ -119,50 +112,20 @@ export interface LivePhase {
   nextGameweek: number | null;
   /** That week's first kickoff, in milliseconds since the epoch. */
   nextKickoff: number | null;
-  /** Milliseconds until `on` can change, or null when nothing lies ahead. */
+  /** Milliseconds until the next shared policy boundary, or null when none lies ahead. */
   changesIn: number | null;
 }
 
-export function livePhase(fixtures: FixturesPayload | null, now: number): LivePhase {
-  if (fixtures === null) {
-    return { on: false, nextGameweek: null, nextKickoff: null, changesIn: null };
-  }
-  const clock = calendarClock(fixtures, now);
-  const weeks = [...fixtures.gameweeks].sort((a, b) => a.gameweek - b.gameweek);
-  const kickoffs = (week: FixturesPayload["gameweeks"][number]) =>
-    week.fixtures.flatMap((fixture) => {
-      const kickoff = instant(fixture.kickoff_utc);
-      return kickoff === null ? [] : [kickoff];
-    });
-  let live: FixturesPayload["gameweeks"][number] | null = null;
-  for (const week of weeks) {
-    const deadline = instant(week.deadline_utc);
-    if (deadline !== null && deadline <= clock) live = week;
-  }
-  if (live !== null) {
-    const times = kickoffs(live);
-    if (times.length > 0) {
-      const first = Math.min(...times);
-      const end = Math.max(...times) + MATCH_WINDOW_LIMIT_MS;
-      if (clock >= first && clock < end) {
-        return { on: true, nextGameweek: null, nextKickoff: null, changesIn: end - clock };
-      }
-      if (clock < first) {
-        return {
-          on: false,
-          nextGameweek: live.gameweek,
-          nextKickoff: first,
-          changesIn: first - clock,
-        };
-      }
-    }
-  }
-  for (const week of weeks) {
-    if (live !== null && week.gameweek <= live.gameweek) continue;
-    const times = kickoffs(week).filter((time) => time > clock);
-    if (times.length === 0) continue;
-    const first = Math.min(...times);
-    return { on: false, nextGameweek: week.gameweek, nextKickoff: first, changesIn: first - clock };
-  }
-  return { on: false, nextGameweek: null, nextKickoff: null, changesIn: null };
+export function livePhase(
+  fixtures: FixturesPayload | null,
+  now: number,
+  events: readonly WeekEvent[] = [],
+): LivePhase {
+  const state = weekState({ treeGameweek: null, events, fixtures, now });
+  return {
+    on: state.weeks.live !== null,
+    nextGameweek: state.weeks.liveWaiting,
+    nextKickoff: state.nextKickoff,
+    changesIn: state.changesIn,
+  };
 }

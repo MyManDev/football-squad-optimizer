@@ -258,7 +258,15 @@ function LeagueMemberContent({
           }),
     [liveDependencies, queryClient],
   );
-  const liveMatch = useLiveWindow(fixtures, matchFilter);
+  const liveEvents =
+    scoreboard?.season === view.season && scoreboard.league_id === view.league_id
+      ? scoreboard.gameweeks
+      : [];
+  const liveMatch = useLiveWindow(
+    fixtures?.season === view.season ? fixtures : null,
+    matchFilter,
+    liveEvents,
+  );
   const matchOn = closed && liveMatch.open;
   // A closed week's heading: the live mark while a match is on, the week's own name otherwise.
   const closedHeading = !closed

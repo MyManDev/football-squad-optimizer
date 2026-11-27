@@ -37,6 +37,7 @@ import { useParams, useSearchParams } from "react-router";
 import { recordUsage } from "../../../data/usage";
 import { useShellLayout } from "../../../design/shell/layout";
 import { useLanguage } from "../../../i18n/context";
+import { availableWeek, type WeekEvent } from "../../../lib/weekState";
 import { useFixtures } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
 import { GoalMomentLayer } from "../../liveScore/GoalMoment";
@@ -50,7 +51,7 @@ import { useForwardedLeague } from "../forwarded/ForwardedLeagueContext";
 import { defaultRivalOf } from "../forwarded/forwardedTree";
 import { forwarder as siteForwarder } from "../forwarder/client";
 import { useClaimedEntry } from "../identity/useLeagueIdentity";
-import { LEAGUE_READ, leagueKeys, useEntrySquad } from "../queries";
+import { LEAGUE_READ, leagueKeys, useEntrySquad, useLeagueScoreboard } from "../queries";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { useLeague } from "../useLeague";
 import { useCoverGone } from "../../liveScore/openingCover";
@@ -128,7 +129,18 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
   const valid = /^[1-9]\d*$/.test(parameter) && Number.isSafeInteger(entryId);
   const squad = useEntrySquad(entryId, valid);
   const fixtures = useFixtures();
-  const phase = useLivePhase(fixtures.data ?? null);
+  const { league } = useLeague();
+  // Only join a scoreboard already held by a page; LIVE does not fetch a league's seasons.
+  const scoreboard = useLeagueScoreboard(false);
+  const held = scoreboard.data?.payload;
+  const events =
+    held !== undefined &&
+    held.league_id === league.leagueId &&
+    held.season === squad.data?.payload.season &&
+    held.season === fixtures.data?.season
+      ? held.gameweeks
+      : [];
+  const phase = useLivePhase(fixtures.data ?? null, events);
   const replaying = useSearchParams()[0].get("replay") === "1";
   const wide = useWide();
   const [head, setHead] = useState<LiveHead | null>(null);
@@ -151,6 +163,7 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
         key={entryId}
         squad={entry}
         fixtures={fixtures.data ?? null}
+        events={events}
         dependencies={dependencies}
         wide={wide}
         unnamed={unnamed}
@@ -163,7 +176,13 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
     <div className={styles.page} data-live-page data-wide={wide || undefined}>
       <LiveHeader
         team={entry === undefined ? "" : (entry.payload.entry.team_name ?? unnamed)}
-        gameweek={known?.gameweek ?? null}
+        gameweek={
+          entry === undefined
+            ? null
+            : phase.on || replaying
+              ? (known?.gameweek ?? null)
+              : phase.nextGameweek
+        }
         entryId={entryId}
         light={light}
       />
@@ -175,6 +194,7 @@ export function LivePage({ dependencies }: { dependencies?: LiveDependencies } =
 function LiveMember({
   squad,
   fixtures,
+  events,
   dependencies = {},
   wide,
   unnamed,
@@ -183,6 +203,7 @@ function LiveMember({
 }: {
   squad: LeagueViewEnvelope<EntrySquad>;
   fixtures: FixturesPayload | null;
+  events: readonly WeekEvent[];
   dependencies?: LiveDependencies;
   wide: boolean;
   unnamed: string;
@@ -220,7 +241,7 @@ function LiveMember({
   // member's matches once a read has named them, and the replay stands in for the page's
   // own reads while it plays.
   const [matchFilter, setMatchFilter] = useState<LiveWindowFilter>({});
-  const liveMatch = useLiveWindow(fixtures, matchFilter);
+  const liveMatch = useLiveWindow(fixtures, matchFilter, events);
   const live = useMemberLiveScore(
     view,
     fixtures,
@@ -263,7 +284,11 @@ function LiveMember({
     ...LEAGUE_READ,
     enabled: ready,
   });
-  const week = memberWeek?.gameweek ?? null;
+  const week = availableWeek(
+    liveMatch.gameweek,
+    memberWeek?.gameweek ?? null,
+    memberWeek === null ? [] : [memberWeek.gameweek],
+  );
   // The board is scored from the read the live week shows, so its total changes in the same
   // render as the moments that read brought and the hold on them. Until the live week shows
   // one (a first read brings no moments), the newest read is drawn.

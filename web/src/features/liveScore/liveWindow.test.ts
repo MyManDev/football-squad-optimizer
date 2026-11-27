@@ -65,11 +65,11 @@ describe("liveWindow", () => {
     expect(gap).toMatchObject({ open: false, changesIn: 14 * 60_000 });
   });
 
-  it("shuts after the last match's window and waits for the next deadline", () => {
+  it("shuts after the ordinary window while retaining the shared final-limit clock boundary", () => {
     const after = at("2026-11-21T15:00:00Z") + MATCH_WINDOW_MS;
     const window = liveWindow(CALENDAR, after);
     expect(window.open).toBe(false);
-    expect(window.changesIn).toBe(at("2026-11-28T11:00:00Z") - after);
+    expect(window.changesIn).toBe(MATCH_WINDOW_LIMIT_MS - MATCH_WINDOW_MS);
   });
 
   it("is shut before the season's first deadline", () => {
@@ -105,7 +105,7 @@ describe("liveWindow", () => {
     const now = at("2026-11-21T13:00:00Z");
     expect(liveWindow(calendar, now).open).toBe(true);
     const mine = liveWindow(calendar, now, { clubs: new Set([4, 9]) });
-    expect(mine).toMatchObject({ open: false, changesIn: at("2026-11-21T17:30:00Z") - now });
+    expect(mine).toMatchObject({ open: false, changesIn: at("2026-11-21T15:30:00Z") - now });
     expect(liveWindow(calendar, at("2026-11-21T17:45:00Z"), { clubs: new Set([4]) }).open).toBe(
       true,
     );
@@ -166,7 +166,7 @@ describe("livePhase", () => {
       on: true,
       nextGameweek: null,
       nextKickoff: null,
-      changesIn: GW11_END - between,
+      changesIn: at("2026-11-21T15:00:00Z") - between,
     });
     expect(livePhase(CALENDAR, GW11_END - 1).on).toBe(true);
   });
@@ -188,10 +188,35 @@ describe("livePhase", () => {
       on: false,
       nextGameweek: 12,
       nextKickoff: at("2026-11-28T12:30:00Z"),
-      changesIn: at("2026-11-28T12:30:00Z") - GW11_END,
+      changesIn: at("2026-11-28T11:00:00Z") - GW11_END,
     });
-    // A later week with no dated match is passed over, so the original calendar names none.
-    expect(livePhase(CALENDAR, GW11_END).nextGameweek).toBeNull();
+    // Q is the next listed week, even when it is blank and has no dated kickoff.
+    expect(livePhase(CALENDAR, GW11_END)).toMatchObject({ nextGameweek: 12, nextKickoff: null });
+  });
+
+  it.each([-1_000, 0, 1_000])(
+    "applies decision A to the real LIVE and pill adapters (%s ms)",
+    (offset) => {
+      const value = livePhase(CALENDAR, GW11_END + offset);
+      expect(value.on).toBe(offset < 0);
+      expect(value.nextGameweek).toBe(offset < 0 ? null : 12);
+      const member = liveWindow(CALENDAR, GW11_END + offset, { unfinished: new Set([102]) });
+      expect(member.gameweek).toBe(11);
+      expect(member.open).toBe(offset < 0);
+      if (offset < 0) expect(value.changesIn).toBe(1_000);
+    },
+  );
+
+  it("uses authoritative completion to close LIVE and the pill while retaining the member score's N", () => {
+    const now = at("2026-11-21T13:00:00Z");
+    const events = [{ gameweek: 11, finished: true, data_checked: false }];
+    expect(livePhase(CALENDAR, now).on).toBe(true);
+    expect(livePhase(CALENDAR, now, events)).toMatchObject({ on: false, nextGameweek: 12 });
+    expect(liveWindow(CALENDAR, now, {}, events)).toMatchObject({
+      gameweek: 11,
+      open: false,
+      slow: false,
+    });
   });
 
   it("waits for the season's first week before any deadline", () => {

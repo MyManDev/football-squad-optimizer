@@ -5,15 +5,19 @@
  */
 
 import { useEffect, useState } from "react";
+import type { WeekEvent } from "../../../lib/weekState";
 
 import type { FixturesPayload } from "../../fixtures/types";
 import { livePhase, type LivePhase } from "../../liveScore/liveWindow";
 
 const LONGEST_WAIT_MS = 30 * 60_000;
 
-export function useLivePhase(fixtures: FixturesPayload | null): LivePhase {
+export function useLivePhase(
+  fixtures: FixturesPayload | null,
+  events: readonly WeekEvent[] = [],
+): LivePhase {
   const [now, setNow] = useState(() => Date.now());
-  const phase = livePhase(fixtures, now);
+  const phase = livePhase(fixtures, now, events);
   const changesIn = phase.changesIn;
   useEffect(() => {
     if (changesIn === null) return undefined;
