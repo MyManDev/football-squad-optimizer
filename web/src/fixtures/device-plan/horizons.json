@@ -1,0 +1,1579 @@
+{
+  "document": {
+    "contract_version": "league_device_plan_v1",
+    "league_id": 9,
+    "season": "2026-27",
+    "gameweek": 2,
+    "source_snapshot_id": "fpl-live-20260902T090000Z-0a0ef05d0c33",
+    "policy_id": "member_planning_policy_v3",
+    "rules": {
+      "squad_size": 15,
+      "starting_size": 11,
+      "squad_position_limits": {
+        "GK": 2,
+        "DEF": 5,
+        "MID": 5,
+        "FWD": 3
+      },
+      "starting_position_min": {
+        "GK": 1,
+        "DEF": 3,
+        "MID": 2,
+        "FWD": 1
+      },
+      "starting_position_max": {
+        "GK": 1,
+        "DEF": 5,
+        "MID": 5,
+        "FWD": 3
+      },
+      "max_players_per_team": 3,
+      "max_free_transfers": 5,
+      "hit_cost_scaled": 8000,
+      "hit_points_charged": 4.0,
+      "hit_charged_scaled": 4000,
+      "expected_points_scale": 1000,
+      "banked_values_scaled": [0, 2900, 2480, 2110, 1650],
+      "strategies": {
+        "fark-yarat": {
+          "overlap_floor": null,
+          "overlap_ceiling": 5
+        },
+        "ortak-koru": {
+          "overlap_floor": 9,
+          "overlap_ceiling": null
+        }
+      }
+    },
+    "players": [
+      {
+        "id": 1001,
+        "name": "Player 1001",
+        "short_name": "1001",
+        "team": "Club 1",
+        "position": "GK",
+        "buy_tenths": 45,
+        "expected_points": 2.37,
+        "coefficients": [237, 2133, 2370]
+      },
+      {
+        "id": 1002,
+        "name": "Player 1002",
+        "short_name": "1002",
+        "team": "Club 2",
+        "position": "GK",
+        "buy_tenths": 50,
+        "expected_points": 3.74,
+        "coefficients": [374, 3366, 3740]
+      },
+      {
+        "id": 1003,
+        "name": "Player 1003",
+        "short_name": "1003",
+        "team": "Club 3",
+        "position": "GK",
+        "buy_tenths": 55,
+        "expected_points": 5.11,
+        "coefficients": [511, 4599, 5110]
+      },
+      {
+        "id": 1004,
+        "name": "Player 1004",
+        "short_name": "1004",
+        "team": "Club 1",
+        "position": "DEF",
+        "buy_tenths": 45,
+        "expected_points": 6.48,
+        "coefficients": [648, 5832, 6480]
+      },
+      {
+        "id": 1005,
+        "name": "Player 1005",
+        "short_name": "1005",
+        "team": "Club 2",
+        "position": "DEF",
+        "buy_tenths": 50,
+        "expected_points": 7.85,
+        "coefficients": [785, 7065, 7850]
+      },
+      {
+        "id": 1006,
+        "name": "Player 1006",
+        "short_name": "1006",
+        "team": "Club 3",
+        "position": "DEF",
+        "buy_tenths": 55,
+        "expected_points": 9.22,
+        "coefficients": [922, 8298, 9220]
+      },
+      {
+        "id": 1007,
+        "name": "Player 1007",
+        "short_name": "1007",
+        "team": "Club 4",
+        "position": "DEF",
+        "buy_tenths": 60,
+        "expected_points": 10.59,
+        "coefficients": [1059, 9531, 10590]
+      },
+      {
+        "id": 1008,
+        "name": "Player 1008",
+        "short_name": "1008",
+        "team": "Club 5",
+        "position": "DEF",
+        "buy_tenths": 45,
+        "expected_points": 11.96,
+        "coefficients": [1196, 10764, 11960]
+      },
+      {
+        "id": 1009,
+        "name": "Player 1009",
+        "short_name": "1009",
+        "team": "Club 6",
+        "position": "DEF",
+        "buy_tenths": 50,
+        "expected_points": 13.33,
+        "coefficients": [1333, 11997, 13330]
+      },
+      {
+        "id": 1010,
+        "name": "Player 1010",
+        "short_name": "1010",
+        "team": "Club 1",
+        "position": "DEF",
+        "buy_tenths": 55,
+        "expected_points": 14.7,
+        "coefficients": [1470, 13230, 14700]
+      },
+      {
+        "id": 1011,
+        "name": "Player 1011",
+        "short_name": "1011",
+        "team": "Club 2",
+        "position": "DEF",
+        "buy_tenths": 60,
+        "expected_points": 16.07,
+        "coefficients": [1607, 14463, 16070]
+      },
+      {
+        "id": 1012,
+        "name": "Player 1012",
+        "short_name": "1012",
+        "team": "Club 1",
+        "position": "MID",
+        "buy_tenths": 45,
+        "expected_points": 17.44,
+        "coefficients": [1744, 15696, 17440]
+      },
+      {
+        "id": 1013,
+        "name": "Player 1013",
+        "short_name": "1013",
+        "team": "Club 2",
+        "position": "MID",
+        "buy_tenths": 50,
+        "expected_points": 1.81,
+        "coefficients": [181, 1629, 1810]
+      },
+      {
+        "id": 1014,
+        "name": "Player 1014",
+        "short_name": "1014",
+        "team": "Club 3",
+        "position": "MID",
+        "buy_tenths": 55,
+        "expected_points": 3.18,
+        "coefficients": [318, 2862, 3180]
+      },
+      {
+        "id": 1015,
+        "name": "Player 1015",
+        "short_name": "1015",
+        "team": "Club 4",
+        "position": "MID",
+        "buy_tenths": 60,
+        "expected_points": 4.55,
+        "coefficients": [455, 4095, 4550]
+      },
+      {
+        "id": 1016,
+        "name": "Player 1016",
+        "short_name": "1016",
+        "team": "Club 5",
+        "position": "MID",
+        "buy_tenths": 45,
+        "expected_points": 5.92,
+        "coefficients": [592, 5328, 5920]
+      },
+      {
+        "id": 1017,
+        "name": "Player 1017",
+        "short_name": "1017",
+        "team": "Club 6",
+        "position": "MID",
+        "buy_tenths": 50,
+        "expected_points": 7.29,
+        "coefficients": [729, 6561, 7290]
+      },
+      {
+        "id": 1018,
+        "name": "Player 1018",
+        "short_name": "1018",
+        "team": "Club 1",
+        "position": "MID",
+        "buy_tenths": 55,
+        "expected_points": 8.66,
+        "coefficients": [866, 7794, 8660]
+      },
+      {
+        "id": 1019,
+        "name": "Player 1019",
+        "short_name": "1019",
+        "team": "Club 2",
+        "position": "MID",
+        "buy_tenths": 60,
+        "expected_points": 10.03,
+        "coefficients": [1003, 9027, 10030]
+      },
+      {
+        "id": 1020,
+        "name": "Player 1020",
+        "short_name": "1020",
+        "team": "Club 1",
+        "position": "FWD",
+        "buy_tenths": 45,
+        "expected_points": 11.4,
+        "coefficients": [1140, 10260, 11400]
+      },
+      {
+        "id": 1021,
+        "name": "Player 1021",
+        "short_name": "1021",
+        "team": "Club 2",
+        "position": "FWD",
+        "buy_tenths": 50,
+        "expected_points": 12.77,
+        "coefficients": [1277, 11493, 12770]
+      },
+      {
+        "id": 1022,
+        "name": "Player 1022",
+        "short_name": "1022",
+        "team": "Club 3",
+        "position": "FWD",
+        "buy_tenths": 55,
+        "expected_points": 14.14,
+        "coefficients": [1414, 12726, 14140]
+      },
+      {
+        "id": 1023,
+        "name": "Player 1023",
+        "short_name": "1023",
+        "team": "Club 4",
+        "position": "FWD",
+        "buy_tenths": 60,
+        "expected_points": 15.51,
+        "coefficients": [1551, 13959, 15510]
+      },
+      {
+        "id": 1024,
+        "name": "Player 1024",
+        "short_name": "1024",
+        "team": "Club 5",
+        "position": "FWD",
+        "buy_tenths": 45,
+        "expected_points": 16.880000000000003,
+        "coefficients": [1688, 15192, 16880]
+      }
+    ],
+    "horizon": {
+      "contract_version": "league_device_horizon_v1",
+      "windows": [3, 5],
+      "projection_horizon_fingerprint": "fdb1ca44153d1cb6c01f28ce0a9088a4f3e702c2553b9ba305b0d93d85c4c6e2",
+      "post_processing_contract_version": "captured_availability_rule_v1+first_week_control_relative_fixture_scaling_v3",
+      "rules": {
+        "max_transfers_per_gameweek": 1,
+        "free_transfer_accrual": 1,
+        "bench_weight": 0.1,
+        "objective_weight_scale": 1000,
+        "horizon_discount_factor": 1.0,
+        "banked_transfer_value_scaled": 0,
+        "acquisition_sell_on_fee": 0.5
+      },
+      "weeks": [
+        {
+          "gameweek": 2,
+          "discount_weight": 1000,
+          "players": [
+            {
+              "id": 1001,
+              "buy_tenths": 45,
+              "expected_points": 2.37,
+              "coefficients": [237, 2133, 2370]
+            },
+            {
+              "id": 1002,
+              "buy_tenths": 50,
+              "expected_points": 3.74,
+              "coefficients": [374, 3366, 3740]
+            },
+            {
+              "id": 1003,
+              "buy_tenths": 55,
+              "expected_points": 5.11,
+              "coefficients": [511, 4599, 5110]
+            },
+            {
+              "id": 1004,
+              "buy_tenths": 45,
+              "expected_points": 6.48,
+              "coefficients": [648, 5832, 6480]
+            },
+            {
+              "id": 1005,
+              "buy_tenths": 50,
+              "expected_points": 7.85,
+              "coefficients": [785, 7065, 7850]
+            },
+            {
+              "id": 1006,
+              "buy_tenths": 55,
+              "expected_points": 9.22,
+              "coefficients": [922, 8298, 9220]
+            },
+            {
+              "id": 1007,
+              "buy_tenths": 60,
+              "expected_points": 10.59,
+              "coefficients": [1059, 9531, 10590]
+            },
+            {
+              "id": 1008,
+              "buy_tenths": 45,
+              "expected_points": 11.96,
+              "coefficients": [1196, 10764, 11960]
+            },
+            {
+              "id": 1009,
+              "buy_tenths": 50,
+              "expected_points": 13.33,
+              "coefficients": [1333, 11997, 13330]
+            },
+            {
+              "id": 1010,
+              "buy_tenths": 55,
+              "expected_points": 14.7,
+              "coefficients": [1470, 13230, 14700]
+            },
+            {
+              "id": 1011,
+              "buy_tenths": 60,
+              "expected_points": 16.07,
+              "coefficients": [1607, 14463, 16070]
+            },
+            {
+              "id": 1012,
+              "buy_tenths": 45,
+              "expected_points": 17.44,
+              "coefficients": [1744, 15696, 17440]
+            },
+            {
+              "id": 1013,
+              "buy_tenths": 50,
+              "expected_points": 1.81,
+              "coefficients": [181, 1629, 1810]
+            },
+            {
+              "id": 1014,
+              "buy_tenths": 55,
+              "expected_points": 3.18,
+              "coefficients": [318, 2862, 3180]
+            },
+            {
+              "id": 1015,
+              "buy_tenths": 60,
+              "expected_points": 4.55,
+              "coefficients": [455, 4095, 4550]
+            },
+            {
+              "id": 1016,
+              "buy_tenths": 45,
+              "expected_points": 5.92,
+              "coefficients": [592, 5328, 5920]
+            },
+            {
+              "id": 1017,
+              "buy_tenths": 50,
+              "expected_points": 7.29,
+              "coefficients": [729, 6561, 7290]
+            },
+            {
+              "id": 1018,
+              "buy_tenths": 55,
+              "expected_points": 8.66,
+              "coefficients": [866, 7794, 8660]
+            },
+            {
+              "id": 1019,
+              "buy_tenths": 60,
+              "expected_points": 10.03,
+              "coefficients": [1003, 9027, 10030]
+            },
+            {
+              "id": 1020,
+              "buy_tenths": 45,
+              "expected_points": 11.4,
+              "coefficients": [1140, 10260, 11400]
+            },
+            {
+              "id": 1021,
+              "buy_tenths": 50,
+              "expected_points": 12.77,
+              "coefficients": [1277, 11493, 12770]
+            },
+            {
+              "id": 1022,
+              "buy_tenths": 55,
+              "expected_points": 14.14,
+              "coefficients": [1414, 12726, 14140]
+            },
+            {
+              "id": 1023,
+              "buy_tenths": 60,
+              "expected_points": 15.51,
+              "coefficients": [1551, 13959, 15510]
+            },
+            {
+              "id": 1024,
+              "buy_tenths": 45,
+              "expected_points": 16.880000000000003,
+              "coefficients": [1688, 15192, 16880]
+            }
+          ]
+        },
+        {
+          "gameweek": 3,
+          "discount_weight": 1000,
+          "players": [
+            {
+              "id": 1001,
+              "buy_tenths": 45,
+              "expected_points": 4.74,
+              "coefficients": [474, 4266, 4740]
+            },
+            {
+              "id": 1002,
+              "buy_tenths": 50,
+              "expected_points": 3.74,
+              "coefficients": [374, 3366, 3740]
+            },
+            {
+              "id": 1003,
+              "buy_tenths": 55,
+              "expected_points": 5.11,
+              "coefficients": [511, 4599, 5110]
+            },
+            {
+              "id": 1004,
+              "buy_tenths": 45,
+              "expected_points": 12.96,
+              "coefficients": [1296, 11664, 12960]
+            },
+            {
+              "id": 1005,
+              "buy_tenths": 50,
+              "expected_points": 7.85,
+              "coefficients": [785, 7065, 7850]
+            },
+            {
+              "id": 1006,
+              "buy_tenths": 55,
+              "expected_points": 9.22,
+              "coefficients": [922, 8298, 9220]
+            },
+            {
+              "id": 1007,
+              "buy_tenths": 60,
+              "expected_points": 10.59,
+              "coefficients": [1059, 9531, 10590]
+            },
+            {
+              "id": 1008,
+              "buy_tenths": 45,
+              "expected_points": 11.96,
+              "coefficients": [1196, 10764, 11960]
+            },
+            {
+              "id": 1009,
+              "buy_tenths": 50,
+              "expected_points": 26.66,
+              "coefficients": [2666, 23994, 26660]
+            },
+            {
+              "id": 1010,
+              "buy_tenths": 55,
+              "expected_points": 29.4,
+              "coefficients": [2940, 26460, 29400]
+            },
+            {
+              "id": 1011,
+              "buy_tenths": 60,
+              "expected_points": 16.07,
+              "coefficients": [1607, 14463, 16070]
+            },
+            {
+              "id": 1012,
+              "buy_tenths": 45,
+              "expected_points": 34.88,
+              "coefficients": [3488, 31392, 34880]
+            },
+            {
+              "id": 1013,
+              "buy_tenths": 50,
+              "expected_points": 1.81,
+              "coefficients": [181, 1629, 1810]
+            },
+            {
+              "id": 1014,
+              "buy_tenths": 55,
+              "expected_points": 3.18,
+              "coefficients": [318, 2862, 3180]
+            },
+            {
+              "id": 1015,
+              "buy_tenths": 60,
+              "expected_points": 4.55,
+              "coefficients": [455, 4095, 4550]
+            },
+            {
+              "id": 1016,
+              "buy_tenths": 45,
+              "expected_points": 5.92,
+              "coefficients": [592, 5328, 5920]
+            },
+            {
+              "id": 1017,
+              "buy_tenths": 50,
+              "expected_points": 14.58,
+              "coefficients": [1458, 13122, 14580]
+            },
+            {
+              "id": 1018,
+              "buy_tenths": 55,
+              "expected_points": 17.32,
+              "coefficients": [1732, 15588, 17320]
+            },
+            {
+              "id": 1019,
+              "buy_tenths": 60,
+              "expected_points": 10.03,
+              "coefficients": [1003, 9027, 10030]
+            },
+            {
+              "id": 1020,
+              "buy_tenths": 45,
+              "expected_points": 22.8,
+              "coefficients": [2280, 20520, 22800]
+            },
+            {
+              "id": 1021,
+              "buy_tenths": 50,
+              "expected_points": 12.77,
+              "coefficients": [1277, 11493, 12770]
+            },
+            {
+              "id": 1022,
+              "buy_tenths": 55,
+              "expected_points": 14.14,
+              "coefficients": [1414, 12726, 14140]
+            },
+            {
+              "id": 1023,
+              "buy_tenths": 60,
+              "expected_points": 15.51,
+              "coefficients": [1551, 13959, 15510]
+            },
+            {
+              "id": 1024,
+              "buy_tenths": 45,
+              "expected_points": 16.880000000000003,
+              "coefficients": [1688, 15192, 16880]
+            }
+          ]
+        },
+        {
+          "gameweek": 4,
+          "discount_weight": 1000,
+          "players": [
+            {
+              "id": 1001,
+              "buy_tenths": 45,
+              "expected_points": 2.37,
+              "coefficients": [237, 2133, 2370]
+            },
+            {
+              "id": 1002,
+              "buy_tenths": 50,
+              "expected_points": 3.74,
+              "coefficients": [374, 3366, 3740]
+            },
+            {
+              "id": 1003,
+              "buy_tenths": 55,
+              "expected_points": 0.0,
+              "coefficients": [0, 0, 0]
+            },
+            {
+              "id": 1004,
+              "buy_tenths": 45,
+              "expected_points": 6.48,
+              "coefficients": [648, 5832, 6480]
+            },
+            {
+              "id": 1005,
+              "buy_tenths": 50,
+              "expected_points": 7.85,
+              "coefficients": [785, 7065, 7850]
+            },
+            {
+              "id": 1006,
+              "buy_tenths": 55,
+              "expected_points": 0.0,
+              "coefficients": [0, 0, 0]
+            },
+            {
+              "id": 1007,
+              "buy_tenths": 60,
+              "expected_points": 0.0,
+              "coefficients": [0, 0, 0]
+            },
+            {
+              "id": 1008,
+              "buy_tenths": 45,
+              "expected_points": 11.96,
+              "coefficients": [1196, 10764, 11960]
+            },
+            {
+              "id": 1009,
+              "buy_tenths": 50,
+              "expected_points": 13.33,
+              "coefficients": [1333, 11997, 13330]
+            },
+            {
+              "id": 1010,
+              "buy_tenths": 55,
+              "expected_points": 14.7,
+              "coefficients": [1470, 13230, 14700]
+            },
+            {
+              "id": 1011,
+              "buy_tenths": 60,
+              "expected_points": 16.07,
+              "coefficients": [1607, 14463, 16070]
+            },
+            {
+              "id": 1012,
+              "buy_tenths": 45,
+              "expected_points": 17.44,
+              "coefficients": [1744, 15696, 17440]
+            },
+            {
+              "id": 1013,
+              "buy_tenths": 50,
+              "expected_points": 1.81,
+              "coefficients": [181, 1629, 1810]
+            },
+            {
+              "id": 1014,
+              "buy_tenths": 55,
+              "expected_points": 0.0,
+              "coefficients": [0, 0, 0]
+            },
+            {
+              "id": 1015,
+              "buy_tenths": 60,
+              "expected_points": 0.0,
+              "coefficients": [0, 0, 0]
+            },
+            {
+              "id": 1016,
+              "buy_tenths": 45,
+              "expected_points": 5.92,
+              "coefficients": [592, 5328, 5920]
+            },
+            {
+              "id": 1017,
+              "buy_tenths": 50,
+              "expected_points": 7.29,
+              "coefficients": [729, 6561, 7290]
+            },
+            {
+              "id": 1018,
+              "buy_tenths": 55,
+              "expected_points": 8.66,
+              "coefficients": [866, 7794, 8660]
+            },
+            {
+              "id": 1019,
+              "buy_tenths": 60,
+              "expected_points": 10.03,
+              "coefficients": [1003, 9027, 10030]
+            },
+            {
+              "id": 1020,
+              "buy_tenths": 45,
+              "expected_points": 11.4,
+              "coefficients": [1140, 10260, 11400]
+            },
+            {
+              "id": 1021,
+              "buy_tenths": 50,
+              "expected_points": 12.77,
+              "coefficients": [1277, 11493, 12770]
+            },
+            {
+              "id": 1022,
+              "buy_tenths": 55,
+              "expected_points": 0.0,
+              "coefficients": [0, 0, 0]
+            },
+            {
+              "id": 1023,
+              "buy_tenths": 60,
+              "expected_points": 0.0,
+              "coefficients": [0, 0, 0]
+            },
+            {
+              "id": 1024,
+              "buy_tenths": 45,
+              "expected_points": 16.880000000000003,
+              "coefficients": [1688, 15192, 16880]
+            }
+          ]
+        },
+        {
+          "gameweek": 5,
+          "discount_weight": 1000,
+          "players": [
+            {
+              "id": 1001,
+              "buy_tenths": 45,
+              "expected_points": 2.37,
+              "coefficients": [237, 2133, 2370]
+            },
+            {
+              "id": 1002,
+              "buy_tenths": 50,
+              "expected_points": 3.74,
+              "coefficients": [374, 3366, 3740]
+            },
+            {
+              "id": 1003,
+              "buy_tenths": 55,
+              "expected_points": 5.11,
+              "coefficients": [511, 4599, 5110]
+            },
+            {
+              "id": 1004,
+              "buy_tenths": 45,
+              "expected_points": 6.48,
+              "coefficients": [648, 5832, 6480]
+            },
+            {
+              "id": 1005,
+              "buy_tenths": 50,
+              "expected_points": 7.85,
+              "coefficients": [785, 7065, 7850]
+            },
+            {
+              "id": 1006,
+              "buy_tenths": 55,
+              "expected_points": 9.22,
+              "coefficients": [922, 8298, 9220]
+            },
+            {
+              "id": 1007,
+              "buy_tenths": 60,
+              "expected_points": 10.59,
+              "coefficients": [1059, 9531, 10590]
+            },
+            {
+              "id": 1008,
+              "buy_tenths": 45,
+              "expected_points": 11.96,
+              "coefficients": [1196, 10764, 11960]
+            },
+            {
+              "id": 1009,
+              "buy_tenths": 50,
+              "expected_points": 13.33,
+              "coefficients": [1333, 11997, 13330]
+            },
+            {
+              "id": 1010,
+              "buy_tenths": 55,
+              "expected_points": 14.7,
+              "coefficients": [1470, 13230, 14700]
+            },
+            {
+              "id": 1011,
+              "buy_tenths": 60,
+              "expected_points": 16.07,
+              "coefficients": [1607, 14463, 16070]
+            },
+            {
+              "id": 1012,
+              "buy_tenths": 45,
+              "expected_points": 17.44,
+              "coefficients": [1744, 15696, 17440]
+            },
+            {
+              "id": 1013,
+              "buy_tenths": 50,
+              "expected_points": 1.81,
+              "coefficients": [181, 1629, 1810]
+            },
+            {
+              "id": 1014,
+              "buy_tenths": 55,
+              "expected_points": 3.18,
+              "coefficients": [318, 2862, 3180]
+            },
+            {
+              "id": 1015,
+              "buy_tenths": 60,
+              "expected_points": 4.55,
+              "coefficients": [455, 4095, 4550]
+            },
+            {
+              "id": 1016,
+              "buy_tenths": 45,
+              "expected_points": 5.92,
+              "coefficients": [592, 5328, 5920]
+            },
+            {
+              "id": 1017,
+              "buy_tenths": 50,
+              "expected_points": 7.29,
+              "coefficients": [729, 6561, 7290]
+            },
+            {
+              "id": 1018,
+              "buy_tenths": 55,
+              "expected_points": 8.66,
+              "coefficients": [866, 7794, 8660]
+            },
+            {
+              "id": 1019,
+              "buy_tenths": 60,
+              "expected_points": 10.03,
+              "coefficients": [1003, 9027, 10030]
+            },
+            {
+              "id": 1020,
+              "buy_tenths": 45,
+              "expected_points": 11.4,
+              "coefficients": [1140, 10260, 11400]
+            },
+            {
+              "id": 1021,
+              "buy_tenths": 50,
+              "expected_points": 12.77,
+              "coefficients": [1277, 11493, 12770]
+            },
+            {
+              "id": 1022,
+              "buy_tenths": 55,
+              "expected_points": 14.14,
+              "coefficients": [1414, 12726, 14140]
+            },
+            {
+              "id": 1023,
+              "buy_tenths": 60,
+              "expected_points": 15.51,
+              "coefficients": [1551, 13959, 15510]
+            },
+            {
+              "id": 1024,
+              "buy_tenths": 45,
+              "expected_points": 16.880000000000003,
+              "coefficients": [1688, 15192, 16880]
+            }
+          ]
+        },
+        {
+          "gameweek": 6,
+          "discount_weight": 1000,
+          "players": [
+            {
+              "id": 1001,
+              "buy_tenths": 45,
+              "expected_points": 2.37,
+              "coefficients": [237, 2133, 2370]
+            },
+            {
+              "id": 1002,
+              "buy_tenths": 50,
+              "expected_points": 3.74,
+              "coefficients": [374, 3366, 3740]
+            },
+            {
+              "id": 1003,
+              "buy_tenths": 55,
+              "expected_points": 5.11,
+              "coefficients": [511, 4599, 5110]
+            },
+            {
+              "id": 1004,
+              "buy_tenths": 45,
+              "expected_points": 6.48,
+              "coefficients": [648, 5832, 6480]
+            },
+            {
+              "id": 1005,
+              "buy_tenths": 50,
+              "expected_points": 7.85,
+              "coefficients": [785, 7065, 7850]
+            },
+            {
+              "id": 1006,
+              "buy_tenths": 55,
+              "expected_points": 9.22,
+              "coefficients": [922, 8298, 9220]
+            },
+            {
+              "id": 1007,
+              "buy_tenths": 60,
+              "expected_points": 10.59,
+              "coefficients": [1059, 9531, 10590]
+            },
+            {
+              "id": 1008,
+              "buy_tenths": 45,
+              "expected_points": 11.96,
+              "coefficients": [1196, 10764, 11960]
+            },
+            {
+              "id": 1009,
+              "buy_tenths": 50,
+              "expected_points": 13.33,
+              "coefficients": [1333, 11997, 13330]
+            },
+            {
+              "id": 1010,
+              "buy_tenths": 55,
+              "expected_points": 14.7,
+              "coefficients": [1470, 13230, 14700]
+            },
+            {
+              "id": 1011,
+              "buy_tenths": 60,
+              "expected_points": 16.07,
+              "coefficients": [1607, 14463, 16070]
+            },
+            {
+              "id": 1012,
+              "buy_tenths": 45,
+              "expected_points": 17.44,
+              "coefficients": [1744, 15696, 17440]
+            },
+            {
+              "id": 1013,
+              "buy_tenths": 50,
+              "expected_points": 1.81,
+              "coefficients": [181, 1629, 1810]
+            },
+            {
+              "id": 1014,
+              "buy_tenths": 55,
+              "expected_points": 3.18,
+              "coefficients": [318, 2862, 3180]
+            },
+            {
+              "id": 1015,
+              "buy_tenths": 60,
+              "expected_points": 4.55,
+              "coefficients": [455, 4095, 4550]
+            },
+            {
+              "id": 1016,
+              "buy_tenths": 45,
+              "expected_points": 5.92,
+              "coefficients": [592, 5328, 5920]
+            },
+            {
+              "id": 1017,
+              "buy_tenths": 50,
+              "expected_points": 7.29,
+              "coefficients": [729, 6561, 7290]
+            },
+            {
+              "id": 1018,
+              "buy_tenths": 55,
+              "expected_points": 8.66,
+              "coefficients": [866, 7794, 8660]
+            },
+            {
+              "id": 1019,
+              "buy_tenths": 60,
+              "expected_points": 10.03,
+              "coefficients": [1003, 9027, 10030]
+            },
+            {
+              "id": 1020,
+              "buy_tenths": 45,
+              "expected_points": 11.4,
+              "coefficients": [1140, 10260, 11400]
+            },
+            {
+              "id": 1021,
+              "buy_tenths": 50,
+              "expected_points": 12.77,
+              "coefficients": [1277, 11493, 12770]
+            },
+            {
+              "id": 1022,
+              "buy_tenths": 55,
+              "expected_points": 14.14,
+              "coefficients": [1414, 12726, 14140]
+            },
+            {
+              "id": 1023,
+              "buy_tenths": 60,
+              "expected_points": 15.51,
+              "coefficients": [1551, 13959, 15510]
+            },
+            {
+              "id": 1024,
+              "buy_tenths": 45,
+              "expected_points": 16.880000000000003,
+              "coefficients": [1688, 15192, 16880]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "members": [
+    {
+      "entry_id": 1,
+      "entry": {
+        "held": [
+          1001, 1002, 1004, 1006, 1007, 1008, 1009, 1012, 1013, 1014, 1015, 1016, 1022, 1023, 1024
+        ],
+        "bank_tenths": 50,
+        "free_transfers": 0,
+        "sell_tenths": {
+          "1001": 45,
+          "1002": 50,
+          "1004": 45,
+          "1006": 55,
+          "1007": 60,
+          "1008": 45,
+          "1009": 50,
+          "1012": 43,
+          "1013": 50,
+          "1014": 55,
+          "1015": 60,
+          "1016": 45,
+          "1022": 55,
+          "1023": 60,
+          "1024": 45
+        }
+      },
+      "reference": {
+        "3": {
+          "objective": 496.136,
+          "objective_scaled": 496136000,
+          "unique_moves": true,
+          "tiebreak_completed": true,
+          "weeks": [
+            {
+              "gameweek": 2,
+              "squad": [
+                1001, 1002, 1006, 1007, 1008, 1009, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1006, 1007, 1008, 1009, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1011],
+              "transfers_out": [1004],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 0,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 4.0,
+              "expected_points": 152.24
+            },
+            {
+              "gameweek": 3,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1001, 1007, 1008, 1009, 1010, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1010],
+              "transfers_out": [1006],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 221.63
+            },
+            {
+              "gameweek": 4,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1015, 1016, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1016, 1019, 1024],
+              "captain": 1012,
+              "transfers_in": [1019],
+              "transfers_out": [1013],
+              "bank_after_tenths": 25,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 127.51000000000002
+            }
+          ]
+        },
+        "5": {
+          "objective": 826.562,
+          "objective_scaled": 826562000,
+          "unique_moves": true,
+          "tiebreak_completed": true,
+          "weeks": [
+            {
+              "gameweek": 2,
+              "squad": [
+                1001, 1002, 1006, 1007, 1008, 1009, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1006, 1007, 1008, 1009, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1011],
+              "transfers_out": [1004],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 0,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 4.0,
+              "expected_points": 152.24
+            },
+            {
+              "gameweek": 3,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1001, 1007, 1008, 1009, 1010, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1010],
+              "transfers_out": [1006],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 221.63
+            },
+            {
+              "gameweek": 4,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1015, 1016, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1016, 1019, 1024],
+              "captain": 1012,
+              "transfers_in": [1019],
+              "transfers_out": [1013],
+              "bank_after_tenths": 25,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 127.51000000000002
+            },
+            {
+              "gameweek": 5,
+              "squad": [
+                1002, 1003, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1015, 1016, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1003, 1007, 1008, 1009, 1010, 1011, 1012, 1019, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1003],
+              "transfers_out": [1001],
+              "bank_after_tenths": 15,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 163.2
+            },
+            {
+              "gameweek": 6,
+              "squad": [
+                1002, 1003, 1007, 1008, 1009, 1010, 1011, 1012, 1015, 1016, 1018, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1003, 1007, 1008, 1009, 1010, 1011, 1012, 1019, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1018],
+              "transfers_out": [1014],
+              "bank_after_tenths": 15,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 163.2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "entry_id": 2,
+      "entry": {
+        "held": [
+          1001, 1002, 1004, 1006, 1007, 1008, 1009, 1012, 1013, 1014, 1015, 1016, 1022, 1023, 1024
+        ],
+        "bank_tenths": 50,
+        "free_transfers": 1,
+        "sell_tenths": {
+          "1001": 45,
+          "1002": 50,
+          "1004": 45,
+          "1006": 55,
+          "1007": 60,
+          "1008": 45,
+          "1009": 50,
+          "1012": 43,
+          "1013": 50,
+          "1014": 55,
+          "1015": 60,
+          "1016": 45,
+          "1022": 55,
+          "1023": 60,
+          "1024": 45
+        }
+      },
+      "reference": {
+        "3": {
+          "objective": 504.136,
+          "objective_scaled": 504136000,
+          "unique_moves": true,
+          "tiebreak_completed": true,
+          "weeks": [
+            {
+              "gameweek": 2,
+              "squad": [
+                1001, 1002, 1006, 1007, 1008, 1009, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1006, 1007, 1008, 1009, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1011],
+              "transfers_out": [1004],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 152.24
+            },
+            {
+              "gameweek": 3,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1001, 1007, 1008, 1009, 1010, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1010],
+              "transfers_out": [1006],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 221.63
+            },
+            {
+              "gameweek": 4,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1015, 1016, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1016, 1019, 1024],
+              "captain": 1012,
+              "transfers_in": [1019],
+              "transfers_out": [1013],
+              "bank_after_tenths": 25,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 127.51000000000002
+            }
+          ]
+        },
+        "5": {
+          "objective": 834.562,
+          "objective_scaled": 834562000,
+          "unique_moves": true,
+          "tiebreak_completed": true,
+          "weeks": [
+            {
+              "gameweek": 2,
+              "squad": [
+                1001, 1002, 1006, 1007, 1008, 1009, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1006, 1007, 1008, 1009, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1011],
+              "transfers_out": [1004],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 152.24
+            },
+            {
+              "gameweek": 3,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1001, 1007, 1008, 1009, 1010, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1010],
+              "transfers_out": [1006],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 221.63
+            },
+            {
+              "gameweek": 4,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1015, 1016, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1016, 1019, 1024],
+              "captain": 1012,
+              "transfers_in": [1019],
+              "transfers_out": [1013],
+              "bank_after_tenths": 25,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 127.51000000000002
+            },
+            {
+              "gameweek": 5,
+              "squad": [
+                1002, 1003, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1015, 1016, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1003, 1007, 1008, 1009, 1010, 1011, 1012, 1019, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1003],
+              "transfers_out": [1001],
+              "bank_after_tenths": 15,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 163.2
+            },
+            {
+              "gameweek": 6,
+              "squad": [
+                1002, 1003, 1007, 1008, 1009, 1010, 1011, 1012, 1015, 1016, 1018, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1003, 1007, 1008, 1009, 1010, 1011, 1012, 1019, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1018],
+              "transfers_out": [1014],
+              "bank_after_tenths": 15,
+              "free_transfers_before": 1,
+              "free_transfers_after": 1,
+              "transfer_hit_points": 0.0,
+              "expected_points": 163.2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "entry_id": 3,
+      "entry": {
+        "held": [
+          1001, 1002, 1004, 1006, 1007, 1008, 1009, 1012, 1013, 1014, 1015, 1016, 1022, 1023, 1024
+        ],
+        "bank_tenths": 50,
+        "free_transfers": 5,
+        "sell_tenths": {
+          "1001": 45,
+          "1002": 50,
+          "1004": 45,
+          "1006": 55,
+          "1007": 60,
+          "1008": 45,
+          "1009": 50,
+          "1012": 43,
+          "1013": 50,
+          "1014": 55,
+          "1015": 60,
+          "1016": 45,
+          "1022": 55,
+          "1023": 60,
+          "1024": 45
+        }
+      },
+      "reference": {
+        "3": {
+          "objective": 504.136,
+          "objective_scaled": 504136000,
+          "unique_moves": true,
+          "tiebreak_completed": true,
+          "weeks": [
+            {
+              "gameweek": 2,
+              "squad": [
+                1001, 1002, 1006, 1007, 1008, 1009, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1006, 1007, 1008, 1009, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1011],
+              "transfers_out": [1004],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 5,
+              "free_transfers_after": 5,
+              "transfer_hit_points": 0.0,
+              "expected_points": 152.24
+            },
+            {
+              "gameweek": 3,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1001, 1007, 1008, 1009, 1010, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1010],
+              "transfers_out": [1006],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 5,
+              "free_transfers_after": 5,
+              "transfer_hit_points": 0.0,
+              "expected_points": 221.63
+            },
+            {
+              "gameweek": 4,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1015, 1016, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1016, 1019, 1024],
+              "captain": 1012,
+              "transfers_in": [1019],
+              "transfers_out": [1013],
+              "bank_after_tenths": 25,
+              "free_transfers_before": 5,
+              "free_transfers_after": 5,
+              "transfer_hit_points": 0.0,
+              "expected_points": 127.51000000000002
+            }
+          ]
+        },
+        "5": {
+          "objective": 834.562,
+          "objective_scaled": 834562000,
+          "unique_moves": true,
+          "tiebreak_completed": true,
+          "weeks": [
+            {
+              "gameweek": 2,
+              "squad": [
+                1001, 1002, 1006, 1007, 1008, 1009, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1006, 1007, 1008, 1009, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1011],
+              "transfers_out": [1004],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 5,
+              "free_transfers_after": 5,
+              "transfer_hit_points": 0.0,
+              "expected_points": 152.24
+            },
+            {
+              "gameweek": 3,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1001, 1007, 1008, 1009, 1010, 1011, 1012, 1016, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1010],
+              "transfers_out": [1006],
+              "bank_after_tenths": 35,
+              "free_transfers_before": 5,
+              "free_transfers_after": 5,
+              "transfer_hit_points": 0.0,
+              "expected_points": 221.63
+            },
+            {
+              "gameweek": 4,
+              "squad": [
+                1001, 1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1015, 1016, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1002, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1016, 1019, 1024],
+              "captain": 1012,
+              "transfers_in": [1019],
+              "transfers_out": [1013],
+              "bank_after_tenths": 25,
+              "free_transfers_before": 5,
+              "free_transfers_after": 5,
+              "transfer_hit_points": 0.0,
+              "expected_points": 127.51000000000002
+            },
+            {
+              "gameweek": 5,
+              "squad": [
+                1002, 1003, 1007, 1008, 1009, 1010, 1011, 1012, 1014, 1015, 1016, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1003, 1007, 1008, 1009, 1010, 1011, 1012, 1019, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1003],
+              "transfers_out": [1001],
+              "bank_after_tenths": 15,
+              "free_transfers_before": 5,
+              "free_transfers_after": 5,
+              "transfer_hit_points": 0.0,
+              "expected_points": 163.2
+            },
+            {
+              "gameweek": 6,
+              "squad": [
+                1002, 1003, 1007, 1008, 1009, 1010, 1011, 1012, 1015, 1016, 1018, 1019, 1022, 1023,
+                1024
+              ],
+              "starting_xi": [1003, 1007, 1008, 1009, 1010, 1011, 1012, 1019, 1022, 1023, 1024],
+              "captain": 1012,
+              "transfers_in": [1018],
+              "transfers_out": [1014],
+              "bank_after_tenths": 15,
+              "free_transfers_before": 5,
+              "free_transfers_after": 5,
+              "transfer_hit_points": 0.0,
+              "expected_points": 163.2
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
