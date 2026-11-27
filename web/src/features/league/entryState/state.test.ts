@@ -3,6 +3,18 @@ import vectors from "./vectors.json";
 import { EntryStateError, planGameweek, readEntry, readHistory, readPicks } from "./parsers";
 import { bankedFreeTransfers, chipStates, heldSquadBasis, type ChipWindow } from "./rules";
 
+it("keeps the shared plan policy's microsecond boundary after parsing a capture", () => {
+  const bootstrap = {
+    events: [
+      { id: 10, finished: false, deadline_time: "2026-11-21T11:00:00.123456Z" },
+      { id: 11, finished: false, deadline_time: "2026-11-28T11:00:00Z" },
+    ],
+  };
+  expect(planGameweek(bootstrap, "2026-11-21T11:00:00.123455Z")).toBe(10);
+  expect(planGameweek(bootstrap, "2026-11-21T11:00:00.123456Z")).toBe(11);
+  expect(planGameweek(bootstrap, "2026-11-21T11:00:00.123457Z")).toBe(11);
+});
+
 describe("the production Python entry-state vectors", () => {
   for (const row of vectors.banking)
     it(row.name, () => {

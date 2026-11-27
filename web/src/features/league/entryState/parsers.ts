@@ -1,4 +1,6 @@
 /** Offline FPL-shaped readers. These do not fetch or authorize a device solve. */
+import { openPlanWeek } from "../../../lib/weekState";
+
 export class EntryStateError extends Error {}
 
 export function object(value: unknown, field: string): Record<string, unknown> {
@@ -201,13 +203,13 @@ export function planGameweek(bootstrap: unknown, asOf: string): number {
     .map((value) => {
       const row = object(value, "event");
       flag(row.finished, "event.finished");
-      return { week: gameweek(row.id), deadline: timestampMicros(row.deadline_time) };
+      return { gameweek: gameweek(row.id), deadline: timestampMicros(row.deadline_time) };
     })
-    .sort((a, b) => a.week - b.week);
-  if (new Set(rows.map((row) => row.week)).size !== rows.length)
+    .sort((a, b) => a.gameweek - b.gameweek);
+  if (new Set(rows.map((row) => row.gameweek)).size !== rows.length)
     throw new EntryStateError("Duplicate deadline gameweek.");
   const now = timestampMicros(asOf);
-  const next = rows.find((row) => row.deadline > now);
-  if (!next) throw new EntryStateError("No open deadline.");
-  return next.week;
+  const next = openPlanWeek(rows, now);
+  if (next === null) throw new EntryStateError("No open deadline.");
+  return next;
 }
