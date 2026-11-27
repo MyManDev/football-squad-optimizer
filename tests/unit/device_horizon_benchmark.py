@@ -255,6 +255,8 @@ def main() -> None:
     )
     parser.add_argument("--rule-bootstrap", type=Path)
     parser.add_argument("--rate", type=int)
+    parser.add_argument("--initial-rate", type=int)
+    parser.add_argument("--calibration-log", type=Path)
     parser.add_argument("--cpu", type=int)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prepare-only", action="store_true")
@@ -272,6 +274,27 @@ def main() -> None:
             for member in problem["members"][:1]
         ]
         provenance = {"pool": "parity-24", "diagnostic_smoke_only": True}
+    if args.calibration_log:
+        raw_calibration = args.calibration_log.read_bytes()
+        records = [json.loads(line) for line in raw_calibration.splitlines()]
+        protocol = next(row for row in records if row["event"] == "protocol")
+        confirmation = next(row for row in records if row["event"] == "calibration_confirmation")
+        cleanup = records[-1]
+        if (
+            any(row["event"] == "run_failed" for row in records)
+            or not 3.90 <= confirmation["worker_ratio"] <= 4.10
+            or cleanup
+            != {"event": "cleanup", "owned_processes_remaining": 0, "node_exit": 0, "errors": []}
+            or protocol["logical_cpu_affinity"] != args.cpu
+            or (args.runtime == "throttled" and args.rate != confirmation["rate"])
+        ):
+            raise ValueError("The fixed rate/affinity has no successful 4x calibration evidence")
+        provenance["calibration_evidence"] = {
+            "sha256": hashlib.sha256(raw_calibration).hexdigest(),
+            "source_head": protocol["head"],
+            "rate": confirmation["rate"],
+            "worker_confirmation_ratio": confirmation["worker_ratio"],
+        }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8") as log:
 
@@ -295,6 +318,7 @@ def main() -> None:
                 "calibration_repeats": 5,
                 "calibration_target_ratio": [3.90, 4.10],
                 "selected_rate": args.rate,
+                "initial_calibration_rate": args.initial_rate,
                 "logical_cpu_affinity": args.cpu,
                 "logical_cpus": psutil.cpu_count(),
                 "physical_cpus": psutil.cpu_count(logical=False),
@@ -396,7 +420,9 @@ def main() -> None:
                 raise RuntimeError("Own compute child did not inherit the frozen CPU affinity")
             if args.runtime == "calibration":
                 baseline = probe()
-                rate = round(10000 / (4 * psutil.cpu_count()) * 1.2)
+                rate = args.initial_rate or round(10000 / (4 * psutil.cpu_count()) * 1.2)
+                if not 1 <= rate <= 10000:
+                    raise ValueError("Initial own-job calibration CPU rate is invalid")
                 for attempt in range(6):
                     emit({"event": "cpu_rate", "attempt": attempt, **job.configure(rate)})
                     limited = probe()
@@ -484,6 +510,9 @@ def main() -> None:
                                 assert week["transfers_out"] == expected["transfers_out"]
                     if result["event"] == "measured":
                         break
+        except Exception as error:
+            emit({"event": "run_failed", "error": type(error).__name__, "message": str(error)})
+            raise
         finally:
             if job:
                 owned = (
