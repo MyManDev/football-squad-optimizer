@@ -70,6 +70,20 @@ function history(gameweek: number, status: "available" | "unsettled" = "availabl
 }
 
 describe("the latest finished week", () => {
+  it("keeps the current result when the new finished phase has no member data row", () => {
+    const old = week(1);
+    const newer = week(2, { data_checked: false, members: [] });
+    expect(lastWeekResult(SQUAD, board([old, newer]), null)).toMatchObject({
+      gameweek: 1,
+      net: 61,
+    });
+    const landed = week(2, { data_checked: false });
+    expect(lastWeekResult(SQUAD, board([old, landed]), null)).toMatchObject({
+      gameweek: 2,
+      net: 62,
+    });
+  });
+
   it("is the highest finished gameweek, whatever order the scoreboard lists them in", () => {
     const result = lastWeekResult(
       standing("up", 1, 3),

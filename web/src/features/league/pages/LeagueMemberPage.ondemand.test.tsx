@@ -279,6 +279,39 @@ describe("a selection nobody published, with the service answering", () => {
     expect(container).not.toHaveTextContent(computeCopy.notPrecomputed);
   });
 
+  it.each(["missing", "other-season"] as const)(
+    "keeps compute-start available with a %s calendar",
+    async (kind) => {
+      const client = new RecordingClient((request) => ({
+        kind: "advice",
+        envelope: computed(request),
+        source: "api-cache",
+      }));
+      renderView(link, client, {
+        adviceIssue: "not-listed",
+        fixtures:
+          kind === "missing"
+            ? null
+            : {
+                season: "2024-25",
+                source_snapshot_id: "synthetic-other-season",
+                captured_at_utc: "2024-08-01T00:00:00Z",
+                current_gameweek: SQUAD.payload.gameweek,
+                unscheduled_count: 0,
+                gameweeks: [
+                  {
+                    gameweek: SQUAD.payload.gameweek,
+                    deadline_utc: "2024-08-15T17:30:00Z",
+                    fixtures: [],
+                  },
+                ],
+              },
+      });
+      await pressCompute();
+      expect(client.requests).toHaveLength(1);
+    },
+  );
+
   it("sends the member's switches and shows the computed plan as computed", async () => {
     const client = new RecordingClient((request) => ({
       kind: "advice",

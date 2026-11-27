@@ -1,14 +1,16 @@
 import { isMemberTool, membersAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { Link, useParams, useSearchParams } from "react-router";
+import { useEffect, useState } from "react";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
+import { useMinuteClock } from "../../../lib/useMinuteClock";
 import { useFixtures } from "../../fixtures/data";
 import { LeagueDataMissing } from "../data";
-import { gameweekDeadline, passedDeadline, useDeadlineClock } from "../advice/deadline";
 import { useLeagueScoreboard, useSuggestionHistory } from "../queries";
 import { lastWeekResult } from "./lastWeekResult";
+import { memberWeekPolicy } from "./memberWeekPolicy";
 import { LeagueMemberView } from "./LeagueMemberView";
 import { MemberPageSkeleton } from "./MemberPageSkeleton";
 import type { AdviceIssue } from "./memberPageTypes";
@@ -48,14 +50,6 @@ export function LeagueMemberPage() {
   } = useLeagueMemberData(entryParam, searchParams);
   // The published calendar: the deadline, and the clubs' next gameweeks on the boards.
   const fixtures = useFixtures();
-  // One clock for the page: the deadline check and the top bar's countdown read it.
-  const deadline = gameweekDeadline(
-    fixtures.data,
-    squad.data?.payload.season,
-    squad.data?.payload.gameweek,
-  );
-  const now = useDeadlineClock(deadline);
-  const deadlinePassed = passedDeadline(deadline, now);
   // The card of the member's latest finished week reads the league's scoreboard, under the
   // key /league reads it by, and only once that holds a finished week for this member, the
   // member's history, under the key their history page reads it by. Neither holds the page
@@ -63,6 +57,18 @@ export function LeagueMemberPage() {
   const ownSquad = squad.data?.payload;
   const scoreboard = useLeagueScoreboard(ownSquad !== undefined);
   const scoreboardView = scoreboard.isError ? null : (scoreboard.data?.payload ?? null);
+  const [boundary, setBoundary] = useState<number | null>(null);
+  // The deadline and the rail's later phase boundaries use the same clock.
+  const now = useMinuteClock(Date.now, boundary);
+  const state =
+    ownSquad === undefined ? null : memberWeekPolicy(ownSquad, fixtures.data, scoreboardView, now);
+  const nextBoundary = state?.changesIn == null ? null : state.clock + state.changesIn;
+  useEffect(() => {
+    if (boundary === nextBoundary) return undefined;
+    const timer = window.setTimeout(() => setBoundary(nextBoundary), 0);
+    return () => window.clearTimeout(timer);
+  }, [boundary, nextBoundary]);
+  const deadlinePassed = state?.planClosed === true ? state.planDeadline : null;
   const history = useSuggestionHistory(
     ownSquad?.entry.entry_id ?? 0,
     ownSquad !== undefined && lastWeekResult(ownSquad, scoreboardView, null) !== null,

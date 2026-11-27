@@ -1,5 +1,6 @@
+import { availableWeek, calendarClock, weekState } from "../../../lib/weekState";
 import type { SuggestionHistory } from "../history/historyData";
-import type { EntrySquad, Scoreboard, ScoreboardGameweek } from "../types";
+import type { EntrySquad, Scoreboard } from "../types";
 
 /** The rank movement the member's standing states: a count of places, or unchanged. */
 export type LastWeekMovement =
@@ -51,11 +52,22 @@ export function lastWeekResult(
     scoreboard.season !== squad.season
   )
     return null;
-  let week: ScoreboardGameweek | null = null;
-  for (const row of scoreboard.gameweeks)
-    if (row.finished && (week === null || row.gameweek > week.gameweek)) week = row;
-  if (week === null) return null;
   const entryId = squad.entry.entry_id;
+  const state = weekState({
+    treeGameweek: squad.gameweek,
+    events: scoreboard.gameweeks,
+    fixtures: null,
+    now: calendarClock(scoreboard, Date.now()),
+  });
+  const rows = scoreboard.gameweeks.filter((row) =>
+    finite(row.members.find((member) => member.entry_id === entryId)?.net),
+  );
+  const available = rows.map((row) => row.gameweek);
+  const current =
+    state.finishedWeeks.filter((gameweek) => available.includes(gameweek)).at(-1) ?? null;
+  const selected = availableWeek(state.weeks.lastResult, current, available);
+  const week = rows.find((row) => row.gameweek === selected);
+  if (week === undefined) return null;
   const net = week.members.find((row) => row.entry_id === entryId)?.net;
   if (!finite(net)) return null;
 

@@ -21,7 +21,7 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { ChipTimingCard } from "../advice/ChipTimingCard";
 import { COMPUTE_COPY, jobStanding, type ComputeCopy } from "../advice/computeCopy";
-import { gameweekDeadline, passedDeadline } from "../advice/deadline";
+import { gameweekDeadline } from "../advice/deadline";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { isDevicePlanEntry } from "../device/types";
@@ -65,6 +65,7 @@ import { RivalDuel } from "./RivalDuel";
 import { SquadCard } from "../card/SquadCard";
 import { LastWeekCard } from "./LastWeekCard";
 import { lastWeekResult } from "./lastWeekResult";
+import { memberWeekPolicy } from "./memberWeekPolicy";
 import { useWeekArrival } from "./weekArrival";
 import styles from "./LeagueMemberPage.module.css";
 
@@ -234,8 +235,11 @@ function LeagueMemberContent({
   // Past its deadline the week is closed: nothing is computed for it and none of its plans
   // can be applied, so the page leaves out what only changes or recomputes the plan.
   const closed = deadlinePassed !== null;
-  const deadline = gameweekDeadline(fixtures, view.season, view.gameweek);
-  const canStart = () => !closed && passedDeadline(deadline, Date.now()) === null;
+  const [initialNow] = useState(Date.now);
+  const state = memberWeekPolicy(view, fixtures, scoreboard, now ?? initialNow);
+  const deadline = state.planDeadline ?? gameweekDeadline(fixtures, view.season, view.gameweek);
+  const canStart = () =>
+    !closed && memberWeekPolicy(view, fixtures, scoreboard, Date.now()).planClosed !== true;
   // While one of the live week's matches is played the page follows it, whichever week it
   // shows: a goal by the member's players plays its moment on an open week's page too.
   // What the member's latest live read said (their clubs, the matches still unfinished), kept
@@ -383,13 +387,14 @@ function LeagueMemberContent({
       : layout === "tablet"
         ? "flow"
         : "column";
+  const railWeek = closed ? state.weeks.memberRail : state.weeks.plan;
   const rail = (
     <MemberFixtureRail
       placement={railPlacement}
-      fixtures={fixtures}
-      pending={fixturesPending}
+      fixtures={railWeek === null ? null : fixtures}
+      pending={railWeek !== null && fixturesPending}
       season={view.season}
-      gameweek={view.gameweek}
+      gameweek={railWeek ?? view.gameweek}
       moves={closed ? [] : (plan?.moves ?? [])}
       eleven={onPitch.eleven}
       codes={codes}

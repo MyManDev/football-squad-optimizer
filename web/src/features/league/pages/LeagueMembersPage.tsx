@@ -10,7 +10,7 @@ import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { useFixtures } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
-import { gameweekDeadline, useDeadlinePassed } from "../advice/deadline";
+import { gameweekDeadline, useDeadlineClock } from "../advice/deadline";
 import { viewerChipLines } from "../chipShape";
 import { RowDetailsFigures, RowDetailsToggle } from "../components/RowDetails";
 import { useOpenRows } from "../components/useOpenRows";
@@ -33,6 +33,7 @@ import type {
 } from "../types";
 import { ScoreBug, TopWeek } from "./MemberTopBar";
 import { scoreBugCells } from "./scoreBug";
+import { memberWeekPolicy } from "./memberWeekPolicy";
 import barStyles from "./LeagueMemberPage.module.css";
 import styles from "./LeagueMembersPage.module.css";
 
@@ -48,14 +49,21 @@ export function LeagueMembersPage() {
   // The scoreboard the league race is drawn from; a missing or failed read draws no race.
   const scoreboard = useLeagueScoreboard();
   // Re-read once a minute, so an open page notices its deadline passing.
-  const deadlinePassed = useDeadlinePassed(
+  const deadline = gameweekDeadline(
+    fixtures.data,
     query.data?.payload.season,
     query.data?.payload.gameweek,
   );
+  const now = useDeadlineClock(deadline);
+  const state =
+    query.data === undefined
+      ? null
+      : memberWeekPolicy(query.data.payload, fixtures.data, scoreboard.data?.payload, now);
+  const deadlinePassed = state?.planClosed === true ? state.planDeadline : null;
   // The viewer's chips are published from before the deadline. Once it has passed, the bundle
   // the member's page and the LIVE pill read names the chip played at it: one read, held under
   // their key, and none at all while the week is open or nobody has said who they are.
-  const gameweek = query.data?.payload.gameweek ?? null;
+  const gameweek = state?.weeks.plan ?? null;
   const viewerBundle = useQuery({
     ...entryBundleQuery(viewer?.entryId ?? 0, gameweek),
     enabled: viewer !== null && gameweek !== null && deadlinePassed !== null,
@@ -82,6 +90,7 @@ export function LeagueMembersPage() {
       viewerSquadPending={viewer !== null && viewerSquad.isPending}
       fixtures={fixtures.data ?? null}
       deadlinePassed={deadlinePassed !== null}
+      now={now}
       viewerPlayedWeek={
         deadlinePassed !== null && played !== null && played.gameweek === gameweek ? played : null
       }
@@ -149,6 +158,7 @@ export function LeagueMembersView({
   deadlinePassed = false,
   viewerPlayedWeek = null,
   scoreboard = null,
+  now,
 }: {
   envelope: LeagueViewEnvelope<LeagueMembers>;
   /** The published scoreboard the league race is drawn from; none, no race. */
@@ -160,6 +170,7 @@ export function LeagueMembersView({
   fixtures?: FixturesPayload | null;
   /** The calendar's deadline for this gameweek has passed. */
   deadlinePassed?: boolean;
+  now?: number;
   /** The viewer's week played at that deadline, once read: the chip it names was played. */
   viewerPlayedWeek?: Pick<PlayedLineup, "active_chip" | "gameweek"> | null;
 }) {
@@ -185,10 +196,17 @@ export function LeagueMembersView({
         viewerPlayedWeek ? { ...squad, ...chipsWithPlayedWeek(squad, viewerPlayedWeek) } : squad,
       )
     : null;
-  const deadline = gameweekDeadline(fixtures, view.season, view.gameweek);
+  const state = memberWeekPolicy(view, now === undefined ? null : fixtures, scoreboard, now ?? 0);
+  const deadline = state.planDeadline ?? gameweekDeadline(fixtures, view.season, view.gameweek);
   // As on the member's page: past the deadline the bank and the free transfers are left out.
   const cells = viewerRow
-    ? scoreBugCells(viewerRow, rows.length, deadlinePassed ? null : squad, locale, copy)
+    ? scoreBugCells(
+        viewerRow,
+        rows.length,
+        deadlinePassed || state.weeks.resources === null ? null : squad,
+        locale,
+        copy,
+      )
     : [];
   const count = (value: number) => points(value, 0, locale);
   const race =
@@ -206,7 +224,11 @@ export function LeagueMembersView({
   return (
     <div className={styles.page}>
       <header className={barStyles.topBar} data-zone="topbar">
-        <TopWeek gameweek={view.gameweek} deadline={deadline} passed={deadlinePassed} />
+        <TopWeek
+          gameweek={state.weeks.topBar ?? view.gameweek}
+          deadline={deadline}
+          passed={deadlinePassed}
+        />
         <ScoreBug cells={cells} />
       </header>
 
