@@ -2,6 +2,8 @@ import { act, cleanup, render } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { TEST_WEEK, testWeek } from "../../../testSupport/liveWeek";
+import { useLivePhase } from "./useLivePhase";
 import { useLiveWindow } from "./useLiveWindow";
 
 afterEach(() => {
@@ -17,6 +19,45 @@ function movingClock() {
 }
 
 describe("the live window's clock", () => {
+  it("closes both hooks exactly at the shared limit after opening less than one second before it", async () => {
+    vi.useFakeTimers();
+    const end = Date.parse("2026-11-21T20:30:00Z");
+    vi.setSystemTime(end - 500);
+    const calendar = testWeek().fixtures!;
+    calendar.gameweeks[0]!.fixtures.push({
+      ...calendar.gameweeks[0]!.fixtures[0]!,
+      fixture_id: 104,
+      kickoff_utc: null,
+    });
+    function Harness() {
+      const phase = useLivePhase(calendar);
+      const window = useLiveWindow(calendar, { unfinished: new Set([103]) });
+      return (
+        <output>
+          {JSON.stringify({ on: phase.on, open: window.open, next: phase.nextGameweek })}
+        </output>
+      );
+    }
+    const shown = render(<Harness />);
+    const state = () => JSON.parse(shown.getByRole("status").textContent!);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(state()).toMatchObject({ on: true, open: true, next: null });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(499);
+    });
+    expect(state()).toMatchObject({ on: true, open: true });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(state()).toMatchObject({ on: false, open: false, next: TEST_WEEK + 1 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(state()).toMatchObject({ on: false, open: false, next: TEST_WEEK + 1 });
+  });
+
   it("takes a caller's new filter object naming the same clubs as the same filter", async () => {
     vi.useFakeTimers();
     movingClock();

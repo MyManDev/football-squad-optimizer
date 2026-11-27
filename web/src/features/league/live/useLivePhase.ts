@@ -23,7 +23,7 @@ export function useLivePhase(
     if (changesIn === null) return undefined;
     const timer = setTimeout(
       () => setNow(Date.now()),
-      Math.min(Math.max(changesIn, 1_000), LONGEST_WAIT_MS),
+      Math.min(Math.max(changesIn, 1), LONGEST_WAIT_MS),
     );
     return () => clearTimeout(timer);
   }, [changesIn, now]);
