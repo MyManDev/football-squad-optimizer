@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-11-26T02:05:14Z",
+  "generated_at_utc": "2026-11-27T02:04:38Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -47,7 +47,7 @@
     "computed": [],
     "unavailable": [],
     "menu": "device",
-    "source_snapshot_id": "fpl-live-20261126T020109Z-c7422fcc66df",
+    "source_snapshot_id": "fpl-live-20261127T020105Z-e101f783762d",
     "chip_states": {
       "known": true,
       "gameweek": 12,
