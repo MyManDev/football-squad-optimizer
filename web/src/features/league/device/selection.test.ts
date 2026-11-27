@@ -44,7 +44,6 @@ describe("what the device solves", () => {
   });
 
   it("leaves every other selection to the service", () => {
-    expect(deviceSelection({ ...plain, window: 3 }, squad)).toBeNull();
     expect(deviceSelection({ ...plain, top100Weight: 20 }, squad)).toBeNull();
     expect(deviceSelection({ ...plain, managersWord: true }, squad)).toBeNull();
     expect(deviceSelection({ ...plain, model: "football" }, squad)).toBeNull();
@@ -66,6 +65,39 @@ describe("what the device solves", () => {
     expect(deviceSelection({ ...plain, rivalEntryId: 35249002 }, squad)).toBeNull();
     // A chip the squad document does not hold, or the automatic chip, is not the device's.
     expect(deviceSelection({ ...plain, chip: "auto" }, squad)).toBeNull();
+  });
+
+  it.each([3, 5] as const)("offers H%i only for unmodified plain points", (window) => {
+    const ask = { ...plain, window };
+    const published = {
+      ...squad,
+      device_plan: {
+        held: [],
+        bank_tenths: 0,
+        free_transfers: 1,
+        sell_tenths: {},
+        horizon: { windows: [3, 5] },
+      },
+    };
+    expect(deviceSelection(ask, published)).toEqual({ kind: "horizon", window });
+    for (const extra of [
+      { chip: "3xc" as const },
+      { top100Weight: 20 },
+      { rivalEntryId: 35249002 },
+      { strategy: "ortak-koru" as const, rivalEntryId: 35249002 },
+      { managersWord: true },
+      { model: "football" as const },
+      {
+        preferences: checkedPreferences({ no_hits: true }),
+        run: {
+          contract_version: "llmopt_run_v1" as const,
+          run_id: "a".repeat(32),
+          stage: "base" as const,
+        },
+        deviceRun: true,
+      },
+    ])
+      expect(deviceSelection({ ...ask, ...extra }, published)).toBeNull();
   });
 
   it("takes a named weight for the pure-points plan or a named rival at one week", () => {

@@ -9,6 +9,7 @@
 import type { AdvicePlayer, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { preferenceScope } from "../advice/decisionPreferences";
 import type { DevicePlanAnswer, DevicePlanDocument, DevicePlanPlayer } from "./types";
+import { horizonInputs } from "./lp/horizon";
 
 /** The server's name for how a chip's gain is measured: this gameweek's expected points. */
 export const CHIP_CHOICE_BASIS = "one_week_expected_points_v1";
@@ -69,7 +70,7 @@ export function deviceAdviceEnvelope(
     gameweek,
     entry_id: squad.entry.entry_id,
     mode: answer.rival?.mode ?? "saf-puan",
-    window: 1,
+    window: answer.window ?? 1,
     source_snapshot_id: document.source_snapshot_id,
     moves: answer.moves.map((move, index) => ({
       move_id: `gw${String(gameweek).padStart(2, "0")}-${index + 1}`,
@@ -78,7 +79,12 @@ export function deviceAdviceEnvelope(
       expected_points_delta: move.gain,
       // As the server labels a one-week plan's moves: the pure-points plan's are a points
       // gain, a rival strategy's are its trade-off (build_advice_payload's default by mode).
-      reason_code: answer.rival === undefined ? "points_gain" : "mode_tradeoff",
+      reason_code:
+        answer.rival === undefined
+          ? answer.window
+            ? "window_value"
+            : "points_gain"
+          : "mode_tradeoff",
     })),
     transfer_hit_points: answer.transfer_hit_points,
     expected_gain_vs_hold: answer.expected_gain_vs_hold,
@@ -95,6 +101,33 @@ export function deviceAdviceEnvelope(
     data_quality: missing.length ? "partial" : "complete",
     missing_fields: missing,
   };
+  if (answer.window && answer.plan_weeks) {
+    const inputs = horizonInputs(document, answer.window);
+    payload.expected_points_cost = 0;
+    const positions = ["GK", "DEF", "MID", "FWD", "UNK"];
+    payload.starting_xi?.sort(
+      (left, right) =>
+        positions.indexOf(left.position) - positions.indexOf(right.position) ||
+        (right.expected_points ?? 0) - (left.expected_points ?? 0) ||
+        left.player_id - right.player_id,
+    );
+    payload.plan_weeks = answer.plan_weeks.map((week, index) => {
+      const points = new Map(inputs.weeks[index]!.players.map((row) => [row.id, row]));
+      const onWeek = (id: number) => advicePlayer({ ...byId.get(id)!, ...points.get(id)! });
+      // The plain service window publishes these same rows. It does not publish
+      // per-week lineups, which would cause the page to draw additional sections.
+      return {
+        gameweek: week.gameweek,
+        transfers_in: week.transfers_in.map(onWeek),
+        transfers_out: week.transfers_out.map(onWeek),
+        transfer_hit_points: week.transfer_hit_points,
+        chip: null,
+        free_transfers_before: week.free_transfers_before,
+        free_transfers_after: week.free_transfers_after,
+        expected_points: week.expected_points,
+      };
+    });
+  }
   if (answer.preferences) {
     Object.assign(payload, {
       preferences: answer.preferences,

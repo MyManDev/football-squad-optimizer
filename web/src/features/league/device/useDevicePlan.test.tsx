@@ -319,7 +319,8 @@ describe("the worker", () => {
     // The worker cannot load here (its wasm comes from the built assets), so its wiring is
     // read from its source; the ceiling itself is tested in solve/ceiling.test.ts.
     const source = readFileSync(join(__dirname, "deviceSolver.worker.ts"), "utf8");
-    expect(source).toContain("replyTo(withinCeiling(loaded), event.data,");
+    expect(source).toMatch(/replyTo\(\s*withinCeiling\(/);
+    expect(source).toContain("DEVICE_HORIZON_SOLVE_CEILING_SECONDS");
   });
 });
 
@@ -427,7 +428,7 @@ describe("what the device can solve", () => {
       withLeague(
         <Harness
           squad={squadWith(entry)}
-          request={{ ...REQUEST, window: 5 }}
+          request={{ ...REQUEST, window: 5, model: "football" }}
           loadDocument={async () => envelope(document)}
           solver={new InProcessSolver()}
           onState={(s) => states.push(s)}

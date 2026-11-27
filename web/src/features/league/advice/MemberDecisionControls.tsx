@@ -72,6 +72,12 @@ import { RivalEntryInput } from "./RivalEntryInput";
 /** Which part of the controls to render; all of them, in turn, when none is named. */
 export type DecisionControlsPart = "plan" | "model" | "top100" | "advanced";
 
+/** Only the plain points strategy has passed the device's longer-window parity gate. */
+function deviceWindows(device: DeviceComputable | undefined, strategy: string) {
+  if (!device || !isMemberStrategy(strategy) || !device.strategies.includes(strategy)) return [];
+  return device.windows.filter((window) => strategy === "saf-puan" || window === 1);
+}
+
 export function MemberDecisionControls({
   entryId,
   members,
@@ -125,9 +131,7 @@ export function MemberDecisionControls({
     ...new Set([
       ...selection.windows,
       ...(computable?.windows ?? []),
-      ...(onDevice && isMemberStrategy(strategy) && onDevice.strategies.includes(strategy)
-        ? onDevice.windows
-        : []),
+      ...deviceWindows(onDevice, strategy),
     ]),
   ];
   const strategies = [
@@ -155,7 +159,7 @@ export function MemberDecisionControls({
     (!!onDevice &&
       isMemberStrategy(strategy) &&
       onDevice.strategies.includes(strategy) &&
-      onDevice.windows.includes(windowSize) &&
+      deviceWindows(onDevice, strategy).includes(windowSize) &&
       (onDevice.rivals.includes(rivalId) || rivalHeld(rivalId)) &&
       !selection.rivals.find((rival) => rival.entryId === rivalId)?.reason);
 
@@ -166,9 +170,7 @@ export function MemberDecisionControls({
     const offeredWindows = [
       ...offered.windows,
       ...(offered.computable?.windows ?? []),
-      ...(offered.onDevice && isMemberStrategy(slug) && offered.onDevice.strategies.includes(slug)
-        ? offered.onDevice.windows
-        : []),
+      ...deviceWindows(offered.onDevice, slug),
     ];
     if (!offeredWindows.includes(offered.request.window) && offeredWindows[0]) {
       next.set("window", String(offeredWindows[0]));
