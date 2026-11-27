@@ -1,11 +1,11 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-11-27T02:01:05.780190Z",
+  "generated_at_utc": "2026-11-27T10:34:17.394541Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 5662073,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261127T020105Z-e101f783762d",
+    "as_of_snapshot_id": "fpl-live-20261127T103417Z-2907c387f11f",
     "weeks": [
       {
         "gameweek": 11,
@@ -16,8 +16,8 @@
         "advice_captured_at_utc": "2026-11-13T02:00:56.690703Z",
         "advice_generated_at_utc": "2026-11-13T13:13:33Z",
         "advice_sha256": "34492ddc0d889151a9cb441f938d4fa396e3ff6cc5fd1bab634c2850cd4927e6",
-        "outcome_snapshot_id": "fpl-live-20261127T020105Z-e101f783762d",
-        "outcome_captured_at_utc": "2026-11-27T02:01:05.780190Z",
+        "outcome_snapshot_id": "fpl-live-20261127T103417Z-2907c387f11f",
+        "outcome_captured_at_utc": "2026-11-27T10:34:17.394541Z",
         "expected_own_points": 49.96949956142359,
         "suggested": {
           "gross_points": 35.0,
@@ -32,7 +32,7 @@
           "transfer_hit_points": 0.0,
           "net_points": 31.0,
           "details": {
-            "source_snapshot_id": "fpl-live-20261127T020105Z-e101f783762d",
+            "source_snapshot_id": "fpl-live-20261127T103417Z-2907c387f11f",
             "captain": {
               "player_id": 244851,
               "name": "Palmer",
