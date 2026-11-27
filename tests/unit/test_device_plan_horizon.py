@@ -1,6 +1,8 @@
 """Captured-calendar device inputs and reference answers, using synthetic live data only."""
 
+import argparse
 import json
+from contextlib import nullcontext
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -36,12 +38,14 @@ from squadopt.live.transfers import member_planning_policy, member_window_policy
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.optimization.coefficients import objective_coefficients
 from squadopt.planning import optimizer as server_model
+from squadopt.planning.native_highs import native_window_executor
+from squadopt.platform.native_windows import execute_native_window
 
 FIXTURE = Path(__file__).resolve().parents[2] / "web/src/fixtures/device-plan/horizons.json"
 SEASON = "2026-27"
 
 
-def horizon_world(root: Path) -> dict[str, Any]:
+def horizon_world(root: Path, *, scale: bool = False) -> dict[str, Any]:
     """No archive, no historical panel: every row belongs to the synthetic live season."""
 
     events = [
@@ -57,6 +61,43 @@ def horizon_world(root: Path) -> dict[str, Any]:
     calendar = [row for row in calendar if not (row["event"] == 4 and row["team_h"] == 3)]
     calendar.append({**calendar[0], "id": 90, "event": 3, "team_h": 1, "team_a": 6})
     bootstrap = _bootstrap(events=events, elements=_elements(start_prices=True))
+    extra_points: dict[int, float] = {}
+    if scale:
+        payload = json.loads(bootstrap)
+        payload["teams"].extend(
+            {"id": club, "code": club * 3, "name": f"Club {club}", "short_name": f"C{club}"}
+            for club in range(7, 21)
+        )
+        positions = [1] * 57 + [2] * 212 + [3] * 212 + [4] * 95
+        for index, position in enumerate(positions):
+            code = 2001 + index
+            strength = ((index * 613) % 1000) / 1000
+            player = {
+                **payload["elements"][0],
+                "code": code,
+                "id": 1001 + index,
+                "first_name": "Synthetic",
+                "second_name": str(code),
+                "element_type": position,
+                "team": 1 + (index * 7) % 20,
+                "now_cost": 40 + int(80 * strength**2),
+                "cost_change_start": 0,
+            }
+            payload["elements"].append(player)
+            factor = {1: 0.6, 2: 0.8, 3: 1.0, 4: 1.0}[position]
+            extra_points[code] = round(0.2 + factor * 13 * strength**3, 2)
+        for gameweek in range(1, 7):
+            for club in range(7, 21, 2):
+                calendar.append(
+                    {
+                        **calendar[0],
+                        "id": 100 + len(calendar),
+                        "event": gameweek,
+                        "team_h": club,
+                        "team_a": club + 1,
+                    }
+                )
+        bootstrap = json.dumps(payload).encode("utf-8")
     metadata = write_snapshot(
         root / "snapshots",
         source="fpl-live",
@@ -73,7 +114,8 @@ def horizon_world(root: Path) -> dict[str, Any]:
         model_version="in-season-carry-over-v1",
         feature_contract_version="synthetic-device-horizon-v1",
         expected_points={
-            1000 + index: 1.0 + ((index * 137) % 1700) / 100 for index in range(1, 25)
+            **{1000 + index: 1.0 + ((index * 137) % 1700) / 100 for index in range(1, 25)},
+            **extra_points,
         },
     )
     handoff_path = write_projection_handoff(root / "handoff.json", handoff)
@@ -126,13 +168,13 @@ def member_picks(world: dict[str, Any], held: HeldSquad, entry_id: int = 1) -> E
     )
 
 
-def build_horizon_fixture(root: Path) -> dict[str, Any]:
-    world = horizon_world(root)
+def build_horizon_fixture(root: Path, *, scale: bool = False) -> dict[str, Any]:
+    world = horizon_world(root, scale=scale)
     inputs, projection, rules = (world[key] for key in ("inputs", "projection", "rules"))
     horizon = device_plan_horizon(inputs, projection, rules, world["builder"])
     document = device_plan_table(inputs, projection, rules, league_id=9, horizon=horizon)
     members = []
-    for entry_id, free in enumerate((0, 1, 5), start=1):
+    for entry_id, free in enumerate((1,) if scale else (0, 1, 5), start=1):
         held = held_member(world, free)
         references = {}
         for window in (3, 5):
@@ -161,6 +203,7 @@ def build_horizon_fixture(root: Path) -> dict[str, Any]:
                     "squadopt.application.horizon_plans.held_squad_from_ledger", return_value=held
                 ),
                 patch.object(server_model, "_build_model", side_effect=capture_model),
+                native_window_executor(execute_native_window) if scale else nullcontext(),
             ):
                 result = plan_horizon(request)
             assert result.solver_status is SolverStatus.OPTIMAL
@@ -169,28 +212,35 @@ def build_horizon_fixture(root: Path) -> dict[str, Any]:
                 * result.plan.diagnostics["objective_weight_scale"]
                 * OptimizationConfig().expected_points_scale
             )
-            artifacts = built[-1]
-            alternative = artifacts.model.clone()
-            alternative.add(artifacts.primary_objective == primary)
-            differences = []
-            for index, week in enumerate(result.plan.weeks):
-                players = artifacts.players_by_week[index].player_id.tolist()
-                for family, chosen in (
-                    (artifacts.transfer_in_vars[index], set(week.transfers_in.player_id)),
-                    (artifacts.transfer_out_vars[index], set(week.transfers_out.player_id)),
-                ):
-                    differences.extend(
-                        1 - variable if player in chosen else variable
-                        for player, variable in zip(players, family, strict=True)
-                    )
-            alternative.add(sum(differences) >= 1)
-            alternative.maximize(artifacts.primary_objective)
-            uniqueness = cp_model.CpSolver()
-            uniqueness.parameters.num_search_workers = 1
-            uniqueness.parameters.max_time_in_seconds = 30
-            uniqueness.parameters.max_deterministic_time = 10
-            uniqueness_status = uniqueness.solve(alternative)
-            assert uniqueness_status in (cp_model.INFEASIBLE, cp_model.OPTIMAL, cp_model.FEASIBLE)
+            unique_moves = None
+            if not scale:
+                artifacts = built[-1]
+                alternative = artifacts.model.clone()
+                alternative.add(artifacts.primary_objective == primary)
+                differences = []
+                for index, week in enumerate(result.plan.weeks):
+                    players = artifacts.players_by_week[index].player_id.tolist()
+                    for family, chosen in (
+                        (artifacts.transfer_in_vars[index], set(week.transfers_in.player_id)),
+                        (artifacts.transfer_out_vars[index], set(week.transfers_out.player_id)),
+                    ):
+                        differences.extend(
+                            1 - variable if player in chosen else variable
+                            for player, variable in zip(players, family, strict=True)
+                        )
+                alternative.add(sum(differences) >= 1)
+                alternative.maximize(artifacts.primary_objective)
+                uniqueness = cp_model.CpSolver()
+                uniqueness.parameters.num_search_workers = 1
+                uniqueness.parameters.max_time_in_seconds = 30
+                uniqueness.parameters.max_deterministic_time = 10
+                uniqueness_status = uniqueness.solve(alternative)
+                assert uniqueness_status in (
+                    cp_model.INFEASIBLE,
+                    cp_model.OPTIMAL,
+                    cp_model.FEASIBLE,
+                )
+                unique_moves = uniqueness_status == cp_model.INFEASIBLE
             published = window_payload(
                 member_picks(world, held, entry_id),
                 projection,
@@ -201,7 +251,7 @@ def build_horizon_fixture(root: Path) -> dict[str, Any]:
             references[str(window)] = {
                 "objective": result.plan.objective_value,
                 "objective_scaled": primary,
-                "unique_moves": uniqueness_status == cp_model.INFEASIBLE,
+                "unique_moves": unique_moves,
                 "tiebreak_completed": result.plan.diagnostics["tiebreak_completed"],
                 "presentation": {
                     field: published[field]
@@ -472,8 +522,56 @@ def test_recorded_horizon_answers_are_the_server_application_answers(tmp_path: P
     assert _same(recorded, build_horizon_fixture(tmp_path)) == []
 
 
+def test_scale_fixture_inputs_are_the_captured_600_player_problem(tmp_path: Path) -> None:
+    recorded = json.loads(FIXTURE.with_name("horizons-scale.json").read_text(encoding="utf-8"))
+    world = horizon_world(tmp_path, scale=True)
+    inputs, projection, rules = (world[key] for key in ("inputs", "projection", "rules"))
+    horizon = device_plan_horizon(inputs, projection, rules, world["builder"])
+    expected = device_plan_table(inputs, projection, rules, league_id=9, horizon=horizon)
+    assert _same(recorded["document"], expected) == []
+    assert len(expected["players"]) == 600
+    assert len({row["team"] for row in expected["players"]}) == 20
+    assert expected["season"] == "2026-27"
+    assert len(recorded["members"]) == 1
+    assert recorded["members"][0]["entry"]["free_transfers"] == 1
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--scale", action="store_true", help="600 players and 20 clubs, FT1 member")
+    arguments = parser.parse_args()
+    destination = FIXTURE.with_name("horizons-scale.json") if arguments.scale else FIXTURE
     with TemporaryDirectory() as temporary:
-        FIXTURE.write_text(
-            json.dumps(build_horizon_fixture(Path(temporary)), indent=2) + "\n", encoding="utf-8"
+        if arguments.scale:
+            world = horizon_world(Path(temporary) / "inputs", scale=True)
+            inputs, projection, rules = (world[key] for key in ("inputs", "projection", "rules"))
+            horizon = device_plan_horizon(inputs, projection, rules, world["builder"])
+            destination.write_text(
+                json.dumps(
+                    {
+                        "reference_proof": "not_available",
+                        "document": device_plan_table(
+                            inputs, projection, rules, league_id=9, horizon=horizon
+                        ),
+                        "members": [
+                            {
+                                "entry_id": 1,
+                                "entry": device_plan_entry(
+                                    inputs, projection, held_member(world, 1), rules
+                                ),
+                            }
+                        ],
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        destination.write_text(
+            json.dumps(
+                build_horizon_fixture(Path(temporary) / "reference", scale=arguments.scale),
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
         )

@@ -4,6 +4,9 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
 import { chipPath } from "../src/features/league/advice/chipChoice";
 import fixture from "../src/fixtures/device-plan/instances.json" with { type: "json" };
+import horizonFixture from "../src/fixtures/device-plan/horizons.json" with { type: "json" };
+import horizonScaleFixture from "../src/fixtures/device-plan/horizons-scale.json" with { type: "json" };
+import type { DevicePlanDocument, DevicePlanEntry } from "../src/features/league/device/types";
 import {
   mockEntryAdviceChipEnvelope,
   mockEntryAdviceIndex,
@@ -627,4 +630,209 @@ test("a table whose bytes are not the ones its line names falls back to the tree
   expect(reads).toEqual([`/data/${TABLE_PATH}?v=${digest}`, "/data/league/device-plan.json"]);
   const origin = new URL(page.url()).origin;
   expect(requested.filter((url) => new URL(url).origin !== origin)).toEqual([]);
+});
+
+interface HorizonFixture {
+  document: DevicePlanDocument;
+  members: Array<{ entry_id: number; entry: DevicePlanEntry; reference?: Record<string, unknown> }>;
+}
+
+const horizonPools = [
+  { pool: "parity-24", fixture: horizonFixture as unknown as HorizonFixture },
+  { pool: "synthetic-600", fixture: horizonScaleFixture as unknown as HorizonFixture },
+];
+const horizonSamples: Array<{ pool: string; member: number; window: number; seconds: number }> = [];
+
+async function runHorizon(page: Page, data: HorizonFixture, memberIndex: number, window: 3 | 5) {
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+  const member = data.members[memberIndex]!;
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  const context = {
+    source_snapshot_id: data.document.source_snapshot_id,
+    season: data.document.season,
+    gameweek: data.document.gameweek,
+  };
+  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: { ...squad, payload: { ...squad.payload, ...context, device_plan: member.entry } },
+    }),
+  );
+  const index = mockEntryAdviceIndex(ENTRY);
+  await page.route(/\/data\/league\/advice\/35249001\/index\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        ...index,
+        payload: {
+          ...index.payload,
+          ...context,
+          menu: "device",
+          computed: [],
+          unavailable: [],
+          windows: { "saf-puan": [], "ortak-koru": [], "fark-yarat": [] },
+          evidence: { available: false, reason: "on_device" },
+          top100: { available: false, reason: "on_device" },
+          chips: { available: false, reason: "on_device" },
+        },
+      },
+    }),
+  );
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-09-02T10:00:00Z",
+        source_kind: "live",
+        payload: { ...data.document, league_id: squad.payload.league_id },
+      },
+    }),
+  );
+  const requests: string[] = [];
+  let pressed = false;
+  page.on("request", (request) => {
+    if (pressed) requests.push(request.url());
+  });
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=${window}`);
+  const button = page.getByRole("button", {
+    name: MESSAGES.en.leagueMembers.deviceButton,
+    exact: true,
+  });
+  await expect(button).toBeVisible();
+  pressed = true;
+  await button.click();
+  await expect(
+    page.locator(
+      "[data-device-state='done'], [data-device-state='refused'], [data-device-state='failed']",
+    ),
+  ).toBeVisible({ timeout: 80_000 });
+  const seconds = await page.evaluate(
+    () => performance.getEntriesByName("device:solve").at(-1)?.duration ?? null,
+  );
+  await expect(page.locator("[data-device-state='done']")).toBeVisible();
+  const section = page.getByRole("region", {
+    name: MESSAGES.en.leagueMembers.windowTitle(window),
+    exact: true,
+  });
+  await expect(section.getByRole("row")).toHaveCount(window + 1);
+  const origin = new URL(page.url()).origin;
+  expect(requests.filter((url) => new URL(url).origin !== origin)).toEqual([]);
+  expect(seconds).not.toBeNull();
+  return seconds! / 1000;
+}
+
+for (const window of [3, 5] as const) {
+  test(`a plain ${window}-week plan is solved by the real device worker and shown as a service window`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await runHorizon(page, horizonPools[0]!.fixture, 1, window);
+  });
+}
+
+test.describe("horizon benchmark", () => {
+  test.describe.configure({ mode: "serial" });
+  test.skip(process.env.SQUADOPT_DEVICE_BENCHMARK !== "1", "Explicit timing run only");
+  test.afterAll(({ browser }) => {
+    if (horizonSamples.length === 0) return;
+    const summarize = (values: number[]) => {
+      const ordered = [...values].sort((a, b) => a - b);
+      const middle = Math.floor(ordered.length / 2);
+      return {
+        count: ordered.length,
+        median:
+          ordered.length % 2 ? ordered[middle] : (ordered[middle - 1]! + ordered[middle]!) / 2,
+        maximum: ordered.at(-1),
+      };
+    };
+    console.log(
+      JSON.stringify({
+        kind: "device-horizon-chromium-measurement",
+        browser_version: browser.version(),
+        measured_at: new Date().toISOString(),
+        ceiling_seconds: 60,
+        repeats: 3,
+        pools: horizonPools.map(({ pool, fixture }) => ({
+          pool,
+          players: fixture.document.players.length,
+          clubs: new Set(fixture.document.players.map((player) => player.team)).size,
+          members: fixture.members.length,
+          server_reference: fixture.members.every(
+            (member) => member.reference?.["3"] && member.reference?.["5"],
+          ),
+          by_member: fixture.members.map((member) => ({
+            member: member.entry_id,
+            windows: [3, 5].map((window) => ({
+              window,
+              ...summarize(
+                horizonSamples
+                  .filter(
+                    (sample) =>
+                      sample.pool === pool &&
+                      sample.member === member.entry_id &&
+                      sample.window === window,
+                  )
+                  .map((sample) => sample.seconds),
+              ),
+            })),
+          })),
+          windows: [3, 5].map((window) => ({
+            window,
+            ...summarize(
+              horizonSamples
+                .filter((sample) => sample.pool === pool && sample.window === window)
+                .map((sample) => sample.seconds),
+            ),
+          })),
+        })),
+        samples: horizonSamples,
+      }),
+    );
+  });
+  for (const { pool, fixture } of horizonPools) {
+    fixture.members.forEach((member, memberIndex) => {
+      for (const window of [3, 5] as const) {
+        for (let repeat = 0; repeat < 3; repeat += 1) {
+          test(`${pool}, member ${member.entry_id}, H${window}, repeat ${repeat + 1}`, async ({
+            page,
+          }) => {
+            test.setTimeout(90_000);
+            const started = performance.now();
+            try {
+              const seconds = await runHorizon(page, fixture, memberIndex, window);
+              horizonSamples.push({ pool, member: member.entry_id, window, seconds });
+              expect(seconds).toBeLessThan(60);
+            } catch (error) {
+              const ending = await page
+                .evaluate(() => ({
+                  solve_milliseconds:
+                    performance.getEntriesByName("device:solve").at(-1)?.duration ?? null,
+                  state:
+                    document
+                      .querySelector("[data-device-state]")
+                      ?.getAttribute("data-device-state") ?? null,
+                }))
+                .catch(() => ({ solve_milliseconds: null, state: null }));
+              console.log(
+                JSON.stringify({
+                  kind: "device-horizon-chromium-failure",
+                  pool,
+                  member: member.entry_id,
+                  window,
+                  repeat: repeat + 1,
+                  elapsed_seconds:
+                    ending.solve_milliseconds === null
+                      ? (performance.now() - started) / 1000
+                      : ending.solve_milliseconds / 1000,
+                  timing_basis: ending.solve_milliseconds === null ? "test_wall" : "worker_solve",
+                  state: ending.state,
+                  status: String(error),
+                }),
+              );
+              throw error;
+            }
+          });
+        }
+      }
+    });
+  }
 });
