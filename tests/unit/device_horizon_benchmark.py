@@ -257,11 +257,38 @@ def main() -> None:
     parser.add_argument("--rate", type=int)
     parser.add_argument("--initial-rate", type=int)
     parser.add_argument("--calibration-log", type=Path)
+    parser.add_argument("--prior-calibration-log", type=Path)
     parser.add_argument("--cpu", type=int)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
+    prior_count = 0
+    prior_manifest = None
+    if args.prior_calibration_log:
+        prior_bytes = args.prior_calibration_log.read_bytes()
+        prior_rows = [json.loads(line) for line in prior_bytes.splitlines()]
+        prior_protocol = next(row for row in prior_rows if row["event"] == "protocol")
+        if (
+            prior_protocol["logical_cpu_affinity"] != args.cpu
+            or prior_protocol["calibration_iterations"] != 1_200_000_000
+            or prior_protocol["calibration_repeats"] != 5
+        ):
+            raise ValueError("The prior calibration used another pinned protocol")
+        prior_count = prior_protocol.get("prior_candidate_count", 0) + sum(
+            row["event"] == "cpu_rate" for row in prior_rows
+        )
+        prior_manifest = {
+            "sha256": hashlib.sha256(prior_bytes).hexdigest(),
+            "source_head": prior_protocol["head"],
+            "earlier_manifest": prior_protocol.get("prior_calibration"),
+            "candidates": [
+                row
+                for row in prior_rows
+                if row["event"] in ("calibration_result", "calibration_confirmation")
+            ],
+            "candidate_count": prior_count,
+        }
     problem, provenance = (
         ({}, {})
         if args.runtime == "calibration" or args.smoke
@@ -319,6 +346,9 @@ def main() -> None:
                 "calibration_target_ratio": [3.90, 4.10],
                 "selected_rate": args.rate,
                 "initial_calibration_rate": args.initial_rate,
+                "calibration_candidate_limit": 6,
+                "prior_candidate_count": prior_count,
+                "prior_calibration": prior_manifest,
                 "logical_cpu_affinity": args.cpu,
                 "logical_cpus": psutil.cpu_count(),
                 "physical_cpus": psutil.cpu_count(logical=False),
@@ -423,7 +453,7 @@ def main() -> None:
                 rate = args.initial_rate or round(10000 / (4 * psutil.cpu_count()) * 1.2)
                 if not 1 <= rate <= 10000:
                     raise ValueError("Initial own-job calibration CPU rate is invalid")
-                for attempt in range(6):
+                for attempt in range(prior_count, 6):
                     emit({"event": "cpu_rate", "attempt": attempt, **job.configure(rate)})
                     limited = probe()
                     ratios = {
