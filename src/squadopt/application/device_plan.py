@@ -200,9 +200,11 @@ def device_plan_horizon(
         horizon.assert_fingerprint()
     except (DataSourceError, TransferPlanningValidationError):
         # A missing/invalid future calendar must not take away the published H1 plan.
-        return _unavailable_horizon("the captured calendar or projection is invalid")
+        _log_unavailable_horizon("the captured calendar or projection is invalid")
+        return None
     if horizon.season != inputs.season or horizon.source_snapshot_id != inputs.snapshot_id:
-        return _unavailable_horizon("the projection belongs to another season or capture")
+        _log_unavailable_horizon("the projection belongs to another season or capture")
+        return None
     settings = OptimizationConfig() if optimization is None else optimization
     policy = member_planning_policy(rules)
     initial = sort_players_by_id(projection.table)
@@ -210,12 +212,15 @@ def device_plan_horizon(
     for offset, gameweek in enumerate(horizon.target_gameweeks):
         table = sort_players_by_id(horizon.table.loc[horizon.table.gameweek.eq(gameweek)])
         if table.player_id.tolist() != initial.player_id.tolist():
-            return _unavailable_horizon("the projection has a different player universe")
+            _log_unavailable_horizon("the projection has a different player universe")
+            return None
         for field in ("name", "team_id", "position", "price_tenths"):
             if table[field].tolist() != initial[field].tolist():
-                return _unavailable_horizon(f"the projection changes captured {field}")
+                _log_unavailable_horizon(f"the projection changes captured {field}")
+                return None
         if offset == 0 and table.expected_points.tolist() != initial.expected_points.tolist():
-            return _unavailable_horizon("the projection changes the one-week points")
+            _log_unavailable_horizon("the projection changes the one-week points")
+            return None
         coefficients = objective_coefficients(table.expected_points.tolist(), settings)
         weeks.append(
             {
@@ -260,7 +265,7 @@ def device_plan_horizon(
     }
 
 
-def _unavailable_horizon(reason: str) -> None:
+def _log_unavailable_horizon(reason: str) -> None:
     _LOG.warning("Skipping device horizon: %s. The one-week inputs are unchanged.", reason)
 
 
