@@ -52,7 +52,7 @@ export function summarizeHistory(weeks: readonly WeekReview[]) {
         difference += week.net_difference!;
         compared += 1;
       }
-      return { week, scored, cumulative: comparable ? difference : null };
+      return { week, scored, comparable, cumulative: comparable ? difference : null };
     });
   return {
     rows,
