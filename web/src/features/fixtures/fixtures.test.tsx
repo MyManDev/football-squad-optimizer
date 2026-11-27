@@ -389,8 +389,11 @@ describe("the fixtures page", () => {
   });
 
   it("retains N in the matrix until the exact shared last-match window boundary", async () => {
-    const clock = atClock("2026-09-20T15:59:59Z");
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"] });
+    vi.restoreAllMocks();
+    vi.useFakeTimers({
+      toFake: ["Date", "setInterval", "clearInterval", "setTimeout", "clearTimeout"],
+    });
+    vi.setSystemTime(Date.parse("2026-09-20T15:59:59Z"));
     try {
       const view = payload();
       view.gameweeks[2]!.fixtures = [upcoming(4, AVL, BRE, "2026-09-20T13:00:00Z")];
@@ -401,7 +404,6 @@ describe("the fixtures page", () => {
       });
       const matrix = screen.getByRole("table", { name: FIXTURES_COPY.en.generalView });
       expect(columnsOf(matrix).slice(1)).toEqual(["GW3", "GW4"]);
-      clock.mockReturnValue(Date.parse("2026-09-20T16:00:00Z"));
       act(() => {
         vi.advanceTimersByTime(999);
       });
@@ -410,7 +412,6 @@ describe("the fixtures page", () => {
         vi.advanceTimersByTime(1);
       });
       expect(columnsOf(matrix).slice(1)).toEqual(["GW4"]);
-      clock.mockReturnValue(Date.parse("2026-09-20T16:00:01Z"));
       act(() => {
         vi.advanceTimersByTime(1_000);
       });

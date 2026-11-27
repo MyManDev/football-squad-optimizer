@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { recordUsage } from "../../data/usage";
@@ -28,14 +28,15 @@ export function FixturesPage() {
   const copy = FIXTURES_COPY[language];
   const { data, isPending } = useFixtures();
   const [searchParams, setSearchParams] = useSearchParams();
-  const state = weekState({
-    treeGameweek: null,
-    events: [],
-    fixtures: data ?? null,
-    now: Date.now(),
-  });
-  const boundary = state.changesIn === null ? null : state.clock + state.changesIn;
+  const [boundary, setBoundary] = useState<number | null>(null);
   const now = useMinuteClock(Date.now, boundary);
+  const state = weekState({ treeGameweek: null, events: [], fixtures: data ?? null, now });
+  const nextBoundary = state.changesIn === null ? null : state.clock + state.changesIn;
+  useEffect(() => {
+    if (boundary === nextBoundary) return undefined;
+    const timer = window.setTimeout(() => setBoundary(nextBoundary), 0);
+    return () => window.clearTimeout(timer);
+  }, [boundary, nextBoundary]);
   if (isPending) return <EmptyState title={messages.common.loading} />;
   if (!data) return <EmptyState page title={copy.notPublished} />;
 
