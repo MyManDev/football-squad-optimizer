@@ -59,6 +59,23 @@ const marks = (container: HTMLElement) =>
 const step = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
 describe("one timeline with a rank change", () => {
+  it("keeps the current timeline endpoint when a new checked week has no member rows", () => {
+    const board = raceScoreboard([
+      raceWeek(1, { 11: 70, 22: 60 }),
+      raceWeek(2, { 11: 120, 22: 125 }),
+      raceWeek(3, {}),
+    ]);
+    const race = leagueRace(board, MEMBERS)!;
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <LeagueRaceCard race={race} members={MEMBERS} />
+      </LanguageProvider>,
+    );
+    expect(screen.getByText(COPY.raceWeek(2))).toBeInTheDocument();
+    expect(screen.queryByText(COPY.raceWeek(3))).toBeNull();
+    expect(screen.getByRole("button", { name: COPY.raceNext })).toBeDisabled();
+  });
+
   it.each(["tr", "en"] as const)(
     "brings the viewer's line forward with the week the place was gained marked (%s)",
     (language) => {

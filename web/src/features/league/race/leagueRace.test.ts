@@ -22,6 +22,19 @@ import { leagueRace, placesMoved } from "./leagueRace";
 const MEMBERS = [raceMember(11), raceMember(22), raceMember(33), RACE_SYSTEM];
 
 describe("the league race", () => {
+  it("keeps C while N is finished but unchecked, and while checked N has no member total row", () => {
+    const prior = [raceWeek(1, { 11: 70, 22: 60 }), raceWeek(2, { 11: 120, 22: 125 })];
+    const n = { ...raceWeek(3, { 11: 180, 22: 185 }), data_checked: false };
+    expect(leagueRace(raceScoreboard([...prior, n]), MEMBERS)!.gameweeks).toEqual([1, 2]);
+    expect(
+      leagueRace(raceScoreboard([...prior, { ...n, data_checked: true, members: [] }]), MEMBERS)!
+        .gameweeks,
+    ).toEqual([1, 2]);
+    expect(
+      leagueRace(raceScoreboard([...prior, { ...n, data_checked: true }]), MEMBERS)!.gameweeks,
+    ).toEqual([1, 2, 3]);
+  });
+
   it("places each member by the week's total and marks the week a place changed hands", () => {
     // Week 2: 22 overtakes 11. Week 3 is not settled and is left out.
     const race = leagueRace(
