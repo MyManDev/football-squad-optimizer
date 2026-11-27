@@ -1,7 +1,41 @@
 import { expect, it } from "vitest";
 import { mockSuggestionOverview } from "../../../fixtures/weeklySuggestionOverview";
 import { checkedHistory } from "./historyData";
-import { summarizeHistory } from "./historySummary";
+import { settledHistoryWeeks, summarizeHistory } from "./historySummary";
+
+it("keeps C when the next recorded week is unsettled, and keeps the comparison endpoint without its actual row", () => {
+  const old = mockSuggestionOverview().payload.weeks[0]!;
+  const base = summarizeHistory([old]);
+  const next = {
+    ...structuredClone(old),
+    gameweek: old.gameweek + 1,
+    status: "unsettled" as const,
+  };
+  const pending = summarizeHistory([old, next]);
+  expect(pending).toMatchObject({
+    throughGameweek: old.gameweek,
+    suggested: base.suggested,
+    actual: base.actual,
+    difference: base.difference,
+  });
+  const partial = {
+    ...next,
+    status: "available" as const,
+    actual: null,
+    actual_reason: "not_available",
+    net_difference: null,
+  };
+  expect(settledHistoryWeeks([old, partial])).toEqual([old.gameweek, next.gameweek]);
+  expect(summarizeHistory([old, partial])).toMatchObject({
+    throughGameweek: old.gameweek,
+    suggested: base.suggested,
+    actual: base.actual,
+    difference: base.difference,
+  });
+  expect(summarizeHistory([old, { ...next, status: "available" as const }]).throughGameweek).toBe(
+    next.gameweek,
+  );
+});
 
 it("sums the same final weeks on both sides and keeps chronological running differences", () => {
   const history = checkedHistory(mockSuggestionOverview(), 101);

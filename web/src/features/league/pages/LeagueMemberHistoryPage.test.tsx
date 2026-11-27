@@ -110,6 +110,29 @@ function show(value = history(), language: Language = "tr") {
   );
 }
 
+it("keeps its current comparison total while retaining a new checked week's available suggestion", async () => {
+  const value = history();
+  const first = show(value, "en");
+  const total = first.container.querySelector("tfoot")!.textContent;
+  cleanup();
+  const old = value.payload.weeks[0]!;
+  const next = old.gameweek + 1;
+  value.payload.weeks.unshift({
+    ...structuredClone(old),
+    gameweek: next,
+    actual: null,
+    actual_reason: "not_available",
+    net_difference: null,
+  });
+  const second = show(value, "en");
+  expect(second.container.querySelector("tfoot")!.textContent).toBe(total);
+  const copy = MESSAGES.en.suggestionHistory;
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: copy.week }), String(next));
+  const detail = screen.getByRole("region", { name: copy.title });
+  expect(within(detail).getAllByRole("row")[3]).toHaveTextContent(/20[,.]0.*—/);
+  expect(screen.getByRole("combobox", { name: copy.week })).toHaveValue(String(next));
+});
+
 it.each<Language>(["tr", "en"])(
   "shows gross, costs, net and a signed comparison in %s",
   async (language) => {
