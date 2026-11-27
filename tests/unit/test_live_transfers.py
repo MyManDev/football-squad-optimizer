@@ -12,6 +12,7 @@ window, a tampered handoff.
 import json
 from collections.abc import Sequence
 from dataclasses import replace
+from itertools import pairwise
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -41,6 +42,7 @@ from squadopt.live.transfers import (
     MEMBER_PLANNING_POLICY,
     MEMBER_PLANNING_POLICY_ID,
     _transfer_config,
+    carried_transfer_values,
 )
 from squadopt.planning import TransferPlanningConfig
 from squadopt.platform.cli import CliServices
@@ -431,51 +433,82 @@ POLICY_PROVENANCE_ARTIFACTS = (
     "chip_bayesopt.json",
     "season_chain_tuned.json",
     "member_policy_hit_cost_grid.json",
+    "research/component_banked_transfer_value.json",
+    "research/component_banked_value_model.json",
+)
+
+#: The Bellman model's all-seasons table, the policy's rows by decisions left after this one.
+BANKED_VALUE_TABLE = (
+    (0.0, 0.0, 0.0, 0.0),
+    (2.05, 1.53, 1.19, 0.88),
+    (2.34, 1.91, 1.61, 1.37),
+    (2.53, 2.13, 1.86, 1.50),
+    (2.67, 2.29, 1.96, 1.58),
+    (2.77, 2.36, 2.03, 1.61),
+    (2.82, 2.41, 2.06, 1.63),
+    (2.85, 2.44, 2.08, 1.64),
+    (2.87, 2.46, 2.09, 1.64),
+    (2.88, 2.47, 2.10, 1.65),
+    (2.89, 2.48, 2.10, 1.65),
+    (2.89, 2.48, 2.10, 1.65),
+    (2.90, 2.48, 2.10, 1.65),
+    (2.90, 2.48, 2.11, 1.65),
 )
 
 
 def test_the_member_planning_policy_is_the_rule_and_its_provenance_exists(
     world: dict[str, Any],
 ) -> None:
-    """The member path plans under ``member_planning_policy_v2``: the rule values.
+    """The member path plans under ``member_planning_policy_v3``: the rule values.
 
-    The policy is the planner's defaults but for the hit cost, which carries the caution
-    margin ``member_policy_hit_cost_grid`` measured; the charge stays the game's 4. The
-    fingerprint must therefore differ from the defaults' in exactly that one control, and
-    each artifact the policy's docstring cites as provenance must exist where it says.
+    The policy is the planner's defaults but for two controls: the hit cost, which carries
+    the caution margin ``member_policy_hit_cost_grid`` measured (the charge stays the game's
+    4), and the carried free transfers' values, the Bellman model's all-seasons table the
+    owner chose after ``component_banked_value_model``. The fingerprint must therefore
+    differ from the defaults' in exactly those two controls, the table must be the record's,
+    and each artifact the policy's docstring cites as provenance must exist where it says.
     """
 
     snapshot = read_snapshot(world["snapshot_root"], world["gw1_id"])
     rules = read_season_rules(snapshot, season=SEASON)
 
-    assert MEMBER_PLANNING_POLICY_ID == "member_planning_policy_v2"
+    assert MEMBER_PLANNING_POLICY_ID == "member_planning_policy_v3"
     assert isinstance(MEMBER_PLANNING_POLICY, MappingProxyType)
     assert dict(MEMBER_PLANNING_POLICY) == {
         "transfer_hit_cost_points": 8.0,
         "hit_points_charged": 4.0,
-        "banked_transfer_value_points": 0.0,
+        "banked_transfer_values_by_remaining": BANKED_VALUE_TABLE,
         "horizon_discount_factor": 1.0,
         "chip_holding_value_points": {},
     }
+    record = json.loads(
+        (REPOSITORY_ROOT / "docs" / "research" / "component_banked_value_model.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert record["described"]["all_seasons_value_table"] == [
+        list(row) for row in BANKED_VALUE_TABLE
+    ]
 
-    config = _transfer_config(rules)
+    config = _transfer_config(rules, gameweek=10)
+    values = (0.0, *BANKED_VALUE_TABLE[-1])
     defaults = TransferPlanningConfig(max_free_transfers=rules.transfers.max_free_transfers)
     assert config.configuration_fingerprint != defaults.configuration_fingerprint
     assert (
         config.configuration_fingerprint
-        == replace(defaults, transfer_hit_cost_points=8.0).configuration_fingerprint
+        == replace(
+            defaults, transfer_hit_cost_points=8.0, banked_transfer_values=values
+        ).configuration_fingerprint
     )
     assert config.transfer_hit_cost_points == MEMBER_PLANNING_POLICY["transfer_hit_cost_points"]
     assert config.hit_points_charged == MEMBER_PLANNING_POLICY["hit_points_charged"]
     # The margin lives in the objective; the charge is the game's, and it did not move.
     assert config.hit_points_charged == defaults.hit_points_charged == 4.0
-    assert (
-        config.banked_transfer_value_points
-        == MEMBER_PLANNING_POLICY["banked_transfer_value_points"]
-    )
+    assert config.banked_transfer_value_points == 0.0
+    assert config.banked_transfer_values == values
     assert config.horizon_discount_factor == MEMBER_PLANNING_POLICY["horizon_discount_factor"]
     assert dict(config.chip_holding_value_points) == {}
-    capped = _transfer_config(rules, transfer_cap=1)
+    capped = _transfer_config(rules, gameweek=10, transfer_cap=1)
     assert (
         capped.configuration_fingerprint
         == replace(config, max_transfers_per_gameweek=1).configuration_fingerprint
@@ -661,7 +694,9 @@ def test_gameweek_two_is_decided_from_the_held_squad_and_frozen(
     monkeypatch: pytest.MonkeyPatch, world: dict[str, Any]
 ) -> None:
     gw1 = _decide_gw1(monkeypatch, world)
-    handoff = _handoff(world)
+    # 1016 at 6.0 clears a second carried free transfer's value (2.90 at gameweek two) by a
+    # margin, so the week spends its free transfer rather than carrying it.
+    handoff = _handoff(world, points={1016: 6.0})
 
     exit_code = _decide_gw2(monkeypatch, world, handoff)
 
@@ -676,7 +711,7 @@ def test_gameweek_two_is_decided_from_the_held_squad_and_frozen(
     after = set(decision["squad_player_ids"])
     assert after == (held - set(block["transfers_out"])) | set(block["transfers_in"])
     assert block["transfer_count"] == len(block["transfers_in"]) == len(block["transfers_out"])
-    assert block["transfer_count"] >= 1  # 1024 at 9.0 is worth a free transfer
+    assert block["transfer_count"] >= 1
     assert block["free_transfers_before"] == 1
     assert (
         block["free_transfers_after"] == min(5, max(0, 1 - block["transfer_count"]) + 1)
@@ -1023,3 +1058,17 @@ def test_gw2_decide_accepts_risk_residuals_and_reports_the_risk_state(
     report = (world["ledger_root"] / SEASON / "gw02" / "report.txt").read_text(encoding="utf-8")
     assert "not_requested" not in report
     assert "unavailable" in report
+
+
+def test_a_carried_free_transfer_is_worth_the_tables_row_for_the_decisions_left() -> None:
+    """The first carried transfer is worth nothing, every later one its row's value, the row
+    chosen by the decisions left after this one; nothing after the season's last."""
+
+    assert carried_transfer_values(38, 5) == (0.0, 0.0, 0.0, 0.0, 0.0)
+    assert carried_transfer_values(37, 5) == (0.0, *BANKED_VALUE_TABLE[1])
+    assert carried_transfer_values(25, 5) == (0.0, *BANKED_VALUE_TABLE[13])
+    assert carried_transfer_values(2, 5) == carried_transfer_values(25, 5)
+    assert carried_transfer_values(30, 2) == (0.0, BANKED_VALUE_TABLE[8][0])
+    for gameweek in range(1, 39):
+        values = carried_transfer_values(gameweek, 5)
+        assert all(left >= right for left, right in pairwise(values[1:]))

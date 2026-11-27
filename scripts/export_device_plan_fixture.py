@@ -63,7 +63,11 @@ from squadopt.application.top100_weight import Top100Counts, rebased_week, weigh
 from squadopt.contracts.players import order_outfield_bench
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live import Projection
-from squadopt.live.transfers import MEMBER_PLANNING_POLICY
+from squadopt.live.transfers import (
+    MEMBER_PLANNING_POLICY,
+    MEMBER_PLANNING_POLICY_ID,
+    carried_transfer_values,
+)
 from squadopt.optimization import OptimizationConfig
 from squadopt.optimization.coefficients import objective_coefficients, scale_expected_points
 from squadopt.planning import (
@@ -185,7 +189,7 @@ def _document(table: pd.DataFrame, settings: OptimizationConfig) -> dict[str, An
         "season": "2026-27",
         "gameweek": GAMEWEEK,
         "source_snapshot_id": "synthetic-device-plan-fixture",
-        "policy_id": "member_planning_policy_v2",
+        "policy_id": MEMBER_PLANNING_POLICY_ID,
         "rules": {
             "squad_size": settings.squad_size,
             "starting_size": settings.starting_size,
@@ -200,6 +204,10 @@ def _document(table: pd.DataFrame, settings: OptimizationConfig) -> dict[str, An
             ),
             "hit_points_charged": _policy_number("hit_points_charged"),
             "expected_points_scale": settings.expected_points_scale,
+            "banked_values_scaled": [
+                scale_expected_points(value, settings.expected_points_scale)
+                for value in carried_transfer_values(GAMEWEEK, MAX_FREE_TRANSFERS)
+            ],
         },
         "players": [
             {
@@ -242,7 +250,7 @@ def _reference(
         max_free_transfers=MAX_FREE_TRANSFERS,
         transfer_hit_cost_points=_policy_number("transfer_hit_cost_points"),
         hit_points_charged=_policy_number("hit_points_charged"),
-        banked_transfer_value_points=0.0,
+        banked_transfer_values=carried_transfer_values(GAMEWEEK, MAX_FREE_TRANSFERS),
         horizon_discount_factor=1.0,
         chip_holding_value_points={},
     )

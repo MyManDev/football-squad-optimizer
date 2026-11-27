@@ -83,7 +83,11 @@ from squadopt.application.advice import (
     WINDOW_LINEARIZATION_LEVEL,
     WINDOW_WALL_CEILING_SECONDS,
 )
-from squadopt.live.transfers import MEMBER_PLANNING_POLICY, MEMBER_PLANNING_POLICY_ID
+from squadopt.live.transfers import (
+    MEMBER_PLANNING_POLICY,
+    MEMBER_PLANNING_POLICY_ID,
+    carried_transfer_values,
+)
 from squadopt.optimization import OptimizationConfig
 from squadopt.optimization.coefficients import (
     objective_coefficients,
@@ -441,6 +445,12 @@ class PlannerCall:
         )
 
 
+# The policies a published table may carry. v3 moved only the carried free transfers'
+# values, which the table states for its gameweek (``banked_values_scaled``) and which
+# price the one-week plan only; a v2 table states none and carried nothing.
+PREVIOUS_POLICY_ID: Final = "member_planning_policy_v2"
+
+
 def _policy_number(name: str) -> float:
     return float(cast(float, MEMBER_PLANNING_POLICY[name]))
 
@@ -466,8 +476,21 @@ def require_rules(table: Mapping[str, Any]) -> None:
     for key, value in expected.items():
         if rules.get(key) != value:
             raise ProtocolRefusal(f"The device table's {key} is {rules.get(key)!r}, not {value!r}.")
-    if table.get("policy_id") != MEMBER_PLANNING_POLICY_ID:
-        raise ProtocolRefusal(f"The device table's policy is {table.get('policy_id')!r}.")
+    policy_id = table.get("policy_id")
+    banked = rules.get("banked_values_scaled")
+    if policy_id == MEMBER_PLANNING_POLICY_ID:
+        expected_banked = [
+            scale_expected_points(value, settings.expected_points_scale)
+            for value in carried_transfer_values(
+                int(table["gameweek"]), int(rules["max_free_transfers"])
+            )
+        ]
+        if banked != expected_banked:
+            raise ProtocolRefusal(
+                f"The device table's banked_values_scaled is {banked!r}, not {expected_banked!r}."
+            )
+    elif policy_id != PREVIOUS_POLICY_ID or banked is not None:
+        raise ProtocolRefusal(f"The device table's policy is {policy_id!r}.")
     players = table["players"]
     coefficients = objective_coefficients([p["expected_points"] for p in players], settings)
     for player, coefficient in zip(players, coefficients, strict=True):
@@ -475,15 +498,27 @@ def require_rules(table: Mapping[str, Any]) -> None:
             raise ProtocolRefusal(f"Player {player['id']}'s published coefficients differ.")
 
 
-def member_policy(table: Mapping[str, Any], *, transfer_cap: int | None) -> TransferPlanningConfig:
-    """``MEMBER_PLANNING_POLICY`` under the published free-transfer cap."""
+def member_policy(
+    table: Mapping[str, Any], *, transfer_cap: int | None, weeks: int
+) -> TransferPlanningConfig:
+    """``MEMBER_PLANNING_POLICY`` under the published free-transfer cap, for ``weeks``.
 
+    The carried free transfers' values are the one-week plan's terminal term for the
+    table's gameweek, as the table states them; a window carries none
+    (``member_window_policy``).
+    """
+
+    banked = (
+        carried_transfer_values(int(table["gameweek"]), int(table["rules"]["max_free_transfers"]))
+        if weeks == 1 and table.get("policy_id") == MEMBER_PLANNING_POLICY_ID
+        else ()
+    )
     return TransferPlanningConfig(
         max_free_transfers=int(table["rules"]["max_free_transfers"]),
         max_transfers_per_gameweek=transfer_cap,
         transfer_hit_cost_points=_policy_number("transfer_hit_cost_points"),
         hit_points_charged=_policy_number("hit_points_charged"),
-        banked_transfer_value_points=_policy_number("banked_transfer_value_points"),
+        banked_transfer_values=banked,
         horizon_discount_factor=_policy_number("horizon_discount_factor"),
         chip_holding_value_points=cast(
             Mapping[str, float], MEMBER_PLANNING_POLICY["chip_holding_value_points"]
@@ -543,7 +578,7 @@ def one_week_call(inputs: PublishedInputs, entry_id: int) -> PlannerCall:
             "expected_points": frame["expected_points"].astype("float64"),
         }
     )
-    policy = member_policy(inputs.table, transfer_cap=None)
+    policy = member_policy(inputs.table, transfer_cap=None, weeks=1)
     return PlannerCall(
         horizon=PlanningHorizon(horizon),
         state=_state(block, policy),
@@ -601,7 +636,8 @@ def window_call(inputs: PublishedInputs, entry_id: int, window: int) -> PlannerC
             )
         )
     policy = replace(
-        member_policy(inputs.table, transfer_cap=1), acquisition_sell_on_fee=SELL_ON_FEE
+        member_policy(inputs.table, transfer_cap=1, weeks=window),
+        acquisition_sell_on_fee=SELL_ON_FEE,
     )
     return PlannerCall(
         horizon=PlanningHorizon(pd.concat(frames, ignore_index=True)),

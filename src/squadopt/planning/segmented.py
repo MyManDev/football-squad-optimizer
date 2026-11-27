@@ -112,7 +112,7 @@ def plan_in_segments(
     rights = chips or ChipAvailability()
     original_rights = rights
     if (
-        settings.banked_transfer_value_points
+        settings.values_carried_transfers
         or settings.chip_holding_value_points
         or any(
             period.holding_value_points not in (None, 0)

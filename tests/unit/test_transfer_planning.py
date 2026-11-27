@@ -948,6 +948,82 @@ def test_a_banked_free_transfer_with_terminal_value_is_kept_for_a_small_gain(
     )
 
 
+@pytest.mark.parametrize(
+    ("schedule", "moves"),
+    [((0.0, 0.2), 1), ((0.0, 0.5), 0), ((9.0, 0.2), 1), ((9.0, 0.5, 0.1), 0)],
+)
+def test_a_declining_schedule_values_each_carried_free_transfer_in_turn(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    schedule: tuple[float, ...],
+    moves: int,
+) -> None:
+    """The same 0.3 move against a schedule: the week carries one free transfer either way,
+    so only the second's value decides, whatever the first is worth; the terminal value is
+    the schedule's sum up to the count carried."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    start = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    result = optimize_transfer_plan(
+        horizon,
+        start,
+        small_config,
+        TransferPlanningConfig(banked_transfer_values=schedule),
+    )
+
+    week = result.weeks[0]
+    assert week.transfer_count == moves
+    carried = week.free_transfers_for_next_gameweek
+    assert carried == (1 if moves else 2)
+    assert result.diagnostics["terminal_banked_transfer_value"] == pytest.approx(
+        sum(schedule[:carried])
+    )
+
+
+@pytest.mark.parametrize("value", [0.2, 0.5])
+def test_a_flat_schedule_plans_what_the_constant_plans(
+    known_optimum_players: pd.DataFrame, small_config: OptimizationConfig, value: float
+) -> None:
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    start = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+    constant = optimize_transfer_plan(
+        horizon, start, small_config, TransferPlanningConfig(banked_transfer_value_points=value)
+    )
+    config = TransferPlanningConfig(banked_transfer_values=(value,) * 5)
+    flat = optimize_transfer_plan(horizon, start, small_config, config)
+
+    assert flat.weeks[0].transfer_count == constant.weeks[0].transfer_count
+    assert (
+        flat.weeks[0].free_transfers_for_next_gameweek
+        == constant.weeks[0].free_transfers_for_next_gameweek
+    )
+    assert flat.objective_value == pytest.approx(constant.objective_value)
+    assert config.carried_transfer_values == (value,) * 5
+    assert TransferPlanningConfig(banked_transfer_value_points=value).carried_transfer_values == (
+        (value,) * 5
+    )
+
+
+def test_a_schedule_is_checked_and_enters_the_fingerprint_only_when_set() -> None:
+    base = TransferPlanningConfig()
+    assert TransferPlanningConfig(banked_transfer_values=()).configuration_fingerprint == (
+        base.configuration_fingerprint
+    )
+    assert not base.values_carried_transfers
+    scheduled = TransferPlanningConfig(banked_transfer_values=(0.0, 2.0, 1.0))
+    assert scheduled.values_carried_transfers
+    assert scheduled.carried_transfer_values == (0.0, 2.0, 1.0, 0.0, 0.0)
+    assert scheduled.configuration_fingerprint != base.configuration_fingerprint
+    assert scheduled.for_net_points().banked_transfer_values == ()
+    with pytest.raises(TransferPlanningConfigurationError):
+        TransferPlanningConfig(banked_transfer_values=(0.0, -1.0))
+    with pytest.raises(TransferPlanningConfigurationError):
+        TransferPlanningConfig(max_free_transfers=2, banked_transfer_values=(0.0, 1.0, 1.0))
+    with pytest.raises(TransferPlanningConfigurationError):
+        TransferPlanningConfig(banked_transfer_value_points=1.0, banked_transfer_values=(1.0,))
+
+
 def test_discipline_settings_enter_the_configuration_fingerprint() -> None:
     base = TransferPlanningConfig()
     assert (

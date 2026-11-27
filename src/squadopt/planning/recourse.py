@@ -150,7 +150,7 @@ def optimize_observed_recourse(
         raise ValueError("candidate_count must be an integer between 1 and 20.")
     if (
         transfer.horizon_discount_factor != 1
-        or transfer.banked_transfer_value_points != 0
+        or transfer.values_carried_transfers
         or transfer.chip_holding_value_points
         or transfer.transfer_hit_cost_points != transfer.hit_points_charged
         or optimization.bench_weight != 0

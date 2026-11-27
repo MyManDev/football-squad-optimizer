@@ -142,7 +142,7 @@ def optimize_observed_window(
     rights = chips or ChipAvailability()
     if (
         transfer.horizon_discount_factor != 1
-        or transfer.banked_transfer_value_points != 0
+        or transfer.values_carried_transfers
         or transfer.chip_holding_value_points
         or any(
             p.holding_value_points not in (None, 0)

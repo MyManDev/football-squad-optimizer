@@ -62,6 +62,13 @@ export interface DevicePlanRules {
   hit_points_charged: number;
   /** The same on the objective scale; absent on documents from before the field. */
   hit_charged_scaled?: number;
+  /**
+   * What the k-th free transfer carried into next week is worth on the objective scale,
+   * k = 1..cap, for this week's decision: the one-week plan adds the first n of them when
+   * the week leaves n in the bank. Absent on documents from before the field, which priced
+   * a carried transfer at nothing.
+   */
+  banked_values_scaled?: number[];
   expected_points_scale: number;
   /** Each rival strategy's band on the decided week; absent on documents from before the field. */
   strategies?: Partial<
@@ -315,6 +322,10 @@ export function isDevicePlanDocument(value: unknown): value is DevicePlanDocumen
     finite(rules.hit_cost_scaled) &&
     finite(rules.hit_points_charged) &&
     (rules.hit_charged_scaled === undefined || finite(rules.hit_charged_scaled)) &&
+    (rules.banked_values_scaled === undefined ||
+      (Array.isArray(rules.banked_values_scaled) &&
+        rules.banked_values_scaled.length <= rules.max_free_transfers &&
+        rules.banked_values_scaled.every((value) => finite(value) && value >= 0))) &&
     (rules.strategies === undefined || isBands(rules.strategies)) &&
     (rules.top100 === undefined || isTop100Rules(rules.top100)) &&
     finite(rules.expected_points_scale) &&

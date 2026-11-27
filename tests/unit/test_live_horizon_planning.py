@@ -162,7 +162,17 @@ def test_the_horizon_path_plans_under_the_same_policy_as_the_one_week_path(
 
     plan, config = plan_transfer_horizon(inputs, horizon, held, rules)
 
-    expected = live_transfers._transfer_config(rules, transfer_cap=None if length == 1 else 1)
+    expected = live_transfers.member_window_policy(
+        rules, gameweek=2, transfer_cap=None if length == 1 else 1, weeks=length
+    )
+    # The carried free transfers' values are the one-week plan's terminal term: a one-week
+    # horizon keeps the decision gameweek's row, a window plans its weeks explicitly and
+    # carries none.
+    assert config.banked_transfer_values == (
+        live_transfers.carried_transfer_values(2, rules.transfers.max_free_transfers)
+        if length == 1
+        else ()
+    )
     if length > 1:
         expected = replace(expected, acquisition_sell_on_fee=float(rules.transfers.sell_on_fee))
     assert config.configuration_fingerprint == expected.configuration_fingerprint
@@ -500,7 +510,7 @@ def test_the_horizon_path_passes_a_band_and_a_first_week_cap_to_the_planner(
     inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
     # The default policy already caps every week of a multi-week horizon at one, so the
     # first-week cap is only observable against a policy that caps no week.
-    uncapped = live_transfers._transfer_config(rules, transfer_cap=None)
+    uncapped = live_transfers._transfer_config(rules, gameweek=2, transfer_cap=None)
     band_players = frozenset(int(player) for player in held.squad_player_ids[:8])
     band = FirstWeekOverlap(player_ids=band_players, minimum=8)
 
@@ -731,7 +741,9 @@ def test_live_repurchase_uses_new_basis_and_chip_restore(
 
 def test_live_multiweek_refuses_explicit_fee_that_contradicts_capture(tmp_path):
     inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
-    policy = replace(live_transfers._transfer_config(rules), acquisition_sell_on_fee=0.0)
+    policy = replace(
+        live_transfers._transfer_config(rules, gameweek=2), acquisition_sell_on_fee=0.0
+    )
     with pytest.raises(DataSourceError, match="sale fee"):
         plan_transfer_horizon(inputs, horizon, held, rules, transfer_config=policy)
 

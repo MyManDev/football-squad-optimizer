@@ -66,7 +66,7 @@ def optimize_with_lookahead(
     if len(forecast.gameweeks) <= window:
         raise ValueError("Lookahead requires explicit forecast weeks beyond the decision window.")
     settings = transfer or TransferPlanningConfig()
-    if settings.banked_transfer_value_points or settings.chip_holding_value_points:
+    if settings.values_carried_transfers or settings.chip_holding_value_points:
         raise ValueError("Explicit lookahead cannot be stacked with terminal constants.")
     if chips is not None and any(
         p.holding_value_points not in (None, 0)

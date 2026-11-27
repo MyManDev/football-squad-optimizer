@@ -80,7 +80,7 @@ from squadopt.live.rules import SeasonRules, read_season_rules
 from squadopt.live.tick import handoff_path_for
 from squadopt.live.transfers import (
     HeldSquad,
-    _transfer_config,
+    member_window_policy,
     plan_transfer_horizon,
     plan_transfers,
 )
@@ -788,7 +788,12 @@ def prepare_window(
         for player, price in zip(table["player_id"], table["price_tenths"], strict=True)
     ]
     weeks = len(horizon.target_gameweeks)
-    policy = _transfer_config(rules, transfer_cap=None if weeks == 1 else 1)
+    policy = member_window_policy(
+        rules,
+        gameweek=int(horizon.target_gameweeks[0]),
+        transfer_cap=None if weeks == 1 else 1,
+        weeks=weeks,
+    )
     if weeks > 1:
         policy = replace(policy, acquisition_sell_on_fee=fee)
     # A three- or five-week football window that plan_transfer_horizon routes also lets a

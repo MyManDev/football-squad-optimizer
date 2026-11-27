@@ -106,6 +106,11 @@ def expected_selection_policy(
         "transfer_hit_cost_points": transfer.transfer_hit_cost_points,
         "horizon_discount_factor": transfer.horizon_discount_factor,
         "banked_transfer_value_points": transfer.banked_transfer_value_points,
+        **(
+            {"banked_transfer_values": list(transfer.banked_transfer_values)}
+            if transfer.banked_transfer_values
+            else {}
+        ),
         "chip_holding_value_points": dict(transfer.chip_holding_value_points),
         "chip_holding_value_overrides": {
             name: [

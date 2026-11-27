@@ -763,6 +763,9 @@ def _policy_values() -> dict[str, object]:
     for name, value in sorted(MEMBER_PLANNING_POLICY.items()):
         if isinstance(value, Mapping):
             values[name] = {str(k): float(str(v)) for k, v in sorted(value.items())}
+        elif isinstance(value, tuple):
+            # A table, such as the carried free transfers' values by decisions left.
+            values[name] = [[float(str(cell)) for cell in row] for row in value]
         else:
             values[name] = float(str(value))
     return values

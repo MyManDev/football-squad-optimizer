@@ -220,28 +220,54 @@ class _MemberPlanningPolicy(TypedDict):
 
     transfer_hit_cost_points: float
     hit_points_charged: float
-    banked_transfer_value_points: float
+    banked_transfer_values_by_remaining: tuple[tuple[float, ...], ...]
     horizon_discount_factor: float
     chip_holding_value_points: Mapping[str, float]
 
 
-MEMBER_PLANNING_POLICY_ID: Final = "member_planning_policy_v2"
+MEMBER_PLANNING_POLICY_ID: Final = "member_planning_policy_v3"
 _MEMBER_PLANNING_POLICY_VALUES: Final[_MemberPlanningPolicy] = {
     "transfer_hit_cost_points": 8.0,
     "hit_points_charged": float(TRANSFER_HIT_POINTS),
-    "banked_transfer_value_points": 0.0,
+    # The value of the 2nd, 3rd, 4th and 5th free transfer carried out of a decision, by
+    # the decisions left in the season after it (the last row for thirteen or more). The
+    # rows are ``all_seasons_value_table`` in ``docs/research/component_banked_value_model.json``.
+    "banked_transfer_values_by_remaining": (
+        (0.0, 0.0, 0.0, 0.0),
+        (2.05, 1.53, 1.19, 0.88),
+        (2.34, 1.91, 1.61, 1.37),
+        (2.53, 2.13, 1.86, 1.50),
+        (2.67, 2.29, 1.96, 1.58),
+        (2.77, 2.36, 2.03, 1.61),
+        (2.82, 2.41, 2.06, 1.63),
+        (2.85, 2.44, 2.08, 1.64),
+        (2.87, 2.46, 2.09, 1.64),
+        (2.88, 2.47, 2.10, 1.65),
+        (2.89, 2.48, 2.10, 1.65),
+        (2.89, 2.48, 2.10, 1.65),
+        (2.90, 2.48, 2.10, 1.65),
+        (2.90, 2.48, 2.11, 1.65),
+    ),
     "horizon_discount_factor": 1.0,
     "chip_holding_value_points": MappingProxyType({}),
 }
 MEMBER_PLANNING_POLICY: Final[Mapping[str, object]] = MappingProxyType(
     _MEMBER_PLANNING_POLICY_VALUES
 )
-"""The member path's planning policy, ``member_planning_policy_v2``: the rule values.
+"""The member path's planning policy, ``member_planning_policy_v3``: the rule values.
 
 Every mid-season member decision plans one week ahead under these five controls; the
 rest of ``TransferPlanningConfig`` is the season's rules (the free-transfer cap, a
-transfer cap when a caller sets one) and the planner's contract. A banked free transfer
-is worth nothing past the week, a single week is not discounted, and no chip carries a
+transfer cap when a caller sets one) and the planner's contract. A free transfer carried
+into next week is worth what a Bellman model over the rest of the season says the stock
+is worth: the first carried transfer is earned anyway and adds nothing, the second about
+2.9 points, the third 2.5, the fourth 2.1 and the fifth 1.65, each falling over the last
+dozen decisions to zero after the season's last (``carried_transfer_values``). So the week
+spends a free transfer only on a move its forecast scores above what holding it is worth,
+and the more it holds the cheaper the next one becomes. The values price the one-week plan
+only: the multi-week windows (``plan_transfer_horizon``) plan the weeks they hold
+explicitly and carry no terminal value. A single week is not
+discounted, and no chip carries a
 holding value because the member path offers no chip unless the operator names one
 (``_chip_availability``), which leaves holding values inert here.
 
@@ -309,6 +335,24 @@ Provenance — what each measurement said about moving them, in date order:
   counted at it. 8 is the top of the measured grid, so it sits on an edge rather than at
   an interior optimum; the next measurement should widen the range (4-12) before it is
   read as one.
+* ``docs/research/component_banked_transfer_value.json`` (2026-11-27): the value of a
+  carried free transfer {0, 0.5, 1, 1.5, 2, 3, 4, 6} on the lookahead-1 chain over the
+  component forecast, bank cap 5, four development seasons, 147 decisions. Against 0:
+  0.5 is +2.60 a week [+1.21, +4.07] (the protocol's ``move``), 1 is +0.78, 1.5 and above
+  at or below 0. The path diagnostic beside it walks 1.12: +0.12 a week [-1.78, +2.12]
+  against 0, below 0.5 in every season. A value computed each week from the next week's
+  plan (``component_computed_banked_value``) read ``unsupported``.
+* **The decision (2026-11-27, Ertugrul Soydal, owner):** set the carried free transfer's
+  value to 1.12, a judgement of what a held transfer is worth rather than the measured
+  best level. 2025-26 is not in the measurement: it stayed the locked season.
+* ``docs/research/component_banked_value_model.json`` (2026-11-27): a Bellman model of the
+  free-transfer stock, its value function built each season from the other three. Against
+  1.12 it is +1.16 a week [-0.35, +3.19], ahead in three seasons of four
+  (``not_separable``); against 0, +1.29 [-0.29, +3.43]; behind 0.5 in every season,
+  -1.31 [-2.98, +0.75]. The table above is the same model on all four seasons' 147
+  decisions (``all_seasons_value_table`` in that record).
+* **The decision (2026-11-27, Ertugrul Soydal, owner):** use the model in place of the
+  constant.
 
 Revisit rule. These values change only in a pull request that cites a measurement on
 the lookahead-1 season chain with 2025-26 included as a season, and that re-pins the
@@ -335,9 +379,24 @@ change: the ledger and the settle step charge the game's 4 regardless.
 """
 
 
+SEASON_LAST_GAMEWEEK: Final = 38
+
+
+def carried_transfer_values(gameweek: int, max_free_transfers: int) -> tuple[float, ...]:
+    """The member policy's value of the ``k``-th free transfer carried out of the decision at
+    ``gameweek``, ``k = 1..max_free_transfers``: zero for the first, which every week earns
+    anyway, then the policy's row for the decisions left in the season after this one."""
+
+    table = _MEMBER_PLANNING_POLICY_VALUES["banked_transfer_values_by_remaining"]
+    remaining = max(0, SEASON_LAST_GAMEWEEK - int(gameweek))
+    row = table[min(remaining, len(table) - 1)]
+    return (0.0, *row)[:max_free_transfers]
+
+
 def _transfer_config(
     rules: SeasonRules,
     *,
+    gameweek: int,
     transfer_cap: int | None = None,
     transfer_hit_cost_points: float | None = None,
 ) -> TransferPlanningConfig:
@@ -349,13 +408,21 @@ def _transfer_config(
     ``None`` is the policy, which is what every published plan uses.
     """
 
-    values = _MEMBER_PLANNING_POLICY_VALUES.copy()
-    if transfer_hit_cost_points is not None:
-        values["transfer_hit_cost_points"] = float(transfer_hit_cost_points)
+    values = _MEMBER_PLANNING_POLICY_VALUES
     return TransferPlanningConfig(
         max_free_transfers=rules.transfers.max_free_transfers,
         max_transfers_per_gameweek=transfer_cap,
-        **values,
+        transfer_hit_cost_points=(
+            values["transfer_hit_cost_points"]
+            if transfer_hit_cost_points is None
+            else float(transfer_hit_cost_points)
+        ),
+        hit_points_charged=values["hit_points_charged"],
+        banked_transfer_values=carried_transfer_values(
+            gameweek, rules.transfers.max_free_transfers
+        ),
+        horizon_discount_factor=values["horizon_discount_factor"],
+        chip_holding_value_points=values["chip_holding_value_points"],
     )
 
 
@@ -482,6 +549,7 @@ def _prepare_planning(
         ].to_numpy()
     transfer_config = _transfer_config(
         rules,
+        gameweek=gameweek,
         transfer_cap=None if transfer_cap is None else int(transfer_cap),
         transfer_hit_cost_points=transfer_hit_cost_points,
     )
@@ -521,10 +589,26 @@ class MemberPlanningInputs:
     settings: OptimizationConfig
 
 
-def member_planning_policy(rules: SeasonRules) -> TransferPlanningConfig:
-    """The member planning policy under this season's rules, as every published plan uses it."""
+def member_window_policy(
+    rules: SeasonRules, *, gameweek: int, transfer_cap: int | None, weeks: int
+) -> TransferPlanningConfig:
+    """The member planning policy as a horizon of ``weeks`` plans under it.
 
-    return _transfer_config(rules)
+    The carried free transfers' values are the one-week plan's terminal term, so a one-week
+    horizon from ``gameweek`` keeps them and plans what the one-week card plans. A longer
+    window plans the weeks it holds explicitly, and the window solvers refuse a terminal
+    value, so it carries none.
+    """
+
+    policy = _transfer_config(rules, gameweek=gameweek, transfer_cap=transfer_cap)
+    return policy if weeks == 1 else replace(policy, banked_transfer_values=())
+
+
+def member_planning_policy(rules: SeasonRules, gameweek: int) -> TransferPlanningConfig:
+    """The member planning policy for the decision at ``gameweek``, as every published plan
+    uses it."""
+
+    return _transfer_config(rules, gameweek=gameweek)
 
 
 def member_planning_inputs(
@@ -1368,12 +1452,15 @@ def plan_transfer_horizon(
     planning_policy = (
         # The same MEMBER_PLANNING_POLICY the one-week path builds from. Spelling the
         # controls out here instead would price a member's window at one hit cost and
-        # their week at another the moment the policy moves.
-        _transfer_config(
+        # their week at another the moment the policy moves. A window carries no
+        # carried-transfer value (``member_window_policy``).
+        member_window_policy(
             rules,
+            gameweek=int(projection_horizon.target_gameweeks[0]),
             transfer_cap=None
             if len(projection_horizon.target_gameweeks) == 1 or game_transfer_limits
             else 1,
+            weeks=len(projection_horizon.target_gameweeks),
         )
         if transfer_config is None
         else transfer_config
@@ -1461,6 +1548,17 @@ def plan_transfer_horizon(
         else None
     )
     planning_horizon = PlanningHorizon(planning_table)
+    # The priority, observed, expected, guarded and chip-strategy solvers refuse a
+    # terminal constant, so a one-week horizon routed to one of them plans without the
+    # carried value; only the plain and named-chip solves carry it.
+    if (
+        (priority_program is not None and priority_reference is not None)
+        or (information is not None and information.nodes)
+        or expected_lineups
+        or guarded_football
+        or chip_strategy
+    ):
+        planning_policy = replace(planning_policy, banked_transfer_values=())
     plan = (
         _priority_plan(
             planning_horizon,

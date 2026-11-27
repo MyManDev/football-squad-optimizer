@@ -178,7 +178,7 @@ def _table_body(
         ]
     )
     coefficients = objective_coefficients(table["expected_points"].tolist(), settings)
-    policy = member_planning_policy(rules)
+    policy = member_planning_policy(rules, int(inputs.deadline.gameweek))
     weights = tuple(weight for weight in TOP100_WEIGHTS if weight != 0)
     weighted_scaled: dict[int, dict[str, int]] = {}
     if top100 is not None:
@@ -218,6 +218,13 @@ def _table_body(
                 policy.hit_points_charged, settings.expected_points_scale
             ),
             "expected_points_scale": settings.expected_points_scale,
+            # What the k-th free transfer carried into next week is worth on the objective
+            # scale, k = 1..cap, for this week's decision: the one-week plan adds the first
+            # n of them when the week leaves n transfers in the bank.
+            "banked_values_scaled": [
+                scale_expected_points(value, settings.expected_points_scale)
+                for value in policy.carried_transfer_values
+            ],
             # Each rival strategy's overlap band on the decided week, from the catalogue:
             # a floor is relaxed downward and a ceiling upward until the free transfers
             # reach it (``advice._solve_within_free_transfers``).

@@ -215,6 +215,45 @@ export function memberWeekProblem(
           )
       : undefined);
   const primary = primaryObjective(document, chip, hitCostScaled, choice);
+  // The free transfers the week carries into next week, priced as the server's one-week
+  // plan prices them (`free_next` in `squadopt/planning/optimizer.py`): next week holds
+  // the unused ones plus the new one, up to the cap. `carried_k` is one when it carries at
+  // least k (`carried_free_transfer_k` on the server), so the k-th value is added only
+  // after the ones before it, whatever the schedule's shape. A rebuild week keeps the bank
+  // as it is, and a net points comparison prices nothing beyond the week, so neither
+  // carries it.
+  const bankedScaled = rules.banked_values_scaled ?? [];
+  const carried = bankedScaled.map((_, k) => `carried${k + 1}`);
+  if (
+    bankedScaled.some((value) => value > 0) &&
+    !rebuilds(chip) &&
+    !preferences?.net_points_priority
+  ) {
+    // `paid` is exact at the optimum only while a paid transfer costs more than a carried
+    // one is worth; otherwise paying for a transfer would buy a carried one.
+    if (bankedScaled.some((value) => hitCostScaled <= value))
+      throw new Error("A carried transfer cannot be worth more than a paid one costs.");
+    rows.push(
+      row(
+        "carried",
+        [
+          ...carried.map((name) => term(1, name)),
+          ...arrivals.map((i) => term(1, s(i))),
+          term(-1, "paid"),
+        ],
+        "<=",
+        entry.free_transfers + 1,
+      ),
+    );
+    for (let k = 1; k < carried.length; k += 1)
+      rows.push(
+        row(`carried_order${k + 1}`, [term(1, carried[k - 1]!), term(-1, carried[k]!)], ">=", 0),
+      );
+    bankedScaled.forEach((value, k) => {
+      if (value !== 0) primary.push(term(value, carried[k]!));
+    });
+  }
+  const carries = rows.some((r) => r.name === "carried");
   if (options.minimumObjectiveScaled !== undefined)
     rows.push(row("point_floor", primary, ">=", options.minimumObjectiveScaled));
   let sense: LpProblem["sense"] = "Maximize";
@@ -234,6 +273,10 @@ export function memberWeekProblem(
     objective,
     rows,
     generals: [{ variable: "paid", lower: 0, upper: rules.squad_size }],
-    binaries: [...indices.flatMap((i) => [s(i), x(i), c(i)]), ...(hasExcess ? ["moved"] : [])],
+    binaries: [
+      ...indices.flatMap((i) => [s(i), x(i), c(i)]),
+      ...(hasExcess ? ["moved"] : []),
+      ...(carries ? carried : []),
+    ],
   };
 }
