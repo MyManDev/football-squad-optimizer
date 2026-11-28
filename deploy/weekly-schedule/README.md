@@ -267,6 +267,30 @@ line on #1093. Stop the timer first: the gate does not yet wait for a release st
 and a run started under one would find `develop` moved and refuse to publish. A tick missed
 while the timer is stopped runs once when it starts again (`Persistent=true`).
 
+The HTTP/content checks always gate a release. The browser smoke and tour are optional on
+this host: if Node, the locked web dependencies or Chromium is unavailable, the release logs
+one browser-skip line after HTTP verification and continues to the backend move. Backend
+reads, including an old endpoint or a transient 503, do not gate the site while the backend
+still serves the previous tag.
+
+Browser provisioning is **off by default** (`SQUADOPT_LIVE_BROWSER=0`). The owner can opt in
+while no weekly tick is running, using the existing provisioning script as root:
+
+```sh
+SQUADOPT_LIVE_BROWSER=1 SQUADOPT_REF=develop bash /srv/squadopt/weekly/deploy/weekly-schedule/provision.sh
+```
+
+This installs Node 22 from its signed apt repository, runs `npm ci` in the checkout's `web/`
+as `squadopt`, and runs `npx --no-install playwright install --with-deps chromium` as root.
+Chromium goes in `/srv/squadopt/.cache/ms-playwright`, the service user's default Linux
+browser cache, and provisioning checks that `squadopt` can launch it. Run the opt-in again
+after a lockfile update to install its matching browser. This changes the host and is the
+owner's decision; it does not deploy the site or move the backend.
+
+If the site deployed but its browser check failed, rerun only the read-only checks in the
+[deployment recovery instructions](../../docs/deployment_runbook.md), then let the owner move
+the backend. Do not rerun `ship.sh` or `deploy.sh`, and do not re-dispatch a successful site.
+
 ```sh
 systemctl is-active weekly-schedule.service   # "inactive": no tick is running
 sudo systemctl stop weekly-schedule.timer

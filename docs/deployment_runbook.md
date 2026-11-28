@@ -277,15 +277,44 @@ if develop **has** moved, the rerun succeeds and ships a different tree than the
 pull request reviewed, with no gate anywhere catching it. Recover with the second stage alone:
 
 ```
-sh scripts/release/deploy.sh <tag>
-python scripts/release/verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]
+sh scripts/release/deploy.sh <tag> <accepted-generated-at-ISO> [settled-gameweek] [expected-data-root]
 ```
 
-Run the second line only when the first has exited 0, and wait about 45 seconds between
-them. `deploy.sh` reports the workflow run, not the site, so the recovery is not done until
-`verify_live.py` prints `ALL GOOD`: it is the step `ship.sh` runs after `deploy.sh`, and
-without it the recovery path had no check of what the site serves. If it fails in the first
-minutes, run it once more a minute later, as `ship.sh` does. `deploy.sh` watches the
+`deploy.sh` waits 45 seconds after the successful workflow, then runs its read-only gate.
+That gate requires `verify_live.py` to print `ALL GOOD` (retrying once after a minute),
+then runs the live browser smoke and full page tour when local browser tooling is available.
+Missing Node, locked web dependencies or a launchable Chromium produces one skip line;
+HTTP/content verification remains required. An available browser that finds a site failure
+still fails the release step. `ship.sh` passes the accepted stamp, settled week and release worktree's data root
+to this same gate. If passing a data root without a settled week, pass an empty third
+argument: `deploy.sh <tag> <stamp> '' <expected-data-root>`. The weekly caller still passes
+the same five required `ship.sh` arguments (site PR, tag, release branch, accepted stamp,
+summary), with the settled gameweek as its optional sixth argument. Its recovery message
+points to this runbook.
+
+To repeat only the HTTP/content verification after recovery, without another deployment:
+
+```sh
+python scripts/release/verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>] [--expected-data-root <path>]
+```
+
+The recovery `deploy.sh` command above already runs this verifier and the browser gate.
+
+**Deployment succeeded, browser gate failed.** The site is already live. Do not rerun
+`deploy.sh`, which refuses the existing tag, and do not re-dispatch a successful deployment:
+another upload spends another Cloudflare deployment. Repeat only the read-only checks:
+
+```sh
+python scripts/release/verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>] --expected-data-root <release-worktree>/web/public/data
+cd web && LIVE_SMOKE_COMPUTE= LIVE_BASE_URL=https://squadopt.mymandev.com npx --no-install playwright test --config playwright.live.config.ts
+```
+
+Retry HTTP verification once after a minute if the edge is still updating, then run the
+browser checks when provisioned. Once the checks pass, the owner moves the backend using
+the [manual backend release steps](../deploy/weekly-schedule/README.md#a-release).
+The browser gate ignores backend read statuses and transport failures because this move
+has not happened yet; it still rejects site failures and attempted service writes.
+`deploy.sh` watches the
 earliest dispatch run created since a minute before its own dispatch (the minute is slack for
 clock skew), so an older release's finished run is not picked while this machine's clock is
 within a minute of GitHub's. It refuses a successful run whose production job does not name
@@ -295,19 +324,27 @@ the name cannot tell this release's own failure from another run's. If another d
 made shortly before this one, check with `gh run list --workflow deploy-pages.yml` that the
 failed run is this release's before dispatching again.
 
-Once the tag has been pushed, recover with a re-dispatch instead, which needs neither script
-and can be repeated, and then run the same `verify_live.py` command once that run has finished:
+If the tag has been pushed but its deployment did not succeed, recovery can require a
+re-dispatch, which needs neither script. This is not recovery for an already-live site
+whose browser check failed. Once the recovered deployment finishes, run the read-only gate:
 
 ```
 gh workflow run deploy-pages.yml --ref develop -f release_tag=<tag>
+python scripts/release/verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>] [--expected-data-root <path>]
+cd web && LIVE_SMOKE_COMPUTE= LIVE_BASE_URL=https://squadopt.mymandev.com npx --no-install playwright test --config playwright.live.config.ts
 ```
+
+After re-dispatch, run the HTTP check only once the deployment finishes; if it fails while
+the edge updates, retry it once after a minute. Run the browser command only after HTTP
+verification passes. These read-only checks do not deploy again.
 
 Each dispatch that reaches the upload spends one of the day's ten Cloudflare deployments,
 whatever happens after it, so a run that uploads and then fails its smoke check has still spent
 one. Previews spend from the same day and stop at eight; on a busy day the previews can be gone
 before 06:00 UTC, leaving two production slots. Check what the day has spent before dispatching.
 
-`deploy.sh <tag>` is the second stage. `verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]`
+`deploy.sh <tag> <accepted-generated-at-ISO> [settled-gameweek] [expected-data-root]` is the second stage.
+`verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>] [--expected-data-root <path>]`
 retains the smoke checks (the routes, the documents, the two absent ones and every asset the shell reaches) and the content checks, and a settled release names the gameweek it settles so the verifier asserts it.
 
 None of these scripts merges into develop. Develop merges through the GitHub merge queue, which
@@ -562,8 +599,36 @@ deployment job is running or queued and inspect the Cloudflare daily count.
 
 ## Post-deployment smoke
 
-After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts`; this manual desktop/phone check is read-only, and optional `LIVE_SMOKE_COMPUTE=1` checks the public backend with a browser GET, reporting a matching cached answer or `NOT_COMPUTED` (never submits a solve).
-In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
+`deploy.sh` runs its verification gate after deployment: the HTTP/content verifier first,
+then `cd web && LIVE_SMOKE_COMPUTE= LIVE_BASE_URL=https://squadopt.mymandev.com npx --no-install playwright test --config playwright.live.config.ts`.
+Browser tooling is optional; HTTP/content verification always gates the release. Release
+commands never install packages. Missing browser tooling produces one skip line after HTTP
+checks pass. The owner can opt into the [host browser setup](../deploy/weekly-schedule/README.md#release-a-run-d1).
+`sh scripts/release/deploy.sh --preflight` checks Python and probes the optional browser
+without fetching or deploying; `ship.sh` calls that mode before waiting for the site PR.
+The live configuration refuses CI, retries a failed visit once, and has a five-minute total budget.
+The existing smoke retains its desktop/phone profiles. The tour visits 15 pages on 1280px
+desktop and 360px phone, in Turkish and English. Run only the tour for a rehearsal by adding
+`live-tour.spec.ts` to the browser command. Record its elapsed time and summary in the release
+receipts. Backend read statuses, transport failures and missing new API routes are diagnostic
+because the site's gate runs before the backend moves. The release command explicitly clears
+`LIVE_SMOKE_COMPUTE`. Optional `LIVE_SMOKE_COMPUTE=1` is a separate manual backend check after
+that move, using a browser GET and never submitting a solve.
+
+Both browser suites fulfill usage beacons with 204 inside the browser and block writes on
+every origin and path. Service workers are blocked so they cannot bypass the request fence.
+The injected Cloudflare `POST /cdn-cgi/rum` is counted separately as blocked analytics; its
+transport is omitted from page-health checks because exercising it would write a record.
+It is never forwarded. Any other attempted write fails the check. LLMOPT stops at its empty
+key step, and the contribution form is only visited. Both suites record redacted request
+journeys without traces, screenshots, DOM snapshots or comparison identities. The decision,
+standalone entry, what-if and card regressions repaired in the live publication are ordinary
+checks in all four profiles. Their former symptoms are never filtered from page health.
+
+Both suites test their write fences with loopback servers before visiting the live site;
+these local checks do not count as live visits. Record each suite's summaries, including
+live visits, local beacon answers, blocked analytics and attempted service writes.
+In PowerShell, run from `web`: `$env:LIVE_SMOKE_COMPUTE=''; $env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx --no-install playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
 The trusted smoke test makes **seven** fixed checks, the absent asset and the asset walk, and they are not all "must return 200". The list
