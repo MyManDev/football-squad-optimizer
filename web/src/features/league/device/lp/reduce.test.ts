@@ -81,8 +81,8 @@ describe("whole-window dominance certificate", () => {
   it.each([
     [3, 7, false],
     [3, 8, true],
-    [5, 10, false],
-    [5, 11, true],
+    [5, 9, false],
+    [5, 10, true],
   ] as const)("H%s with %s distinct-club choices, removal=%s", (window, count, removed) => {
     const w = world(count);
     const r = reduceHorizonPool(w.document, w.entry, w.inputs, window);
@@ -127,14 +127,18 @@ describe("whole-window dominance certificate", () => {
     expect(reduceHorizonPool(w.document, w.entry, w.inputs, 3, [107]).indices).toContain(w.target);
     w.entry.sell_tenths["107"] = 50;
     expect(reduceHorizonPool(w.document, w.entry, w.inputs, 3).indices).toContain(w.target);
-    delete w.entry.sell_tenths["107"];
-    w.entry.held[0] = 107;
-    w.entry.sell_tenths["107"] = 50;
-    // Keep the displaced player's explicit sale key protected as well; otherwise
-    // that newly unheld, earlier and stronger player becomes an extra dominator.
-    const r = reduceHorizonPool(w.document, w.entry, w.inputs, 3);
-    expect(r.indices).toContain(w.target);
-    expect(r.indices).toContain(22);
+    // Isolate held-q exclusion in p's own club, so the changed initial club
+    // distribution cannot independently strengthen the full-club bound.
+    const heldWorld = world(3, ["target", "target", "target"]);
+    expect(
+      reduceHorizonPool(heldWorld.document, heldWorld.entry, heldWorld.inputs, 3).indices,
+    ).not.toContain(heldWorld.target);
+    heldWorld.entry.held[0] = 100;
+    heldWorld.entry.sell_tenths["100"] = 50;
+    // The displaced player's explicit sale key remains protected too.
+    const r = reduceHorizonPool(heldWorld.document, heldWorld.entry, heldWorld.inputs, 3);
+    expect(r.indices).toContain(heldWorld.target);
+    expect(r.indices).toContain(15);
   });
 
   it("requires every week's squad, starter and captain coefficient, frozen price and position", () => {
@@ -162,20 +166,42 @@ describe("whole-window dominance certificate", () => {
     expect(reduceHorizonPool(w.document, w.entry, w.inputs, 3).indices).not.toContain(w.target);
   });
 
-  it("uses a weighted whole-club budget, rather than treating every club as freely full", () => {
+  it("shares the purchase budget between full clubs and held q outside them", () => {
     for (const [clubs, removed] of [
-      [["spread-0", "spread-0", "spread-1", "spread-1"], false],
-      [["spread-0", "spread-0", "spread-1", "spread-1", "empty"], true],
+      [["spread-0", "spread-0"], false],
+      [["spread-0", "spread-0", "spread-1"], true],
+      [["spread-0", "spread-0", "spread-1", "spread-1"], true],
+      [["spread-0", "spread-0", "spread-0", "spread-0"], false],
+      [["spread-0", "spread-0", "spread-0", "spread-0", "empty"], true],
     ] as const) {
       const w = world(clubs.length, [...clubs]);
       for (let i = 0; i < 15; i += 1) w.document.players[i]!.team = `spread-${i}`;
       // A spread club has one initial player and costs two purchases to fill.
-      // The budget after buying p is two, so at most one such group can block q.
+      // Filling it leaves zero purchases for q outside it. A two-q group has
+      // zero surplus, while a four-q group has surplus two.
       expect(!reduceHorizonPool(w.document, w.entry, w.inputs, 3).indices.includes(w.target)).toBe(
         removed,
       );
     }
   });
+
+  it.each([
+    [4, false],
+    [5, true],
+  ] as const)(
+    "keeps the empty subset when all club profits are negative: %s choices, removal=%s",
+    (count, removed) => {
+      const w = world(
+        count,
+        Array.from({ length: count }, (_, i) => `empty-${i}`),
+      );
+      // At H5 the budget is four. A new club costs three to fill but only
+      // blocks one q, profit -2. The maximum surplus is the empty set's zero.
+      expect(!reduceHorizonPool(w.document, w.entry, w.inputs, 5).indices.includes(w.target)).toBe(
+        removed,
+      );
+    },
+  );
 
   it("counts a zero-cost full club once and preserves p's own-club exception", () => {
     const w = world(8, [
