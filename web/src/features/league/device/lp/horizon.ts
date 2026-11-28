@@ -163,8 +163,27 @@ export function horizonProblem(
     const family = (prefix: string) => indices.map((i) => v(prefix, i));
     for (const prefix of ["s", "x", "c", "i", "o"]) problem.binaries.push(...family(prefix));
     problem.binaries.push(v("z"), v("p"), v("k"));
-    for (const prefix of ["f", "u", "n"])
-      problem.generals.push({ variable: v(prefix), lower: 0, upper: rules.max_free_transfers });
+    const cap = rules.max_free_transfers;
+    // With at most one move and accrual one, n=min(f-min(m,f)+1,cap)
+    // never decreases f. After the first week it is at least one unless
+    // cap=0. These reachable-state bounds preserve every integer plan,
+    // including FT0's paid first move and the cap=0 boundary. No player,
+    // squad or optimum is removed; original player ranks stay unchanged.
+    const freeLower = Math.min(cap, Math.max(entry.free_transfers, w > 0 ? 1 : 0));
+    problem.generals.push(
+      {
+        variable: v("f"),
+        lower: freeLower,
+        upper: Math.min(cap, entry.free_transfers + w),
+      },
+      { variable: v("u"), lower: 0, upper: cap },
+      {
+        variable: v("n"),
+        lower: Math.min(cap, Math.max(entry.free_transfers, 1)),
+        upper: Math.min(cap, entry.free_transfers + w + 1),
+      },
+    );
+    if (freeLower >= 1) add(v("paid_impossible"), [term(1, v("p"))], "=", 0);
     problem.generals.push({ variable: v("m"), lower: 0, upper: 1 });
     problem.generals.push({ variable: v("b"), lower: 0, upper: wealth });
     add(v("size"), ones(family("s")), "=", rules.squad_size);
@@ -210,6 +229,16 @@ export function horizonProblem(
         w === 0 && original ? 1 : 0,
       );
       add(v("one_direction", i), [term(1, v("i", i)), term(1, v("o", i))], "<=", 1);
+      // Binary continuity and i+o<=1 imply both facets. An arrival is
+      // held afterwards and was not held before. They exclude fractional
+      // same-week buy/sell cycles from the relaxation, not integer plans.
+      add(v("arrival_held", i), [term(1, v("i", i)), term(-1, v("s", i))], "<=", 0);
+      add(
+        v("arrival_new", i),
+        [term(1, v("i", i)), ...(w > 0 ? [term(1, horizonVariable("s", w - 1, i))] : [])],
+        "<=",
+        w === 0 && original ? 0 : 1,
+      );
       add(v("starter_held", i), [term(1, v("x", i)), term(-1, v("s", i))], "<=", 0);
       add(v("captain_starts", i), [term(1, v("c", i)), term(-1, v("x", i))], "<=", 0);
       bank.push(term(player.buy_tenths, v("i", i)), term(-player.buy_tenths, v("o", i)));
@@ -259,6 +288,9 @@ export function horizonProblem(
       0,
     );
     const bound = rules.max_free_transfers + 1;
+    // f<=cap and min(m,f)<=1 imply min(f-min(m,f)+1,cap)>=f,
+    // even at cap=0. Cut the big-M relaxation's artificial FT decrease.
+    add(v("next_monotone"), [term(1, v("n")), term(-1, v("f"))], ">=", 0);
     add(v("next_upper"), [term(1, v("n")), term(-1, v("u"))], "<=", 1);
     add(v("next_lower"), [term(1, v("n")), term(-1, v("u")), term(bound, v("k"))], ">=", 1);
     add(
