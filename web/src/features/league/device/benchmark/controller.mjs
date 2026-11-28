@@ -19,6 +19,7 @@ if (process.argv[2] === "build") {
   await build({ configFile: resolve(here, "vite.config.mts") });
   await build({
     configFile: false,
+    publicDir: false,
     ssr: { external: ["highs"] },
     build: {
       ssr: resolve(here, "node.ts"),

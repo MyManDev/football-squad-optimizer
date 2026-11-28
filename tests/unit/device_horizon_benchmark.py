@@ -309,6 +309,7 @@ def main() -> None:
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--audit-only", action="store_true")
     parser.add_argument("--watchdog-smoke", action="store_true")
+    parser.add_argument("--references", type=Path, help="Numeric server reference JSONL to compare")
     args = parser.parse_args()
     if args.cpu is not None and args.cpus is not None:
         raise ValueError("Choose either a single CPU or a homogeneous CPU mask")
@@ -373,6 +374,29 @@ def main() -> None:
             for member in problem["members"]
         ]
         provenance = {"pool": "parity-24", "diagnostic_smoke_only": True}
+    references = {}
+    reference_manifest = None
+    if args.references:
+        from tests.unit.device_horizon_reference import compare_reference
+
+        raw_references = args.references.read_bytes()
+        reference_rows = [json.loads(line) for line in raw_references.splitlines()]
+        reference_provenance = next(row for row in reference_rows if row["event"] == "metadata")
+        if reference_provenance["provenance"]["in_memory_problem_sha256"] != provenance.get(
+            "in_memory_problem_sha256"
+        ):
+            raise ValueError("The numeric reference belongs to a different problem")
+        references = {
+            (row["member"], row["window"]): row
+            for row in reference_rows
+            if row["event"] == "reference"
+        }
+        if len(references) != 6 or any(
+            row["status"] != "OPTIMAL" or row["diagnostics"]["relative_optimality_gap"] != 0
+            for row in references.values()
+        ):
+            raise ValueError("Six proved primary references with zero gap are required")
+        reference_manifest = {"sha256": hashlib.sha256(raw_references).hexdigest()}
     if args.calibration_log:
         raw_calibration = args.calibration_log.read_bytes()
         records = [json.loads(line) for line in raw_calibration.splitlines()]
@@ -427,6 +451,7 @@ def main() -> None:
                 else "execution-context-audit"
                 if args.audit_only
                 else "timing",
+                "numeric_server_references": reference_manifest,
                 "calibration_iterations": 1_200_000_000,
                 "calibration_repeats": 5,
                 "calibration_target_ratio": [3.90, 4.10],
@@ -717,6 +742,7 @@ def main() -> None:
                         else "timing",
                     }
                 )
+                reference_failures = []
                 while True:
                     result = receive()
                     if accept_restart(result):
@@ -724,6 +750,24 @@ def main() -> None:
                     if result["event"] == "sample":
                         result["runtime"] = args.runtime
                     emit(result)
+                    if references and result["event"] == "sample" and result["completed"]:
+                        comparison = compare_reference(
+                            result["reply"]["answer"],
+                            references[result["member"], result["window"]],
+                        )
+                        emit(
+                            {
+                                "event": "reference_check",
+                                "member": result["member"],
+                                "window": result["window"],
+                                "repetition": result["repetition"],
+                                **comparison,
+                            }
+                        )
+                        if not comparison["passed"]:
+                            reference_failures.append(
+                                (result["member"], result["window"], result["repetition"])
+                            )
                     if (
                         args.audit_only
                         and result["event"] == "sample"
@@ -751,6 +795,8 @@ def main() -> None:
                                 assert week["transfers_out"] == expected["transfers_out"]
                     if result["event"] == "measured":
                         break
+                if reference_failures:
+                    raise RuntimeError(f"Numeric reference parity failed: {reference_failures}")
                 if args.cpu_throttling == "cdp" and args.runtime == "throttled":
                     cdp_rate(1)
         except Exception as error:

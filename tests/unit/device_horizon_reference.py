@@ -35,6 +35,27 @@ from squadopt.planning.native_highs import native_window_executor, native_window
 from squadopt.platform.native_windows import execute_native_window
 
 
+def compare_reference(answer: dict[str, Any], reference: dict[str, Any]) -> dict[str, Any]:
+    """Keep primary equality, raw points and certified moves separate and exact."""
+    difference = answer["objective"] - reference["objective"]
+    scaled_equal = answer["objective_scaled"] == reference["objective_scaled"]
+    moves_equal = None
+    if reference["unique_moves"] is True:
+        moves_equal = len(answer["plan_weeks"]) == len(reference["weeks"]) and all(
+            actual["transfers_in"] == expected["transfers_in"]
+            and actual["transfers_out"] == expected["transfers_out"]
+            for actual, expected in zip(answer["plan_weeks"], reference["weeks"], strict=True)
+        )
+    return {
+        "objective_difference": difference,
+        "scaled_equal": scaled_equal,
+        "within_tolerance": abs(difference) <= 1e-6,
+        "certified_moves_equal": moves_equal,
+        "reference_tiebreak_completed": reference["tiebreak_completed"],
+        "passed": scaled_equal and abs(difference) <= 1e-6 and moves_equal is not False,
+    }
+
+
 def reference_horizon(
     document: dict[str, Any], entry: dict[str, Any], window: int
 ) -> PlanningHorizon:
@@ -119,9 +140,7 @@ def solve_reference(
         raise ValueError("The server returned a nonnumeric model objective")
     primary = (
         round(
-            float(model_objective)
-            * policy.objective_weight_scale
-            * settings.expected_points_scale
+            float(model_objective) * policy.objective_weight_scale * settings.expected_points_scale
         )
         if model_objective is not None
         else None

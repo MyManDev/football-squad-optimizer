@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 
 import pytest
-from tests.unit.device_horizon_reference import reference_horizon, solve_reference
+from tests.unit.device_horizon_reference import (
+    compare_reference,
+    reference_horizon,
+    solve_reference,
+)
 from tests.unit.test_device_plan_horizon import FIXTURE, horizon_world
 
 
@@ -44,4 +48,25 @@ def test_numeric_reference_matches_the_certified_application_fixture(
     assert actual["diagnostics"]["solver_deterministic_time_limit"] == window * 20
     assert actual["diagnostics"]["linearization_level"] == 2
     assert actual["diagnostics"]["hold_protection"]["version"] == "feasible_hold_v1"
+    assert len(actual["native_outcomes"]) == 1
     assert all(outcome["backend"] == "highs-native" for outcome in actual["native_outcomes"])
+
+
+def test_reference_comparison_requires_certified_moves_but_allows_unproved_ties() -> None:
+    reference = {
+        "objective": 1.0,
+        "objective_scaled": 1000,
+        "unique_moves": None,
+        "tiebreak_completed": False,
+        "weeks": [{"transfers_in": [1], "transfers_out": [2]}],
+    }
+    answer = {
+        "objective": 1.0,
+        "objective_scaled": 1000,
+        "plan_weeks": [{"transfers_in": [3], "transfers_out": [4]}],
+    }
+    assert compare_reference(answer, reference)["passed"]
+    assert compare_reference(answer, reference)["certified_moves_equal"] is None
+    assert not compare_reference(answer, {**reference, "unique_moves": True})["passed"]
+    assert not compare_reference({**answer, "objective": 1.000002}, reference)["passed"]
+    assert not compare_reference({**answer, "objective_scaled": 1001}, reference)["passed"]
