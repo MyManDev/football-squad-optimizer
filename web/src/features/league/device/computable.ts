@@ -9,6 +9,7 @@
 import { rivalCandidates, type DeviceComputable } from "../advice/adviceSelection";
 import { isTop100Weight } from "../advice/top100";
 import type { EntrySquad, EntryView } from "../types";
+import { admittedHorizonWindows } from "./admission";
 import { deviceChip, rivalFromSquad } from "./selection";
 import { DEVICE_CHIPS, isDevicePlanEntry, RIVAL_STRATEGIES } from "./types";
 
@@ -63,7 +64,7 @@ export function deviceComputable(
     reads.squads.some((rival) => rival.entry.entry_id === id && deviceRivalUsable(squad, rival));
   return {
     strategies: ["saf-puan", ...RIVAL_STRATEGIES],
-    windows: [1],
+    windows: [1, ...admittedHorizonWindows(squad.device_plan)],
     rivals: candidates.filter(usable),
     top100Weights: [0, ...(squad.device_plan.top100_weights ?? []).filter(isTop100Weight)],
     chips: DEVICE_CHIPS.filter((chip) => deviceChip({ chip }, squad) === chip),

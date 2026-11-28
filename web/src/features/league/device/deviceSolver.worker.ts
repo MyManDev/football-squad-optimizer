@@ -9,7 +9,7 @@
 import { highs } from "./lp/highs";
 import { replyTo, type DevicePlanReply } from "./replies";
 import type { DevicePlanRequest } from "./requests";
-import { withinCeiling } from "./solve/ceiling";
+import { DEVICE_HORIZON_SOLVE_CEILING_SECONDS, withinCeiling } from "./solve/ceiling";
 
 export type { DevicePlanRequest } from "./requests";
 export type { DevicePlanReply } from "./replies";
@@ -27,5 +27,12 @@ self.onmessage = async (event: MessageEvent<DevicePlanRequest>) => {
   self.postMessage({ id, kind: "ready" } satisfies DevicePlanReply);
   // Every solve of the request shares one ceiling; a solve it stops is refused. A chip
   // gain it stops is unknown, and the plain plan solved before it is still the answer.
-  replyTo(withinCeiling(loaded), event.data, (reply) => self.postMessage(reply));
+  replyTo(
+    withinCeiling(
+      loaded,
+      (event.data.window ?? 1) > 1 ? DEVICE_HORIZON_SOLVE_CEILING_SECONDS : undefined,
+    ),
+    event.data,
+    (reply) => self.postMessage(reply),
+  );
 };

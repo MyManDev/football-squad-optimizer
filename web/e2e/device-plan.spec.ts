@@ -1,9 +1,15 @@
 import { createHash } from "node:crypto";
+import { readdirSync } from "node:fs";
+import type { DevicePlanReply } from "../src/features/league/device/replies";
+import type { DeviceHorizonAnswer } from "../src/features/league/device/solve/horizon";
 
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
 import { chipPath } from "../src/features/league/advice/chipChoice";
 import fixture from "../src/fixtures/device-plan/instances.json" with { type: "json" };
+import horizonFixture from "../src/fixtures/device-plan/horizons.json" with { type: "json" };
+import horizonScaleFixture from "../src/fixtures/device-plan/horizons-scale.json" with { type: "json" };
+import type { DevicePlanDocument, DevicePlanEntry } from "../src/features/league/device/types";
 import {
   mockEntryAdviceChipEnvelope,
   mockEntryAdviceIndex,
@@ -627,4 +633,258 @@ test("a table whose bytes are not the ones its line names falls back to the tree
   expect(reads).toEqual([`/data/${TABLE_PATH}?v=${digest}`, "/data/league/device-plan.json"]);
   const origin = new URL(page.url()).origin;
   expect(requested.filter((url) => new URL(url).origin !== origin)).toEqual([]);
+});
+
+interface HorizonFixture {
+  document: DevicePlanDocument;
+  members: Array<{
+    entry_id: number;
+    entry: DevicePlanEntry;
+    reference?: Record<
+      string,
+      {
+        objective: number;
+        objective_scaled: number;
+        unique_moves?: boolean | null;
+        weeks?: Array<{ transfers_in: number[]; transfers_out: number[] }>;
+      }
+    >;
+  }>;
+}
+
+const horizonPools = [
+  { pool: "parity-24", fixture: horizonFixture as unknown as HorizonFixture },
+  { pool: "synthetic-600", fixture: horizonScaleFixture as unknown as HorizonFixture },
+];
+const horizonSamples: Array<{ pool: string; member: number; window: number; seconds: number }> = [];
+
+async function runHorizon(page: Page, data: HorizonFixture, memberIndex: number, window: 3 | 5) {
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+  const member = data.members[memberIndex]!;
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  const context = {
+    source_snapshot_id: data.document.source_snapshot_id,
+    season: data.document.season,
+    gameweek: data.document.gameweek,
+  };
+  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: { ...squad, payload: { ...squad.payload, ...context, device_plan: member.entry } },
+    }),
+  );
+  const index = mockEntryAdviceIndex(ENTRY);
+  await page.route(/\/data\/league\/advice\/35249001\/index\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        ...index,
+        payload: {
+          ...index.payload,
+          ...context,
+          menu: "device",
+          computed: [],
+          unavailable: [],
+          windows: { "saf-puan": [], "ortak-koru": [], "fark-yarat": [] },
+          evidence: { available: false, reason: "on_device" },
+          top100: { available: false, reason: "on_device" },
+          chips: { available: false, reason: "on_device" },
+        },
+      },
+    }),
+  );
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-09-02T10:00:00Z",
+        source_kind: "live",
+        payload: { ...data.document, league_id: squad.payload.league_id },
+      },
+    }),
+  );
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=${window}`);
+  await expect(page.locator('input[name="window"][value="3"]')).toHaveCount(1);
+  await expect(
+    page.getByRole("button", {
+      name: MESSAGES.en.leagueMembers.deviceButton,
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  expect(page.workers()).toHaveLength(0);
+
+  // Exercise the actual shipped numeric worker independently of UI admission.
+  // Slow real-pool selections stay on the service; the small parity model remains testable.
+  const asset = readdirSync(new URL("../dist/assets/", import.meta.url)).find((name) =>
+    /^deviceSolver\.worker-.*\.js$/.test(name),
+  );
+  expect(asset).toBeDefined();
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  const reply = await page.evaluate(
+    async ({ url, document, entry, window }) => {
+      return await new Promise<DevicePlanReply>((resolve, reject) => {
+        const worker = new Worker(url, { type: "module" });
+        const timeout = setTimeout(() => {
+          worker.terminate();
+          reject(new Error("The own numeric worker reached its reply ceiling"));
+        }, 75_000);
+        worker.onerror = () => {
+          clearTimeout(timeout);
+          worker.terminate();
+          reject(new Error("The own numeric worker failed"));
+        };
+        worker.onmessage = (event: MessageEvent<DevicePlanReply>) => {
+          if (!["answer", "refused", "failed"].includes(event.data.kind)) return;
+          clearTimeout(timeout);
+          worker.terminate();
+          resolve(event.data);
+        };
+        worker.postMessage({ id: 1, document, entry, window });
+      });
+    },
+    { url: `/assets/${asset}`, document: data.document, entry: member.entry, window },
+  );
+  const origin = new URL(page.url()).origin;
+  expect(requests.filter((url) => new URL(url).origin !== origin)).toEqual([]);
+  expect(reply.kind).toBe("answer");
+  if (reply.kind !== "answer") throw new Error("No proved numeric worker answer");
+  const reference = member.reference?.[String(window)];
+  if (reference) {
+    expect(reply.answer.objective_scaled).toBe(reference.objective_scaled);
+    expect(Math.abs(reply.answer.objective - reference.objective)).toBeLessThanOrEqual(1e-6);
+    if (reference.unique_moves) {
+      const weeks = (reply.answer as DeviceHorizonAnswer).plan_weeks;
+      for (const [index, week] of weeks.entries()) {
+        expect(week.transfers_in).toEqual(reference.weeks![index]!.transfers_in);
+        expect(week.transfers_out).toEqual(reference.weeks![index]!.transfers_out);
+      }
+    }
+  }
+  return reply.answer.seconds;
+}
+
+for (const window of [3, 5] as const) {
+  test(`a slow ${window}-week selection leaves the device idle and its numeric worker retains parity`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await runHorizon(page, horizonPools[0]!.fixture, 1, window);
+  });
+}
+
+test.describe("horizon benchmark", () => {
+  test.describe.configure({ mode: "default" });
+  test.skip(process.env.SQUADOPT_DEVICE_BENCHMARK !== "1", "Explicit timing run only");
+  test.afterAll(({ browser }) => {
+    if (horizonSamples.length === 0) return;
+    const summarize = (values: number[]) => {
+      const ordered = [...values].sort((a, b) => a - b);
+      const middle = Math.floor(ordered.length / 2);
+      return {
+        count: ordered.length,
+        median:
+          ordered.length % 2 ? ordered[middle] : (ordered[middle - 1]! + ordered[middle]!) / 2,
+        maximum: ordered.at(-1),
+      };
+    };
+    console.log(
+      JSON.stringify({
+        kind: "device-horizon-chromium-measurement",
+        aggregation_scope: "worker_session",
+        browser_version: browser.version(),
+        measured_at: new Date().toISOString(),
+        ceiling_seconds: 60,
+        repeats: 3,
+        pools: horizonPools.map(({ pool, fixture }) => ({
+          pool,
+          players: fixture.document.players.length,
+          clubs: new Set(fixture.document.players.map((player) => player.team)).size,
+          members: fixture.members.length,
+          server_reference: fixture.members.every(
+            (member) => member.reference?.["3"] && member.reference?.["5"],
+          ),
+          by_member: fixture.members.map((member) => ({
+            member: member.entry_id,
+            windows: [3, 5].map((window) => ({
+              window,
+              ...summarize(
+                horizonSamples
+                  .filter(
+                    (sample) =>
+                      sample.pool === pool &&
+                      sample.member === member.entry_id &&
+                      sample.window === window,
+                  )
+                  .map((sample) => sample.seconds),
+              ),
+            })),
+          })),
+          windows: [3, 5].map((window) => ({
+            window,
+            ...summarize(
+              horizonSamples
+                .filter((sample) => sample.pool === pool && sample.window === window)
+                .map((sample) => sample.seconds),
+            ),
+          })),
+        })),
+        samples: horizonSamples,
+      }),
+    );
+  });
+  for (const { pool, fixture } of horizonPools) {
+    fixture.members.forEach((member, memberIndex) => {
+      for (const window of [3, 5] as const) {
+        test(`${pool}, member ${member.entry_id}, H${window}`, async ({ page }) => {
+          test.setTimeout(240_000);
+          for (let repeat = 0; repeat < 3; repeat += 1) {
+            const started = performance.now();
+            try {
+              const seconds = await runHorizon(page, fixture, memberIndex, window);
+              horizonSamples.push({ pool, member: member.entry_id, window, seconds });
+              console.log(
+                JSON.stringify({
+                  kind: "device-horizon-chromium-sample",
+                  pool,
+                  member: member.entry_id,
+                  window,
+                  repeat: repeat + 1,
+                  seconds,
+                }),
+              );
+              expect(seconds).toBeLessThan(60);
+            } catch (error) {
+              const ending = await page
+                .evaluate(() => ({
+                  solve_milliseconds:
+                    performance.getEntriesByName("device:solve").at(-1)?.duration ?? null,
+                  state:
+                    document
+                      .querySelector("[data-device-state]")
+                      ?.getAttribute("data-device-state") ?? null,
+                }))
+                .catch(() => ({ solve_milliseconds: null, state: null }));
+              console.log(
+                JSON.stringify({
+                  kind: "device-horizon-chromium-failure",
+                  pool,
+                  member: member.entry_id,
+                  window,
+                  repeat: repeat + 1,
+                  elapsed_seconds:
+                    ending.solve_milliseconds === null
+                      ? (performance.now() - started) / 1000
+                      : ending.solve_milliseconds / 1000,
+                  timing_basis: ending.solve_milliseconds === null ? "test_wall" : "worker_solve",
+                  state: ending.state,
+                  status: String(error),
+                }),
+              );
+              throw error;
+            }
+          }
+        });
+      }
+    });
+  }
 });
