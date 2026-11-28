@@ -21,11 +21,20 @@ export interface HorizonPoolReduction {
  * held: each such club consumes C distinct players from the p-free union, and
  * club identities are fixed. A q from p's own club has no club obstruction.
  *
- * Group dominators by club. Discard the F largest groups from clubs other than
- * p's, a worst-case bound on every full-club obstruction over the WHOLE window.
- * If more than T-1 q remain, one is absent from the entire plan union and its
- * club is never full in a p-held week (or is p's club). Single-week counts, or
- * q merely being absent in p-held weeks, would not establish this result.
+ * We can bound blocked dominators more tightly using the initial club counts.
+ * For c != p.club, let h_c be the initial holdings and d_c=max(0,C-h_c).
+ * A club that becomes full in ANY p-held week needs at least d_c different
+ * noninitial purchases. Clubs are disjoint and p's own purchase uses another
+ * slot, so the set of such clubs has sum(d_c) <= T-1. A 0/1 knapsack with club
+ * cost d_c and value equal to its dominator count therefore upper-bounds ALL
+ * blocked q across the WHOLE window. A zero-cost club is included only once;
+ * p's own club is exempt because replacing p cannot increase its club count.
+ * For legal h_c<=C this also implies the earlier F bound: C*club_count equals
+ * sum(h_c+d_c) <= N+T-1. Thus this is a tighter sufficient bound, no heuristic.
+ *
+ * If total_q - worst_blocked_q > T-1, one remaining q is absent from the entire
+ * plan union and its club is never full in a p-held week (or is p's own club).
+ * Single-week counts, or q merely absent in p-held weeks, would not suffice.
  *
  * Replace p by this same q in every held week and copy p's exact i/o/x/c pattern.
  * Neither is an initial lot; q was never held, including adjacent weeks. Every
@@ -109,12 +118,18 @@ export function reduceHorizonPool(
       byClub.set(other.team, (byClub.get(other.team) ?? 0) + 1);
     }
     const dominatedBy = [...byClub.values()].reduce((sum, count) => sum + count, 0);
-    const blockedByFullClubs = [...byClub.entries()]
-      .filter(([club]) => club !== player.team)
-      .map(([, count]) => count)
-      .sort((a, b) => b - a)
-      .slice(0, fullClubs)
-      .reduce((sum, count) => sum + count, 0);
+    const budget = purchases - 1;
+    const blocked = Array.from({ length: budget + 1 }, () => 0);
+    for (const [club, count] of byClub) {
+      if (club === player.team) continue;
+      const cost = Math.max(0, rules.max_players_per_team - (heldClubs.get(club) ?? 0));
+      const previous = [...blocked];
+      // Read only the previous club state, including when cost=0: each club
+      // contributes its obstruction once, rather than an unbounded number.
+      for (let remaining = cost; remaining <= budget; remaining += 1)
+        blocked[remaining] = Math.max(previous[remaining]!, previous[remaining - cost]! + count);
+    }
+    const blockedByFullClubs = blocked[budget]!;
     return dominatedBy - blockedByFullClubs <= purchases - 1;
   });
   return result(indices);
