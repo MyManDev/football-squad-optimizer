@@ -621,8 +621,8 @@ def main() -> None:
 
         try:
             boot = receive()
-            if boot != {"event": "boot", "pid": proc.pid}:
-                raise RuntimeError("Wrong own launcher PID")
+            if boot != {"event": "boot", "pid": proc.pid, "pool_mode": args.pool_mode}:
+                raise RuntimeError("Own launcher PID or pool-mode handshake mismatch")
             job = OwnedCpuJob(proc)
             emit({"event": "cpu_full_rate", **job.configure(10000)})
             owned = [job.node]
