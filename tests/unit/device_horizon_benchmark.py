@@ -421,7 +421,12 @@ def main() -> None:
                 ).strip(),
                 "diagnostic_seconds": 300,
                 "production_ceiling_seconds": 60,
-                "repeats": 3,
+                "repeats": 1 if args.smoke or args.audit_only else 3,
+                "purpose": "parity-smoke"
+                if args.smoke
+                else "execution-context-audit"
+                if args.audit_only
+                else "timing",
                 "calibration_iterations": 1_200_000_000,
                 "calibration_repeats": 5,
                 "calibration_target_ratio": [3.90, 4.10],
