@@ -10,30 +10,43 @@ import { guardedBrowserSolve } from "./watchdog.mjs";
 const here = fileURLToPath(new URL(".", import.meta.url));
 const web = resolve(here, "../../../../..");
 const project = resolve(web, "..");
-const browserDist = resolve(project, ".codex-tmp/real-horizon-browser");
-const nodeBundle = resolve(web, ".codex-tmp/real-horizon-node.mjs");
+const poolMode = process.argv.includes("--pool-mode=full") ? "full" : "reduced";
+const suffix = poolMode === "full" ? "-full" : "";
+const browserDist = resolve(project, `.codex-tmp/real-horizon${suffix}-browser`);
+const nodeBundle = resolve(web, `.codex-tmp/real-horizon${suffix}-node.mjs`);
 const emit = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
 
 if (process.argv[2] === "build") {
   const { build } = await import("vite");
-  await build({ configFile: resolve(here, "vite.config.mts") });
+  // Only this diagnostic build substitutes the reducer. Production request IPC
+  // and the shipped worker have no full-pool override or benchmark field.
+  const alias =
+    poolMode === "full"
+      ? [{ find: /^\.\/reduce$/, replacement: resolve(here, "fullPool.ts") }]
+      : [];
+  await build({
+    configFile: resolve(here, "vite.config.mts"),
+    resolve: { alias },
+    build: { outDir: browserDist },
+  });
   await build({
     configFile: false,
     publicDir: false,
+    resolve: { alias },
     ssr: { external: ["highs"] },
     build: {
       ssr: resolve(here, "node.ts"),
       outDir: resolve(web, ".codex-tmp"),
       emptyOutDir: false,
       target: "node22",
-      rolldownOptions: { output: { entryFileNames: "real-horizon-node.mjs" } },
+      rolldownOptions: { output: { entryFileNames: `real-horizon${suffix}-node.mjs` } },
     },
   });
-  emit({ event: "built", browserDist, nodeBundle });
+  emit({ event: "built", browserDist, nodeBundle, pool_mode: poolMode });
 } else {
   const lines = createInterface({ input: process.stdin });
   const iterator = lines[Symbol.asyncIterator]();
-  emit({ event: "boot", pid: process.pid });
+  emit({ event: "boot", pid: process.pid, pool_mode: poolMode });
   const gate = await iterator.next();
   if (gate.done || JSON.parse(gate.value).command !== "go") throw new Error("No launcher gate");
   const runtime = process.argv[2];
@@ -151,15 +164,36 @@ if (process.argv[2] === "build") {
         });
       } else if (command.command === "measure") {
         const { document, members } = command.problem;
-        const { modelFingerprint } = await import(pathToFileURL(nodeBundle).href);
+        const { modelDetails } = await import(pathToFileURL(nodeBundle).href);
         const models = new Map();
         let id = 0;
         for (const member of members)
-          for (const window of [3, 5])
+          for (const window of command.windows ?? [3, 5])
             for (let repetition = 0; repetition < command.repeats; repetition += 1) {
               const request = { id: ++id, document, entry: member.entry, window };
               const key = `${member.member}:${window}`;
-              if (!models.has(key)) models.set(key, modelFingerprint(request));
+              if (!models.has(key)) models.set(key, modelDetails(request));
+              const model = models.get(key);
+              if (command.fingerprint_only) {
+                if (!page || runtime !== "browser")
+                  throw new Error("Actual-worker fingerprint needs the worker context");
+                const actual = await page.evaluate(
+                  (value) => window.deviceBenchmark.fingerprint(value),
+                  request,
+                );
+                emit({
+                  event: "fingerprint",
+                  member: member.member,
+                  window,
+                  pool_mode: poolMode,
+                  expected_model_sha256: model.sha256,
+                  model_sha256: actual,
+                  pool_before: model.pool_before,
+                  pool_after: model.pool_after,
+                });
+                if (actual !== model.sha256) throw new Error("Worker LP differs from Node LP");
+                continue;
+              }
               const started = performance.now();
               let result;
               try {
@@ -189,9 +223,12 @@ if (process.argv[2] === "build") {
                       ? "chromium-main"
                       : "dedicated-worker",
                 purpose: command.purpose,
-                expected_model_sha256: models.get(key),
+                expected_model_sha256: model.sha256,
+                pool_before: model.pool_before,
+                pool_after: model.pool_after,
                 pool: command.pool,
                 players: document.players.length,
+                pool_mode: poolMode,
                 member: member.member,
                 free_transfers: member.entry.free_transfers,
                 window,

@@ -11,14 +11,21 @@ import { horizonProblem } from "../lp/horizon";
 import { lpText } from "../lp/problem";
 import { inSolverOrder } from "../solve/week";
 
+export function modelDetails(request: DevicePlanRequest) {
+  const problem = horizonProblem(
+    inSolverOrder(request.document),
+    request.entry,
+    request.window as 3 | 5,
+  );
+  return {
+    sha256: createHash("sha256").update(lpText(problem)).digest("hex"),
+    pool_before: request.document.players.length,
+    pool_after: problem.playerIndices.length,
+  };
+}
+
 export function modelFingerprint(request: DevicePlanRequest) {
-  return createHash("sha256")
-    .update(
-      lpText(
-        horizonProblem(inSolverOrder(request.document), request.entry, request.window as 3 | 5),
-      ),
-    )
-    .digest("hex");
+  return modelDetails(request).sha256;
 }
 
 export async function nodeSolver() {

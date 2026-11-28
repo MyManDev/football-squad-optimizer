@@ -32,6 +32,9 @@ const cases = fixture.members.flatMap((member) =>
 describe.each(cases)("member $member.entry_id, H$window", ({ member, window, reference }) => {
   it("has the server objective within 1e-6 and certified unique moves", () => {
     const answer = solveHorizon(solver, document, member.entry, window);
+    const full = solveHorizon(solver, document, member.entry, window, undefined, "full");
+    expect(Math.abs(answer.objective - full.objective)).toBeLessThanOrEqual(1e-6);
+    expect(answer.objective_scaled).toBe(full.objective_scaled);
     expect(Math.abs(answer.objective - reference.objective)).toBeLessThanOrEqual(1e-6);
     expect(answer.objective_scaled).toBe(reference.objective_scaled);
     expect(answer.plan_weeks).toHaveLength(window);
@@ -40,6 +43,8 @@ describe.each(cases)("member $member.entry_id, H$window", ({ member, window, ref
         const expected = reference.weeks[w]!;
         expect(week.transfers_in).toEqual(expected.transfers_in);
         expect(week.transfers_out).toEqual(expected.transfers_out);
+        expect(week.transfers_in).toEqual(full.plan_weeks[w]!.transfers_in);
+        expect(week.transfers_out).toEqual(full.plan_weeks[w]!.transfers_out);
         expect(week.bank_after_tenths).toBe(expected.bank_after_tenths);
         expect(week.free_transfers_before).toBe(expected.free_transfers_before);
         expect(week.free_transfers_after).toBe(expected.free_transfers_after);
@@ -48,19 +53,20 @@ describe.each(cases)("member $member.entry_id, H$window", ({ member, window, ref
     }
     // The server proves these tiers independently of move uniqueness. Equal tier
     // values can still permit several equivalent squads or lineups.
+    const rank = new Map(document.players.map((player, index) => [player.id, index]));
+    const tiers = (weeks: Array<{ squad: number[]; starting_xi: number[]; captain: number }>) => [
+      weeks.reduce((sum, week) => sum + rank.get(week.captain)!, 0),
+      weeks.reduce(
+        (sum, week) => sum + week.starting_xi.reduce((part, id) => part + rank.get(id)!, 0),
+        0,
+      ),
+      weeks.reduce(
+        (sum, week) => sum + week.squad.reduce((part, id) => part + rank.get(id)!, 0),
+        0,
+      ),
+    ];
+    expect(tiers(answer.plan_weeks)).toEqual(tiers(full.plan_weeks));
     if (reference.tiebreak_completed) {
-      const rank = new Map(document.players.map((player, index) => [player.id, index]));
-      const tiers = (weeks: Array<{ squad: number[]; starting_xi: number[]; captain: number }>) => [
-        weeks.reduce((sum, week) => sum + rank.get(week.captain)!, 0),
-        weeks.reduce(
-          (sum, week) => sum + week.starting_xi.reduce((part, id) => part + rank.get(id)!, 0),
-          0,
-        ),
-        weeks.reduce(
-          (sum, week) => sum + week.squad.reduce((part, id) => part + rank.get(id)!, 0),
-          0,
-        ),
-      ];
       expect(tiers(answer.plan_weeks)).toEqual(tiers(reference.weeks));
     }
   }, 60_000);

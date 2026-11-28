@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import psutil  # type: ignore[import-untyped]
-from tests.unit.device_horizon_replay import benchmark_problem
+from tests.unit.device_horizon_replay import benchmark_problem, five_shape_members
 
 from squadopt.data.snapshots import CapturedSnapshot, SnapshotMetadata
 from squadopt.live.rules import read_season_rules
@@ -123,7 +123,9 @@ def wasm_contract() -> dict[str, Any]:
     }
 
 
-def live_problem(bootstrap_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def live_problem(
+    bootstrap_path: Path, cohort_free_transfers: int | None = None
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """Use an explicitly named live bootstrap only for verified rule metadata."""
     raw = bootstrap_path.read_bytes()
     meta = json.loads((bootstrap_path.parent.parent / "metadata.json").read_bytes())
@@ -139,6 +141,13 @@ def live_problem(bootstrap_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     table, calendar = json.loads(TABLE.read_bytes()), json.loads(CALENDAR.read_bytes())
     problem = benchmark_problem(table, calendar, rules)
     document = problem["document"]
+    baseline_problem_sha256 = hashlib.sha256(
+        json.dumps(problem, sort_keys=True).encode()
+    ).hexdigest()
+    if cohort_free_transfers is not None:
+        problem["members"] = five_shape_members(
+            document, rules.transfers.budget_tenths, cohort_free_transfers
+        )
     provenance = {
         "season": "2026-27",
         "source_snapshot_id": document["source_snapshot_id"],
@@ -154,6 +163,7 @@ def live_problem(bootstrap_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         "in_memory_problem_sha256": hashlib.sha256(
             json.dumps(problem, sort_keys=True).encode()
         ).hexdigest(),
+        "baseline_replay_problem_sha256": baseline_problem_sha256,
         "players": len(document["players"]),
         "clubs": len({p["team"] for p in document["players"]}),
         "members": [
@@ -161,6 +171,20 @@ def live_problem(bootstrap_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
                 "member": m["member"],
                 "free_transfers": m["entry"]["free_transfers"],
                 "bank_tenths": m["entry"]["bank_tenths"],
+                "squad_value_tenths": sum(
+                    p["buy_tenths"] for p in document["players"] if p["id"] in m["entry"]["held"]
+                ),
+                "club_spread": sorted(
+                    sum(
+                        p["team"] == club and p["id"] in m["entry"]["held"]
+                        for p in document["players"]
+                    )
+                    for club in {p["team"] for p in document["players"]}
+                    if any(
+                        p["team"] == club and p["id"] in m["entry"]["held"]
+                        for p in document["players"]
+                    )
+                ),
                 "held_count": len(m["entry"]["held"]),
                 "roster_sha256": hashlib.sha256(
                     json.dumps(m["entry"], sort_keys=True).encode()
@@ -308,9 +332,34 @@ def main() -> None:
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--audit-only", action="store_true")
+    parser.add_argument("--fingerprint-only", action="store_true")
+    parser.add_argument("--parity-only", action="store_true")
+    parser.add_argument("--full-pool-log", type=Path, action="append", default=[])
     parser.add_argument("--watchdog-smoke", action="store_true")
     parser.add_argument("--references", type=Path, help="Numeric server reference JSONL to compare")
+    parser.add_argument("--pool-mode", choices=["full", "reduced"], default="reduced")
+    parser.add_argument("--free-transfer-group", type=int, choices=[0, 1, 5])
+    parser.add_argument("--window", type=int, choices=[3, 5])
     args = parser.parse_args()
+    if (
+        not args.prepare_only
+        and subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
+    ):
+        raise ValueError("Freeze a clean source head before a diagnostic runtime starts")
+    single_attempt = args.smoke or args.audit_only or args.fingerprint_only or args.parity_only
+    purpose = (
+        "fingerprint-audit"
+        if args.fingerprint_only
+        else "parity-smoke"
+        if args.smoke
+        else "execution-context-audit"
+        if args.audit_only
+        else "pool-parity"
+        if args.parity_only
+        else "timing"
+    )
+    if args.fingerprint_only and (args.runtime != "desktop" or args.execution_context != "worker"):
+        raise ValueError("Fingerprint-only audit needs the explicit desktop worker context")
     if args.cpu is not None and args.cpus is not None:
         raise ValueError("Choose either a single CPU or a homogeneous CPU mask")
     cpu_mask = (
@@ -365,7 +414,7 @@ def main() -> None:
     problem, provenance = (
         ({}, {})
         if args.runtime == "calibration" or args.smoke
-        else live_problem(args.rule_bootstrap)
+        else live_problem(args.rule_bootstrap, args.free_transfer_group)
     )
     if args.smoke:
         problem = json.loads((ROOT / "web/src/fixtures/device-plan/horizons.json").read_bytes())
@@ -375,6 +424,18 @@ def main() -> None:
         ]
         provenance = {"pool": "parity-24", "diagnostic_smoke_only": True}
     references = {}
+    full_controls: dict[tuple[str, int], dict[str, Any]] = {}
+    control_manifests: list[dict[str, Any]] = []
+    if args.full_pool_log:
+        from tests.unit.device_horizon_pool_parity import (
+            compare_full_pool_answer,
+            load_full_pool_controls,
+            parity_coverage,
+        )
+
+        full_controls, control_manifests = load_full_pool_controls(
+            args.full_pool_log, problem, provenance["in_memory_problem_sha256"]
+        )
     reference_manifest = None
     if args.references:
         from tests.unit.device_horizon_reference import compare_reference
@@ -440,18 +501,17 @@ def main() -> None:
             {
                 "event": "protocol",
                 "runtime": args.runtime,
+                "pool_mode": args.pool_mode,
+                "windows": [args.window] if args.window is not None else [3, 5],
                 "head": subprocess.check_output(
                     ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
                 ).strip(),
                 "diagnostic_seconds": 300,
                 "production_ceiling_seconds": 60,
-                "repeats": 1 if args.smoke or args.audit_only else 3,
-                "purpose": "parity-smoke"
-                if args.smoke
-                else "execution-context-audit"
-                if args.audit_only
-                else "timing",
+                "repeats": 1 if single_attempt else 3,
+                "purpose": purpose,
                 "numeric_server_references": reference_manifest,
+                "unreduced_control_logs": control_manifests,
                 "calibration_iterations": 1_200_000_000,
                 "calibration_repeats": 5,
                 "calibration_target_ratio": [3.90, 4.10],
@@ -486,7 +546,7 @@ def main() -> None:
             else "browser"
         )
         proc = subprocess.Popen(
-            ["node", str(CONTROLLER), runtime],
+            ["node", str(CONTROLLER), runtime, f"--pool-mode={args.pool_mode}"],
             cwd=ROOT / "web",
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -732,17 +792,23 @@ def main() -> None:
                     {
                         "command": "measure",
                         "problem": problem,
-                        "repeats": 1 if args.smoke or args.audit_only else 3,
+                        "windows": [args.window] if args.window is not None else [3, 5],
+                        "repeats": 1 if single_attempt else 3,
+                        "fingerprint_only": args.fingerprint_only,
                         "pool": "parity-24" if args.smoke else "published-674",
                         "audit": args.audit_only,
-                        "purpose": "parity-smoke"
-                        if args.smoke
-                        else "execution-context-audit"
-                        if args.audit_only
-                        else "timing",
+                        "purpose": purpose,
                     }
                 )
                 reference_failures = []
+                required_pool_cases = {
+                    (member["member"], window, repetition)
+                    for member in problem.get("members", [])
+                    for window in ([args.window] if args.window is not None else [3, 5])
+                    if (member["member"], window) in full_controls
+                    for repetition in range(1 if single_attempt else 3)
+                }
+                observed_pool_cases = {}
                 while True:
                     result = receive()
                     if accept_restart(result):
@@ -768,10 +834,44 @@ def main() -> None:
                             reference_failures.append(
                                 (result["member"], result["window"], result["repetition"])
                             )
+                    if args.full_pool_log and result["event"] == "sample":
+                        control = full_controls.get((result["member"], result["window"]))
+                        comparison = (
+                            compare_full_pool_answer(
+                                result["reply"]["answer"], control, problem["document"]
+                            )
+                            if control is not None and result["completed"]
+                            else {"compared": False, "reason": "reduced answer incomplete"}
+                            if control is not None
+                            else {"compared": False, "reason": "no completed unreduced answer"}
+                        )
+                        if control is not None:
+                            key = result["member"], result["window"], result["repetition"]
+                            if key in observed_pool_cases:
+                                raise RuntimeError("Repeated pool-parity case in the sample stream")
+                            observed_pool_cases[key] = (
+                                "passed"
+                                if comparison.get("passed") is True
+                                else "different"
+                                if result["completed"]
+                                else "incomplete"
+                            )
+                        emit(
+                            {
+                                "event": "pool_parity_check",
+                                "member": result["member"],
+                                "window": result["window"],
+                                "repetition": result["repetition"],
+                                **comparison,
+                            }
+                        )
+                        if comparison.get("passed") is False:
+                            reference_failures.append(
+                                (result["member"], result["window"], result["repetition"])
+                            )
                     if (
                         args.audit_only
                         and result["event"] == "sample"
-                        and result["completed"]
                         and result.get("model_sha256") != result["expected_model_sha256"]
                     ):
                         raise RuntimeError(
@@ -795,8 +895,14 @@ def main() -> None:
                                 assert week["transfers_out"] == expected["transfers_out"]
                     if result["event"] == "measured":
                         break
+                coverage = None
+                if args.full_pool_log:
+                    coverage = parity_coverage(required_pool_cases, observed_pool_cases)
+                    emit({"event": "pool_parity_summary", **coverage})
                 if reference_failures:
                     raise RuntimeError(f"Numeric reference parity failed: {reference_failures}")
+                if coverage is not None and not coverage["passed"]:
+                    raise RuntimeError("Full/reduced parity coverage is incomplete or different")
                 if args.cpu_throttling == "cdp" and args.runtime == "throttled":
                     cdp_rate(1)
         except Exception as error:

@@ -2,6 +2,14 @@
 import type { DevicePlanDocument, DevicePlanEntry } from "../types";
 import { DevicePlanRefused } from "../solve/week";
 import { row, term, type LpProblem, type LpTerm } from "./problem";
+import { reduceHorizonPool } from "./reduce";
+
+export type HorizonPoolMode = "reduced" | "full";
+
+export interface HorizonProblem extends LpProblem {
+  /** Full-document indices: neither variable ids nor lexicographic ranks are compacted. */
+  playerIndices: number[];
+}
 
 export interface HorizonPlayer {
   id: number;
@@ -94,13 +102,14 @@ export function horizonObjective(
   document: DevicePlanDocument,
   inputs: HorizonInputs,
   window: 3 | 5,
+  indices: readonly number[] = document.players.map((_, i) => i),
 ): LpTerm[] {
   return inputs.weeks.slice(0, window).flatMap((week, w) => {
     const players = new Map(week.players.map((player) => [player.id, player]));
     return [
-      ...document.players.flatMap((player, i) =>
+      ...indices.flatMap((i) =>
         players
-          .get(player.id)!
+          .get(document.players[i]!.id)!
           .coefficients.map((coefficient, family) =>
             term(
               coefficient * week.discount_weight,
@@ -114,9 +123,14 @@ export function horizonObjective(
 }
 
 /** Captain, starters, squad rank sums are the server's three ordered tie-break tiers. */
-export function horizonRanks(count: number, window: number, family: "s" | "x" | "c"): LpTerm[] {
+export function horizonRanks(
+  count: number,
+  window: number,
+  family: "s" | "x" | "c",
+  indices: readonly number[] = Array.from({ length: count }, (_, i) => i),
+): LpTerm[] {
   return Array.from({ length: window }, (_, w) =>
-    Array.from({ length: count }, (_, i) => term(w * count + i, horizonVariable(family, w, i))),
+    indices.map((i) => term(w * count + i, horizonVariable(family, w, i))),
   ).flat();
 }
 
@@ -124,7 +138,8 @@ export function horizonProblem(
   document: DevicePlanDocument,
   entry: DevicePlanEntry,
   window: 3 | 5,
-): LpProblem {
+  poolMode: HorizonPoolMode = "reduced",
+): HorizonProblem {
   const inputs = horizonInputs(document, window);
   const { players, rules } = document;
   const held = new Set(entry.held);
@@ -139,9 +154,15 @@ export function horizonProblem(
     entry.held.some((id) => !Number.isSafeInteger(entry.sell_tenths[String(id)]))
   )
     return fail();
-  const problem: LpProblem = {
+  const indices =
+    poolMode === "full"
+      ? players.map((_, i) => i)
+      : reduceHorizonPool(document, entry, inputs, window).indices;
+  const active = new Set(indices);
+  const problem: HorizonProblem = {
+    playerIndices: indices,
     sense: "Maximize",
-    objective: horizonObjective(document, inputs, window),
+    objective: horizonObjective(document, inputs, window, indices),
     rows: [],
     binaries: [],
     generals: [],
@@ -159,7 +180,6 @@ export function horizonProblem(
   );
   for (let w = 0; w < window; w += 1) {
     const v = (family: string, i?: number) => horizonVariable(family, w, i);
-    const indices = players.map((_, i) => i);
     const family = (prefix: string) => indices.map((i) => v(prefix, i));
     for (const prefix of ["s", "x", "c", "i", "o"]) problem.binaries.push(...family(prefix));
     problem.binaries.push(v("z"), v("p"), v("k"));
@@ -201,6 +221,7 @@ export function horizonProblem(
     const bank: LpTerm[] = [term(1, v("b"))];
     if (w > 0) bank.push(term(-1, horizonVariable("b", w - 1)));
     players.forEach((player, i) => {
+      if (!active.has(i)) return;
       const original = held.has(player.id);
       const prior = w > 0 ? [term(-1, horizonVariable("s", w - 1, i))] : [];
       add(

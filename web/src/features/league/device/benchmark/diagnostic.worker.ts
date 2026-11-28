@@ -6,6 +6,9 @@ import { withinCeiling } from "../solve/ceiling";
 import { kernel, probe } from "./kernel";
 import type { LpSolver } from "../lp/problem";
 import type { DevicePlanReply } from "../replies";
+import { horizonProblem } from "../lp/horizon";
+import { lpText } from "../lp/problem";
+import { inSolverOrder } from "../solve/week";
 
 const loaded = await highs();
 self.postMessage({ kind: "loaded" });
@@ -13,11 +16,26 @@ self.onmessage = async (
   event: MessageEvent<
     | { kind: "probe"; count: number; warmup: number }
     | { kind: "solve"; request: DevicePlanRequest; audit?: boolean }
+    | { kind: "fingerprint"; request: DevicePlanRequest }
   >,
 ) => {
   if (event.data.kind === "probe") {
     kernel(event.data.warmup);
     self.postMessage({ kind: "probe", ...probe(event.data.count) });
+    return;
+  }
+  if (event.data.kind === "fingerprint") {
+    const request = event.data.request;
+    const text = lpText(
+      horizonProblem(inSolverOrder(request.document), request.entry, request.window as 3 | 5),
+    );
+    const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    self.postMessage({
+      kind: "model",
+      sha256: Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join(
+        "",
+      ),
+    });
     return;
   }
   // Only diagnostics get 300 seconds to distinguish a slow proof from a 60s refusal.

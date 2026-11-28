@@ -1,5 +1,11 @@
 /** A proved plain H3/H5 plan and its weekly squads, moves and resources. */
-import { horizonInputs, horizonProblem, horizonRanks, horizonVariable } from "../lp/horizon";
+import {
+  horizonInputs,
+  horizonProblem,
+  horizonRanks,
+  horizonVariable,
+  type HorizonPoolMode,
+} from "../lp/horizon";
 import { chosenIds, EXACT, lpText, row, type LpSolver, type Solution } from "../lp/problem";
 import { checkedColumns, valueOf } from "../priorityWitness";
 import { orderedBench, viceCaptain } from "../publication/rows";
@@ -45,16 +51,19 @@ export function solveHorizon(
   entry: DevicePlanEntry,
   window: 3 | 5,
   now: () => number = () => performance.now(),
+  poolMode: HorizonPoolMode = "reduced",
 ): DeviceHorizonAnswer {
   const started = now();
   const document = inSolverOrder(published);
   const inputs = horizonInputs(document, window);
-  const problem = horizonProblem(document, entry, window);
+  // Only the horizon LP is reduced. Reporting, hold value and attributed moves
+  // continue to use the complete solver-order document below.
+  const problem = horizonProblem(document, entry, window, poolMode);
   let solution = proved(solver, problem, "plan");
   const primary = valueOf(problem.objective, solution.Columns);
   const fixed = [row("primary_optimum", problem.objective, "=", primary)];
   for (const family of ["c", "x", "s"] as const) {
-    const objective = horizonRanks(document.players.length, window, family);
+    const objective = horizonRanks(document.players.length, window, family, problem.playerIndices);
     solution = proved(
       solver,
       { ...problem, sense: "Minimize", objective, rows: [...problem.rows, ...fixed] },

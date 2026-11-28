@@ -31,9 +31,40 @@ describe.skipIf(process.env.SQUADOPT_DEVICE_SCALE_PARITY !== "1")(
             member.entry,
             window,
           );
+          const full = solveHorizon(
+            withinCeiling(solver, 300),
+            fixture.document as unknown as DevicePlanDocument,
+            member.entry,
+            window,
+            undefined,
+            "full",
+          );
           const reference = member.reference[String(window) as "3" | "5"];
           expect(answer.objective_scaled).toBe(reference.objective_scaled);
           expect(Math.abs(answer.objective - reference.objective)).toBeLessThanOrEqual(1e-6);
-        }, 315_000);
+          expect(answer.objective_scaled).toBe(full.objective_scaled);
+          expect(Math.abs(answer.objective - full.objective)).toBeLessThanOrEqual(1e-6);
+          const rank = new Map(fixture.document.players.map((player, index) => [player.id, index]));
+          const tiers = (weeks: typeof answer.plan_weeks) => [
+            weeks.reduce((sum, week) => sum + rank.get(week.captain)!, 0),
+            weeks.reduce(
+              (sum, week) => sum + week.starting_xi.reduce((s, id) => s + rank.get(id)!, 0),
+              0,
+            ),
+            weeks.reduce(
+              (sum, week) => sum + week.squad.reduce((s, id) => s + rank.get(id)!, 0),
+              0,
+            ),
+          ];
+          expect(tiers(answer.plan_weeks)).toEqual(tiers(full.plan_weeks));
+          if ((reference as { unique_moves?: boolean | null }).unique_moves === true)
+            for (const [w, week] of answer.plan_weeks.entries()) {
+              expect(week.transfers_in).toEqual(full.plan_weeks[w]!.transfers_in);
+              expect(week.transfers_out).toEqual(full.plan_weeks[w]!.transfers_out);
+              expect(week.transfers_in).toEqual(reference.weeks[w]!.transfers_in);
+              expect(week.transfers_out).toEqual(reference.weeks[w]!.transfers_out);
+            }
+          // Two independent diagnostic300 solves, without changing either production ceiling.
+        }, 630_000);
   },
 );

@@ -234,8 +234,8 @@ def benchmark_problem(
     return {"document": document, "members": synthetic_members(document, transfers.budget_tenths)}
 
 
-def synthetic_members(document: Mapping[str, Any], budget: int) -> list[dict[str, Any]]:
-    """Three reproducible legal squads; no member endpoint or member identity is used.
+def synthetic_squad_path(document: Mapping[str, Any], budget: int) -> list[list[int]]:
+    """Reproducible legal squad path; no endpoint or solve timing is used.
 
     Start with the cheapest eligible player of each required position, respecting club
     caps. Then apply the largest positive raw-points upgrade that preserves every rule.
@@ -290,6 +290,13 @@ def synthetic_members(document: Mapping[str, Any], budget: int) -> list[dict[str
         trace.append(sorted(held))
     if len(trace) < 3:
         raise PublishedHorizonReplayError("The pool cannot produce three different squad shapes.")
+    return trace
+
+
+def synthetic_members(document: Mapping[str, Any], budget: int) -> list[dict[str, Any]]:
+    """The original three-member cohort, unchanged for historical replay hashes."""
+    trace = synthetic_squad_path(document, budget)
+    by_id = {player["id"]: player for player in document["players"]}
     members = []
     for free, roster in zip((0, 1, 5), (trace[0], trace[len(trace) // 2], trace[-1]), strict=True):
         bank = budget - sum(by_id[identifier]["buy_tenths"] for identifier in roster)
@@ -310,6 +317,46 @@ def synthetic_members(document: Mapping[str, Any], budget: int) -> list[dict[str
             }
         )
     return members
+
+
+def five_shape_members(
+    document: Mapping[str, Any], budget: int, free_transfers: int
+) -> list[dict[str, Any]]:
+    """Five fixed structural quantiles, selected before any horizon solve runs.
+
+    Deduplicate the roster constructor's path by (bank, club spread), then take
+    its endpoints and quarter points. No time/answer/admission result is an input.
+    The same five squads are used for every requested FT group and both windows.
+    """
+    by_id = {player["id"]: player for player in document["players"]}
+    trace = synthetic_squad_path(document, budget)
+    shapes = []
+    seen = set()
+    for roster in trace:
+        bank = budget - sum(by_id[identifier]["buy_tenths"] for identifier in roster)
+        clubs = Counter(by_id[identifier]["team"] for identifier in roster)
+        shape = (bank, tuple(sorted(clubs.values())))
+        if shape not in seen:
+            shapes.append((roster, bank))
+            seen.add(shape)
+    if len(shapes) < 5:
+        raise PublishedHorizonReplayError("The pool does not provide five structural shapes.")
+    selected = [shapes[round(part * (len(shapes) - 1) / 4)] for part in range(5)]
+    return [
+        {
+            "member": f"synthetic-ft{free_transfers}-shape{index + 1}",
+            "entry": {
+                "held": roster,
+                "bank_tenths": bank,
+                "free_transfers": free_transfers,
+                "sell_tenths": {
+                    str(identifier): by_id[identifier]["buy_tenths"] for identifier in roster
+                },
+                "horizon": {"windows": [3, 5]},
+            },
+        }
+        for index, (roster, bank) in enumerate(selected)
+    ]
 
 
 def main() -> None:

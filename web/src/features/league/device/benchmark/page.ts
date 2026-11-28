@@ -29,6 +29,14 @@ async function workerProbe(count: number, warmup: number) {
 const benchmark = {
   ready: workerReady,
   readyMain: () => highs().then(() => undefined),
+  async fingerprint(request: DevicePlanRequest) {
+    await workerReady();
+    return new Promise<string>((resolve, reject) => {
+      worker.onmessage = ({ data }) => resolve(data.sha256);
+      worker.onerror = () => reject(new Error("Worker model fingerprint failed"));
+      worker.postMessage({ kind: "fingerprint", request });
+    });
+  },
   async calibrate(count: number, repeats: number) {
     await Promise.all([workerReady(), highs()]);
     // Long warmup in both contexts before the repeated long CPU-only kernel.
