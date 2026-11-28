@@ -1,9 +1,8 @@
 /**
- * The device's clock rule, as the server's (`application/advice.py`,
- * `WINDOW_WALL_CEILING_SECONDS`): a ceiling is a safety stop, never a budget. A solve the
- * clock stops is not proved, and an unproved solve is refused (`DevicePlanRefused`),
- * never shown, as the server refuses a plan its ceiling cut short rather than publish one
- * machine's answer as though another would find it.
+ * The device's own clock rule: a ceiling is a safety stop, never a search budget. The
+ * server's window phase ceiling is separately configured in `application/advice.py`.
+ * A solve stopped by the clock is unproved and refused (`DevicePlanRefused`).
+ * Only proved device answers are shown.
  */
 
 import type { LpSolver } from "../lp/problem";
@@ -18,6 +17,8 @@ import type { LpSolver } from "../lp/problem";
  * far slower than any measured one, or on a solve that has stopped making progress.
  */
 export const DEVICE_SOLVE_CEILING_SECONDS = 120;
+/** H3/H5 must prove the complete window inside one minute on the measured fixtures. */
+export const DEVICE_HORIZON_SOLVE_CEILING_SECONDS = 60;
 export const DEVICE_ALTERNATIVE_SECONDS = 15;
 
 /** How long the page waits for the solver to load before the ceiling starts. */

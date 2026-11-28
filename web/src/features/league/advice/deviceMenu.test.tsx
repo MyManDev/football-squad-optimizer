@@ -32,6 +32,7 @@ const SQUAD: EntrySquad = {
     free_transfers: 1,
     sell_tenths: {},
     top100_weights: [20],
+    horizon: { windows: [3, 5] },
   },
   chips: {
     known: true,
@@ -214,6 +215,170 @@ describe("the device menu without published chip answers", () => {
       "3xc",
     );
     expect(triple).toBeChecked();
+  });
+});
+
+describe("plain device horizons beside the one-week strategies", () => {
+  const SERVICE: AdviceCapabilities = {
+    leagueId: DEVICE_INDEX.league_id,
+    captureSnapshotId: "device-menu-capture",
+    season: SQUAD.season,
+    gameweek: SQUAD.gameweek,
+    strategies: {
+      "saf-puan": { windows: [1, 3, 5], requiresRival: false },
+      "ortak-koru": { windows: [1], requiresRival: true },
+      "fark-yarat": { windows: [1], requiresRival: true },
+    },
+    top100Weights: [0, 20],
+    managersWord: false,
+  };
+  function Location() {
+    return <output data-testid="horizon-location">{useLocation().search}</output>;
+  }
+
+  function mount(query: string, capabilities: AdviceCapabilities | null = null) {
+    return render(
+      <LanguageProvider initialLanguage="en">
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${query}`]}>
+          <MemberDecisionControls
+            entryId={ENTRY}
+            members={MEMBERS}
+            index={DEVICE_INDEX}
+            capabilities={capabilities}
+            onDevice={deviceComputable(SQUAD, MEMBERS, READS)}
+          />
+          <Location />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+  }
+
+  function enabledWindows() {
+    return Array.from(document.querySelectorAll<HTMLInputElement>('input[name="window"]'))
+      .filter((input) => !input.disabled)
+      .map((input) => input.value);
+  }
+
+  it.each([3, 5])(
+    "keeps service H%i and its supported weight without offering a device solve",
+    (window) => {
+      mount(`mode=saf-puan&window=${window}`, SERVICE);
+      expect(enabledWindows()).toEqual(["1", "3", "5"]);
+      expect(
+        document.querySelector<HTMLInputElement>('input[name="chip"][value="3xc"]'),
+      ).toBeDisabled();
+      const weighted = document.querySelector<HTMLInputElement>(
+        'input[name="top100"][value="20"]',
+      )!;
+      expect(weighted).toBeEnabled();
+      fireEvent.click(weighted);
+      const params = new URLSearchParams(screen.getByTestId("horizon-location").textContent!);
+      const selected = resolvePublishedAdvice(
+        params,
+        SQUAD.league_id,
+        ENTRY,
+        MEMBERS,
+        DEVICE_INDEX,
+        undefined,
+        SERVICE,
+        DEVICE,
+      );
+      const request = deviceRequestFor(selected);
+      expect(request.window).toBe(window);
+      expect(request.top100Weight).toBe(20);
+      expect(deviceSelection(request, SQUAD)).toBeNull();
+    },
+  );
+
+  it("offers H1 when only slow horizon inputs exist and no service is available", () => {
+    mount("mode=saf-puan&window=3");
+    expect(enabledWindows()).toEqual(["1"]);
+  });
+
+  it.each(["ortak-koru", "fark-yarat"])("offers only H1 for device strategy %s", (strategy) => {
+    mount(`mode=${strategy}&rival=${RIVAL}&window=1`);
+    expect(enabledWindows()).toEqual(["1"]);
+  });
+
+  it.each(["ortak-koru", "fark-yarat"])(
+    "returns to H1 when switching an H5 plan to %s",
+    (strategy) => {
+      mount("mode=saf-puan&window=5", SERVICE);
+      fireEvent.click(
+        document.querySelector<HTMLInputElement>(`input[name="strategy"][value="${strategy}"]`)!,
+      );
+      const params = new URLSearchParams(screen.getByTestId("horizon-location").textContent!);
+      expect(params.get("mode")).toBe(strategy);
+      expect(params.get("window")).toBe("1");
+      expect(enabledWindows()).toEqual(["1"]);
+      fireEvent.click(
+        document.querySelector<HTMLInputElement>('input[name="strategy"][value="saf-puan"]')!,
+      );
+      expect(enabledWindows()).toEqual(["1", "3", "5"]);
+      fireEvent.click(document.querySelector<HTMLInputElement>('input[name="window"][value="3"]')!);
+      expect(
+        new URLSearchParams(screen.getByTestId("horizon-location").textContent!).get("window"),
+      ).toBe("3");
+    },
+  );
+
+  it.each(["chip", "top100"])(
+    "returns from an H1 device %s choice to a service H5 plan",
+    (control) => {
+      mount("mode=saf-puan&window=3", SERVICE);
+      fireEvent.click(document.querySelector<HTMLInputElement>('input[name="window"][value="1"]')!);
+      const chosen = control === "chip" ? "3xc" : "20";
+      const cleared = control === "chip" ? "" : "0";
+      fireEvent.click(
+        document.querySelector<HTMLInputElement>(`input[name="${control}"][value="${chosen}"]`)!,
+      );
+      let params = new URLSearchParams(screen.getByTestId("horizon-location").textContent!);
+      expect(params.get("window")).toBe("1");
+      const selected = resolvePublishedAdvice(
+        params,
+        SQUAD.league_id,
+        ENTRY,
+        MEMBERS,
+        DEVICE_INDEX,
+        undefined,
+        SERVICE,
+        DEVICE,
+      );
+      expect(deviceSelection(deviceRequestFor(selected), SQUAD)?.kind).toBe(
+        control === "chip" ? "chip" : "top100",
+      );
+      fireEvent.click(
+        document.querySelector<HTMLInputElement>(`input[name="${control}"][value="${cleared}"]`)!,
+      );
+      fireEvent.click(document.querySelector<HTMLInputElement>('input[name="window"][value="5"]')!);
+      params = new URLSearchParams(screen.getByTestId("horizon-location").textContent!);
+      const plain = resolvePublishedAdvice(
+        params,
+        SQUAD.league_id,
+        ENTRY,
+        MEMBERS,
+        DEVICE_INDEX,
+        undefined,
+        SERVICE,
+        DEVICE,
+      );
+      expect(plain.request.window).toBe(5);
+      expect(plain.computable?.windows).toContain(5);
+      expect(deviceSelection(deviceRequestFor(plain), SQUAD)).toBeNull();
+    },
+  );
+
+  it("keeps longer rival windows that the service itself supports", () => {
+    mount(`mode=ortak-koru&rival=${RIVAL}&window=3`, {
+      leagueId: DEVICE_INDEX.league_id,
+      captureSnapshotId: "device-menu-capture",
+      season: SQUAD.season,
+      gameweek: SQUAD.gameweek,
+      strategies: { "ortak-koru": { windows: [1, 3], requiresRival: true } },
+      top100Weights: [0],
+      managersWord: false,
+    });
+    expect(enabledWindows()).toEqual(["1", "3"]);
   });
 });
 

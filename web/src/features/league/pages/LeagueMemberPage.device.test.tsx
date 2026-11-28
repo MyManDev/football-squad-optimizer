@@ -250,7 +250,16 @@ describe("the device solve on the member page", () => {
     renderView(squadWith(null));
     expect(deviceButton()).toBeNull();
     cleanup();
-    renderView(squadWith(entryBlock), "mode=saf-puan&window=3");
+    for (const window of [3, 5]) {
+      renderView(
+        squadWith({ ...entryBlock, horizon: { windows: [3, 5] } }),
+        `mode=saf-puan&window=${window}`,
+      );
+      expect(deviceButton()).toBeNull();
+      cleanup();
+    }
+    cleanup();
+    renderView(squadWith(entryBlock), "mode=saf-puan&window=3&model=football");
     expect(deviceButton()).toBeNull();
   });
 

@@ -31,6 +31,7 @@ import {
   DEVICE_LOAD_ALLOWANCE_SECONDS,
   DEVICE_REPLY_GRACE_SECONDS,
   DEVICE_SOLVE_CEILING_SECONDS,
+  DEVICE_HORIZON_SOLVE_CEILING_SECONDS,
 } from "./solve/ceiling";
 import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
 import { offeredDeviceSelection, rivalFromSquad } from "./selection";
@@ -50,7 +51,7 @@ import {
  */
 export interface DeviceProgress {
   /** The stage under way. */
-  step: "inputs" | "solver" | "plan" | "chips";
+  step: "inputs" | "solver" | "plan" | "horizon" | "chips";
   /** Stages finished, of `total`. */
   done: number;
   total: number | null;
@@ -506,9 +507,21 @@ export function useDevicePlan(
             ready = true;
             timing.mark("ready");
             timing.measure("load", "posted", "ready");
-            if (pending.current?.settle === settle) watch(DEVICE_SOLVE_CEILING_SECONDS);
+            if (pending.current?.settle === settle)
+              watch(
+                selection.kind === "horizon"
+                  ? DEVICE_HORIZON_SOLVE_CEILING_SECONDS
+                  : DEVICE_SOLVE_CEILING_SECONDS,
+              );
             if (alive()) {
-              setState({ phase: "solving", progress: { step: "plan", done: 2, total } });
+              setState({
+                phase: "solving",
+                progress: {
+                  step: selection.kind === "horizon" ? "horizon" : "plan",
+                  done: 2,
+                  total,
+                },
+              });
             }
             return;
           }
@@ -549,6 +562,7 @@ export function useDevicePlan(
             id: run,
             document,
             entry,
+            ...(selection.kind === "horizon" ? { window: selection.window } : {}),
             ...(request.preferences ? { preferences: request.preferences } : {}),
             chip,
             strategy,

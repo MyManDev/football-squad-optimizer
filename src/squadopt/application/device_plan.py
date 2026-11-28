@@ -24,7 +24,9 @@ the server uses, not a description of them.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import logging
+from collections.abc import Callable, Mapping
+from decimal import Decimal
 from typing import Any, Final
 
 from squadopt.application.strategies.catalog import STRATEGY_CATALOG
@@ -41,15 +43,23 @@ from squadopt.live.transfers import (
     MemberPlanningInputs,
     member_planning_inputs,
     member_planning_policy,
+    member_window_policy,
 )
 from squadopt.optimization import OptimizationConfig
-from squadopt.optimization.coefficients import objective_coefficients, scale_expected_points
+from squadopt.optimization.coefficients import (
+    objective_coefficients,
+    round_half_up,
+    scale_expected_points,
+)
+from squadopt.planning import ProjectionHorizon, TransferPlanningValidationError
 from squadopt.prediction.elite_evidence import ELITE_COHORT_SIZE
 
 DEVICE_PLAN_CONTRACT_VERSION: Final = "league_device_plan_v1"
 #: The per-capture table: one document per capture, no league in it.
 DEVICE_PLAN_TABLE_CONTRACT_VERSION: Final = "league_device_plan_v2"
+DEVICE_PLAN_HORIZON_CONTRACT_VERSION: Final = "league_device_horizon_v1"
 DEVICE_PLAN_DOCUMENT: Final = DEVICE_PLAN_FILE
+_LOG: Final = logging.getLogger(__name__)
 
 
 def device_plan_table(
@@ -60,6 +70,7 @@ def device_plan_table(
     league_id: int,
     optimization: OptimizationConfig | None = None,
     top100: Top100Counts | None = None,
+    horizon: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """The capture's table and rules, as the member path's solver receives them.
 
@@ -84,6 +95,7 @@ def device_plan_table(
         "contract_version": DEVICE_PLAN_CONTRACT_VERSION,
         "league_id": int(league_id),
         **body,
+        **({"horizon": dict(horizon)} if horizon is not None else {}),
     }
 
 
@@ -95,6 +107,7 @@ def device_plan_capture_table(
     bootstrap: bytes,
     optimization: OptimizationConfig | None = None,
     top100: Top100Counts | None = None,
+    horizon: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """The capture's table once for every league of the run (contract v2).
 
@@ -154,7 +167,107 @@ def device_plan_capture_table(
         **{key: value for key, value in body.items() if key not in ("rules", "players")},
         "rules": body_rules,
         "players": players,
+        **({"horizon": dict(horizon)} if horizon is not None else {}),
     }
+
+
+def device_plan_horizon(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    builder: Callable[[tuple[int, ...]], ProjectionHorizon] | None,
+    *,
+    optimization: OptimizationConfig | None = None,
+) -> dict[str, object] | None:
+    """An additive, versioned horizon beside the unchanged one-week document.
+
+    Reuse the server's captured-calendar builder, never extrapolate from the device's
+    one-week points. A capture without a valid future calendar retains its one-week
+    inputs. The longest complete supported window carries all shorter windows too.
+    """
+
+    if builder is None:
+        return None
+    first = int(inputs.deadline.gameweek)
+    windows = [
+        length
+        for length in (3, 5)
+        if set(range(first, first + length)).issubset(inputs.published_gameweeks)
+    ]
+    if not windows:
+        return None
+    try:
+        horizon = builder(tuple(range(first, first + windows[-1])))
+        horizon.assert_fingerprint()
+    except (DataSourceError, TransferPlanningValidationError):
+        # A missing/invalid future calendar must not take away the published H1 plan.
+        _log_unavailable_horizon("the captured calendar or projection is invalid")
+        return None
+    if horizon.season != inputs.season or horizon.source_snapshot_id != inputs.snapshot_id:
+        _log_unavailable_horizon("the projection belongs to another season or capture")
+        return None
+    settings = OptimizationConfig() if optimization is None else optimization
+    policy = member_window_policy(rules, gameweek=first, transfer_cap=1, weeks=windows[-1])
+    initial = sort_players_by_id(projection.table)
+    weeks: list[dict[str, object]] = []
+    for offset, gameweek in enumerate(horizon.target_gameweeks):
+        table = sort_players_by_id(horizon.table.loc[horizon.table.gameweek.eq(gameweek)])
+        if table.player_id.tolist() != initial.player_id.tolist():
+            _log_unavailable_horizon("the projection has a different player universe")
+            return None
+        for field in ("name", "team_id", "position", "price_tenths"):
+            if table[field].tolist() != initial[field].tolist():
+                _log_unavailable_horizon(f"the projection changes captured {field}")
+                return None
+        if offset == 0 and table.expected_points.tolist() != initial.expected_points.tolist():
+            _log_unavailable_horizon("the projection changes the one-week points")
+            return None
+        coefficients = objective_coefficients(table.expected_points.tolist(), settings)
+        weeks.append(
+            {
+                "gameweek": gameweek,
+                "discount_weight": round_half_up(
+                    Decimal(str(policy.horizon_discount_factor)) ** offset
+                    * policy.objective_weight_scale
+                ),
+                "players": [
+                    {
+                        "id": int(str(row.player_id)),
+                        "buy_tenths": int(str(row.price_tenths)),
+                        "expected_points": float(str(row.expected_points)),
+                        "coefficients": list(coefficients[index]),
+                        **(
+                            {"appearance_probability": float(str(row.appearance_probability))}
+                            if hasattr(row, "appearance_probability")
+                            else {}
+                        ),
+                    }
+                    for index, row in enumerate(table.itertuples(index=False))
+                ],
+            }
+        )
+    return {
+        "contract_version": DEVICE_PLAN_HORIZON_CONTRACT_VERSION,
+        "windows": windows,
+        "projection_horizon_fingerprint": horizon.horizon_fingerprint,
+        "post_processing_contract_version": horizon.post_processing_contract_version,
+        "rules": {
+            "max_transfers_per_gameweek": policy.max_transfers_per_gameweek,
+            "free_transfer_accrual": policy.free_transfer_accrual,
+            "bench_weight": settings.bench_weight,
+            "objective_weight_scale": policy.objective_weight_scale,
+            "horizon_discount_factor": policy.horizon_discount_factor,
+            "banked_transfer_value_scaled": scale_expected_points(
+                policy.banked_transfer_value_points, settings.expected_points_scale
+            ),
+            "acquisition_sell_on_fee": float(rules.transfers.sell_on_fee),
+        },
+        "weeks": weeks,
+    }
+
+
+def _log_unavailable_horizon(reason: str) -> None:
+    _LOG.warning("Skipping device horizon: %s. The one-week inputs are unchanged.", reason)
 
 
 _V1_PLAYER_KEYS: Final = ("id", "name", "short_name", "team", "position", "buy_tenths")
@@ -283,6 +396,7 @@ def device_plan_entry(
     rules: SeasonRules,
     *,
     top100: Top100Counts | None = None,
+    horizon: Mapping[str, object] | None = None,
 ) -> dict[str, object] | None:
     """One member's side of the problem, or ``None`` where the live path would not plan.
 
@@ -299,10 +413,16 @@ def device_plan_entry(
         return None
     sell: Mapping[int, int] = prepared.sell_prices_tenths
     weights = [weight for weight in TOP100_WEIGHTS if weight != 0]
+    windows = None if horizon is None else horizon.get("windows")
     return {
         # The weights the shared document carries this week, so a page can offer them
         # before it reads the document; none where the week has no counts.
         **({} if top100 is None else {"top100_weights": weights}),
+        **(
+            {"horizon": {"windows": [window for window in (3, 5) if window in windows]}}
+            if isinstance(windows, (list, tuple))
+            else {}
+        ),
         "held": [int(player) for player in held.squad_player_ids],
         "bank_tenths": int(prepared.bank_tenths),
         "free_transfers": int(prepared.free_transfers),

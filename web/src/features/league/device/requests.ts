@@ -12,6 +12,7 @@ import { orderedBench, viceCaptain } from "./publication/rows";
 import { solveChipGains } from "./chipForecast/gains";
 import type { LpSolver } from "./lp/problem";
 import { DevicePlanRefused, solvePlan } from "./solve/week";
+import { solveHorizon } from "./solve/horizon";
 import { gainVsNoChip, weekPoints } from "./strategies/chips";
 import { solveRival } from "./strategies/rival";
 import { solveRivalWithTop100, solveTop100 } from "./strategies/top100";
@@ -25,6 +26,8 @@ import type {
 } from "./types";
 
 export interface DevicePlanRequest {
+  /** Longer windows are available only for the plain points plan. */
+  window?: 1 | 3 | 5;
   priorityMain?: true;
   priorityReference?: DevicePriorityReference;
   preferenceBundle?: PreferenceBundle;
@@ -60,6 +63,7 @@ export function solveRequest(
   {
     document,
     entry,
+    window = 1,
     chip = null,
     strategy = null,
     top100Weight = 0,
@@ -74,6 +78,22 @@ export function solveRequest(
   onPlan?: (plan: DevicePlanAnswer) => void,
   onChip?: (done: number, total: number) => void,
 ): DevicePlanAnswer {
+  if (window !== 1) {
+    if (
+      (window !== 3 && window !== 5) ||
+      chip !== null ||
+      strategy !== null ||
+      top100Weight !== 0 ||
+      chipGains.length > 0 ||
+      preferences ||
+      preferenceBundle ||
+      alternatives ||
+      priorityReference ||
+      priorityMain
+    )
+      throw new DevicePlanRefused("unsupported horizon selection", "plan");
+    return solveHorizon(solver, document, entry, window, now);
+  }
   if (preferenceBundle) {
     if (
       alternatives ||
