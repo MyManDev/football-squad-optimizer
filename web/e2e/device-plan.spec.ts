@@ -718,6 +718,8 @@ async function runHorizon(page: Page, data: HorizonFixture, memberIndex: number,
     /^deviceSolver\.worker-.*\.js$/.test(name),
   );
   expect(asset).toBeDefined();
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
   const reply = await page.evaluate(
     async ({ url, document, entry, window }) => {
       return await new Promise<DevicePlanReply>((resolve, reject) => {
@@ -742,6 +744,8 @@ async function runHorizon(page: Page, data: HorizonFixture, memberIndex: number,
     },
     { url: `/assets/${asset}`, document: data.document, entry: member.entry, window },
   );
+  const origin = new URL(page.url()).origin;
+  expect(requests.filter((url) => new URL(url).origin !== origin)).toEqual([]);
   expect(reply.kind).toBe("answer");
   if (reply.kind !== "answer") throw new Error("No proved numeric worker answer");
   const reference = member.reference?.[String(window)];
