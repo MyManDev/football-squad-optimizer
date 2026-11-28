@@ -1,6 +1,7 @@
 /**
- * The device's clock rule, as the server's (`application/advice.py`,
- * `WINDOW_WALL_CEILING_SECONDS`): a ceiling is a safety stop, never a budget. A solve the
+ * The device's own clock rule: a ceiling is a safety stop, never a search budget. The
+ * server's window phase ceiling is separately configured in `application/advice.py`.
+ * A solve the
  * clock stops is not proved, and an unproved solve is refused (`DevicePlanRefused`),
  * never shown, as the server refuses a plan its ceiling cut short rather than publish one
  * machine's answer as though another would find it.

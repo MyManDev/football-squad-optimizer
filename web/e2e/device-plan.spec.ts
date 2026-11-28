@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { readdirSync } from "node:fs";
+import type { DevicePlanReply } from "../src/features/league/device/replies";
+import type { DeviceHorizonAnswer } from "../src/features/league/device/solve/horizon";
 
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
@@ -634,7 +637,19 @@ test("a table whose bytes are not the ones its line names falls back to the tree
 
 interface HorizonFixture {
   document: DevicePlanDocument;
-  members: Array<{ entry_id: number; entry: DevicePlanEntry; reference?: Record<string, unknown> }>;
+  members: Array<{
+    entry_id: number;
+    entry: DevicePlanEntry;
+    reference?: Record<
+      string,
+      {
+        objective: number;
+        objective_scaled: number;
+        unique_moves?: boolean | null;
+        weeks?: Array<{ transfers_in: number[]; transfers_out: number[] }>;
+      }
+    >;
+  }>;
 }
 
 const horizonPools = [
@@ -687,41 +702,65 @@ async function runHorizon(page: Page, data: HorizonFixture, memberIndex: number,
       },
     }),
   );
-  const requests: string[] = [];
-  let pressed = false;
-  page.on("request", (request) => {
-    if (pressed) requests.push(request.url());
-  });
   await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=${window}`);
-  const button = page.getByRole("button", {
-    name: MESSAGES.en.leagueMembers.deviceButton,
-    exact: true,
-  });
-  await expect(button).toBeVisible();
-  pressed = true;
-  await button.click();
+  await expect(page.locator('input[name="window"][value="3"]')).toHaveCount(1);
   await expect(
-    page.locator(
-      "[data-device-state='done'], [data-device-state='refused'], [data-device-state='failed']",
-    ),
-  ).toBeVisible({ timeout: 80_000 });
-  const seconds = await page.evaluate(
-    () => performance.getEntriesByName("device:solve").at(-1)?.duration ?? null,
+    page.getByRole("button", {
+      name: MESSAGES.en.leagueMembers.deviceButton,
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  expect(page.workers()).toHaveLength(0);
+
+  // Exercise the actual shipped numeric worker independently of UI admission.
+  // Slow real-pool selections stay on the service; the small parity model remains testable.
+  const asset = readdirSync(new URL("../dist/assets/", import.meta.url)).find((name) =>
+    /^deviceSolver\.worker-.*\.js$/.test(name),
   );
-  await expect(page.locator("[data-device-state='done']")).toBeVisible();
-  const section = page.getByRole("region", {
-    name: MESSAGES.en.leagueMembers.windowTitle(window),
-    exact: true,
-  });
-  await expect(section.getByRole("row")).toHaveCount(window + 1);
-  const origin = new URL(page.url()).origin;
-  expect(requests.filter((url) => new URL(url).origin !== origin)).toEqual([]);
-  expect(seconds).not.toBeNull();
-  return seconds! / 1000;
+  expect(asset).toBeDefined();
+  const reply = await page.evaluate(
+    async ({ url, document, entry, window }) => {
+      return await new Promise<DevicePlanReply>((resolve, reject) => {
+        const worker = new Worker(url, { type: "module" });
+        const timeout = setTimeout(() => {
+          worker.terminate();
+          reject(new Error("The own numeric worker reached its reply ceiling"));
+        }, 75_000);
+        worker.onerror = () => {
+          clearTimeout(timeout);
+          worker.terminate();
+          reject(new Error("The own numeric worker failed"));
+        };
+        worker.onmessage = (event: MessageEvent<DevicePlanReply>) => {
+          if (!["answer", "refused", "failed"].includes(event.data.kind)) return;
+          clearTimeout(timeout);
+          worker.terminate();
+          resolve(event.data);
+        };
+        worker.postMessage({ id: 1, document, entry, window });
+      });
+    },
+    { url: `/assets/${asset}`, document: data.document, entry: member.entry, window },
+  );
+  expect(reply.kind).toBe("answer");
+  if (reply.kind !== "answer") throw new Error("No proved numeric worker answer");
+  const reference = member.reference?.[String(window)];
+  if (reference) {
+    expect(reply.answer.objective_scaled).toBe(reference.objective_scaled);
+    expect(Math.abs(reply.answer.objective - reference.objective)).toBeLessThanOrEqual(1e-6);
+    if (reference.unique_moves) {
+      const weeks = (reply.answer as DeviceHorizonAnswer).plan_weeks;
+      for (const [index, week] of weeks.entries()) {
+        expect(week.transfers_in).toEqual(reference.weeks![index]!.transfers_in);
+        expect(week.transfers_out).toEqual(reference.weeks![index]!.transfers_out);
+      }
+    }
+  }
+  return reply.answer.seconds;
 }
 
 for (const window of [3, 5] as const) {
-  test(`a plain ${window}-week plan is solved by the real device worker and shown as a service window`, async ({
+  test(`a slow ${window}-week selection leaves the device idle and its numeric worker retains parity`, async ({
     page,
   }) => {
     test.setTimeout(90_000);

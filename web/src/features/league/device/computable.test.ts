@@ -4,6 +4,7 @@ import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../../../fix
 import type { EntrySquad } from "../types";
 import { deviceComputable, deviceRivalUsable, type DeviceRivalReads } from "./computable";
 import { deviceSelection } from "./selection";
+import { deviceHorizonWindows } from "./types";
 
 const MEMBERS = mockLeagueMembersEnvelope.payload.members;
 const ENTRY = 35249001;
@@ -27,25 +28,20 @@ describe("the published horizon windows", () => {
     { title: "a late-season capture carrying H3 only", horizon: { windows: [3] }, windows: [1, 3] },
     { title: "a capture carrying H3 and H5", horizon: { windows: [3, 5] }, windows: [1, 3, 5] },
   ])(
-    "offers only the inputs in $title and leaves absent windows to the service",
+    "retains the published inputs in $title and leaves slow windows to the service",
     ({ horizon, windows }) => {
       const published = {
         ...own,
         device_plan: { ...own.device_plan!, ...(horizon ? { horizon } : {}) },
       };
-      expect(deviceComputable(published, MEMBERS, read([]))?.windows).toEqual(windows);
+      expect(deviceHorizonWindows(published.device_plan)).toEqual(windows.filter((w) => w !== 1));
+      expect(deviceComputable(published, MEMBERS, read([]))?.windows).toEqual([1]);
       for (const window of [1, 3, 5] as const) {
         const selection = deviceSelection(
           { leagueId: own.league_id, entryId: ENTRY, strategy: "saf-puan", window },
           published,
         );
-        expect(selection).toEqual(
-          windows.includes(window)
-            ? window === 1
-              ? { kind: "plain" }
-              : { kind: "horizon", window }
-            : null,
-        );
+        expect(selection).toEqual(window === 1 ? { kind: "plain" } : null);
       }
     },
   );

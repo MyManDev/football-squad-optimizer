@@ -10,7 +10,7 @@ import { withLeague } from "../../../testSupport/league";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
 import type { LpSolver } from "./lp/problem";
 import { replyTo, type DevicePlanReply } from "./replies";
-import { solveRequest, type DevicePlanRequest } from "./requests";
+import { solveRequest } from "./requests";
 import type { DevicePlanDocument } from "./types";
 import { useDevicePlan, type DeviceSolver } from "./useDevicePlan";
 
@@ -104,69 +104,47 @@ it("refuses unverified combinations before invoking the solver", () => {
 });
 
 it.each([3, 5] as const)(
-  "sends H%i with its own progress stage and no companion chips",
+  "leaves slow H%i to the service without loading a worker",
   async (window) => {
-    let posted: DevicePlanRequest | null = null;
-    const solver: DeviceSolver = {
-      onmessage: null,
-      postMessage(request) {
-        posted = request;
-        this.onmessage?.(new MessageEvent("message", { data: { id: request.id, kind: "ready" } }));
-      },
-      terminate() {},
-    };
     const member = fixture.members[1]!;
     const squad = {
       ...mockEntrySquadEnvelopes[ENTRY]!.payload,
       source_snapshot_id: document.source_snapshot_id,
       device_plan: member.entry,
     };
-    const timers: number[] = [];
+    const loadDocument = vi.fn(async () => ({
+      contract_version: "provisional_league_ui_v1" as const,
+      generated_at_utc: "2026-09-02T10:00:00Z",
+      source_kind: "live" as const,
+      payload: document,
+    }));
+    const createSolver = vi.fn(
+      () =>
+        ({
+          onmessage: null,
+          postMessage: vi.fn(),
+          terminate: vi.fn(),
+        }) satisfies DeviceSolver,
+    );
     function Harness() {
       const device = useDevicePlan(
         squad,
         { leagueId: squad.league_id, entryId: ENTRY, strategy: "saf-puan", window },
-        {
-          loadDocument: async () => ({
-            contract_version: "provisional_league_ui_v1",
-            generated_at_utc: "2026-09-02T10:00:00Z",
-            source_kind: "live",
-            payload: document,
-          }),
-          createSolver: () => solver,
-          setTimer: (_callback, milliseconds) => {
-            timers.push(milliseconds);
-            return milliseconds;
-          },
-          clearTimer: () => {},
-        },
+        { loadDocument, createSolver },
       );
       return (
         <>
           <button onClick={device.run}>run</button>
+          <output data-testid="available">{String(device.available)}</output>
           <output data-testid="phase">{device.state.phase}</output>
-          <output data-testid="progress">
-            {"progress" in device.state ? device.state.progress?.step : ""}
-          </output>
-          <output data-testid="window">
-            {device.state.phase === "done" ? device.state.envelope.payload.window : ""}
-          </output>
         </>
       );
     }
     render(withLeague(<Harness />));
     await act(async () => screen.getByText("run").click());
-    await waitFor(() => expect(screen.getByTestId("progress")).toHaveTextContent("horizon"));
-    expect(posted).toMatchObject({ window, chip: null });
-    expect(posted).not.toHaveProperty("chipGains");
-    expect(timers.at(-1)).toBe(75_000);
-    const request = posted! as DevicePlanRequest;
-    await act(async () =>
-      replyTo(highs, request, (reply) =>
-        solver.onmessage?.(new MessageEvent("message", { data: reply })),
-      ),
-    );
-    expect(screen.getByTestId("phase")).toHaveTextContent("done");
-    expect(screen.getByTestId("window")).toHaveTextContent(String(window));
+    await waitFor(() => expect(screen.getByTestId("available")).toHaveTextContent("false"));
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    expect(loadDocument).not.toHaveBeenCalled();
+    expect(createSolver).not.toHaveBeenCalled();
   },
 );

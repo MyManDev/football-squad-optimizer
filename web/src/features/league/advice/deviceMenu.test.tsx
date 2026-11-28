@@ -219,6 +219,19 @@ describe("the device menu without published chip answers", () => {
 });
 
 describe("plain device horizons beside the one-week strategies", () => {
+  const SERVICE: AdviceCapabilities = {
+    leagueId: DEVICE_INDEX.league_id,
+    captureSnapshotId: "device-menu-capture",
+    season: SQUAD.season,
+    gameweek: SQUAD.gameweek,
+    strategies: {
+      "saf-puan": { windows: [1, 3, 5], requiresRival: false },
+      "ortak-koru": { windows: [1], requiresRival: true },
+      "fark-yarat": { windows: [1], requiresRival: true },
+    },
+    top100Weights: [0, 20],
+    managersWord: false,
+  };
   function Location() {
     return <output data-testid="horizon-location">{useLocation().search}</output>;
   }
@@ -247,18 +260,40 @@ describe("plain device horizons beside the one-week strategies", () => {
   }
 
   it.each([3, 5])(
-    "offers H%i for plain points and leaves device chips and weights at H1",
+    "keeps service H%i and its supported weight without offering a device solve",
     (window) => {
-      mount(`mode=saf-puan&window=${window}`);
+      mount(`mode=saf-puan&window=${window}`, SERVICE);
       expect(enabledWindows()).toEqual(["1", "3", "5"]);
       expect(
         document.querySelector<HTMLInputElement>('input[name="chip"][value="3xc"]'),
       ).toBeDisabled();
-      expect(
-        document.querySelector<HTMLInputElement>('input[name="top100"][value="20"]'),
-      ).toBeDisabled();
+      const weighted = document.querySelector<HTMLInputElement>(
+        'input[name="top100"][value="20"]',
+      )!;
+      expect(weighted).toBeEnabled();
+      fireEvent.click(weighted);
+      const params = new URLSearchParams(screen.getByTestId("horizon-location").textContent!);
+      const selected = resolvePublishedAdvice(
+        params,
+        SQUAD.league_id,
+        ENTRY,
+        MEMBERS,
+        DEVICE_INDEX,
+        undefined,
+        SERVICE,
+        DEVICE,
+      );
+      const request = deviceRequestFor(selected);
+      expect(request.window).toBe(window);
+      expect(request.top100Weight).toBe(20);
+      expect(deviceSelection(request, SQUAD)).toBeNull();
     },
   );
+
+  it("offers H1 when only slow horizon inputs exist and no service is available", () => {
+    mount("mode=saf-puan&window=3");
+    expect(enabledWindows()).toEqual(["1"]);
+  });
 
   it.each(["ortak-koru", "fark-yarat"])("offers only H1 for device strategy %s", (strategy) => {
     mount(`mode=${strategy}&rival=${RIVAL}&window=1`);
@@ -268,7 +303,7 @@ describe("plain device horizons beside the one-week strategies", () => {
   it.each(["ortak-koru", "fark-yarat"])(
     "returns to H1 when switching an H5 plan to %s",
     (strategy) => {
-      mount("mode=saf-puan&window=5");
+      mount("mode=saf-puan&window=5", SERVICE);
       fireEvent.click(
         document.querySelector<HTMLInputElement>(`input[name="strategy"][value="${strategy}"]`)!,
       );
@@ -287,46 +322,51 @@ describe("plain device horizons beside the one-week strategies", () => {
     },
   );
 
-  it.each(["chip", "top100"])("returns from an H1 %s choice to a plain H5 plan", (control) => {
-    mount("mode=saf-puan&window=3");
-    fireEvent.click(document.querySelector<HTMLInputElement>('input[name="window"][value="1"]')!);
-    const chosen = control === "chip" ? "3xc" : "20";
-    const cleared = control === "chip" ? "" : "0";
-    fireEvent.click(
-      document.querySelector<HTMLInputElement>(`input[name="${control}"][value="${chosen}"]`)!,
-    );
-    let params = new URLSearchParams(screen.getByTestId("horizon-location").textContent!);
-    expect(params.get("window")).toBe("1");
-    const selected = resolvePublishedAdvice(
-      params,
-      SQUAD.league_id,
-      ENTRY,
-      MEMBERS,
-      DEVICE_INDEX,
-      undefined,
-      null,
-      DEVICE,
-    );
-    expect(deviceSelection(deviceRequestFor(selected), SQUAD)?.kind).toBe(
-      control === "chip" ? "chip" : "top100",
-    );
-    fireEvent.click(
-      document.querySelector<HTMLInputElement>(`input[name="${control}"][value="${cleared}"]`)!,
-    );
-    fireEvent.click(document.querySelector<HTMLInputElement>('input[name="window"][value="5"]')!);
-    params = new URLSearchParams(screen.getByTestId("horizon-location").textContent!);
-    const plain = resolvePublishedAdvice(
-      params,
-      SQUAD.league_id,
-      ENTRY,
-      MEMBERS,
-      DEVICE_INDEX,
-      undefined,
-      null,
-      DEVICE,
-    );
-    expect(deviceSelection(deviceRequestFor(plain), SQUAD)).toEqual({ kind: "horizon", window: 5 });
-  });
+  it.each(["chip", "top100"])(
+    "returns from an H1 device %s choice to a service H5 plan",
+    (control) => {
+      mount("mode=saf-puan&window=3", SERVICE);
+      fireEvent.click(document.querySelector<HTMLInputElement>('input[name="window"][value="1"]')!);
+      const chosen = control === "chip" ? "3xc" : "20";
+      const cleared = control === "chip" ? "" : "0";
+      fireEvent.click(
+        document.querySelector<HTMLInputElement>(`input[name="${control}"][value="${chosen}"]`)!,
+      );
+      let params = new URLSearchParams(screen.getByTestId("horizon-location").textContent!);
+      expect(params.get("window")).toBe("1");
+      const selected = resolvePublishedAdvice(
+        params,
+        SQUAD.league_id,
+        ENTRY,
+        MEMBERS,
+        DEVICE_INDEX,
+        undefined,
+        SERVICE,
+        DEVICE,
+      );
+      expect(deviceSelection(deviceRequestFor(selected), SQUAD)?.kind).toBe(
+        control === "chip" ? "chip" : "top100",
+      );
+      fireEvent.click(
+        document.querySelector<HTMLInputElement>(`input[name="${control}"][value="${cleared}"]`)!,
+      );
+      fireEvent.click(document.querySelector<HTMLInputElement>('input[name="window"][value="5"]')!);
+      params = new URLSearchParams(screen.getByTestId("horizon-location").textContent!);
+      const plain = resolvePublishedAdvice(
+        params,
+        SQUAD.league_id,
+        ENTRY,
+        MEMBERS,
+        DEVICE_INDEX,
+        undefined,
+        SERVICE,
+        DEVICE,
+      );
+      expect(plain.request.window).toBe(5);
+      expect(plain.computable?.windows).toContain(5);
+      expect(deviceSelection(deviceRequestFor(plain), SQUAD)).toBeNull();
+    },
+  );
 
   it("keeps longer rival windows that the service itself supports", () => {
     mount(`mode=ortak-koru&rival=${RIVAL}&window=3`, {

@@ -3,16 +3,16 @@
  * needs: the plain pure-points plan over one week; the same with a chip the member still
  * holds; a rival strategy over one week against a named rival; either plan at a
  * Top 100 weight the member block names. Nothing switched on beyond that (the club's word,
- * the football model, preferences) is the service's. Plain points alone also admits
- * three and five weeks, from the separately versioned captured horizon.
+ * the football model, preferences) is the service's. Plain points over three and five
+ * weeks require both published inputs and measured admission.
  */
 
 import type { AdviceRequest } from "../advice/adviceClient";
 import type { EntrySquad } from "../types";
+import { admittedHorizonWindows } from "./admission";
 import { oneWeekPreferences } from "./preferences";
 import { oneWeekBundle } from "./preferenceBundle";
 import {
-  deviceHorizonWindows,
   hasCompleteStartingXi,
   isDeviceChip,
   isDevicePlanEntry,
@@ -73,7 +73,7 @@ export function deviceSelection(
   if (request.window !== 1) {
     return (request.window === 3 || request.window === 5) &&
       isDevicePlanEntry(squad.device_plan) &&
-      deviceHorizonWindows(squad.device_plan).includes(request.window) &&
+      admittedHorizonWindows(squad.device_plan).includes(request.window) &&
       request.strategy === "saf-puan" &&
       (request.chip ?? null) === null &&
       (request.top100Weight ?? 0) === 0 &&
